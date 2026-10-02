@@ -11,13 +11,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
 import hivens.ui.surface.NxSurface
-import hivens.ui.surface.NxSurfaceLevel
-import hivens.ui.theme.NxTheme
 import hivens.ui.theme.Spacing
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.NxInk
+import hivens.ui.surface.SurfaceKind
 
 /**
- * One text input: a [BasicTextField] inside a sunken library surface (opaque body
- * + bevel, no wallpaper bleed) with a [placeholder] and a palette cursor. The one
+ * One text input: a [BasicTextField] inside a [SurfaceKind.Field] surface with a
+ * [placeholder] and a cursor in the theme's lead colour. The one
  * field screens compose, replacing raw `BasicTextField` + a hand-rolled background.
  * [singleLine] off makes it a multi-line area; pass height through [modifier].
  * [textStyle] null falls back to bodySmall in the primary text colour.
@@ -31,23 +32,23 @@ fun NxField(
     singleLine: Boolean = true,
     textStyle: TextStyle? = null,
 ) {
-    val ts = textStyle ?: MaterialTheme.typography.bodySmall.copy(color = NxTheme.colors.textPrimary)
     NxSurface(
-        level    = NxSurfaceLevel.Sunken,
-        blurDp   = 0f,
+        kind     = SurfaceKind.Field,
         shape    = MaterialTheme.shapes.small,
         modifier = modifier,
     ) {
+        // Inside the surface, so the ink is the one that reads on the field itself.
+        val ts = textStyle ?: MaterialTheme.typography.bodySmall.copy(color = NxInk.main)
         BasicTextField(
             value         = value,
             onValueChange = onValueChange,
             singleLine    = singleLine,
             textStyle     = ts,
-            cursorBrush   = SolidColor(NxTheme.colors.primary),
+            cursorBrush   = SolidColor(NxColor.lead()),
             modifier      = Modifier.fillMaxWidth().padding(horizontal = Spacing.s10, vertical = Spacing.s8),
         ) { inner ->
             if (value.isEmpty()) {
-                Text(placeholder, style = ts.copy(color = NxTheme.colors.textSecondary.copy(alpha = 0.6f)))
+                Text(placeholder, style = ts.copy(color = NxInk.quiet))
             }
             inner()
         }

@@ -14,21 +14,19 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import hivens.ui.icons.NxIcon
-import hivens.ui.theme.DarkColorPalette
-import hivens.ui.theme.LightColorPalette
-import hivens.ui.theme.LocalNxColors
-import hivens.ui.theme.NxColors
 import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.EncodedImageFormat
 import org.jetbrains.skia.Image
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertTrue
+import hivens.ui.theme.NxTheme
+import hivens.ui.theme.Themes
 
 /**
  * Static render sheet of the Play pill's moments (play, a wait, exit-the-game,
  * an unavailable ghost, compact, icon-only) over a dark art-like ground -- the
- * scrimmed hero the pill actually lives on -- in both palettes (the static ink
+ * scrimmed hero the pill actually lives on -- in both modes (the static ink
  * flips black/white with the theme). Smoke plus a PNG under build/render for a
  * manual look; every state on both grounds is drawn by `PlayButtonStatesProbe`
  * in client-ui, and hover/press are animated and verified live.
@@ -36,11 +34,9 @@ import kotlin.test.assertTrue
 class PlayButtonRenderTest {
 
     @OptIn(ExperimentalComposeUiApi::class)
-    private fun render(palette: NxColors, name: String) {
+    private fun render(dark: Boolean, name: String) {
         val scene = ImageComposeScene(width = 1150, height = 360, density = Density(2f)) {
-            CompositionLocalProvider(
-                LocalNxColors provides palette,
-            ) {
+            NxTheme(Themes.Celestia, dark = dark) {
                 Column(
                     modifier            = Modifier.fillMaxSize().background(Color(BACKDROP)).padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp),
@@ -76,9 +72,9 @@ class PlayButtonRenderTest {
         assertTrue(painted > MIN_PAINTED, "the sheet covers ${(painted * 100).toInt()}% of the frame -- it did not render")
     }
 
-    @Test fun `renders on the dark palette`() = render(DarkColorPalette, "dark")
+    @Test fun `renders on the dark palette`() = render(dark = true, "dark")
 
-    @Test fun `renders on the light palette`() = render(LightColorPalette, "light")
+    @Test fun `renders on the light palette`() = render(dark = false, "light")
 
 
     /** Share of sampled pixels that are not the bare backdrop the sheet sits on. */

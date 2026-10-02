@@ -47,11 +47,11 @@ import androidx.compose.ui.window.PopupProperties
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.Symbol
 import hivens.ui.surface.NxSurface
-import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.theme.Motion
-import hivens.ui.theme.NxTheme
 import hivens.ui.theme.Spacing
 import kotlin.math.roundToInt
+import hivens.ui.theme.NxInk
+import hivens.ui.surface.SurfaceKind
 
 /**
  * Where a tooltip sits relative to what raised it.
@@ -244,14 +244,8 @@ fun NxTooltip(
                         scaleOut(Motion.tap.of(), targetScale = 0.94f, transformOrigin = TransformOrigin(0f, 0f)),
                 ) {
                     NxSurface(
-                        level = NxSurfaceLevel.Floating,
-                        blurDp = 0f,
-                        // Opaque for the same reason a menu is: it floats over
-                        // arbitrary content, and a translucent body would read
-                        // whatever it happens to cover.
-                        opacity = 1f,
+                        kind = SurfaceKind.Popup,
                         shape = shape,
-                        shadowDp = 6f,
                         modifier = Modifier.hoverable(tooltipInteraction, enabled = behaviour.enterable),
                     ) {
                         Box(Modifier.widthIn(max = behaviour.maxWidth).padding(contentPadding)) { tooltip() }
@@ -295,7 +289,7 @@ fun NxTooltipLabel(text: String) {
     Text(
         text = text,
         style = MaterialTheme.typography.labelSmall,
-        color = NxTheme.colors.textPrimary,
+        color = NxInk.main,
     )
 }
 
@@ -305,7 +299,7 @@ fun NxTooltipGlyphLabel(icon: IconKey, text: String) {
     // Top, not centre: a label long enough to wrap would otherwise park the glyph
     // against the middle of the block, pointing at the gap between its lines.
     Row(verticalAlignment = Alignment.Top) {
-        Symbol(icon, contentDescription = null, tint = NxTheme.colors.textSecondary, size = 16.dp)
+        Symbol(icon, contentDescription = null, tint = NxInk.quiet, size = 16.dp)
         Spacer(Modifier.width(Spacing.s8))
         NxTooltipLabel(text)
     }
@@ -323,14 +317,14 @@ fun NxTooltipTitled(title: String, description: String, shortcut: String? = null
             Text(
                 text = title,
                 style = MaterialTheme.typography.bodyLarge,
-                color = NxTheme.colors.textPrimary,
+                color = NxInk.main,
             )
             if (shortcut != null) {
                 Spacer(Modifier.width(Spacing.s12))
                 Text(
                     text = shortcut,
                     style = MaterialTheme.typography.labelSmall,
-                    color = NxTheme.colors.textSecondary,
+                    color = NxInk.quiet,
                 )
             }
         }
@@ -338,7 +332,7 @@ fun NxTooltipTitled(title: String, description: String, shortcut: String? = null
         Text(
             text = description,
             style = MaterialTheme.typography.bodySmall,
-            color = NxTheme.colors.textSecondary,
+            color = NxInk.quiet,
         )
     }
 }
@@ -356,7 +350,7 @@ fun NxTooltipPreview(caption: String? = null, picture: @Composable () -> Unit) {
             Text(
                 text = caption,
                 style = MaterialTheme.typography.labelSmall,
-                color = NxTheme.colors.textSecondary,
+                color = NxInk.quiet,
             )
         }
     }

@@ -7,7 +7,8 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import hivens.ui.nx.NxButton
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.Status
 
 /**
  * Something failed and can be asked again: a red headline, the reason, one retry.
@@ -30,7 +31,7 @@ fun RetryStateBlock(
         title = title,
         message = message,
         modifier = modifier,
-        titleColor = NxTheme.colors.error,
+        titleColor = NxColor.status(Status.Error, text = true),
         titleStyle = titleStyle,
         spacing = spacing,
         action = { NxButton(label = retryLabel, onClick = onRetry) },

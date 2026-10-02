@@ -24,7 +24,7 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.icons.NxIcon
 import hivens.ui.surface.ChamferedRectShape
 import hivens.ui.surface.NxSurface
-import hivens.ui.surface.NxSurfaceLevel
+import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.Spacing
 import org.jetbrains.skia.Bitmap
@@ -36,6 +36,7 @@ import org.jetbrains.skia.Paint as SkPaint
 import org.jetbrains.skia.Rect as SkRect
 import java.io.File
 import kotlin.test.Test
+import hivens.ui.theme.NxColor
 
 /**
  * Throwaway: what each tooltip content actually draws, one per sheet at density 4.
@@ -62,12 +63,10 @@ class TooltipContentProbeTest {
     private fun sheet(name: String, wDp: Int, hDp: Int, shape: Shape? = null, body: @Composable () -> Unit) {
         val d = 4f
         val scene = ImageComposeScene((wDp * d).toInt(), (hDp * d).toInt(), density = Density(d)) {
-            NxTheme(useDarkTheme = true) {
-                Box(Modifier.fillMaxSize().background(NxTheme.colors.background), contentAlignment = Alignment.Center) {
+            NxTheme(dark = true) {
+                Box(Modifier.fillMaxSize().background(NxColor.page), contentAlignment = Alignment.Center) {
                     NxSurface(
-                        level = NxSurfaceLevel.Floating,
-                        blurDp = 0f,
-                        opacity = 1f,
+                        kind = SurfaceKind.Popup,
                         shape = shape ?: MaterialTheme.shapes.extraSmall,
                         shadowDp = 6f,
                     ) {

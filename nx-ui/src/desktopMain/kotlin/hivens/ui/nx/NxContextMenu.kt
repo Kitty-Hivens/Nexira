@@ -61,11 +61,15 @@ import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.surface.NxSurface
-import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.theme.Motion
-import hivens.ui.theme.NxTheme
 import hivens.ui.theme.Spacing
 import kotlin.math.roundToInt
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.Status
+import hivens.ui.theme.SchemeColours
+import hivens.ui.theme.fit
+import hivens.ui.surface.SurfaceKind
 
 /** Which edge of the trigger the menu's own matching edge lands on. */
 enum class NxMenuAlign {
@@ -237,12 +241,8 @@ private fun NxMenuSurface(
     var bodyHeight by remember { mutableStateOf(0.dp) }
 
     NxSurface(
-        level   = NxSurfaceLevel.Floating,
-        blurDp  = 0f,
-        // Opaque: a menu floats over arbitrary content, so the dark-theme body
-        // bleed-through (0.92) would read the rows underneath through it.
-        opacity = 1f,
-        shape   = MaterialTheme.shapes.medium,
+        kind     = SurfaceKind.Popup,
+        shape    = MaterialTheme.shapes.medium,
         modifier = modifier,
     ) {
         // Intrinsic width outside the bounds, so the menu is as wide as its widest
@@ -266,7 +266,7 @@ private fun NxMenuSurface(
                 content()
             }
             footer?.let {
-                HorizontalDivider(color = NxTheme.colors.outline.copy(alpha = 0.25f))
+                HorizontalDivider(color = NxInk.line)
                 Column(Modifier.padding(MENU_INSET)) { it() }
             }
         }
@@ -317,23 +317,28 @@ fun NxMenuItem(
 ) {
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
-    val palette = NxTheme.colors
-    val color = when {
-        !enabled    -> palette.textSecondary.copy(alpha = 0.45f)
-        destructive -> palette.error
-        selected    -> palette.primary
-        else        -> palette.textPrimary
+    val error = NxColor.status(Status.Error)
+    val lead = NxColor.lead()
+    val hoverTint = if (destructive) error else lead
+    val washTarget = when {
+        (hovered || highlighted) && enabled -> NxColor.wash(hoverTint, 0.14f)
+        selected                            -> NxColor.wash(hoverTint, 0.07f)
+        else                                -> null
     }
-    val hoverTint = if (destructive) palette.error else palette.primary
     val wash by animateColorAsState(
-        targetValue = when {
-            (hovered || highlighted) && enabled -> hoverTint.copy(alpha = 0.14f)
-            selected                            -> hoverTint.copy(alpha = 0.07f)
-            else                                -> Color.Transparent
-        },
+        targetValue   = washTarget ?: NxColor.wash(hoverTint, 0f).copy(alpha = 0f),
         animationSpec = Motion.tap.of(),
         label         = "menuItemWash",
     )
+    // Fitted to the wash the row is on, so a highlighted row's label keeps its contrast.
+    val ground = washTarget ?: NxColor.wash(hoverTint, 0f)
+    val color = when {
+        !enabled    -> NxInk.off
+        destructive -> fitOn(error, ground)
+        selected    -> fitOn(lead, ground)
+        else        -> NxInk.main
+    }
+    val quiet = NxInk.quiet
 
     Row(
         modifier = Modifier
@@ -346,7 +351,7 @@ fun NxMenuItem(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (mark == NxMenuMark.Radio) {
-            RadioMark(selected = selected, color = if (selected) palette.primary else palette.textSecondary)
+            RadioMark(selected = selected, color = if (selected) fitOn(lead, ground) else quiet)
             Spacer(Modifier.width(Spacing.s10))
         }
         if (icon != null) {
@@ -376,7 +381,7 @@ fun NxMenuItem(
             Text(
                 text  = hint,
                 style = MaterialTheme.typography.labelSmall,
-                color = palette.textSecondary,
+                color = quiet,
             )
             if (trailingCheck) Spacer(Modifier.width(Spacing.s8))
         }
@@ -417,7 +422,7 @@ internal fun RadioMark(selected: Boolean, color: Color, size: Dp = 16.dp) {
 @Composable
 fun NxMenuDivider() {
     HorizontalDivider(
-        color    = NxTheme.colors.outline.copy(alpha = 0.25f),
+        color    = NxInk.line,
         modifier = Modifier.padding(horizontal = Spacing.s10, vertical = Spacing.s6),
     )
 }
@@ -428,7 +433,7 @@ fun NxMenuSection(label: String) {
     Text(
         text     = label,
         style    = MaterialTheme.typography.labelSmall,
-        color    = NxTheme.colors.textSecondary,
+        color    = NxInk.quiet,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
         modifier = Modifier.padding(start = Spacing.s10, end = Spacing.s10, top = Spacing.s6, bottom = Spacing.s4),
@@ -503,3 +508,6 @@ private fun anchorOrigin(anchorX: Int, popupX: Int, popupWidth: Int, growsDown: 
     val fx = if (popupWidth == 0) 0.5f else ((anchorX - popupX).toFloat() / popupWidth).coerceIn(0f, 1f)
     return TransformOrigin(fx, if (growsDown) 0f else 1f)
 }
+
+/** [colour] made readable as text on [ground], the row's own wash. */
+private fun fitOn(colour: Color, ground: Color): Color = fit(colour, ground, SchemeColours.TEXT)

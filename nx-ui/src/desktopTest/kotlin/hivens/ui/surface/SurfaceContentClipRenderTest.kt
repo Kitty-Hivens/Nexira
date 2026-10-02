@@ -13,13 +13,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
-import hivens.ui.theme.DarkColorPalette
-import hivens.ui.theme.LocalNxColors
 import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertTrue
+import hivens.ui.theme.NxTheme
+import hivens.ui.theme.Themes
 
 /**
  * A rounded surface has to round what is INSIDE it too.
@@ -58,15 +58,12 @@ class SurfaceContentClipRenderTest {
     @OptIn(ExperimentalComposeUiApi::class)
     private fun pixel(px: Int, py: Int): Px {
         val scene = ImageComposeScene(width = W + 2 * M, height = H + 2 * M, density = Density(1f)) {
-            CompositionLocalProvider(
-                LocalNxColors provides DarkColorPalette,
-            ) {
+            NxTheme(Themes.Celestia, dark = true) {
                 Box(Modifier.fillMaxSize().background(PAGE)) {
                     NxSurface(
-                        level = NxSurfaceLevel.Floating,
+                        kind = SurfaceKind.Panel,
                         modifier = Modifier.offset(M.dp, M.dp).size(W.dp, H.dp),
                         shape = RoundedCornerShape(24.dp),
-                        blurDp = 0f,
                         borderWidthDp = 0f,
                     ) {
                         Box(Modifier.fillMaxSize().background(CONTENT))

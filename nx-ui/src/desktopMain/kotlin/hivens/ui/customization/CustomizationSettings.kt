@@ -10,8 +10,11 @@ import kotlinx.serialization.Serializable
  * Default state is a no-op -- every field is null / 1.0 / false so an
  * unconfigured user sees the same UI as before customization existed.
  *
- * [accentOverride] re-seeds the primary accent, the remaining fields decide
- * whether surfaces blur and how the nav-rail selection is drawn.
+ * The fields decide whether surfaces blur and how the nav-rail selection is drawn.
+ *
+ * An accent override used to live here too, pasting a hex over the theme's colour
+ * after the theme was built. Nothing wrote it, and the theme now owns its colours
+ * outright, so there is no later step for it to paste into.
  *
  * A glass-intensity multiplier used to live here too. It scaled the tint helper
  * every screen mixed its own planes with -- so it moved thirty places and none of
@@ -29,8 +32,6 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 data class CustomizationSettings(
-    val accentOverride: String? = null,
-
     /**
      * Whether a surface blurs what is behind it at all.
      *
@@ -52,8 +53,7 @@ data class CustomizationSettings(
     val navSelectionStyleWire: String = NavSelectionStyle.Pill.name,
     /**
      * Optional hex color for the nav selection decoration and the active
-     * icon. Null keeps the theme accent (primary), so it tracks the palette
-     * and [accentOverride] by default.
+     * icon. Null keeps the theme's lead colour, so it tracks the theme by default.
      */
     val navSelectionAccent: String? = null,
     /**

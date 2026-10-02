@@ -39,7 +39,7 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.surface.NxSurface
-import hivens.ui.surface.NxSurfaceLevel
+import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.Spacing
 import hivens.ui.theme.seedFromImage
@@ -48,6 +48,7 @@ import java.io.File
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.test.Test
+import hivens.ui.theme.NxColor
 
 /**
  * Concepts built on one real track rather than on a synthetic square.
@@ -94,9 +95,9 @@ class RealTrackConceptsProbe {
     private fun sheet(name: String, wDp: Int, hDp: Int, body: @Composable () -> Unit) {
         val d = 3f
         val scene = ImageComposeScene((wDp * d).toInt(), (hDp * d).toInt(), density = Density(d)) {
-            NxTheme(useDarkTheme = true) {
+            NxTheme(dark = true) {
                 Box(
-                    Modifier.fillMaxSize().background(NxTheme.colors.background).padding(Spacing.s16),
+                    Modifier.fillMaxSize().background(NxColor.page).padding(Spacing.s16),
                     contentAlignment = Alignment.Center,
                 ) { body() }
             }
@@ -138,29 +139,29 @@ class RealTrackConceptsProbe {
     // played bars are inked, so nothing else in the card has to show position.
     @Composable
     private fun ConceptWave() {
-        val c = NxTheme.colors
-        NxSurface(NxSurfaceLevel.Floating, Modifier.width(340.dp), shape = MaterialTheme.shapes.medium) {
+        val c = probeInks()
+        NxSurface(SurfaceKind.Card, Modifier.width(340.dp), shape = MaterialTheme.shapes.medium) {
             Row(
                 Modifier.fillMaxWidth().height(104.dp).padding(Spacing.s14),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Box(
-                    Modifier.size(46.dp).clip(CircleShape).background(c.primaryContainer),
+                    Modifier.size(46.dp).clip(CircleShape).background(c.leadWash),
                     contentAlignment = Alignment.Center,
-                ) { Glyph(NxIcon.Pause, 22, c.onPrimaryContainer) }
+                ) { Glyph(NxIcon.Pause, 22, c.main) }
                 Spacer(Modifier.width(Spacing.s14))
                 Column(Modifier.weight(1f)) {
                     Text(
-                        title, style = MaterialTheme.typography.bodyLarge, color = c.textPrimary,
+                        title, style = MaterialTheme.typography.bodyLarge, color = c.main,
                         fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis,
                     )
                     Spacer(Modifier.height(Spacing.s6))
-                    Envelope(c.primary, c.textSecondary.copy(alpha = 0.28f), Modifier.fillMaxWidth().height(34.dp))
+                    Envelope(c.lead, c.quiet.copy(alpha = 0.28f), Modifier.fillMaxWidth().height(34.dp))
                     Spacer(Modifier.height(Spacing.s4))
                     Row(Modifier.fillMaxWidth()) {
-                        Text(elapsed, style = MaterialTheme.typography.labelSmall, color = c.textSecondary)
+                        Text(elapsed, style = MaterialTheme.typography.labelSmall, color = c.quiet)
                         Spacer(Modifier.weight(1f))
-                        Text(total, style = MaterialTheme.typography.labelSmall, color = c.textSecondary)
+                        Text(total, style = MaterialTheme.typography.labelSmall, color = c.quiet)
                     }
                 }
             }
@@ -174,11 +175,11 @@ class RealTrackConceptsProbe {
     // palette uses.
     @Composable
     private fun ConceptSeeded() {
-        val c = NxTheme.colors
+        val c = probeInks()
         val seed = cover?.let { seedFromImage(it) }
-        val body = if (seed != null) lerp(c.surfaceContainer, Color(seed), 0.24f) else c.surfaceContainer
+        val body = if (seed != null) lerp(c.raised, Color(seed), 0.24f) else c.raised
         NxSurface(
-            NxSurfaceLevel.Floating, Modifier.width(340.dp),
+            SurfaceKind.Card, Modifier.width(340.dp),
             shape = MaterialTheme.shapes.medium, fillColor = body,
         ) {
             Row(Modifier.fillMaxWidth().height(112.dp).padding(Spacing.s12), verticalAlignment = Alignment.CenterVertically) {
@@ -191,35 +192,35 @@ class RealTrackConceptsProbe {
                 } else {
                     Box(
                         Modifier.size(88.dp).clip(MaterialTheme.shapes.small)
-                            .background(c.primary.copy(alpha = 0.18f)),
+                            .background(c.lead.copy(alpha = 0.18f)),
                         contentAlignment = Alignment.Center,
-                    ) { Glyph(NxIcon.MusicNote, 30, c.primary) }
+                    ) { Glyph(NxIcon.MusicNote, 30, c.lead) }
                 }
                 Spacer(Modifier.width(Spacing.s14))
                 Column(Modifier.weight(1f)) {
                     Text(
-                        title, style = MaterialTheme.typography.titleMedium, color = c.textPrimary,
+                        title, style = MaterialTheme.typography.titleMedium, color = c.main,
                         fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis,
                     )
                     Text(
-                        artist, style = MaterialTheme.typography.bodySmall, color = c.textSecondary,
+                        artist, style = MaterialTheme.typography.bodySmall, color = c.quiet,
                         maxLines = 1, overflow = TextOverflow.Ellipsis,
                     )
                     Text(
                         album, style = MaterialTheme.typography.labelSmall,
-                        color = c.textSecondary.copy(alpha = 0.7f), maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        color = c.quiet.copy(alpha = 0.7f), maxLines = 1, overflow = TextOverflow.Ellipsis,
                     )
                     Spacer(Modifier.height(Spacing.s8))
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Glyph(NxIcon.SkipPrevious, 18, c.textSecondary)
+                        Glyph(NxIcon.SkipPrevious, 18, c.quiet)
                         Spacer(Modifier.width(Spacing.s10))
-                        Glyph(NxIcon.Pause, 22, c.textPrimary)
+                        Glyph(NxIcon.Pause, 22, c.main)
                         Spacer(Modifier.width(Spacing.s10))
-                        Glyph(NxIcon.SkipNext, 18, c.textSecondary)
+                        Glyph(NxIcon.SkipNext, 18, c.quiet)
                         Spacer(Modifier.width(Spacing.s12))
                         Box(Modifier.weight(1f).height(3.dp).clip(CircleShape)) {
-                            Box(Modifier.fillMaxSize().background(c.textSecondary.copy(alpha = 0.24f)))
-                            Box(Modifier.fillMaxWidth(fraction).fillMaxHeight().background(c.primary))
+                            Box(Modifier.fillMaxSize().background(c.quiet.copy(alpha = 0.24f)))
+                            Box(Modifier.fillMaxWidth(fraction).fillMaxHeight().background(c.lead))
                         }
                     }
                 }
@@ -233,7 +234,7 @@ class RealTrackConceptsProbe {
     // library now anchors under the control instead of chasing the pointer.
     @Composable
     private fun ConceptRecord() {
-        val c = NxTheme.colors
+        val c = probeInks()
         Box(Modifier.size(168.dp), contentAlignment = Alignment.Center) {
             Canvas(Modifier.fillMaxSize()) {
                 val cx = size.width / 2f
@@ -250,7 +251,7 @@ class RealTrackConceptsProbe {
                     val ex = cx + cos(a) * len
                     val ey = cy + sin(a) * len
                     drawLine(
-                        color = if (i < cut) c.primary else c.textSecondary.copy(alpha = 0.30f),
+                        color = if (i < cut) c.lead else c.quiet.copy(alpha = 0.30f),
                         start = Offset(sx, sy), end = Offset(ex, ey),
                         strokeWidth = 2.6f, cap = StrokeCap.Round,
                     )
@@ -264,9 +265,9 @@ class RealTrackConceptsProbe {
                 )
             } else {
                 Box(
-                    Modifier.size(96.dp).clip(CircleShape).background(c.primary.copy(alpha = 0.18f)),
+                    Modifier.size(96.dp).clip(CircleShape).background(c.lead.copy(alpha = 0.18f)),
                     contentAlignment = Alignment.Center,
-                ) { Glyph(NxIcon.MusicNote, 34, c.primary) }
+                ) { Glyph(NxIcon.MusicNote, 34, c.lead) }
             }
             Box(
                 Modifier.size(44.dp).clip(CircleShape).background(Color.Black.copy(alpha = 0.46f)),

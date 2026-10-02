@@ -27,7 +27,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -38,6 +37,9 @@ import hivens.ui.theme.Motion
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.Spacing
 import kotlinx.serialization.Serializable
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.Status
 
 /** What a launch control is doing, which decides how it is drawn. */
 enum class PlayTone {
@@ -286,8 +288,8 @@ private class PlayInks(
 
 @Composable
 private fun playInks(ground: PlayGround): PlayInks {
-    val colors = NxTheme.colors
-    val dark = colors.background.luminance() < 0.5f
+    val scheme = NxTheme.colours.scheme
+    val dark = NxTheme.isDark
     return when (ground) {
         PlayGround.Media -> PlayInks(
             plate     = if (dark) DARK_INK else Color.White,
@@ -300,13 +302,15 @@ private fun playInks(ground: PlayGround): PlayInks {
             warn      = MEDIA_WARN,
             caption   = Color.White.copy(alpha = 0.82f),
         )
+        // The theme's two ends, crossed: the plate is its main ink and the word on it
+        // is its page, so the control is the strongest contrast the theme has.
         PlayGround.Surface -> PlayInks(
-            plate     = if (dark) Color.White else DARK_INK,
-            onPlate   = if (dark) Color.Black else Color.White,
-            quiet     = colors.textSecondary,
-            quietLine = colors.textSecondary.copy(alpha = 0.35f),
-            warn      = colors.warnAccent,
-            caption   = colors.textSecondary,
+            plate     = scheme.inks[0],
+            onPlate   = scheme.steps[0],
+            quiet     = NxInk.quiet,
+            quietLine = NxInk.quiet.copy(alpha = 0.35f),
+            warn      = NxColor.status(Status.Warning, text = true),
+            caption   = NxInk.quiet,
         )
     }
 }

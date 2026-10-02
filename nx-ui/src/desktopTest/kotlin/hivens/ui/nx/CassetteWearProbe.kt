@@ -45,7 +45,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import hivens.ui.surface.NxSurface
-import hivens.ui.surface.NxSurfaceLevel
+import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.Spacing
 import org.jetbrains.skia.EncodedImageFormat
@@ -55,6 +55,7 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 import kotlin.random.Random
 import kotlin.test.Test
+import hivens.ui.theme.NxColor
 
 /**
  * The tape wears out with every play.
@@ -108,9 +109,9 @@ class CassetteWearProbe {
 
     @Composable
     private fun Cassette(wear: Float, chewed: Boolean, blank: Boolean = false) {
-        val c = NxTheme.colors
+        val c = probeInks()
         val w0 = wear.coerceIn(0f, 1f)
-        val shell = lerp(lerp(c.surfaceContainerHigh, Color.Black, 0.52f), Color(0xFF6B6259), w0 * 0.22f)
+        val shell = lerp(lerp(c.top, Color.Black, 0.52f), Color(0xFF6B6259), w0 * 0.22f)
         val paper = lerp(Color(0xFFEDE6DA), Color(0xFFB99A5E), w0 * 0.62f)
         val ink = lerp(Color(0xFF1A1714), Color(0xFF6B5B44), w0 * 0.45f)
         val inkSoft = lerp(Color(0xFF5A5248), Color(0xFF8A7B62), w0 * 0.5f)
@@ -260,9 +261,9 @@ class CassetteWearProbe {
     private fun one(name: String, wear: Float, chewed: Boolean) {
         val d = 2f
         val scene = ImageComposeScene((330 * d).toInt(), (214 * d).toInt(), density = Density(d)) {
-            NxTheme(useDarkTheme = true) {
+            NxTheme(dark = true) {
                 Box(
-                    Modifier.fillMaxSize().background(NxTheme.colors.background),
+                    Modifier.fillMaxSize().background(NxColor.page),
                     contentAlignment = Alignment.Center,
                 ) { Cassette(wear, chewed) }
             }
@@ -280,8 +281,8 @@ class CassetteWearProbe {
      */
     @Composable
     private fun Sprawled() {
-        val c = NxTheme.colors
-        NxSurface(NxSurfaceLevel.Floating, Modifier.width(340.dp), shape = MaterialTheme.shapes.medium) {
+        val c = probeInks()
+        NxSurface(SurfaceKind.Card, Modifier.width(340.dp), shape = MaterialTheme.shapes.medium) {
             Box(
                 Modifier.fillMaxWidth().height(248.dp),
                 contentAlignment = Alignment.Center,
@@ -323,13 +324,13 @@ class CassetteWearProbe {
      */
     @Composable
     private fun ChewedHint(modifier: Modifier) {
-        val c = NxTheme.colors
+        val c = probeInks()
         val style = MaterialTheme.typography.labelMedium
         Row(modifier, verticalAlignment = Alignment.Bottom) {
-            Text("пере-пер", style = style, color = c.textSecondary)
+            Text("пере-пер", style = style, color = c.quiet)
             "еееее".forEachIndexed { i, ch ->
                 Text(
-                    ch.toString(), style = style, color = c.textSecondary,
+                    ch.toString(), style = style, color = c.quiet,
                     modifier = Modifier.graphicsLayer(
                         scaleX = 1f + i * 0.30f,
                         scaleY = 1f - i * 0.08f,
@@ -352,9 +353,9 @@ class CassetteWearProbe {
     private fun sprawledSheet() {
         val d = 2f
         val scene = ImageComposeScene((372 * d).toInt(), (282 * d).toInt(), density = Density(d)) {
-            NxTheme(useDarkTheme = true) {
+            NxTheme(dark = true) {
                 Box(
-                    Modifier.fillMaxSize().background(NxTheme.colors.background),
+                    Modifier.fillMaxSize().background(NxColor.page),
                     contentAlignment = Alignment.Center,
                 ) { Sprawled() }
             }

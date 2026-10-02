@@ -10,13 +10,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
-import hivens.ui.theme.DarkColorPalette
-import hivens.ui.theme.LocalNxColors
 import org.jetbrains.skia.Bitmap
 import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import hivens.ui.theme.NxTheme
+import hivens.ui.theme.Themes
+import hivens.ui.theme.SchemeColours
+import hivens.ui.theme.Status
 
 /**
  * Reads a measurement out of the frame rather than asserting the PNG is not
@@ -38,7 +40,7 @@ class NxProgressBarRenderTest {
     /** Accent run along one scanline, in pixels. */
     private fun accentRun(progress: Float?, row: Int): Int {
         val bmp = render(progress)
-        val accent = DarkColorPalette.progressAccent
+        val accent = SchemeColours(Themes.Celestia.dark).status(Status.Info)
         var run = 0
         for (x in 0 until width) {
             if (isAccent(bmp.getColor(x, row), accent)) run++
@@ -49,9 +51,7 @@ class NxProgressBarRenderTest {
     @OptIn(ExperimentalComposeUiApi::class)
     private fun render(progress: Float?): Bitmap {
         val scene = ImageComposeScene(width = width, height = barHeight, density = Density(density)) {
-            CompositionLocalProvider(
-                LocalNxColors provides DarkColorPalette,
-            ) {
+            NxTheme(Themes.Celestia, dark = true) {
                 Box(Modifier.fillMaxSize().background(Color(0xFF121212))) {
                     NxProgressBar(progress = progress, height = barHeight.dp)
                 }

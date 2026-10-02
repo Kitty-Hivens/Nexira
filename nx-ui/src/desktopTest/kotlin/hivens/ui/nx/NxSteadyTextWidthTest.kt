@@ -33,7 +33,7 @@ class NxSteadyTextWidthTest {
     private fun widthOf(body: @Composable (Modifier) -> Unit): Int {
         var width = -1
         val scene = ImageComposeScene(400, 120, density = Density(2f)) {
-            NxTheme(useDarkTheme = true) {
+            NxTheme(dark = true) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterStart) {
                     body(Modifier.onGloballyPositioned { width = it.size.width })
                 }

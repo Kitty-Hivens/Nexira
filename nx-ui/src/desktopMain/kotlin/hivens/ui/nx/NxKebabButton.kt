@@ -9,7 +9,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import hivens.ui.icons.NxIcon
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxInk
 
 /**
  * The blessed "three dots" overflow affordance: a MoreVert button that opens an
@@ -22,7 +22,7 @@ import hivens.ui.theme.NxTheme
 fun NxKebabButton(
     contentDescription: String,
     modifier: Modifier = Modifier,
-    tint: Color = NxTheme.colors.textSecondary,
+    tint: Color = NxInk.quiet,
     menuItems: @Composable (dismiss: () -> Unit) -> Unit,
 ) {
     var open by remember { mutableStateOf(false) }

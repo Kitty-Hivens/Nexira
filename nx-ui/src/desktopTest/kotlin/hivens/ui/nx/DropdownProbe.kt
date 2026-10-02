@@ -26,6 +26,8 @@ import hivens.ui.theme.Spacing
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
 import kotlin.test.Test
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
 
 /**
  * What the dropdown work actually looks like.
@@ -55,8 +57,8 @@ class DropdownProbe {
             height = (hDp * density).toInt(),
             density = Density(density),
         ) {
-            NxTheme(useDarkTheme = dark) {
-                Box(Modifier.fillMaxSize().background(NxTheme.colors.background).padding(Spacing.s16)) { body() }
+            NxTheme(dark = dark) {
+                Box(Modifier.fillMaxSize().background(NxColor.page).padding(Spacing.s16)) { body() }
             }
         }
         // The popup unfolds over several frames, so the clock is advanced by hand;
@@ -91,7 +93,7 @@ class DropdownProbe {
     /** A stand-in trigger, so the sheet shows what the menu is hanging off. */
     @Composable
     private fun Trigger(width: Int = 36, height: Int = 36) {
-        Box(Modifier.size(width.dp, height.dp).background(NxTheme.colors.primary.copy(alpha = 0.35f)))
+        Box(Modifier.size(width.dp, height.dp).background(NxColor.lead().copy(alpha = 0.35f)))
     }
 
     @Test
@@ -190,7 +192,7 @@ class DropdownProbe {
         for (dark in listOf(true, false)) {
             sheet("select-closed-${if (dark) "dark" else "light"}", 320, 120, dark = dark) {
                 Column {
-                    Text("Home view", color = NxTheme.colors.textSecondary)
+                    Text("Home view", color = NxInk.quiet)
                     Spacer(Modifier.height(Spacing.s6))
                     NxSelect(
                         options = listOf("New", "Classic"),
@@ -213,7 +215,7 @@ class DropdownProbe {
                 click = Offset(126f, 64f),
             ) {
                 Column {
-                    Text("Language", color = NxTheme.colors.textSecondary)
+                    Text("Language", color = NxInk.quiet)
                     Spacer(Modifier.height(Spacing.s6))
                     NxSelect(
                         options  = listOf("English", "Русский", "Deutsch", "日本語 (alpha)"),
@@ -230,7 +232,7 @@ class DropdownProbe {
         // answer rather than to the top of the list.
         sheet("select-long", 320, 340, click = Offset(126f, 64f)) {
             Column {
-                Text("Minecraft", color = NxTheme.colors.textSecondary)
+                Text("Minecraft", color = NxInk.quiet)
                 Spacer(Modifier.height(Spacing.s6))
                 NxSelect(
                     options   = (0 until 40).map { "1.$it.1" },

@@ -19,7 +19,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import hivens.ui.theme.Motion
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.Status
 
 /**
  * The measure primitive. A track and the part of it that is done.
@@ -39,8 +41,8 @@ fun NxProgressBar(
     progress: Float?,
     modifier: Modifier = Modifier,
     height: Dp = 4.dp,
-    color: Color = NxTheme.colors.progressAccent,
-    trackColor: Color = NxTheme.colors.textSecondary.copy(alpha = 0.22f),
+    color: Color = NxColor.status(Status.Info),
+    trackColor: Color = NxColor.wash(NxInk.quiet, 0.25f),
 ) {
     val corner = CornerSize(50)
 

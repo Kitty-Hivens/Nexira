@@ -18,7 +18,6 @@ import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size as GeomSize
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
@@ -29,6 +28,8 @@ import hivens.ui.theme.Spacing
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
 import kotlin.test.Test
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
 
 /** Throwaway: the real transport glyphs against the ones I drew by hand. */
 class GlyphCompareProbe {
@@ -36,7 +37,7 @@ class GlyphCompareProbe {
     /** What I drew yesterday, kept verbatim for the comparison. */
     @Composable
     private fun HandDrawn(forward: Boolean) {
-        val tint = NxTheme.colors.textPrimary
+        val tint = NxInk.main
         Box(Modifier.size(24.dp), contentAlignment = Alignment.Center) {
             Canvas(Modifier.size(18.dp)) {
                 val w = size.width
@@ -65,13 +66,13 @@ class GlyphCompareProbe {
     @Composable
     private fun Real(icon: hivens.ui.icons.IconKey) {
         Box(Modifier.size(24.dp), contentAlignment = Alignment.Center) {
-            Symbol(icon, null, tint = NxTheme.colors.textPrimary, fill = 1f, weight = 500, modifier = Modifier.size(22.dp))
+            Symbol(icon, null, tint = NxInk.main, fill = 1f, weight = 500, modifier = Modifier.size(22.dp))
         }
     }
 
     @Composable
     private fun Label(t: String) {
-        Text(t, style = MaterialTheme.typography.labelSmall, color = NxTheme.colors.textSecondary)
+        Text(t, style = MaterialTheme.typography.labelSmall, color = NxInk.quiet)
     }
 
     @OptIn(ExperimentalComposeUiApi::class)
@@ -79,9 +80,9 @@ class GlyphCompareProbe {
     fun probe() {
         val d = 6f
         val scene = ImageComposeScene((230 * d).toInt(), (86 * d).toInt(), density = Density(d)) {
-            NxTheme(useDarkTheme = true) {
+            NxTheme(dark = true) {
                 Column(
-                    Modifier.fillMaxSize().background(NxTheme.colors.background).padding(Spacing.s12),
+                    Modifier.fillMaxSize().background(NxColor.page).padding(Spacing.s12),
                     verticalArrangement = Arrangement.spacedBy(Spacing.s10),
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s10)) {

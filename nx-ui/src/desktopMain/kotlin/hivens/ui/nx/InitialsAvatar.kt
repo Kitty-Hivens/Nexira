@@ -10,10 +10,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import hivens.ui.theme.NxColor
 
 /**
  * Letter-monogram fallback for a missing icon: up to two initials from
- * [name]'s words, white over the entity's [hue]. Fills its parent -- size
+ * [name]'s words, in whichever ink reads on the entity's [hue]. Fills its parent -- size
  * it from the outside (an AsyncImage error slot, an avatar Box).
  */
 @Composable
@@ -30,7 +31,7 @@ fun InitialsAvatar(name: String, hue: Color, modifier: Modifier = Modifier) {
     ) {
         Text(
             text       = initials,
-            color      = Color.White,
+            color      = NxColor.on(hue),
             style      = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
         )

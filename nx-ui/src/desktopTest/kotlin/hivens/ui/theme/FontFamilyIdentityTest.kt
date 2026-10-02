@@ -40,7 +40,7 @@ class FontFamilyIdentityTest {
     private fun <T> underTheme(read: @androidx.compose.runtime.Composable () -> T): T {
         val captured = mutableListOf<T>()
         val scene = ImageComposeScene(width = 8, height = 8, density = Density(1f)) {
-            NxTheme(useDarkTheme = true) {
+            NxTheme(dark = true) {
                 if (captured.isEmpty()) captured += read()
                 Box(androidx.compose.ui.Modifier)
             }

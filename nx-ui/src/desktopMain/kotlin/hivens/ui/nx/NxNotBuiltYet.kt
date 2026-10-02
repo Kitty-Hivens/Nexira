@@ -7,7 +7,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.NxInk
 
 /**
  * A place that exists and has nothing behind it yet.
@@ -39,14 +40,14 @@ fun NxNotBuiltYet(
         // The accent and not the warning colour. Nothing here is wrong, and a
         // reader who has learned that red means trouble should not be told it does
         // when the only news is that we have not got to this yet.
-        titleColor = NxTheme.colors.primary,
+        titleColor = NxColor.lead(text = true),
         titleStyle = MaterialTheme.typography.titleMedium,
         action = detail?.let {
             {
                 Text(
                     text = it,
                     style = MaterialTheme.typography.labelSmall,
-                    color = NxTheme.colors.textSecondary,
+                    color = NxInk.quiet,
                     textAlign = TextAlign.Center,
                 )
             }

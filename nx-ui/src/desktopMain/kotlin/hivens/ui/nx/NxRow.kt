@@ -33,8 +33,8 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.Symbol
 import hivens.ui.theme.Motion
-import hivens.ui.theme.NxTheme
 import hivens.ui.theme.Spacing
+import hivens.ui.theme.NxInk
 
 /**
  * A generic in-plane settings row: optional [icon] + [title] (+ [subtitle]) on the
@@ -65,7 +65,7 @@ fun NxRow(
     title: String,
     modifier: Modifier = Modifier,
     icon: IconKey? = null,
-    iconTint: Color = NxTheme.colors.textSecondary,
+    iconTint: Color = NxInk.quiet,
     subtitle: String? = null,
     onClick: (() -> Unit)? = null,
     edgeBleed: Dp = 16.dp,
@@ -81,7 +81,7 @@ fun NxRow(
             .bleedHorizontally(edgeBleed)
             .fillMaxWidth()
             .clip(shape)
-            .background(NxTheme.colors.textPrimary.copy(alpha = alpha))
+            .background(NxInk.main.copy(alpha = alpha))
             .clickable(interactionSource = interaction, indication = null, onClick = onClick)
             .padding(horizontal = edgeBleed, vertical = Spacing.s8)
     } else {
@@ -108,13 +108,13 @@ fun NxRow(
                     // what this row has always drawn, and naming a role here would move
                     // every existing call site to prove a point about the narrow one.
                     style      = if (compact) MaterialTheme.typography.bodySmall else LocalTextStyle.current,
-                    color      = if (compact) NxTheme.colors.textSecondary else NxTheme.colors.textPrimary,
+                    color      = if (compact) NxInk.quiet else NxInk.main,
                     fontWeight = FontWeight.Medium,
                     maxLines   = 1,
                     overflow   = TextOverflow.Ellipsis,
                 )
                 if (subtitle != null) {
-                    Text(subtitle, style = MaterialTheme.typography.bodySmall, color = NxTheme.colors.textSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Text(subtitle, style = MaterialTheme.typography.bodySmall, color = NxInk.quiet, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
             }
         }

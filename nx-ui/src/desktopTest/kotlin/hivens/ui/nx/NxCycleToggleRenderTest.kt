@@ -21,6 +21,8 @@ import hivens.ui.theme.Spacing
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
 import kotlin.test.Test
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
 
 /**
  * Every state of the cycle control, on both palettes.
@@ -42,7 +44,7 @@ class NxCycleToggleRenderTest {
     @Composable
     private fun Strip(label: String) {
         Column(verticalArrangement = Arrangement.spacedBy(Spacing.s6)) {
-            Text(label, style = MaterialTheme.typography.labelSmall, color = NxTheme.colors.textSecondary)
+            Text(label, style = MaterialTheme.typography.labelSmall, color = NxInk.quiet)
             Row(
                 horizontalArrangement = Arrangement.spacedBy(Spacing.s10),
                 verticalAlignment     = Alignment.CenterVertically,
@@ -59,9 +61,9 @@ class NxCycleToggleRenderTest {
     private fun sheet(name: String, dark: Boolean) {
         val d = 3f
         val scene = ImageComposeScene((260 * d).toInt(), (86 * d).toInt(), density = Density(d)) {
-            NxTheme(useDarkTheme = dark) {
+            NxTheme(dark = dark) {
                 Box(
-                    Modifier.fillMaxSize().background(NxTheme.colors.background).padding(Spacing.s12),
+                    Modifier.fillMaxSize().background(NxColor.page).padding(Spacing.s12),
                     contentAlignment = Alignment.CenterStart,
                 ) { Strip(if (dark) "off / queue / one / disabled" else "off / queue / one / disabled") }
             }

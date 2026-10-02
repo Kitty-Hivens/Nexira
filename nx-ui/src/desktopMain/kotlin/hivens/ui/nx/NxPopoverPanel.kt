@@ -37,10 +37,10 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import hivens.ui.icons.NxIcon
 import hivens.ui.surface.NxSurface
-import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.theme.Motion
-import hivens.ui.theme.NxTheme
 import hivens.ui.theme.Spacing
+import hivens.ui.theme.NxInk
+import hivens.ui.surface.SurfaceKind
 
 /**
  * A titled panel that hangs off a control, for choices that do not fit a menu.
@@ -104,12 +104,7 @@ fun NxPopoverPanel(
                 scaleOut(Motion.tap.of(), targetScale = 0.10f, transformOrigin = origin.value),
         ) {
             NxSurface(
-                level    = NxSurfaceLevel.Floating,
-                blurDp   = 0f,
-                // Opaque for the same reason a menu is: it floats over arbitrary
-                // content, and the dark-theme body bleed would read the list
-                // underneath through the panel.
-                opacity   = 1f,
+                kind     = SurfaceKind.Popup,
                 shape    = MaterialTheme.shapes.medium,
                 modifier = modifier.width(width),
             ) {
@@ -124,7 +119,7 @@ fun NxPopoverPanel(
                             text       = title,
                             style      = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.SemiBold,
-                            color      = NxTheme.colors.textPrimary,
+                            color      = NxInk.main,
                             modifier   = Modifier.weight(1f),
                         )
                         NxIconButton(
@@ -133,7 +128,7 @@ fun NxPopoverPanel(
                             onClick            = onDismissRequest,
                         )
                     }
-                    HorizontalDivider(color = NxTheme.colors.outline.copy(alpha = 0.25f))
+                    HorizontalDivider(color = NxInk.line)
                     Column(
                         modifier            = Modifier
                             .fillMaxWidth()
@@ -145,7 +140,7 @@ fun NxPopoverPanel(
                         content()
                     }
                     footer?.let {
-                        HorizontalDivider(color = NxTheme.colors.outline.copy(alpha = 0.25f))
+                        HorizontalDivider(color = NxInk.line)
                         Row(
                             modifier              = Modifier.fillMaxWidth().padding(horizontal = Spacing.s10, vertical = Spacing.s8),
                             verticalAlignment     = Alignment.CenterVertically,
@@ -207,7 +202,7 @@ fun NxPanelGroup(
         Text(
             text  = label,
             style = MaterialTheme.typography.labelSmall,
-            color = NxTheme.colors.textSecondary,
+            color = NxInk.quiet,
         )
         content()
         // Under the controls rather than over them: the caption names the axis, the
@@ -217,7 +212,7 @@ fun NxPanelGroup(
             Text(
                 text  = it,
                 style = MaterialTheme.typography.labelSmall,
-                color = NxTheme.colors.textSecondary.copy(alpha = 0.7f),
+                color = NxInk.quiet,
             )
         }
     }

@@ -12,7 +12,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import hivens.ui.theme.Motion
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxInk
 
 // One look for every list bar (Rule 0). Geometry and the 40%/75% textSecondary mix
 // match the console's hand-tuned bar; the only addition here is the idle fade. (The
@@ -43,7 +43,7 @@ fun NxVerticalScrollbar(
 
 @Composable
 private fun autoHideStyle(revealed: Boolean): ScrollbarStyle {
-    val base  = NxTheme.colors.textSecondary
+    val base  = NxInk.quiet
     // Reveal fades in at once; hiding waits out the idle pause, then fades. The corner
     // follows buttonCorner so the bar agrees with the buttons beside it.
     val alpha by animateFloatAsState(

@@ -17,7 +17,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.Symbol
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxInk
 
 /**
  * A pane with nothing in it, saying why.
@@ -38,7 +38,7 @@ fun NxStateBlock(
     message: String,
     modifier: Modifier = Modifier,
     icon: IconKey? = null,
-    titleColor: Color = NxTheme.colors.textPrimary,
+    titleColor: Color = NxInk.main,
     titleStyle: TextStyle = MaterialTheme.typography.titleLarge,
     spacing: Dp = 12.dp,
     action: (@Composable () -> Unit)? = null,
@@ -61,7 +61,7 @@ fun NxStateBlock(
             Text(
                 text = message,
                 style = MaterialTheme.typography.bodySmall,
-                color = NxTheme.colors.textSecondary,
+                color = NxInk.quiet,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.widthIn(max = 480.dp),
             )

@@ -50,6 +50,7 @@ import kotlin.math.hypot
 import kotlin.math.sin
 import kotlin.math.sqrt
 import kotlin.test.Test
+import hivens.ui.theme.NxColor
 
 /** What the face of the shell exposes. */
 enum class Face(val caption: String) {
@@ -92,9 +93,9 @@ class CassetteFaceProbe {
     private fun sheet(name: String, wDp: Int, hDp: Int, body: @Composable () -> Unit) {
         val d = 2f
         val scene = ImageComposeScene((wDp * d).toInt(), (hDp * d).toInt(), density = Density(d)) {
-            NxTheme(useDarkTheme = true) {
+            NxTheme(dark = true) {
                 Box(
-                    Modifier.fillMaxSize().background(NxTheme.colors.background).padding(Spacing.s16),
+                    Modifier.fillMaxSize().background(NxColor.page).padding(Spacing.s16),
                     contentAlignment = Alignment.Center,
                 ) { body() }
             }
@@ -161,9 +162,9 @@ class CassetteFaceProbe {
 
     @Composable
     private fun Cassette(face: Face) {
-        val c = NxTheme.colors
-        val opaque = lerp(c.surfaceContainerHigh, Color.Black, 0.52f)
-        val clear = lerp(c.surfaceContainerHigh, Color.White, 0.10f).copy(alpha = 0.55f)
+        val c = probeInks()
+        val opaque = lerp(c.top, Color.Black, 0.52f)
+        val clear = lerp(c.top, Color.White, 0.10f).copy(alpha = 0.55f)
         val shell = if (face == Face.Clear) clear else opaque
         val labelH = if (face == Face.Slot) 93f else 80f
 
@@ -333,7 +334,7 @@ class CassetteFaceProbe {
     @Test
     fun probe() {
         sheet("faces", 720, 520) {
-            val c = NxTheme.colors
+            val c = probeInks()
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.s20)) {
                 Face.entries.chunked(2).forEach { row ->
                     Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s20)) {
@@ -343,7 +344,7 @@ class CassetteFaceProbe {
                                 Spacer(Modifier.height(Spacing.s8))
                                 Text(
                                     face.caption, style = MaterialTheme.typography.labelMedium,
-                                    color = c.textSecondary,
+                                    color = c.quiet,
                                 )
                             }
                         }

@@ -41,7 +41,7 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.surface.NxSurface
-import hivens.ui.surface.NxSurfaceLevel
+import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.Spacing
 import org.jetbrains.skia.EncodedImageFormat
@@ -53,6 +53,7 @@ import kotlin.math.hypot
 import kotlin.math.sin
 import kotlin.math.sqrt
 import kotlin.test.Test
+import hivens.ui.theme.NxColor
 
 /**
  * The cassette, drawn from the object's real proportions.
@@ -94,9 +95,9 @@ class CassetteProbe {
     private fun sheet(name: String, wDp: Int, hDp: Int, body: @Composable () -> Unit) {
         val d = 3f
         val scene = ImageComposeScene((wDp * d).toInt(), (hDp * d).toInt(), density = Density(d)) {
-            NxTheme(useDarkTheme = true) {
+            NxTheme(dark = true) {
                 Box(
-                    Modifier.fillMaxSize().background(NxTheme.colors.background).padding(Spacing.s16),
+                    Modifier.fillMaxSize().background(NxColor.page).padding(Spacing.s16),
                     contentAlignment = Alignment.Center,
                 ) { body() }
             }
@@ -164,7 +165,7 @@ class CassetteProbe {
      */
     @Composable
     private fun Window(fraction: Float, scrubbing: Boolean, spool: Spool, modifier: Modifier) {
-        val c = NxTheme.colors
+        val c = probeInks()
         val tape = Color(0xFF3B2A20)
         val tapeRing = Color(0xFF553D30)
         val plastic = Color(0xFF7C746A)
@@ -303,10 +304,10 @@ class CassetteProbe {
             if (scrubbing) {
                 val hx = lrx + (rrx - lrx) * fraction.coerceIn(0f, 1f)
                 drawLine(
-                    color = c.primary, start = Offset(lrx, runY), end = Offset(hx, runY),
+                    color = c.lead, start = Offset(lrx, runY), end = Offset(hx, runY),
                     strokeWidth = 3f, cap = StrokeCap.Round,
                 )
-                drawCircle(c.primary, radius = 12f, center = Offset(hx, runY))
+                drawCircle(c.lead, radius = 12f, center = Offset(hx, runY))
                 drawCircle(bore, radius = 4f, center = Offset(hx, runY))
             }
         }
@@ -314,8 +315,8 @@ class CassetteProbe {
 
     @Composable
     private fun Cassette(fraction: Float, scrubbing: Boolean, spool: Spool, inside: Boolean, repeatOn: Boolean, paper: Color, ink: Color, inkSoft: Color) {
-        val c = NxTheme.colors
-        val shell = lerp(c.surfaceContainerHigh, Color.Black, 0.45f)
+        val c = probeInks()
+        val shell = lerp(c.top, Color.Black, 0.45f)
         Box(Modifier.fillMaxWidth().height(if (inside) 220.dp else 200.dp)) {
             Canvas(Modifier.fillMaxSize().clip(RoundedCornerShape(8.dp))) {
                 val d = 3f
@@ -377,7 +378,7 @@ class CassetteProbe {
                         maxLines = 1, overflow = TextOverflow.Ellipsis,
                     )
                     Spacer(Modifier.height(6.dp))
-                    Box(Modifier.width(28.dp).height(2.dp).background(c.primary))
+                    Box(Modifier.width(28.dp).height(2.dp).background(c.lead))
                     Spacer(Modifier.height(6.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
@@ -401,8 +402,8 @@ class CassetteProbe {
                     Controls(
                         plate = Color.Black.copy(alpha = 0.42f),
                         tint = Color(0xFFC9C2B8),
-                        accent = c.primary,
-                        onAccent = c.onPrimary,
+                        accent = c.lead,
+                        onAccent = c.onLead,
                         repeatOn = repeatOn,
                     )
                 }
@@ -420,9 +421,9 @@ class CassetteProbe {
 
     @Composable
     private fun ConceptTape(fraction: Float, scrubbing: Boolean, spool: Spool, inside: Boolean, repeatOn: Boolean, paper: Color, ink: Color, inkSoft: Color) {
-        val c = NxTheme.colors
+        val c = probeInks()
         NxSurface(
-            NxSurfaceLevel.Floating, Modifier.width(340.dp),
+            SurfaceKind.Card, Modifier.width(340.dp),
             shape = MaterialTheme.shapes.medium,
         ) {
             Column(Modifier.fillMaxWidth().padding(Spacing.s12)) {
@@ -431,9 +432,9 @@ class CassetteProbe {
                     Spacer(Modifier.height(Spacing.s12))
                     Controls(
                         plate = Color.White.copy(alpha = 0.07f),
-                        tint = c.textSecondary,
-                        accent = c.primary,
-                        onAccent = c.onPrimary,
+                        tint = c.quiet,
+                        accent = c.lead,
+                        onAccent = c.onLead,
                         repeatOn = repeatOn,
                     )
                 }
@@ -443,8 +444,8 @@ class CassetteProbe {
 
     @Composable
     private fun SpoolSheet() {
-        val c = NxTheme.colors
-        val shell = lerp(c.surfaceContainerHigh, Color.Black, 0.45f)
+        val c = probeInks()
+        val shell = lerp(c.top, Color.Black, 0.45f)
         Column(verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(Spacing.s12)) {
             Spool.entries.chunked(2).forEach { pair ->
                 Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(Spacing.s16)) {
@@ -460,7 +461,7 @@ class CassetteProbe {
                             Spacer(Modifier.height(Spacing.s6))
                             Text(
                                 spool.label, style = MaterialTheme.typography.labelMedium,
-                                color = c.textSecondary,
+                                color = c.quiet,
                             )
                         }
                     }

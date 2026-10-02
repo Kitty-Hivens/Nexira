@@ -18,8 +18,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import hivens.ui.theme.NxTheme
 import hivens.ui.theme.Spacing
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.OnFill
+import hivens.ui.theme.Status
 
 /** What happened to the entry a [NxDiffRow] describes. */
 enum class NxDiffRowKind { Added, Removed, Updated }
@@ -41,30 +44,32 @@ fun NxDiffRow(
     trailing: String? = null,
     leading: (@Composable () -> Unit)? = null,
 ) {
-    val colors = NxTheme.colors
-    val (accent, glyph) = when (kind) {
-        NxDiffRowKind.Added   -> colors.success to "+"
-        NxDiffRowKind.Removed -> colors.error to "-"
-        NxDiffRowKind.Updated -> colors.warnAccent to "~"
+    val (status, glyph) = when (kind) {
+        NxDiffRowKind.Added   -> Status.Success to "+"
+        NxDiffRowKind.Removed -> Status.Error to "-"
+        NxDiffRowKind.Updated -> Status.Warning to "~"
     }
     val dim = if (kind == NxDiffRowKind.Removed) 0.6f else 1f
+    val badge = NxColor.wash(NxColor.status(status), 0.16f)
     Row(
         modifier              = modifier.fillMaxWidth().padding(vertical = 3.dp),
         verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s10),
     ) {
         Box(
-            modifier         = Modifier.size(20.dp).clip(RoundedCornerShape(6.dp)).background(accent.copy(alpha = 0.16f)),
+            modifier         = Modifier.size(20.dp).clip(RoundedCornerShape(6.dp)).background(badge),
             contentAlignment = Alignment.Center,
         ) {
-            Text(glyph, style = MaterialTheme.typography.labelMedium, color = accent, fontWeight = FontWeight.Bold)
+            OnFill(badge) {
+                Text(glyph, style = MaterialTheme.typography.labelMedium, color = NxColor.status(status, text = true), fontWeight = FontWeight.Bold)
+            }
         }
         leading?.invoke()
         Column(Modifier.weight(1f)) {
             Text(
                 text       = title,
                 style      = MaterialTheme.typography.bodyMedium,
-                color      = colors.textPrimary.copy(alpha = dim),
+                color      = NxInk.main.copy(alpha = dim),
                 fontWeight = FontWeight.Medium,
                 maxLines   = 1,
                 overflow   = TextOverflow.Ellipsis,
@@ -73,14 +78,14 @@ fun NxDiffRow(
                 Text(
                     text     = subtitle,
                     style    = MaterialTheme.typography.labelSmall,
-                    color    = colors.textSecondary.copy(alpha = dim),
+                    color    = NxInk.quiet.copy(alpha = dim),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
         }
         if (trailing != null) {
-            Text(trailing, style = MaterialTheme.typography.labelSmall, color = colors.textSecondary)
+            Text(trailing, style = MaterialTheme.typography.labelSmall, color = NxInk.quiet)
         }
     }
 }

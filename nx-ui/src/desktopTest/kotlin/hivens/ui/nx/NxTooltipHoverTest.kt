@@ -62,7 +62,7 @@ class NxTooltipHoverTest {
     @OptIn(ExperimentalComposeUiApi::class)
     private fun hoverInk(behaviour: NxTooltipBehaviour): Pair<Int, Int> {
         val scene = ImageComposeScene(width = 400, height = 300, density = Density(1f)) {
-            NxTheme(useDarkTheme = true) {
+            NxTheme(dark = true) {
                 Box(Modifier.fillMaxSize().background(Color.Black)) {
                     NxTooltip(
                         tooltip = { Box(Modifier.size(40.dp2()).background(tipColor)) },
@@ -100,7 +100,7 @@ class NxTooltipHoverTest {
     @Test
     fun `control, the stock TooltipArea under the same pointer sequence`() {
         val scene = ImageComposeScene(width = 400, height = 300, density = Density(1f)) {
-            NxTheme(useDarkTheme = true) {
+            NxTheme(dark = true) {
                 Box(Modifier.fillMaxSize().background(Color.Black)) {
                     TooltipArea(
                         tooltip = { Box(Modifier.size(40.dp2()).background(tipColor)) },
@@ -209,7 +209,7 @@ class NxTooltipHoverTest {
     @Test
     fun `control, the context menu popup pattern under the same harness`() {
         val scene = ImageComposeScene(width = 400, height = 300, density = Density(1f)) {
-            NxTheme(useDarkTheme = true) {
+            NxTheme(dark = true) {
                 Box(Modifier.fillMaxSize().background(Color.Black)) {
                     Box {
                         Box(Modifier.size(60.dp2()).background(anchorColor))

@@ -12,8 +12,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.Symbol
-import hivens.ui.theme.NxTheme
 import hivens.ui.theme.Spacing
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.NxInk
 
 /**
  * Leading icon + label for one vertical-nav entry, selected styling
@@ -25,16 +26,14 @@ import hivens.ui.theme.Spacing
 fun NxNavRowContent(icon: IconKey, label: String, isSelected: Boolean) {
     Symbol(icon = icon,
         contentDescription = null,
-        tint = if (isSelected) NxTheme.colors.primary
-               else NxTheme.colors.textSecondary,
+        tint = if (isSelected) NxColor.lead() else NxInk.quiet,
         modifier = Modifier.size(20.dp),
     )
     Spacer(Modifier.width(Spacing.s12))
     Text(
         text  = label,
         style = MaterialTheme.typography.bodyMedium,
-        color = if (isSelected) NxTheme.colors.primary
-                else NxTheme.colors.textPrimary,
+        color = if (isSelected) NxColor.lead(text = true) else NxInk.main,
         fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,

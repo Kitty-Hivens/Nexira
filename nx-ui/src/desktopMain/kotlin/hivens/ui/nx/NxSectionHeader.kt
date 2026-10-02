@@ -5,7 +5,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.NxInk
 
 /**
  * Title above a group of controls. [muted] picks between the two roles that
@@ -22,7 +23,7 @@ fun NxSectionHeader(
     Text(
         text       = text,
         style      = MaterialTheme.typography.titleSmall,
-        color      = if (muted) NxTheme.colors.textSecondary else NxTheme.colors.primary,
+        color      = if (muted) NxInk.quiet else NxColor.lead(text = true),
         // Muted leaves the weight to titleSmall (Medium); the accent header bolds it.
         fontWeight = if (muted) null else FontWeight.Bold,
         modifier   = modifier,

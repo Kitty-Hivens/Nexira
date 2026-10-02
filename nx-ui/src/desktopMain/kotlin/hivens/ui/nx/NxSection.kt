@@ -16,17 +16,16 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import hivens.ui.surface.NxSurface
-import hivens.ui.surface.NxSurfaceLevel
-import hivens.ui.theme.NxTheme
 import hivens.ui.theme.Spacing
+import hivens.ui.theme.NxColor
+import hivens.ui.surface.SurfaceKind
 
 /**
- * A settings/config section: an accent header label over a single opaque body
- * plane. The rows live inside one [NxSurface] (not a per-row alpha card each),
- * and the separator is that plane's own bevel -- never an orphan divider in the
- * column (Rule 0/D07). Because the plane is an [NxSurface] with [glass] off, it
- * keeps a body and a luminance hairline under any theme and with no wallpaper
- * (Rule 2/3): the section stays a distinct plane when the coat comes off.
+ * A settings/config section: a header in the theme's lead colour over one
+ * [SurfaceKind.Panel]. The rows live inside that one surface (not a per-row card
+ * each), and the separator is the panel's own bevel, never an orphan divider in the
+ * column (Rule 0/D07). A panel is a body, so the section stays a distinct plane
+ * under any theme and with no wallpaper (Rule 2/3).
  *
  * Sections separate from each other by the caller's outer gap (the island
  * model), so a page is `Column(spacedBy(gap)) { NxSection(...){}; NxSection(...){} }`.
@@ -36,7 +35,6 @@ fun NxSection(
     title: String,
     modifier: Modifier = Modifier,
     titleModifier: Modifier = Modifier,
-    level: NxSurfaceLevel = NxSurfaceLevel.Floating,
     spacing: Dp = 12.dp,
     content: @Composable ColumnScope.() -> Unit,
 ) {
@@ -46,12 +44,12 @@ fun NxSection(
             modifier   = titleModifier,
             style      = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.Bold,
-            color      = NxTheme.colors.primary,
+            color      = NxColor.lead(text = true),
             maxLines   = 1,
             overflow   = TextOverflow.Ellipsis,
         )
         Spacer(Modifier.height(Spacing.s8))
-        NxSurface(level = level, blurDp = 0f, modifier = Modifier.fillMaxWidth()) {
+        NxSurface(SurfaceKind.Panel, modifier = Modifier.fillMaxWidth()) {
             Column(
                 modifier            = Modifier.fillMaxWidth().padding(Spacing.s16),
                 verticalArrangement = Arrangement.spacedBy(spacing),

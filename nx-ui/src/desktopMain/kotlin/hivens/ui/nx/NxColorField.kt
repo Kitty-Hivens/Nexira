@@ -22,8 +22,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import hivens.ui.theme.NxTheme
 import hivens.ui.theme.Spacing
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.NxInk
 
 /**
  * Parse a hex string into a [Color] or null. Accepts `#RRGGBB` / `#AARRGGBB`
@@ -70,7 +71,7 @@ fun NxColorField(
                 .size(22.dp)
                 .clip(RoundedCornerShape(6.dp))
                 .background(parsed ?: Color.Transparent)
-                .border(1.dp, NxTheme.colors.outline, RoundedCornerShape(6.dp)),
+                .border(1.dp, NxInk.line, RoundedCornerShape(6.dp)),
         )
         NxField(
             value         = text,
@@ -82,7 +83,7 @@ fun NxColorField(
             Text(
                 text     = clearLabel,
                 style    = MaterialTheme.typography.labelSmall,
-                color    = NxTheme.colors.primary,
+                color    = NxColor.lead(text = true),
                 modifier = Modifier
                     .clip(MaterialTheme.shapes.small)
                     .clickable { text = ""; onClear() }

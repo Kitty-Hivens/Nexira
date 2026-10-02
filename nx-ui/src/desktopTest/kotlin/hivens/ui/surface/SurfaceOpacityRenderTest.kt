@@ -7,17 +7,14 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
-import hivens.ui.theme.DarkColorPalette
-import hivens.ui.theme.LightColorPalette
-import hivens.ui.theme.LocalNxColors
-import hivens.ui.theme.NxColors
+import hivens.ui.theme.NxTheme
+import hivens.ui.theme.Themes
 import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
@@ -26,68 +23,53 @@ import kotlin.test.Test
 import kotlin.test.assertTrue
 
 /**
- * A named opacity has to reach the pixel.
+ * A named opacity has to reach the pixel, and an unnamed one is solid.
  *
- * It did not. `bodyFloor` was applied as a clamp, so every surface drew at 0.92 on
- * dark and 1.0 on light no matter what any knob above it said -- which is why the
- * glass slider moved nothing and the layer meant to show the wallpaper through was
- * covered before it drew. Light was the worse half: alpha was refused outright.
+ * A body used to default to 0.92 on dark, applied as a clamp, so every knob above it
+ * moved nothing and the plane leaked whatever was under it. A body is opaque now
+ * unless a caller names a number, and a named number is honoured on both themes.
  *
- * These render a surface over a bright magenta ground and read the body. Green is
- * the instrument: the ground has none and every ladder tone has plenty, so the
- * green channel falls exactly as far as the ground is allowed through.
+ * These render a surface over a bright magenta ground and read the body. Green is the
+ * instrument: the ground has none and every ladder tone has plenty, so the green
+ * channel falls exactly as far as the ground is allowed through.
  */
 class SurfaceOpacityRenderTest {
 
     @Test
     fun `a named opacity lets the ground through on dark`() {
-        val opaque = greenAt(DarkColorPalette, opacity = 1f)
-        val half = greenAt(DarkColorPalette, opacity = 0.5f)
+        val opaque = greenAt(dark = true, opacity = 1f)
+        val half = greenAt(dark = true, opacity = 0.5f)
         assertTrue(opaque - half >= 10, "dark refused the alpha: opaque $opaque, half $half")
     }
 
-    /**
-     * The case the clamp refused. Whether a light plane can afford to be translucent
-     * depends on what sits behind it and on what the widget buys legibility with; the
-     * library can see neither, so it may default but must not decide.
-     */
     @Test
     fun `a named opacity lets the ground through on light too`() {
-        val opaque = greenAt(LightColorPalette, opacity = 1f)
-        val half = greenAt(LightColorPalette, opacity = 0.5f)
+        val opaque = greenAt(dark = false, opacity = 1f)
+        val half = greenAt(dark = false, opacity = 0.5f)
         assertTrue(opaque - half >= 50, "light refused the alpha: opaque $opaque, half $half")
     }
 
-    /** The default is unchanged: a surface that names nothing still draws solid on light. */
     @Test
-    fun `light stays solid when no opacity is named`() {
-        val named = greenAt(LightColorPalette, opacity = 1f)
-        val default = greenAt(LightColorPalette, opacity = null)
-        assertTrue(abs(named - default) <= 2, "light default moved: named $named, default $default")
-    }
-
-    /** Same for dark: unconfigured surfaces keep the floor they always had. */
-    @Test
-    fun `dark keeps its floor when no opacity is named`() {
-        val floored = greenAt(DarkColorPalette, opacity = bodyFloor(dark = true))
-        val default = greenAt(DarkColorPalette, opacity = null)
-        assertTrue(abs(floored - default) <= 2, "dark default moved: floor $floored, default $default")
+    fun `a body that names no opacity is solid on both themes`() {
+        for (dark in listOf(true, false)) {
+            val named = greenAt(dark, opacity = 1f)
+            val default = greenAt(dark, opacity = null)
+            assertTrue(abs(named - default) <= 2, "default is not solid (dark=$dark): named $named, default $default")
+        }
     }
 
     // Renders one surface at [opacity] over magenta and returns the green channel at
-    // its centre. blurDp = 0f so nothing but the body is under test.
+    // its centre.
     @OptIn(ExperimentalComposeUiApi::class)
-    private fun greenAt(palette: NxColors, opacity: Float?): Int {
+    private fun greenAt(dark: Boolean, opacity: Float?): Int {
         val scene = ImageComposeScene(width = W, height = H, density = Density(1f)) {
-            CompositionLocalProvider(
-                LocalNxColors provides palette,
-            ) {
+            NxTheme(Themes.Celestia, dark = dark) {
                 Box(Modifier.fillMaxSize().background(GROUND)) { Plate(opacity) }
             }
         }
         val image = scene.render()
         scene.close()
-        val tag = if (palette === LightColorPalette) "light" else "dark"
+        val tag = if (dark) "dark" else "light"
         val name = "surface-opacity-$tag-${opacity ?: "default"}.png"
         File(OUT).mkdirs()
         image.encodeToData(EncodedImageFormat.PNG)?.bytes?.let { File(OUT, name).writeBytes(it) }
@@ -99,10 +81,9 @@ class SurfaceOpacityRenderTest {
     @Composable
     private fun Plate(opacity: Float?) {
         NxSurface(
-            level = NxSurfaceLevel.Floating,
+            kind = SurfaceKind.Panel,
             modifier = Modifier.offset(PAD.dp, PAD.dp).size((W - 2 * PAD).dp, (H - 2 * PAD).dp),
             shape = RoundedCornerShape(12.dp),
-            blurDp = 0f,
             borderWidthDp = 0f,
             opacity = opacity,
         ) {}
