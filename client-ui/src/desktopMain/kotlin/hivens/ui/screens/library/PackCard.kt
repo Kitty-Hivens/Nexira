@@ -267,22 +267,22 @@ private fun PackAvatar(iconUrl: String?, displayName: String, hue: Color) {
 
 @Composable
 private fun LastPlayedChip(lastPlayedEpoch: Long) {
+    NxMetaChip(lastPlayedLabel(lastPlayedEpoch), tone = NxMetaChipTone.OnMedia)
+}
+
+/** When a pack was last played, in the words a card uses: "1 h ago", "never played". */
+@Composable
+internal fun lastPlayedLabel(lastPlayedEpoch: Long): String {
     val s = LocalStrings.current
-    if (lastPlayedEpoch <= 0L) {
-        NxMetaChip(s.packCardNeverPlayed, tone = NxMetaChipTone.OnMedia)
-        return
-    }
-    val now = Instant.now()
-    val then = Instant.ofEpochSecond(lastPlayedEpoch)
-    val dur = Duration.between(then, now)
-    val label = when {
+    if (lastPlayedEpoch <= 0L) return s.packCardNeverPlayed
+    val dur = Duration.between(Instant.ofEpochSecond(lastPlayedEpoch), Instant.now())
+    return when {
         dur.toMinutes() < 1   -> s.packCardPlayedJustNow
         dur.toHours()   < 1   -> s.packCardPlayedMinutesAgo(dur.toMinutes())
         dur.toDays()    < 1   -> s.packCardPlayedHoursAgo(dur.toHours())
         dur.toDays()    < 14  -> s.packCardPlayedDaysAgo(dur.toDays())
         else                  -> s.packCardPlayedLongAgo
     }
-    NxMetaChip(label, tone = NxMetaChipTone.OnMedia)
 }
 
 /** The card's on-media meta chip, kept as a named alias for other over-banner surfaces. */
