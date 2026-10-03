@@ -3,6 +3,8 @@ package hivens.ui.editor
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import hivens.ui.layout.LayoutGraphRepository
+import hivens.ui.screens.custom.ScreenIcons
+import hivens.ui.screens.custom.ScreenLinks
 import hivens.widget.model.FlowSpec
 import hivens.widget.model.GRID_MAX
 import hivens.widget.model.LayoutGraph
@@ -12,7 +14,11 @@ import hivens.widget.model.SlotId
 import hivens.widget.model.SlotPath
 import hivens.widget.model.SurfaceId
 import hivens.widget.model.SurfaceInsets
+import hivens.widget.model.ScreenSpec
 import hivens.widget.model.SurfaceSpec
+import hivens.widget.model.addScreen
+import hivens.widget.model.removeScreen
+import hivens.widget.model.updateScreen
 import hivens.widget.model.ViewportSpec
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
@@ -384,13 +390,49 @@ class EditModeController(
         }
     }
 
-    // Full reset to the bundled default across every surface.
+    // Full reset to the bundled default across every surface. The screens somebody
+    // made survive it, and so does the way to them: the rail comes back as bundled,
+    // so each one's link is put back on it.
     fun resetAll() {
         scope.launch(writeDispatcher) {
             val before = repo.value()
             repo.resetAll()
+            repo.update { ScreenLinks.ensureLinks(it) }
             history.record(key = null, before = before, after = repo.value())
             publishHistory()
+        }
+    }
+
+    // ── Screens somebody made ──────────────────────────────────────────
+
+    /**
+     * Makes a screen called [title] with a blank, static page and a link at the
+     * bottom of the rail. Returns the record at once, before the write lands, so
+     * the caller can wait for it to appear and open it.
+     */
+    fun createScreen(title: String, icon: String = ScreenIcons.DEFAULT): ScreenSpec {
+        val id = newInstanceId()
+        val spec = ScreenSpec(id = id, title = title, icon = icon, surface = SurfaceId("screen.$id"))
+        scope.launch(writeDispatcher) {
+            edit(key = null) { ScreenLinks.ensureLink(it.addScreen(spec), spec) }
+        }
+        return spec
+    }
+
+    /** Renames a made screen or changes its icon. Null leaves that half as it is. */
+    fun updateScreen(id: String, title: String? = null, icon: String? = null) {
+        scope.launch(writeDispatcher) {
+            // Keyed, so typing a name is one step back and not one per letter.
+            edit(key = "screen:$id") { g ->
+                g.updateScreen(id) { it.copy(title = title ?: it.title, icon = icon ?: it.icon) }
+            }
+        }
+    }
+
+    /** Deletes a made screen, what was on it, and every link to it. */
+    fun deleteScreen(id: String) {
+        scope.launch(writeDispatcher) {
+            edit(key = null) { ScreenLinks.removeLinks(it.removeScreen(id), id) }
         }
     }
 

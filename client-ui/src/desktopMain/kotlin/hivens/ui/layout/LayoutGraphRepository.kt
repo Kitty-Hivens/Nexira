@@ -6,7 +6,10 @@ import hivens.widget.model.SurfaceId
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
 import hivens.widget.model.flatMapInstances
+import hivens.widget.model.resetScreenSurface
 import hivens.widget.model.resetSurface
+import hivens.widget.model.screenOn
+import hivens.widget.model.withScreensFrom
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -175,16 +178,26 @@ class LayoutGraphRepository(
      */
     suspend fun resetSurface(surface: SurfaceId) {
         val def = defaultGraph()
-        update { it.resetSurface(surface, def.surfaces[surface]) }
+        update { graph ->
+            // A screen somebody made has no bundled default, and the general reset
+            // reads that as "remove the surface", which would leave the screen
+            // pointing at nothing. Its default is the blank page it started as.
+            if (graph.screenOn(surface) != null) graph.resetScreenSurface(surface)
+            else graph.resetSurface(surface, def.surfaces[surface])
+        }
     }
 
     /**
      * Full reset: restore the entire graph to the bundled default. The escape
      * hatch when per-surface resets are not enough -- e.g. undoing edits spread
      * across several surfaces in one action.
+     *
+     * The screens somebody made stay, content and all. A reset is about how the
+     * launcher's own surfaces are arranged, and a screen made and filled by hand is
+     * not an arrangement of anything the default knows.
      */
     suspend fun resetAll() {
-        update { defaultGraph() }
+        update { current -> defaultGraph().withScreensFrom(current) }
     }
 
     /**

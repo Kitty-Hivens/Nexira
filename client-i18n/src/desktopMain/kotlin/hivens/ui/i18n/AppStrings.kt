@@ -1610,6 +1610,16 @@ interface AppStrings {
     val editorRegionProps: String
     /** Spoken name of a surface tab whose rail is rolled up. [name] is the tab's own name. */
     fun editorSurfaceFolded(name: String): String
+    val editorNewScreen: String
+    val editorMountRefused: String
+    val screenMissing: String
+    val screenUntitled: String
+    fun screenDefaultTitle(n: Int): String
+    val screenSettingsTitle: String
+    val screenTitleLabel: String
+    val screenIconLabel: String
+    val screenDelete: String
+    fun screenDeleteBody(title: String): String
     val editorUndo: String
     val editorRedo: String
     val editorEscHint: String

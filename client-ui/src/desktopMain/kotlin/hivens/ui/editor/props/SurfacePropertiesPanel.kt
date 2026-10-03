@@ -17,6 +17,7 @@ import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
@@ -53,6 +54,7 @@ import hivens.ui.customization.CustomizationSettings
 import hivens.ui.customization.NavSelectionStyle
 import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.puppet.PuppetClick
@@ -84,6 +86,28 @@ fun SurfacePropertiesPanel(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    EditorSidePanel(visible = visible, title = title, icon = NxIcon.ViewSidebar, onDismiss = onDismiss, modifier = modifier) {
+        NavSelectionControl(customization = customization, onChange = onCustomizationChanged)
+    }
+}
+
+/**
+ * The editor's right-edge panel frame: a solid popup 320 wide, sliding in from the
+ * edge, with a header that drags it off the edge and closes it.
+ *
+ * One frame for every panel about a whole thing rather than one widget, so a
+ * region's settings and a made screen's settings sit in the same place and move
+ * the same way.
+ */
+@Composable
+internal fun EditorSidePanel(
+    visible: Boolean,
+    title: String,
+    icon: IconKey,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit,
+) {
     AnimatedVisibility(
         visible  = visible,
         enter    = fadeIn(spring()) + slideInHorizontally(spring(stiffness = Spring.StiffnessMediumLow)) { it },
@@ -91,7 +115,7 @@ fun SurfacePropertiesPanel(
         modifier = modifier,
     ) {
         val s = LocalStrings.current
-            // Draggable dock: the header drags this offset (session-scoped), like the
+        // Draggable dock: the header drags this offset (session-scoped), like the
         // widget palette, so the panel can be pulled off the right edge.
         val offset = rememberDockOffset()
         NxSurface(
@@ -133,7 +157,7 @@ fun SurfacePropertiesPanel(
                     .padding(start = 14.dp, end = 6.dp, top = 12.dp, bottom = 6.dp),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Symbol(icon = NxIcon.ViewSidebar,
+                    Symbol(icon = icon,
                         contentDescription = null,
                         tint               = NxColor.lead(),
                         modifier           = Modifier.size(18.dp),
@@ -162,9 +186,8 @@ fun SurfacePropertiesPanel(
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = 14.dp, vertical = 4.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                NavSelectionControl(customization = customization, onChange = onCustomizationChanged)
-            }
+                content             = content,
+            )
         }
         }
     }

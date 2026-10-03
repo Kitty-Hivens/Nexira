@@ -2,6 +2,7 @@ package hivens.ui.layout
 
 import hivens.widget.model.LAYOUT_SCHEMA
 import hivens.widget.model.LayoutGraph
+import hivens.widget.model.normalizeScreens
 import hivens.widget.model.walkInstances
 import org.slf4j.LoggerFactory
 
@@ -53,7 +54,10 @@ object LayoutReconcile {
     fun reconcile(schemaVersion: Int, graph: LayoutGraph, default: LayoutGraph): Result {
         val migrated = Migrations.apply(schemaVersion, graph)
         firstDuplicateInstanceId(migrated)?.let { return Result.DuplicateId(it, "migration") }
-        val merged = mergeMissingFamilies(mergeMissingSurfaces(migrated, default), default)
+        // Screens last: a made screen's surface is nobody's default, so the merges
+        // above never touch it, and a screen whose surface went missing gets a blank
+        // one here rather than opening onto nothing.
+        val merged = mergeMissingFamilies(mergeMissingSurfaces(migrated, default), default).normalizeScreens()
         firstDuplicateInstanceId(merged)?.let { return Result.DuplicateId(it, "merge") }
         return Result.Ok(merged)
     }

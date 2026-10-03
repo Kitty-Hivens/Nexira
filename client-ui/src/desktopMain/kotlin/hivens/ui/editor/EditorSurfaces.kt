@@ -5,6 +5,7 @@ import hivens.ui.Screen
 import hivens.ui.i18n.AppStrings
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
+import hivens.ui.screens.custom.ScreenIcons
 import hivens.ui.widgets.about.LocalAboutContext
 import hivens.ui.widgets.about.STUB_ABOUT
 import hivens.ui.widgets.bgsettings.LocalBgSettingsContext
@@ -20,9 +21,12 @@ import hivens.ui.widgets.themepicker.LocalThemePickerContext
 import hivens.ui.widgets.themepicker.STUB_THEME_PICKER
 import hivens.widget.model.FamilyId
 import hivens.widget.model.LayoutGraph
+import hivens.widget.model.ScreenSpec
 import hivens.widget.model.SlotId
 import hivens.widget.model.SlotPath
 import hivens.widget.model.SurfaceId
+import hivens.widget.model.screen
+import hivens.widget.model.screenOn
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.jsonPrimitive
 
@@ -202,6 +206,33 @@ internal object EditorSurfaces {
     fun spec(id: SurfaceId): EditorSurfaceSpec? = byId[id]
 
     /**
+     * The spec for [id], screens somebody made included.
+     *
+     * Those are in the graph and nowhere else, so a lookup that only asked the
+     * compiled-in list found nothing for them, and the editor drew a made screen's
+     * tab with its raw surface id and no way to its settings.
+     */
+    fun specIn(id: SurfaceId, graph: LayoutGraph): EditorSurfaceSpec? =
+        byId[id] ?: graph.screenOn(id)?.let(::madeScreen)
+
+    /**
+     * What the editor knows about a made screen, read off its record.
+     *
+     * Settings, because a made screen has its own: its name, its icon, and the way
+     * to delete it. No stub, because a made screen provides no context of its own;
+     * whatever its widgets read, the shell provides.
+     */
+    private fun madeScreen(spec: ScreenSpec): EditorSurfaceSpec = EditorSurfaceSpec(
+        id          = spec.surface,
+        icon        = ScreenIcons.of(spec.icon),
+        name        = { s -> spec.title.ifBlank { s.screenUntitled } },
+        shortName   = { s -> spec.title.ifBlank { s.screenUntitled } },
+        hasSettings = true,
+        mountedOn   = { screen -> screen == Screen.Custom(spec.id) },
+        ownerRegion = "appshell.region.center",
+    )
+
+    /**
      * Every no-op context the editor stands in for, in one array the host
      * spreads into its provider. Derived from the registry, so a surface that
      * declares a stub gets it mounted by existing.
@@ -220,7 +251,11 @@ internal object EditorSurfaces {
      */
     fun availableFor(screen: Screen, graph: LayoutGraph): List<SurfaceId> {
         val known = graph.surfaces.keys
-        val main = centre.firstOrNull { it.mountedOn?.invoke(screen) == true }
+        val main = when (screen) {
+            // A made screen's surface is named by its record, which is in the graph.
+            is Screen.Custom -> graph.screen(screen.id)?.let(::madeScreen)
+            else -> centre.firstOrNull { it.mountedOn?.invoke(screen) == true }
+        }
         return (listOfNotNull(main) + shell).map { it.id }.filter { it in known }
     }
 
@@ -258,7 +293,7 @@ internal object EditorSurfaces {
      * the region this build expects.
      */
     fun ownerRegionOf(surface: SurfaceId, graph: LayoutGraph): Pair<SlotPath, String>? {
-        val kind = spec(surface)?.ownerRegion ?: return null
+        val kind = specIn(surface, graph)?.ownerRegion ?: return null
         return FRAMES.firstNotNullOfOrNull { (frame, slot) ->
             val path = SlotPath(frame, slot)
             graph.surfaces[frame]

@@ -53,6 +53,10 @@ internal object JsonMigrations {
         12 -> ::dropRetiredServerLayout
         13 -> ::compensateHomeSlotPadding
         14 -> ::scrollTheBackgroundControls
+        // 15 adds the screens somebody made. Nothing in an older file has to move,
+        // so the step is the identity; the bump is for the other direction, where an
+        // older build would drop the list on its next write and has to open the
+        // file read-only instead.
         else -> { it -> it }
     }
 

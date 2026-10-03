@@ -169,7 +169,7 @@ fun NavEntry(instance: WidgetInstance) {
 // outlined FILL-axis form when the user enables the swap; service entries
 // stay filled in both states.
 @Composable
-private fun NavSlot(
+internal fun NavSlot(
     icon: IconKey,
     phase: Float,
     active: Boolean,

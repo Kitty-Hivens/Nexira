@@ -1366,6 +1366,7 @@ object JapaneseStrings : AppStrings {
         "widget.library.header.title" to "見出し",
         "widget.library.header.show" to "見出しを表示",
         "widget.nav.entry" to "ナビ項目",
+        "widget.nav.screen" to "画面へのリンク",
         "widget.notes.scratch" to "メモ",
         "widget.notes.scratch.placeholder" to "何か書いてください...",
         "widget.notes.scratch.title" to "タイトル",
@@ -1542,6 +1543,16 @@ object JapaneseStrings : AppStrings {
     override val editorPaletteToggleHide = "隠す"
     override val editorRegionProps = "この領域"
     override fun editorSurfaceFolded(name: String) = "$name (折りたたみ中)"
+    override val editorNewScreen = "新しい画面"
+    override val editorMountRefused = "この面はすでに上で開かれているため、ここでは開きません"
+    override val screenMissing = "この画面はもうありません"
+    override val screenUntitled = "無題"
+    override fun screenDefaultTitle(n: Int) = "画面 $n"
+    override val screenSettingsTitle = "画面"
+    override val screenTitleLabel = "名前"
+    override val screenIconLabel = "アイコン"
+    override val screenDelete = "画面を削除"
+    override fun screenDeleteBody(title: String) = "「$title」とその中身は、レールのボタンと一緒に削除されます。"
     override val editorUndo = "元に戻す"
     override val editorRedo = "やり直す"
     override val editorEscHint = "Esc で終了"

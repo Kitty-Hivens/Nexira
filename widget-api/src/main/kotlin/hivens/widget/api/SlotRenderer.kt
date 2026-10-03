@@ -121,7 +121,18 @@ fun SlotRenderer(
     // declares, and so a slot declared before families existed keeps meaning the
     // general one without saying so.
     val path = SlotPath(surface, slot, family = activeFamilyOf(surface))
-    CompositionLocalProvider(LocalSlotPath provides path) {
+    val mounted = LocalMountedSurfaces.current
+    // Open above already: this slot is inside its own surface, through some widget
+    // that opens it. Refused rather than drawn, because drawing it draws it again.
+    // It keeps the slot's footprint, the way an empty slot does, so the layout
+    // around it does not jump because one of its slots refused.
+    if (surface in mounted) {
+        val refused = LocalRefusedMount.current
+        Box(modifier) { refused(surface) }
+        return
+    }
+    val nowMounted = remember(mounted, surface) { mounted + surface }
+    CompositionLocalProvider(LocalSlotPath provides path, LocalMountedSurfaces provides nowMounted) {
         RenderSlotContent(path, modifier, spacing, contentPadding)
     }
 }

@@ -95,6 +95,7 @@ class WidgetRegistryConsistencyTest {
             "home.new.video",
             // unified configurable nav rail item
             "nav.entry",
+            "nav.screen",
             // Phase A.3 container sample
             "container.group",
             // tab container
@@ -292,6 +293,7 @@ class WidgetRegistryConsistencyTest {
             "appshell.region.top",
             // unified nav rail item (target prop)
             "nav.entry",
+            "nav.screen",
             // persistent notification history (expand-direction + clock props)
             "notifications.history",
             // per-instance state widgets (props alongside their runtime state)

@@ -81,6 +81,7 @@ import hivens.ui.editor.presets.PresetEnvelope
 import hivens.ui.editor.presets.PresetManagerPanel
 import hivens.ui.editor.presets.PresetMeta
 import hivens.ui.editor.presets.PresetRepository
+import hivens.ui.editor.props.ScreenPropertiesPanel
 import hivens.ui.editor.props.SurfacePropertiesPanel
 import hivens.ui.editor.props.WidgetPropPanel
 import hivens.ui.i18n.AppStrings
@@ -103,6 +104,7 @@ import hivens.widget.api.LocalEmptySlotDecorator
 import hivens.widget.api.LocalFamilyOverrides
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.LocalPlacementReflow
+import hivens.widget.api.LocalRefusedMount
 import hivens.widget.api.LocalSlotBoundsReporter
 import hivens.widget.api.LocalSlotChromeModifier
 import hivens.widget.api.LocalSlotMotionMs
@@ -120,8 +122,11 @@ import hivens.widget.model.withSurfacesFrom
 import hivens.widget.model.FlowSpec
 import hivens.widget.model.FamilyId
 import hivens.widget.model.LayoutGraph
+import hivens.widget.model.ScreenSpec
 import hivens.widget.model.SlotPath
 import hivens.widget.model.SurfaceId
+import hivens.widget.model.screen
+import hivens.widget.model.screenOn
 import hivens.widget.model.traverse
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineScope as KotlinCoroutineScope
@@ -154,6 +159,8 @@ fun EditorSurfaceHost(
     currentScreen: Screen,
     customization: CustomizationSettings = CustomizationSettings(),
     onCustomizationChanged: (CustomizationSettings) -> Unit = {},
+    /** Opens a screen, the way the rail does. The editor uses it to show a screen it just made. */
+    onOpenScreen: (Screen) -> Unit = {},
     content: @Composable () -> Unit,
 ) {
     val graphForSurfaces = LocalLayoutGraph.current
@@ -261,6 +268,33 @@ fun EditorSurfaceHost(
     // settings panel, and any slot selection, so re-entering does not silently reopen
     // the last panel with the palette still hidden.
     LaunchedEffect(editing) { if (!editing) { propTarget = null; surfaceSettingsOpen = false; clearSlotSelection() } }
+
+    // A screen just made from the pill. Not keyed on the tab set, because opening it
+    // changes the tab set and that is exactly when this has to survive: the record
+    // lands a frame or two after the press, the screen is opened once it is there,
+    // and once its surface is a tab the editor stays on with the screen's own
+    // settings open, so the next thing the person does is name it. Declared after
+    // the exit clean-up above, which runs first on the same change and would
+    // otherwise close the panel this opens.
+    var pendingScreen by remember { mutableStateOf<ScreenSpec?>(null) }
+    LaunchedEffect(pendingScreen, graphForSurfaces) {
+        val made = pendingScreen ?: return@LaunchedEffect
+        if (graphForSurfaces.screen(made.id) != null && currentScreen != Screen.Custom(made.id)) {
+            onOpenScreen(Screen.Custom(made.id))
+        }
+    }
+    LaunchedEffect(availableSurfaces) {
+        val made = pendingScreen ?: return@LaunchedEffect
+        if (made.surface !in availableSurfaces) return@LaunchedEffect
+        editing = true
+        selectedSurface = made.surface
+        propTarget = null
+        surfaceSettingsOpen = true
+        pendingScreen = null
+    }
+    // The selected surface's made screen, when it is one: its settings are the
+    // screen's own panel rather than a region's.
+    val selectedScreen: ScreenSpec? = selectedSurface?.let { graphForSurfaces.screenOn(it) }
 
     // Commit the arrangement at the points where the user has finished a
     // thought: leaving edit mode, and moving to another surface. Writes are
@@ -519,6 +553,16 @@ fun EditorSurfaceHost(
      * a drag. That put a second whole-shell invalidation per pointer move next to
      * the one the layout graph was already causing.
      */
+    // Where a surface refused to open inside itself. Said only while arranging,
+    // which is the only time somebody can have caused it and can undo it.
+    val refusedMount: @Composable (SurfaceId) -> Unit = remember(state, previewing) {
+        if (state is EditModeState.On && !previewing) {
+            { _ -> RefusedMountPlaceholder() }
+        } else {
+            { _ -> }
+        }
+    }
+
     val slotBoundsReporter: SlotBoundsReporter = remember(state, previewing, registry) {
         if (state is EditModeState.On && !previewing) {
             { path, visible, content -> registry.registerSlot(path, visible, content) }
@@ -551,6 +595,7 @@ fun EditorSurfaceHost(
         // Placement slots report their window bounds so palette drops land at the
         // release point (PaletteItem reads slotOrigin to convert the pointer).
         LocalSlotBoundsReporter provides slotBoundsReporter,
+        LocalRefusedMount provides refusedMount,
         // Stub surface contexts, spread from the registry. Surface composables
         // that mount under content() override with the real values; widgets
         // dropped on a foreign surface fall through to the stubs and render
@@ -636,7 +681,7 @@ fun EditorSurfaceHost(
                         title            = { Text(s.editorResetSurfaceTitle) },
                         text             = {
                             Text(
-                                text = s.editorResetSurfaceBody(humanSurfaceName(surfaceForReset, s)),
+                                text = s.editorResetSurfaceBody(humanSurfaceName(surfaceForReset, s, graphForSurfaces)),
                                 style = MaterialTheme.typography.bodyMedium,
                             )
                         },
@@ -782,12 +827,22 @@ fun EditorSurfaceHost(
                 // rail's selection style) -- shares the right edge with the
                 // widget prop panel; the two are mutually exclusive by flag.
                 SurfacePropertiesPanel(
-                    visible                = editing && !previewing && surfaceSettingsOpen && surfaceHasSettings(selectedSurface),
-                    title                  = selectedSurface?.let { humanSurfaceName(it, s) } ?: "",
+                    visible                = editing && !previewing && surfaceSettingsOpen &&
+                        selectedScreen == null && surfaceHasSettings(selectedSurface, graphForSurfaces),
+                    title                  = selectedSurface?.let { humanSurfaceName(it, s, graphForSurfaces) } ?: "",
                     customization          = customization,
                     onCustomizationChanged = onCustomizationChanged,
                     onDismiss              = { surfaceSettingsOpen = false },
                     modifier               = Modifier.align(Alignment.TopEnd),
+                )
+
+                // A made screen's own settings, on the same chip and in the same place.
+                ScreenPropertiesPanel(
+                    visible    = editing && !previewing && surfaceSettingsOpen && selectedScreen != null,
+                    spec       = selectedScreen,
+                    controller = controller,
+                    onDismiss  = { surfaceSettingsOpen = false },
+                    modifier   = Modifier.align(Alignment.TopEnd),
                 )
 
                 // No edit-mode FAB: Ctrl+E (window-level, see AppShell) toggles
@@ -823,13 +878,16 @@ fun EditorSurfaceHost(
                     families              = availableFamilies,
                     selectedFamily        = selectedFamily,
                     onFamilyPicked        = { selectedFamily = it; clearSlotSelection() },
-                    surfaceHasSettings    = surfaceHasSettings(selectedSurface),
+                    surfaceHasSettings    = surfaceHasSettings(selectedSurface, graphForSurfaces),
                     onOpenSurfaceSettings = { surfaceSettingsOpen = !surfaceSettingsOpen; if (surfaceSettingsOpen) propTarget = null },
                     paletteOpen           = paletteOpen,
                     onTogglePalette       = { paletteOpen = !paletteOpen },
                     previewing            = previewing,
                     onTogglePreview       = { previewing = !previewing },
                     onOpenPresets         = { presetPanelOpen = true },
+                    onNewScreen           = {
+                        pendingScreen = controller.createScreen(s.screenDefaultTitle(graphForSurfaces.screens.size + 1))
+                    },
                     onRequestReset        = { if (selectedSurface != null) resetSurfaceConfirm = true },
                     hasRegionProps        = ownerRegion(selectedSurface) != null,
                     onOpenRegionProps     = {
@@ -912,6 +970,7 @@ private fun EditModePill(
     previewing: Boolean,
     onTogglePreview: () -> Unit,
     onOpenPresets: () -> Unit,
+    onNewScreen: () -> Unit,
     onRequestReset: () -> Unit,
     canUndo: Boolean,
     canRedo: Boolean,
@@ -1064,6 +1123,16 @@ private fun EditModePill(
                     )
                     Spacer(Modifier.width(4.dp))
 
+                    // A new screen of one's own, opened and ready to be named.
+                    ToolChip(
+                        icon     = NxIcon.Add,
+                        label    = s.editorNewScreen,
+                        selected = false,
+                        onClick  = onNewScreen,
+                        compact  = compact,
+                    )
+                    Spacer(Modifier.width(4.dp))
+
                     // Presets dialog.
                     ToolChip(
                         icon     = NxIcon.Inventory2,
@@ -1123,9 +1192,10 @@ private fun SurfaceChip(
     onClick: () -> Unit,
 ) {
     val s = LocalStrings.current
+    val graph = LocalLayoutGraph.current
     val bg = if (active) NxColor.wash(NxColor.lead(), 0.18f)
              else Color.Transparent
-    val name = humanSurfaceShortName(surface, s)
+    val name = humanSurfaceShortName(surface, s, graph)
     val label = if (folded) s.editorSurfaceFolded(name) else name
     OnFill(bg) {
         val base = if (active) NxColor.lead(text = true) else NxInk.quiet
@@ -1138,7 +1208,7 @@ private fun SurfaceChip(
                 .clickable { onClick() }
                 .padding(horizontal = if (compact) 7.dp else 10.dp, vertical = 5.dp),
         ) {
-            Symbol(icon = if (folded) NxIcon.VisibilityOff else surfaceIcon(surface),
+            Symbol(icon = if (folded) NxIcon.VisibilityOff else surfaceIcon(surface, graph),
                 // Named whenever the tab is folded, not only when the pill is too
                 // narrow for words: the wide pill writes the plain name and the
                 // only other cue is a dimmed tint, which a screen reader has no
@@ -1234,22 +1304,40 @@ private fun ToolChip(
 
 private val CHIP_SHAPE = RoundedCornerShape(12.dp)
 
-private fun surfaceIcon(surface: SurfaceId): IconKey =
-    EditorSurfaces.spec(surface)?.icon ?: NxIcon.Home
+private fun surfaceIcon(surface: SurfaceId, graph: LayoutGraph): IconKey =
+    EditorSurfaces.specIn(surface, graph)?.icon ?: NxIcon.Home
 
 // Falls back to the raw id for a surface with no spec: better a visible
 // `home.experiment` in the picker than a blank chip, and the registry test
 // catches the omission before a build ships it.
-private fun humanSurfaceShortName(surface: SurfaceId, s: AppStrings): String =
-    EditorSurfaces.spec(surface)?.shortName?.invoke(s) ?: surface.value
+private fun humanSurfaceShortName(surface: SurfaceId, s: AppStrings, graph: LayoutGraph): String =
+    EditorSurfaces.specIn(surface, graph)?.shortName?.invoke(s) ?: surface.value
 
-private fun humanSurfaceName(surface: SurfaceId, s: AppStrings): String =
-    EditorSurfaces.spec(surface)?.name?.invoke(s) ?: surface.value
+private fun humanSurfaceName(surface: SurfaceId, s: AppStrings, graph: LayoutGraph): String =
+    EditorSurfaces.specIn(surface, graph)?.name?.invoke(s) ?: surface.value
 
-// Surfaces that expose surface-level settings (a SurfacePropertiesPanel),
-// distinct from per-widget props.
-private fun surfaceHasSettings(surface: SurfaceId?): Boolean =
-    surface != null && EditorSurfaces.spec(surface)?.hasSettings == true
+// Surfaces that expose surface-level settings (a SurfacePropertiesPanel, or a made
+// screen's own), distinct from per-widget props.
+private fun surfaceHasSettings(surface: SurfaceId?, graph: LayoutGraph): Boolean =
+    surface != null && EditorSurfaces.specIn(surface, graph)?.hasSettings == true
+
+/**
+ * What a surface that refused to open inside itself draws while somebody is
+ * arranging: a dashed box saying so, where the surface would have been, so the
+ * widget that caused it can be found and moved.
+ */
+@Composable
+private fun RefusedMountPlaceholder() {
+    val s = LocalStrings.current
+    Box(
+        modifier = Modifier
+            .padding(8.dp)
+            .border(1.dp, NxColor.status(Status.Warning), RoundedCornerShape(8.dp))
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+    ) {
+        Text(s.editorMountRefused, style = MaterialTheme.typography.labelMedium, color = NxColor.status(Status.Warning, text = true))
+    }
+}
 
 // ── Vignette ────────────────────────────────────────────────────────────────
 

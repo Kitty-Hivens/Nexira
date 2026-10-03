@@ -122,8 +122,15 @@ data class SurfaceLayout(
 fun SurfaceLayout(slots: Map<SlotId, SlotContent>): SurfaceLayout =
     SurfaceLayout(families = mapOf(FamilyId.GENERAL to FamilyLayout(slots)))
 
+/**
+ * Everything arranged: every surface, and the screens somebody made, which open
+ * surfaces of their own. See [ScreenSpec].
+ */
 @Serializable
-data class LayoutGraph(val surfaces: Map<SurfaceId, SurfaceLayout> = emptyMap()) {
+data class LayoutGraph(
+    val surfaces: Map<SurfaceId, SurfaceLayout> = emptyMap(),
+    val screens: List<ScreenSpec> = emptyList(),
+) {
     companion object {
         val EMPTY: LayoutGraph = LayoutGraph()
     }

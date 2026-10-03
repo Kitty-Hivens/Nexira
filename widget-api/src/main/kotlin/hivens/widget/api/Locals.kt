@@ -20,6 +20,7 @@ import hivens.widget.model.LayoutGraph
 import hivens.widget.model.SlotAddress
 import hivens.widget.model.SlotContent
 import hivens.widget.model.SlotPath
+import hivens.widget.model.SurfaceId
 import hivens.widget.model.SurfaceSpec
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetSizing
@@ -288,6 +289,25 @@ typealias ViewportScrollbar = @Composable BoxScope.(state: ScrollState, horizont
 
 val LocalViewportScrollbar: ProvidableCompositionLocal<ViewportScrollbar> =
     staticCompositionLocalOf { { _, _, _ -> } }
+
+/**
+ * The surfaces open above the slot rendering now, innermost last.
+ *
+ * A widget does not contain a surface, it opens one, so nothing in the model can
+ * say that a surface ends up inside itself: the edge only exists inside a widget's
+ * body. Composition is depth first, so the check is a stack. A surface that finds
+ * itself already on it refuses to open and draws [LocalRefusedMount] instead,
+ * before the recursion can reach the stack's own limit. Two of the same surface
+ * side by side are different branches and both open.
+ */
+val LocalMountedSurfaces: ProvidableCompositionLocal<Set<SurfaceId>> = compositionLocalOf { emptySet() }
+
+/**
+ * Drawn where a surface refused to open inside itself. Nothing by default, which
+ * is what a person not arranging anything should see; the editor says why.
+ */
+val LocalRefusedMount: ProvidableCompositionLocal<@Composable (SurfaceId) -> Unit> =
+    staticCompositionLocalOf { {} }
 
 /**
  * The nearest scrolling slot above, for a gesture that has to move it.

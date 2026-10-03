@@ -1374,6 +1374,7 @@ object RussianStrings : AppStrings {
         "widget.library.header.title" to "Заголовок",
         "widget.library.header.show" to "Показывать шапку",
         "widget.nav.entry" to "Пункт навигации",
+        "widget.nav.screen" to "Ссылка на экран",
         "widget.notes.scratch" to "Заметки",
         "widget.notes.scratch.placeholder" to "Напишите что-нибудь...",
         "widget.notes.scratch.title" to "Заголовок",
@@ -1550,6 +1551,16 @@ object RussianStrings : AppStrings {
     override val editorPaletteToggleHide = "Скрыть"
     override val editorRegionProps       = "Сама область"
     override fun editorSurfaceFolded(name: String) = "$name, свёрнута"
+    override val editorNewScreen = "Новый экран"
+    override val editorMountRefused = "Эта поверхность уже открыта выше, второй раз она здесь не откроется"
+    override val screenMissing = "Этого экрана больше нет"
+    override val screenUntitled = "Без названия"
+    override fun screenDefaultTitle(n: Int) = "Экран $n"
+    override val screenSettingsTitle = "Экран"
+    override val screenTitleLabel = "Название"
+    override val screenIconLabel = "Значок"
+    override val screenDelete = "Удалить экран"
+    override fun screenDeleteBody(title: String) = "«$title» и всё, что на нём, будут удалены вместе с кнопкой на панели."
     override val editorUndo              = "Отменить"
     override val editorRedo              = "Вернуть"
     override val editorEscHint           = "Esc — выйти"

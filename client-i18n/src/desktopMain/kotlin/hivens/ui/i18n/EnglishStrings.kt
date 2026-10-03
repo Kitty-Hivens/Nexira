@@ -1359,6 +1359,7 @@ object EnglishStrings : AppStrings {
         "widget.library.header.title" to "Heading",
         "widget.library.header.show" to "Show header",
         "widget.nav.entry" to "Nav item",
+        "widget.nav.screen" to "Screen link",
         "widget.notes.scratch" to "Notes",
         "widget.notes.scratch.placeholder" to "Write something...",
         "widget.notes.scratch.title" to "Title",
@@ -1535,6 +1536,16 @@ object EnglishStrings : AppStrings {
     override val editorPaletteToggleHide = "Hide"
     override val editorRegionProps       = "This region"
     override fun editorSurfaceFolded(name: String) = "$name, rolled up"
+    override val editorNewScreen = "New screen"
+    override val editorMountRefused = "This surface is already open above, so it is not opened again here"
+    override val screenMissing = "This screen no longer exists"
+    override val screenUntitled = "Untitled"
+    override fun screenDefaultTitle(n: Int) = "Screen $n"
+    override val screenSettingsTitle = "Screen"
+    override val screenTitleLabel = "Name"
+    override val screenIconLabel = "Icon"
+    override val screenDelete = "Delete screen"
+    override fun screenDeleteBody(title: String) = "“$title” and everything on it will be deleted, along with its button on the rail."
     override val editorUndo              = "Undo"
     override val editorRedo              = "Redo"
     override val editorEscHint           = "Esc to exit"

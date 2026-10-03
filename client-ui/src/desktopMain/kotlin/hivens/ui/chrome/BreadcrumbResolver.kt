@@ -13,6 +13,8 @@ import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.screens.mod.ModTarget
 import hivens.ui.screens.mod.OpenProjectState
+import hivens.widget.api.LocalLayoutGraph
+import hivens.widget.model.screen
 import org.koin.compose.koinInject
 
 /**
@@ -38,6 +40,8 @@ fun staticCrumbLabel(screen: Screen, s: AppStrings): String? = when (screen) {
     is Screen.ModDetail           -> null
     // The route carries the build's own number, so this one needs nothing fetched.
     is Screen.ModVersion          -> screen.versionNumber
+    // Named in the layout graph, which a pure mapping cannot read.
+    is Screen.Custom              -> null
 }
 
 /**
@@ -79,6 +83,10 @@ fun rememberCrumbLabel(screen: Screen): String {
         }
         is Screen.CataloguePackDetail -> catalogueCrumb(screen.origin, screen.packId, s.crumbLoading)
         is Screen.ModDetail           -> modCrumb(screen.target)
+        // Read live, so a rename in the editor relabels the crumb at once. A screen
+        // deleted while it was open says so rather than naming nothing.
+        is Screen.Custom              ->
+            LocalLayoutGraph.current.screen(screen.id)?.title?.ifBlank { null } ?: s.screenMissing
         else -> staticCrumbLabel(screen, s).orEmpty() // unreachable: statics returned above
     }
 }

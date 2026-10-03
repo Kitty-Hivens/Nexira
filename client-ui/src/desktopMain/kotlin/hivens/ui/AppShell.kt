@@ -277,6 +277,13 @@ sealed class Screen {
     ) : Screen()
 
     /**
+     * A screen somebody made, by its id. Everything about it, what it is called and
+     * what it holds, is in the layout graph, so this carries the id and nothing else
+     * and a rename never leaves a stale title on the back stack.
+     */
+    data class Custom(val id: String) : Screen()
+
+    /**
      * Identity for state that outlives a visit, stable across the fields a screen
      * stamps onto its own back-stack entry.
      *
@@ -292,6 +299,7 @@ sealed class Screen {
         is CataloguePackDetail -> "CataloguePackDetail:$origin:$packId"
         is ModDetail           -> "ModDetail:${target.key}"
         is ModVersion          -> "ModVersion:${target.key}:$versionId"
+        is Custom              -> "Custom:$id"
         else                   -> this::class.simpleName.orEmpty()
     }
 }
@@ -1293,6 +1301,13 @@ fun AppRoot(
         }
         toolkit.addAWTEventListener(listener, AWTEvent.MOUSE_EVENT_MASK)
         onDispose { toolkit.removeAWTEventListener(listener) }
+    }
+
+    // A made screen deleted while it sits in the history leaves it, back and
+    // forward both, so neither arrow can open a page about nothing.
+    val screenIds = LocalLayoutGraph.current.screens.map { it.id }.toSet()
+    LaunchedEffect(screenIds) {
+        backStack.retainWhere(Screen.Home) { it !is Screen.Custom || it.id in screenIds }
     }
 
     // Out-of-composition navigation requests (notification actions, drivers)

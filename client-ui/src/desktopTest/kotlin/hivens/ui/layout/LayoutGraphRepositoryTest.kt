@@ -13,6 +13,12 @@ import hivens.widget.model.SurfaceShape
 import hivens.widget.model.SurfaceSpec
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
+import hivens.widget.model.SCREEN_MAIN_SLOT
+import hivens.widget.model.ScreenSpec
+import hivens.widget.model.addScreen
+import hivens.widget.model.insertWidget
+import hivens.widget.model.screen
+import hivens.widget.model.traverse
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -661,5 +667,34 @@ class LayoutGraphRepositoryTest {
         repo.flush()
         assertFalse(Files.exists(file), "flush wrote again with nothing owed")
         assertTrue(stamp.toMillis() > 0)
+    }
+
+    @Test
+    fun `a full reset keeps the screens somebody made, content and all`() = runBlocking {
+        val repo = repo()
+        val made = ScreenSpec("mine", "Mine", surface = SurfaceId("screen.mine"))
+        repo.update { it.addScreen(made) }
+        repo.update {
+            it.insertWidget(SlotPath(made.surface, SCREEN_MAIN_SLOT), WidgetInstance(WidgetKind("k"), "w"), 0)
+        }
+        repo.resetAll()
+        val g = repo.value()
+        assertEquals("Mine", g.screen("mine")?.title)
+        assertEquals(listOf("w"), g.traverse(SlotPath(made.surface, SCREEN_MAIN_SLOT))!!.widgets.map { it.instanceId })
+        assertTrue(SurfaceId("home.classic") in g.surfaces, "and the launcher's own surfaces are the default again")
+    }
+
+    @Test
+    fun `resetting a made screen leaves it blank rather than gone`() = runBlocking {
+        val repo = repo()
+        val made = ScreenSpec("mine", "Mine", surface = SurfaceId("screen.mine"))
+        repo.update { it.addScreen(made) }
+        repo.update {
+            it.insertWidget(SlotPath(made.surface, SCREEN_MAIN_SLOT), WidgetInstance(WidgetKind("k"), "w"), 0)
+        }
+        repo.resetSurface(made.surface)
+        val g = repo.value()
+        assertTrue(made.surface in g.surfaces, "the screen still has a page to open")
+        assertTrue(g.traverse(SlotPath(made.surface, SCREEN_MAIN_SLOT))!!.widgets.isEmpty())
     }
 }

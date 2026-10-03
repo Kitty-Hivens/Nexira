@@ -1361,6 +1361,7 @@ object GermanStrings : AppStrings {
         "widget.library.header.title" to "Überschrift",
         "widget.library.header.show" to "Kopf anzeigen",
         "widget.nav.entry" to "Navigationspunkt",
+        "widget.nav.screen" to "Bildschirm-Link",
         "widget.notes.scratch" to "Notizen",
         "widget.notes.scratch.placeholder" to "Schreib etwas...",
         "widget.notes.scratch.title" to "Titel",
@@ -1537,6 +1538,16 @@ object GermanStrings : AppStrings {
     override val editorPaletteToggleHide = "Ausblenden"
     override val editorRegionProps       = "Dieser Bereich"
     override fun editorSurfaceFolded(name: String) = "$name, eingeklappt"
+    override val editorNewScreen = "Neuer Bildschirm"
+    override val editorMountRefused = "Diese Fläche ist weiter oben schon geöffnet und wird hier nicht noch einmal geöffnet"
+    override val screenMissing = "Diesen Bildschirm gibt es nicht mehr"
+    override val screenUntitled = "Ohne Namen"
+    override fun screenDefaultTitle(n: Int) = "Bildschirm $n"
+    override val screenSettingsTitle = "Bildschirm"
+    override val screenTitleLabel = "Name"
+    override val screenIconLabel = "Symbol"
+    override val screenDelete = "Bildschirm löschen"
+    override fun screenDeleteBody(title: String) = "„$title“ und alles darauf werden gelöscht, zusammen mit seinem Knopf in der Leiste."
     override val editorUndo              = "Rückgängig"
     override val editorRedo              = "Wiederholen"
     override val editorEscHint           = "Esc zum Beenden"

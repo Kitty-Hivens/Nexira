@@ -44,6 +44,10 @@ import hivens.ui.screens.mod.LocalLinkFollower
 import hivens.ui.screens.mod.ModDetailScreen
 import hivens.ui.screens.mod.rememberNavigatingLinkFollower
 import hivens.ui.screens.mod.ModVersionScreen
+import hivens.ui.screens.custom.CustomScreen
+import hivens.ui.widgets.home.new.HomeNewContext
+import hivens.ui.widgets.home.new.LocalHomeNewContext
+import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.SlotRenderer
 import hivens.widget.model.SlotId
 import hivens.widget.model.SurfaceId
@@ -121,10 +125,7 @@ fun AppLayout(
                     // One home. The classic dashboard WAS the SmartyCraft server
                     // list, and SmartyCraft arrives as mirror packs now, so the
                     // screen it lived on went with the path it was a front for.
-                    Screen.Home -> NewHomeScreen(
-                        appState       = appState,
-                        onScreenChange = onScreenChange,
-                    )
+                    Screen.Home -> NewHomeScreen()
 
                     Screen.Profile ->
                         ProfileSurface(
@@ -244,6 +245,8 @@ fun AppLayout(
                         target = screen.target,
                         versionId = screen.versionId,
                     )
+
+                    is Screen.Custom -> CustomScreen(screen.id)
                 }
             }
         }
@@ -271,16 +274,26 @@ fun AppLayout(
     // reach rail widgets; it puts its own chrome back over the content pane from
     // what the centre region reports. The shell itself is a widget surface:
     // appshell.root lays its three region widgets in a Row.
+    // What Home's widgets read, provided around the whole shell rather than by the
+    // Home screen alone. Both halves are the shell's anyway, and provided only on
+    // Home they pinned every one of those widgets there: dropped on a screen
+    // somebody made, they read a context nobody had provided and took the shell down.
+    val homeCtx = remember(appState, onScreenChange) {
+        HomeNewContext(appState = appState, onScreenChange = onScreenChange)
+    }
+
     EditorSurfaceHost(
         currentScreen          = currentScreen,
         customization          = customization,
         onCustomizationChanged = onCustomizationChanged,
+        onOpenScreen           = onSwitchTab,
     ) {
         // Links that point at a project the launcher can draw stop going out to a
         // browser from here down. Provided at the shell rather than per surface, so
         // a markdown body and a rail widget follow the same rule.
         CompositionLocalProvider(
             LocalShellContext provides shellCtx,
+            LocalHomeNewContext provides homeCtx,
             LocalLinkFollower provides rememberNavigatingLinkFollower(),
             LocalPlane provides page,
         ) {
@@ -322,6 +335,10 @@ fun AppSidebar(
     }
     if (isAuthenticated) {
         PuppetClick("nav.logout") { onLogout() }
+    }
+    // A made screen has no fixed entry above, so it is driven by its id.
+    LocalLayoutGraph.current.screens.forEach { spec ->
+        key(spec.id) { PuppetClick("nav.screen.${spec.id}") { onSwitchTab(Screen.Custom(spec.id)) } }
     }
 
     val ctx = remember(currentScreen, isAuthenticated, onScreenChange, onSwitchTab, onLogout) {
