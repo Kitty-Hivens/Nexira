@@ -30,7 +30,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
@@ -206,7 +205,7 @@ private fun RenderSlotContent(path: SlotPath, modifier: Modifier, spacing: Dp, c
         // A map holds placed widgets. A flow on one is shown as it would be static
         // until the slot is placed, which the editor does in the same step anyway.
         ViewportMode.Map -> if (content.flow == null) {
-            MapViewport(content, chrome.then(modifier)) { pan -> MapPlacement(path, content, pan) }
+            MapViewport(content, chrome.then(modifier)) { pan, inView -> MapPlacement(path, content, pan, inView) }
         } else {
             SlotBody(path, content, chrome.then(modifier).inset(contentPadding), spacing, scroll = null)
         }
@@ -313,8 +312,11 @@ private fun ScrollViewport(
  * The position is saved like a scroll position is.
  */
 @Composable
-private fun MapViewport(content: SlotContent, outer: Modifier, body: @Composable (State<Offset>) -> Unit) {
+private fun MapViewport(content: SlotContent, outer: Modifier, body: @Composable (State<Offset>, MutableState<Boolean>) -> Unit) {
     val pan = rememberSaveable(saver = PanSaver) { mutableStateOf(Offset.Zero) }
+    // Whether any widget is in view, answered by the layout, which is the one place
+    // that knows where each of them is drawn.
+    val inView = remember { mutableStateOf(true) }
     val handle = remember(pan) { MapViewportHandle(pan) }
     val insidePage = LocalViewport.current != null
     val panOnPrimary = LocalMapPanOnPrimary.current
@@ -336,20 +338,15 @@ private fun MapViewport(content: SlotContent, outer: Modifier, body: @Composable
             .onGloballyPositioned { handle.bounds = it.boundsInWindow() }
             .pointerInput(insidePage, panOnPrimary, wheelStep) { mapGestures(pan, insidePage, panOnPrimary, wheelStep) },
     ) {
-        val widthPx = constraints.maxWidth.toFloat()
-        val heightPx = constraints.maxHeight.toFloat()
         CompositionLocalProvider(
             LocalViewportExtent provides ViewportExtent(maxWidth, maxHeight),
             LocalViewport provides handle,
         ) {
-            body(pan)
+            body(pan, inView)
         }
-        // Lost: moved more than half a view away from the content on either axis.
-        // Derived, so moving the map recomposes this only when the answer flips and
-        // not on every pixel of the drag.
-        val away by remember(home, widthPx, heightPx) {
-            derivedStateOf { abs(pan.value.x - home.x) > widthPx / 2f || abs(pan.value.y - home.y) > heightPx / 2f }
-        }
+        // Lost: nothing on the map is in view. Written by the layout only when the
+        // answer flips, so moving the map does not recompose this on every pixel.
+        val away = !inView.value && content.widgets.isNotEmpty()
         val controls = LocalMapControls.current
         controls(away) { pan.value = home }
     }
@@ -427,7 +424,7 @@ private val MAP_HOME_MARGIN = 24.dp
  * composed again, for every pixel the plane moves.
  */
 @Composable
-private fun MapPlacement(path: SlotPath, content: SlotContent, pan: State<Offset>) {
+private fun MapPlacement(path: SlotPath, content: SlotContent, pan: State<Offset>, inView: MutableState<Boolean>) {
     val registry = LocalWidgetRegistry.current
     val decorator = LocalWidgetDecorator.current
     val unknownDecorator = LocalUnknownWidgetDecorator.current
@@ -457,7 +454,7 @@ private fun MapPlacement(path: SlotPath, content: SlotContent, pan: State<Offset
                             val p = instance.placement ?: Placement()
                             val descriptor = registry[instance.kind]
                             val sizing = descriptor?.sizing ?: WidgetSizing.UNDECLARED
-                            PlacedBox(p, 0, 0f, 0f, slotDp, sizing, bounds, { Modifier }) {
+                            PlacedBox(p, 0, 0f, 0f, slotDp, sizing, bounds, { Modifier.layoutId(it) }) {
                                 if (descriptor == null) {
                                     unknownDecorator(address, index, instance)
                                 } else {
@@ -471,9 +468,20 @@ private fun MapPlacement(path: SlotPath, content: SlotContent, pan: State<Offset
             modifier = Modifier.fillMaxSize().onGloballyPositioned { where.visible = it.boundsInWindow(); publish() },
         ) { measurables, constraints ->
             val placeables = measurables.map { it.measure(Constraints()) }
+            val at = measurables.map { it.layoutId as? PlacedAt }
             layout(constraints.maxWidth, constraints.maxHeight) {
-                val at = pan.value
-                placeables.forEach { it.place(at.x.roundToInt(), at.y.roundToInt()) }
+                val o = pan.value
+                placeables.forEach { it.place(o.x.roundToInt(), o.y.roundToInt()) }
+                // A widget is drawn at the plane's origin plus its own offset, which
+                // its box applies inside itself, so the offset comes from its record.
+                val visible = placeables.indices.any { i ->
+                    val where = at[i] ?: return@any false
+                    val left = o.x + where.heldX.dp.toPx()
+                    val top = o.y + where.heldY.dp.toPx()
+                    left < constraints.maxWidth && left + placeables[i].width > 0 &&
+                        top < constraints.maxHeight && top + placeables[i].height > 0
+                }
+                if (inView.value != visible) inView.value = visible
             }
         }
     }

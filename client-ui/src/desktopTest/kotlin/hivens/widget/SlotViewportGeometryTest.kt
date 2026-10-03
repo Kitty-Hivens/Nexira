@@ -22,6 +22,8 @@ import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import hivens.widget.api.LocalLayoutGraph
+import hivens.widget.api.LocalMapControls
+import hivens.widget.api.MapControls
 import hivens.widget.api.LocalWidgetRegistry
 import hivens.widget.api.SlotRenderer
 import hivens.widget.api.WidgetDescriptor
@@ -258,6 +260,25 @@ class SlotViewportGeometryTest {
     }
 
     @Test
+    fun `the way back shows once nothing on the map is in view, and goes home`() {
+        var away = false
+        var goHome: () -> Unit = {}
+        val page = Probe(
+            map(widget("a", "fill.a", Placement(x = -500f, y = 20f, width = 50f, height = 50f)),
+                widget("b", "fill.b", Placement(x = 20f, y = 20f, width = 50f, height = 50f))),
+            controls = { a, home -> away = a; goHome = home },
+        )
+        assertEquals(false, away, "a widget is in view, even though the content's corner is far off")
+        page.drag(from = Offset(150f, 150f), to = Offset(150f, -150f))
+        page.drag(from = Offset(150f, 150f), to = Offset(150f, -150f))
+        assertEquals(true, away, "nothing in view")
+        goHome()
+        page.settle()
+        assertEquals(false, away)
+        assertEquals(A, page.at(40, 40), "home puts the content's top left corner near the view's")
+    }
+
+    @Test
     fun `a corner named on a map counts from the origin`() {
         // The record keeps its corner for whenever the slot stops being a map.
         val page = Probe(map(widget("a", "fill.a", Placement(anchor = Placement.BOTTOM_END, x = 10f, y = 10f, width = 40f, height = 40f))))
@@ -330,11 +351,15 @@ class SlotViewportGeometryTest {
      * pumped on a clock, because a wheel on the desktop scrolls with an animation
      * and a single render would read the first frame of it.
      */
-    private inner class Probe(initial: SlotContent) {
+    private inner class Probe(initial: SlotContent, controls: MapControls = { _, _ -> }) {
         private var content by mutableStateOf(initial)
         private val scene = ImageComposeScene(width = SIDE, height = SIDE, density = Density(1f)) {
             val graph = LayoutGraph(surfaces = mapOf(surface to SurfaceLayout(slots = mapOf(slot to content))))
-            CompositionLocalProvider(LocalLayoutGraph provides graph, LocalWidgetRegistry provides registry) {
+            CompositionLocalProvider(
+                LocalLayoutGraph provides graph,
+                LocalWidgetRegistry provides registry,
+                LocalMapControls provides controls,
+            ) {
                 Box(Modifier.fillMaxSize().background(PAGE_COLOUR)) {
                     SlotRenderer(surface, slot, Modifier.fillMaxSize())
                 }
@@ -368,6 +393,11 @@ class SlotViewportGeometryTest {
                 scene.sendPointerEvent(PointerEventType.Move, at, buttons = down)
             }
             scene.sendPointerEvent(PointerEventType.Release, to, buttons = PointerButtons(), button = PointerButton.Primary)
+            frame = pump(4)
+        }
+
+        /** Draws a few frames, for a change made from outside a gesture. */
+        fun settle() {
             frame = pump(4)
         }
 
