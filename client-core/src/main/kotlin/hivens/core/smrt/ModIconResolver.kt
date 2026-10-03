@@ -44,6 +44,14 @@ class ModIconResolver(
     // still binds to [resolveProjectIcon] (Kotlin's trailing lambda maps to the last
     // parameter). Both real call sites use named arguments.
     private val resolveIconByHash: suspend (sha1: String) -> String? = { null },
+    /**
+     * The file's sha1, or null when it cannot be read. Injected so a caller can
+     * remember it across launches: hashing reads the whole jar, and a folder of a
+     * hundred and fifty mods is a hundred and fifty full reads on every start.
+     */
+    private val hashFile: suspend (file: Path) -> String? = { file ->
+        withContext(Dispatchers.IO) { runCatching { fileSha1(file) }.getOrNull() }
+    },
     private val resolveProjectIcon: suspend (projectId: String) -> String?,
 ) {
 
@@ -135,7 +143,7 @@ class ModIconResolver(
      * an answer and the caller must not record it as one.
      */
     suspend fun resolveByFile(file: Path): String? {
-        val sha1 = withContext(Dispatchers.IO) { runCatching { sha1Of(file) }.getOrNull() } ?: return null
+        val sha1 = hashFile(file) ?: return null
         return iconByHash(sha1, file.fileName.toString())
     }
 
@@ -174,16 +182,18 @@ class ModIconResolver(
         return resolved
     }
 
-    private fun sha1Of(file: Path): String {
-        val md = MessageDigest.getInstance("SHA-1")
-        Files.newInputStream(file).use { ins ->
-            val buf = ByteArray(8192)
-            while (true) {
-                val n = ins.read(buf)
-                if (n < 0) break
-                md.update(buf, 0, n)
-            }
+}
+
+/** The sha1 of [file]'s bytes, as lower-case hex. Reads the whole file, on the caller's thread. */
+fun fileSha1(file: Path): String {
+    val md = MessageDigest.getInstance("SHA-1")
+    Files.newInputStream(file).use { ins ->
+        val buf = ByteArray(8192)
+        while (true) {
+            val n = ins.read(buf)
+            if (n < 0) break
+            md.update(buf, 0, n)
         }
-        return md.digest().joinToString("") { "%02x".format(it) }
     }
+    return md.digest().joinToString("") { "%02x".format(it) }
 }

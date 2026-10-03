@@ -23,6 +23,8 @@ import androidx.compose.ui.window.FrameWindowScope
 import androidx.compose.ui.window.WindowState
 import coil3.ImageLoader
 import coil3.SingletonImageLoader
+import coil3.disk.DiskCache
+import coil3.disk.directory
 import hivens.ui.render.SvgImageDecoder
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import hivens.config.Branding
@@ -1223,6 +1225,16 @@ fun AppRoot(
     remember(routingCallFactory) {
         SingletonImageLoader.setSafe { context ->
             ImageLoader.Builder(context)
+                // In the launcher's own data, not the default under the system temp
+                // dir: that one is a tmpfs on many Linux machines, emptied on every
+                // boot, so every icon and banner was downloaded again each day, and it
+                // is shared with any other program built on the same library.
+                .diskCache {
+                    DiskCache.Builder()
+                        .directory(dataDirectory.resolve("cache").resolve("images").toFile())
+                        .maxSizeBytes(IMAGE_CACHE_BYTES)
+                        .build()
+                }
                 .components {
                     add(OkHttpNetworkFetcherFactory(callFactory = { routingCallFactory }))
                     // Pack descriptions carry rows of shields.io badges, and
@@ -1476,6 +1488,9 @@ fun AppRoot(
       }
     }
 }
+
+/** The most the image cache keeps on disk before it evicts the least recently used. */
+private const val IMAGE_CACHE_BYTES = 256L * 1024 * 1024
 
 /**
  * How long quitting waits for a game it was asked to stop. The game gets its own

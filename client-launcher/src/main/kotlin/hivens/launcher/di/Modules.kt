@@ -81,6 +81,9 @@ import hivens.launcher.imports.ModrinthAppSource
 import hivens.launcher.imports.PrismLauncherSource
 import hivens.launcher.curseforge.CurseForgeZipInstaller
 import hivens.launcher.cache.ModrinthCaches
+import hivens.launcher.cache.ModIconCaches
+import hivens.launcher.cache.ModIconLookups
+import kotlinx.serialization.builtins.serializer
 import hivens.core.api.dto.smrt.SmrtManifestVersions
 import hivens.launcher.cache.SmrtPackCaches
 import hivens.core.io.IconProcessor
@@ -690,9 +693,15 @@ val mirrorModule = module {
     // resolver instance.
     single {
         val client: ModrinthClient = get()
+        val lookups = ModIconLookups(
+            caches        = modIconCaches(),
+            versionByHash = { sha1 -> client.versionByHash(sha1) },
+            projectIcon   = { projectId -> client.resolveProject(projectId).iconUrl },
+        )
         ModIconResolver(
-            resolveProjectIcon = { projectId -> client.resolveProject(projectId).iconUrl },
-            resolveIconByHash  = { sha1 -> client.versionByHash(sha1)?.let { client.resolveProject(it.projectId).iconUrl } },
+            resolveProjectIcon = lookups::iconForProject,
+            resolveIconByHash  = lookups::iconForHash,
+            hashFile           = lookups::sha1,
         )
     }
 }
@@ -988,6 +997,22 @@ private fun Scope.modrinthCaches(): ModrinthCaches {
             ModrinthVersion.serializer(),
             CacheConfig(ttlMs = 30 * day, staleTtlMs = 90 * day),
         ),
+    )
+}
+
+/**
+ * Mod icon namespaces, kept on disk so a launch asks the network only about what
+ * is new. A hash names one published file forever and a file is itself for as long
+ * as its path, size and time are, so both are kept for a year. A project's icon can
+ * change, so it is kept for a week and the old one is shown while it is asked again.
+ */
+private fun Scope.modIconCaches(): ModIconCaches {
+    val f: CacheFactory = get()
+    val day = 24 * 60 * 60_000L
+    return ModIconCaches(
+        byHash = f.create("mod-icon-by-hash", String.serializer(), CacheConfig(ttlMs = 7 * day, maxEntries = 2048)),
+        byProject = f.create("mod-icon-by-project", String.serializer(), CacheConfig(ttlMs = 7 * day, maxEntries = 2048)),
+        fileHash = f.create("file-sha1", String.serializer(), CacheConfig(ttlMs = 365 * day, maxEntries = 4096)),
     )
 }
 
