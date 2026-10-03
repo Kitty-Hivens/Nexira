@@ -22,7 +22,7 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 data class ViewportSpec(
-    /** [STATIC], [SCROLL] or [MAP]. Anything else reads as static. */
+    /** [STATIC], [SCROLL], [PAGES] or [MAP]. Anything else reads as static. */
     val kind: String = STATIC,
     /** [VERTICAL] or [HORIZONTAL], for a kind that moves along one axis. Anything else reads as vertical. */
     val axis: String = VERTICAL,
@@ -33,6 +33,7 @@ data class ViewportSpec(
     val mode: ViewportMode
         get() = when (kind.trim().lowercase()) {
             SCROLL -> ViewportMode.Scroll(horizontal = axis.trim().lowercase() == HORIZONTAL)
+            PAGES -> ViewportMode.Scroll(horizontal = axis.trim().lowercase() == HORIZONTAL, paged = true)
             MAP -> ViewportMode.Map
             else -> ViewportMode.Static
         }
@@ -41,6 +42,7 @@ data class ViewportSpec(
         const val STATIC = "static"
         const val SCROLL = "scroll"
         const val MAP = "map"
+        const val PAGES = "pages"
         const val VERTICAL = "vertical"
         const val HORIZONTAL = "horizontal"
 
@@ -63,8 +65,12 @@ sealed interface ViewportMode {
     /**
      * Unbounded along one axis and moved along it. [horizontal] false is down,
      * true is sideways.
+     *
+     * [paged] moves it a whole screen at a time: the wheel turns a page, and a
+     * scroll that ends between two pages settles on the nearer one. Laid out
+     * exactly as a scroll is, so a widget weighted 1 alone in its line is a page.
      */
-    data class Scroll(val horizontal: Boolean) : ViewportMode
+    data class Scroll(val horizontal: Boolean, val paged: Boolean = false) : ViewportMode
 
     /**
      * Unbounded on both axes, a plane with no edges that the view is moved over.

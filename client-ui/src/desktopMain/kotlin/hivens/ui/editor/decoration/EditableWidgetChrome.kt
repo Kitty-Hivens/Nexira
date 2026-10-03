@@ -105,7 +105,9 @@ import hivens.widget.model.clampPlacementAxis
 import hivens.widget.model.parseAnchor
 import hivens.widget.model.SlotPath
 import hivens.widget.model.WidgetInstance
+import hivens.widget.model.ViewportMode
 import hivens.widget.model.traverse
+import hivens.widget.model.viewportMode
 import java.awt.Cursor
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxColor
@@ -834,6 +836,15 @@ private fun WidgetContextMenuContent(
     val s = LocalStrings.current
     val graph = LocalLayoutGraph.current
     NxMenuItem(s.editorConfigure) { onConfigure() }
+    // Only where something moves: in a slot that does not, a widget is already
+    // where it stays, and the item would do nothing anybody could see.
+    val slot = graph.traverse(path)
+    if (slot != null && slot.viewportMode != ViewportMode.Static) {
+        val pinned = slot.widgets.firstOrNull { it.instanceId == instanceId }?.placement?.pinned == true
+        NxMenuItem(if (pinned) s.editorUnpin else s.editorPin) {
+            editController.setWidgetPinned(path, instanceId, !pinned); onClose()
+        }
+    }
     if (isPlaced) {
         // The corner an offset is measured from. It is the whole reason a widget
         // parked at the bottom right survives a window that grows, and until now

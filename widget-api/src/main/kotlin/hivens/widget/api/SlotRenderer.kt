@@ -12,6 +12,7 @@ import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -30,6 +31,8 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
@@ -45,6 +48,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.isPrimaryPressed
@@ -70,6 +74,9 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.isFinite
 import kotlin.math.abs
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 import kotlin.math.max
 import kotlin.math.roundToInt
 import hivens.widget.model.FlowPlacement
@@ -191,21 +198,41 @@ private fun RenderSlotContent(path: SlotPath, modifier: Modifier, spacing: Dp, c
         return
     }
 
+    val anyPinned = content.widgets.any { it.isPinned }
     when (val mode = content.viewportMode) {
         // The chrome goes on the viewport, which is the slot as anybody sees it, and
         // not on the content inside, which is taller than the slot and mostly off it.
-        is ViewportMode.Scroll -> ScrollViewport(
-            horizontal = mode.horizontal,
-            scrollbar = content.viewport?.scrollbar != false,
-            outer = chrome.then(modifier),
-            contentPadding = contentPadding,
-        ) { scroll, inner ->
-            SlotBody(path, content, inner, spacing, scroll)
+        is ViewportMode.Scroll -> {
+            val scrolled: @Composable (Modifier) -> Unit = { viewport ->
+                ScrollViewport(
+                    horizontal = mode.horizontal,
+                    paged = mode.paged,
+                    scrollbar = content.viewport?.scrollbar != false,
+                    outer = viewport,
+                    contentPadding = contentPadding,
+                    overlay = if (anyPinned && content.flow == null) {
+                        { PinnedPlacement(path, content, spacing) }
+                    } else {
+                        null
+                    },
+                ) { scroll, inner ->
+                    SlotBody(path, content, inner, spacing, scroll, include = { !it.isPinned })
+                }
+            }
+            if (anyPinned && content.flow != null) {
+                PinnedFlowFrame(path, content, mode.horizontal, chrome.then(modifier), spacing, scrolled)
+            } else {
+                scrolled(chrome.then(modifier))
+            }
         }
         // A map holds placed widgets. A flow on one is shown as it would be static
         // until the slot is placed, which the editor does in the same step anyway.
         ViewportMode.Map -> if (content.flow == null) {
-            MapViewport(content, chrome.then(modifier)) { pan, inView -> MapPlacement(path, content, pan, inView) }
+            MapViewport(
+                content = content,
+                outer = chrome.then(modifier),
+                overlay = if (anyPinned) ({ PinnedPlacement(path, content, spacing) }) else null,
+            ) { pan, inView -> MapPlacement(path, content, pan, inView) }
         } else {
             SlotBody(path, content, chrome.then(modifier).inset(contentPadding), spacing, scroll = null)
         }
@@ -213,17 +240,88 @@ private fun RenderSlotContent(path: SlotPath, modifier: Modifier, spacing: Dp, c
     }
 }
 
+/** Whether the widget is held in place while its slot moves. See [Placement.pinned]. */
+private val WidgetInstance.isPinned: Boolean get() = placement?.pinned == true
+
+/**
+ * A scrolling flow with pinned widgets: they stand at the start of the axis, in
+ * their order, outside the part that moves, and the moving part takes the rest.
+ * A header that stays at the top of a page, or a column that stays at the left of
+ * a page that scrolls sideways.
+ */
 @Composable
-private fun SlotBody(path: SlotPath, content: SlotContent, outer: Modifier, spacing: Dp, scroll: ScrollAxis?) {
+private fun PinnedFlowFrame(
+    path: SlotPath,
+    content: SlotContent,
+    horizontal: Boolean,
+    outer: Modifier,
+    spacing: Dp,
+    scrolled: @Composable (Modifier) -> Unit,
+) {
+    val registry = LocalWidgetRegistry.current
+    val decorator = LocalWidgetDecorator.current
+    val unknownDecorator = LocalUnknownWidgetDecorator.current
+    val pinned = content.widgets.withIndex().filter { it.value.isPinned }
+    // A weight means a share of the moving part, which a pinned widget is not in,
+    // so in the strip every widget is its own size.
+    val natural: Weigh = { _, _ -> Modifier }
+    if (horizontal) {
+        Row(outer, horizontalArrangement = Arrangement.spacedBy(spacing)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(spacing)) {
+                FlowWidgets(path.leafAddress, pinned, registry, decorator, unknownDecorator, natural)
+            }
+            scrolled(Modifier.weight(1f).fillMaxHeight())
+        }
+    } else {
+        Column(outer, verticalArrangement = Arrangement.spacedBy(spacing)) {
+            Column(verticalArrangement = Arrangement.spacedBy(spacing)) {
+                FlowWidgets(path.leafAddress, pinned, registry, decorator, unknownDecorator, natural)
+            }
+            scrolled(Modifier.weight(1f).fillMaxWidth())
+        }
+    }
+}
+
+/**
+ * The pinned widgets of a placement slot that moves, laid over the view rather
+ * than the content: each by its own anchor against the view's box, so a corner
+ * means a corner of the window again, as it does in a slot that does not move.
+ */
+@Composable
+private fun BoxScope.PinnedPlacement(path: SlotPath, content: SlotContent, spacing: Dp) {
+    PlacementSlot(
+        path = path,
+        content = content,
+        address = path.leafAddress,
+        registry = LocalWidgetRegistry.current,
+        decorator = LocalWidgetDecorator.current,
+        unknownDecorator = LocalUnknownWidgetDecorator.current,
+        outer = Modifier.matchParentSize(),
+        spacing = spacing,
+        scroll = null,
+        include = { it.isPinned },
+        reportBounds = false,
+    )
+}
+
+@Composable
+private fun SlotBody(
+    path: SlotPath,
+    content: SlotContent,
+    outer: Modifier,
+    spacing: Dp,
+    scroll: ScrollAxis?,
+    include: (WidgetInstance) -> Boolean = { true },
+) {
     val registry = LocalWidgetRegistry.current
     val decorator = LocalWidgetDecorator.current
     val unknownDecorator = LocalUnknownWidgetDecorator.current
     val address = path.leafAddress
     val flow = content.flow
     if (flow == null) {
-        PlacementSlot(path, content, address, registry, decorator, unknownDecorator, outer, spacing, scroll)
+        PlacementSlot(path, content, address, registry, decorator, unknownDecorator, outer, spacing, scroll, include)
     } else {
-        FlowSlot(flow, content, address, registry, decorator, unknownDecorator, outer, spacing, LocalSlotMotionMs.current, scroll)
+        FlowSlot(flow, content, address, registry, decorator, unknownDecorator, outer, spacing, LocalSlotMotionMs.current, scroll, include)
     }
 }
 
@@ -257,9 +355,11 @@ private data class ScrollAxis(val horizontal: Boolean, val extent: Dp)
 @Composable
 private fun ScrollViewport(
     horizontal: Boolean,
+    paged: Boolean,
     scrollbar: Boolean,
     outer: Modifier,
     contentPadding: PaddingValues,
+    overlay: (@Composable BoxScope.() -> Unit)?,
     body: @Composable (ScrollAxis?, Modifier) -> Unit,
 ) {
     val interaction = remember { MutableInteractionSource() }
@@ -267,7 +367,16 @@ private fun ScrollViewport(
     val direction = LocalLayoutDirection.current
     val state = rememberSaveable(saver = ScrollState.Saver) { ScrollState(0) }
     val handle = remember(state, horizontal) { ScrollViewportHandle(horizontal, state) }
-    BoxWithConstraints(outer.hoverable(interaction).onGloballyPositioned { handle.bounds = it.boundsInWindow() }) {
+    val turns = rememberCoroutineScope()
+    // One screen, in px, for turning pages: a plain field the wheel reads when it
+    // turns, set where the box is measured. Zero until then.
+    val page = remember { PageLength() }
+    val paging = if (paged) {
+        Modifier.pointerInput(horizontal) { pageTurns(state, horizontal, { page.px }, turns) }
+    } else {
+        Modifier
+    }
+    BoxWithConstraints(outer.hoverable(interaction).onGloballyPositioned { handle.bounds = it.boundsInWindow() }.then(paging)) {
         val along = if (horizontal) maxWidth else maxHeight
         if (!along.isFinite) {
             body(null, Modifier.inset(contentPadding))
@@ -279,6 +388,18 @@ private fun ScrollViewport(
             contentPadding.calculateTopPadding() + contentPadding.calculateBottomPadding()
         }
         val extent = (along - padding).coerceAtLeast(0.dp)
+        val pagePx = with(LocalDensity.current) { extent.roundToPx() }
+        page.px = pagePx
+        // A page turned by anything other than the wheel, the bar dragged or a
+        // touchpad, settles on the nearer page once it stops.
+        if (paged) {
+            val moving = state.isScrollInProgress
+            LaunchedEffect(moving, pagePx) {
+                if (moving || pagePx <= 0) return@LaunchedEffect
+                val nearest = (state.value.toFloat() / pagePx).roundToInt() * pagePx
+                if (nearest != state.value) state.animateScrollTo(nearest.coerceIn(0, state.maxValue))
+            }
+        }
         val parent = LocalViewportExtent.current
         val here = if (horizontal) parent.copy(width = extent) else parent.copy(height = extent)
         val scroller = if (horizontal) {
@@ -289,10 +410,48 @@ private fun ScrollViewport(
         CompositionLocalProvider(LocalViewportExtent provides here, LocalViewport provides handle) {
             body(ScrollAxis(horizontal, extent), scroller.inset(contentPadding))
         }
+        overlay?.invoke(this)
         if (scrollbar) {
             val bar = LocalViewportScrollbar.current
             bar(state, horizontal, hovered || state.isScrollInProgress)
         }
+    }
+}
+
+/** How long one page of a paged slot is, in px. */
+private class PageLength {
+    var px: Int = 0
+}
+
+/**
+ * The wheel on a paged slot: one turn of it, one page, whichever way it went.
+ *
+ * Taken on the first pass, before the scroll under it sees the event, and only
+ * while no turn is still running, so a burst of notches from one flick is one page
+ * rather than six. A slot that pages sideways turns on the ordinary wheel too,
+ * which is the wheel a desktop mouse has.
+ */
+private suspend fun PointerInputScope.pageTurns(
+    state: ScrollState,
+    horizontal: Boolean,
+    pagePx: () -> Int,
+    turns: CoroutineScope,
+) = awaitPointerEventScope {
+    var turning: Job? = null
+    while (true) {
+        val event = awaitPointerEvent(PointerEventPass.Initial)
+        if (event.type != PointerEventType.Scroll) continue
+        val change = event.changes.firstOrNull() ?: continue
+        if (change.isConsumed) continue
+        val delta = change.scrollDelta
+        val along = if (horizontal && delta.x != 0f) delta.x else delta.y
+        if (along == 0f) continue
+        change.consume()
+        val page = pagePx()
+        if (page <= 0 || turning?.isActive == true) continue
+        val current = (state.value.toFloat() / page).roundToInt()
+        val target = ((current + if (along > 0f) 1 else -1) * page).coerceIn(0, state.maxValue)
+        turning = turns.launch { state.animateScrollTo(target) }
     }
 }
 
@@ -312,7 +471,12 @@ private fun ScrollViewport(
  * The position is saved like a scroll position is.
  */
 @Composable
-private fun MapViewport(content: SlotContent, outer: Modifier, body: @Composable (State<Offset>, MutableState<Boolean>) -> Unit) {
+private fun MapViewport(
+    content: SlotContent,
+    outer: Modifier,
+    overlay: (@Composable BoxScope.() -> Unit)?,
+    body: @Composable (State<Offset>, MutableState<Boolean>) -> Unit,
+) {
     val pan = rememberSaveable(saver = PanSaver) { mutableStateOf(Offset.Zero) }
     // Whether any widget is in view, answered by the layout, which is the one place
     // that knows where each of them is drawn.
@@ -344,6 +508,7 @@ private fun MapViewport(content: SlotContent, outer: Modifier, body: @Composable
         ) {
             body(pan, inView)
         }
+        overlay?.invoke(this)
         // Lost: nothing on the map is in view. Written by the layout only when the
         // answer flips, so moving the map does not recompose this on every pixel.
         val away = !inView.value && content.widgets.isNotEmpty()
@@ -448,6 +613,7 @@ private fun MapPlacement(path: SlotPath, content: SlotContent, pan: State<Offset
             content = {
                 Box(Modifier.onGloballyPositioned { where.origin = it.positionInWindow(); publish() })
                 content.widgets.withIndex()
+                    .filter { !it.value.isPinned }
                     .sortedWith(compareBy({ it.value.placement?.z ?: 0 }, { it.index }))
                     .forEach { (index, instance) ->
                         key(instance.instanceId) {
@@ -529,9 +695,14 @@ private fun FlowSlot(
     spacing: Dp,
     motionMs: Int,
     scroll: ScrollAxis?,
+    include: (WidgetInstance) -> Boolean,
 ) {
     val outer = outerModifier.animatedReflow(motionMs)
     val lineLength = flow.wrap.coerceAtLeast(0)
+    // Each with its place in the whole slot, which is what the editor addresses a
+    // widget by, whichever of them this pass draws.
+    val items = content.widgets.withIndex().filter { include(it.value) }
+    val drawn = items.map { it.value }
 
     // A line along the scrolling axis shares one screen between its weights; a line
     // across it is bounded and keeps Compose's own weight.
@@ -540,15 +711,15 @@ private fun FlowSlot(
     if (lineLength == 0) {
         if (flow.horizontal) {
             Row(outer, horizontalArrangement = Arrangement.spacedBy(spacing)) {
-                val weigh: Weigh = alongScroll(true)?.let { viewportShare(it, totalWeight(content.widgets)) }
+                val weigh: Weigh = alongScroll(true)?.let { viewportShare(it, totalWeight(drawn)) }
                     ?: { w, _ -> Modifier.weight(w) }
-                FlowWidgets(address, content.widgets, registry, decorator, unknownDecorator, weigh)
+                FlowWidgets(address, items, registry, decorator, unknownDecorator, weigh)
             }
         } else {
             Column(outer, verticalArrangement = Arrangement.spacedBy(spacing)) {
-                val weigh: Weigh = alongScroll(false)?.let { viewportShare(it, totalWeight(content.widgets)) }
+                val weigh: Weigh = alongScroll(false)?.let { viewportShare(it, totalWeight(drawn)) }
                     ?: { w, _ -> Modifier.weight(w) }
-                FlowWidgets(address, content.widgets, registry, decorator, unknownDecorator, weigh)
+                FlowWidgets(address, items, registry, decorator, unknownDecorator, weigh)
             }
         }
         return
@@ -558,14 +729,14 @@ private fun FlowSlot(
     // stacked along the other one. A uniform line gives every cell an equal
     // share and pads the short last line with weighted spacers so the columns
     // stay aligned; a non-uniform one lets each child take its own size.
-    val lines = content.widgets.chunked(lineLength)
+    val lines = items.chunked(lineLength)
     if (flow.horizontal) {
         Column(outer, verticalArrangement = Arrangement.spacedBy(spacing)) {
             lines.forEachIndexed { lineIndex, line ->
                 Row(horizontalArrangement = Arrangement.spacedBy(spacing)) {
                     val weigh: Weigh = alongScroll(true)?.let { viewportShare(it, lineLength.toFloat()) }
                         ?: { w, _ -> Modifier.weight(w) }
-                    WrappedLine(address, line, lineIndex, lineLength, flow.uniform, registry, decorator, unknownDecorator, weigh)
+                    WrappedLine(address, line, flow.uniform, registry, decorator, unknownDecorator, weigh)
                     if (flow.uniform) repeat(lineLength - line.size) { Spacer(weigh(1f, WidgetSizing.UNDECLARED)) }
                 }
             }
@@ -576,7 +747,7 @@ private fun FlowSlot(
                 Column(verticalArrangement = Arrangement.spacedBy(spacing)) {
                     val weigh: Weigh = alongScroll(false)?.let { viewportShare(it, lineLength.toFloat()) }
                         ?: { w, _ -> Modifier.weight(w) }
-                    WrappedLine(address, line, lineIndex, lineLength, flow.uniform, registry, decorator, unknownDecorator, weigh)
+                    WrappedLine(address, line, flow.uniform, registry, decorator, unknownDecorator, weigh)
                     if (flow.uniform) repeat(lineLength - line.size) { Spacer(weigh(1f, WidgetSizing.UNDECLARED)) }
                 }
             }
@@ -587,13 +758,13 @@ private fun FlowSlot(
 @Composable
 private fun FlowWidgets(
     address: SlotAddress,
-    widgets: List<WidgetInstance>,
+    widgets: List<IndexedValue<WidgetInstance>>,
     registry: WidgetRegistry,
     decorator: WidgetDecorator,
     unknownDecorator: UnknownWidgetDecorator,
     weigh: Weigh,
 ) {
-    widgets.forEachIndexed { index, instance ->
+    widgets.forEach { (index, instance) ->
         key(instance.instanceId) {
             val descriptor = registry[instance.kind]
             if (descriptor == null) {
@@ -621,23 +792,20 @@ private fun FlowWidgets(
     }
 }
 
-// One line of a wrapped flow. `index` has to be the child's position in the
-// whole slot, not in the line, because that is what the drop hit-test and the
-// decorator address it by.
+// One line of a wrapped flow. Each child carries its position in the whole slot,
+// not in the line, because that is what the drop hit-test and the decorator
+// address it by.
 @Composable
 private fun WrappedLine(
     address: SlotAddress,
-    line: List<WidgetInstance>,
-    lineIndex: Int,
-    lineLength: Int,
+    line: List<IndexedValue<WidgetInstance>>,
     uniform: Boolean,
     registry: WidgetRegistry,
     decorator: WidgetDecorator,
     unknownDecorator: UnknownWidgetDecorator,
     weigh: Weigh,
 ) {
-    line.forEachIndexed { inLine, instance ->
-        val index = lineIndex * lineLength + inLine
+    line.forEach { (index, instance) ->
         key(instance.instanceId) {
             val descriptor = registry[instance.kind]
             val cell: Modifier = if (uniform) weigh(1f, descriptor?.sizing ?: WidgetSizing.UNDECLARED) else Modifier
@@ -706,9 +874,13 @@ private fun PlacementSlot(
     outer: Modifier,
     spacing: Dp,
     scroll: ScrollAxis?,
+    include: (WidgetInstance) -> Boolean = { true },
+    // Off for the layer of pinned widgets over a moving slot: the slot itself
+    // reports where its content is, and two reports would fight over one path.
+    reportBounds: Boolean = true,
 ) {
     val density = LocalDensity.current
-    val reportSlotBounds = LocalSlotBoundsReporter.current
+    val reportSlotBounds = if (reportBounds) LocalSlotBoundsReporter.current else NO_REPORT
     val columns = content.grid.coerceIn(0, GRID_MAX)
     val transposed = scroll?.horizontal == true
     val placementBounds = PlacementBounds(unboundedX = scroll?.horizontal == true, unboundedY = scroll?.horizontal == false)
@@ -758,6 +930,7 @@ private fun PlacementSlot(
 
         val placed: @Composable (position: (PlacedAt) -> Modifier) -> Unit = { position ->
             content.widgets.withIndex()
+                .filter { include(it.value) }
                 .sortedWith(compareBy({ it.value.placement?.z ?: 0 }, { it.index }))
                 .forEach { (index, instance) ->
                     key(instance.instanceId) {
@@ -797,6 +970,8 @@ private fun PlacementSlot(
         }
     }
 }
+
+private val NO_REPORT: SlotBoundsReporter = { _, _, _ -> }
 
 /**
  * Where a placed widget sits: its corner, the offset it is held at from that

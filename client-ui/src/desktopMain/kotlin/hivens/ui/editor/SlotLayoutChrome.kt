@@ -256,15 +256,19 @@ internal fun SlotLayoutMenuContent(
     // Static is first and is what every slot is until somebody says otherwise.
     val mode = live.viewportMode
     val bar = live.viewport?.scrollbar ?: true
+    val paged = (mode as? ViewportMode.Scroll)?.paged == true
+    // Keeps the page-by-page setting across a change of axis: it is a property of
+    // how the slot scrolls, not of which way.
+    val scrollKind = if (paged) ViewportSpec.PAGES else ViewportSpec.SCROLL
     MenuSectionTitle(s.editorSlotViewportTitle)
     NxMenuItem(s.editorViewportStatic, selected = mode == ViewportMode.Static) {
         controller.setViewport(path, null); onClose()
     }
-    NxMenuItem(s.editorViewportDown, selected = mode == ViewportMode.Scroll(horizontal = false)) {
-        controller.setViewport(path, ViewportSpec.ScrollDown.copy(scrollbar = bar)); onClose()
+    NxMenuItem(s.editorViewportDown, selected = mode is ViewportMode.Scroll && !mode.horizontal) {
+        controller.setViewport(path, ViewportSpec(scrollKind, ViewportSpec.VERTICAL, bar)); onClose()
     }
-    NxMenuItem(s.editorViewportRight, selected = mode == ViewportMode.Scroll(horizontal = true)) {
-        controller.setViewport(path, ViewportSpec.ScrollRight.copy(scrollbar = bar)); onClose()
+    NxMenuItem(s.editorViewportRight, selected = mode is ViewportMode.Scroll && mode.horizontal) {
+        controller.setViewport(path, ViewportSpec(scrollKind, ViewportSpec.HORIZONTAL, bar)); onClose()
     }
     // A plane with no edges. It holds placed widgets, so a flow put on one becomes
     // a canvas in the same step.
@@ -275,6 +279,10 @@ internal fun SlotLayoutMenuContent(
     // it wants to see the bar come and go without reopening the menu.
     val current = live.viewport
     if (mode is ViewportMode.Scroll && current != null) {
+        // A whole screen at a time: the wheel turns a page, a scroll settles on one.
+        NxMenuItem(s.editorViewportPaged, selected = paged) {
+            controller.setViewport(path, current.copy(kind = if (paged) ViewportSpec.SCROLL else ViewportSpec.PAGES))
+        }
         NxMenuItem(s.editorViewportScrollbar, selected = bar) {
             controller.setViewport(path, current.copy(scrollbar = !bar))
         }

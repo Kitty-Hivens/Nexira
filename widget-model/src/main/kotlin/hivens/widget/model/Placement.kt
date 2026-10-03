@@ -117,6 +117,14 @@ data class Placement(
      * the way a margin does, not the way inner padding does.
      */
     val padding: SurfaceInsets = SurfaceInsets(),
+    /**
+     * Held where it is while the slot it sits in scrolls or is moved: a header that
+     * stays at the top of a page, a button that stays in a map's corner. In a flow
+     * it is taken out of the moving content and set at the start of the axis; in a
+     * placement slot it is placed against the view, by its anchor, rather than
+     * against the content. In a slot that does not move it changes nothing.
+     */
+    val pinned: Boolean = false,
 ) {
     companion object {
         const val TOP_START = "topStart"

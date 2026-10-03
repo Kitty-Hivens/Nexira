@@ -35,6 +35,7 @@ import hivens.widget.model.setWidgetAnchor
 import hivens.widget.model.setWidgetBounds
 import hivens.widget.model.setWidgetOffset
 import hivens.widget.model.setWidgetPadding
+import hivens.widget.model.setWidgetPinned
 import hivens.widget.model.setWidgetSize
 import hivens.widget.model.setWidgetZ
 import hivens.widget.model.traverse
@@ -330,6 +331,11 @@ class EditModeController(
                 it.setWidgetBounds(path, instanceId, x, y, width, height)
             }
         }
+    }
+
+    // Held in place while the slot scrolls or is moved, or let go.
+    fun setWidgetPinned(path: SlotPath, instanceId: String, pinned: Boolean) {
+        scope.launch(writeDispatcher) { edit(key = null) { it.setWidgetPinned(path, instanceId, pinned) } }
     }
 
     fun setWidgetZ(path: SlotPath, instanceId: String, z: Int) {

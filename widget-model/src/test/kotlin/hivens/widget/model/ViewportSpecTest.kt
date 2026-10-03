@@ -111,4 +111,19 @@ class ViewportSpecTest {
         assertTrue(out.widgets.all { it.placement != null }, "and every widget was given a point on it")
         assertTrue(out.widgets[0].placement != out.widgets[1].placement, "not the same point")
     }
+
+    // ── Pages and pinning ────────────────────────────────────────────
+
+    @Test
+    fun `pages read as a scroll that turns a page at a time`() {
+        assertEquals(ViewportMode.Scroll(horizontal = true, paged = true), slot("""{"viewport":{"kind":"pages","axis":"horizontal"}}""").viewportMode)
+    }
+
+    @Test
+    fun `a widget is pinned and let go`() {
+        val g = graph(SlotContent(widgets = listOf(WidgetInstance(WidgetKind("k"), "a"))))
+        val pinned = g.setWidgetPinned(path, "a", true)
+        assertEquals(true, pinned.traverse(path)!!.widgets.single().placement?.pinned)
+        assertEquals(false, pinned.setWidgetPinned(path, "a", false).traverse(path)!!.widgets.single().placement?.pinned)
+    }
 }

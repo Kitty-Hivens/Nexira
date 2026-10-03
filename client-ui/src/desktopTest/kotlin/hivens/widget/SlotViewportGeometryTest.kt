@@ -229,6 +229,80 @@ class SlotViewportGeometryTest {
         assertEquals(B, page.at(150, 50), "column three is past the window and the page reaches it")
     }
 
+    // ── Pages and pinned widgets ──────────────────────────────────────
+
+    private val pagesDown = ViewportSpec(ViewportSpec.PAGES, ViewportSpec.VERTICAL)
+
+    @Test
+    fun `a paged slot turns exactly one page per turn of the wheel`() {
+        val page = Probe(
+            SlotContent(
+                widgets = listOf(widget("a", "fill.a"), widget("b", "fill.b"), widget("c", "fill.a")),
+                flow = FlowSpec.Column,
+                viewport = pagesDown,
+            ),
+        )
+        page.wheel(down = 1f)
+        assertEquals(B, page.at(100, 5), "the second page starts at the top of the view")
+        assertEquals(B, page.at(100, 195), "and fills it")
+        page.wheel(down = 1f)
+        assertEquals(A, page.at(100, 5), "one more turn, one more page")
+        page.wheel(down = -1f)
+        assertEquals(B, page.at(100, 100), "and back")
+    }
+
+    @Test
+    fun `a pinned widget at the top of a page stays there while the rest scrolls`() {
+        val page = Probe(
+            SlotContent(
+                widgets = listOf(
+                    widget("h", "tall.c", Placement(pinned = true)),
+                    widget("a", "tall.a"),
+                    widget("b", "tall.b"),
+                    widget("c", "tall.a"),
+                ),
+                flow = FlowSpec.Column,
+                viewport = ViewportSpec.ScrollDown,
+            ),
+        )
+        assertEquals(C, page.at(100, 50))
+        assertEquals(A, page.at(100, 150))
+        page.wheel(down = 50f)
+        assertEquals(C, page.at(100, 50), "the pinned header moved with the content")
+        assertEquals(A, page.at(100, 150), "the moving part did not reach its end under the header")
+    }
+
+    @Test
+    fun `a pinned widget on a page that is a canvas holds its corner of the view`() {
+        val page = Probe(
+            SlotContent(
+                widgets = listOf(
+                    widget("p", "fill.b", Placement(anchor = Placement.BOTTOM_END, x = 10f, y = 10f, width = 40f, height = 40f, pinned = true)),
+                    widget("a", "fill.a", Placement(x = 0f, y = 600f, width = 50f, height = 50f)),
+                ),
+                flow = null,
+                viewport = ViewportSpec.ScrollDown,
+            ),
+        )
+        assertEquals(B, page.at(170, 170), "a corner is the view's corner again")
+        page.wheel(down = 50f)
+        assertEquals(B, page.at(170, 170), "and it stays there")
+        assertEquals(A, page.at(25, 175), "while the page moved under it")
+    }
+
+    @Test
+    fun `a pinned widget on a map stays put while the map moves`() {
+        val page = Probe(
+            map(
+                widget("p", "fill.b", Placement(x = 10f, y = 10f, width = 40f, height = 40f, pinned = true)),
+                widget("a", "fill.a", Placement(x = 100f, y = 100f, width = 40f, height = 40f)),
+            ),
+        )
+        page.drag(from = Offset(150f, 180f), to = Offset(60f, 180f))
+        assertEquals(B, page.at(30, 30), "the pinned widget moved with the plane")
+        assertEquals(PAGE, page.at(120, 120), "the plane did not move")
+    }
+
     // ── Map ───────────────────────────────────────────────────────────
 
     private fun map(vararg widgets: WidgetInstance) =

@@ -369,6 +369,10 @@ fun LayoutGraph.setWidgetWeight(path: SlotPath, instanceId: String, weight: Floa
 fun LayoutGraph.setWidgetPadding(path: SlotPath, instanceId: String, padding: SurfaceInsets): LayoutGraph =
     updatePlacement(path, instanceId) { it.copy(padding = padding) }
 
+/** Holds the widget where it is while its slot scrolls or is moved, or lets it go. See [Placement.pinned]. */
+fun LayoutGraph.setWidgetPinned(path: SlotPath, instanceId: String, pinned: Boolean): LayoutGraph =
+    updatePlacement(path, instanceId) { it.copy(pinned = pinned) }
+
 /**
  * Reads the widget's current placement (or the default when it carries none),
  * applies [edit], and writes it back, so offset, size, z, anchor and weight

@@ -1513,6 +1513,9 @@ interface AppStrings {
     val editorViewportRight: String
     val editorViewportScrollbar: String
     val editorViewportMap: String
+    val editorViewportPaged: String
+    val editorPin: String
+    val editorUnpin: String
     val modulesTitle: String
     val modulesChip: String
     val modulesEmpty: String
