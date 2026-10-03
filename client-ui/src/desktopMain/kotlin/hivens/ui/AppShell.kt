@@ -68,7 +68,11 @@ import hivens.auth.AccountStore
 import hivens.core.launch.LaunchState
 import hivens.launcher.launch.LauncherController
 import hivens.launcher.network.ServerProtocolConfig
+import hivens.ui.chrome.ExtraButton
+import hivens.ui.chrome.awtOnX11
 import hivens.ui.chrome.computeSafeWindowMinSize
+import hivens.ui.chrome.extraButton
+import hivens.ui.chrome.resendAsSidewaysWheel
 import hivens.tray.TrayController
 import hivens.tray.TrayStrings
 import hivens.ui.background.BackgroundManager
@@ -1313,15 +1317,19 @@ fun AppRoot(
     // the AWT level where the thumb buttons still arrive. The AWT event thread is
     // the Compose UI thread in Compose Desktop, so mutating the NavBackStack here is
     // on the right thread.
+    //
+    // Which number is which depends on the toolkit (see extraButton): on X11 the
+    // sideways wheel arrives here too, and goes back to the window as a wheel.
     DisposableEffect(Unit) {
         val toolkit = Toolkit.getDefaultToolkit()
         val listener = AWTEventListener { ev ->
             if (ev is MouseEvent && ev.id == MouseEvent.MOUSE_PRESSED) {
-                // AWT numbers the thumb buttons inconsistently across mice / X11
-                // setups (4/5 on some, 6/7 on others); lower of each pair = Back.
-                when (ev.button) {
-                    4, 6 -> backStack.back()
-                    5, 7 -> backStack.forward()
+                when (extraButton(ev.button, awtOnX11)) {
+                    ExtraButton.Back        -> backStack.back()
+                    ExtraButton.Forward     -> backStack.forward()
+                    ExtraButton.ScrollLeft  -> resendAsSidewaysWheel(ev, toRight = false)
+                    ExtraButton.ScrollRight -> resendAsSidewaysWheel(ev, toRight = true)
+                    ExtraButton.None        -> Unit
                 }
             }
         }
