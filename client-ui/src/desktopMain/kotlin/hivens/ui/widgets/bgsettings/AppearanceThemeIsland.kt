@@ -43,6 +43,8 @@ internal fun AppearanceThemeIsland(
     activeTheme: Theme,
     surfaceBlur: Boolean,
     onSurfaceBlurChanged: (Boolean) -> Unit,
+    reduceMotion: Boolean,
+    onReduceMotionChanged: (Boolean) -> Unit,
     onOpenThemePicker: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -101,6 +103,17 @@ internal fun AppearanceThemeIsland(
                 icon            = NxIcon.Layers,
                 accent          = NxColor.lead(),
                 onCheckedChange = onSurfaceBlurChanged,
+            )
+
+            // Beside the blur because it is the same kind of choice: decoration that
+            // costs something, switched off in one place rather than widget by widget.
+            NxToggle(
+                label           = s.settingsReduceMotion,
+                checked         = reduceMotion,
+                description     = s.settingsReduceMotionDesc,
+                icon            = NxIcon.Speed,
+                accent          = NxColor.lead(),
+                onCheckedChange = onReduceMotionChanged,
             )
 
             NxRow(

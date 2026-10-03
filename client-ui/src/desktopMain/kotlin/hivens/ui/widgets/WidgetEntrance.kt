@@ -9,6 +9,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
+import hivens.ui.customization.LocalCustomization
 import hivens.ui.editor.EditModeState
 import hivens.ui.editor.LocalEditMode
 import hivens.ui.theme.Motion
@@ -33,7 +34,8 @@ import kotlin.time.Duration.Companion.milliseconds
  * first frame and the arrival is alpha, offset and scale over it, so nothing around
  * it moves while it comes in. It starts invisible on the first frame rather than
  * shown and then hidden. In the editor it starts arrived, because a widget being
- * arranged must not vanish under the hand arranging it.
+ * arranged must not vanish under the hand arranging it, and with reduced motion on
+ * it starts arrived everywhere.
  */
 val PlayedWidgetEntrance: WidgetEntrance = { entrance, order, delayMs, content ->
     WidgetArrival(entrance, order, delayMs, content)
@@ -42,7 +44,8 @@ val PlayedWidgetEntrance: WidgetEntrance = { entrance, order, delayMs, content -
 @Composable
 private fun WidgetArrival(entrance: Entrance, order: Int, delayMs: Int?, content: @Composable () -> Unit) {
     val editing = LocalEditMode.current is EditModeState.On
-    val arrives = entrance != Entrance.None && !editing
+    val still = LocalCustomization.current.reduceMotion
+    val arrives = entrance != Entrance.None && !editing && !still
     val role = when (entrance) {
         Entrance.Rise -> Motion.reveal
         Entrance.Settle -> Motion.emphasis

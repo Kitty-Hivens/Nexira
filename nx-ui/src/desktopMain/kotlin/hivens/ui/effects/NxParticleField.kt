@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import hivens.ui.customization.LocalCustomization
 import hivens.ui.theme.LocalScheme
 import hivens.ui.theme.NxInk
 import kotlin.math.PI
@@ -73,9 +74,13 @@ fun NxParticleField(
     }
     // Named apart from the draw scope's own density, which is the screen's.
     val perArea = density
+    // Held on its first frame when the person asked for less movement: the field
+    // still decorates, it just stops drifting, and stops costing a frame a frame.
+    val still = LocalCustomization.current.reduceMotion
     var nanos by remember { mutableLongStateOf(0L) }
-    LaunchedEffect(Unit) {
-        val start = withFrameNanos { it }
+    LaunchedEffect(still) {
+        if (still) return@LaunchedEffect
+        val start = withFrameNanos { it } - nanos
         while (true) withFrameNanos { nanos = it - start }
     }
     Canvas(modifier.graphicsLayer()) {

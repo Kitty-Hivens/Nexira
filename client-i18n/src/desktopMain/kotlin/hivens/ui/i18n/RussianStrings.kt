@@ -85,6 +85,8 @@ object RussianStrings : AppStrings {
     override val settingsThemeModeSystemUnavailable = "Системная схема недоступна в этой среде"
     override val settingsSurfaceBlur                = "Размытие за панелями"
     override val settingsSurfaceBlurDesc            = "Стоит немного на каждом кадре; без него панели сохраняют форму и непрозрачность"
+    override val settingsReduceMotion               = "Меньше движения"
+    override val settingsReduceMotionDesc           = "Виджеты сразу на месте при открытии экрана, частицы замирают"
     override val settingsCustomChrome               = "Своя строка заголовка"
     override val settingsCustomChromeDesc           = "Заменяет заголовок окна собственной верхней панелью. Применится при следующем запуске."
     override val settingsCustomChromeTiling         = "Твой оконный менеджер не рисует заголовок, так что здесь это ничего не меняет."

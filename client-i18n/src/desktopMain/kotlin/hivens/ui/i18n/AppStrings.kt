@@ -94,6 +94,8 @@ interface AppStrings {
     val settingsThemeModeSystemUnavailable: String
     val settingsSurfaceBlur: String
     val settingsSurfaceBlurDesc: String
+    val settingsReduceMotion: String
+    val settingsReduceMotionDesc: String
     val settingsCustomChrome: String
     val settingsCustomChromeDesc: String
     val settingsCustomChromeTiling: String

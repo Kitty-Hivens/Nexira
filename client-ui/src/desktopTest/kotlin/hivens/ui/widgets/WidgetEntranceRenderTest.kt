@@ -13,6 +13,9 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import hivens.ui.FRAME_NANOS
 import hivens.ui.theme.NxTheme
+import hivens.ui.customization.CustomizationSettings
+import hivens.ui.customization.LocalCustomization
+import androidx.compose.runtime.CompositionLocalProvider
 import hivens.widget.model.Entrance
 import org.jetbrains.skia.Bitmap
 import kotlin.test.Test
@@ -31,14 +34,16 @@ class WidgetEntranceRenderTest {
     private val ground = Color(0xFF000000)
     private val block = Color(0xFFFF00FF)
 
-    private fun frames(entrance: Entrance, order: Int): Pair<Int, Int> {
+    private fun frames(entrance: Entrance, order: Int, reduceMotion: Boolean = false): Pair<Int, Int> {
         val scene = ImageComposeScene(100, 100, density = Density(1f)) {
+            CompositionLocalProvider(LocalCustomization provides CustomizationSettings(reduceMotion = reduceMotion)) {
             NxTheme(dark = true) {
                 Box(Modifier.fillMaxSize().background(ground)) {
                     PlayedWidgetEntrance(entrance, order, null) {
                         Box(Modifier.size(100.dp).background(block))
                     }
                 }
+            }
             }
         }
         try {
@@ -65,6 +70,14 @@ class WidgetEntranceRenderTest {
     fun `a widget told not to arrive is there from the first frame`() {
         val (first, _) = frames(Entrance.None, order = 3)
         assertEquals(block.toArgb(), first)
+    }
+
+    @Test
+    fun `with reduced motion every widget is there from the first frame`() {
+        for (entrance in Entrance.entries) {
+            val (first, _) = frames(entrance, order = 2, reduceMotion = true)
+            assertEquals(block.toArgb(), first, "$entrance arrived although motion was reduced")
+        }
     }
 
     @Test

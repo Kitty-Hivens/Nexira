@@ -59,6 +59,8 @@ fun BgSettingsSurface(
     activeTheme: Theme,
     surfaceBlur: Boolean,
     onSurfaceBlurChanged: (Boolean) -> Unit,
+    reduceMotion: Boolean,
+    onReduceMotionChanged: (Boolean) -> Unit,
     onOpenThemePicker: () -> Unit,
 ) {
     val settings = remember { mutableStateOf(currentSettings) }
@@ -79,6 +81,7 @@ fun BgSettingsSurface(
         update { copy(imagePath = null, enabled = false) }
     }
     PuppetToggle("background.surfaceBlur", surfaceBlur, onValueChange = onSurfaceBlurChanged)
+    PuppetToggle("background.reduceMotion", reduceMotion, onValueChange = onReduceMotionChanged)
     PuppetClick("background.reset") {
         settings.value = BackgroundSettings()
         onSettingsChanged(settings.value)
@@ -109,6 +112,8 @@ fun BgSettingsSurface(
                 activeTheme          = activeTheme,
                 surfaceBlur          = surfaceBlur,
                 onSurfaceBlurChanged = onSurfaceBlurChanged,
+                reduceMotion         = reduceMotion,
+                onReduceMotionChanged = onReduceMotionChanged,
                 onOpenThemePicker    = onOpenThemePicker,
                 modifier             = Modifier.width(THEME_PANEL_WIDTH).fillMaxHeight(),
             )

@@ -44,6 +44,16 @@ data class CustomizationSettings(
     val surfaceBlur: Boolean = true,
 
     /**
+     * Whether the interface keeps decorative movement to itself.
+     *
+     * On, widgets are where they belong when a surface opens instead of arriving, and
+     * a field of particles holds still on its first frame instead of drifting. It is
+     * one switch for the movement nothing depends on, and it leaves the motion that
+     * says something alone: a press still answers, a panel still opens.
+     */
+    val reduceMotion: Boolean = false,
+
+    /**
      * How the active item in the left navigation rail is highlighted.
      * [NavSelectionStyle.Pill] (default) keeps the original Material capsule
      * behind the icon; the other variants change only the selection

@@ -10,6 +10,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.Density
 import hivens.ui.theme.NxTheme
+import hivens.ui.customization.CustomizationSettings
+import hivens.ui.customization.LocalCustomization
+import androidx.compose.runtime.CompositionLocalProvider
 import org.jetbrains.skia.Bitmap
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -86,6 +89,31 @@ class ParticleFieldTest {
             var lit = 0
             for (x in 0 until 400 step 2) for (y in 0 until 300 step 2) if (bmp.getColor(x, y) != ground) lit++
             assertTrue(lit > 20, "the field drew $lit lit samples")
+        } finally {
+            scene.close()
+        }
+    }
+
+    @OptIn(ExperimentalComposeUiApi::class)
+    @Test
+    fun `with reduced motion the field holds still`() {
+        val scene = ImageComposeScene(300, 200, density = Density(1f)) {
+            CompositionLocalProvider(LocalCustomization provides CustomizationSettings(reduceMotion = true)) {
+                NxTheme(dark = true) {
+                    Box(Modifier.fillMaxSize().background(Color.Black)) {
+                        NxParticleField(ParticleField.Snow, Modifier.fillMaxSize(), ParticleDensity.Rich)
+                    }
+                }
+            }
+        }
+        try {
+            val early = Bitmap.makeFromImage(scene.render(16_000_000L))
+            var t = 16_000_000L
+            repeat(60) { t += 16_000_000L; scene.render(t).close() }
+            val late = Bitmap.makeFromImage(scene.render(t))
+            var differing = 0
+            for (x in 0 until 300 step 3) for (y in 0 until 200 step 3) if (early.getColor(x, y) != late.getColor(x, y)) differing++
+            assertEquals(0, differing, "the field moved although motion was reduced")
         } finally {
             scene.close()
         }

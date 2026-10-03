@@ -97,6 +97,8 @@ object JapaneseStrings : AppStrings {
     override val settingsThemeModeSystemUnavailable = "この環境ではシステムの配色を利用できません"
     override val settingsSurfaceBlur = "パネル背面をぼかす"
     override val settingsSurfaceBlurDesc = "毎フレームわずかに負荷がかかります。オフでもパネルの形と不透明度は変わりません"
+    override val settingsReduceMotion = "動きを減らす"
+    override val settingsReduceMotionDesc = "画面を開いたときウィジェットはすぐに表示され、パーティクルは静止します"
     override val settingsCustomChrome = "アプリ内タイトルバー"
     override val settingsCustomChromeDesc = "ウィンドウのタイトルバーをアプリ独自の上部バーに置き換えます。次回の起動から有効になります。"
     override val settingsCustomChromeTiling = "お使いのウィンドウマネージャーはタイトルバーを描画しないため、ここでは何も変わりません。"

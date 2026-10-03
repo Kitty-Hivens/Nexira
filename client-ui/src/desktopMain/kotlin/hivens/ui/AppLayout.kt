@@ -175,6 +175,8 @@ fun AppLayout(
                             activeTheme       = themeLibrary.active,
                             surfaceBlur       = customization.surfaceBlur,
                             onSurfaceBlurChanged = { onCustomizationChanged(customization.copy(surfaceBlur = it)) },
+                            reduceMotion      = customization.reduceMotion,
+                            onReduceMotionChanged = { onCustomizationChanged(customization.copy(reduceMotion = it)) },
                             onOpenThemePicker = { onScreenChange(Screen.ThemePicker) },
                         )
 

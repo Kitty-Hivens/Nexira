@@ -87,6 +87,8 @@ object EnglishStrings : AppStrings {
     override val settingsThemeModeSystemUnavailable = "System scheme is not available in this environment"
     override val settingsSurfaceBlur                = "Blur behind panels"
     override val settingsSurfaceBlurDesc            = "Costs a little on every frame; panels keep their shape and opacity when off"
+    override val settingsReduceMotion               = "Reduce motion"
+    override val settingsReduceMotionDesc           = "Widgets are in place when a screen opens and particles hold still"
     override val settingsCustomChrome               = "In-app title bar"
     override val settingsCustomChromeDesc           = "Replace the window's title bar with the app's own top bar. Applies on the next launch."
     override val settingsCustomChromeTiling         = "Your window manager draws no title bar, so this changes nothing here."
