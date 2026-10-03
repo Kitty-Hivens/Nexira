@@ -1571,6 +1571,8 @@ object JapaneseStrings : AppStrings {
     override val screenIconLabel = "アイコン"
     override val screenDelete = "画面を削除"
     override fun screenDeleteBody(title: String) = "「$title」とその中身は、レールのボタンと一緒に削除されます。"
+    override fun screenDeletedTitle(title: String) = "画面「$title」を削除しました"
+    override val screenRestore = "元に戻す"
     override val editorUndo = "元に戻す"
     override val editorRedo = "やり直す"
     override val editorEscHint = "Esc で終了"

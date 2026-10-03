@@ -100,6 +100,11 @@ import hivens.ui.nx.WidthClass
 import hivens.ui.theme.Motion
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
+import hivens.config.Branding
+import hivens.ui.notifications.Kind
+import hivens.ui.notifications.NotifAction
+import hivens.ui.notifications.NotificationCenter
+import hivens.ui.notifications.Severity
 import hivens.ui.theme.OnFill
 import hivens.ui.widgets.modules.WidgetModules
 import hivens.widget.api.EmptySlotDecorator
@@ -195,25 +200,28 @@ fun EditorSurfaceHost(
     val coroutineScope = rememberCoroutineScope()
     val s = LocalStrings.current
 
-    // Keyed on the tab set, which is a List compared by content, so it re-keys
-    // only when what is editable actually changes. Keying on the screen instead
-    // looked equivalent and was not: the shell surfaces are on every screen, so
-    // moving between two screens that mount no centre surface leaves this list
-    // equal, and an edit session arranging the rails survived the navigation. On
-    // the screen it did not, and arranging the rails while walking through the
-    // app is most of why they are reachable from everywhere.
-    var editing       by remember(availableSurfaces) { mutableStateOf(false) }
-    var paletteOpen   by remember(availableSurfaces) { mutableStateOf(true) }
-    var previewing    by remember(availableSurfaces) { mutableStateOf(false) }
+    // An edit session belongs to the app, not to the screen it started on. Moving
+    // to another screen while arranging keeps the editor on: a rail or the top bar
+    // stays the selected tab, and a tab that belonged to the screen left behind
+    // gives way to the new screen's own (see the re-point below). It used to end
+    // with any move that changed the tab set, so arranging several screens meant
+    // leaving the editor and coming back for each, and deleting a screen threw the
+    // person out of the editor they were deleting it from.
+    var editing       by remember { mutableStateOf(false) }
+    var paletteOpen   by remember { mutableStateOf(true) }
+    var previewing    by remember { mutableStateOf(false) }
     // Where a right-click landed while NOT editing, which is the only thing that
     // opens the way in. Null closes the menu.
     var entryMenuAt   by remember { mutableStateOf<Offset?>(null) }
-    var presetPanelOpen by remember(availableSurfaces) { mutableStateOf(false) }
-    var modulesPanelOpen by remember(availableSurfaces) { mutableStateOf(false) }
-    var resetSurfaceConfirm by remember(availableSurfaces) { mutableStateOf(false) }
-    var selectedSurface by remember(availableSurfaces) {
-        mutableStateOf(availableSurfaces.firstOrNull())
-    }
+    var presetPanelOpen by remember { mutableStateOf(false) }
+    var modulesPanelOpen by remember { mutableStateOf(false) }
+    var resetSurfaceConfirm by remember { mutableStateOf(false) }
+    var selectedSurface by remember { mutableStateOf(availableSurfaces.firstOrNull()) }
+    // Whether the selection is the open screen's own page rather than a rail or the
+    // top bar. Set by what the person picks, and only by that: a re-point made
+    // while a screen is half gone must not decide it, or a deleted screen leaves
+    // the selection stuck on the top bar it fell back to for one frame.
+    var followsScreen by remember { mutableStateOf(true) }
     // Which of the selected surface's families is being arranged. Null follows the
     // app, which is what a surface with one family always does. A family the app
     // only enters in some state -- a rail that only shows its project view while a
@@ -224,21 +232,21 @@ fun EditorSurfaceHost(
         selectedSurface?.let { graphForSurfaces.surfaces[it]?.families?.keys?.toList() }.orEmpty()
     }
 
-    // Prop editor target. Cleared on surface change (keyed remember), on
-    // dismiss, and on leaving edit mode; while set, the palette hides so
-    // the two right-edge panels do not overlap.
-    var propTarget by remember(availableSurfaces) { mutableStateOf<PropTarget?>(null) }
-    // Surface-level settings panel (currently the left rail's nav-selection
-    // settings). Mutually exclusive with the per-widget prop panel + palette.
-    var surfaceSettingsOpen by remember(availableSurfaces) { mutableStateOf(false) }
+    // Prop editor target. Cleared when the selected tab is re-pointed or the widget's
+    // surface leaves the tab set, on dismiss, and on leaving edit mode; while set,
+    // the palette hides so the two right-edge panels do not overlap.
+    var propTarget by remember { mutableStateOf<PropTarget?>(null) }
+    // Surface-level settings panel (a region's, or a made screen's). Mutually
+    // exclusive with the per-widget prop panel + palette.
+    var surfaceSettingsOpen by remember { mutableStateOf(false) }
     // Selected slot (Tier 2 slot layout chrome): the highlighted slot, its window
     // rect (for the handle anchor), the cursor anchor for a right-click menu, and
     // whether the handle's menu is open. selectedSlotState stays a State so the slot
     // chrome modifier can read it without the host capturing a stale value.
-    val selectedSlotState = remember(availableSurfaces) { mutableStateOf<SlotPath?>(null) }
-    var selectedSlotRect  by remember(availableSurfaces) { mutableStateOf<Rect?>(null) }
-    var slotMenuCursor    by remember(availableSurfaces) { mutableStateOf<Offset?>(null) }
-    var handleMenuOpen    by remember(availableSurfaces) { mutableStateOf(false) }
+    val selectedSlotState = remember { mutableStateOf<SlotPath?>(null) }
+    var selectedSlotRect  by remember { mutableStateOf<Rect?>(null) }
+    var slotMenuCursor    by remember { mutableStateOf<Offset?>(null) }
+    var handleMenuOpen    by remember { mutableStateOf(false) }
     fun clearSlotSelection() {
         selectedSlotState.value = null
         selectedSlotRect = null
@@ -246,17 +254,28 @@ fun EditorSurfaceHost(
         handleMenuOpen = false
     }
 
-    // A surface can leave the graph under a running editor: a preset load or a
-    // reset rebuilds it. Re-point rather than hold an id nothing answers to, which
-    // renders as an editor over nothing with no way to say so.
+    // The tab set changes under a running editor: a move to another screen, a
+    // deleted screen, a preset load or a reset. A selected tab still in the set
+    // stays selected, which is a rail or the top bar on any move. One that left
+    // gives way to the first tab, which is the new screen's own, rather than hold
+    // an id nothing answers to, which renders as an editor over nothing.
     LaunchedEffect(availableSurfaces) {
-        if (selectedSurface !in availableSurfaces) {
-            selectedSurface = availableSurfaces.firstOrNull()
+        val page = availableSurfaces.firstOrNull { !EditorSurfaces.isShell(it) }
+        val gone = selectedSurface !in availableSurfaces
+        if (gone || (followsScreen && page != null && selectedSurface != page)) {
+            selectedSurface = page ?: availableSurfaces.firstOrNull()
+            propTarget = null
+            surfaceSettingsOpen = false
             // The same clean-up every other route to a new surface does. Without
             // it the handle and its menu stay anchored to a slot on a surface that
             // is gone, and act on a path nothing answers to.
             clearSlotSelection()
+        } else if (propTarget?.path?.surface?.let { it !in availableSurfaces } == true) {
+            propTarget = null
         }
+        // Nothing left to arrange, which no screen has today, but the editor would
+        // otherwise stay on over nothing.
+        if (availableSurfaces.isEmpty()) editing = false
     }
 
     // One Escape backs out one step: an open slot menu first, then the slot
@@ -282,7 +301,11 @@ fun EditorSurfaceHost(
     // settings open, so the next thing the person does is name it. Declared after
     // the exit clean-up above, which runs first on the same change and would
     // otherwise close the panel this opens.
+    //
+    // A screen put back after a deletion takes the same road without the settings:
+    // it is not new, there is nothing to name.
     var pendingScreen by remember { mutableStateOf<ScreenSpec?>(null) }
+    var pendingSettings by remember { mutableStateOf(true) }
     LaunchedEffect(pendingScreen, graphForSurfaces) {
         val made = pendingScreen ?: return@LaunchedEffect
         if (graphForSurfaces.screen(made.id) != null && currentScreen != Screen.Custom(made.id)) {
@@ -294,9 +317,34 @@ fun EditorSurfaceHost(
         if (made.surface !in availableSurfaces) return@LaunchedEffect
         editing = true
         selectedSurface = made.surface
+        followsScreen = true
         propTarget = null
-        surfaceSettingsOpen = true
+        surfaceSettingsOpen = pendingSettings
         pendingScreen = null
+    }
+    // A screen deleted from its own settings: said in a notice with the way back,
+    // because the editor stays on and the page the person was arranging is gone.
+    val notifications: NotificationCenter = koinInject()
+    val deleteScreen: (ScreenSpec) -> Unit = { doomed ->
+        controller.deleteScreen(doomed.id) { gone ->
+            notifications.push(
+                sourceKey = "screen-deleted-${doomed.id}",
+                sender    = Branding.TITLE,
+                iconUrl   = null,
+                severity  = Severity.Info,
+                // Held until answered or closed: a one-shot notice is gone in five
+                // seconds, which is less time than it takes to read it and decide.
+                kind      = Kind.ActionRequired,
+                title     = s.screenDeletedTitle(doomed.title.ifBlank { s.screenUntitled }),
+                actions   = listOf(
+                    NotifAction(id = "screen-restore-${doomed.id}", label = s.screenRestore) {
+                        controller.restoreScreen(gone)
+                        pendingSettings = false
+                        pendingScreen = gone.spec
+                    },
+                ),
+            )
+        }
     }
     // The selected surface's made screen, when it is one: its settings are the
     // screen's own panel rather than a region's.
@@ -314,8 +362,8 @@ fun EditorSurfaceHost(
     // nothing pending, which is what entering edit mode hits.
     LaunchedEffect(editing, selectedSurface) { layoutRepo.flush() }
     val currentGraph = LocalLayoutGraph.current
-    // Leaving a surface drops edit mode -- avoids a stale edit state
-    // pointed at the wrong surface after navigation.
+    // Rebuilt whenever the selected tab changes, so the chrome is always pointed at
+    // the surface being arranged and never at one a move left behind.
     val state: EditModeState = remember(editing, selectedSurface) {
         val sel = selectedSurface
         if (editing && sel != null) {
@@ -857,6 +905,7 @@ fun EditorSurfaceHost(
                     visible    = editing && !previewing && surfaceSettingsOpen && selectedScreen != null,
                     spec       = selectedScreen,
                     controller = controller,
+                    onDelete   = deleteScreen,
                     onDismiss  = { surfaceSettingsOpen = false },
                     modifier   = Modifier.align(Alignment.TopEnd),
                 )
@@ -878,6 +927,7 @@ fun EditorSurfaceHost(
                     folded                = foldedSurfaces,
                     onSurfacePicked       = { picked ->
                         selectedSurface = picked
+                        followsScreen = !EditorSurfaces.isShell(picked)
                         surfaceSettingsOpen = false
                         clearSlotSelection()
                         // Nothing can be arranged inside a folded rail, and the one
@@ -903,6 +953,7 @@ fun EditorSurfaceHost(
                     onOpenPresets         = { presetPanelOpen = true },
                     onOpenModules         = { modulesPanelOpen = !modulesPanelOpen },
                     onNewScreen           = {
+                        pendingSettings = true
                         pendingScreen = controller.createScreen(s.screenDefaultTitle(graphForSurfaces.screens.size + 1))
                     },
                     onRequestReset        = { if (selectedSurface != null) resetSurfaceConfirm = true },

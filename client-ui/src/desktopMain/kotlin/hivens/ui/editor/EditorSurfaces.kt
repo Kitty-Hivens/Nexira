@@ -201,6 +201,9 @@ internal object EditorSurfaces {
 
     val all: List<EditorSurfaceSpec> = centre + shell
 
+    /** Whether [id] is one of the shell's own surfaces, the ones every screen has. */
+    fun isShell(id: SurfaceId): Boolean = shell.any { it.id == id }
+
     private val byId: Map<SurfaceId, EditorSurfaceSpec> = all.associateBy { it.id }
 
     fun spec(id: SurfaceId): EditorSurfaceSpec? = byId[id]

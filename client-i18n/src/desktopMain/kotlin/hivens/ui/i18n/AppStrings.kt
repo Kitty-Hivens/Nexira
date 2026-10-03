@@ -1638,6 +1638,8 @@ interface AppStrings {
     val screenIconLabel: String
     val screenDelete: String
     fun screenDeleteBody(title: String): String
+    fun screenDeletedTitle(title: String): String
+    val screenRestore: String
     val editorUndo: String
     val editorRedo: String
     val editorEscHint: String

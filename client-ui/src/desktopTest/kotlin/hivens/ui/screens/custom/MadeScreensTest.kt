@@ -14,6 +14,8 @@ import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
 import hivens.widget.model.addScreen
 import hivens.widget.model.insertWidget
+import hivens.widget.model.removeScreen
+import hivens.widget.model.screen
 import hivens.widget.model.traverse
 import hivens.widget.model.walkInstances
 import kotlinx.serialization.json.JsonPrimitive
@@ -88,5 +90,28 @@ class MadeScreensTest {
         // Links land in this slot by name. If the rail's slots are ever renamed, a
         // made screen would be created with no way to reach it.
         assertTrue(DefaultLayout.load().surfaces[rail.surface]!!.slotsOf(FamilyId.GENERAL).containsKey(rail.rootSlot))
+    }
+
+    @Test
+    fun `a deleted screen comes back as it stood, links in their places`() {
+        val home = SlotPath(SurfaceId("home.new"), SlotId("main"))
+        val filled = ScreenLinks.ensureLink(graph, spec)
+            .insertWidget(SlotPath(spec.surface, SlotId("main")), WidgetInstance(WidgetKind("k"), "on-it"), 0)
+            .insertWidget(home, WidgetInstance(ScreenLinks.KIND, "on-home", props = buildJsonObject { put("screen", JsonPrimitive("mine")) }), 1)
+        val gone = ScreenTrash.capture(filled, "mine")!!
+        val deleted = ScreenLinks.removeLinks(filled.removeScreen("mine"), "mine")
+
+        val back = ScreenTrash.restore(deleted, gone)
+
+        assertEquals("Mine", back.screen("mine")?.title)
+        assertEquals(listOf("on-it"), back.traverse(SlotPath(spec.surface, SlotId("main")))!!.widgets.map { it.instanceId })
+        assertEquals("on-home", back.traverse(home)!!.widgets[1].instanceId, "the link on Home is back in its place")
+        assertEquals(2, links(back).size, "and the one on the rail, not a third")
+    }
+
+    @Test
+    fun `a screen whose id was taken again is not put back over it`() {
+        val gone = ScreenTrash.capture(graph, "mine")!!
+        assertSame(graph, ScreenTrash.restore(graph, gone))
     }
 }

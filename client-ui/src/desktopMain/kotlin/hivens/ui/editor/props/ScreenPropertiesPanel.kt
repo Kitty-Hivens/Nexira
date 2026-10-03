@@ -59,6 +59,7 @@ internal fun ScreenPropertiesPanel(
     visible: Boolean,
     spec: ScreenSpec?,
     controller: EditModeController,
+    onDelete: (ScreenSpec) -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -135,7 +136,7 @@ internal fun ScreenPropertiesPanel(
     if (confirmDelete && doomed != null) {
         val delete = {
             confirmDelete = false
-            controller.deleteScreen(doomed.id)
+            onDelete(doomed)
             onDismiss()
         }
         PuppetClick("screen.delete.confirm") { delete() }

@@ -1566,6 +1566,8 @@ object GermanStrings : AppStrings {
     override val screenIconLabel = "Symbol"
     override val screenDelete = "Bildschirm löschen"
     override fun screenDeleteBody(title: String) = "„$title“ und alles darauf werden gelöscht, zusammen mit seinem Knopf in der Leiste."
+    override fun screenDeletedTitle(title: String) = "Bildschirm „$title“ gelöscht"
+    override val screenRestore = "Wiederherstellen"
     override val editorUndo              = "Rückgängig"
     override val editorRedo              = "Wiederholen"
     override val editorEscHint           = "Esc zum Beenden"

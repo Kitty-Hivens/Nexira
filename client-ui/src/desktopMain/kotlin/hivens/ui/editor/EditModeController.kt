@@ -4,7 +4,9 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import hivens.ui.layout.LayoutGraphRepository
 import hivens.ui.screens.custom.ScreenIcons
+import hivens.ui.screens.custom.DeletedScreen
 import hivens.ui.screens.custom.ScreenLinks
+import hivens.ui.screens.custom.ScreenTrash
 import hivens.widget.model.FlowSpec
 import hivens.widget.model.GRID_MAX
 import hivens.widget.model.LayoutGraph
@@ -435,11 +437,24 @@ class EditModeController(
         }
     }
 
-    /** Deletes a made screen, what was on it, and every link to it. */
-    fun deleteScreen(id: String) {
+    /**
+     * Deletes a made screen, what was on it, and every link to it. [onDeleted] hears
+     * what was deleted, as it stood, for putting it back with [restoreScreen].
+     */
+    internal fun deleteScreen(id: String, onDeleted: (DeletedScreen) -> Unit = {}) {
         scope.launch(writeDispatcher) {
-            edit(key = null) { ScreenLinks.removeLinks(it.removeScreen(id), id) }
+            var gone: DeletedScreen? = null
+            edit(key = null) { g ->
+                gone = ScreenTrash.capture(g, id)
+                ScreenLinks.removeLinks(g.removeScreen(id), id)
+            }
+            gone?.let(onDeleted)
         }
+    }
+
+    /** Puts a deleted screen back as it stood, links included. */
+    internal fun restoreScreen(deleted: DeletedScreen) {
+        scope.launch(writeDispatcher) { edit(key = null) { ScreenTrash.restore(it, deleted) } }
     }
 
     // UUID minting on palette drop. Matches NotificationCenter.kt's
