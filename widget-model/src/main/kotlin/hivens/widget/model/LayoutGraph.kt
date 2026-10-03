@@ -298,9 +298,17 @@ fun LayoutGraph.setViewport(path: SlotPath, viewport: ViewportSpec?): LayoutGrap
     mutate(path) { content ->
         val normalized = viewport?.takeUnless { it.mode == ViewportMode.Static }
         if (content.viewport == normalized) return@mutate content
-        val next = content.copy(viewport = normalized)
+        var next = content.copy(viewport = normalized)
         val lattice = content.flow == null && content.grid > 0
-        if (lattice && next.latticeTransposed != content.latticeTransposed) next.transposedPlacements() else next
+        if (lattice && next.latticeTransposed != content.latticeTransposed) next = next.transposedPlacements()
+        // A map holds placed widgets only, so a flow put on one becomes a placement
+        // slot in the same step, seeded the way flipping it by hand would seed it.
+        // The flow is kept as nothing rather than remembered: the two modes share
+        // the slot and a placement slot is what a map is.
+        if (next.viewportMode == ViewportMode.Map && next.flow != null) {
+            next = next.copy(flow = null, widgets = seedPlacements(next.widgets, 0))
+        }
+        next
     }
 
 // ── Placement ────────────────────────────────────────────────────────

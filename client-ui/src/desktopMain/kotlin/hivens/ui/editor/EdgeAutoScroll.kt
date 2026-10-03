@@ -21,10 +21,10 @@ import kotlinx.coroutines.flow.first
 internal class EdgeAutoScroll(private val viewport: () -> ViewportHandle?) {
     private val dragging = MutableStateFlow(false)
     private var pointer: Offset? = null
-    private var onScrolled: (Float) -> Unit = {}
+    private var onScrolled: (Offset) -> Unit = {}
 
-    /** A drag began at [pointerInWindow]. [onScrolled] hears how far the page moved, in px along its axis. */
-    fun start(pointerInWindow: Offset, onScrolled: (Float) -> Unit) {
+    /** A drag began at [pointerInWindow]. [onScrolled] hears how far the view moved on, in px on each axis. */
+    fun start(pointerInWindow: Offset, onScrolled: (Offset) -> Unit) {
         pointer = pointerInWindow
         this.onScrolled = onScrolled
         dragging.value = true
@@ -40,26 +40,25 @@ internal class EdgeAutoScroll(private val viewport: () -> ViewportHandle?) {
         onScrolled = {}
     }
 
-    /** The page this drag is on scrolls along x, or null when it is on no page. */
-    val horizontal: Boolean? get() = viewport()?.horizontal
-
     suspend fun run(density: () -> Float) {
         while (true) {
             dragging.first { it }
             while (dragging.value) {
                 withFrameNanos { }
-                val page = viewport() ?: continue
+                val view = viewport() ?: continue
                 val at = pointer ?: continue
-                val d = density()
-                val b = page.bounds
-                val step = if (page.horizontal) {
-                    autoScrollStep(at.x, b.left, b.right, AUTO_SCROLL_ZONE_DP * d, AUTO_SCROLL_MAX_STEP_DP * d)
-                } else {
-                    autoScrollStep(at.y, b.top, b.bottom, AUTO_SCROLL_ZONE_DP * d, AUTO_SCROLL_MAX_STEP_DP * d)
-                }
-                if (step == 0f) continue
-                val moved = page.scrollBy(step)
-                if (moved != 0f) onScrolled(moved)
+                val zone = AUTO_SCROLL_ZONE_DP * density()
+                val max = AUTO_SCROLL_MAX_STEP_DP * density()
+                val b = view.bounds
+                // Each axis the view moves along, on its own: a page has one, a map
+                // two, and a widget held in a map's corner moves it diagonally.
+                val step = Offset(
+                    if (view.movesX) autoScrollStep(at.x, b.left, b.right, zone, max) else 0f,
+                    if (view.movesY) autoScrollStep(at.y, b.top, b.bottom, zone, max) else 0f,
+                )
+                if (step == Offset.Zero) continue
+                val moved = view.scrollBy(step)
+                if (moved != Offset.Zero) onScrolled(moved)
             }
         }
     }

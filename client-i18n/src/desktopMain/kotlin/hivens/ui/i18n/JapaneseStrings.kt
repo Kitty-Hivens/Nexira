@@ -1435,6 +1435,8 @@ object JapaneseStrings : AppStrings {
     override val editorViewportDown = "縦"
     override val editorViewportRight = "横"
     override val editorViewportScrollbar = "スクロールバー"
+    override val editorViewportMap = "マップ"
+    override val mapGoHome = "コンテンツへ戻る"
     override val editorAnchorTitle = "アンカー"
     override val editorAnchorTopStart = "左上"
     override val editorAnchorTopCenter = "上"

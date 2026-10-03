@@ -92,7 +92,7 @@ import hivens.ui.theme.NxTheme
 import hivens.widget.api.LocalPlacementSlotSizeDp
 import hivens.widget.api.LocalGridGeometry
 import hivens.widget.api.LocalLayoutGraph
-import hivens.widget.api.LocalPlacementScrollAxis
+import hivens.widget.api.LocalPlacementBounds
 import hivens.widget.api.LocalViewport
 import hivens.widget.api.WidgetDescriptor
 import hivens.widget.model.FlowSpec
@@ -196,11 +196,20 @@ fun EditableWidgetChrome(
     // ones. The clipped window rect starts at the viewport's edge once the widget
     // is partly scrolled out, which is exactly when the edge matters.
     var widgetOrigin by remember { mutableStateOf(Offset.Zero) }
-    // The axis the placement slot scrolls along. A widget attached to the start of
-    // it is held off the start and nowhere else, the way the renderer holds it.
-    val liveScrollAxis = rememberUpdatedState(LocalPlacementScrollAxis.current)
-    fun clampSlot(horizontal: Boolean, bias: Float, measured: Float): Float =
-        if (liveScrollAxis.value == horizontal && bias == 0f) Float.POSITIVE_INFINITY else measured
+    // The axes the placement slot has no end on. A widget attached to the start of
+    // one is held off the start and nowhere else, the way the renderer holds it, and
+    // on a map, which has no edges at all, every widget counts from the origin.
+    val liveBounds = rememberUpdatedState(LocalPlacementBounds.current)
+    fun clampSlot(horizontal: Boolean, bias: Float, measured: Float): Float {
+        // A map has no edge to hold a widget off, not even a start. Zero is the
+        // clamp's own answer for "nothing to hold against", which leaves it free.
+        if (liveBounds.value.anchorsIgnored) return 0f
+        val unbounded = if (horizontal) liveBounds.value.unboundedX else liveBounds.value.unboundedY
+        return if (unbounded && bias == 0f) Float.POSITIVE_INFINITY else measured
+    }
+    // The corner the renderer counts this widget from: its own, or the origin on a map.
+    fun anchorOf(p: Placement?): String =
+        if (liveBounds.value.anchorsIgnored) Placement.TOP_START else p?.anchor ?: Placement.TOP_START
     // What this widget says it needs and can use. The gesture is held to it, the
     // renderer bounds by it, and while a handle is down the two extremes are drawn
     // so the range is visible before the drag ends rather than discovered by it.
@@ -439,7 +448,7 @@ fun EditableWidgetChrome(
                                 // this the widget walked the wrong way on every axis
                                 // whose anchor is not at the start.
                                 isPlaced && gridGeo.value != null -> {
-                                    val a = livePlacement.value?.anchor ?: Placement.TOP_START
+                                    val a = anchorOf(livePlacement.value)
                                     val signX = anchorDragSignX(a)
                                     val signY = anchorDragSignY(a)
                                     // Lattice move: follow the pointer live, then commit
@@ -452,7 +461,7 @@ fun EditableWidgetChrome(
                                     // widget travels across the lattice, so it is added to
                                     // the drag rather than left behind with the content.
                                     autoScroll.start(pointer) { moved ->
-                                        acc += if (autoScroll.horizontal == true) Offset(moved, 0f) else Offset(0f, moved)
+                                        acc += moved
                                         latticeDrag = acc
                                     }
                                     drag(down.id) { change ->
@@ -474,7 +483,7 @@ fun EditableWidgetChrome(
                                     latticeDrag = Offset.Zero
                                 }
                                 isPlaced -> {
-                                    val a = livePlacement.value?.anchor ?: Placement.TOP_START
+                                    val a = anchorOf(livePlacement.value)
                                     val signX = anchorDragSignX(a)
                                     val signY = anchorDragSignY(a)
                                     // Free move: apply each frame's delta to the
@@ -501,8 +510,8 @@ fun EditableWidgetChrome(
                                     // The page moved under the held widget: the widget keeps
                                     // to the pointer, which on the page is that much further on.
                                     autoScroll.start(pointer) { moved ->
-                                        val along = moved / density
-                                        if (autoScroll.horizontal == true) curX += along * signX else curY += along * signY
+                                        curX += moved.x / density * signX
+                                        curY += moved.y / density * signY
                                         editController.setWidgetOffset(path, instance.instanceId, curX, curY)
                                     }
                                     drag(down.id) { change ->
@@ -624,7 +633,7 @@ fun EditableWidgetChrome(
                                     resizing = true
                                     val p = livePlacement.value
                                     val geo = gridGeo.value
-                                    val anchor = p?.anchor ?: Placement.TOP_START
+                                    val anchor = anchorOf(p)
                                     val slot0 = liveSlotSize.value
                                     // The drawn box at the start of the gesture, sized off the
                                     // unclipped layout so a widget under the panel is not measured
@@ -705,7 +714,8 @@ fun EditableWidgetChrome(
                                     // A handle pulled to the edge of a page grows the widget
                                     // on past it, by as far as the page moved under it.
                                     autoScroll.start(pointer) { moved ->
-                                        if (autoScroll.horizontal == true) accX += moved else accY += moved
+                                        accX += moved.x
+                                        accY += moved.y
                                         apply()
                                     }
                                     drag(down.id) { change ->
@@ -762,6 +772,7 @@ fun EditableWidgetChrome(
         NxContextMenu(anchorInWindow = anchor, expanded = true, onDismissRequest = { menuAnchor = null }) {
             WidgetContextMenuContent(
                 isPlaced       = isPlaced,
+                anchorsIgnored = liveBounds.value.anchorsIgnored,
                 removable      = descriptor.removable,
                 path           = path,
                 instanceId     = instance.instanceId,
@@ -810,6 +821,7 @@ fun EditableWidgetChrome(
 @Composable
 private fun WidgetContextMenuContent(
     isPlaced: Boolean,
+    anchorsIgnored: Boolean,
     removable: Boolean,
     path: SlotPath,
     instanceId: String,
@@ -830,13 +842,17 @@ private fun WidgetContextMenuContent(
             graph.traverse(path)?.widgets?.firstOrNull { it.instanceId == instanceId }?.placement?.anchor
                 ?: Placement.TOP_START,
         )
-        Text(
-            text     = s.editorAnchorTitle,
-            style    = MaterialTheme.typography.labelSmall,
-            color    = NxInk.quiet,
-            modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 6.dp, bottom = 2.dp),
-        )
-        AnchorGrid(current) { editController.setWidgetAnchor(path, instanceId, it); onClose() }
+        // Not on a map: every widget there counts from the plane's origin, so a
+        // corner picked here would change nothing anybody could see.
+        if (!anchorsIgnored) {
+            Text(
+                text     = s.editorAnchorTitle,
+                style    = MaterialTheme.typography.labelSmall,
+                color    = NxInk.quiet,
+                modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 6.dp, bottom = 2.dp),
+            )
+            AnchorGrid(current) { editController.setWidgetAnchor(path, instanceId, it); onClose() }
+        }
         NxMenuItem(s.editorToFront) {
             val maxZ = graph.traverse(path)?.widgets?.maxOfOrNull { it.placement?.z ?: 0 } ?: 0
             editController.setWidgetZ(path, instanceId, maxZ + 1); onClose()

@@ -1430,6 +1430,8 @@ object GermanStrings : AppStrings {
     override val editorViewportDown = "Nach unten"
     override val editorViewportRight = "Zur Seite"
     override val editorViewportScrollbar = "Bildlaufleiste"
+    override val editorViewportMap = "Karte"
+    override val mapGoHome = "Zurück zum Inhalt"
     override val editorAnchorTitle = "Anker"
     override val editorAnchorTopStart = "Oben links"
     override val editorAnchorTopCenter = "Oben"

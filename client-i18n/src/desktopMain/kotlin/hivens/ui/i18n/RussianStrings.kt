@@ -1443,6 +1443,8 @@ object RussianStrings : AppStrings {
     override val editorViewportDown = "Вниз"
     override val editorViewportRight = "Вправо"
     override val editorViewportScrollbar = "Полоса прокрутки"
+    override val editorViewportMap = "Карта"
+    override val mapGoHome = "К содержимому"
     override val editorAnchorTitle = "Якорь"
     override val editorAnchorTopStart = "Сверху слева"
     override val editorAnchorTopCenter = "Сверху"

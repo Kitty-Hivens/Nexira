@@ -3,6 +3,8 @@ package hivens.widget.api
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.gestures.awaitTouchSlopOrCancellation
+import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -28,6 +30,9 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -35,9 +40,19 @@ import androidx.compose.runtime.movableContentOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.PointerInputScope
+import androidx.compose.ui.input.pointer.isPrimaryPressed
+import androidx.compose.ui.input.pointer.isShiftPressed
+import androidx.compose.ui.input.pointer.isTertiaryPressed
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.unit.toSize
@@ -57,6 +72,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.isFinite
 import kotlin.math.abs
 import kotlin.math.max
+import kotlin.math.roundToInt
 import hivens.widget.model.FlowPlacement
 import hivens.widget.model.FlowSpec
 import hivens.widget.model.GRID_MAX
@@ -187,6 +203,13 @@ private fun RenderSlotContent(path: SlotPath, modifier: Modifier, spacing: Dp, c
         ) { scroll, inner ->
             SlotBody(path, content, inner, spacing, scroll)
         }
+        // A map holds placed widgets. A flow on one is shown as it would be static
+        // until the slot is placed, which the editor does in the same step anyway.
+        ViewportMode.Map -> if (content.flow == null) {
+            MapViewport(content, chrome.then(modifier)) { pan -> MapPlacement(path, content, pan) }
+        } else {
+            SlotBody(path, content, chrome.then(modifier).inset(contentPadding), spacing, scroll = null)
+        }
         ViewportMode.Static -> SlotBody(path, content, chrome.then(modifier).inset(contentPadding), spacing, scroll = null)
     }
 }
@@ -244,7 +267,7 @@ private fun ScrollViewport(
     val hovered by interaction.collectIsHoveredAsState()
     val direction = LocalLayoutDirection.current
     val state = rememberSaveable(saver = ScrollState.Saver) { ScrollState(0) }
-    val handle = remember(state, horizontal) { ViewportHandle(horizontal, state) }
+    val handle = remember(state, horizontal) { ScrollViewportHandle(horizontal, state) }
     BoxWithConstraints(outer.hoverable(interaction).onGloballyPositioned { handle.bounds = it.boundsInWindow() }) {
         val along = if (horizontal) maxWidth else maxHeight
         if (!along.isFinite) {
@@ -270,6 +293,188 @@ private fun ScrollViewport(
         if (scrollbar) {
             val bar = LocalViewportScrollbar.current
             bar(state, horizontal, hovered || state.isScrollInProgress)
+        }
+    }
+}
+
+/**
+ * A slot with no edges: a plane the view is moved over on both axes.
+ *
+ * The box is the slot's footprint like any other slot's. The plane behind it is
+ * moved by [pan], the position of the plane's origin in the box, in px. The wheel
+ * moves it down, the wheel with Shift moves it sideways, a touchpad moves it both
+ * ways, and a drag that starts on nothing the widgets claimed moves it under the
+ * pointer, after the touch slop so a click on a widget stays a click.
+ *
+ * Inside a page that scrolls, the wheel is the page's: a plane has no end to hand
+ * the wheel back at, so a map that took it would stop the page dead. There the map
+ * is moved by dragging only.
+ *
+ * The position is saved like a scroll position is.
+ */
+@Composable
+private fun MapViewport(content: SlotContent, outer: Modifier, body: @Composable (State<Offset>) -> Unit) {
+    val pan = rememberSaveable(saver = PanSaver) { mutableStateOf(Offset.Zero) }
+    val handle = remember(pan) { MapViewportHandle(pan) }
+    val insidePage = LocalViewport.current != null
+    val panOnPrimary = LocalMapPanOnPrimary.current
+    val density = LocalDensity.current
+    val wheelStep = with(density) { MAP_WHEEL_STEP.toPx() }
+    val margin = with(density) { MAP_HOME_MARGIN.toPx() }
+    // Where the plane sits when its content's top left corner is near the view's.
+    val home = remember(content.widgets, density) {
+        val placed = content.widgets.mapNotNull { it.placement }
+        if (placed.isEmpty()) {
+            Offset.Zero
+        } else {
+            Offset(margin - placed.minOf { it.x } * density.density, margin - placed.minOf { it.y } * density.density)
+        }
+    }
+    BoxWithConstraints(
+        outer
+            .clipToBounds()
+            .onGloballyPositioned { handle.bounds = it.boundsInWindow() }
+            .pointerInput(insidePage, panOnPrimary, wheelStep) { mapGestures(pan, insidePage, panOnPrimary, wheelStep) },
+    ) {
+        val widthPx = constraints.maxWidth.toFloat()
+        val heightPx = constraints.maxHeight.toFloat()
+        CompositionLocalProvider(
+            LocalViewportExtent provides ViewportExtent(maxWidth, maxHeight),
+            LocalViewport provides handle,
+        ) {
+            body(pan)
+        }
+        // Lost: moved more than half a view away from the content on either axis.
+        // Derived, so moving the map recomposes this only when the answer flips and
+        // not on every pixel of the drag.
+        val away by remember(home, widthPx, heightPx) {
+            derivedStateOf { abs(pan.value.x - home.x) > widthPx / 2f || abs(pan.value.y - home.y) > heightPx / 2f }
+        }
+        val controls = LocalMapControls.current
+        controls(away) { pan.value = home }
+    }
+}
+
+/** The wheel and the drag that move a map, after its widgets have had the event. */
+private suspend fun PointerInputScope.mapGestures(
+    pan: MutableState<Offset>,
+    insidePage: Boolean,
+    panOnPrimary: Boolean,
+    wheelStep: Float,
+) = awaitPointerEventScope {
+    while (true) {
+        val event = awaitPointerEvent()
+        val change = event.changes.firstOrNull() ?: continue
+        when (event.type) {
+            PointerEventType.Scroll -> {
+                if (insidePage || change.isConsumed) continue
+                var delta = change.scrollDelta
+                if (event.keyboardModifiers.isShiftPressed && delta.x == 0f) delta = Offset(delta.y, 0f)
+                pan.value -= delta * wheelStep
+                change.consume()
+            }
+            PointerEventType.Press -> {
+                val wanted = (panOnPrimary && event.buttons.isPrimaryPressed) || event.buttons.isTertiaryPressed
+                if (!wanted || change.isConsumed) continue
+                val started = awaitTouchSlopOrCancellation(change.id) { moved, over ->
+                    pan.value += over
+                    moved.consume()
+                } ?: continue
+                drag(started.id) { moved ->
+                    pan.value += moved.positionChange()
+                    moved.consume()
+                }
+            }
+            else -> Unit
+        }
+    }
+}
+
+/** A map's view: moving it on moves the plane's origin back by as much. */
+private class MapViewportHandle(private val pan: MutableState<Offset>) : ViewportHandle() {
+    override val movesX: Boolean get() = true
+    override val movesY: Boolean get() = true
+
+    override fun scrollBy(delta: Offset): Offset {
+        pan.value -= delta
+        return delta
+    }
+}
+
+private val PanSaver: Saver<MutableState<Offset>, List<Float>> = Saver(
+    save = { listOf(it.value.x, it.value.y) },
+    restore = { mutableStateOf(Offset(it[0], it[1])) },
+)
+
+/** Where a map's box and its plane's origin last were on screen, in window px. */
+private class MapWhere {
+    var visible: Rect = Rect.Zero
+    var origin: Offset = Offset.Zero
+}
+
+/** How far one notch of the wheel moves a map. */
+private val MAP_WHEEL_STEP = 64.dp
+
+/** How far in from the view's corner the content sits when the map is sent home. */
+private val MAP_HOME_MARGIN = 24.dp
+
+/**
+ * The widgets of a map, each at its own point on the plane, all moved by [pan].
+ *
+ * Measured with no bound on either axis, so each widget is its claimed size or its
+ * own, under the one-screen ceiling the map hands down. Moving the map is a
+ * placement pass and nothing more: the widgets are not measured again, let alone
+ * composed again, for every pixel the plane moves.
+ */
+@Composable
+private fun MapPlacement(path: SlotPath, content: SlotContent, pan: State<Offset>) {
+    val registry = LocalWidgetRegistry.current
+    val decorator = LocalWidgetDecorator.current
+    val unknownDecorator = LocalUnknownWidgetDecorator.current
+    val reportSlotBounds = LocalSlotBoundsReporter.current
+    val extent = LocalViewportExtent.current
+    val address = path.leafAddress
+    val slotDp = Size(extent.width.value, extent.height.value)
+    val bounds = PlacementBounds(unboundedX = true, unboundedY = true)
+    // The plane's origin on screen, reported with what is visible so a drop converts
+    // against the plane, wherever it has been moved to. Plain fields reported from
+    // the two layout callbacks, so moving the map is not a recomposition here.
+    val where = remember { MapWhere() }
+    val report = rememberUpdatedState(reportSlotBounds)
+    fun publish() = report.value(path, where.visible, Rect(where.origin, where.visible.size))
+    CompositionLocalProvider(
+        LocalPlacementSlotSizeDp provides slotDp,
+        LocalGridGeometry provides null,
+        LocalPlacementBounds provides bounds,
+    ) {
+        Layout(
+            content = {
+                Box(Modifier.onGloballyPositioned { where.origin = it.positionInWindow(); publish() })
+                content.widgets.withIndex()
+                    .sortedWith(compareBy({ it.value.placement?.z ?: 0 }, { it.index }))
+                    .forEach { (index, instance) ->
+                        key(instance.instanceId) {
+                            val p = instance.placement ?: Placement()
+                            val descriptor = registry[instance.kind]
+                            val sizing = descriptor?.sizing ?: WidgetSizing.UNDECLARED
+                            PlacedBox(p, 0, 0f, 0f, slotDp, sizing, bounds, { Modifier }) {
+                                if (descriptor == null) {
+                                    unknownDecorator(address, index, instance)
+                                } else {
+                                    val movable = rememberWidgetMovable(descriptor, instance, index)
+                                    decorator(address, index, descriptor, instance) { movable() }
+                                }
+                            }
+                        }
+                    }
+            },
+            modifier = Modifier.fillMaxSize().onGloballyPositioned { where.visible = it.boundsInWindow(); publish() },
+        ) { measurables, constraints ->
+            val placeables = measurables.map { it.measure(Constraints()) }
+            layout(constraints.maxWidth, constraints.maxHeight) {
+                val at = pan.value
+                placeables.forEach { it.place(at.x.roundToInt(), at.y.roundToInt()) }
+            }
         }
     }
 }
@@ -498,6 +703,7 @@ private fun PlacementSlot(
     val reportSlotBounds = LocalSlotBoundsReporter.current
     val columns = content.grid.coerceIn(0, GRID_MAX)
     val transposed = scroll?.horizontal == true
+    val placementBounds = PlacementBounds(unboundedX = scroll?.horizontal == true, unboundedY = scroll?.horizontal == false)
 
     // Two measurements, for two jobs, and they are not the same number.
     //
@@ -550,7 +756,7 @@ private fun PlacementSlot(
                         val p = instance.placement ?: Placement()
                         val descriptor = registry[instance.kind]
                         val sizing = descriptor?.sizing ?: WidgetSizing.UNDECLARED
-                        PlacedBox(p, columns, cell, spacing.value, clampSize, sizing, scroll?.horizontal, position) {
+                        PlacedBox(p, columns, cell, spacing.value, clampSize, sizing, placementBounds, position) {
                             if (descriptor == null) {
                                 unknownDecorator(address, index, instance)
                             } else {
@@ -564,7 +770,7 @@ private fun PlacementSlot(
 
         CompositionLocalProvider(
             LocalPlacementSlotSizeDp provides measuredDp,
-            LocalPlacementScrollAxis provides scroll?.horizontal,
+            LocalPlacementBounds provides placementBounds,
             // Published only when there is a cell to convert against. A geometry
             // carrying a zero cell reads as a lattice to the editor and then
             // answers every pointer delta with "no movement", which is a gesture
@@ -652,10 +858,10 @@ private fun roomFromAnchor(slot: Float, offset: Float, bias: Float, pad: Float):
 // runs inward from an end anchor, because "16 from the right" is what somebody
 // parking a widget in a corner means, not "16 further right than the edge".
 //
-// [scrollHorizontal] is the axis the slot scrolls on, null when it does not. A
-// transposed lattice counts [columns] as rows and grows to the right. [position]
-// attaches the corner the way the container needs it, as a box alignment or as
-// data for a container that measures its own length.
+// [bounds] says which axes the slot has no end on: one for a page, both for a map.
+// A lattice on a page that scrolls sideways counts [columns] as rows and grows to
+// the right. [position] attaches the corner the way the container needs it, as a
+// box alignment or as data for a container that measures its own length.
 @Composable
 private fun PlacedBox(
     placement: Placement,
@@ -664,12 +870,12 @@ private fun PlacedBox(
     gutter: Float,
     slotDp: Size,
     sizing: WidgetSizing,
-    scrollHorizontal: Boolean?,
+    bounds: PlacementBounds,
     position: (PlacedAt) -> Modifier,
     content: @Composable () -> Unit,
 ) {
     val lattice = columns > 0
-    val transposed = scrollHorizontal == true
+    val transposed = bounds.unboundedX && !bounds.unboundedY
     val stride = cell + gutter
 
     // A lattice clamps what it is given, the way the cube grid it replaces did.
@@ -708,7 +914,9 @@ private fun PlacedBox(
     val width = if (lattice) spanW * stride - gutter else placement.width
     val height = if (lattice) spanH * stride - gutter else placement.height
 
-    val anchor = parseAnchor(placement.anchor)
+    // On a map every widget counts from the plane's origin: there is no far edge to
+    // count from. The record keeps its corner for whenever the slot stops being one.
+    val anchor = if (bounds.anchorsIgnored) Placement.TOP_START else parseAnchor(placement.anchor)
     val hBias = anchorHorizontalBias(anchor)
     val vBias = anchorVerticalBias(anchor)
 
@@ -745,10 +953,14 @@ private fun PlacedBox(
     // and nowhere else: the page is as long as it reaches, so a far edge measured a
     // frame ago would hold it to last frame's length and the page would creep out to
     // it one frame at a time.
-    val clampW = if (scrollHorizontal == true && hBias == 0f) Float.POSITIVE_INFINITY else slotDp.width
-    val clampH = if (scrollHorizontal == false && vBias == 0f) Float.POSITIVE_INFINITY else slotDp.height
-    val clampedX = if (lattice || ownW <= 0f) offX else clampPlacementAxis(offX, clampW, ownW, hBias)
-    val clampedY = if (lattice || ownH <= 0f) offY else clampPlacementAxis(offY, clampH, ownH, vBias)
+    val clampW = if (bounds.unboundedX && hBias == 0f) Float.POSITIVE_INFINITY else slotDp.width
+    val clampH = if (bounds.unboundedY && vBias == 0f) Float.POSITIVE_INFINITY else slotDp.height
+    //
+    // A map has no edge at all, not even a start: a widget left of its origin is
+    // where it was put, and the view is moved to it.
+    val free = bounds.anchorsIgnored
+    val clampedX = if (lattice || free || ownW <= 0f) offX else clampPlacementAxis(offX, clampW, ownW, hBias)
+    val clampedY = if (lattice || free || ownH <= 0f) offY else clampPlacementAxis(offY, clampH, ownH, vBias)
     val heldX = if (hBias > 0.5f) -clampedX else clampedX
     val heldY = if (vBias > 0.5f) -clampedY else clampedY
 
@@ -793,12 +1005,12 @@ private fun PlacedBox(
     // Never along a scrolling axis. The slot's length there is measured from where
     // its widgets reach, so capping a widget to that length would hold it at the
     // size it had last frame and it could never grow.
-    val availW = if (reflow && !lattice && scrollHorizontal != true && slotDp.width > 0f && offX <= slotDp.width) {
+    val availW = if (reflow && !lattice && !bounds.unboundedX && slotDp.width > 0f && offX <= slotDp.width) {
         roomFromAnchor(slotDp.width, clampedX, hBias, placement.padding.start(0f) + placement.padding.end(0f))
     } else {
         Float.POSITIVE_INFINITY
     }
-    val availH = if (reflow && !lattice && scrollHorizontal != false && slotDp.height > 0f && offY <= slotDp.height) {
+    val availH = if (reflow && !lattice && !bounds.unboundedY && slotDp.height > 0f && offY <= slotDp.height) {
         roomFromAnchor(slotDp.height, clampedY, vBias, placement.padding.top(0f) + placement.padding.bottom(0f))
     } else {
         Float.POSITIVE_INFINITY

@@ -1512,6 +1512,8 @@ interface AppStrings {
     val editorViewportDown: String
     val editorViewportRight: String
     val editorViewportScrollbar: String
+    val editorViewportMap: String
+    val mapGoHome: String
     val editorAnchorTitle: String
     val editorAnchorTopStart: String
     val editorAnchorTopCenter: String

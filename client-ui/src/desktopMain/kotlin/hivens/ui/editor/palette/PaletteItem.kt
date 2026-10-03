@@ -58,7 +58,9 @@ import hivens.ui.theme.LocalMonoFamily
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.WidgetDescriptor
 import hivens.widget.model.FlowSpec
+import hivens.widget.model.ViewportMode
 import hivens.widget.model.latticeTransposed
+import hivens.widget.model.viewportMode
 import hivens.widget.model.seedPlacement
 import hivens.widget.model.WidgetSizing
 import hivens.widget.model.traverse
@@ -133,7 +135,13 @@ fun PaletteItem(
                         // drop converted against the visible top would land a scroll
                         // short of where it was let go.
                         val slotRect = registry.slotContentRect(targetPath)
-                        val placement = if (target.grid == 0 && slotRect != null) {
+                        // A map has no edges, so a drop anywhere on it lands where it was let
+                        // go, left of the origin and above it included.
+                        val onMap = target.viewportMode == ViewportMode.Map
+                        val placement = if (onMap && slotRect != null) {
+                            val (xDp, yDp) = windowPointToSlotDp(pointer.x, pointer.y, slotRect.left, slotRect.top, density)
+                            seed.copy(x = xDp, y = yDp)
+                        } else if (target.grid == 0 && slotRect != null) {
                             val (xDp, yDp) = windowPointToSlotDp(
                                 pointer.x, pointer.y, slotRect.left, slotRect.top, density,
                             )

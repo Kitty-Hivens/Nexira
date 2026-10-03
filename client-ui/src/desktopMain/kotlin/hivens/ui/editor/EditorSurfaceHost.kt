@@ -104,6 +104,7 @@ import hivens.widget.api.LocalEmptySlotDecorator
 import hivens.widget.api.LocalFamilyOverrides
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.LocalPlacementReflow
+import hivens.widget.api.LocalMapPanOnPrimary
 import hivens.widget.api.LocalRefusedMount
 import hivens.widget.api.LocalSlotBoundsReporter
 import hivens.widget.api.LocalSlotChromeModifier
@@ -596,6 +597,9 @@ fun EditorSurfaceHost(
         // release point (PaletteItem reads slotOrigin to convert the pointer).
         LocalSlotBoundsReporter provides slotBoundsReporter,
         LocalRefusedMount provides refusedMount,
+        // A press on empty map selects the slot while arranging; the middle button
+        // moves the map then.
+        LocalMapPanOnPrimary provides !(state is EditModeState.On && !previewing),
         // Stub surface contexts, spread from the registry. Surface composables
         // that mount under content() override with the real values; widgets
         // dropped on a foreign surface fall through to the stubs and render

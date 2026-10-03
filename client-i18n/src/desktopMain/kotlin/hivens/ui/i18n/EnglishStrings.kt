@@ -1428,6 +1428,8 @@ object EnglishStrings : AppStrings {
     override val editorViewportDown = "Down"
     override val editorViewportRight = "Sideways"
     override val editorViewportScrollbar = "Scrollbar"
+    override val editorViewportMap = "Map"
+    override val mapGoHome = "Back to content"
     override val editorAnchorTitle = "Anchor"
     override val editorAnchorTopStart = "Top left"
     override val editorAnchorTopCenter = "Top"

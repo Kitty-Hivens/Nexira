@@ -5,6 +5,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertSame
+import kotlin.test.assertTrue
 
 /**
  * How a slot's viewport reads off the wire, and how it degrades.
@@ -37,11 +38,11 @@ class ViewportSpecTest {
 
     @Test
     fun `a kind this build does not know reads as static and is kept as written`() {
-        // A newer build's map, say. Static is the fallback because it is what every
-        // slot was before the field existed: the content stays where it was put.
-        val content = slot("""{"viewport":{"kind":"map","axis":"both"}}""")
+        // A newer build's kind. Static is the fallback because it is what every slot
+        // was before the field existed: the content stays where it was put.
+        val content = slot("""{"viewport":{"kind":"spiral","axis":"both"}}""")
         assertEquals(ViewportMode.Static, content.viewportMode)
-        assertEquals("map", content.viewport?.kind, "the file keeps what it said")
+        assertEquals("spiral", content.viewport?.kind, "the file keeps what it said")
     }
 
     @Test
@@ -92,5 +93,22 @@ class ViewportSpecTest {
     fun `a slot that is not there is left alone`() {
         val g = graph()
         assertSame(g, g.setViewport(SlotPath(SurfaceId("s"), SlotId("missing")), ViewportSpec.ScrollDown))
+    }
+
+    // ── Map ──────────────────────────────────────────────────────────
+
+    @Test
+    fun `a map reads as a map whatever axis it names`() {
+        assertEquals(ViewportMode.Map, slot("""{"viewport":{"kind":"map","axis":"horizontal"}}""").viewportMode)
+    }
+
+    @Test
+    fun `a flow put on a map becomes a placement slot in the same step`() {
+        val flow = graph(SlotContent(widgets = listOf(WidgetInstance(WidgetKind("k"), "a"), WidgetInstance(WidgetKind("k"), "b"))))
+        val out = flow.setViewport(path, ViewportSpec.Map).traverse(path)!!
+        assertEquals(ViewportMode.Map, out.viewportMode)
+        assertEquals(null, out.flow, "a map holds placed widgets")
+        assertTrue(out.widgets.all { it.placement != null }, "and every widget was given a point on it")
+        assertTrue(out.widgets[0].placement != out.widgets[1].placement, "not the same point")
     }
 }

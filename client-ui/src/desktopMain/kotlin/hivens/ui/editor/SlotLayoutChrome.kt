@@ -246,7 +246,8 @@ internal fun SlotLayoutMenuContent(
     // with it, and the only way back was the menu item, which reset the number.
     if (flow != null) {
         SlotNumberRow(s.editorSlotGridColumns, flow.wrap, s, { controller.nudgeWrap(path, -1) }, { controller.nudgeWrap(path, 1) })
-    } else {
+    } else if (live.viewportMode != ViewportMode.Map) {
+        // Not on a map, which has no width for a lattice to divide.
         SlotNumberRow(s.editorSlotGridColumns, live.grid, s, { controller.nudgeGrid(path, -1) }, { controller.nudgeGrid(path, 1) })
     }
 
@@ -264,6 +265,11 @@ internal fun SlotLayoutMenuContent(
     }
     NxMenuItem(s.editorViewportRight, selected = mode == ViewportMode.Scroll(horizontal = true)) {
         controller.setViewport(path, ViewportSpec.ScrollRight.copy(scrollbar = bar)); onClose()
+    }
+    // A plane with no edges. It holds placed widgets, so a flow put on one becomes
+    // a canvas in the same step.
+    NxMenuItem(s.editorViewportMap, selected = mode == ViewportMode.Map) {
+        controller.setViewport(path, ViewportSpec.Map); onClose()
     }
     // Stays open: it is a setting of the scroll just picked, and a reader flipping
     // it wants to see the bar come and go without reopening the menu.

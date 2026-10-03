@@ -22,7 +22,7 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 data class ViewportSpec(
-    /** [STATIC] or [SCROLL]. Anything else reads as static. */
+    /** [STATIC], [SCROLL] or [MAP]. Anything else reads as static. */
     val kind: String = STATIC,
     /** [VERTICAL] or [HORIZONTAL], for a kind that moves along one axis. Anything else reads as vertical. */
     val axis: String = VERTICAL,
@@ -33,12 +33,14 @@ data class ViewportSpec(
     val mode: ViewportMode
         get() = when (kind.trim().lowercase()) {
             SCROLL -> ViewportMode.Scroll(horizontal = axis.trim().lowercase() == HORIZONTAL)
+            MAP -> ViewportMode.Map
             else -> ViewportMode.Static
         }
 
     companion object {
         const val STATIC = "static"
         const val SCROLL = "scroll"
+        const val MAP = "map"
         const val VERTICAL = "vertical"
         const val HORIZONTAL = "horizontal"
 
@@ -47,6 +49,9 @@ data class ViewportSpec(
 
         /** A slot that scrolls sideways. */
         val ScrollRight = ViewportSpec(SCROLL, HORIZONTAL)
+
+        /** A plane with no edges, moved on both axes. */
+        val Map = ViewportSpec(MAP)
     }
 }
 
@@ -60,6 +65,15 @@ sealed interface ViewportMode {
      * true is sideways.
      */
     data class Scroll(val horizontal: Boolean) : ViewportMode
+
+    /**
+     * Unbounded on both axes, a plane with no edges that the view is moved over.
+     *
+     * It holds placed widgets only, each at its own point on the plane, counted
+     * from the plane's origin whatever corner it names: with no edges there is
+     * no far corner to count from, and a lattice has no width to divide.
+     */
+    data object Map : ViewportMode
 }
 
 /** How this slot shows what does not fit, static when nothing has said. */

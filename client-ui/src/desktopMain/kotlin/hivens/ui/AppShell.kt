@@ -124,7 +124,9 @@ import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.LocalWidgetRegistry
 import hivens.widget.api.LocalWidgetSurfaceRenderer
 import hivens.widget.api.LocalWidgetEntrance
+import hivens.widget.api.LocalMapControls
 import hivens.widget.api.LocalViewportScrollbar
+import hivens.ui.widgets.NxMapControls
 import hivens.ui.widgets.NxViewportScrollbar
 import hivens.ui.widgets.PlayedWidgetEntrance
 import hivens.widget.api.WidgetSurfaceRenderer
@@ -1024,6 +1026,7 @@ fun FrameWindowScope.AppShellContent(
                 LocalWidgetSurfaceRenderer               provides surfaceRenderer,
                 LocalWidgetEntrance                      provides PlayedWidgetEntrance,
                 LocalViewportScrollbar                   provides NxViewportScrollbar,
+                LocalMapControls                         provides NxMapControls,
                 LocalWindowState                         provides windowState,
                 LocalWindowMaximizer                     provides maximizer,
                 LocalComposeWindow                       provides window,

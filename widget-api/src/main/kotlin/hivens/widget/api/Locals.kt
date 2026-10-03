@@ -12,6 +12,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.unit.Dp
@@ -319,24 +320,76 @@ val LocalRefusedMount: ProvidableCompositionLocal<@Composable (SurfaceId) -> Uni
  * moves, where it is on screen, and a way to move it.
  */
 @Stable
-class ViewportHandle(val horizontal: Boolean, private val state: ScrollState) {
+abstract class ViewportHandle internal constructor() {
+    /** Whether the view moves along x. */
+    abstract val movesX: Boolean
+
+    /** Whether the view moves along y. */
+    abstract val movesY: Boolean
+
     /** The slot's box on screen, in window px. */
     var bounds: Rect by mutableStateOf(Rect.Zero)
         internal set
 
-    /** Moves the content by [px] along the axis, and says how far it actually went. */
-    fun scrollBy(px: Float): Float = state.dispatchRawDelta(px)
+    /**
+     * Moves the view on by [delta] px, positive toward the end of each axis, so the
+     * content travels the other way. Says how far it actually went, which is less
+     * at a scroll's end and on an axis the view does not move along.
+     */
+    abstract fun scrollBy(delta: Offset): Offset
+}
+
+/** A slot scrolling along one axis. */
+internal class ScrollViewportHandle(private val horizontal: Boolean, private val state: ScrollState) : ViewportHandle() {
+    override val movesX: Boolean get() = horizontal
+    override val movesY: Boolean get() = !horizontal
+
+    override fun scrollBy(delta: Offset): Offset {
+        val moved = state.dispatchRawDelta(if (horizontal) delta.x else delta.y)
+        return if (horizontal) Offset(moved, 0f) else Offset(0f, moved)
+    }
 }
 
 val LocalViewport: ProvidableCompositionLocal<ViewportHandle?> = compositionLocalOf { null }
 
 /**
- * Which axis the placement slot currently rendering scrolls along: false down,
- * true sideways, null when it does not scroll. Published by each placement slot
- * for its own widgets, so the editor's clamp holds a widget off the start of a
- * page and lets it go as far along it as it likes, the way the renderer does.
+ * Which axes the placement slot currently rendering has no end on, and whether it
+ * reads anchors at all.
+ *
+ * Published by each placement slot for its own widgets, so the editor's clamp
+ * holds a widget off the start of a page and lets it go as far along it as it
+ * likes, the way the renderer does, and so the editor stops offering corners on a
+ * map, where every widget counts from the plane's origin.
  */
-val LocalPlacementScrollAxis: ProvidableCompositionLocal<Boolean?> = compositionLocalOf { null }
+@Immutable
+data class PlacementBounds(val unboundedX: Boolean = false, val unboundedY: Boolean = false) {
+    /** A plane with no edges reads every widget from its origin, so a named corner means nothing there. */
+    val anchorsIgnored: Boolean get() = unboundedX && unboundedY
+
+    companion object {
+        val BOUNDED = PlacementBounds()
+    }
+}
+
+val LocalPlacementBounds: ProvidableCompositionLocal<PlacementBounds> = compositionLocalOf { PlacementBounds.BOUNDED }
+
+/**
+ * Whether a primary-button drag on an empty part of a map moves the map.
+ *
+ * True for anybody looking at a map. The editor turns it off, because there a
+ * press on empty space selects the slot, and the middle button moves the map.
+ */
+val LocalMapPanOnPrimary: ProvidableCompositionLocal<Boolean> = staticCompositionLocalOf { true }
+
+/**
+ * Drawn over a map, for the way back to what is on it. [away] is true once the
+ * view has been moved off the content, and [goHome] puts the content's top left
+ * corner back near the view's. Nothing by default: the kernel knows a map can be
+ * lost in and nothing about what a button looks like.
+ */
+typealias MapControls = @Composable BoxScope.(away: Boolean, goHome: () -> Unit) -> Unit
+
+val LocalMapControls: ProvidableCompositionLocal<MapControls> = staticCompositionLocalOf { { _, _ -> } }
 
 // Editor-only hook: SlotRenderer's placement branch reports its window bounds
 // here so a palette drop can land at the release point (converted to slot-local dp).

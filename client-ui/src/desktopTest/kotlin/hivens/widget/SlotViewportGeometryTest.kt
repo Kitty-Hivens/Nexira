@@ -16,6 +16,8 @@ import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerButton
+import androidx.compose.ui.input.pointer.PointerButtons
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
@@ -223,6 +225,55 @@ class SlotViewportGeometryTest {
         assertEquals(B, page.at(150, 50), "column three is past the window and the page reaches it")
     }
 
+    // ── Map ───────────────────────────────────────────────────────────
+
+    private fun map(vararg widgets: WidgetInstance) =
+        SlotContent(widgets = widgets.toList(), flow = null, viewport = ViewportSpec.Map)
+
+    @Test
+    fun `a widget on a map sits at its own point on the plane`() {
+        val page = Probe(map(widget("a", "fill.a", Placement(x = 50f, y = 50f, width = 50f, height = 50f))))
+        assertEquals(A, page.at(75, 75))
+        assertEquals(PAGE, page.at(25, 25))
+        assertEquals(PAGE, page.at(125, 125))
+    }
+
+    @Test
+    fun `the wheel moves a map down and Shift with it sideways`() {
+        val page = Probe(map(widget("a", "fill.a", Placement(x = 250f, y = 250f, width = 50f, height = 50f))))
+        assertEquals(PAGE, page.at(190, 190), "the widget starts past the corner of the view")
+        // One notch is 64: the plane moves up and left by that much.
+        page.wheel(down = 1f, frames = 4)
+        page.wheel(right = 1f, frames = 4)
+        assertEquals(A, page.at(190, 190), "the plane did not move under the wheel")
+        assertEquals(PAGE, page.at(180, 180), "it moved further than one notch")
+    }
+
+    @Test
+    fun `dragging empty space moves the map, to the left of the origin too`() {
+        val page = Probe(map(widget("a", "fill.a", Placement(x = -100f, y = 20f, width = 50f, height = 50f))))
+        assertEquals(PAGE, page.at(5, 45), "a widget left of the origin starts out of view")
+        page.drag(from = Offset(150f, 150f), to = Offset(300f, 150f))
+        assertEquals(A, page.at(75, 45), "the plane followed the pointer by 150")
+    }
+
+    @Test
+    fun `a corner named on a map counts from the origin`() {
+        // The record keeps its corner for whenever the slot stops being a map.
+        val page = Probe(map(widget("a", "fill.a", Placement(anchor = Placement.BOTTOM_END, x = 10f, y = 10f, width = 40f, height = 40f))))
+        assertEquals(A, page.at(30, 30))
+        assertEquals(PAGE, page.at(180, 180))
+    }
+
+    @Test
+    fun `a flow on a map is shown as it would be static`() {
+        val page = Probe(
+            SlotContent(widgets = listOf(widget("a", "tall.a"), widget("b", "tall.b")), flow = FlowSpec.Column, viewport = ViewportSpec.Map),
+        )
+        assertEquals(A, page.at(100, 50))
+        assertEquals(B, page.at(100, 150))
+    }
+
     // ── Harness ───────────────────────────────────────────────────────
 
     private fun widget(id: String, kind: String, placement: Placement? = null) =
@@ -304,6 +355,20 @@ class SlotViewportGeometryTest {
             scene.sendPointerEvent(PointerEventType.Move, at)
             scene.sendPointerEvent(PointerEventType.Scroll, at, scrollDelta = Offset(right, down))
             frame = pump(frames)
+        }
+
+        /** A primary-button drag from [from] to [to], in steps, then a few frames to settle. */
+        fun drag(from: Offset, to: Offset) {
+            val down = PointerButtons(isPrimaryPressed = true)
+            scene.sendPointerEvent(PointerEventType.Move, from)
+            scene.sendPointerEvent(PointerEventType.Press, from, buttons = down, button = PointerButton.Primary)
+            for (i in 1..10) {
+                val at = from + (to - from) * (i / 10f)
+                scene.render(nanos).close(); nanos += FRAME_NANOS
+                scene.sendPointerEvent(PointerEventType.Move, at, buttons = down)
+            }
+            scene.sendPointerEvent(PointerEventType.Release, to, buttons = PointerButtons(), button = PointerButton.Primary)
+            frame = pump(4)
         }
 
         /** Swaps the slot's record, the way an edit does, and draws [frames] frames of it. */
