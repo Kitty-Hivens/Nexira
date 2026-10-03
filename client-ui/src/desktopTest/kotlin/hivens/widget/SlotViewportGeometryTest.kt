@@ -8,6 +8,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
@@ -137,17 +140,19 @@ class SlotViewportGeometryTest {
     }
 
     @Test
-    fun `a page is as long as a far widget from its first frame`() {
-        // Held to a length measured last frame, the page crept out to a far widget a
-        // widget's height at a time, and this one would have taken two hundred frames.
-        val page = Probe(
-            SlotContent(
-                widgets = listOf(widget("a", "fill.a", Placement(x = 0f, y = 5000f, width = 50f, height = 50f))),
-                flow = null,
-                viewport = ViewportSpec.ScrollDown,
-            ),
+    fun `a widget sent far down a page takes the page with it at once`() {
+        // The page has already been measured one screen long. An undo or a preset
+        // then puts the widget five thousand down. Held to the length measured the
+        // frame before, the page crept out toward it a widget's height per frame and
+        // would have taken two hundred frames to get there.
+        val near = SlotContent(
+            widgets = listOf(widget("a", "fill.a", Placement(x = 0f, y = 20f, width = 50f, height = 50f))),
+            flow = null,
+            viewport = ViewportSpec.ScrollDown,
         )
-        page.wheel(down = 5000f)
+        val page = Probe(near)
+        page.show(near.copy(widgets = listOf(widget("a", "fill.a", Placement(x = 0f, y = 5000f, width = 50f, height = 50f)))), frames = 2)
+        page.wheel(down = 5000f, frames = 20)
         assertEquals(A, page.at(25, 175), "the page stopped short of the widget")
     }
 
@@ -274,7 +279,8 @@ class SlotViewportGeometryTest {
      * pumped on a clock, because a wheel on the desktop scrolls with an animation
      * and a single render would read the first frame of it.
      */
-    private inner class Probe(content: SlotContent) {
+    private inner class Probe(initial: SlotContent) {
+        private var content by mutableStateOf(initial)
         private val scene = ImageComposeScene(width = SIDE, height = SIDE, density = Density(1f)) {
             val graph = LayoutGraph(surfaces = mapOf(surface to SurfaceLayout(slots = mapOf(slot to content))))
             CompositionLocalProvider(LocalLayoutGraph provides graph, LocalWidgetRegistry provides registry) {
@@ -293,11 +299,17 @@ class SlotViewportGeometryTest {
             return Bitmap.makeFromImage(image)
         }
 
-        fun wheel(down: Float = 0f, right: Float = 0f) {
+        fun wheel(down: Float = 0f, right: Float = 0f, frames: Int = 90) {
             val at = Offset(SIDE / 2f, SIDE / 2f)
             scene.sendPointerEvent(PointerEventType.Move, at)
             scene.sendPointerEvent(PointerEventType.Scroll, at, scrollDelta = Offset(right, down))
-            frame = pump(90)
+            frame = pump(frames)
+        }
+
+        /** Swaps the slot's record, the way an edit does, and draws [frames] frames of it. */
+        fun show(next: SlotContent, frames: Int) {
+            content = next
+            frame = pump(frames)
         }
 
         fun at(x: Int, y: Int): Triple<Int, Int, Int> {
