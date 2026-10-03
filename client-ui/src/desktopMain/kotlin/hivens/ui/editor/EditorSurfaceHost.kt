@@ -82,6 +82,7 @@ import hivens.ui.editor.presets.PresetManagerPanel
 import hivens.ui.editor.presets.PresetMeta
 import hivens.ui.editor.presets.PresetRepository
 import hivens.ui.editor.props.ScreenPropertiesPanel
+import hivens.ui.editor.props.WidgetModulesPanel
 import hivens.ui.editor.props.SurfacePropertiesPanel
 import hivens.ui.editor.props.WidgetPropPanel
 import hivens.ui.i18n.AppStrings
@@ -99,6 +100,7 @@ import hivens.ui.theme.Motion
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.OnFill
+import hivens.ui.widgets.modules.WidgetModules
 import hivens.widget.api.EmptySlotDecorator
 import hivens.widget.api.LocalEmptySlotDecorator
 import hivens.widget.api.LocalFamilyOverrides
@@ -188,6 +190,7 @@ fun EditorSurfaceHost(
     val controller: EditModeController = koinInject()
     val layoutRepo: LayoutGraphRepository = koinInject()
     val presetRepo: PresetRepository      = koinInject()
+    val widgetModules: WidgetModules      = koinInject()
     val coroutineScope = rememberCoroutineScope()
     val s = LocalStrings.current
 
@@ -205,6 +208,7 @@ fun EditorSurfaceHost(
     // opens the way in. Null closes the menu.
     var entryMenuAt   by remember { mutableStateOf<Offset?>(null) }
     var presetPanelOpen by remember(availableSurfaces) { mutableStateOf(false) }
+    var modulesPanelOpen by remember(availableSurfaces) { mutableStateOf(false) }
     var resetSurfaceConfirm by remember(availableSurfaces) { mutableStateOf(false) }
     var selectedSurface by remember(availableSurfaces) {
         mutableStateOf(availableSurfaces.firstOrNull())
@@ -809,6 +813,13 @@ fun EditorSurfaceHost(
                     },
                 )
 
+                WidgetModulesPanel(
+                    visible   = editing && !previewing && modulesPanelOpen,
+                    modules   = widgetModules,
+                    onDismiss = { modulesPanelOpen = false },
+                    modifier  = Modifier.align(Alignment.TopStart).padding(start = 16.dp),
+                )
+
                 WidgetPalettePanel(
                     visible        = editing && paletteOpen && !previewing && propTarget == null && !surfaceSettingsOpen,
                     onDismiss      = { paletteOpen = false },
@@ -889,6 +900,7 @@ fun EditorSurfaceHost(
                     previewing            = previewing,
                     onTogglePreview       = { previewing = !previewing },
                     onOpenPresets         = { presetPanelOpen = true },
+                    onOpenModules         = { modulesPanelOpen = !modulesPanelOpen },
                     onNewScreen           = {
                         pendingScreen = controller.createScreen(s.screenDefaultTitle(graphForSurfaces.screens.size + 1))
                     },
@@ -974,6 +986,7 @@ private fun EditModePill(
     previewing: Boolean,
     onTogglePreview: () -> Unit,
     onOpenPresets: () -> Unit,
+    onOpenModules: () -> Unit,
     onNewScreen: () -> Unit,
     onRequestReset: () -> Unit,
     canUndo: Boolean,
@@ -998,7 +1011,7 @@ private fun EditModePill(
             // WidthClass, so it tracks the real chip count -- and the family
             // chips are words rather than icons, so a surface that shows them
             // needs the rest to give up their labels sooner.
-            val compact = maxWidth < if (families.size > 1) 1250.dp else 1100.dp
+            val compact = maxWidth < if (families.size > 1) 1500.dp else 1350.dp
             NxSurface(
                 kind  = SurfaceKind.Popup,
                 shape = RoundedCornerShape(20.dp),
@@ -1133,6 +1146,16 @@ private fun EditModePill(
                         label    = s.editorNewScreen,
                         selected = false,
                         onClick  = onNewScreen,
+                        compact  = compact,
+                    )
+                    Spacer(Modifier.width(4.dp))
+
+                    // The widget modules, switched on and off while the launcher runs.
+                    ToolChip(
+                        icon     = NxIcon.Folder,
+                        label    = s.modulesChip,
+                        selected = false,
+                        onClick  = onOpenModules,
                         compact  = compact,
                     )
                     Spacer(Modifier.width(4.dp))

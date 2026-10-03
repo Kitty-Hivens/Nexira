@@ -1513,6 +1513,19 @@ interface AppStrings {
     val editorViewportRight: String
     val editorViewportScrollbar: String
     val editorViewportMap: String
+    val modulesTitle: String
+    val modulesChip: String
+    val modulesEmpty: String
+    val modulesReload: String
+    val modulesOpenFolder: String
+    fun moduleWidgets(n: Int): String
+    val moduleOff: String
+    fun moduleOffAfterCrash(failure: String): String
+    fun moduleRefused(reason: String): String
+    val moduleGone: String
+    val moduleForget: String
+    fun moduleCrashedTitle(name: String): String
+    fun moduleCrashedBody(failure: String): String
     val mapGoHome: String
     val editorAnchorTitle: String
     val editorAnchorTopStart: String

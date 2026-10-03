@@ -28,6 +28,9 @@ class FixtureRegistry : WidgetRegistry {
     override fun all(): Map<WidgetKind, WidgetDescriptor> = map
     override fun get(kind: WidgetKind): WidgetDescriptor? = map[kind]
 
+    /** Fails from inside the module's own code, for tracing a failure back to the module. */
+    fun explode(): Nothing = throw IllegalStateException("the fixture module failed on purpose")
+
     companion object {
         const val FIXTURE_KIND = "fixture.widget"
     }

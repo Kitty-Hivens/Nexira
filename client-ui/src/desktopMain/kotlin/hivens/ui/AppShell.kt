@@ -136,6 +136,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import hivens.ui.widgets.WidgetSurface
+import hivens.ui.widgets.modules.WidgetModules
 import hivens.ui.widgets.state.WidgetStateStore
 import hivens.widget.api.LocalWidgetCommandRegistry
 import hivens.widget.api.LocalWidgetDataRegistry
@@ -348,6 +349,7 @@ fun FrameWindowScope.AppShellContent(
     val debugOverlay: DebugOverlayState        = koinInject()
     val layoutGraphRepo: LayoutGraphRepository = koinInject()
     val widgetRegistry: WidgetRegistry         = koinInject()
+    val widgetModules: WidgetModules           = koinInject()
     val widgetServiceRegistry: WidgetServiceRegistry = koinInject()
     val widgetDataRegistry: WidgetDataRegistry = koinInject()
     val widgetCommandRegistry: WidgetCommandRegistry = koinInject()
@@ -489,7 +491,9 @@ fun FrameWindowScope.AppShellContent(
     // a healthy graph reconciles to itself and writes nothing.
     LaunchedEffect(Unit) {
         val before = layoutGraphRepo.value()
-        val defaultKinds = DefaultLayout.load().walkInstances().map { it.kind }.toSet()
+        // A module that is off, broken or gone still owns its kinds until somebody
+        // forgets it, so its widgets are not pruned as if they had been renamed away.
+        val defaultKinds = DefaultLayout.load().walkInstances().map { it.kind }.toSet() + widgetModules.knownKinds()
         val result = WidgetGraphReconciler.reconcile(
             graph        = before,
             registry     = widgetRegistry,
@@ -497,15 +501,12 @@ fun FrameWindowScope.AppShellContent(
             // Prune removed kinds only when a schema bump actually happened --
             // a deliberate app update is the safe moment to reap orphans.
             //
-            // TRAP, armed the moment the registry has a second source: a kind
-            // vanishes here either because it was renamed away, or because the
-            // source that carried it is not in this build. The reconciler cannot
-            // tell those apart, and for the second it deletes the user's widgets
-            // along with their props and placement, permanently, on a file with
-            // no undo. Today every source is compiled in, so completeness is a
-            // build-time fact and this cannot fire. Whoever adds a source that
-            // can be absent has to gate this on the registry being complete
-            // BEFORE doing so, not after.
+            // A kind vanishes here either because it was renamed away, or because
+            // the module that carried it is off, broken or gone. The reconciler
+            // cannot tell those apart, which is why every kind a remembered module
+            // ever brought is counted as known above: only a kind no module claims
+            // is reaped, and a module's kinds are let go only when somebody forgets
+            // the module.
             prune        = layoutGraphRepo.migratedFromSchema != null,
         )
         if (result.graph != before) {
@@ -714,6 +715,24 @@ fun FrameWindowScope.AppShellContent(
                     },
                 )
             }
+        }
+
+        // A widget module crashed the interface and the recovery switched it off.
+        // Said once the shell is back, because the person has to know why the
+        // widgets went and where to switch the module back on.
+        val crashNotice by widgetModules.crashNotice.collectAsState()
+        LaunchedEffect(crashNotice) {
+            val notice = crashNotice ?: return@LaunchedEffect
+            notificationCenter.push(
+                sourceKey = "widget-module-crash",
+                sender    = Branding.TITLE,
+                iconUrl   = null,
+                severity  = Severity.Warn,
+                kind      = Kind.Sticky,
+                title     = s.moduleCrashedTitle(notice.name),
+                body      = s.moduleCrashedBody(notice.failure),
+            )
+            widgetModules.consumeCrashNotice()
         }
 
         val dataDirectory: java.nio.file.Path = koinInject()
@@ -992,6 +1011,10 @@ fun FrameWindowScope.AppShellContent(
             }
 
             val layoutGraph by layoutGraphRepo.observe().collectAsState()
+            // The registry as it is now. A module switched on or off, or the folder
+            // read again, is a new value here and a whole-tree recomposition, which
+            // is what a change to the set of widgets that exist is.
+            val modules by widgetModules.state.collectAsState()
             // Production renderer for a widget's own surface, see
             // [hivens.ui.widgets.WidgetSurface]. Invoked by the kernel only when a
             // widget carries one, so a widget without a plane pays nothing.
@@ -1006,7 +1029,7 @@ fun FrameWindowScope.AppShellContent(
             CompositionLocalProvider(
                 LocalCustomization                       provides customization,
                 LocalLayoutGraph                         provides layoutGraph,
-                LocalWidgetRegistry                      provides widgetRegistry,
+                LocalWidgetRegistry                      provides modules.registry,
                 LocalWidgetServiceRegistry               provides widgetServiceRegistry,
                 LocalWidgetDataRegistry                  provides widgetDataRegistry,
                 LocalWidgetCommandRegistry               provides widgetCommandRegistry,

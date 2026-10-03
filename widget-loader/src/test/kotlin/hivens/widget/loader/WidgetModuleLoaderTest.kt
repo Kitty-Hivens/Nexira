@@ -189,6 +189,63 @@ class WidgetModuleLoaderTest {
         assertEquals(WidgetModuleScan(), scan(tmp.resolve("nothing-here")))
     }
 
+    // -- loading without a restart -------------------------------------------
+
+    @Test
+    fun `a module opened from a copy leaves the original free to go`() {
+        install("good.jar")
+        val shadow = tmp.resolve("shadow")
+
+        val module = WidgetModuleLoader(modules, shadowDir = shadow).scan().loaded.single().also { opened += it }
+
+        assertTrue(module.loader.urLs.single().path.startsWith(shadow.toUri().path), "it was opened from the copy")
+        // The point on every host: the file the person put there is not held.
+        Files.delete(modules.resolve("good.jar"))
+        assertEquals("fixture", module.id)
+    }
+
+    @Test
+    fun `a jar replaced while loaded is read afresh on the next scan`() {
+        val shadow = tmp.resolve("shadow")
+        install("mod.jar", name = "First")
+        val first = WidgetModuleLoader(modules, shadowDir = shadow).scan().loaded.single().also { opened += it }
+
+        install("mod.jar", name = "Second")
+        val second = WidgetModuleLoader(modules, shadowDir = shadow).scan().loaded.single().also { opened += it }
+
+        assertEquals("First", first.name)
+        assertEquals("Second", second.name)
+        assertTrue(first.loader.urLs.single() != second.loader.urLs.single(), "different bytes, different copy")
+    }
+
+    @Test
+    fun `a switched-off module is named and left closed`() {
+        install("good.jar")
+
+        val scan = WidgetModuleLoader(modules, disabled = setOf("fixture")).scan().also { opened += it.loaded }
+
+        assertEquals(emptyList(), scan.loaded)
+        assertEquals(listOf("fixture"), scan.disabled.map { it.id })
+        assertEquals("Fixture Module", scan.disabled.single().name)
+    }
+
+    @Test
+    fun `a failure inside a module is traced back to it`() {
+        install("good.jar")
+        val registry = scan().loaded.single().registry
+
+        val failure = runCatching { registry.javaClass.getMethod("explode").invoke(registry) }.exceptionOrNull()!!
+
+        // Reflection wraps it, the way Compose wraps a widget's failure: the trace has
+        // to be found through the cause.
+        assertEquals("fixture", WidgetModuleLoader.moduleIdIn(failure))
+    }
+
+    @Test
+    fun `a failure in the launcher's own code is no module's`() {
+        assertEquals(null, WidgetModuleLoader.moduleIdIn(IllegalStateException("ours")))
+    }
+
     // -- fixture ------------------------------------------------------------
 
     /**

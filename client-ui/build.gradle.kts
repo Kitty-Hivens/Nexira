@@ -879,3 +879,15 @@ tasks.withType<JavaExec>().configureEach {
     // the shell that exports the variable.
     providers.gradleProperty("nexiraDataDir").orNull?.let { environment("NEXIRA_DATA_DIR", it) }
 }
+
+// The widget module tests load a real module jar, built by :widget-loader the way a
+// third party would build one, and kept off this test classpath for the reason it
+// is kept off that module's: a fixture the tests could already see would resolve
+// through the parent loader and prove nothing about loading.
+tasks.named<Test>("desktopTest") {
+    dependsOn(":widget-loader:fixtureModuleJar")
+    systemProperty(
+        "nexira.test.fixtureModuleJar",
+        rootProject.layout.projectDirectory.file("widget-loader/build/fixtures/fixture-module.jar").asFile.absolutePath,
+    )
+}

@@ -81,9 +81,8 @@ import hivens.ui.widgets.state.WidgetStateStore
 import hivens.widget.api.WidgetCommandRegistry
 import hivens.widget.api.WidgetDataRegistry
 import hivens.ui.screens.mod.OpenProjectState
-import hivens.widget.api.CompositeWidgetRegistry
 import hivens.widget.api.SurfaceFamilies
-import hivens.widget.loader.WidgetModuleLoader
+import hivens.ui.widgets.modules.WidgetModules
 import hivens.widget.api.WidgetRegistry
 import hivens.widget.api.WidgetServiceRegistry
 import hivens.widget.api.command
@@ -95,6 +94,7 @@ import hivens.widget.generated.GeneratedWidgetRegistry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.jetbrains.compose.resources.ExperimentalResourceApi
+import org.koin.core.context.GlobalContext
 import org.koin.core.context.stopKoin
 import kotlin.concurrent.thread
 import kotlin.system.exitProcess
@@ -175,31 +175,23 @@ val uiModule = module {
     // the shell regions and the sign-in panel are non-removable because a layout
     // without them has no navigation and no way to sign in, and shadowing them
     // by id would be that removal through a side door.
-    single<WidgetRegistry> {
-        val contributed = WidgetModuleLoader(get<Path>().resolve(Storage.WIDGETS_DIR)).scan()
-        val sources = listOf(GeneratedWidgetRegistry) + contributed.loaded.map { it.registry }
-        // Parallel to sources, so a diagnostic can name a module rather than an
-        // index into a list the reader cannot see.
-        val labels = listOf("built-in") + contributed.loaded.map { it.id }
-        val registry = CompositeWidgetRegistry(sources)
-
-        val log = LoggerFactory.getLogger("Widgets")
-        log.info(
-            "Widget registry: {} kinds from {} source(s) [{}]",
-            registry.all().size, sources.size, labels.joinToString(", "),
+    //
+    // The modules can change while the launcher runs: switched off, switched on,
+    // the folder read again. The composition reads their state and hears the change;
+    // everything outside it asks the registry below, which answers with whatever is
+    // current.
+    single {
+        val dataDir: Path = get()
+        WidgetModules(
+            directory = dataDir.resolve(Storage.WIDGETS_DIR),
+            shadowDir = dataDir.resolve("cache").resolve("widget-modules"),
+            stateFile = dataDir.resolve("widget-modules.json"),
+            json      = get(),
+            builtIn   = GeneratedWidgetRegistry,
+            scope     = get(),
         )
-        // A contribution that loses its id loses it silently otherwise: the
-        // widget simply never appears, and nothing anywhere says why. The
-        // composite deliberately has no logger of its own, so the diagnostic
-        // gets read out here, where one exists.
-        registry.shadowed.forEach {
-            log.warn(
-                "Widget '{}' from '{}' is shadowed by '{}' and will not be used",
-                it.kind.value, labels[it.bySource], labels[it.heldBy],
-            )
-        }
-        registry
     }
+    single<WidgetRegistry> { get<WidgetModules>().registry }
 
     // Cross-widget service registry (Phase D). One global instance per
     // launcher process. Provider widgets register via provideService
@@ -682,6 +674,17 @@ private fun runShellWithRecovery(
             if (safe) "Safe-mode window crashed -- giving up" else "Shell composition crashed -- attempting recovery",
             crash,
         )
+
+        // A crash that ran through a widget module's code is the module's. Switching
+        // it off before the restart is what makes the restart work, where retrying
+        // the same crash would only count down to safe mode. The crash still counts:
+        // if the module was not the whole story, safe mode is still the floor.
+        if (!safe) {
+            runCatching {
+                val modules = GlobalContext.getOrNull()?.getOrNull<WidgetModules>()
+                modules?.culpritOf(crash)?.let { modules.switchOffAfterCrash(it, crash) }
+            }.onFailure { log.warn("Could not trace the crash to a widget module", it) }
+        }
 
         val saved = runCatching {
             val reporter = pre.crashReporter.get()
