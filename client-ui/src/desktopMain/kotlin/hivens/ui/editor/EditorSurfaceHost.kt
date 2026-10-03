@@ -110,6 +110,7 @@ import hivens.widget.api.LocalSlotPath
 import hivens.widget.api.LocalUnknownWidgetDecorator
 import hivens.widget.api.LocalWidgetDecorator
 import hivens.widget.api.LocalWidgetRegistry
+import hivens.widget.api.SlotBoundsReporter
 import hivens.widget.api.SlotChromeModifier
 import hivens.widget.api.UnknownWidgetDecorator
 import hivens.widget.api.WidgetDecorator
@@ -518,11 +519,11 @@ fun EditorSurfaceHost(
      * a drag. That put a second whole-shell invalidation per pointer move next to
      * the one the layout graph was already causing.
      */
-    val slotBoundsReporter: (SlotPath, Rect) -> Unit = remember(state, previewing, registry) {
+    val slotBoundsReporter: SlotBoundsReporter = remember(state, previewing, registry) {
         if (state is EditModeState.On && !previewing) {
-            { path, rect -> registry.registerSlot(path, rect) }
+            { path, visible, content -> registry.registerSlot(path, visible, content) }
         } else {
-            { _, _ -> }
+            { _, _, _ -> }
         }
     }
 

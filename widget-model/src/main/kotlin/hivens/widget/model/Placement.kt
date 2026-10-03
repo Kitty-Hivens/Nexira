@@ -187,6 +187,12 @@ fun anchorDragSignY(anchor: String): Float = if (anchorVerticalBias(anchor) > 0.
  * clamp written for the top left lets a centred one travel a whole slot width
  * before it notices. A degenerate slot, or one too small to hold the margins,
  * returns the value untouched rather than pinning it to zero.
+ *
+ * An infinite [slotDp] is the axis a slot scrolls along. It has a start and no
+ * end, so a widget attached to the start is held off the start and nowhere else:
+ * a page is as long as its furthest widget, and a widget far down it is reached by
+ * scrolling, not pulled back up. Attached anywhere else it is left alone, because
+ * the far edge it would count from is the page's own length.
  */
 fun clampPlacementAxis(
     valueDp: Float,
@@ -195,6 +201,9 @@ fun clampPlacementAxis(
     bias: Float,
     marginDp: Float = GRAB_MARGIN_DP,
 ): Float {
+    if (slotDp == Float.POSITIVE_INFINITY) {
+        return if (bias == 0f) valueDp.coerceAtLeast(marginDp - widgetDp) else valueDp
+    }
     if (slotDp <= 0f) return valueDp
     val base = bias * (slotDp - widgetDp)
     val lo = marginDp - widgetDp - base

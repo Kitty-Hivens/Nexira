@@ -98,6 +98,9 @@ class DropTargetRegistry {
     private val widgets: SnapshotStateMap<SlotPath, SnapshotStateMap<String, WidgetBounds>> =
         mutableStateMapOf()
     private val slotBounds: SnapshotStateMap<SlotPath, Rect> = mutableStateMapOf()
+    // The whole placement box where it is larger than what is on screen, which is
+    // a slot that scrolls. Absent means the two are the same rect.
+    private val slotContent: SnapshotStateMap<SlotPath, Rect> = mutableStateMapOf()
 
     /**
      * Which widgets the one being moved is currently sitting on top of.
@@ -132,8 +135,14 @@ class DropTargetRegistry {
             .mapTo(mutableSetOf()) { it.key }
     }
 
-    fun registerSlot(path: SlotPath, rect: Rect) {
+    /**
+     * Where a slot is. [rect] is what is on screen and is what a pointer can be
+     * over. [content] is the whole box, for a slot that scrolls, and is what a
+     * point inside it converts against.
+     */
+    fun registerSlot(path: SlotPath, rect: Rect, content: Rect = rect) {
         slotBounds[path] = rect
+        if (content == rect) slotContent.remove(path) else slotContent[path] = content
     }
 
     fun registerWidget(path: SlotPath, instanceId: String, index: Int, rect: Rect) {
@@ -155,8 +164,15 @@ class DropTargetRegistry {
     // Null when the slot has not reported bounds.
     fun slotOrigin(path: SlotPath): Offset? = slotBounds[path]?.topLeft
 
-    /** The whole reported rect of a slot, for a drop that has to land inside it. */
+    /** The part of a slot that is on screen. */
     fun slotRect(path: SlotPath): Rect? = slotBounds[path]
+
+    /**
+     * The whole of a slot, on screen or not, for a drop that converts the pointer
+     * into the slot's own coordinates. On a page scrolled down by a screen this
+     * starts a screen above the window, which is where the page's origin is.
+     */
+    fun slotContentRect(path: SlotPath): Rect? = slotContent[path] ?: slotBounds[path]
 
     // Two passes:
     //   1) exact rect hit across all registered sources (widget rects +

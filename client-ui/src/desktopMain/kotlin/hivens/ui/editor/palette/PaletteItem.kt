@@ -58,6 +58,7 @@ import hivens.ui.theme.LocalMonoFamily
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.WidgetDescriptor
 import hivens.widget.model.FlowSpec
+import hivens.widget.model.latticeTransposed
 import hivens.widget.model.seedPlacement
 import hivens.widget.model.WidgetSizing
 import hivens.widget.model.traverse
@@ -126,8 +127,12 @@ fun PaletteItem(
                         // reported origin. A lattice takes the first free cell instead:
                         // the pointer names a dp, and turning that into a cell needs
                         // geometry this row does not have and the model already knows.
-                        val seed = seedPlacement(target.widgets.size, target.grid, target.widgets)
-                        val slotRect = registry.slotRect(targetPath)
+                        val seed = seedPlacement(target.widgets.size, target.grid, target.widgets, target.latticeTransposed)
+                        // The whole slot rather than the part on screen: on a page that
+                        // has been scrolled, the slot's origin is above the window, and a
+                        // drop converted against the visible top would land a scroll
+                        // short of where it was let go.
+                        val slotRect = registry.slotContentRect(targetPath)
                         val placement = if (target.grid == 0 && slotRect != null) {
                             val (xDp, yDp) = windowPointToSlotDp(
                                 pointer.x, pointer.y, slotRect.left, slotRect.top, density,

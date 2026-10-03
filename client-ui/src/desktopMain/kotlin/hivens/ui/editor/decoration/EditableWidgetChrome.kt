@@ -35,6 +35,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.currentCompositionLocalContext
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -62,10 +63,13 @@ import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
+import hivens.ui.editor.EdgeAutoScroll
 import hivens.ui.editor.EditModeController
 import hivens.ui.editor.ResizeBounds
 import hivens.ui.editor.ResizeEdge
@@ -88,6 +92,8 @@ import hivens.ui.theme.NxTheme
 import hivens.widget.api.LocalPlacementSlotSizeDp
 import hivens.widget.api.LocalGridGeometry
 import hivens.widget.api.LocalLayoutGraph
+import hivens.widget.api.LocalPlacementScrollAxis
+import hivens.widget.api.LocalViewport
 import hivens.widget.api.WidgetDescriptor
 import hivens.widget.model.FlowSpec
 import hivens.widget.model.Placement
@@ -179,6 +185,22 @@ fun EditableWidgetChrome(
     val liveInstance = rememberUpdatedState(instance)
     val liveCommitDrop = rememberUpdatedState(onCommitDrop)
     var latticeDrag by remember { mutableStateOf(Offset.Zero) }
+    // The page this widget is on, if it is on one, so a drag that reaches the edge
+    // scrolls the page under it. One loop per widget, idle between drags.
+    val liveViewport = rememberUpdatedState(LocalViewport.current)
+    val autoScroll = remember { EdgeAutoScroll { liveViewport.value } }
+    val liveDensity = rememberUpdatedState(LocalDensity.current.density)
+    LaunchedEffect(autoScroll) { autoScroll.run { liveDensity.value } }
+    // Where the widget's own box starts on screen, unclipped, so a pointer the
+    // gesture reports in the box's coordinates can be told to the page in window
+    // ones. The clipped window rect starts at the viewport's edge once the widget
+    // is partly scrolled out, which is exactly when the edge matters.
+    var widgetOrigin by remember { mutableStateOf(Offset.Zero) }
+    // The axis the placement slot scrolls along. A widget attached to the start of
+    // it is held off the start and nowhere else, the way the renderer holds it.
+    val liveScrollAxis = rememberUpdatedState(LocalPlacementScrollAxis.current)
+    fun clampSlot(horizontal: Boolean, bias: Float, measured: Float): Float =
+        if (liveScrollAxis.value == horizontal && bias == 0f) Float.POSITIVE_INFINITY else measured
     // What this widget says it needs and can use. The gesture is held to it, the
     // renderer bounds by it, and while a handle is down the two extremes are drawn
     // so the range is visible before the drag ends rather than discovered by it.
@@ -359,6 +381,7 @@ fun EditableWidgetChrome(
                     // The unclipped size (coords.size), not the rect, which a clipping
                     // parent may have trimmed. The resize gesture reads this.
                     widgetLayoutSize = Size(coords.size.width.toFloat(), coords.size.height.toFloat())
+                    widgetOrigin = coords.positionInWindow()
                     registry.registerWidget(path, instance.instanceId, index, rect)
                 },
         ) {
@@ -424,16 +447,27 @@ fun EditableWidgetChrome(
                                     // that collides snaps to the nearest free cell.
                                     val start = livePlacement.value ?: Placement()
                                     var acc = Offset.Zero
+                                    var pointer = widgetOrigin + down.position
+                                    // The page moving under a held widget is distance the
+                                    // widget travels across the lattice, so it is added to
+                                    // the drag rather than left behind with the content.
+                                    autoScroll.start(pointer) { moved ->
+                                        acc += if (autoScroll.horizontal == true) Offset(moved, 0f) else Offset(0f, moved)
+                                        latticeDrag = acc
+                                    }
                                     drag(down.id) { change ->
                                         acc += change.positionChange()
+                                        pointer += change.positionChange()
+                                        autoScroll.move(pointer)
                                         latticeDrag = acc
                                         change.consume()
                                     }
+                                    autoScroll.stop()
                                     gridGeo.value?.let { geo ->
                                         val (col, row) = gridDragCell(
                                             start.x.toInt(), start.y.toInt(),
                                             acc.x * signX, acc.y * signY, density,
-                                            geo.cellDp, geo.gutterDp, geo.columns,
+                                            geo.cellDp, geo.gutterDp, geo.columns, geo.transposed,
                                         )
                                         editController.moveWidgetInGrid(path, instance.instanceId, col, row, geo.columns)
                                     }
@@ -455,21 +489,33 @@ fun EditableWidgetChrome(
                                     // stored spot on the first frame. Sized off the unclipped
                                     // layout, not the (clip-trimmed) window bounds.
                                     val slot0 = liveSlotSize.value
+                                    val hBias = anchorHorizontalBias(a)
+                                    val vBias = anchorVerticalBias(a)
                                     var curX = clampPlacementAxis(
-                                        p?.x ?: 0f, slot0.width, widgetLayoutSize.width / density, anchorHorizontalBias(a),
+                                        p?.x ?: 0f, clampSlot(true, hBias, slot0.width), widgetLayoutSize.width / density, hBias,
                                     )
                                     var curY = clampPlacementAxis(
-                                        p?.y ?: 0f, slot0.height, widgetLayoutSize.height / density, anchorVerticalBias(a),
+                                        p?.y ?: 0f, clampSlot(false, vBias, slot0.height), widgetLayoutSize.height / density, vBias,
                                     )
+                                    var pointer = widgetOrigin + down.position
+                                    // The page moved under the held widget: the widget keeps
+                                    // to the pointer, which on the page is that much further on.
+                                    autoScroll.start(pointer) { moved ->
+                                        val along = moved / density
+                                        if (autoScroll.horizontal == true) curX += along * signX else curY += along * signY
+                                        editController.setWidgetOffset(path, instance.instanceId, curX, curY)
+                                    }
                                     drag(down.id) { change ->
+                                        pointer += change.positionChange()
+                                        autoScroll.move(pointer)
                                         val slot = liveSlotSize.value
                                         val wb = widgetWindowBounds
                                         val (nx, ny) = placementDragOffset(
                                             curX, curY,
                                             change.positionChange().x * signX, change.positionChange().y * signY,
                                             density,
-                                            slotWDp   = slot.width,
-                                            slotHDp   = slot.height,
+                                            slotWDp   = clampSlot(true, hBias, slot.width),
+                                            slotHDp   = clampSlot(false, vBias, slot.height),
                                             widgetWDp = widgetLayoutSize.width / density,
                                             widgetHDp = widgetLayoutSize.height / density,
                                             hBias     = anchorHorizontalBias(a),
@@ -487,6 +533,7 @@ fun EditableWidgetChrome(
                                         )
                                         change.consume()
                                     }
+                                    autoScroll.stop()
                                     registry.publishOverlap(emptySet())
                                 }
                                 else -> {
@@ -511,11 +558,17 @@ fun EditableWidgetChrome(
                                     // hit-test back. The two branches above already do it
                                     // this way; this one was the odd one out.
                                     var last = bounds.topLeft + slop.position
+                                    // Nothing to carry along: the ghost follows the pointer on
+                                    // screen, and the drop is read off where the slots are,
+                                    // which moves with the page by itself.
+                                    autoScroll.start(last) { }
                                     drag(slop.id) { change ->
                                         last += change.positionChange()
+                                        autoScroll.move(last)
                                         controller.update(last)
                                         change.consume()
                                     }
+                                    autoScroll.stop()
                                     liveCommitDrop.value(last)
                                     controller.end()
                                 }
@@ -550,11 +603,15 @@ fun EditableWidgetChrome(
                     exit     = fadeOut(tween(chromeMotionMs)),
                     modifier = Modifier.align(edge.alignment()).padding(2.dp),
                 ) {
+                    // The handle's own place on screen, for telling the page where the
+                    // pointer is: the press is reported in the handle's coordinates.
+                    var handleOrigin by remember { mutableStateOf(Offset.Zero) }
                     Surface(
                         color    = NxColor.lead().copy(alpha = if (edge.isCorner()) 0.85f else 0.6f),
                         shape    = RoundedCornerShape(4.dp),
                         modifier = Modifier
                             .size(edge.handleSize())
+                            .onGloballyPositioned { handleOrigin = it.positionInWindow() }
                             .pointerHoverIcon(remember(edge) { PointerIcon(Cursor(edge.cursor())) })
                             .pointerInput(instance.instanceId, edge) {
                                 // Custom gesture (not detectDragGestures) so the press
@@ -585,13 +642,15 @@ fun EditableWidgetChrome(
                                     // Off the raw stored offset the handle sat where the widget was
                                     // drawn but the maths ran from where it was recorded, and the
                                     // two disagreeing walked the widget across the slot.
-                                    val startX = clampPlacementAxis(p?.x ?: 0f, slot0.width, startDrawnW, anchorHorizontalBias(anchor))
-                                    val startY = clampPlacementAxis(p?.y ?: 0f, slot0.height, startDrawnH, anchorVerticalBias(anchor))
+                                    val startX = clampPlacementAxis(
+                                        p?.x ?: 0f, clampSlot(true, anchorHorizontalBias(anchor), slot0.width), startDrawnW, anchorHorizontalBias(anchor),
+                                    )
+                                    val startY = clampPlacementAxis(
+                                        p?.y ?: 0f, clampSlot(false, anchorVerticalBias(anchor), slot0.height), startDrawnH, anchorVerticalBias(anchor),
+                                    )
                                     var accX = 0f
                                     var accY = 0f
-                                    drag(down.id) { change ->
-                                        accX += change.positionChange().x
-                                        accY += change.positionChange().y
+                                    fun apply() {
                                         if (geo != null) {
                                             // One gesture, two units: a lattice slot sizes in
                                             // whole cells, so the same drag quantises instead
@@ -600,7 +659,7 @@ fun EditableWidgetChrome(
                                                 (p?.width ?: 1f).toInt().coerceAtLeast(1),
                                                 (p?.height ?: 1f).toInt().coerceAtLeast(1),
                                                 accX, accY, density,
-                                                geo.cellDp, geo.gutterDp, geo.columns,
+                                                geo.cellDp, geo.gutterDp, geo.columns, geo.transposed,
                                             )
                                             editController.resizeWidgetInGrid(path, instance.instanceId, cw, ch, geo.columns)
                                         } else {
@@ -641,8 +700,23 @@ fun EditableWidgetChrome(
                                                     .orEmpty(),
                                             )
                                         }
+                                    }
+                                    var pointer = handleOrigin + down.position
+                                    // A handle pulled to the edge of a page grows the widget
+                                    // on past it, by as far as the page moved under it.
+                                    autoScroll.start(pointer) { moved ->
+                                        if (autoScroll.horizontal == true) accX += moved else accY += moved
+                                        apply()
+                                    }
+                                    drag(down.id) { change ->
+                                        accX += change.positionChange().x
+                                        accY += change.positionChange().y
+                                        pointer += change.positionChange()
+                                        autoScroll.move(pointer)
+                                        apply()
                                         change.consume()
                                     }
+                                    autoScroll.stop()
                                     resizing = false
                                     registry.publishOverlap(emptySet())
                                 }

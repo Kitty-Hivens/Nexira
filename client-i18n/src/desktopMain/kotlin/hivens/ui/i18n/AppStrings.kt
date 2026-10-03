@@ -1507,6 +1507,11 @@ interface AppStrings {
     val editorSlotRow: String
     val editorSlotGrid: String
     val editorSlotCanvas: String
+    val editorSlotViewportTitle: String
+    val editorViewportStatic: String
+    val editorViewportDown: String
+    val editorViewportRight: String
+    val editorViewportScrollbar: String
     val editorAnchorTitle: String
     val editorAnchorTopStart: String
     val editorAnchorTopCenter: String

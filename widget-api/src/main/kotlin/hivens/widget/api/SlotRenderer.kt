@@ -38,13 +38,16 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.unit.toSize
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.Constraints
@@ -229,13 +232,14 @@ private fun ScrollViewport(
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
     val direction = LocalLayoutDirection.current
-    BoxWithConstraints(outer.hoverable(interaction)) {
+    val state = rememberSaveable(saver = ScrollState.Saver) { ScrollState(0) }
+    val handle = remember(state, horizontal) { ViewportHandle(horizontal, state) }
+    BoxWithConstraints(outer.hoverable(interaction).onGloballyPositioned { handle.bounds = it.boundsInWindow() }) {
         val along = if (horizontal) maxWidth else maxHeight
         if (!along.isFinite) {
             body(null, Modifier.inset(contentPadding))
             return@BoxWithConstraints
         }
-        val state = rememberSaveable(saver = ScrollState.Saver) { ScrollState(0) }
         val padding = if (horizontal) {
             contentPadding.calculateStartPadding(direction) + contentPadding.calculateEndPadding(direction)
         } else {
@@ -249,7 +253,7 @@ private fun ScrollViewport(
         } else {
             Modifier.verticalScroll(state).fillMaxWidth()
         }
-        CompositionLocalProvider(LocalViewportExtent provides here) {
+        CompositionLocalProvider(LocalViewportExtent provides here, LocalViewport provides handle) {
             body(ScrollAxis(horizontal, extent), scroller.inset(contentPadding))
         }
         if (scrollbar) {
@@ -503,7 +507,9 @@ private fun PlacementSlot(
             .onSizeChanged { sz ->
                 measuredDp = with(density) { Size(sz.width.toDp().value, sz.height.toDp().value) }
             }
-            .onGloballyPositioned { reportSlotBounds(path, it.boundsInWindow()) },
+            .onGloballyPositioned {
+                reportSlotBounds(path, it.boundsInWindow(), Rect(it.positionInWindow(), it.size.toSize()))
+            },
     ) {
         val boundedWidth = maxWidth.value.takeIf { it.isFinite() } ?: 0f
         val boundedHeight = maxHeight.value.takeIf { it.isFinite() } ?: 0f
@@ -547,6 +553,7 @@ private fun PlacementSlot(
 
         CompositionLocalProvider(
             LocalPlacementSlotSizeDp provides measuredDp,
+            LocalPlacementScrollAxis provides scroll?.horizontal,
             // Published only when there is a cell to convert against. A geometry
             // carrying a zero cell reads as a lattice to the editor and then
             // answers every pointer delta with "no movement", which is a gesture
@@ -722,8 +729,15 @@ private fun PlacedBox(
     // grab-margin range was wide enough on both sides to contain a small value of
     // either sign. Containment is one-sided and would have drawn end and centre
     // anchors in the wrong place.
-    val clampedX = if (lattice || ownW <= 0f) offX else clampPlacementAxis(offX, slotDp.width, ownW, hBias)
-    val clampedY = if (lattice || ownH <= 0f) offY else clampPlacementAxis(offY, slotDp.height, ownH, vBias)
+    //
+    // Along a scrolling axis a widget attached to the start is held off the start
+    // and nowhere else: the page is as long as it reaches, so a far edge measured a
+    // frame ago would hold it to last frame's length and the page would creep out to
+    // it one frame at a time.
+    val clampW = if (scrollHorizontal == true && hBias == 0f) Float.POSITIVE_INFINITY else slotDp.width
+    val clampH = if (scrollHorizontal == false && vBias == 0f) Float.POSITIVE_INFINITY else slotDp.height
+    val clampedX = if (lattice || ownW <= 0f) offX else clampPlacementAxis(offX, clampW, ownW, hBias)
+    val clampedY = if (lattice || ownH <= 0f) offY else clampPlacementAxis(offY, clampH, ownH, vBias)
     val heldX = if (hBias > 0.5f) -clampedX else clampedX
     val heldY = if (vBias > 0.5f) -clampedY else clampedY
 

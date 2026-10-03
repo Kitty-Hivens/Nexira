@@ -64,3 +64,20 @@ sealed interface ViewportMode {
 
 /** How this slot shows what does not fit, static when nothing has said. */
 val SlotContent.viewportMode: ViewportMode get() = viewport?.mode ?: ViewportMode.Static
+
+/**
+ * Whether this slot's lattice counts rows rather than columns.
+ *
+ * A lattice counts its lines across the side that does not move, which in a slot
+ * scrolling sideways is the height. Every lattice rule is written for columns, so
+ * a transposed slot runs them on its placements with the two axes swapped.
+ */
+val SlotContent.latticeTransposed: Boolean
+    get() = (viewportMode as? ViewportMode.Scroll)?.horizontal == true
+
+/** This placement with its two axes swapped. */
+internal fun Placement.transposed(): Placement = copy(x = y, y = x, width = height, height = width)
+
+/** Every placement in the slot with its two axes swapped. Twice is the identity. */
+internal fun SlotContent.transposedPlacements(): SlotContent =
+    copy(widgets = widgets.map { w -> w.placement?.let { w.copy(placement = it.transposed()) } ?: w })

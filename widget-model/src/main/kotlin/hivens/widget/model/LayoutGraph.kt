@@ -189,7 +189,7 @@ fun LayoutGraph.moveWidget(
     // widget that walks in and a widget that was already there are placed by
     // one rule.
     val seeded = if (target.flow == null && widget.placement == null) {
-        widget.copy(placement = seedPlacement(target.widgets.size, target.grid, target.widgets))
+        widget.copy(placement = seedPlacement(target.widgets.size, target.grid, target.widgets, target.latticeTransposed))
     } else {
         widget
     }
@@ -260,7 +260,7 @@ fun LayoutGraph.setFlow(path: SlotPath, flow: FlowSpec?): LayoutGraph =
     mutate(path) { content ->
         if (content.flow == flow) return@mutate content
         if (flow != null) return@mutate content.copy(flow = flow)
-        content.copy(flow = null, widgets = seedPlacements(content.widgets, content.grid))
+        content.copy(flow = null, widgets = seedPlacements(content.widgets, content.grid, content.latticeTransposed))
     }
 
 /**
@@ -280,11 +280,20 @@ fun LayoutGraph.setGrid(path: SlotPath, grid: Int): LayoutGraph =
  * Sets how the slot shows what does not fit in it. A static record normalizes to
  * null, so a slot put back to static leaves the file as it was before anybody
  * touched it.
+ *
+ * A lattice that starts or stops scrolling sideways has its placements swapped
+ * across the diagonal, because the count it carries changes from columns to rows.
+ * Left as they were, every widget past the new last row would be drawn in that
+ * row on top of the others. Swapped, each one lands in a line that exists, and
+ * swapping back on the way out gives the arrangement back exactly.
  */
 fun LayoutGraph.setViewport(path: SlotPath, viewport: ViewportSpec?): LayoutGraph =
     mutate(path) { content ->
         val normalized = viewport?.takeUnless { it.mode == ViewportMode.Static }
-        if (content.viewport == normalized) content else content.copy(viewport = normalized)
+        if (content.viewport == normalized) return@mutate content
+        val next = content.copy(viewport = normalized)
+        val lattice = content.flow == null && content.grid > 0
+        if (lattice && next.latticeTransposed != content.latticeTransposed) next.transposedPlacements() else next
     }
 
 // ── Placement ────────────────────────────────────────────────────────
@@ -376,7 +385,18 @@ private fun LayoutGraph.updatePlacement(
  * origin. A lattice takes the first free cell in reading order, so widgets land
  * the way they read. Pure and deterministic, so the cascade is unit-testable.
  */
-fun seedPlacement(index: Int, grid: Int, existing: List<WidgetInstance> = emptyList()): Placement {
+fun seedPlacement(
+    index: Int,
+    grid: Int,
+    existing: List<WidgetInstance> = emptyList(),
+    transposed: Boolean = false,
+): Placement {
+    // A lattice counting rows takes the first free cell down its first column,
+    // which is reading order with the axes swapped.
+    if (transposed && grid > 0) {
+        val flipped = existing.map { w -> w.placement?.let { w.copy(placement = it.transposed()) } ?: w }
+        return seedPlacement(index, grid, flipped).transposed()
+    }
     if (grid <= 0) {
         val columns = 3
         return Placement(
@@ -392,12 +412,12 @@ fun seedPlacement(index: Int, grid: Int, existing: List<WidgetInstance> = emptyL
 }
 
 /** Fills in a position for every widget that carries none, leaving the rest alone. */
-fun seedPlacements(widgets: List<WidgetInstance>, grid: Int): List<WidgetInstance> {
+fun seedPlacements(widgets: List<WidgetInstance>, grid: Int, transposed: Boolean = false): List<WidgetInstance> {
     if (widgets.none { it.placement == null }) return widgets
     val settled = widgets.filter { it.placement != null }.toMutableList()
     return widgets.mapIndexed { index, w ->
         if (w.placement != null) return@mapIndexed w
-        val seeded = w.copy(placement = seedPlacement(index, grid, settled))
+        val seeded = w.copy(placement = seedPlacement(index, grid, settled, transposed))
         settled.add(seeded)
         seeded
     }
@@ -427,7 +447,10 @@ private fun occupiesCell(taken: List<Placement>, col: Int, row: Int): Boolean =
  * allowed, because the model is a snap grid laid over free placement and not a
  * packer. Identity when nothing moves.
  */
-fun placeInGrid(content: SlotContent, movedId: String, target: Placement, columns: Int): SlotContent {
+fun placeInGrid(content: SlotContent, movedId: String, target: Placement, columns: Int): SlotContent =
+    acrossLattice(content) { across, flip -> placeAcross(across, movedId, if (flip) target.transposed() else target, columns) }
+
+private fun placeAcross(content: SlotContent, movedId: String, target: Placement, columns: Int): SlotContent {
     val cols = columns.coerceIn(1, GRID_MAX)
     val seeded = seedPlacements(content.widgets, cols)
     val w = target.spanW().coerceIn(1f, cols.toFloat())
@@ -448,7 +471,24 @@ fun placeInGrid(content: SlotContent, movedId: String, target: Placement, column
  * clamped to the largest span that stays free. Other widgets are fixed, so a
  * resize never evicts a neighbour.
  */
-fun resizeInGrid(content: SlotContent, movedId: String, width: Float, height: Float, columns: Int): SlotContent {
+fun resizeInGrid(content: SlotContent, movedId: String, width: Float, height: Float, columns: Int): SlotContent =
+    acrossLattice(content) { across, flip ->
+        if (flip) resizeAcross(across, movedId, height, width, columns) else resizeAcross(across, movedId, width, height, columns)
+    }
+
+/**
+ * Runs a lattice rule written for columns on [content], swapping the axes first
+ * and back afterwards when the lattice counts rows. Identity is kept: a rule that
+ * moved nothing hands back the very object it was given, and so does this.
+ */
+private fun acrossLattice(content: SlotContent, rule: (SlotContent, Boolean) -> SlotContent): SlotContent {
+    if (!content.latticeTransposed) return rule(content, false)
+    val flipped = content.transposedPlacements()
+    val out = rule(flipped, true)
+    return if (out === flipped) content else out.transposedPlacements()
+}
+
+private fun resizeAcross(content: SlotContent, movedId: String, width: Float, height: Float, columns: Int): SlotContent {
     val cols = columns.coerceIn(1, GRID_MAX)
     val seeded = seedPlacements(content.widgets, cols)
     val cur = seeded.firstOrNull { it.instanceId == movedId }?.placement ?: Placement()

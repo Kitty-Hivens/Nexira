@@ -13,6 +13,7 @@ import hivens.widget.model.SlotPath
 import hivens.widget.model.SurfaceId
 import hivens.widget.model.SurfaceInsets
 import hivens.widget.model.SurfaceSpec
+import hivens.widget.model.ViewportSpec
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
 import hivens.widget.model.insertWidget
@@ -23,6 +24,7 @@ import hivens.widget.model.reorderInSlot
 import hivens.widget.model.resizeWidgetInGrid
 import hivens.widget.model.setFlow
 import hivens.widget.model.setGrid
+import hivens.widget.model.setViewport
 import hivens.widget.model.setWidgetAnchor
 import hivens.widget.model.setWidgetBounds
 import hivens.widget.model.setWidgetOffset
@@ -255,6 +257,11 @@ class EditModeController(
     // null hands that to the children and seeds one onto any that carries none.
     fun setFlow(path: SlotPath, flow: FlowSpec?) {
         scope.launch(writeDispatcher) { edit(key = null) { it.setFlow(path, flow) } }
+    }
+
+    // How the slot shows what does not fit. Null and a static record both clear it.
+    fun setViewport(path: SlotPath, viewport: ViewportSpec?) {
+        scope.launch(writeDispatcher) { edit(key = null) { it.setViewport(path, viewport) } }
     }
 
     // Nudges the line length of a wrapped flow. Reads the current value from the

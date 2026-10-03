@@ -50,7 +50,10 @@ import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.model.SlotContent
 import hivens.widget.model.FlowSpec
 import hivens.widget.model.SlotPath
+import hivens.widget.model.ViewportMode
+import hivens.widget.model.ViewportSpec
 import hivens.widget.model.traverse
+import hivens.widget.model.viewportMode
 import kotlin.math.roundToInt
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxColor
@@ -246,6 +249,40 @@ internal fun SlotLayoutMenuContent(
     } else {
         SlotNumberRow(s.editorSlotGridColumns, live.grid, s, { controller.nudgeGrid(path, -1) }, { controller.nudgeGrid(path, 1) })
     }
+
+    // How the slot shows what does not fit, which is a separate question from how
+    // it arranges what it holds: any of the four shapes above can scroll or not.
+    // Static is first and is what every slot is until somebody says otherwise.
+    val mode = live.viewportMode
+    val bar = live.viewport?.scrollbar ?: true
+    MenuSectionTitle(s.editorSlotViewportTitle)
+    NxMenuItem(s.editorViewportStatic, selected = mode == ViewportMode.Static) {
+        controller.setViewport(path, null); onClose()
+    }
+    NxMenuItem(s.editorViewportDown, selected = mode == ViewportMode.Scroll(horizontal = false)) {
+        controller.setViewport(path, ViewportSpec.ScrollDown.copy(scrollbar = bar)); onClose()
+    }
+    NxMenuItem(s.editorViewportRight, selected = mode == ViewportMode.Scroll(horizontal = true)) {
+        controller.setViewport(path, ViewportSpec.ScrollRight.copy(scrollbar = bar)); onClose()
+    }
+    // Stays open: it is a setting of the scroll just picked, and a reader flipping
+    // it wants to see the bar come and go without reopening the menu.
+    val current = live.viewport
+    if (mode is ViewportMode.Scroll && current != null) {
+        NxMenuItem(s.editorViewportScrollbar, selected = bar) {
+            controller.setViewport(path, current.copy(scrollbar = !bar))
+        }
+    }
+}
+
+@Composable
+private fun MenuSectionTitle(text: String) {
+    Text(
+        text     = text,
+        style    = MaterialTheme.typography.labelSmall,
+        color    = NxInk.quiet,
+        modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 2.dp),
+    )
 }
 
 /** Default line length a slot takes when it becomes a wrapped flow. */

@@ -137,6 +137,21 @@ class SlotViewportGeometryTest {
     }
 
     @Test
+    fun `a page is as long as a far widget from its first frame`() {
+        // Held to a length measured last frame, the page crept out to a far widget a
+        // widget's height at a time, and this one would have taken two hundred frames.
+        val page = Probe(
+            SlotContent(
+                widgets = listOf(widget("a", "fill.a", Placement(x = 0f, y = 5000f, width = 50f, height = 50f))),
+                flow = null,
+                viewport = ViewportSpec.ScrollDown,
+            ),
+        )
+        page.wheel(down = 5000f)
+        assertEquals(A, page.at(25, 175), "the page stopped short of the widget")
+    }
+
+    @Test
     fun `a placed widget inside the first screen leaves the page one screen long`() {
         val page = Probe(
             SlotContent(

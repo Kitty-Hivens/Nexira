@@ -5,7 +5,11 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.ProvidableCompositionLocal
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
@@ -285,9 +289,45 @@ typealias ViewportScrollbar = @Composable BoxScope.(state: ScrollState, horizont
 val LocalViewportScrollbar: ProvidableCompositionLocal<ViewportScrollbar> =
     staticCompositionLocalOf { { _, _, _ -> } }
 
+/**
+ * The nearest scrolling slot above, for a gesture that has to move it.
+ *
+ * An editor dragging a widget toward the edge of a page has to scroll the page
+ * under it, or the only way to put a widget below the fold is to drop it at the
+ * edge, scroll, and drag again. The kernel owns the scroll position and the editor
+ * owns the gesture, so the slot hands out this much and no more: which way it
+ * moves, where it is on screen, and a way to move it.
+ */
+@Stable
+class ViewportHandle(val horizontal: Boolean, private val state: ScrollState) {
+    /** The slot's box on screen, in window px. */
+    var bounds: Rect by mutableStateOf(Rect.Zero)
+        internal set
+
+    /** Moves the content by [px] along the axis, and says how far it actually went. */
+    fun scrollBy(px: Float): Float = state.dispatchRawDelta(px)
+}
+
+val LocalViewport: ProvidableCompositionLocal<ViewportHandle?> = compositionLocalOf { null }
+
+/**
+ * Which axis the placement slot currently rendering scrolls along: false down,
+ * true sideways, null when it does not scroll. Published by each placement slot
+ * for its own widgets, so the editor's clamp holds a widget off the start of a
+ * page and lets it go as far along it as it likes, the way the renderer does.
+ */
+val LocalPlacementScrollAxis: ProvidableCompositionLocal<Boolean?> = compositionLocalOf { null }
+
 // Editor-only hook: SlotRenderer's placement branch reports its window bounds
 // here so a palette drop can land at the release point (converted to slot-local dp).
 // Default no-op; the editor host provides one that registers into the
 // DropTargetRegistry.
-val LocalSlotBoundsReporter: ProvidableCompositionLocal<(SlotPath, Rect) -> Unit> =
-    staticCompositionLocalOf { { _, _ -> } }
+//
+// Two rects, because a slot that scrolls has two answers. [visible] is what is on
+// screen, clipped to the viewport, and is what a pointer can be over. [content]
+// is the whole placement box, most of it off screen, and is what a point converts
+// against: a drop on a page scrolled down by a screen lands a screen down.
+typealias SlotBoundsReporter = (path: SlotPath, visible: Rect, content: Rect) -> Unit
+
+val LocalSlotBoundsReporter: ProvidableCompositionLocal<SlotBoundsReporter> =
+    staticCompositionLocalOf { { _, _, _ -> } }

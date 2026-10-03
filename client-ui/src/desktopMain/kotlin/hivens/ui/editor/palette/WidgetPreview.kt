@@ -398,7 +398,7 @@ internal fun PreviewEnvironment(data: WidgetDataRegistry, content: @Composable (
         LocalWidgetServiceRegistry provides ownServices,
         LocalWidgetStateHost provides DiscardedState,
         LocalEmptySlotDecorator provides {},
-        LocalSlotBoundsReporter provides { _, _ -> },
+        LocalSlotBoundsReporter provides { _, _, _ -> },
         LocalSlotChromeModifier provides { _, _ -> Modifier },
         LocalWidgetDecorator provides { _, _, _, _, inner -> inner() },
         LocalUnknownWidgetDecorator provides { _, _, _ -> },

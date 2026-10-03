@@ -254,6 +254,8 @@ private fun resizeAxis(
 // Target cell for a lattice MOVE drag: the widget's start cell shifted by the
 // accumulated pointer delta rounded to whole cells (stride = cell width + gutter).
 // Column clamps inside the grid; row only floors at 0 (the grid grows downward).
+// A [transposed] lattice counts rows and grows to the right, so there the row is
+// the one held inside and the column only floors.
 internal fun gridDragCell(
     startCol: Int,
     startRow: Int,
@@ -263,7 +265,12 @@ internal fun gridDragCell(
     cellWidthDp: Float,
     gutterDp: Float,
     columns: Int,
+    transposed: Boolean = false,
 ): Pair<Int, Int> {
+    if (transposed) {
+        val (row, col) = gridDragCell(startRow, startCol, accumYPx, accumXPx, density, cellWidthDp, gutterDp, columns)
+        return col to row
+    }
     val stride = cellWidthDp + gutterDp
     if (stride <= 0f || density <= 0f) return startCol to startRow
     val col = (startCol + ((accumXPx / density) / stride).roundToInt()).coerceIn(0, (columns - 1).coerceAtLeast(0))
@@ -283,10 +290,44 @@ internal fun gridResizeSpan(
     cellWidthDp: Float,
     gutterDp: Float,
     columns: Int,
+    transposed: Boolean = false,
 ): Pair<Int, Int> {
+    if (transposed) {
+        val (rowSpan, colSpan) = gridResizeSpan(startRowSpan, startColSpan, accumYPx, accumXPx, density, cellWidthDp, gutterDp, columns)
+        return colSpan to rowSpan
+    }
     val stride = cellWidthDp + gutterDp
     if (stride <= 0f || density <= 0f) return startColSpan to startRowSpan
     val colSpan = (startColSpan + ((accumXPx / density) / stride).roundToInt()).coerceIn(1, columns.coerceAtLeast(1))
     val rowSpan = (startRowSpan + ((accumYPx / density) / stride).roundToInt()).coerceAtLeast(1)
     return colSpan to rowSpan
 }
+
+/**
+ * How far to scroll a page this frame while something is dragged near its edge,
+ * in px along its axis: negative toward the start, positive toward the end, zero
+ * away from both.
+ *
+ * Proportional to how deep the pointer is into the edge zone, so a widget eased
+ * toward the edge creeps and one pushed into it runs, and past the edge it runs at
+ * full speed. Without it, putting a widget below the fold took a drop at the edge,
+ * a scroll, and a second drag.
+ *
+ * [pointerPx] and the two edges are in the same window coordinates. A page shorter
+ * than two zones answers zero, because there both zones are the whole page and any
+ * position would scroll it.
+ */
+internal fun autoScrollStep(pointerPx: Float, startPx: Float, endPx: Float, zonePx: Float, maxStepPx: Float): Float {
+    if (zonePx <= 0f || endPx - startPx < zonePx * 2f) return 0f
+    val intoStart = startPx + zonePx - pointerPx
+    if (intoStart > 0f) return -maxStepPx * (intoStart / zonePx).coerceAtMost(1f)
+    val intoEnd = pointerPx - (endPx - zonePx)
+    if (intoEnd > 0f) return maxStepPx * (intoEnd / zonePx).coerceAtMost(1f)
+    return 0f
+}
+
+/** How close to a page's edge a drag has to come before the page moves. */
+internal const val AUTO_SCROLL_ZONE_DP = 56f
+
+/** The fastest a page moves under a drag, per frame. */
+internal const val AUTO_SCROLL_MAX_STEP_DP = 18f
