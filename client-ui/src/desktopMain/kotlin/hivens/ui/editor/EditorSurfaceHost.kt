@@ -57,11 +57,13 @@ import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.isSecondaryPressed
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
@@ -92,7 +94,6 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.layout.LayoutGraphRepository
 import hivens.ui.layout.LayoutReconcile
-import hivens.ui.nx.AdaptiveWidth
 import hivens.ui.nx.NxContextMenu
 import hivens.ui.nx.NxMenuItem
 import hivens.ui.nx.WidthClass
@@ -1003,15 +1004,12 @@ private fun EditModePill(
         exit     = fadeOut(tween(motionMs)) + slideOutVertically(tween(motionMs)) { -it },
         modifier = modifier,
     ) {
-        AdaptiveWidth { _, maxWidth ->
-            // The pill goes icon-only below this width: the full-label set (with
-            // the surface-settings gear added) overflows around the 960dp min
-            // window, where the "Esc -- exit" hint got squeezed into a vertical
-            // staircase. Threshold on the measured width, not the coarse
-            // WidthClass, so it tracks the real chip count -- and the family
-            // chips are words rather than icons, so a surface that shows them
-            // needs the rest to give up their labels sooner.
-            val compact = maxWidth < if (families.size > 1) 1500.dp else 1350.dp
+        // The pill goes icon-only when the labelled one does not fit, measured rather
+        // than guessed. A width threshold was right for one set of chips and wrong
+        // the moment a chip or a surface tab was added: the labelled pill ran past
+        // the window and the "Esc -- exit" hint was squeezed into a vertical
+        // staircase that made the whole pill five rows tall.
+        FitOrCompact { compact ->
             NxSurface(
                 kind  = SurfaceKind.Popup,
                 shape = RoundedCornerShape(20.dp),
@@ -1197,6 +1195,23 @@ private fun EditModePill(
                     }
                 }
             }
+        }
+    }
+}
+
+/**
+ * Lays out [content] with labels when that fits the width it is given, and in its
+ * compact form when it does not. The labelled form is measured with no limit to
+ * find out, and only composed a second time, compact, when it is too wide.
+ */
+@Composable
+private fun FitOrCompact(content: @Composable (compact: Boolean) -> Unit) {
+    SubcomposeLayout { constraints ->
+        val full = subcompose(false) { content(false) }.map { it.measure(Constraints()) }
+        val fits = (full.maxOfOrNull { it.width } ?: 0) <= constraints.maxWidth
+        val chosen = if (fits) full else subcompose(true) { content(true) }.map { it.measure(constraints.copy(minWidth = 0)) }
+        layout(chosen.maxOfOrNull { it.width } ?: 0, chosen.maxOfOrNull { it.height } ?: 0) {
+            chosen.forEach { it.place(0, 0) }
         }
     }
 }
