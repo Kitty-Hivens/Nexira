@@ -2,6 +2,7 @@ package hivens.ui.nx
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.HorizontalScrollbar
 import androidx.compose.foundation.ScrollbarStyle
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.v2.ScrollbarAdapter
@@ -40,6 +41,14 @@ fun NxVerticalScrollbar(
     revealed: Boolean,
     modifier: Modifier = Modifier,
 ) = VerticalScrollbar(adapter = adapter, modifier = modifier, style = autoHideStyle(revealed))
+
+/** [NxVerticalScrollbar] laid along the bottom edge, for content that scrolls sideways. */
+@Composable
+fun NxHorizontalScrollbar(
+    adapter: ScrollbarAdapter,
+    revealed: Boolean,
+    modifier: Modifier = Modifier,
+) = HorizontalScrollbar(adapter = adapter, modifier = modifier, style = autoHideStyle(revealed))
 
 @Composable
 private fun autoHideStyle(revealed: Boolean): ScrollbarStyle {

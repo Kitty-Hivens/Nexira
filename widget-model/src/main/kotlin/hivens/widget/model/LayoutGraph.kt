@@ -46,12 +46,17 @@ data class WidgetInstance(
  * A slot in flow mode ignores [grid], and a slot in placement mode ignores
  * [flow] by being null. Neither is cleared when the mode changes, so flipping a
  * slot and flipping it back costs nothing.
+ *
+ * [viewport] is how the slot shows what does not fit in it, independent of the
+ * arrangement: a flow and a placement slot can each be static or scroll. Null is
+ * static.
  */
 @Serializable
 data class SlotContent(
     val widgets: List<WidgetInstance> = emptyList(),
     val flow: FlowSpec? = FlowSpec.Column,
     val grid: Int = 0,
+    val viewport: ViewportSpec? = null,
 )
 
 /** Upper bound for [SlotContent.grid] and for [FlowSpec.wrap]; the steppers clamp to it. */
@@ -269,6 +274,17 @@ fun LayoutGraph.setGrid(path: SlotPath, grid: Int): LayoutGraph =
     mutate(path) { content ->
         val coerced = grid.coerceIn(0, GRID_MAX)
         if (content.grid == coerced) content else content.copy(grid = coerced)
+    }
+
+/**
+ * Sets how the slot shows what does not fit in it. A static record normalizes to
+ * null, so a slot put back to static leaves the file as it was before anybody
+ * touched it.
+ */
+fun LayoutGraph.setViewport(path: SlotPath, viewport: ViewportSpec?): LayoutGraph =
+    mutate(path) { content ->
+        val normalized = viewport?.takeUnless { it.mode == ViewportMode.Static }
+        if (content.viewport == normalized) content else content.copy(viewport = normalized)
     }
 
 // ── Placement ────────────────────────────────────────────────────────

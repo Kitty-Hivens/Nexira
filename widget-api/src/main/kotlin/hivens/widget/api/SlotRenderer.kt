@@ -2,19 +2,30 @@ package hivens.widget.api
 
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -24,18 +35,25 @@ import androidx.compose.runtime.movableContentOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.isFinite
 import kotlin.math.abs
+import kotlin.math.max
 import hivens.widget.model.FlowPlacement
 import hivens.widget.model.FlowSpec
 import hivens.widget.model.GRID_MAX
@@ -47,6 +65,7 @@ import hivens.widget.model.SlotPath
 import hivens.widget.model.SurfaceId
 import hivens.widget.model.SurfaceInsets
 import hivens.widget.model.WidgetInstance
+import hivens.widget.model.ViewportMode
 import hivens.widget.model.WidgetSizing
 import hivens.widget.model.anchorHorizontalBias
 import hivens.widget.model.anchorVerticalBias
@@ -54,6 +73,7 @@ import hivens.widget.model.clampPlacementAxis
 import hivens.widget.model.flowPlacement
 import hivens.widget.model.parseAnchor
 import hivens.widget.model.traverse
+import hivens.widget.model.viewportMode
 
 // Renders every widget at the addressed slot. Two entry forms:
 //
@@ -71,8 +91,13 @@ import hivens.widget.model.traverse
 // The slot OWNS its intra-slot layout, and owns it in one of two modes rather
 // than one of five names. A flow derives each child's position from the
 // sequence; a placement slot reads it off the child. The surface passes
-// `modifier` for inter-slot positioning (weight / fill / padding / scroll) and
-// `spacing` for the gap between children, which in a lattice is the gutter.
+// `modifier` for inter-slot positioning (weight / fill / padding), `spacing` for
+// the gap between children, which in a lattice is the gutter, and
+// `contentPadding` for room inside the slot that the content scrolls through.
+//
+// Whether the slot scrolls is the slot's own record (SlotContent.viewport), not
+// the surface's, so a surface never wraps a slot in a scroll of its own: the
+// kernel is what knows how a widget has to be measured once an axis is unbounded.
 //
 // Each widget renders through LocalWidgetDecorator. Default decorator is
 // identity -- zero cost when no editor is mounted. A widget whose kind is
@@ -86,6 +111,7 @@ fun SlotRenderer(
     slot: SlotId,
     modifier: Modifier = Modifier,
     spacing: Dp = 0.dp,
+    contentPadding: PaddingValues = NO_PADDING,
 ) {
     // The family is resolved here rather than taken from an argument so a surface
     // that switches families does not have to thread the id through every slot it
@@ -93,7 +119,7 @@ fun SlotRenderer(
     // general one without saying so.
     val path = SlotPath(surface, slot, family = activeFamilyOf(surface))
     CompositionLocalProvider(LocalSlotPath provides path) {
-        RenderSlotContent(path, modifier, spacing)
+        RenderSlotContent(path, modifier, spacing, contentPadding)
     }
 }
 
@@ -103,42 +129,158 @@ fun SlotRenderer(
     slot: SlotId,
     modifier: Modifier = Modifier,
     spacing: Dp = 0.dp,
+    contentPadding: PaddingValues = NO_PADDING,
 ) {
     val parentPath = LocalSlotPath.current
     val childPath = parentPath.child(parent.instanceId, slot)
     CompositionLocalProvider(LocalSlotPath provides childPath) {
-        RenderSlotContent(childPath, modifier, spacing)
+        RenderSlotContent(childPath, modifier, spacing, contentPadding)
     }
 }
 
+private val NO_PADDING = PaddingValues(0.dp)
+
+// Padding only when there is some, so the slots that ask for none, which is nearly
+// all of them, do not each carry a node that does nothing.
+private fun Modifier.inset(padding: PaddingValues): Modifier =
+    if (padding == NO_PADDING) this else this.padding(padding)
+
 @Composable
-private fun RenderSlotContent(path: SlotPath, modifier: Modifier, spacing: Dp) {
+private fun RenderSlotContent(path: SlotPath, modifier: Modifier, spacing: Dp, contentPadding: PaddingValues) {
     val graph = LocalLayoutGraph.current
-    val registry = LocalWidgetRegistry.current
-    val decorator = LocalWidgetDecorator.current
-    val emptyDecorator = LocalEmptySlotDecorator.current
-    val unknownDecorator = LocalUnknownWidgetDecorator.current
     val slotChrome = LocalSlotChromeModifier.current
-    val motionMs = LocalSlotMotionMs.current
 
     val content: SlotContent = graph.traverse(path) ?: SlotContent()
-    val address = path.leafAddress
+    val chrome = slotChrome(path, content)
 
     if (content.widgets.isEmpty()) {
         // Occupy the slot footprint (inter-slot sizing lives in `modifier`)
         // so an empty slot keeps its place; the empty decorator paints the
         // edit-mode placeholder, or nothing.
-        Box(slotChrome(path, content).then(modifier)) { emptyDecorator(address) }
+        val emptyDecorator = LocalEmptySlotDecorator.current
+        Box(chrome.then(modifier)) { emptyDecorator(path.leafAddress) }
         return
     }
 
-    val flow = content.flow
-    if (flow == null) {
-        PlacementSlot(path, content, address, registry, decorator, unknownDecorator, slotChrome, modifier, spacing)
-    } else {
-        FlowSlot(flow, content, address, registry, decorator, unknownDecorator, slotChrome(path, content), modifier, spacing, motionMs)
+    when (val mode = content.viewportMode) {
+        // The chrome goes on the viewport, which is the slot as anybody sees it, and
+        // not on the content inside, which is taller than the slot and mostly off it.
+        is ViewportMode.Scroll -> ScrollViewport(
+            horizontal = mode.horizontal,
+            scrollbar = content.viewport?.scrollbar != false,
+            outer = chrome.then(modifier),
+            contentPadding = contentPadding,
+        ) { scroll, inner ->
+            SlotBody(path, content, inner, spacing, scroll)
+        }
+        ViewportMode.Static -> SlotBody(path, content, chrome.then(modifier).inset(contentPadding), spacing, scroll = null)
     }
 }
+
+@Composable
+private fun SlotBody(path: SlotPath, content: SlotContent, outer: Modifier, spacing: Dp, scroll: ScrollAxis?) {
+    val registry = LocalWidgetRegistry.current
+    val decorator = LocalWidgetDecorator.current
+    val unknownDecorator = LocalUnknownWidgetDecorator.current
+    val address = path.leafAddress
+    val flow = content.flow
+    if (flow == null) {
+        PlacementSlot(path, content, address, registry, decorator, unknownDecorator, outer, spacing, scroll)
+    } else {
+        FlowSlot(flow, content, address, registry, decorator, unknownDecorator, outer, spacing, LocalSlotMotionMs.current, scroll)
+    }
+}
+
+// ── Viewport ─────────────────────────────────────────────────────────
+
+/**
+ * The axis a slot scrolls on, and how long one screen of it is.
+ *
+ * Handed to the two arrangements as an argument and never through a composition
+ * local, because it describes THIS slot's content: a placement slot inside a
+ * widget inside a scrolling page is not itself scrolling, and a local would have
+ * told it that it was.
+ */
+private data class ScrollAxis(val horizontal: Boolean, val extent: Dp)
+
+/**
+ * A slot that is unbounded along one axis and moves along it.
+ *
+ * The box is the slot's own footprint, sized by the surface like any other slot.
+ * Inside it the content is measured with no limit on the scrolling axis and moved
+ * under the box, which is what makes a page longer than the window.
+ *
+ * A slot given no bound on that axis by its parent (a scrolling slot nested in
+ * another that scrolls the same way, inside a widget that declared no ceiling)
+ * has no screen to scroll against, so it lays out as static and the outer one
+ * does the scrolling.
+ *
+ * The position is saved, so a page left and come back to opens where it was left.
+ * The router keeps saved state per destination, which is what this rides on.
+ */
+@Composable
+private fun ScrollViewport(
+    horizontal: Boolean,
+    scrollbar: Boolean,
+    outer: Modifier,
+    contentPadding: PaddingValues,
+    body: @Composable (ScrollAxis?, Modifier) -> Unit,
+) {
+    val interaction = remember { MutableInteractionSource() }
+    val hovered by interaction.collectIsHoveredAsState()
+    val direction = LocalLayoutDirection.current
+    BoxWithConstraints(outer.hoverable(interaction)) {
+        val along = if (horizontal) maxWidth else maxHeight
+        if (!along.isFinite) {
+            body(null, Modifier.inset(contentPadding))
+            return@BoxWithConstraints
+        }
+        val state = rememberSaveable(saver = ScrollState.Saver) { ScrollState(0) }
+        val padding = if (horizontal) {
+            contentPadding.calculateStartPadding(direction) + contentPadding.calculateEndPadding(direction)
+        } else {
+            contentPadding.calculateTopPadding() + contentPadding.calculateBottomPadding()
+        }
+        val extent = (along - padding).coerceAtLeast(0.dp)
+        val parent = LocalViewportExtent.current
+        val here = if (horizontal) parent.copy(width = extent) else parent.copy(height = extent)
+        val scroller = if (horizontal) {
+            Modifier.horizontalScroll(state).fillMaxHeight()
+        } else {
+            Modifier.verticalScroll(state).fillMaxWidth()
+        }
+        CompositionLocalProvider(LocalViewportExtent provides here) {
+            body(ScrollAxis(horizontal, extent), scroller.inset(contentPadding))
+        }
+        if (scrollbar) {
+            val bar = LocalViewportScrollbar.current
+            bar(state, horizontal, hovered || state.isScrollInProgress)
+        }
+    }
+}
+
+/**
+ * How a flow line hands out a weight, given the size rules of the widget taking it.
+ *
+ * Across a bounded axis it is Compose's own weight: a share of what the line has
+ * left. Along a scrolling axis nothing is left, the axis has no end, and Compose
+ * answers a weight there with nothing at all. So there it is a share of one screen:
+ * a hero weighted 1 alone in its line is exactly the first screen, two weighted
+ * 1 and 1 are half a screen each, and everything natural around them adds to the
+ * page instead of squeezing them. Never below what the widget declared it needs.
+ */
+private typealias Weigh = (weight: Float, sizing: WidgetSizing) -> Modifier
+
+private fun viewportShare(scroll: ScrollAxis, totalWeight: Float): Weigh = { weight, sizing ->
+    val share = if (totalWeight > 0f) scroll.extent * (weight / totalWeight) else scroll.extent
+    val floor = (if (scroll.horizontal) sizing.minWidth else sizing.minHeight).dp
+    val size = maxOf(share, floor)
+    if (scroll.horizontal) Modifier.width(size) else Modifier.height(size)
+}
+
+/** Total weight of the weighted children in [line], for sharing one screen between them. */
+private fun totalWeight(line: List<WidgetInstance>): Float =
+    line.sumOf { (it.flowPlacement() as? FlowPlacement.Weighted)?.weight?.toDouble() ?: 0.0 }.toFloat()
 
 // ── Flow ─────────────────────────────────────────────────────────────
 
@@ -155,22 +297,30 @@ private fun FlowSlot(
     registry: WidgetRegistry,
     decorator: WidgetDecorator,
     unknownDecorator: UnknownWidgetDecorator,
-    chrome: Modifier,
-    modifier: Modifier,
+    outerModifier: Modifier,
     spacing: Dp,
     motionMs: Int,
+    scroll: ScrollAxis?,
 ) {
-    val outer = chrome.then(modifier).animatedReflow(motionMs)
+    val outer = outerModifier.animatedReflow(motionMs)
     val lineLength = flow.wrap.coerceAtLeast(0)
+
+    // A line along the scrolling axis shares one screen between its weights; a line
+    // across it is bounded and keeps Compose's own weight.
+    fun alongScroll(lineHorizontal: Boolean): ScrollAxis? = scroll?.takeIf { it.horizontal == lineHorizontal }
 
     if (lineLength == 0) {
         if (flow.horizontal) {
             Row(outer, horizontalArrangement = Arrangement.spacedBy(spacing)) {
-                FlowWidgets(address, content.widgets, registry, decorator, unknownDecorator) { Modifier.weight(it) }
+                val weigh: Weigh = alongScroll(true)?.let { viewportShare(it, totalWeight(content.widgets)) }
+                    ?: { w, _ -> Modifier.weight(w) }
+                FlowWidgets(address, content.widgets, registry, decorator, unknownDecorator, weigh)
             }
         } else {
             Column(outer, verticalArrangement = Arrangement.spacedBy(spacing)) {
-                FlowWidgets(address, content.widgets, registry, decorator, unknownDecorator) { Modifier.weight(it) }
+                val weigh: Weigh = alongScroll(false)?.let { viewportShare(it, totalWeight(content.widgets)) }
+                    ?: { w, _ -> Modifier.weight(w) }
+                FlowWidgets(address, content.widgets, registry, decorator, unknownDecorator, weigh)
             }
         }
         return
@@ -185,10 +335,10 @@ private fun FlowSlot(
         Column(outer, verticalArrangement = Arrangement.spacedBy(spacing)) {
             lines.forEachIndexed { lineIndex, line ->
                 Row(horizontalArrangement = Arrangement.spacedBy(spacing)) {
-                    WrappedLine(address, line, lineIndex, lineLength, flow.uniform, registry, decorator, unknownDecorator) {
-                        Modifier.weight(it)
-                    }
-                    if (flow.uniform) repeat(lineLength - line.size) { Spacer(Modifier.weight(1f)) }
+                    val weigh: Weigh = alongScroll(true)?.let { viewportShare(it, lineLength.toFloat()) }
+                        ?: { w, _ -> Modifier.weight(w) }
+                    WrappedLine(address, line, lineIndex, lineLength, flow.uniform, registry, decorator, unknownDecorator, weigh)
+                    if (flow.uniform) repeat(lineLength - line.size) { Spacer(weigh(1f, WidgetSizing.UNDECLARED)) }
                 }
             }
         }
@@ -196,10 +346,10 @@ private fun FlowSlot(
         Row(outer, horizontalArrangement = Arrangement.spacedBy(spacing)) {
             lines.forEachIndexed { lineIndex, line ->
                 Column(verticalArrangement = Arrangement.spacedBy(spacing)) {
-                    WrappedLine(address, line, lineIndex, lineLength, flow.uniform, registry, decorator, unknownDecorator) {
-                        Modifier.weight(it)
-                    }
-                    if (flow.uniform) repeat(lineLength - line.size) { Spacer(Modifier.weight(1f)) }
+                    val weigh: Weigh = alongScroll(false)?.let { viewportShare(it, lineLength.toFloat()) }
+                        ?: { w, _ -> Modifier.weight(w) }
+                    WrappedLine(address, line, lineIndex, lineLength, flow.uniform, registry, decorator, unknownDecorator, weigh)
+                    if (flow.uniform) repeat(lineLength - line.size) { Spacer(weigh(1f, WidgetSizing.UNDECLARED)) }
                 }
             }
         }
@@ -213,7 +363,7 @@ private fun FlowWidgets(
     registry: WidgetRegistry,
     decorator: WidgetDecorator,
     unknownDecorator: UnknownWidgetDecorator,
-    weight: (Float) -> Modifier,
+    weigh: Weigh,
 ) {
     widgets.forEachIndexed { index, instance ->
         key(instance.instanceId) {
@@ -228,7 +378,7 @@ private fun FlowWidgets(
                 // Precedence lives on the model as flowPlacement(), so the rule is
                 // testable without a composition.
                 when (val placement = instance.flowPlacement()) {
-                    is FlowPlacement.Weighted -> Box(weight(placement.weight).then(pad)) {
+                    is FlowPlacement.Weighted -> Box(weigh(placement.weight, descriptor.sizing).then(pad)) {
                         decorator(address, index, descriptor, instance) { movable() }
                     }
                     is FlowPlacement.Bounded -> Box(boundedModifier(placement, descriptor.sizing).then(pad)) {
@@ -256,13 +406,13 @@ private fun WrappedLine(
     registry: WidgetRegistry,
     decorator: WidgetDecorator,
     unknownDecorator: UnknownWidgetDecorator,
-    weight: (Float) -> Modifier,
+    weigh: Weigh,
 ) {
     line.forEachIndexed { inLine, instance ->
         val index = lineIndex * lineLength + inLine
         key(instance.instanceId) {
             val descriptor = registry[instance.kind]
-            val cell: Modifier = if (uniform) weight(1f) else Modifier
+            val cell: Modifier = if (uniform) weigh(1f, descriptor?.sizing ?: WidgetSizing.UNDECLARED) else Modifier
             Box(cell) {
                 if (descriptor == null) {
                     unknownDecorator(address, index, instance)
@@ -312,6 +462,11 @@ private fun SurfaceInsets.asPadding(): PaddingValues = PaddingValues(
 // says which: 0 measures in dp, N measures in cells of an N-column lattice
 // whose cell size comes from the measured width, so a position survives a
 // window resize instead of being clipped on a narrow one.
+//
+// In a slot that scrolls, the lattice counts its lines across the bounded axis:
+// columns when the slot scrolls down, rows when it scrolls sideways, so the same
+// number in the same menu always means "this many across the side that does not
+// move", and the lattice grows along the side that does.
 @Composable
 private fun PlacementSlot(
     path: SlotPath,
@@ -320,13 +475,14 @@ private fun PlacementSlot(
     registry: WidgetRegistry,
     decorator: WidgetDecorator,
     unknownDecorator: UnknownWidgetDecorator,
-    slotChrome: SlotChromeModifier,
-    modifier: Modifier,
+    outer: Modifier,
     spacing: Dp,
+    scroll: ScrollAxis?,
 ) {
     val density = LocalDensity.current
     val reportSlotBounds = LocalSlotBoundsReporter.current
     val columns = content.grid.coerceIn(0, GRID_MAX)
+    val transposed = scroll?.horizontal == true
 
     // Two measurements, for two jobs, and they are not the same number.
     //
@@ -343,8 +499,7 @@ private fun PlacementSlot(
     // appears, and publishing a zero would switch the clamp off entirely.
     var measuredDp by remember { mutableStateOf(Size.Zero) }
     BoxWithConstraints(
-        slotChrome(path, content)
-            .then(modifier)
+        outer
             .onSizeChanged { sz ->
                 measuredDp = with(density) { Size(sz.width.toDp().value, sz.height.toDp().value) }
             }
@@ -361,12 +516,33 @@ private fun PlacementSlot(
             if (measuredDp.height > 0f) measuredDp.height else boundedHeight,
         )
         // One cell, gutters taken off first. Zero outside a lattice, and zero in a
-        // slot with no bounded width, where a fraction of the width has nothing to
-        // be a fraction of.
-        val cell: Float = if (columns > 0 && boundedWidth > 0f) {
-            ((boundedWidth - spacing.value * (columns + 1)) / columns).coerceAtLeast(0f)
+        // slot whose lattice axis is unbounded, where a fraction of it has nothing
+        // to be a fraction of.
+        val across = if (transposed) boundedHeight else boundedWidth
+        val cell: Float = if (columns > 0 && across > 0f) {
+            ((across - spacing.value * (columns + 1)) / columns).coerceAtLeast(0f)
         } else {
             0f
+        }
+
+        val placed: @Composable (position: (PlacedAt) -> Modifier) -> Unit = { position ->
+            content.widgets.withIndex()
+                .sortedWith(compareBy({ it.value.placement?.z ?: 0 }, { it.index }))
+                .forEach { (index, instance) ->
+                    key(instance.instanceId) {
+                        val p = instance.placement ?: Placement()
+                        val descriptor = registry[instance.kind]
+                        val sizing = descriptor?.sizing ?: WidgetSizing.UNDECLARED
+                        PlacedBox(p, columns, cell, spacing.value, clampSize, sizing, scroll?.horizontal, position) {
+                            if (descriptor == null) {
+                                unknownDecorator(address, index, instance)
+                            } else {
+                                val movable = rememberWidgetMovable(descriptor, instance, index)
+                                decorator(address, index, descriptor, instance) { movable() }
+                            }
+                        }
+                    }
+                }
         }
 
         CompositionLocalProvider(
@@ -375,26 +551,71 @@ private fun PlacementSlot(
             // carrying a zero cell reads as a lattice to the editor and then
             // answers every pointer delta with "no movement", which is a gesture
             // that is present and does nothing.
-            LocalGridGeometry provides if (columns > 0 && cell > 0f) GridGeometry(cell, spacing.value, columns) else null,
+            LocalGridGeometry provides if (columns > 0 && cell > 0f) GridGeometry(cell, spacing.value, columns, transposed) else null,
         ) {
-            Box(Modifier.fillMaxSize()) {
-                content.widgets.withIndex()
-                    .sortedWith(compareBy({ it.value.placement?.z ?: 0 }, { it.index }))
-                    .forEach { (index, instance) ->
-                        key(instance.instanceId) {
-                            val p = instance.placement ?: Placement()
-                            val descriptor = registry[instance.kind]
-                            val sizing = descriptor?.sizing ?: WidgetSizing.UNDECLARED
-                            PlacedBox(p, columns, cell, spacing.value, clampSize, sizing) {
-                                if (descriptor == null) {
-                                    unknownDecorator(address, index, instance)
-                                } else {
-                                    val movable = rememberWidgetMovable(descriptor, instance, index)
-                                    decorator(address, index, descriptor, instance) { movable() }
-                                }
-                            }
-                        }
-                    }
+            if (scroll == null) {
+                Box(Modifier.fillMaxSize()) {
+                    placed { Modifier.align(it.alignment) }
+                }
+            } else {
+                ExtendingPlacement(scroll) {
+                    placed { Modifier.layoutId(it) }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Where a placed widget sits: its corner, the offset it is held at from that
+ * corner in dp, and whether that corner is the start of each axis.
+ */
+private data class PlacedAt(
+    val alignment: Alignment,
+    val heldX: Float,
+    val heldY: Float,
+    val startX: Boolean,
+    val startY: Boolean,
+)
+
+/**
+ * The placement box of a slot that scrolls: as long as its furthest widget, and
+ * never shorter than one screen.
+ *
+ * A plain box cannot answer that. It sizes itself from its children's sizes, and
+ * a placed widget's offset is applied by the widget's own modifier after the box
+ * has already decided, so a widget parked two screens down left a box one widget
+ * tall and a page that would not scroll to it. This places children exactly the
+ * way the box does, by their alignment against its final size, and measures the
+ * length first.
+ *
+ * Only a widget attached to the start of the scrolling axis decides the length.
+ * One attached to the middle or the far end is attached to the content's own
+ * edge, so it follows the length rather than setting it, and letting it set it
+ * would chase itself.
+ */
+@Composable
+private fun ExtendingPlacement(scroll: ScrollAxis, content: @Composable () -> Unit) {
+    Layout(content) { measurables, constraints ->
+        val loose = constraints.copy(minWidth = 0, minHeight = 0)
+        val placeables = measurables.map { it.measure(loose) }
+        val at = measurables.map { it.layoutId as? PlacedAt }
+        var length = scroll.extent.roundToPx()
+        placeables.forEachIndexed { i, p ->
+            val where = at[i] ?: return@forEachIndexed
+            if (!(if (scroll.horizontal) where.startX else where.startY)) return@forEachIndexed
+            val reach = if (scroll.horizontal) where.heldX.dp.roundToPx() + p.width else where.heldY.dp.roundToPx() + p.height
+            length = max(length, reach)
+        }
+        val crossOf: (Int, Boolean) -> Int = { bound, bounded ->
+            if (bounded) bound else placeables.maxOfOrNull { if (scroll.horizontal) it.height else it.width } ?: 0
+        }
+        val width = if (scroll.horizontal) length else crossOf(constraints.maxWidth, constraints.hasBoundedWidth)
+        val height = if (scroll.horizontal) crossOf(constraints.maxHeight, constraints.hasBoundedHeight) else length
+        layout(width, height) {
+            placeables.forEachIndexed { i, p ->
+                val alignment = at[i]?.alignment ?: Alignment.TopStart
+                p.place(alignment.align(IntSize(p.width, p.height), IntSize(width, height), layoutDirection))
             }
         }
     }
@@ -412,17 +633,25 @@ private fun roomFromAnchor(slot: Float, offset: Float, bias: Float, pad: Float):
 // arithmetic, so the offset is only the nudge away from that corner -- and it
 // runs inward from an end anchor, because "16 from the right" is what somebody
 // parking a widget in a corner means, not "16 further right than the edge".
+//
+// [scrollHorizontal] is the axis the slot scrolls on, null when it does not. A
+// transposed lattice counts [columns] as rows and grows to the right. [position]
+// attaches the corner the way the container needs it, as a box alignment or as
+// data for a container that measures its own length.
 @Composable
-private fun BoxScope.PlacedBox(
+private fun PlacedBox(
     placement: Placement,
     columns: Int,
     cell: Float,
     gutter: Float,
     slotDp: Size,
     sizing: WidgetSizing,
+    scrollHorizontal: Boolean?,
+    position: (PlacedAt) -> Modifier,
     content: @Composable () -> Unit,
 ) {
     val lattice = columns > 0
+    val transposed = scrollHorizontal == true
     val stride = cell + gutter
 
     // A lattice clamps what it is given, the way the cube grid it replaces did.
@@ -432,10 +661,29 @@ private fun BoxScope.PlacedBox(
     // of the window and out of reach, with no way back but to raise the count
     // again. The record is left alone and the drawing is clamped, so lowering the
     // count is reversible.
-    val spanW = if (lattice) placement.width.coerceIn(1f, columns.toFloat()) else placement.width
-    val spanH = if (lattice) placement.height.coerceAtLeast(1f) else placement.height
-    val col = if (lattice) placement.x.coerceIn(0f, (columns - spanW).coerceAtLeast(0f)) else placement.x
-    val row = if (lattice) placement.y.coerceAtLeast(0f) else placement.y
+    //
+    // Only across the bounded axis. Along a scrolling one the lattice has no last
+    // line to clamp to.
+    val spanW = when {
+        !lattice -> placement.width
+        transposed -> placement.width.coerceAtLeast(1f)
+        else -> placement.width.coerceIn(1f, columns.toFloat())
+    }
+    val spanH = when {
+        !lattice -> placement.height
+        transposed -> placement.height.coerceIn(1f, columns.toFloat())
+        else -> placement.height.coerceAtLeast(1f)
+    }
+    val col = when {
+        !lattice -> placement.x
+        transposed -> placement.x.coerceAtLeast(0f)
+        else -> placement.x.coerceIn(0f, (columns - spanW).coerceAtLeast(0f))
+    }
+    val row = when {
+        !lattice -> placement.y
+        transposed -> placement.y.coerceIn(0f, (columns - spanH).coerceAtLeast(0f))
+        else -> placement.y.coerceAtLeast(0f)
+    }
 
     val offX = if (lattice) gutter + col * stride else col
     val offY = if (lattice) gutter + row * stride else row
@@ -516,12 +764,16 @@ private fun BoxScope.PlacedBox(
     // left at its own size. Never below the widget's floor: if not even the floor fits
     // it keeps the floor and the overflow is irreducible. A lattice sizes in whole
     // cells and keeps its own clamp.
-    val availW = if (reflow && !lattice && slotDp.width > 0f && offX <= slotDp.width) {
+    //
+    // Never along a scrolling axis. The slot's length there is measured from where
+    // its widgets reach, so capping a widget to that length would hold it at the
+    // size it had last frame and it could never grow.
+    val availW = if (reflow && !lattice && scrollHorizontal != true && slotDp.width > 0f && offX <= slotDp.width) {
         roomFromAnchor(slotDp.width, clampedX, hBias, placement.padding.start(0f) + placement.padding.end(0f))
     } else {
         Float.POSITIVE_INFINITY
     }
-    val availH = if (reflow && !lattice && slotDp.height > 0f && offY <= slotDp.height) {
+    val availH = if (reflow && !lattice && scrollHorizontal != false && slotDp.height > 0f && offY <= slotDp.height) {
         roomFromAnchor(slotDp.height, clampedY, vBias, placement.padding.top(0f) + placement.padding.bottom(0f))
     } else {
         Float.POSITIVE_INFINITY
@@ -539,8 +791,7 @@ private fun BoxScope.PlacedBox(
     // so it offsets and reserves rather than shrinking the plane.
     val pad = placement.padding
     Box(
-        Modifier
-            .align(alignmentFor(anchor))
+        position(PlacedAt(alignmentFor(anchor), heldX, heldY, startX = hBias == 0f, startY = vBias == 0f))
             .offset(heldX.dp, heldY.dp)
             .onSizeChanged { ownDp = with(density) { Size(it.width.toDp().value, it.height.toDp().value) } }
             .padding(
@@ -628,10 +879,11 @@ private fun RenderWidget(descriptor: WidgetDescriptor, instance: WidgetInstance,
             }
         }
         // One funnel, so every widget in every branch is covered once. The node is
-        // added only for a widget that declared a ceiling, so nothing an
-        // undeclared widget sees changes: most of the registry declares nothing
-        // and none of it should start measuring differently for this.
-        val ceiling = descriptor.sizing.unboundedAxisCeiling()
+        // added only for a widget that has a ceiling to apply, its own or a
+        // scrolling slot's, so outside a scrolling slot nothing an undeclared widget
+        // sees changes: most of the registry declares nothing and none of it should
+        // start measuring differently for this.
+        val ceiling = descriptor.sizing.unboundedAxisCeiling(LocalViewportExtent.current)
         entrance(descriptor.resolveEntrance(instance), order, instance.motion?.delayMs) {
             if (ceiling == null) body() else Box(ceiling) { body() }
         }
@@ -639,44 +891,47 @@ private fun RenderWidget(descriptor: WidgetDescriptor, instance: WidgetInstance,
 }
 
 /**
- * Substitutes the widget's declared maximum for an axis it was given no bound on,
- * or null when it declared no maximum to substitute.
+ * Substitutes a ceiling for an axis the widget was given no bound on, or null when
+ * there is none to substitute. The widget's own declared maximum first, and inside
+ * a scrolling slot, one screen of it ([viewport]).
  *
  * An unbounded axis is not a generous offer, it is the absence of an answer, and
  * a widget that scrolls or lazily lists cannot be measured against one: Compose
  * throws rather than guessing. That is reachable from the editor, because the
  * editor lets any widget be dropped in any slot and a slot inherits whatever its
- * surface hands down. Two surfaces already avoid it by not scrolling around a
- * slot, each with a comment saying so, which is a rule kept by hand in the places
- * that happened to be written carefully.
+ * surface hands down, and a scrolling slot hands down an unbounded axis by design.
  *
  * The declaration is the place that already answers "how much can this use", so
- * it answers here too. Nothing is imposed where a bound exists: a slot that said
- * a height is obeyed, including one that said less than the widget wants, and the
+ * it answers first. Nothing is imposed where a bound exists: a slot that said a
+ * height is obeyed, including one that said less than the widget wants, and the
  * claim rules in [boundedModifier] are untouched. This only fills a silence.
  *
- * A zero maximum means undeclared, and an undeclared widget in an unbounded slot
- * is left exactly as it was, which is to say it still throws. That is deliberate:
- * inventing a ceiling for it would be this file guessing at a widget's size, and
- * the fix for those is the declaration they are missing.
+ * Inside a scrolling slot an undeclared widget gets one screen. That is not a
+ * guess at its size: it is the one length the page itself defines, and it is what
+ * a list or a picture that fills reads as on any page, so a widget that fills its
+ * slot fills the window and one that does not keeps its own size under it.
+ *
+ * Outside any scrolling slot an undeclared widget on an unbounded axis is left
+ * exactly as it was, which is to say it still throws. Nothing there defines a
+ * length, and inventing one would be this file guessing at a widget's size.
  */
-private fun WidgetSizing.unboundedAxisCeiling(): Modifier? {
-    if (maxWidth <= 0 && maxHeight <= 0) return null
-    val ceilingW = maxWidth
-    val ceilingH = maxHeight
+private fun WidgetSizing.unboundedAxisCeiling(viewport: ViewportExtent): Modifier? {
+    val ceilingW = if (maxWidth > 0) maxWidth.dp else viewport.width
+    val ceilingH = if (maxHeight > 0) maxHeight.dp else viewport.height
+    if (ceilingW == Dp.Unspecified && ceilingH == Dp.Unspecified) return null
     return Modifier.layout { measurable, constraints ->
         val filled = Constraints(
             minWidth = constraints.minWidth,
             // coerceAtLeast the minimum: a Constraints with max below min does not
             // exist, and an unbounded axis can still carry a minimum.
-            maxWidth = if (ceilingW > 0 && constraints.maxWidth == Constraints.Infinity) {
-                ceilingW.dp.roundToPx().coerceAtLeast(constraints.minWidth)
+            maxWidth = if (ceilingW != Dp.Unspecified && constraints.maxWidth == Constraints.Infinity) {
+                ceilingW.roundToPx().coerceAtLeast(constraints.minWidth)
             } else {
                 constraints.maxWidth
             },
             minHeight = constraints.minHeight,
-            maxHeight = if (ceilingH > 0 && constraints.maxHeight == Constraints.Infinity) {
-                ceilingH.dp.roundToPx().coerceAtLeast(constraints.minHeight)
+            maxHeight = if (ceilingH != Dp.Unspecified && constraints.maxHeight == Constraints.Infinity) {
+                ceilingH.roundToPx().coerceAtLeast(constraints.minHeight)
             } else {
                 constraints.maxHeight
             },

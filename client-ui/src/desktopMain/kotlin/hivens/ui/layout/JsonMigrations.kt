@@ -52,8 +52,54 @@ internal object JsonMigrations {
         11 -> ::wrapSlotsInGeneralFamily
         12 -> ::dropRetiredServerLayout
         13 -> ::compensateHomeSlotPadding
+        14 -> ::scrollTheBackgroundControls
         else -> { it -> it }
     }
+
+    /**
+     * The background controls scrolled because their screen wrapped the slot in a
+     * scroll. That wrap is gone and the slot says it now, so a file written before
+     * has to say it too, or the column of sixteen controls is cut at the bottom of
+     * the panel with no way to reach the rest.
+     *
+     * Every family of the surface, and whatever the slot holds: the scroll was the
+     * screen's and applied to whatever the reader had put there. A slot that
+     * already names a viewport keeps it.
+     */
+    private fun scrollTheBackgroundControls(graph: JsonObject): JsonObject {
+        val surfaces = graph["surfaces"]?.asObjectOrNull() ?: return graph
+        val bg = surfaces[BG_SURFACE]?.asObjectOrNull() ?: return graph
+        val families = bg["families"]?.asObjectOrNull() ?: return graph
+        val newFamilies = families.mapValues { (_, family) ->
+            val obj = family.asObjectOrNull() ?: return@mapValues family
+            val slots = obj["slots"]?.asObjectOrNull() ?: return@mapValues family
+            val controls = slots[BG_SLOT]?.asObjectOrNull() ?: return@mapValues family
+            if (controls["viewport"].let { it != null && it !is JsonNull }) return@mapValues family
+            val scrolled = buildJsonObject {
+                controls.forEach { (k, v) -> if (k != "viewport") put(k, v) }
+                put("viewport", buildJsonObject {
+                    put("kind", "scroll")
+                    put("axis", "vertical")
+                })
+            }
+            buildJsonObject {
+                obj.forEach { (k, v) -> if (k != "slots") put(k, v) }
+                put("slots", JsonObject(slots + (BG_SLOT to scrolled)))
+            }
+        }
+        if (JsonObject(newFamilies) == families) return graph
+        val newBg = buildJsonObject {
+            bg.forEach { (k, v) -> if (k != "families") put(k, v) }
+            put("families", JsonObject(newFamilies))
+        }
+        return buildJsonObject {
+            graph.forEach { (k, v) -> if (k != "surfaces") put(k, v) }
+            put("surfaces", JsonObject(surfaces + (BG_SURFACE to newBg)))
+        }
+    }
+
+    private const val BG_SURFACE = "bg.settings"
+    private const val BG_SLOT = "controls"
 
     // The home slot dropped its blanket 24/20 padding: widgets own their spacing
     // now, carried on each placement. A widget placed against that padded inner edge

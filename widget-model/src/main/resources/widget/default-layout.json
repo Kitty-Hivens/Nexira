@@ -1,5 +1,5 @@
 {
-  "schema_version": 13,
+  "schema_version": 14,
   "graph": {
     "surfaces": {
       "appshell.backdrop": {
@@ -461,7 +461,11 @@
                   "wrap": 0,
                   "uniform": false
                 },
-                "grid": 0
+                "grid": 0,
+                "viewport": {
+                  "kind": "scroll",
+                  "axis": "vertical"
+                }
               }
             }
           }

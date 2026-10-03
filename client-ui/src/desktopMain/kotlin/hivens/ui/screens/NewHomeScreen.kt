@@ -32,13 +32,8 @@ fun NewHomeScreen(
         HomeNewContext(appState = appState, onScreenChange = onScreenChange)
     }
     CompositionLocalProvider(LocalHomeNewContext provides ctx) {
-        // No verticalScroll. The scroll modifier passes maxHeight =
-        // Infinity to children, which breaks LazyList-based widgets
-        // the user may drop into the slot via the editor. Plain
-        // Column distributes its bounded height; Lazy widgets manage
-        // their own viewport. A stack of fixed-height widgets that
-        // exceeds the pane overflows -- the per-surface reset action
-        // is the recovery path.
+        // Whether Home scrolls is the slot's own viewport, static unless the
+        // reader set it otherwise, and the kernel measures each widget for it.
         // No blanket slot padding. Spacing between widgets a flow still owns, but the
         // margin from the window edge is each widget's own now, carried on its
         // placement, so a widget that wants to reach the edge can and a widget that

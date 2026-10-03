@@ -1,13 +1,12 @@
 package hivens.ui.widgets.bgsettings
 
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
@@ -90,14 +89,15 @@ fun BgSettingsSurface(
     CompositionLocalProvider(LocalBgSettingsContext provides ctx) {
         Row(Modifier.fillMaxSize().padding(16.dp)) {
             NxSurface(SurfaceKind.Panel, Modifier.width(PANEL_WIDTH).fillMaxHeight()) {
+                // Scrolls because the slot says so (the bundled layout sets it), not
+                // because this screen wraps it: the kernel is what knows how each
+                // widget is measured once the column has no end.
                 SlotRenderer(
                     SurfaceId(SURFACE),
                     SlotId("controls"),
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                        .padding(20.dp),
-                    spacing  = 16.dp,
+                    modifier       = Modifier.fillMaxSize(),
+                    spacing        = 16.dp,
+                    contentPadding = PaddingValues(20.dp),
                 )
             }
 

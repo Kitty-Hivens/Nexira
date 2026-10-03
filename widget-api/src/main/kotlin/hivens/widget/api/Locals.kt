@@ -1,12 +1,16 @@
 package hivens.widget.api
 
+import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.ProvidableCompositionLocal
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.unit.Dp
 import hivens.widget.model.Entrance
 import hivens.widget.model.LayoutGraph
 import hivens.widget.model.SlotAddress
@@ -225,7 +229,11 @@ val LocalWidgetSizing: ProvidableCompositionLocal<WidgetSizing> =
 // number of cells. Null in a free placement slot, where the unit is already the
 // dp and nothing has to be converted. Dynamic, like the size above -- it updates
 // as the slot is measured; only the chrome that reads it recomposes.
-data class GridGeometry(val cellDp: Float, val gutterDp: Float, val columns: Int)
+//
+// [transposed] is a lattice in a slot that scrolls sideways: the bounded axis is
+// the height there, so [columns] counts rows, the cell comes from the height, and
+// the lattice grows to the right instead of down.
+data class GridGeometry(val cellDp: Float, val gutterDp: Float, val columns: Int, val transposed: Boolean = false)
 
 val LocalGridGeometry: ProvidableCompositionLocal<GridGeometry?> =
     compositionLocalOf { null }
@@ -239,6 +247,43 @@ val LocalGridGeometry: ProvidableCompositionLocal<GridGeometry?> =
 // size, and the reflow is a view-time transform on top.
 val LocalPlacementReflow: ProvidableCompositionLocal<Boolean> =
     compositionLocalOf { true }
+
+/**
+ * The room of the nearest scrolling slot above, per axis, Unspecified where
+ * nothing above scrolls on that axis.
+ *
+ * A scrolling slot hands its content an unbounded axis, which is what lets the
+ * content be longer than the window. A widget that fills, lists lazily or scrolls
+ * itself cannot be measured against an unbounded axis: Compose throws for some of
+ * them and draws the others at nothing. So the kernel gives each widget its own
+ * declared maximum there, and failing that, this: one viewport.
+ *
+ * It reaches through nested slots on purpose. A widget inside a container inside
+ * a scrolling page is still on that page, and a bounded axis further down simply
+ * never asks.
+ */
+@Immutable
+data class ViewportExtent(val width: Dp = Dp.Unspecified, val height: Dp = Dp.Unspecified) {
+    companion object {
+        val NONE = ViewportExtent()
+    }
+}
+
+val LocalViewportExtent: ProvidableCompositionLocal<ViewportExtent> =
+    compositionLocalOf { ViewportExtent.NONE }
+
+/**
+ * Draws the bar of a scrolling slot, inside the slot's own box. [revealed] is the
+ * kernel's "somebody is looking": the pointer is over the slot, or it is moving.
+ *
+ * The kernel knows that a slot scrolls and nothing about how a bar looks, which
+ * belongs to the theme it cannot see. So the default draws nothing, and the app
+ * provides the one that matches its other lists.
+ */
+typealias ViewportScrollbar = @Composable BoxScope.(state: ScrollState, horizontal: Boolean, revealed: Boolean) -> Unit
+
+val LocalViewportScrollbar: ProvidableCompositionLocal<ViewportScrollbar> =
+    staticCompositionLocalOf { { _, _, _ -> } }
 
 // Editor-only hook: SlotRenderer's placement branch reports its window bounds
 // here so a palette drop can land at the release point (converted to slot-local dp).

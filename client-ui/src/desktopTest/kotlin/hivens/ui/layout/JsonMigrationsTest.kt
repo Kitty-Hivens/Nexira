@@ -8,6 +8,8 @@ import hivens.widget.model.Placement
 import hivens.widget.model.SlotContent
 import hivens.widget.model.SlotId
 import hivens.widget.model.SurfaceId
+import hivens.widget.model.ViewportMode
+import hivens.widget.model.viewportMode
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
@@ -457,6 +459,68 @@ class JsonMigrationsTest {
         )
         assertEquals(24f, w.padding.start, "the seed's own padding is untouched")
         assertNull(w.padding.top, "and nothing was added")
+    }
+
+    // ── Background controls scroll (schema 14) ────────────────────────
+
+    private fun bgControls(graph: String, family: String = "general"): SlotContent =
+        json.decodeFromJsonElement(
+            LayoutGraph.serializer(),
+            JsonMigrations.apply(13, json.parseToJsonElement(graph).jsonObject),
+        ).surfaces[SurfaceId("bg.settings")]!!.slotsOf(FamilyId(family))[SlotId("controls")]!!
+
+    @Test
+    fun `the background controls keep scrolling once the screen stops wrapping them`() {
+        // The scroll was the screen's and the screen no longer adds it. A file from
+        // before has to carry it, or the controls past the panel's height are gone.
+        val slot = bgControls(
+            """{"surfaces":{"bg.settings":{"families":{"general":{"slots":{"controls":{
+              "widgets":[{"kind":"bg.reset","instance_id":"r"}],
+              "flow":{"direction":"vertical","wrap":0,"uniform":false},"grid":0}}}}}}}""",
+        )
+        assertEquals(ViewportMode.Scroll(horizontal = false), slot.viewportMode)
+        assertEquals(listOf("r"), slot.widgets.map { it.instanceId }, "and keeps what the reader put there")
+    }
+
+    @Test
+    fun `a viewport the reader already chose is not overwritten`() {
+        val slot = bgControls(
+            """{"surfaces":{"bg.settings":{"families":{"general":{"slots":{"controls":{
+              "widgets":[],"viewport":{"kind":"scroll","axis":"horizontal"}}}}}}}}""",
+        )
+        assertEquals(ViewportMode.Scroll(horizontal = true), slot.viewportMode)
+    }
+
+    @Test
+    fun `every family of the background surface is covered`() {
+        val slot = bgControls(
+            """{"surfaces":{"bg.settings":{"families":{"other":{"slots":{"controls":{"widgets":[]}}}}}}}""",
+            family = "other",
+        )
+        assertEquals(ViewportMode.Scroll(horizontal = false), slot.viewportMode)
+    }
+
+    @Test
+    fun `a file without the background surface is handed back untouched`() {
+        val before = json.parseToJsonElement("""{"surfaces":{"home.new":{"families":{}}}}""").jsonObject
+        assertSame(before, JsonMigrations.apply(13, before))
+    }
+
+    @Test
+    fun `no other slot starts scrolling`() {
+        val migrated = json.decodeFromJsonElement(
+            LayoutGraph.serializer(),
+            JsonMigrations.apply(
+                13,
+                json.parseToJsonElement(
+                    """{"surfaces":{"bg.settings":{"families":{"general":{"slots":{"other":{"widgets":[]}}}}},
+                       "home.new":{"families":{"general":{"slots":{"controls":{"widgets":[]}}}}}}}""",
+                ).jsonObject,
+            ),
+        )
+        migrated.surfaces.values.forEach { layout ->
+            layout.allSlots().forEach { assertNull(it.viewport, "only the background controls were the screen's to scroll") }
+        }
     }
 
     private fun fixture(name: String): JsonObject =

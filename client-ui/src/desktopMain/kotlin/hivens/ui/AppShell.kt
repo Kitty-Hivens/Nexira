@@ -124,6 +124,8 @@ import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.LocalWidgetRegistry
 import hivens.widget.api.LocalWidgetSurfaceRenderer
 import hivens.widget.api.LocalWidgetEntrance
+import hivens.widget.api.LocalViewportScrollbar
+import hivens.ui.widgets.NxViewportScrollbar
 import hivens.ui.widgets.PlayedWidgetEntrance
 import hivens.widget.api.WidgetSurfaceRenderer
 import androidx.compose.foundation.background
@@ -1013,6 +1015,7 @@ fun FrameWindowScope.AppShellContent(
                         debugOverlay.slotChrome else IdentitySlotChromeModifier,
                 LocalWidgetSurfaceRenderer               provides surfaceRenderer,
                 LocalWidgetEntrance                      provides PlayedWidgetEntrance,
+                LocalViewportScrollbar                   provides NxViewportScrollbar,
                 LocalWindowState                         provides windowState,
                 LocalWindowMaximizer                     provides maximizer,
                 LocalComposeWindow                       provides window,
