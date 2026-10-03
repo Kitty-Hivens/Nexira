@@ -65,6 +65,9 @@ fun PresetManagerPanel(
     onDelete: suspend (PresetMeta) -> Unit,
     onExport: (PresetMeta) -> Unit,
     listProvider: () -> List<PresetMeta>,
+    /** Ids of the presets that ship, offered above the saved ones. */
+    builtIns: List<String> = emptyList(),
+    onApplyBuiltIn: (String) -> Unit = {},
 ) {
     if (!visible) return
 
@@ -182,35 +185,41 @@ fun PresetManagerPanel(
 
                 Spacer(Modifier.height(16.dp))
 
-                Text(
-                    text       = s.editorPresetsSaved(presets.size),
-                    style      = MaterialTheme.typography.labelMedium,
-                    color      = NxInk.quiet,
-                    fontWeight = FontWeight.Medium,
-                )
-                Spacer(Modifier.height(8.dp))
-
-                if (presets.isEmpty()) {
-                    NxSurface(
-                        kind     = SurfaceKind.Panel,
-                        shape    = RoundedCornerShape(10.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f),
-                    ) {
-                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text(
-                                text  = s.editorPresetsEmpty,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = NxInk.quiet,
+                // One scrolling list for both kinds, so the ready-made ones never
+                // squeeze the saved ones out of the dialog or the other way round.
+                LazyColumn(
+                    modifier            = Modifier.fillMaxWidth().weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    if (builtIns.isNotEmpty()) {
+                        item(key = "built-in-header") { SectionLabel(s.editorPresetsBuiltIn) }
+                        items(items = builtIns, key = { "built-in:$it" }) { id ->
+                            BuiltInRow(
+                                name        = s.bundledPresetName(id),
+                                description = s.bundledPresetDescription(id),
+                                onApply     = { onApplyBuiltIn(id) },
                             )
                         }
+                        item(key = "built-in-gap") { Spacer(Modifier.height(10.dp)) }
                     }
-                } else {
-                    LazyColumn(
-                        modifier            = Modifier.fillMaxWidth().weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
+                    item(key = "saved-header") { SectionLabel(s.editorPresetsSaved(presets.size)) }
+                    if (presets.isEmpty()) {
+                        item(key = "saved-empty") {
+                            NxSurface(
+                                kind     = SurfaceKind.Panel,
+                                shape    = RoundedCornerShape(10.dp),
+                                modifier = Modifier.fillMaxWidth().height(96.dp),
+                            ) {
+                                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                    Text(
+                                        text  = s.editorPresetsEmpty,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = NxInk.quiet,
+                                    )
+                                }
+                            }
+                        }
+                    } else {
                         items(items = presets, key = { it.name }) { meta ->
                             PresetRow(
                                 meta     = meta,
@@ -227,6 +236,54 @@ fun PresetManagerPanel(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun SectionLabel(text: String) {
+    Text(
+        text       = text,
+        style      = MaterialTheme.typography.labelMedium,
+        color      = NxInk.quiet,
+        fontWeight = FontWeight.Medium,
+        modifier   = Modifier.padding(bottom = 2.dp),
+    )
+}
+
+/**
+ * A preset that ships. Applied, never deleted or exported: it is part of the
+ * launcher, and it changes only the surfaces it is about.
+ */
+@Composable
+private fun BuiltInRow(name: String, description: String, onApply: () -> Unit) {
+    val s = LocalStrings.current
+    NxCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp)) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text       = name,
+                    style      = MaterialTheme.typography.bodyLarge,
+                    color      = NxInk.main,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines   = 1,
+                    overflow   = TextOverflow.Ellipsis,
+                )
+                if (description.isNotBlank()) {
+                    Text(
+                        text  = description,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = NxInk.quiet,
+                    )
+                }
+            }
+            Spacer(Modifier.width(8.dp))
+            NxButton(label = s.editorApply, onClick = onApply, compact = true)
         }
     }
 }

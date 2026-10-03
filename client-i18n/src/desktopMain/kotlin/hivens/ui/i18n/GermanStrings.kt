@@ -1334,6 +1334,10 @@ object GermanStrings : AppStrings {
         "widget.home.new.continue" to "Weiterspielen, groß",
         "widget.home.new.continue.showFacts" to "Fakten",
         "widget.home.new.packlist" to "Modpack-Liste",
+        "widget.home.new.spines" to "Modpack-Rücken",
+        "widget.home.new.time" to "Uhrzeit, groß",
+        "widget.home.new.time.showDate" to "Datum",
+        "widget.home.new.hero.fillHeight" to "Höhe füllen",
         "widget.home.new.packlist.title" to "Titel",
         "widget.home.new.packlist.maxRows" to "Zeilen (0: alle)",
         "widget.home.new.packlist.skipContinued" to "Weitergespieltes Modpack auslassen",
@@ -1485,6 +1489,23 @@ object GermanStrings : AppStrings {
     override val editorPresetNamePlaceholder = "Preset-Name..."
     override fun editorPresetsSaved(count: Int) = "Gespeichert ($count)"
     override val editorPresetsEmpty          = "Leer. Speichere das aktuelle Layout als erstes Preset."
+    override val editorPresetsBuiltIn          = "Vorlagen"
+    override fun bundledPresetName(id: String) = when (id) {
+        "home-type" -> "Startseite: Typografie"
+        "home-column" -> "Startseite: Spalte"
+        "home-spines" -> "Startseite: Buchrücken"
+        "home-dock" -> "Startseite: Dock"
+        "home-bento" -> "Startseite: Bento"
+        else -> id
+    }
+    override fun bundledPresetDescription(id: String) = when (id) {
+        "home-type" -> "Das Modpack zum Weiterspielen groß, die Bibliothek als Liste"
+        "home-column" -> "Eine hohe Karte links, die Modpacks als Raster daneben"
+        "home-spines" -> "Jedes Modpack ein Streifen im Regal, eines aufgeklappt"
+        "home-dock" -> "Oben die Uhrzeit, unten die Modpacks in einer Reihe"
+        "home-bento" -> "Zellen nach Gewicht, das Modpack zum Weiterspielen am größten"
+        else -> ""
+    }
 
     // --- Layout editor: palette ---
     override val editorPaletteHide  = "Palette ausblenden"

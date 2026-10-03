@@ -1576,6 +1576,10 @@ interface AppStrings {
     val editorPresetNamePlaceholder: String
     fun editorPresetsSaved(count: Int): String
     val editorPresetsEmpty: String
+    val editorPresetsBuiltIn: String
+    /** The name of a preset that ships, by its id. The id itself for one this locale does not name. */
+    fun bundledPresetName(id: String): String
+    fun bundledPresetDescription(id: String): String
 
     // --- Layout editor: palette ---
     val editorPaletteHide: String

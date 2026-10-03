@@ -47,6 +47,10 @@ class WidgetRegistryConsistencyTest {
             // the type-led Home: the pack to go back to set large, and the library as a list
             "home.new.continue",
             "home.new.packlist",
+            // the library as spines on a shelf, one opened out
+            "home.new.spines",
+            // the time as the largest thing on the surface
+            "home.new.time",
             // decor: a field of particles, for the backdrop under the content pane
             "decor.particles",
             "library.header",
@@ -264,6 +268,7 @@ class WidgetRegistryConsistencyTest {
             "home.new.continue",
             "home.new.packlist",
             "decor.particles",
+            "home.new.time",
             // About surface (title overrides)
             "about.logo",
             "about.system.card",

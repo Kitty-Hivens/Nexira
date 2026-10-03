@@ -1339,6 +1339,10 @@ object JapaneseStrings : AppStrings {
         "widget.home.new.continue" to "続きから (大)",
         "widget.home.new.continue.showFacts" to "情報",
         "widget.home.new.packlist" to "パック一覧",
+        "widget.home.new.spines" to "パックの背表紙",
+        "widget.home.new.time" to "大きな時刻",
+        "widget.home.new.time.showDate" to "日付",
+        "widget.home.new.hero.fillHeight" to "高さを満たす",
         "widget.home.new.packlist.title" to "タイトル",
         "widget.home.new.packlist.maxRows" to "行数 (0: すべて)",
         "widget.home.new.packlist.skipContinued" to "続きのパックを除く",
@@ -1490,6 +1494,23 @@ object JapaneseStrings : AppStrings {
     override val editorPresetNamePlaceholder = "プリセットの名前..."
     override fun editorPresetsSaved(count: Int) = "保存済み ($count)"
     override val editorPresetsEmpty = "空です。いまのレイアウトを最初のプリセットとして保存してください。"
+    override val editorPresetsBuiltIn = "既成"
+    override fun bundledPresetName(id: String) = when (id) {
+        "home-type" -> "ホーム: タイポグラフィ"
+        "home-column" -> "ホーム: カラム"
+        "home-spines" -> "ホーム: 背表紙"
+        "home-dock" -> "ホーム: ドック"
+        "home-bento" -> "ホーム: ベントー"
+        else -> id
+    }
+    override fun bundledPresetDescription(id: String) = when (id) {
+        "home-type" -> "続きのパックを大きく、ライブラリを一覧で"
+        "home-column" -> "左に縦長のカード、隣にパックのグリッド"
+        "home-spines" -> "棚に並ぶ帯、ひとつを開いて"
+        "home-dock" -> "上に時刻、下にパックを一列に"
+        "home-bento" -> "重要度に応じたセル、続きのパックが最大"
+        else -> ""
+    }
 
     // --- Layout editor: palette ---
     override val editorPaletteHide = "パレットを隠す"

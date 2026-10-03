@@ -1,0 +1,49 @@
+{
+  "schema_version": 13,
+  "id": "home-spines",
+  "graph": {
+    "surfaces": {
+      "home.new": {
+        "families": {
+          "general": {
+            "slots": {
+              "main": {
+                "widgets": [
+                  {
+                    "kind": "home.new.whatsnew",
+                    "instance_id": "preset-spines-whatsnew",
+                    "placement": {
+                      "padding": {
+                        "start": 24.0,
+                        "end": 24.0,
+                        "top": 20.0
+                      }
+                    }
+                  },
+                  {
+                    "kind": "home.new.spines",
+                    "instance_id": "preset-spines-shelf",
+                    "placement": {
+                      "weight": 1.0,
+                      "padding": {
+                        "start": 24.0,
+                        "end": 24.0,
+                        "bottom": 20.0
+                      }
+                    }
+                  }
+                ],
+                "flow": {
+                  "direction": "vertical",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

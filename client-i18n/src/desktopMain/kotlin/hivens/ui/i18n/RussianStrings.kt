@@ -1347,6 +1347,10 @@ object RussianStrings : AppStrings {
         "widget.home.new.continue" to "Продолжить крупно",
         "widget.home.new.continue.showFacts" to "Факты",
         "widget.home.new.packlist" to "Список сборок",
+        "widget.home.new.spines" to "Корешки сборок",
+        "widget.home.new.time" to "Время крупно",
+        "widget.home.new.time.showDate" to "Дата",
+        "widget.home.new.hero.fillHeight" to "Заполнять высоту",
         "widget.home.new.packlist.title" to "Заголовок",
         "widget.home.new.packlist.maxRows" to "Строк (0: все)",
         "widget.home.new.packlist.skipContinued" to "Без продолжаемой сборки",
@@ -1498,6 +1502,23 @@ object RussianStrings : AppStrings {
     override val editorPresetNamePlaceholder = "Имя пресета..."
     override fun editorPresetsSaved(count: Int) = "Сохранённые ($count)"
     override val editorPresetsEmpty          = "Пусто. Сохрани текущий layout как первый пресет."
+    override val editorPresetsBuiltIn          = "Готовые"
+    override fun bundledPresetName(id: String) = when (id) {
+        "home-type" -> "Главная: типографика"
+        "home-column" -> "Главная: колонна"
+        "home-spines" -> "Главная: корешки"
+        "home-dock" -> "Главная: причал"
+        "home-bento" -> "Главная: бенто"
+        else -> id
+    }
+    override fun bundledPresetDescription(id: String) = when (id) {
+        "home-type" -> "Продолжаемая сборка крупным шрифтом, библиотека списком"
+        "home-column" -> "Высокая карточка слева, сборки сеткой рядом"
+        "home-spines" -> "Каждая сборка полосой на полке, одна раскрыта"
+        "home-dock" -> "Время сверху, сборки в ряд внизу"
+        "home-bento" -> "Ячейки по важности, продолжаемая сборка крупнее всех"
+        else -> ""
+    }
 
     // --- Layout editor: palette ---
     override val editorPaletteHide  = "Скрыть палитру"

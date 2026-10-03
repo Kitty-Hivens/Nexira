@@ -113,7 +113,9 @@ import hivens.widget.api.LocalWidgetRegistry
 import hivens.widget.api.SlotChromeModifier
 import hivens.widget.api.UnknownWidgetDecorator
 import hivens.widget.api.WidgetDecorator
+import hivens.widget.model.BundledPresets
 import hivens.widget.model.DefaultLayout
+import hivens.widget.model.withSurfacesFrom
 import hivens.widget.model.FlowSpec
 import hivens.widget.model.FamilyId
 import hivens.widget.model.LayoutGraph
@@ -735,6 +737,26 @@ fun EditorSurfaceHost(
                         }
                     },
                     listProvider = { presetRepo.list() },
+                    builtIns     = BundledPresets.IDS,
+                    onApplyBuiltIn = { id ->
+                        coroutineScope.launch {
+                            val preset = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                runCatching { BundledPresets.load(id) }
+                                    .onFailure { log.error("Bundled preset '{}' failed to load", id, it) }
+                                    .getOrNull()
+                            } ?: return@launch
+                            // Only the surfaces the preset is about change. The look and
+                            // every other surface stay as the person left them, which is
+                            // what separates a shipped arrangement from a saved snapshot.
+                            layoutRepo.update { graph ->
+                                WidgetGraphReconciler.reconcile(
+                                    graph    = graph.withSurfacesFrom(preset),
+                                    registry = widgetRegistry,
+                                ).graph
+                            }
+                            presetPanelOpen = false
+                        }
+                    },
                 )
 
                 WidgetPalettePanel(

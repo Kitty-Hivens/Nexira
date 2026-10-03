@@ -24,6 +24,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import coil3.compose.SubcomposeAsyncImage
@@ -54,6 +55,8 @@ data class HeroProps(
     /** The height, or with [followWidth] the least height: a wider card is taller than this. */
     @PropLabel("widget.home.new.hero.height") @PropRange(120.0, 340.0) val height: Int = 170,
     @PropLabel("widget.home.new.hero.followWidth") val followWidth: Boolean = true,
+    /** Takes the height the slot gives it, when the slot gives one: a card that is a column, not a strip. */
+    @PropLabel("widget.home.new.hero.fillHeight") val fillHeight: Boolean = false,
     @PropLabel("widget.home.new.hero.showMeta") val showMeta: Boolean = true,
     @PropLabel("widget.home.new.hero.playLayout") val playLayout: PlayLayout = PlayLayout.Plate,
 )
@@ -90,7 +93,13 @@ fun HomeNewHero(instance: WidgetInstance) {
     val openDetail = { ctx.onScreenChange(Screen.PackDetail(target.id)) }
 
     BoxWithConstraints(Modifier.fillMaxWidth().padding(top = 12.dp)) {
-        val height = if (p.followWidth) maxOf(p.height.dp, maxWidth / HERO_RATIO).coerceAtMost(HERO_MAX) else p.height.dp
+        val height = when {
+            // Only a bounded slot has a height to give. An unbounded one would hand
+            // over infinity, and the card falls back to its own measure instead.
+            p.fillHeight && maxHeight != Dp.Infinity -> maxHeight
+            p.followWidth -> maxOf(p.height.dp, maxWidth / HERO_RATIO).coerceAtMost(HERO_MAX)
+            else -> p.height.dp
+        }
         val tall = height >= TALL_HERO
         Box(
             modifier = Modifier

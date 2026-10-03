@@ -1332,6 +1332,10 @@ object EnglishStrings : AppStrings {
         "widget.home.new.continue" to "Continue, set large",
         "widget.home.new.continue.showFacts" to "Facts",
         "widget.home.new.packlist" to "Pack list",
+        "widget.home.new.spines" to "Pack spines",
+        "widget.home.new.time" to "Time, set large",
+        "widget.home.new.time.showDate" to "Date",
+        "widget.home.new.hero.fillHeight" to "Fill the height",
         "widget.home.new.packlist.title" to "Title",
         "widget.home.new.packlist.maxRows" to "Rows (0: all)",
         "widget.home.new.packlist.skipContinued" to "Leave out the continued pack",
@@ -1483,6 +1487,23 @@ object EnglishStrings : AppStrings {
     override val editorPresetNamePlaceholder = "Preset name..."
     override fun editorPresetsSaved(count: Int) = "Saved ($count)"
     override val editorPresetsEmpty          = "Empty. Save the current layout as your first preset."
+    override val editorPresetsBuiltIn          = "Ready-made"
+    override fun bundledPresetName(id: String) = when (id) {
+        "home-type" -> "Home: type"
+        "home-column" -> "Home: column"
+        "home-spines" -> "Home: spines"
+        "home-dock" -> "Home: dock"
+        "home-bento" -> "Home: bento"
+        else -> id
+    }
+    override fun bundledPresetDescription(id: String) = when (id) {
+        "home-type" -> "The pack to go back to set large, the library as a list"
+        "home-column" -> "A tall card on the left, the packs as a grid beside it"
+        "home-spines" -> "Every pack a strip on a shelf, one opened out"
+        "home-dock" -> "The time on top, the packs in a row along the bottom"
+        "home-bento" -> "Cells sized by what matters, the pack to go back to largest"
+        else -> ""
+    }
 
     // --- Layout editor: palette ---
     override val editorPaletteHide  = "Hide palette"
