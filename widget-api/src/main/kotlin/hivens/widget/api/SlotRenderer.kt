@@ -456,7 +456,7 @@ private fun MapPlacement(path: SlotPath, content: SlotContent, pan: State<Offset
                             val sizing = descriptor?.sizing ?: WidgetSizing.UNDECLARED
                             PlacedBox(p, 0, 0f, 0f, slotDp, sizing, bounds, { Modifier.layoutId(it) }) {
                                 if (descriptor == null) {
-                                    unknownDecorator(address, index, instance)
+                                    RenderUnknown(unknownDecorator, address, index, instance)
                                 } else {
                                     val movable = rememberWidgetMovable(descriptor, instance, index)
                                     decorator(address, index, descriptor, instance) { movable() }
@@ -597,7 +597,7 @@ private fun FlowWidgets(
         key(instance.instanceId) {
             val descriptor = registry[instance.kind]
             if (descriptor == null) {
-                unknownDecorator(address, index, instance)
+                RenderUnknown(unknownDecorator, address, index, instance)
             } else {
                 val movable = rememberWidgetMovable(descriptor, instance, index)
                 // Outer spacing around the widget, from its placement so a flow
@@ -643,7 +643,7 @@ private fun WrappedLine(
             val cell: Modifier = if (uniform) weigh(1f, descriptor?.sizing ?: WidgetSizing.UNDECLARED) else Modifier
             Box(cell) {
                 if (descriptor == null) {
-                    unknownDecorator(address, index, instance)
+                    RenderUnknown(unknownDecorator, address, index, instance)
                 } else {
                     val movable = rememberWidgetMovable(descriptor, instance, index)
                     val pad = Modifier.padding((instance.placement?.padding ?: SurfaceInsets()).asPadding())
@@ -766,7 +766,7 @@ private fun PlacementSlot(
                         val sizing = descriptor?.sizing ?: WidgetSizing.UNDECLARED
                         PlacedBox(p, columns, cell, spacing.value, clampSize, sizing, placementBounds, position) {
                             if (descriptor == null) {
-                                unknownDecorator(address, index, instance)
+                                RenderUnknown(unknownDecorator, address, index, instance)
                             } else {
                                 val movable = rememberWidgetMovable(descriptor, instance, index)
                                 decorator(address, index, descriptor, instance) { movable() }
@@ -1133,6 +1133,21 @@ private fun RenderWidget(descriptor: WidgetDescriptor, instance: WidgetInstance,
             if (ceiling == null) body() else Box(ceiling) { body() }
         }
     }
+}
+
+/**
+ * A widget whose kind is not in the registry, measured the way an undeclared one is.
+ *
+ * It has no declaration to read a ceiling from, and on an axis a scrolling slot or
+ * a map leaves unbounded it was measured against nothing: the editor's stand-in
+ * fills its width, a fill against no width is no width at all, and its label came
+ * out one letter per line. The one-screen ceiling the known widgets get is the
+ * answer for it too.
+ */
+@Composable
+private fun RenderUnknown(decorator: UnknownWidgetDecorator, address: SlotAddress, index: Int, instance: WidgetInstance) {
+    val ceiling = WidgetSizing.UNDECLARED.unboundedAxisCeiling(LocalViewportExtent.current)
+    if (ceiling == null) decorator(address, index, instance) else Box(ceiling) { decorator(address, index, instance) }
 }
 
 /**

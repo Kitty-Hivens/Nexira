@@ -23,6 +23,8 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.LocalMapControls
+import hivens.widget.api.LocalUnknownWidgetDecorator
+import hivens.widget.api.UnknownWidgetDecorator
 import hivens.widget.api.MapControls
 import hivens.widget.api.LocalWidgetRegistry
 import hivens.widget.api.SlotRenderer
@@ -279,6 +281,16 @@ class SlotViewportGeometryTest {
     }
 
     @Test
+    fun `a widget whose kind is unknown is measured against one screen on a map`() {
+        // Its stand-in fills its width; against no width at all it drew nothing.
+        val page = Probe(
+            map(widget("u", "missing.kind", Placement(x = 20f, y = 20f))),
+            unknown = { _, _, _ -> Box(Modifier.fillMaxWidth().height(40.dp).background(BLUE)) },
+        )
+        assertEquals(C, page.at(150, 40), "the stand-in was given the view's width to fill")
+    }
+
+    @Test
     fun `a corner named on a map counts from the origin`() {
         // The record keeps its corner for whenever the slot stops being a map.
         val page = Probe(map(widget("a", "fill.a", Placement(anchor = Placement.BOTTOM_END, x = 10f, y = 10f, width = 40f, height = 40f))))
@@ -351,7 +363,11 @@ class SlotViewportGeometryTest {
      * pumped on a clock, because a wheel on the desktop scrolls with an animation
      * and a single render would read the first frame of it.
      */
-    private inner class Probe(initial: SlotContent, controls: MapControls = { _, _ -> }) {
+    private inner class Probe(
+        initial: SlotContent,
+        controls: MapControls = { _, _ -> },
+        unknown: UnknownWidgetDecorator = { _, _, _ -> },
+    ) {
         private var content by mutableStateOf(initial)
         private val scene = ImageComposeScene(width = SIDE, height = SIDE, density = Density(1f)) {
             val graph = LayoutGraph(surfaces = mapOf(surface to SurfaceLayout(slots = mapOf(slot to content))))
@@ -359,6 +375,7 @@ class SlotViewportGeometryTest {
                 LocalLayoutGraph provides graph,
                 LocalWidgetRegistry provides registry,
                 LocalMapControls provides controls,
+                LocalUnknownWidgetDecorator provides unknown,
             ) {
                 Box(Modifier.fillMaxSize().background(PAGE_COLOUR)) {
                     SlotRenderer(surface, slot, Modifier.fillMaxSize())
