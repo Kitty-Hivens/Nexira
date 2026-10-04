@@ -129,8 +129,6 @@ object RussianStrings : AppStrings {
     // Server Detail
 
     // Server Settings
-    override val serverSettingsRam             = "ОЗУ"
-    override fun serverSettingsRamValue(mb: Int) = "ОЗУ: $mb МБ"
     override val serverSettingsOpenFolder      = "Открыть папку"
 
     override val backgroundResetConfirmTitle     = "Сбросить фон?"
@@ -238,10 +236,18 @@ object RussianStrings : AppStrings {
     // =========================================================================
     // RAM Selector
     // =========================================================================
-    override val ramCustomInputLabel = "Своё значение:"
     override fun ramSystemHint(systemRam: String, recommended: String) =
         "Система: $systemRam • Рекомендуется не более $recommended"
-    override fun ramAutoLabel(resolved: String) = "Авто · ~$resolved"
+    override val ramModeTitle = "Объём памяти"
+    override val ramModeAuto = "Авто"
+    override val ramModeOwn = "Своё"
+    override fun ramAutoDetail(resolved: String) = "Подбирается под систему и под эту сборку. Сейчас это $resolved."
+    override val ramOwnDetail = "Столько игра получит при каждом запуске."
+    override val ramAllocated = "Выделено"
+    override val ramUnitGb = "ГБ"
+    override val ramUnitMb = "МБ"
+    override fun ramOutOfRange(min: String, max: String) = "Можно от $min до $max"
+    override fun ramAboveRecommended(recommended: String) = "Больше $recommended: системе и самой игре вне кучи может не хватить памяти"
 
     // =========================================================================
     // Mod cards
@@ -965,6 +971,14 @@ object RussianStrings : AppStrings {
 
     override val packSettingsTitle              = "Настройки сборки"
     override val packSettingsClose              = "Закрыть"
+    override val packSettingsExpand             = "Развернуть"
+    override val packSettingsCollapse           = "Свернуть"
+    override fun packSettingsRuntimeLine(loader: String, mc: String) = "$loader на $mc"
+    override fun packSettingsRuntimeVanilla(mc: String) = "Minecraft $mc"
+    override val packSettingsLoader             = "Загрузчик"
+    override val packSettingsJavaPickOwn        = "Указать свою"
+    override val packSettingsOptionalCoToggle   = "Мод включает то, что ему нужно, и выключает то, с чем несовместим."
+    override val packVersionCheckTitle          = "Обновления"
     override val packSettingsCategoryGeneral    = "Основное"
     override val packSettingsCategoryRuntime    = "Запуск"
     override val packSettingsCategoryVersion    = "Версия"
@@ -981,7 +995,7 @@ object RussianStrings : AppStrings {
     override val packSettingsMemory             = "Память"
     override val packSettingsEnvironment        = "Среда"
     override val packSettingsJava               = "Java"
-    override fun packSettingsJavaManaged(major: Int) = "Управляемая — Java $major"
+    override fun packSettingsJavaManaged(major: Int) = "Управляется лаунчером: Java $major"
     override val packSettingsJavaCustom         = "Свой путь к Java"
     override val packSettingsJavaPathPlaceholder = "/путь/к/bin/java"
     override val packSettingsJavaReset          = "На управляемую"

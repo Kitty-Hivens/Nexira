@@ -141,8 +141,6 @@ object JapaneseStrings : AppStrings {
     // Server Detail
 
     // Server Settings
-    override val serverSettingsRam = "メモリ"
-    override fun serverSettingsRamValue(mb: Int) = "メモリ: $mb MB"
     override val serverSettingsOpenFolder = "フォルダーを開く"
 
     override val backgroundResetConfirmTitle = "背景をリセットしますか?"
@@ -250,10 +248,18 @@ object JapaneseStrings : AppStrings {
     // =========================================================================
     // RAM Selector
     // =========================================================================
-    override val ramCustomInputLabel = "任意の値:"
     override fun ramSystemHint(systemRam: String, recommended: String) =
         "システム: $systemRam • 推奨の上限: $recommended"
-    override fun ramAutoLabel(resolved: String) = "自動 · 約 ${resolved}"
+    override val ramModeTitle = "メモリ量"
+    override val ramModeAuto = "自動"
+    override val ramModeOwn = "指定"
+    override fun ramAutoDetail(resolved: String) = "このシステムとこのパックに合わせて決めます。今は ${resolved} です。"
+    override val ramOwnDetail = "起動のたびにこの量を割り当てます。"
+    override val ramAllocated = "割り当て"
+    override val ramUnitGb = "GB"
+    override val ramUnitMb = "MB"
+    override fun ramOutOfRange(min: String, max: String) = "${min} から ${max} まで"
+    override fun ramAboveRecommended(recommended: String) = "${recommended} を超えると、システムやゲームのヒープ外メモリが足りなくなることがあります"
 
     // =========================================================================
     // Mod cards
@@ -970,6 +976,14 @@ object JapaneseStrings : AppStrings {
 
     override val packSettingsTitle = "パックの設定"
     override val packSettingsClose = "閉じる"
+    override val packSettingsExpand = "広げる"
+    override val packSettingsCollapse = "戻す"
+    override fun packSettingsRuntimeLine(loader: String, mc: String) = "${mc} の ${loader}"
+    override fun packSettingsRuntimeVanilla(mc: String) = "Minecraft ${mc}"
+    override val packSettingsLoader = "ローダー"
+    override val packSettingsJavaPickOwn = "自分で指定"
+    override val packSettingsOptionalCoToggle = "MOD を有効にすると、必要なものも有効になり、両立できないものは無効になります。"
+    override val packVersionCheckTitle = "アップデート"
     override val packSettingsCategoryGeneral = "全般"
     override val packSettingsCategoryRuntime = "起動"
     override val packSettingsCategoryVersion = "バージョン"
@@ -986,7 +1000,7 @@ object JapaneseStrings : AppStrings {
     override val packSettingsMemory = "メモリ"
     override val packSettingsEnvironment = "実行環境"
     override val packSettingsJava = "Java"
-    override fun packSettingsJavaManaged(major: Int) = "管理下 — Java ${major}"
+    override fun packSettingsJavaManaged(major: Int) = "ランチャーが管理: Java ${major}"
     override val packSettingsJavaCustom = "Java のパスを指定"
     override val packSettingsJavaPathPlaceholder = "/path/to/bin/java"
     override val packSettingsJavaReset = "管理下のものを使う"

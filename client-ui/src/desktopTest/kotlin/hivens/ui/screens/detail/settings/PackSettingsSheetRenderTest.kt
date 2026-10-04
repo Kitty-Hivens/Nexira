@@ -40,14 +40,14 @@ import kotlin.test.Test
 import kotlin.test.assertTrue
 
 /**
- * Off-screen render smoke of the floating pack-settings window at FHD and 2K,
- * under both styles. ImageComposeScene rasterises the composition with no
- * display -- fully isolated from any live session -- so it both guards the
- * window from a compose-time crash and dumps a PNG under build/ for a manual
- * look. Only the default (General) section composes here; the header's mirror
- * reads run against an always-failing fake and must degrade to placeholders.
+ * Off-screen render smoke of the pack-settings sheet at FHD and 2K.
+ * ImageComposeScene rasterises the composition with no display -- fully isolated
+ * from any live session -- so it both guards the sheet from a compose-time crash
+ * and dumps a PNG under build/ for a manual look. Only the default (General)
+ * section composes here; the header's mirror reads run against an always-failing
+ * fake and must degrade to placeholders.
  */
-class PackSettingsWindowRenderTest {
+class PackSettingsSheetRenderTest {
 
     @AfterTest fun tearDown() = stopKoin()
 
@@ -104,8 +104,8 @@ class PackSettingsWindowRenderTest {
                 single<IPackRepository> { FakeRepo() }
                 single<IMirrorPackClient> { OfflineMirror }
                 single { InstanceSizeService(dataDir = Path.of("/tmp/render"), scope = scope) }
-                // The window persists an edit on the app scope, so the graph has
-                // to hold one -- a write must outlive the window that made it.
+                // The sheet persists an edit on the app scope, so the graph has
+                // to hold one -- a write must outlive the sheet that made it.
                 single<CoroutineScope> { scope }
                 single { PackOperationService(scope = scope, sizes = get(), work = InstanceWorkRegistry()) }
                 single<PackUpdater> { VersionedSource }
@@ -115,14 +115,15 @@ class PackSettingsWindowRenderTest {
         Files.createDirectories(out.parent)
         val scene = ImageComposeScene(width, height, density = Density(1f)) {
             NxTheme(dark = true) {
-                // A vivid backdrop so any bleed-through of the overlay surface shows
-                // up as a pink tint -- proves the window is actually opaque.
+                // A vivid backdrop so any bleed-through of the sheet shows up as a
+                // pink tint -- proves the sheet is opaque and the page beside it is not.
                 Box(Modifier.fillMaxSize().background(Color(BACKDROP))) {
-                    PackSettingsWindow(pack = pack, instanceDir = Path.of("/tmp/render"), onDismiss = {})
+                    PackSettingsSheet(pack = pack, instanceDir = Path.of("/tmp/render"), onDismiss = {})
                 }
             }
         }
-        val painted: Double
+        val sheet: Double
+        val page: Double
         try {
             var frameNanos = 0L
             repeat(20) {
@@ -132,14 +133,19 @@ class PackSettingsWindowRenderTest {
             }
             val frame = scene.render(frameNanos)
             Files.write(out, frame.encodeToData(EncodedImageFormat.PNG)?.bytes ?: error("PNG encode failed"))
-            painted = paintedFraction(frame)
+            // The sheet's own band at the right edge, inside its margins, and a band of
+            // the page well to the left of where any sheet width reaches.
+            sheet = pinkFraction(frame, xFrom = width - SHEET_BAND, xTo = width - EDGE_BAND)
+            page = pinkFraction(frame, xFrom = 0, xTo = width - PAGE_CLEAR)
         } finally {
             scene.close()
         }
-        // The window is drawn over a vivid pink ground on purpose. Measuring how much
-        // of the frame is no longer pink says both that the window rendered and that
-        // it is opaque, where file size said neither.
-        assertTrue(painted > MIN_PAINTED, "the window covers ${(painted * 100).toInt()}% of the frame -- it did not render")
+        // Drawn over a vivid pink ground on purpose. No pink inside the band says the
+        // sheet came in and is opaque. Pink still showing to its left says the page
+        // stays visible beside it under a light scrim, which is what makes it a sheet
+        // rather than a dialog over everything.
+        assertTrue(sheet < MAX_PINK_IN_SHEET, "${(sheet * 100).toInt()}% of the sheet band shows the page through -- it did not come in")
+        assertTrue(page > MIN_PINK_BESIDE, "only ${(page * 100).toInt()}% of the page beside the sheet reads as the page -- the scrim is too heavy")
     }
 
     @Test fun `renders at FHD 1920x1080 under Celestia`() = render(1920, 1080, "pack-settings-fhd.png")
@@ -147,32 +153,42 @@ class PackSettingsWindowRenderTest {
 
     @Test fun `renders at 2K 2560x1440 under Celestia`() = render(2560, 1440, "pack-settings-2k.png")
 
-    /** Share of sampled pixels that are no longer the backdrop the window sits on. */
-    private fun paintedFraction(frame: Image): Double {
+    /** Share of sampled pixels in a vertical band that still read as the pink backdrop. */
+    private fun pinkFraction(frame: Image, xFrom: Int, xTo: Int): Double {
         val bmp = Bitmap.makeFromImage(frame)
-        var painted = 0
+        var pink = 0
         var sampled = 0
         var y = 0
         while (y < bmp.height) {
-            var x = 0
-            while (x < bmp.width) {
-                if (bmp.getColor(x, y) != BACKDROP) painted++
+            var x = xFrom.coerceAtLeast(0)
+            while (x < xTo.coerceAtMost(bmp.width)) {
+                val c = bmp.getColor(x, y)
+                val r = (c shr 16) and 0xFF
+                val g = (c shr 8) and 0xFF
+                if (r > g + PINK_MARGIN) pink++
                 sampled++
                 x += 4
             }
             y += 4
         }
-        return painted.toDouble() / sampled
+        return pink.toDouble() / sampled
     }
 
     private companion object {
-        /** The vivid ground the window is drawn over, so bleed-through is visible. */
+        /** The vivid ground the sheet is drawn over, so bleed-through is visible. */
         val BACKDROP = 0xFFE91E63.toInt()
 
-        /**
-         * A floating window covers a good part of the frame; an empty one covers
-         * none of it. Only has to tell those apart, not pin a layout.
-         */
-        const val MIN_PAINTED = 0.10
+        /** Red ahead of green by this much reads as the pink ground, tinted or not. */
+        const val PINK_MARGIN = 60
+
+        /** The band sampled for the sheet: well inside its 640dp at scale one. */
+        const val SHEET_BAND = 560
+        const val EDGE_BAND = 40
+
+        /** Everything left of this distance from the right edge is page at either size. */
+        const val PAGE_CLEAR = 760
+
+        const val MAX_PINK_IN_SHEET = 0.02
+        const val MIN_PINK_BESIDE = 0.90
     }
 }

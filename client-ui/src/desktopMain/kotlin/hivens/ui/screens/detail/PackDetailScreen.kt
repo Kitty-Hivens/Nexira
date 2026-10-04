@@ -80,7 +80,7 @@ import hivens.ui.screens.ConsoleContent
 import hivens.ui.screens.ConsoleSource
 import hivens.ui.screens.mod.ModTarget
 import hivens.ui.screens.detail.settings.PackSettingsCategory
-import hivens.ui.screens.detail.settings.PackSettingsWindow
+import hivens.ui.screens.detail.settings.PackSettingsSheet
 import hivens.ui.screens.library.FileBrowserPane
 import hivens.ui.screens.library.content.ContentTabPane
 import hivens.ui.screens.library.content.ContentVersionsOverlay
@@ -240,11 +240,13 @@ fun PackDetailScreen(
         }
     }
 
-    // Above the tabs and beside the settings window: both cover the screen.
+    // Above the tabs: it covers the screen.
     ContentVersionsOverlay(instance = pack, state = contentState)
 
+    // A sheet over the whole window, so it is mounted here only for its state: where
+    // it draws is not this screen's bounds.
     if (showSettings) {
-        PackSettingsWindow(
+        PackSettingsSheet(
             pack            = pack,
             instanceDir     = instanceDir,
             onDismiss       = { showSettings = false },

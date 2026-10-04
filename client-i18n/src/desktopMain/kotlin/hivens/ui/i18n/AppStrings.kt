@@ -157,8 +157,6 @@ interface AppStrings {
     // --- Server Detail ---
 
     // --- Server Settings ---
-    val serverSettingsRam: String
-    fun serverSettingsRamValue(mb: Int): String
     val serverSettingsOpenFolder: String
 
     // --- Destructive-action confirm dialogs ---
@@ -276,10 +274,18 @@ interface AppStrings {
     // =========================================================================
     // RAM Selector
     // =========================================================================
-    val ramCustomInputLabel: String
     fun ramSystemHint(systemRam: String, recommended: String): String
+    val ramModeTitle: String
+    val ramModeAuto: String
+    val ramModeOwn: String
+    fun ramAutoDetail(resolved: String): String
+    val ramOwnDetail: String
+    val ramAllocated: String
+    val ramUnitGb: String
+    val ramUnitMb: String
+    fun ramOutOfRange(min: String, max: String): String
+    fun ramAboveRecommended(recommended: String): String
     /** Auto-mode chip label; [resolved] is the formatted heap Auto currently resolves to. */
-    fun ramAutoLabel(resolved: String): String
 
     // =========================================================================
     // Mod cards
@@ -1118,6 +1124,14 @@ interface AppStrings {
     // Pack settings window (floating, section rail)
     val packSettingsTitle: String
     val packSettingsClose: String
+    val packSettingsExpand: String
+    val packSettingsCollapse: String
+    fun packSettingsRuntimeLine(loader: String, mc: String): String
+    fun packSettingsRuntimeVanilla(mc: String): String
+    val packSettingsLoader: String
+    val packSettingsJavaPickOwn: String
+    val packSettingsOptionalCoToggle: String
+    val packVersionCheckTitle: String
     val packSettingsCategoryGeneral: String
     val packSettingsCategoryRuntime: String
     val packSettingsCategoryVersion: String

@@ -129,8 +129,6 @@ object GermanStrings : AppStrings {
     // Server Detail
 
     // Server Settings
-    override val serverSettingsRam             = "RAM"
-    override fun serverSettingsRamValue(mb: Int) = "RAM: $mb MB"
     override val serverSettingsOpenFolder      = "Ordner öffnen"
 
     override val backgroundResetConfirmTitle     = "Hintergrund zurücksetzen?"
@@ -238,10 +236,18 @@ object GermanStrings : AppStrings {
     // =========================================================================
     // RAM Selector
     // =========================================================================
-    override val ramCustomInputLabel = "Eigener Wert:"
     override fun ramSystemHint(systemRam: String, recommended: String) =
         "System: $systemRam • Empfohlen max: $recommended"
-    override fun ramAutoLabel(resolved: String) = "Auto · ~$resolved"
+    override val ramModeTitle = "Speichermenge"
+    override val ramModeAuto = "Auto"
+    override val ramModeOwn = "Eigener Wert"
+    override fun ramAutoDetail(resolved: String) = "Passend zu diesem System und diesem Pack. Gerade sind das $resolved."
+    override val ramOwnDetail = "So viel bekommt das Spiel bei jedem Start."
+    override val ramAllocated = "Zugewiesen"
+    override val ramUnitGb = "GB"
+    override val ramUnitMb = "MB"
+    override fun ramOutOfRange(min: String, max: String) = "Zwischen $min und $max"
+    override fun ramAboveRecommended(recommended: String) = "Über $recommended kann dem System und dem Spiel außerhalb des Heaps der Speicher ausgehen"
 
     // =========================================================================
     // Mod cards
@@ -962,6 +968,14 @@ object GermanStrings : AppStrings {
 
     override val packSettingsTitle              = "Pack-Einstellungen"
     override val packSettingsClose              = "Schließen"
+    override val packSettingsExpand             = "Erweitern"
+    override val packSettingsCollapse           = "Verkleinern"
+    override fun packSettingsRuntimeLine(loader: String, mc: String) = "$loader auf $mc"
+    override fun packSettingsRuntimeVanilla(mc: String) = "Minecraft $mc"
+    override val packSettingsLoader             = "Loader"
+    override val packSettingsJavaPickOwn        = "Eigene angeben"
+    override val packSettingsOptionalCoToggle   = "Ein Mod schaltet ein, was er braucht, und aus, womit er nicht laufen kann."
+    override val packVersionCheckTitle          = "Updates"
     override val packSettingsCategoryGeneral    = "Allgemein"
     override val packSettingsCategoryRuntime    = "Start"
     override val packSettingsCategoryVersion    = "Version"
@@ -978,7 +992,7 @@ object GermanStrings : AppStrings {
     override val packSettingsMemory             = "Arbeitsspeicher"
     override val packSettingsEnvironment        = "Umgebung"
     override val packSettingsJava               = "Java"
-    override fun packSettingsJavaManaged(major: Int) = "Verwaltet -- Java $major"
+    override fun packSettingsJavaManaged(major: Int) = "Vom Launcher verwaltet: Java $major"
     override val packSettingsJavaCustom         = "Eigener Java-Pfad"
     override val packSettingsJavaPathPlaceholder = "/pfad/zu/bin/java"
     override val packSettingsJavaReset          = "Verwaltet nutzen"

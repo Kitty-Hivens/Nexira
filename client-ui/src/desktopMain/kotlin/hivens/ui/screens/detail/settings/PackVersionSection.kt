@@ -1,9 +1,7 @@
 package hivens.ui.screens.detail.settings
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -36,17 +34,15 @@ import hivens.ui.components.ChannelChip
 import hivens.ui.components.formatBuildTimestamp
 import hivens.ui.components.rememberRunningPackGuard
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.icons.NxIcon
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxCalloutBanner
 import hivens.ui.nx.NxCalloutTone
-import hivens.ui.nx.NxSection
-import hivens.ui.nx.NxToggle
+import hivens.ui.nx.NxSettingGroup
+import hivens.ui.nx.NxSettingRow
+import hivens.ui.nx.NxSwitch
 import hivens.ui.puppet.PuppetClick
-import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
-import hivens.ui.theme.Status
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
@@ -148,21 +144,20 @@ internal fun PackVersionSection(
         }
     }
 
-    NxSection(s.packVersionSection) {
-        Row(
-            modifier          = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
+    NxSettingGroup(s.packVersionSection) {
+        NxSettingRow(
+            title  = s.packVersionInstalled,
+            detail = latestLine,
         ) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(s.packVersionInstalled, style = MaterialTheme.typography.labelSmall, color = NxInk.quiet)
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(current, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = NxInk.main)
-                    installedChannel?.let { ChannelChip(it) }
-                }
-                latestLine?.let {
-                    Text(it, style = MaterialTheme.typography.labelSmall, color = NxInk.quiet)
-                }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(current, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = NxInk.main)
+                installedChannel?.let { ChannelChip(it) }
             }
+        }
+        NxSettingRow(
+            title  = s.packVersionCheckTitle,
+            detail = if (check == UpdateCheck.UpToDate) s.packVersionUpToDate else null,
+        ) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 PuppetClick("packSettings.version.check") { runCheck() }
                 NxButton(
@@ -181,15 +176,8 @@ internal fun PackVersionSection(
                 )
             }
         }
-        NxToggle(
-            s.packVersionFollowLatest,
-            pack.followLatest,
-            description = s.packVersionFollowLatestDesc,
-            icon = NxIcon.Sync,
-        ) { enabled -> save { it.copy(followLatest = enabled) } }
-        // Up-to-date is a quiet one-liner inside the section, not a banner block.
-        if (check == UpdateCheck.UpToDate) {
-            Text(s.packVersionUpToDate, style = MaterialTheme.typography.bodySmall, color = NxColor.status(Status.Success, text = true))
+        NxSettingRow(s.packVersionFollowLatest, detail = s.packVersionFollowLatestDesc) {
+            NxSwitch(pack.followLatest, { enabled -> save { it.copy(followLatest = enabled) } })
         }
     }
 

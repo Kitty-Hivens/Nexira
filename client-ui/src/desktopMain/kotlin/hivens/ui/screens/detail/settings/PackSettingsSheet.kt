@@ -1,14 +1,10 @@
 package hivens.ui.screens.detail.settings
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.focusable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -34,14 +30,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -49,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.SubcomposeAsyncImage
 import hivens.core.api.interfaces.IMirrorPackClient
 import hivens.core.api.interfaces.IPackRepository
+import hivens.core.data.CachedManifestSnapshot
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
 import hivens.core.update.PackUpdater
@@ -58,18 +48,20 @@ import hivens.launcher.PackOperationKind
 import hivens.launcher.PackOperationPhase
 import hivens.launcher.PackOperationService
 import hivens.ui.components.ChannelChip
+import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.nx.NxIconButton
 import hivens.ui.nx.NxMetaChip
 import hivens.ui.nx.NxMetaChipTone
-import hivens.ui.nx.NxNavRowContent
+import hivens.ui.nx.NxSideSheet
+import hivens.ui.nx.NxTabRow
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
-import hivens.ui.surface.NxSurface
-import hivens.ui.surface.SurfaceKind
+import hivens.ui.screens.mod.loaderLabel
+import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
-import hivens.ui.theme.OnFill
+import hivens.ui.theme.Status
 import hivens.ui.theme.decorativeColor
 import hivens.ui.utils.shortNameList
 import kotlinx.coroutines.CoroutineScope
@@ -77,8 +69,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import java.nio.file.Path
-import hivens.ui.theme.NxColor
-import hivens.ui.theme.Status
 
 /**
  * A change to a pack's settings, as a function of the record rather than a copy of
@@ -102,32 +92,32 @@ private class Edit(val change: PackEdit, val persist: Boolean) {
 private const val EDIT_SETTLE_MS = 250L
 
 /**
- * The floating pack-settings window: a scrimmed overlay hosting a section rail
- * on the left and the selected section's controls on the right -- the global
- * Settings "by sections" grammar, but as a transient panel over the pack detail
- * rather than a nav route.
+ * A pack's settings, in a sheet that comes in from the right edge of the window and
+ * leaves the pack page readable beside it: the header names the pack and what it
+ * runs on, the sections are tabs along the top, and the footer is a layout-stable
+ * status strip for the section-launched async work (an update apply, a failed
+ * check), so progress never reflows the panes (Rule 6).
  *
- * Sized purely by fraction of the app window (no dp caps): a big monitor gets a
- * proportionally big panel instead of a fixed island. Esc and the scrim both
- * dismiss. The footer is a layout-stable status strip for the section-launched
- * async work (an update apply, a failed check), so progress never reflows the
- * panes (Rule 6).
+ * It was a window mounted inside the centre pane, so its scrim stopped at the rails
+ * and the title bar, and it was sized as a share of that pane. The sheet sits over
+ * the whole window ([NxSideSheet]), keeps one width whatever the display, and widens
+ * on request.
  *
  * The long operations it narrates belong to [PackOperationService], not to this
- * composition: reopening the window over a repair that is still running finds it
- * and picks the narration back up, where window-local state would have shown an
+ * composition: reopening the sheet over a repair that is still running finds it
+ * and picks the narration back up, where sheet-local state would have shown an
  * idle footer and offered to start a second one.
  *
  * Each control hands [save] a [PackEdit] naming the fields it changes, and the
  * rewritten record arrives back through [pack] because the screen that hosts this
- * window follows the registry. There is no separate form-state blob, and the write
+ * sheet follows the registry. There is no separate form-state blob, and the write
  * lives here rather than in each section: one write per settled edit, applied
  * through [IPackRepository.update] to the record as it is at that moment. Writing
- * the copy this window was showing put back whatever had changed underneath it
+ * the copy this sheet was showing put back whatever had changed underneath it
  * during the edit: playtime recorded at exit, a build an update had committed.
  */
 @Composable
-fun PackSettingsWindow(
+fun PackSettingsSheet(
     pack: PackInstance,
     instanceDir: Path,
     onDismiss: () -> Unit,
@@ -165,7 +155,7 @@ fun PackSettingsWindow(
         if (current.persist) repo.update(pack.id, current.change)
         if (edit === current) edit = null
     }
-    // Closing the window is not what discards an edit it has not written yet, and
+    // Closing the sheet is not what discards an edit it has not written yet, and
     // the composition scope above dies with it.
     val unwritten = rememberUpdatedState(edit)
     DisposableEffect(pack.id) {
@@ -188,128 +178,92 @@ fun PackSettingsWindow(
     // rather than inferred from where the pack came from.
     val updater: PackUpdater = koinInject()
     val hasVersionFeed = remember(pack.packRef.origin) { updater.handles(pack) }
-    val categories = remember(hasVersionFeed) {
-        PackSettingsCategory.entries.filter { hasVersionFeed || !it.needsVersionFeed }
+    val categories = remember(hasVersionFeed, isMirror) {
+        PackSettingsCategory.entries.filter {
+            (hasVersionFeed || !it.needsVersionFeed) && (isMirror || !it.needsOptionalContent)
+        }
     }
     var selected by remember(pack.id) { mutableStateOf(initialCategory ?: PackSettingsCategory.General) }
     // A detach mid-session drops the Version section; fall back so the pane never
-    // dispatches a category the rail no longer shows.
+    // dispatches a category the tabs no longer show.
     if (selected !in categories) selected = PackSettingsCategory.General
+    var expanded by remember(pack.id) { mutableStateOf(false) }
 
     val operations: PackOperationService = koinInject()
     val inFlight by operations.operations.collectAsState()
     val operation = inFlight[pack.id]
-    // A check is short and belongs to the window, so its failure is a window-local
+    // A check is short and belongs to the sheet, so its failure is a sheet-local
     // line rather than an entry in the app-scoped registry.
     var notice by remember(pack.id) { mutableStateOf<String?>(null) }
 
     // The result of a finished operation is read here and nowhere else, so it is
-    // dropped when the window goes: a repair from twenty minutes ago has nothing
-    // to say to the next visit. A running one is left alone -- closing the window
-    // is not what ends it.
+    // dropped when the sheet goes: a repair from twenty minutes ago has nothing to
+    // say to the next visit. A running one is left alone -- closing the sheet is
+    // not what ends it.
     DisposableEffect(pack.id) {
         onDispose { operations.dismiss(pack.id) }
     }
 
-    // Scrim: click outside dismisses; the card swallows clicks so a stray tap
-    // inside does not close the window. Esc closes from anywhere in the overlay
-    // (the scrim holds focus for it).
-    val scrim = remember { MutableInteractionSource() }
-    val card = remember { MutableInteractionSource() }
-    val focus = remember { FocusRequester() }
-    LaunchedEffect(Unit) { focus.requestFocus() }
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(NxColor.page.copy(alpha = 0.55f))
-            .focusRequester(focus)
-            .focusable()
-            .onPreviewKeyEvent { ev ->
-                if (ev.type == KeyEventType.KeyDown && ev.key == Key.Escape) {
-                    onDismiss(); true
-                } else {
-                    false
-                }
-            }
-            .clickable(scrim, indication = null, onClick = onDismiss),
-        contentAlignment = Alignment.Center,
-    ) {
-        NxSurface(
-            kind = SurfaceKind.Dialog,
+    NxSideSheet(onDismissRequest = onDismiss, expanded = expanded) { close ->
+        PuppetClick("packSettings.close") { close() }
+        SheetHeader(
+            pack       = shown,
+            isMirror   = isMirror,
+            expanded   = expanded,
+            onExpand   = { expanded = !expanded },
+            onClose    = close,
+        )
+        categories.forEach { category ->
+            PuppetClick("packSettings.category.${category.name}") { selected = category }
+        }
+        NxTabRow(
+            tabs     = categories.map { it.label(s) },
+            selected = categories.indexOf(selected),
+            onSelect = { selected = categories[it] },
+            modifier = Modifier.padding(horizontal = 24.dp),
+        )
+        Box(Modifier.fillMaxWidth().padding(top = 8.dp).height(1.dp).background(NxInk.line))
+
+        Column(
             modifier = Modifier
-                .fillMaxWidth(0.88f)
-                .fillMaxHeight(0.90f)
-                .clickable(card, indication = null, onClick = {}),
+                .weight(1f)
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 24.dp, vertical = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(28.dp),
         ) {
-            Column(Modifier.fillMaxSize()) {
-                WindowHeader(pack = shown, isMirror = isMirror, onDismiss = onDismiss)
-
-                Row(Modifier.weight(1f).fillMaxWidth().padding(start = 12.dp, end = 16.dp)) {
-                    // ── Rail (the global Settings nav grammar) ────────────
-                    Column(
-                        modifier = Modifier.width(200.dp).fillMaxHeight().padding(end = 12.dp),
-                        verticalArrangement = Arrangement.spacedBy(2.dp),
-                    ) {
-                        categories.forEach { category ->
-                            val isSelected = category == selected
-                            PuppetClick("packSettings.category.${category.name}") { selected = category }
-                            val rowFill = if (isSelected) NxColor.wash(NxColor.lead(), 0.18f) else Color.Transparent
-                            OnFill(rowFill) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(MaterialTheme.shapes.medium)
-                                        .background(rowFill)
-                                        .clickable { selected = category }
-                                        .padding(horizontal = 12.dp, vertical = 10.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    NxNavRowContent(
-                                        icon = category.icon,
-                                        label = category.label(s),
-                                        isSelected = isSelected,
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    // ── Pane ──────────────────────────────────────────────
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight()
-                            .verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(16.dp),
-                    ) {
-                        when (selected) {
-                            PackSettingsCategory.General ->
-                                PackGeneralSection(shown, save)
-                            PackSettingsCategory.Runtime ->
-                                PackRuntimeSection(shown, instanceDir, save)
-                            PackSettingsCategory.Version ->
-                                PackVersionSection(shown, operation, save, onOpenVersions, onNotice = { notice = it })
-                            PackSettingsCategory.Content ->
-                                PackContentSection(shown, adopt)
-                            PackSettingsCategory.Data ->
-                                PackDataSection(shown, instanceDir, operation, onDismiss)
-                        }
-                    }
-                }
-
-                FooterStatus(operation, notice)
+            when (selected) {
+                PackSettingsCategory.General ->
+                    PackGeneralSection(shown, save)
+                PackSettingsCategory.Runtime ->
+                    PackRuntimeSection(shown, instanceDir, save)
+                PackSettingsCategory.Version ->
+                    PackVersionSection(shown, operation, save, onOpenVersions, onNotice = { notice = it })
+                PackSettingsCategory.Content ->
+                    PackContentSection(shown, adopt)
+                PackSettingsCategory.Data ->
+                    PackDataSection(shown, instanceDir, operation, onDismiss)
             }
         }
+
+        FooterStatus(operation, notice)
     }
 }
 
 /**
- * Identity header: pack avatar + name, the installed build with its channel for
- * a mirror pack, and close. Channel data arrives best-effort (offline settings
- * stay fully usable; the chips just do not render).
+ * Identity header: the pack's mark, what the sheet is and which pack and runtime it
+ * is about, the installed build with its channel where a source names one, then
+ * widen and close. Channel data arrives best-effort (offline settings stay fully
+ * usable; the chips just do not render).
  */
 @Composable
-private fun WindowHeader(pack: PackInstance, isMirror: Boolean, onDismiss: () -> Unit) {
+private fun SheetHeader(
+    pack: PackInstance,
+    isMirror: Boolean,
+    expanded: Boolean,
+    onExpand: () -> Unit,
+    onClose: () -> Unit,
+) {
     val s = LocalStrings.current
     val mirror: IMirrorPackClient = koinInject()
     val installed = pack.pinnedPackVersion ?: pack.packRef.version
@@ -323,36 +277,57 @@ private fun WindowHeader(pack: PackInstance, isMirror: Boolean, onDismiss: () ->
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 18.dp, vertical = 14.dp),
+            .padding(start = 24.dp, end = 16.dp, top = 18.dp, bottom = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         HeaderAvatar(pack)
         Column(Modifier.weight(1f)) {
             Text(
-                pack.displayName,
+                s.packSettingsTitle,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = NxInk.main,
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
             )
             Text(
-                s.packSettingsTitle,
-                style = MaterialTheme.typography.labelSmall,
+                listOfNotNull(pack.displayName, pack.cachedManifest?.let { runtimeLine(it, s) }).joinToString(" · "),
+                style = MaterialTheme.typography.bodySmall,
                 color = NxInk.quiet,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
         if (isMirror && installed != null) {
             NxMetaChip("v$installed", tone = NxMetaChipTone.Surface)
             installedChannel?.let { ChannelChip(it) }
         }
-        PuppetClick("packSettings.close") { onDismiss() }
+        NxIconButton(
+            icon = if (expanded) NxIcon.CloseFullscreen else NxIcon.OpenInFull,
+            contentDescription = if (expanded) s.packSettingsCollapse else s.packSettingsExpand,
+            onClick = onExpand,
+        )
         NxIconButton(
             icon = NxIcon.Close,
             contentDescription = s.packSettingsClose,
-            onClick = onDismiss,
+            onClick = onClose,
         )
+    }
+}
+
+/**
+ * What a pack runs on, in one phrase: the loader with its version on a Minecraft
+ * version. The loader version is the part nothing else on screen showed, and the
+ * one a player needs to say which build of the loader a crash came from.
+ */
+internal fun runtimeLine(m: CachedManifestSnapshot, s: AppStrings): String {
+    val loader = m.loaderName
+        .takeIf { it.isNotBlank() && !it.equals("vanilla", ignoreCase = true) }
+        ?.let(::loaderLabel)
+    return when {
+        loader == null -> s.packSettingsRuntimeVanilla(m.minecraftVersion)
+        m.loaderVersion.isBlank() -> s.packSettingsRuntimeLine(loader, m.minecraftVersion)
+        else -> s.packSettingsRuntimeLine("$loader ${m.loaderVersion}", m.minecraftVersion)
     }
 }
 
@@ -382,13 +357,13 @@ private fun HeaderAvatar(pack: PackInstance) {
 
 /**
  * Layout-stable footer strip: the instance's long operation, or -- when it has
- * none -- whatever the window itself has to report.
+ * none -- whatever the sheet itself has to report.
  */
 @Composable
 private fun FooterStatus(operation: PackOperation?, notice: String?) {
     val s = LocalStrings.current
     Box(
-        modifier = Modifier.fillMaxWidth().height(34.dp).padding(horizontal = 18.dp, vertical = 6.dp),
+        modifier = Modifier.fillMaxWidth().height(34.dp).padding(horizontal = 24.dp, vertical = 6.dp),
         contentAlignment = Alignment.CenterStart,
     ) {
         val phase = operation?.phase
