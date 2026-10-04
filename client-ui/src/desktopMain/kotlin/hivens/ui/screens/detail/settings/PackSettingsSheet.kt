@@ -6,7 +6,7 @@ import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -234,11 +234,13 @@ fun PackSettingsSheet(
         )
         Box(Modifier.fillMaxWidth().padding(top = 8.dp).height(1.dp).background(NxInk.line))
 
-        // The next section comes in from the side its tab is on, so the move reads as
-        // travel along the tab row rather than as a page being swapped out.
+        // The section being left goes first, fading where it stands, and the next one
+        // comes in a moment later from the side its tab is on. Moving both at once laid
+        // two panes over each other for the length of the move.
         val still = LocalCustomization.current.reduceMotion
         val slide = Motion.panelSlide
         val fade = Motion.fade
+        val leave = Motion.tap
         AnimatedContent(
             targetState = selected,
             modifier = Modifier.weight(1f).fillMaxWidth(),
@@ -248,8 +250,11 @@ fun PackSettingsSheet(
                 } else {
                     val forward = categories.indexOf(targetState) > categories.indexOf(initialState)
                     val towards = if (forward) 1 else -1
-                    (slideInHorizontally(slide.of()) { it / SECTION_TRAVEL * towards } + fadeIn(fade.of())) togetherWith
-                        (slideOutHorizontally(slide.of()) { -it / SECTION_TRAVEL * towards } + fadeOut(fade.of()))
+                    val after = leave.durationMs
+                    (
+                        slideInHorizontally(tween(slide.durationMs, after, slide.easing)) { it / SECTION_TRAVEL * towards } +
+                            fadeIn(tween(fade.durationMs, after, fade.easing))
+                        ) togetherWith fadeOut(tween(leave.durationMs, easing = leave.easing))
                 }
             },
             label = "packSettingsSection",
@@ -281,7 +286,7 @@ fun PackSettingsSheet(
 }
 
 /** How far a section travels on a tab change, as a share of the sheet's width. */
-private const val SECTION_TRAVEL = 8
+private const val SECTION_TRAVEL = 24
 
 /**
  * Identity header: the pack's mark, what the sheet is and which pack and runtime it

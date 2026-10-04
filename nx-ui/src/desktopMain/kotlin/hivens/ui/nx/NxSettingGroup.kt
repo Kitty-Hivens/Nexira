@@ -1,5 +1,7 @@
 package hivens.ui.nx
 
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.snap
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -23,8 +25,10 @@ import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import hivens.ui.customization.LocalCustomization
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
+import hivens.ui.theme.Motion
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.Status
@@ -80,8 +84,15 @@ fun NxSettingRow(
     trailing: @Composable () -> Unit = {},
 ) {
     val alpha = if (enabled) 1f else 0.4f
+    val still = LocalCustomization.current.reduceMotion
+    val reveal = Motion.reveal
     Row(
-        modifier              = modifier.fillMaxWidth().heightIn(min = 60.dp).padding(vertical = 12.dp),
+        // The height follows the text rather than jumping to it: a detail line that
+        // arrives late (a folder size being measured) or wraps differently once the
+        // sheet widens would otherwise move every row under it in one frame.
+        modifier              = modifier.fillMaxWidth()
+            .animateContentSize(if (still) snap() else reveal.of())
+            .heightIn(min = 60.dp).padding(vertical = 12.dp),
         verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(24.dp),
     ) {
