@@ -41,6 +41,7 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.nx.CenteredProgress
 import hivens.ui.nx.NxSectionHeader
+import hivens.ui.nx.NxSwap
 import hivens.ui.nx.RetryStateBlock
 import hivens.ui.surface.NxCard
 import hivens.ui.surface.NxSurface
@@ -90,16 +91,24 @@ fun WorldsTabPane(instanceDir: Path, modifier: Modifier = Modifier) {
         }.getOrElse { WorldsState.Error }
     }
 
-    when (val st = state) {
-        WorldsState.Loading -> CenteredProgress(modifier.fillMaxSize())
-        WorldsState.Error -> RetryStateBlock(
-            title      = s.worldsTabErrorTitle,
-            message    = s.worldsTabErrorMessage,
-            retryLabel = s.contentTabRetry,
-            onRetry    = { retryTick++ },
-            modifier   = modifier.fillMaxSize(),
-        )
-        is WorldsState.Loaded -> WorldsList(worlds = st.worlds, servers = st.servers, modifier = modifier)
+    // One panel under the whole tab, as the Logs tab has, from the first frame: the
+    // section headings are text and need something under them, and a panel that
+    // only arrived with the scan left a frame of bare wallpaper and then a jump.
+    // What is on it changes by a fade, so the scan landing is not a second jump.
+    NxSurface(SurfaceKind.Panel, modifier = modifier.fillMaxSize()) {
+        NxSwap(target = state, label = "worldsState") { st ->
+            when (st) {
+                WorldsState.Loading -> CenteredProgress(Modifier.fillMaxSize())
+                WorldsState.Error -> RetryStateBlock(
+                    title      = s.worldsTabErrorTitle,
+                    message    = s.worldsTabErrorMessage,
+                    retryLabel = s.contentTabRetry,
+                    onRetry    = { retryTick++ },
+                    modifier   = Modifier.fillMaxSize(),
+                )
+                is WorldsState.Loaded -> WorldsList(worlds = st.worlds, servers = st.servers)
+            }
+        }
     }
 }
 
@@ -116,13 +125,8 @@ private sealed interface WorldsState {
 private fun WorldsList(
     worlds: List<WorldEntry>,
     servers: List<MultiplayerServerEntry>,
-    modifier: Modifier,
 ) {
     val s = LocalStrings.current
-    // One panel under the whole tab, as the Logs tab has: the section headings are
-    // text, and text laid straight over the page sat on the wallpaper with nothing
-    // under it to read against.
-    NxSurface(SurfaceKind.Panel, modifier = modifier.fillMaxSize()) {
     LazyColumn(
         modifier            = Modifier.fillMaxSize(),
         contentPadding      = PaddingValues(16.dp),
@@ -149,7 +153,6 @@ private fun WorldsList(
             items(count = servers.size, key = { it }) { i -> ServerCard(entry = servers[i]) }
         }
 
-    }
     }
 }
 

@@ -1,5 +1,10 @@
 package hivens.ui.screens.detail
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -102,6 +107,7 @@ import java.time.Instant
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
+import hivens.ui.theme.Motion
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.Status
@@ -226,8 +232,23 @@ fun PackDetailScreen(
                 .fillMaxSize()
                 .padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 16.dp),
         ) {
-            tabRetention.SaveableStateProvider(tabIndex) {
-            when (tabIndex) {
+            // The body being left goes quickly and the next fades in after it. Cut, a
+            // body that fills itself in after its first frame (a file tree listed
+            // off-thread, worlds scanned) showed as a run of jumps; and a plain
+            // crossfade left both bodies half clear at once, the wallpaper showing
+            // through two panels at the midpoint.
+            val leave = Motion.tap
+            val arrive = Motion.fade
+            AnimatedContent(
+                targetState    = tabIndex,
+                transitionSpec = {
+                    fadeIn(tween(arrive.durationMs, leave.durationMs / 2, arrive.easing)) togetherWith
+                        fadeOut(tween(leave.durationMs, easing = leave.easing))
+                },
+                label          = "packTab",
+            ) { tab ->
+            tabRetention.SaveableStateProvider(tab) {
+            when (tab) {
                 0 -> ContentTabPane(
                     instance = pack,
                     state = contentState,
@@ -242,6 +263,7 @@ fun PackDetailScreen(
                 1 -> FileBrowserPane(rootDir = instanceDir)
                 2 -> WorldsTabPane(instanceDir = instanceDir)
                 3 -> PackLogsTab(packId = pack.id, instanceDir = instanceDir)
+            }
             }
             }
         }
