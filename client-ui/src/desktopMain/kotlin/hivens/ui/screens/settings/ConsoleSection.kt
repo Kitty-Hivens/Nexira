@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -159,16 +160,26 @@ internal fun ConsoleSection() {
 }
 
 /** Severity colour row: a label and a library [NxColorField]; the auto label clears
- *  the override back to the theme default. */
+ *  the override back to the theme default. The label column is pinned because the
+ *  field fills its row, and a label left to take the remainder is measured at zero.
+ *  No vertical padding of its own, so the rows keep the section's toggle rhythm. */
 @Composable
 private fun ConsoleColorRow(label: String, hex: String?, autoLabel: String, onChange: (String?) -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(label, color = NxInk.main, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+        Text(
+            text       = label,
+            color      = NxInk.main,
+            fontWeight = FontWeight.Medium,
+            maxLines   = 1,
+            overflow   = TextOverflow.Ellipsis,
+            modifier   = Modifier.width(64.dp),
+        )
         NxColorField(
             hex           = hex,
             onValueChange = onChange,
             onClear       = { onChange(null) },
             clearLabel    = autoLabel,
+            modifier      = Modifier.weight(1f),
         )
     }
 }
@@ -188,7 +199,7 @@ private fun HighlightRuleCard(rule: HighlightRule, onChange: (HighlightRule) -> 
             }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 NxChoiceChip(s.consoleSecRegex, rule.regex) { onChange(rule.copy(regex = !rule.regex)) }
-                NxColorField(hex = rule.colorHex, onValueChange = { onChange(rule.copy(colorHex = it.orEmpty())) })
+                NxColorField(hex = rule.colorHex, onValueChange = { onChange(rule.copy(colorHex = it.orEmpty())) }, modifier = Modifier.weight(1f))
                 NxChoiceChip(s.consoleSecBold, rule.bold) { onChange(rule.copy(bold = !rule.bold)) }
             }
         }
