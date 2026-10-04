@@ -69,8 +69,8 @@ fun hostIsMusl(): Boolean {
 kotlin {
     // KMP modules don't apply the `java` plugin, so the root's toolchain pin
     // (java-plugin modules only) skips them; set it here so org.gradle.jvm.version
-    // matches the JDK 26 leaf modules instead of falling back to the daemon JVM.
-    jvmToolchain(26)
+    // matches the JDK 27 leaf modules instead of falling back to the daemon JVM.
+    jvmToolchain(27)
     jvm("desktop") {
         // Every other module already runs on the platform; this one was still on
         // JUnit 4 purely by KMP default, which left it out of the build-wide
@@ -699,14 +699,14 @@ tasks.matching { it.name == "customRuntime" || it.name == "emitAppImageProfile" 
 // recomposition audits but wasted IO on every regular compile.
 tasks.withType<KotlinJvmCompile>().configureEach {
     compilerOptions {
-        jvmTarget.set(JvmTarget.JVM_26)
+        jvmTarget.set(JvmTarget.JVM_27)
 
         val composeMetricsEnabled = providers.gradleProperty("nexiraComposeMetrics")
             .map { it == "true" }.orElse(false).get()
         val buildDirAbsolute = layout.buildDirectory.get().asFile.absolutePath
 
         freeCompilerArgs.addAll(
-            // Bytecode: emit default methods directly (legal on jvmTarget=26).
+            // Bytecode: emit default methods directly (legal on jvmTarget=27).
             // Smaller class files, removes the DefaultImpls indirection.
             "-jvm-default=no-compatibility",
 

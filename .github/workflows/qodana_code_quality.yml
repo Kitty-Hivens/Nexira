@@ -25,18 +25,18 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
-      # The Gradle build pins a Java 26 toolchain, but the Qodana linter's bundled
-      # JBR has no 26 and cannot auto-download it, so its Gradle import died on
-      # "No defined toolchain download url" for languageVersion=26. Install a real
-      # JDK 26 on the runner and mount it into the linter container (the -v below);
+      # The Gradle build pins a Java 27 toolchain, but the Qodana linter's bundled
+      # JBR has no 27 and cannot auto-download it, so its Gradle import dies on
+      # "No defined toolchain download url" for languageVersion=27. Install a real
+      # JDK 27 on the runner and mount it into the linter container (the -v below);
       # qodana.yaml's projectJDK points the project's Gradle JVM at it so
-      # toolchain(26) resolves to the running JVM instead of a download.
-      - name: Set up JDK 26 for the Gradle toolchain
-        id: jdk26
+      # toolchain(27) resolves to the running JVM instead of a download.
+      - name: Set up JDK 27 for the Gradle toolchain
+        id: jdk
         uses: actions/setup-java@v6
         with:
           distribution: liberica
-          java-version: '26'
+          java-version: '27'
       - name: 'Qodana Scan'
         uses: JetBrains/qodana-action@v2026.2.1
         env:
@@ -54,7 +54,7 @@ jobs:
           upload-result: true
           # quick-fixes available in Ultimate and Ultimate Plus plans
           push-fixes: 'none'
-          # Mount the runner's JDK 26 into the linter container so projectJDK
+          # Mount the runner's JDK 27 into the linter container so projectJDK
           # (/root/.jdks/jdk) resolves the Gradle toolchain. Space-separated: the
           # comma form is deprecated and the action warns on it every run.
-          args: -v ${{ steps.jdk26.outputs.path }}:/root/.jdks/jdk
+          args: -v ${{ steps.jdk.outputs.path }}:/root/.jdks/jdk

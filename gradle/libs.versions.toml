@@ -4,15 +4,17 @@
 
 [versions]
 # ── Toolchain & language plugins ─────────────────────────────────────────────
-kotlin            = "2.4.20"
+# A beta on purpose: 2.5.0-Beta1 is the first Kotlin line with JvmTarget.JVM_27,
+# and the build targets Java 27 bytecode. Every 2.4.x stops at JVM_26. Move to
+# 2.5.0 when it ships stable.
+kotlin            = "2.5.0-Beta1"
 compose           = "1.13.0-alpha01"
 buildconfigPlugin = "6.1.2"
 versionsPlugin    = "0.64.0"
-# ksp tracks its own release line, decoupled from the Kotlin version. 2.3.10 is
-# the latest published KSP; KSP2 runs on the Analysis API and compiles cleanly
-# against the Kotlin 2.4.10 toolchain here (:widget-processor / :client-ui
-# kspKotlinDesktop both green). Bump when a newer KSP ships; it does not need to
-# match the Kotlin minor.
+# ksp tracks its own release line, decoupled from the Kotlin version. KSP2 runs
+# on the Analysis API it bundles, so it does not need to match the Kotlin minor
+# (:widget-processor / :client-ui kspKotlinDesktop are the check). Bump when a
+# newer KSP ships.
 ksp               = "2.3.12"
 
 # ── Core libraries ───────────────────────────────────────────────────────────

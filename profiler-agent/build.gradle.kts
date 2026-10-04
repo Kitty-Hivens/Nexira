@@ -17,11 +17,11 @@ tasks.test {
 // This jar is a -javaagent that loads into the GAME JVM, not the launcher.
 // Legacy SmartyCraft packs (1.7.10 / 1.12.2) run on Java 8, so the agent must
 // be Java 8 bytecode (class major 52) or it throws UnsupportedClassVersionError
-// there. The root build.gradle.kts forces Java 26 on every subproject inside an
+// there. The root build.gradle.kts forces Java 27 on every subproject inside an
 // afterEvaluate; this block runs after it (callbacks fire in registration order,
 // and the root registers its callback before this script is evaluated), pinning
 // the agent back to 8. `options.release` makes javac ignore the inherited
-// source/target=26. Verify after a build with:
+// source/target=27. Verify after a build with:
 //   javap -v build/classes/java/main/hivens/profiler/agent/ProfilerAgent.class | grep major
 // -> must read "major version: 52".
 afterEvaluate {

@@ -62,9 +62,9 @@ exclude:
   # trips one of those inspections, suppress at the call site
   # (`@Suppress("UnusedSymbol")`) rather than file-wide here.
 
-# CI mounts a real JDK 26 at this path (qodana_code_quality.yml passes `-v <jdk>:/root/.jdks/jdk`).
-# The build pins a Java 26 Gradle toolchain, and the linter's bundled JBR has no 26 to auto-download,
-# so we point the project (and thus Gradle's JVM) at the mounted 26 to resolve toolchain(26) locally.
+# CI mounts a real JDK 27 at this path (qodana_code_quality.yml passes `-v <jdk>:/root/.jdks/jdk`).
+# The build pins a Java 27 Gradle toolchain, and the linter's bundled JBR has no 27 to auto-download,
+# so we point the project (and thus Gradle's JVM) at the mounted 27 to resolve toolchain(27) locally.
 projectJDK: /root/.jdks/jdk
 
 #Execute shell command before Qodana execution (Applied in CI/CD pipeline)
