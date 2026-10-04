@@ -3,6 +3,7 @@ package hivens.ui.widgets.home.new
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
@@ -12,20 +13,26 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -44,6 +51,7 @@ import hivens.ui.components.rememberLaunchControl
 import hivens.ui.effects.pixelArtBackground
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.nx.NxMetaChipTone
+import hivens.ui.nx.NxVerticalScrollbar
 import hivens.ui.nx.PlayGround
 import hivens.ui.nx.PlayLayout
 import hivens.ui.screens.library.PendingUpdateBadge
@@ -64,7 +72,7 @@ import org.koin.compose.koinInject
 @Serializable
 data class PackListProps(
     @PropLabel("widget.home.new.packlist.title") val title: String = "",
-    @PropLabel("widget.home.new.packlist.maxRows") @PropRange(0.0, 48.0) val maxRows: Int = 8,
+    @PropLabel("widget.home.new.packlist.maxRows") @PropRange(0.0, 48.0) val maxRows: Int = 0,
     @PropLabel("widget.home.new.packlist.skipContinued") val skipContinued: Boolean = true,
 )
 
@@ -79,6 +87,10 @@ data class PackListProps(
 //
 // Narrow, the facts that are least needed to choose a pack go first: when it was
 // played, then what it runs on. The name and the hours stay.
+//
+// Every pack is listed unless the props name a ceiling. Where the slot bounds the
+// height, as on a Home that does not scroll, the list scrolls inside it rather than
+// dropping the rows that do not fit.
 @Widget(
     id = "home.new.packlist",
     enter = "rise",
@@ -122,12 +134,8 @@ fun HomeNewPackList(instance: WidgetInstance) {
         )
         BoxWithConstraints(Modifier.fillMaxWidth()) {
             val columns = PackListColumns.forWidth(maxWidth.value)
-            // Home does not scroll, so the list takes the rows the height left to it
-            // holds rather than running off the bottom of a small window. A slot with
-            // no bound below it gets the rows the props ask for.
-            val fit = rowsThatFit(maxHeight)
-            Column {
-                rows.take(fit).forEachIndexed { i, pack ->
+            ScrollingRows(bounded = maxHeight != Dp.Infinity) {
+                rows.forEachIndexed { i, pack ->
                     if (i > 0) Box(Modifier.fillMaxWidth().height(RULE).background(NxInk.line))
                     PackRow(pack, columns)
                 }
@@ -136,10 +144,41 @@ fun HomeNewPackList(instance: WidgetInstance) {
     }
 }
 
-/** How many rows, with the rules between them, stand in [height]. */
-internal fun rowsThatFit(height: Dp): Int =
-    if (height == Dp.Infinity) Int.MAX_VALUE
-    else (((height + RULE) / (ROW_HEIGHT + RULE)).toInt()).coerceAtLeast(1)
+/**
+ * The rows, scrolling inside the height the slot leaves them when it leaves a bound.
+ *
+ * Unbounded, which is what a scrolling page hands down, there is nothing to scroll
+ * against and a scroll measured against nothing throws, so the rows are laid out in
+ * full and the page does the scrolling.
+ *
+ * The bar sits in the widget's side padding, clear of Play at the end of each row,
+ * and is sized to the list rather than to the height on offer: filling the offer
+ * stretched the panel to the bottom of the window under a list of two packs. The
+ * position is saved, so Home opens where the list was left.
+ */
+@Composable
+internal fun ScrollingRows(
+    bounded: Boolean,
+    state: ScrollState = rememberSaveable(saver = ScrollState.Saver) { ScrollState(0) },
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    if (!bounded) {
+        Column(content = content)
+        return
+    }
+    val interaction = remember { MutableInteractionSource() }
+    val hovered by interaction.collectIsHoveredAsState()
+    Box(Modifier.fillMaxWidth().hoverable(interaction)) {
+        Column(Modifier.fillMaxWidth().verticalScroll(state), content = content)
+        Box(Modifier.matchParentSize()) {
+            NxVerticalScrollbar(
+                adapter  = rememberScrollbarAdapter(state),
+                revealed = hovered || state.isScrollInProgress,
+                modifier = Modifier.align(Alignment.CenterEnd).offset(x = BAR_OFFSET).fillMaxHeight(),
+            )
+        }
+    }
+}
 
 /** Which of the optional columns a row of this width has room for. */
 internal data class PackListColumns(val runsOn: Boolean, val played: Boolean) {
@@ -262,3 +301,6 @@ private val MARK = 32.dp
 private val HOURS_WIDTH = 64.dp
 private val PLAY_WIDTH = 40.dp
 private const val HOVER_ALPHA = 0.05f
+
+/** Into the 20dp side padding, so the 8dp bar stands 6dp off the panel's edge. */
+private val BAR_OFFSET = 14.dp

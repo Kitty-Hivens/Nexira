@@ -1,7 +1,20 @@
 package hivens.ui.widgets.home.new
 
-import androidx.compose.ui.unit.Dp
+import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.ImageComposeScene
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import hivens.ui.theme.NxTheme
+import hivens.ui.theme.Themes
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -34,20 +47,25 @@ class RecentTileGridTest {
     }
 }
 
-/** The pack list on a Home that does not scroll. */
+/** The pack list, on a Home that does not scroll and on a page that does. */
 class PackListFitTest {
 
     @Test
-    fun `the rows that stand in the height are the rows shown`() {
-        // Six rows of 52 with five rules between them take 317.
-        assertEquals(6, rowsThatFit(317.dp))
-        assertEquals(5, rowsThatFit(316.dp))
+    fun `a bounded list keeps every row and scrolls to the ones below`() {
+        val state = ScrollState(0)
+        val height = listHeight(rows = 10, bound = 200, state = state)
+        assertEquals(200, height)
+        assertEquals(10 * ROW - 200, state.maxValue)
     }
 
     @Test
-    fun `a sliver still shows one row, and no bound shows them all`() {
-        assertEquals(1, rowsThatFit(10.dp))
-        assertEquals(Int.MAX_VALUE, rowsThatFit(Dp.Infinity))
+    fun `a short list is as tall as its rows, not as the height on offer`() {
+        assertEquals(2 * ROW, listHeight(rows = 2, bound = 400))
+    }
+
+    @Test
+    fun `an unbounded list lays out in full and leaves the scrolling to the page`() {
+        assertEquals(10 * ROW, listHeight(rows = 10, bound = null))
     }
 
     @Test
@@ -55,5 +73,37 @@ class PackListFitTest {
         assertEquals(PackListColumns(runsOn = false, played = false), PackListColumns.forWidth(400f))
         assertEquals(PackListColumns(runsOn = true, played = false), PackListColumns.forWidth(600f))
         assertEquals(PackListColumns(runsOn = true, played = true), PackListColumns.forWidth(900f))
+    }
+
+    /**
+     * The height the list draws at, with [rows] rows of [ROW] under a parent that
+     * bounds it at [bound] or, for null, scrolls itself and so bounds nothing.
+     */
+    @OptIn(ExperimentalComposeUiApi::class)
+    private fun listHeight(rows: Int, bound: Int?, state: ScrollState = ScrollState(0)): Int {
+        var measured = -1
+        val scene = ImageComposeScene(width = 600, height = 800, density = Density(1f)) {
+            NxTheme(Themes.Celestia, dark = true) {
+                val parent = if (bound != null) {
+                    Modifier.heightIn(max = bound.dp)
+                } else {
+                    Modifier.verticalScroll(rememberScrollState())
+                }
+                Box(parent.fillMaxWidth()) {
+                    Box(Modifier.onSizeChanged { measured = it.height }) {
+                        ScrollingRows(bounded = bound != null, state = state) {
+                            repeat(rows) { Box(Modifier.fillMaxWidth().height(ROW.dp)) }
+                        }
+                    }
+                }
+            }
+        }
+        scene.render()
+        scene.close()
+        return measured
+    }
+
+    private companion object {
+        const val ROW = 52
     }
 }
