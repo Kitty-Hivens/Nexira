@@ -1,23 +1,10 @@
 package hivens.ui.screens.mod
 
 import androidx.compose.foundation.background
-import hivens.ui.theme.Motion
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.layout.positionInParent
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.runtime.mutableStateMapOf
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
-import androidx.compose.animation.core.VectorConverter
-import androidx.compose.animation.core.Animatable
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -36,11 +23,11 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -49,7 +36,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalUriHandler
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -70,7 +56,7 @@ import hivens.ui.nx.NxKebabButton
 import hivens.ui.nx.NxMenuItem
 import hivens.ui.nx.NxMetaChip
 import hivens.ui.nx.NxMetaChipTone
-import hivens.ui.nx.NxSteadyText
+import hivens.ui.nx.NxTabRow
 import hivens.ui.nx.RetryStateBlock
 import hivens.ui.components.ImageGallery
 import hivens.ui.components.modrinthGalleryMedia
@@ -530,7 +516,6 @@ internal fun Tabs(
     hasGallery: Boolean = false,
 ) {
     val s = LocalStrings.current
-    val density = LocalDensity.current
     // The gallery appears only where there are shots, the way the reference does
     // it. A tab that opens an empty pane is a click that tells a reader nothing
     // its absence would not have told them.
@@ -541,73 +526,12 @@ internal fun Tabs(
         if (hasGallery) add(ModPageTab.Gallery to s.modPageTabGallery)
     }
 
-    // Where each tab's mark belongs, measured rather than computed: the labels are
-    // five different words in five languages and the row is the only thing that
-    // knows how wide each came out.
-    val marks = remember { mutableStateMapOf<ModPageTab, Dp>() }
-    val target = marks[active]
-    val travel = remember { Animatable(0.dp, Dp.VectorConverter) }
-    var placed by remember { mutableStateOf(false) }
-    val spec = Motion.track.of<Dp>()
-    LaunchedEffect(target, spec) {
-        val to = target ?: return@LaunchedEffect
-        if (!placed) {
-            // The first position is where the mark ALREADY is. Animating to it
-            // would slide the underline in from the left edge on arrival, as if
-            // the reader had just moved it there.
-            travel.snapTo(to)
-            placed = true
-        } else {
-            travel.animateTo(to, spec)
-        }
-    }
-
-    Column(modifier) {
-        Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-            tabs.forEach { (id, label) ->
-                // Measured at its heaviest, drawn at its current weight. A bold face
-                // is wider, so selecting a tab used to widen its label and slide
-                // every tab after it sideways, out from under the cursor that had
-                // just clicked.
-                NxSteadyText(
-                    text = label,
-                    weight = if (id == active) FontWeight.Bold else FontWeight.Normal,
-                    style = MaterialTheme.typography.titleSmall,
-                    color = if (id == active) NxInk.main else NxInk.quiet,
-                    // No indication. A tab already says where you are with its weight
-                    // and its rule, and a hover plate behind the word is a second
-                    // answer to a question the row has already answered.
-                    modifier = Modifier
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                        ) { onSelect(id) }
-                        .onGloballyPositioned { c ->
-                            val centre = c.positionInParent().x + c.size.width / 2f
-                            marks[id] = with(density) { (centre - MARK_WIDTH.toPx() / 2f).toDp() }
-                        },
-                )
-            }
-        }
-        Spacer(Modifier.size(6.dp))
-        // ONE mark that travels, not one per tab that blinks on and off. The
-        // underline is the same object wherever it is, so it moves the way the
-        // reader's attention does -- and because every click retargets an
-        // animation already in flight, a run of fast clicks is followed rather
-        // than queued: the mark is always heading for the tab last asked for,
-        // from wherever it had got to.
-        Box(Modifier.fillMaxWidth().height(MARK_HEIGHT)) {
-            if (placed) {
-                Box(
-                    Modifier.offset(x = travel.value)
-                        .size(width = MARK_WIDTH, height = MARK_HEIGHT)
-                        .background(NxColor.lead()),
-                )
-            }
-        }
-    }
+    // The row and its travelling mark are the library's now: the pack settings
+    // sheet wanted the same tabs, and two copies of one control drift apart.
+    NxTabRow(
+        tabs = tabs.map { it.second },
+        selected = tabs.indexOfFirst { it.first == active }.coerceAtLeast(0),
+        onSelect = { onSelect(tabs[it].first) },
+        modifier = modifier,
+    )
 }
-
-/** The underline: a mark under the word rather than a rule the width of it. */
-private val MARK_WIDTH = 26.dp
-private val MARK_HEIGHT = 2.dp

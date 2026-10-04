@@ -38,6 +38,7 @@ import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxCalloutBanner
 import hivens.ui.nx.NxCalloutTone
+import hivens.ui.nx.NxReveal
 import hivens.ui.nx.NxSettingGroup
 import hivens.ui.nx.NxSettingRow
 import hivens.ui.nx.NxSwitch
@@ -184,37 +185,44 @@ internal fun PackVersionSection(
     // Only an actual available update earns a prominent banner. Green applies in
     // place; amber (structural) opens the versions screen where the full diff,
     // the snapshot notice and the confirm flow live.
-    (check as? UpdateCheck.Available)?.let { c ->
-        val isRollback = c.direction == UpdateDirection.Older
-        NxCalloutBanner(
-            // A mirror-side rollback of latest arrives through the same check as
-            // a release; calling it "available build" would be true but reads as
-            // an update, and the target is older than what is installed.
-            title = if (isRollback) s.packVersionRolledBack(c.toVersion) else s.packVersionAvailable(c.toVersion),
-            body = if (c.compat.isSafe) s.packVersionSafe else s.packVersionNeedsCare,
-            tone = if (c.compat.isSafe && !isRollback) NxCalloutTone.Info else NxCalloutTone.Warning,
-        ) {
-            // No line at all when the plan is absent: the source could not say
-            // what would change without handing over the whole pack, and a
-            // count of zero would read as "nothing changes".
-            c.plan?.takeIf { !it.isEmpty }?.let { plan ->
-                Text(
-                    s.packVersionsPlanCounts(plan.toAdd.size, plan.toUpdate.size, plan.toDelete.size),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = NxInk.quiet,
-                )
-            }
-            Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (c.compat.isSafe) {
-                    PuppetClick("packSettings.version.updateNow") { runningGuard.run(::applyLatest) }
-                    NxButton(
-                        label   = if (isRollback) s.packVersionSwitchNow else s.packVersionUpdateNow,
-                        onClick = { runningGuard.run(::applyLatest) },
-                        enabled = !busy,
-                        compact = true,
+    // Held across the reveal so the banner can play its way out after the check
+    // that raised it is cleared by an applied update.
+    val available = check as? UpdateCheck.Available
+    var shownCheck by remember(pack.id) { mutableStateOf<UpdateCheck.Available?>(null) }
+    if (available != null) shownCheck = available
+    NxReveal(visible = available != null) {
+        shownCheck?.let { c ->
+            val isRollback = c.direction == UpdateDirection.Older
+            NxCalloutBanner(
+                // A mirror-side rollback of latest arrives through the same check as
+                // a release; calling it "available build" would be true but reads as
+                // an update, and the target is older than what is installed.
+                title = if (isRollback) s.packVersionRolledBack(c.toVersion) else s.packVersionAvailable(c.toVersion),
+                body = if (c.compat.isSafe) s.packVersionSafe else s.packVersionNeedsCare,
+                tone = if (c.compat.isSafe && !isRollback) NxCalloutTone.Info else NxCalloutTone.Warning,
+            ) {
+                // No line at all when the plan is absent: the source could not say
+                // what would change without handing over the whole pack, and a
+                // count of zero would read as "nothing changes".
+                c.plan?.takeIf { !it.isEmpty }?.let { plan ->
+                    Text(
+                        s.packVersionsPlanCounts(plan.toAdd.size, plan.toUpdate.size, plan.toDelete.size),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = NxInk.quiet,
                     )
-                } else {
-                    NxButton(s.packVersionsAllVersions, onClick = onOpenVersions, compact = true)
+                }
+                Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (c.compat.isSafe) {
+                        PuppetClick("packSettings.version.updateNow") { runningGuard.run(::applyLatest) }
+                        NxButton(
+                            label   = if (isRollback) s.packVersionSwitchNow else s.packVersionUpdateNow,
+                            onClick = { runningGuard.run(::applyLatest) },
+                            enabled = !busy,
+                            compact = true,
+                        )
+                    } else {
+                        NxButton(s.packVersionsAllVersions, onClick = onOpenVersions, compact = true)
+                    }
                 }
             }
         }

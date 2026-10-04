@@ -32,6 +32,7 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxField
+import hivens.ui.nx.NxReveal
 import hivens.ui.nx.NxSettingBlock
 import hivens.ui.nx.NxSettingGroup
 import hivens.ui.nx.NxSettingRow
@@ -120,7 +121,7 @@ internal fun PackRuntimeSection(
                 )
             }
         }
-        if (customJava || ownJava) {
+        NxReveal(visible = customJava || ownJava) {
             NxSettingBlock {
                 NxField(
                     value = runtime.javaPath ?: "",
@@ -149,7 +150,7 @@ internal fun PackRuntimeSection(
             NxSwitch(runtime.windowSizeOverride, { on -> commit { rt -> rt.copy(windowSizeOverride = on) } })
         }
 
-        if (runtime.windowSizeOverride) {
+        NxReveal(visible = runtime.windowSizeOverride) {
             NxSettingBlock {
                 Row(
                     modifier = Modifier.fillMaxWidth(),

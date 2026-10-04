@@ -1,5 +1,13 @@
 package hivens.ui.screens.detail.settings
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -59,6 +67,8 @@ import hivens.ui.nx.NxTabRow
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.screens.mod.loaderLabel
+import hivens.ui.customization.LocalCustomization
+import hivens.ui.theme.Motion
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.Status
@@ -224,31 +234,54 @@ fun PackSettingsSheet(
         )
         Box(Modifier.fillMaxWidth().padding(top = 8.dp).height(1.dp).background(NxInk.line))
 
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp, vertical = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(28.dp),
-        ) {
-            when (selected) {
-                PackSettingsCategory.General ->
-                    PackGeneralSection(shown, save)
-                PackSettingsCategory.Runtime ->
-                    PackRuntimeSection(shown, instanceDir, save)
-                PackSettingsCategory.Version ->
-                    PackVersionSection(shown, operation, save, onOpenVersions, onNotice = { notice = it })
-                PackSettingsCategory.Content ->
-                    PackContentSection(shown, adopt)
-                PackSettingsCategory.Data ->
-                    PackDataSection(shown, instanceDir, operation, onDismiss)
+        // The next section comes in from the side its tab is on, so the move reads as
+        // travel along the tab row rather than as a page being swapped out.
+        val still = LocalCustomization.current.reduceMotion
+        val slide = Motion.panelSlide
+        val fade = Motion.fade
+        AnimatedContent(
+            targetState = selected,
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            transitionSpec = {
+                if (still) {
+                    EnterTransition.None togetherWith ExitTransition.None
+                } else {
+                    val forward = categories.indexOf(targetState) > categories.indexOf(initialState)
+                    val towards = if (forward) 1 else -1
+                    (slideInHorizontally(slide.of()) { it / SECTION_TRAVEL * towards } + fadeIn(fade.of())) togetherWith
+                        (slideOutHorizontally(slide.of()) { -it / SECTION_TRAVEL * towards } + fadeOut(fade.of()))
+                }
+            },
+            label = "packSettingsSection",
+        ) { section ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 24.dp, vertical = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(28.dp),
+            ) {
+                when (section) {
+                    PackSettingsCategory.General ->
+                        PackGeneralSection(shown, save)
+                    PackSettingsCategory.Runtime ->
+                        PackRuntimeSection(shown, instanceDir, save)
+                    PackSettingsCategory.Version ->
+                        PackVersionSection(shown, operation, save, onOpenVersions, onNotice = { notice = it })
+                    PackSettingsCategory.Content ->
+                        PackContentSection(shown, adopt)
+                    PackSettingsCategory.Data ->
+                        PackDataSection(shown, instanceDir, operation, onDismiss)
+                }
             }
         }
 
         FooterStatus(operation, notice)
     }
 }
+
+/** How far a section travels on a tab change, as a share of the sheet's width. */
+private const val SECTION_TRAVEL = 8
 
 /**
  * Identity header: the pack's mark, what the sheet is and which pack and runtime it

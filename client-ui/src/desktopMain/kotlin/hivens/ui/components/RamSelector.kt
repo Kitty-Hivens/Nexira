@@ -21,6 +21,7 @@ import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.nx.NxChoiceChip
 import hivens.ui.nx.NxField
+import hivens.ui.nx.NxReveal
 import hivens.ui.nx.NxSettingBlock
 import hivens.ui.nx.NxSettingRow
 import hivens.ui.nx.NxSliderTrack
@@ -77,67 +78,69 @@ fun RamSelector(
         }
     }
 
-    if (isAuto) return
+    // Opened out under the row rather than swapped in: the choice above it stays
+    // where it was, and the eye follows what it uncovered.
+    NxReveal(visible = !isAuto) {
+        NxSettingBlock {
+            val sliderTopGb = maxOf(snapGb(recommendedMb / MB_PER_GB, down = true), currentMb / MB_PER_GB, MIN_SLIDER_GB)
+            // The track bare, under a header set like every other row: the slider's own
+            // label is a size larger, made for a page with nothing else on it.
+            val sliderValue = (currentMb / MB_PER_GB).coerceIn(MIN_SLIDER_GB, sliderTopGb)
+            val onSlide: (Float) -> Unit = { gb -> onValueChanged((snapGb(gb) * MB_PER_GB).roundToInt()) }
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    s.ramAllocated,
+                    style      = MaterialTheme.typography.bodyMedium,
+                    color      = NxInk.main,
+                    fontWeight = FontWeight.Medium,
+                    modifier   = Modifier.weight(1f),
+                )
+                Text(formatRam(currentMb, s), style = MaterialTheme.typography.bodyMedium, color = NxInk.quiet)
+            }
+            NxSliderTrack(
+                value         = sliderValue,
+                range         = MIN_SLIDER_GB..sliderTopGb,
+                onValueChange = onSlide,
+                modifier      = Modifier.fillMaxWidth().sliderKeyboardAdjust(sliderValue, MIN_SLIDER_GB..sliderTopGb, STEP_GB, onSlide),
+            )
 
-    NxSettingBlock {
-        val sliderTopGb = maxOf(snapGb(recommendedMb / MB_PER_GB, down = true), currentMb / MB_PER_GB, MIN_SLIDER_GB)
-        // The track bare, under a header set like every other row: the slider's own
-        // label is a size larger, made for a page with nothing else on it.
-        val sliderValue = (currentMb / MB_PER_GB).coerceIn(MIN_SLIDER_GB, sliderTopGb)
-        val onSlide: (Float) -> Unit = { gb -> onValueChanged((snapGb(gb) * MB_PER_GB).roundToInt()) }
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            // Re-seeded from the record whenever it moves, so a drag on the slider shows
+            // in the field; typing keeps what was typed until it parses.
+            var typed by remember(currentMb) { mutableStateOf(gbText(currentMb)) }
+            val parsed = typed.replace(',', '.').toFloatOrNull()
+            val typedMb = parsed?.let { (it * MB_PER_GB).roundToInt() }
+            val outOfRange = typed.isNotBlank() && (typedMb == null || typedMb !in MIN_MB..MAX_MB)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                NxField(
+                    value         = typed,
+                    onValueChange = { raw ->
+                        typed = raw.filter { it.isDigit() || it == '.' || it == ',' }.take(5)
+                        typed.replace(',', '.').toFloatOrNull()
+                            ?.let { (it * MB_PER_GB).roundToInt() }
+                            ?.takeIf { it in MIN_MB..MAX_MB }
+                            ?.let(onValueChanged)
+                    },
+                    placeholder   = gbText(currentMb),
+                    modifier      = Modifier.width(88.dp),
+                )
+                Text(s.ramUnitGb, style = MaterialTheme.typography.bodyMedium, color = NxInk.quiet)
+            }
+
+            val hint = when {
+                outOfRange -> s.ramOutOfRange(formatRam(MIN_MB, s), formatRam(MAX_MB, s))
+                currentMb > recommendedMb -> s.ramAboveRecommended(formatRam(recommendedMb, s))
+                else -> s.ramSystemHint(formatRam(systemRamMb, s), formatRam(recommendedMb, s))
+            }
             Text(
-                s.ramAllocated,
-                style      = MaterialTheme.typography.bodyMedium,
-                color      = NxInk.main,
-                fontWeight = FontWeight.Medium,
-                modifier   = Modifier.weight(1f),
-            )
-            Text(formatRam(currentMb, s), style = MaterialTheme.typography.bodyMedium, color = NxInk.quiet)
-        }
-        NxSliderTrack(
-            value         = sliderValue,
-            range         = MIN_SLIDER_GB..sliderTopGb,
-            onValueChange = onSlide,
-            modifier      = Modifier.fillMaxWidth().sliderKeyboardAdjust(sliderValue, MIN_SLIDER_GB..sliderTopGb, STEP_GB, onSlide),
-        )
-
-        // Re-seeded from the record whenever it moves, so a drag on the slider shows
-        // in the field; typing keeps what was typed until it parses.
-        var typed by remember(currentMb) { mutableStateOf(gbText(currentMb)) }
-        val parsed = typed.replace(',', '.').toFloatOrNull()
-        val typedMb = parsed?.let { (it * MB_PER_GB).roundToInt() }
-        val outOfRange = typed.isNotBlank() && (typedMb == null || typedMb !in MIN_MB..MAX_MB)
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            NxField(
-                value         = typed,
-                onValueChange = { raw ->
-                    typed = raw.filter { it.isDigit() || it == '.' || it == ',' }.take(5)
-                    typed.replace(',', '.').toFloatOrNull()
-                        ?.let { (it * MB_PER_GB).roundToInt() }
-                        ?.takeIf { it in MIN_MB..MAX_MB }
-                        ?.let(onValueChanged)
+                text  = hint,
+                style = MaterialTheme.typography.bodySmall,
+                color = when {
+                    outOfRange -> NxColor.status(Status.Error, text = true)
+                    currentMb > recommendedMb -> NxColor.status(Status.Warning, text = true)
+                    else -> NxInk.quiet
                 },
-                placeholder   = gbText(currentMb),
-                modifier      = Modifier.width(88.dp),
             )
-            Text(s.ramUnitGb, style = MaterialTheme.typography.bodyMedium, color = NxInk.quiet)
         }
-
-        val hint = when {
-            outOfRange -> s.ramOutOfRange(formatRam(MIN_MB, s), formatRam(MAX_MB, s))
-            currentMb > recommendedMb -> s.ramAboveRecommended(formatRam(recommendedMb, s))
-            else -> s.ramSystemHint(formatRam(systemRamMb, s), formatRam(recommendedMb, s))
-        }
-        Text(
-            text  = hint,
-            style = MaterialTheme.typography.bodySmall,
-            color = when {
-                outOfRange -> NxColor.status(Status.Error, text = true)
-                currentMb > recommendedMb -> NxColor.status(Status.Warning, text = true)
-                else -> NxInk.quiet
-            },
-        )
     }
 }
 
