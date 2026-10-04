@@ -811,6 +811,10 @@ interface AppStrings {
     val selectionClear: String
     fun selectionBlockedByPack(count: Int): String
     val contentActionDetails: String
+    val contentLockedTitle: String
+    val contentLockedBody: String
+    val contentLockedOptionalBody: String
+    val contentLockedOpenSettings: String
     val contentActionOpenPage: String
 
     // Updates for installed content: the check, the batch, and the version picker

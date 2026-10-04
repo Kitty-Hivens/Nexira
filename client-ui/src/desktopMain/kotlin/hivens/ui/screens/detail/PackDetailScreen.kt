@@ -160,6 +160,9 @@ fun PackDetailScreen(
     val s = LocalStrings.current
 
     var showSettings by remember(pack.id) { mutableStateOf(initialShowSettings) }
+    // Which section the sheet opens on. The gear opens it at the top; a locked
+    // content row opens it where detaching is, since that is what its menu offers.
+    var settingsSection by remember(pack.id) { mutableStateOf(initialSettingsSection) }
     // Owned here rather than inside the tab, because one thing it holds -- the
     // version picker -- is a modal over the whole screen, and a modal drawn
     // inside a tab body is sized and clipped by that body.
@@ -182,7 +185,7 @@ fun PackDetailScreen(
             pack           = pack,
             launchControl  = launchControl,
             onBack         = onBack,
-            onOpenSettings = { showSettings = true },
+            onOpenSettings = { settingsSection = null; showSettings = true },
             onOpenFolder   = { state.openFolder() },
             // Any source that pins a version has one worth naming; this used to
             // ask whether the pack came from the mirror, which hid the version of
@@ -231,6 +234,10 @@ fun PackDetailScreen(
                     onOpenProject = onOpenProject,
                     browsing = browsingProjects,
                     onBrowsing = { browsingProjects = it },
+                    onOpenPackSettings = {
+                        settingsSection = PackSettingsCategory.Data
+                        showSettings = true
+                    },
                 )
                 1 -> FileBrowserPane(rootDir = instanceDir)
                 2 -> WorldsTabPane(instanceDir = instanceDir)
@@ -251,7 +258,7 @@ fun PackDetailScreen(
             instanceDir     = instanceDir,
             onDismiss       = { showSettings = false },
             onOpenVersions  = { onOpenVersions(true) },
-            initialCategory = initialSettingsSection,
+            initialCategory = settingsSection,
         )
     }
 }

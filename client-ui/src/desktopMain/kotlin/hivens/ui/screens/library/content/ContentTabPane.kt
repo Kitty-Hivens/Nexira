@@ -148,6 +148,8 @@ internal fun ContentTabPane(
     browsing: Boolean,
     onBrowsing: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    /** Opens the pack's settings where detaching lives, offered from a locked row's menu. */
+    onOpenPackSettings: () -> Unit = {},
 ) {
     val s = LocalStrings.current
     val selections: SelectionRegistry = koinInject()
@@ -295,6 +297,7 @@ internal fun ContentTabPane(
                                 // Switching versions is the same write as an update,
                                 // so it is offered on the same rows.
                                 onVersions     = if (rules.canDelete) ({ state.openVersions(c) }) else null,
+                                onOpenPackSettings = onOpenPackSettings,
                             )
                         }
                     }
@@ -766,9 +769,17 @@ internal fun ContentRow(
     update: ModUpdate?,
     onUpdate: () -> Unit,
     onVersions: (() -> Unit)?,
+    onOpenPackSettings: () -> Unit = {},
 ) {
     val s = LocalStrings.current
     val dim = if (rules.effectiveEnabled) 1f else 0.5f
+    // A row that cannot be deleted is the pack's: only a mod is ever held back, the
+    // rest of the content is the player's whatever the pack shipped.
+    val lock = when {
+        rules.canDelete -> null
+        rules.showToggle -> RowLock.PackOptional
+        else -> RowLock.Pack
+    }
     var menuAt by remember(content.fileName) { mutableStateOf<Offset?>(null) }
     var rowOrigin by remember(content.fileName) { mutableStateOf(Offset.Zero) }
     NxSurface(SurfaceKind.Card, modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.small) {
@@ -863,7 +874,7 @@ internal fun ContentRow(
                 // (local metadata at minimum); Open page and Delete appear only when the
                 // caller passed them (a mod with a known URL / a user-owned row).
                 NxKebabButton(contentDescription = s.packCardMore) { dismiss ->
-                    ContentRowMenuItems(content, update, resolveProject, onDetails, onUpdate, onDelete, dismiss)
+                    ContentRowMenuItems(content, update, resolveProject, onDetails, onUpdate, onDelete, lock, onOpenPackSettings, dismiss)
                 }
             }
         }
@@ -877,7 +888,7 @@ internal fun ContentRow(
     // answering a question asked about a file in it.
     menuAt?.let { at ->
         NxContextMenu(anchorInWindow = at, expanded = true, onDismissRequest = { menuAt = null }) {
-            ContentRowMenuItems(content, update, resolveProject, onDetails, onUpdate, onDelete) { menuAt = null }
+            ContentRowMenuItems(content, update, resolveProject, onDetails, onUpdate, onDelete, lock, onOpenPackSettings) { menuAt = null }
         }
     }
 }
@@ -894,10 +905,15 @@ private fun ContentRowMenuItems(
     onDetails: () -> Unit,
     onUpdate: () -> Unit,
     onDelete: (() -> Unit)?,
+    lock: RowLock?,
+    onOpenPackSettings: () -> Unit,
     dismiss: () -> Unit,
 ) {
     val s = LocalStrings.current
     val follow = rememberLinkFollower()
+    // First, because it answers the question a locked row raises before any of the
+    // actions below it is read.
+    lock?.let { PackLockNotice(it, onOpenPackSettings, dismiss) }
     NxMenuItem(label = s.contentActionDetails, icon = NxIcon.Info, onClick = { dismiss(); onDetails() })
     if (update != null) {
         NxMenuItem(label = s.contentUpdateTo(update.versionNumber), icon = NxIcon.Download, onClick = { dismiss(); onUpdate() })
