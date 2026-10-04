@@ -3,6 +3,7 @@ package hivens.ui.screens.library.worlds
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -118,8 +119,13 @@ private fun WorldsList(
     modifier: Modifier,
 ) {
     val s = LocalStrings.current
+    // One panel under the whole tab, as the Logs tab has: the section headings are
+    // text, and text laid straight over the page sat on the wallpaper with nothing
+    // under it to read against.
+    NxSurface(SurfaceKind.Panel, modifier = modifier.fillMaxSize()) {
     LazyColumn(
-        modifier            = modifier.fillMaxSize(),
+        modifier            = Modifier.fillMaxSize(),
+        contentPadding      = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item { NxSectionHeader(text = s.worldsTabLocalSection(worlds.size)) }
@@ -143,7 +149,7 @@ private fun WorldsList(
             items(count = servers.size, key = { it }) { i -> ServerCard(entry = servers[i]) }
         }
 
-        item { Spacer(Modifier.height(8.dp)) }
+    }
     }
 }
 

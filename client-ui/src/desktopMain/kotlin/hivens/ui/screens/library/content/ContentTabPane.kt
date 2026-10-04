@@ -459,7 +459,12 @@ internal fun Toolbar(
 ) {
     val s = LocalStrings.current
     var filtersOpen by remember { mutableStateOf(false) }
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    // On a panel of its own, like the project page's header: laid straight over the
+    // page, the outlined buttons and the unselected chips were ink on whatever the
+    // wallpaper had there, and no ink the theme picks reads on a picture it has
+    // never seen.
+    NxSurface(SurfaceKind.Panel, modifier = Modifier.fillMaxWidth()) {
+    Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         ContentSearch(query, onQuery, s.contentSearchPlaceholder)
         Row(
             modifier              = Modifier.fillMaxWidth(),
@@ -503,6 +508,7 @@ internal fun Toolbar(
                 NxButton(label = s.contentAddFiles, onClick = onAddFiles, style = NxButtonStyle.Secondary, icon = NxIcon.Add, compact = true)
             }
         }
+    }
     }
 }
 
