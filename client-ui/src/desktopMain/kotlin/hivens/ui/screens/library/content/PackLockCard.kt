@@ -2,18 +2,23 @@ package hivens.ui.screens.library.content
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.keyframes
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -21,16 +26,22 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import hivens.core.api.dto.modrinth.ModrinthProject
+import hivens.launcher.instance.InstalledContent
 import hivens.ui.customization.LocalCustomization
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.nx.NxMenuDivider
-import hivens.ui.nx.NxMenuItem
+import hivens.ui.nx.NxButton
+import hivens.ui.nx.NxButtonStyle
+import hivens.ui.nx.NxIconButton
+import hivens.ui.screens.mod.rememberLinkFollower
 import hivens.ui.theme.Motion
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
+import hivens.ui.theme.familyForText
 import kotlinx.coroutines.launch
 
 /** Why a row offers less than the player might expect of it. */
@@ -43,30 +54,74 @@ internal enum class RowLock {
 }
 
 /**
- * What the pack keeps from a row, said where somebody asked about the row.
+ * What the pack keeps from a row, on a card of its own.
  *
  * A mod the pack placed has no switch, cannot be removed and has no versions to
  * pick, and a row that simply lacks those controls reads as a fault: the tab used
  * to say why in a banner, and the banner left with the detach button it pointed
- * at. This answers in the row's own menu instead, the place a person goes when a
- * row does not do what they want, and offers the way out it describes.
+ * at. The row's right-click and its overflow open this instead of a menu, since
+ * the question a locked row raises is "why", and a list of verbs does not answer
+ * it. The verbs the menu had are here as buttons, beside the way out.
  *
  * The lock arrives rather than sits: it lands, rocks on its hinge and fills, the
- * way a latch closes, so the menu reads as an answer and not as one more row.
+ * way a latch closes, so the card reads as an answer the moment it opens.
  */
 @Composable
-internal fun PackLockNotice(lock: RowLock, onOpenPackSettings: () -> Unit, dismiss: () -> Unit) {
+internal fun PackLockCard(
+    content: InstalledContent,
+    lock: RowLock,
+    mark: @Composable () -> Unit,
+    resolveProject: suspend () -> ModrinthProject?,
+    onDetails: () -> Unit,
+    onOpenPackSettings: () -> Unit,
+    dismiss: () -> Unit,
+) {
     val s = LocalStrings.current
-    Row(
-        modifier              = Modifier.padding(start = 10.dp, end = 10.dp, top = 8.dp, bottom = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment     = Alignment.Top,
-    ) {
+    val follow = rememberLinkFollower()
+    // The same resolution the menu makes: the declared homepage, else the catalogue
+    // page found by the file's hash, and no button while neither is known.
+    var page by remember(content.fileName) { mutableStateOf(content.homepageUrl) }
+    if (page == null) {
+        LaunchedEffect(content.fileName) {
+            page = runCatching { resolveProject() }.getOrNull()
+                ?.let { "https://modrinth.com/${it.projectType}/${it.slug}" }
+        }
+    }
+
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        mark()
+        Column(Modifier.weight(1f)) {
+            Text(
+                text       = content.displayName,
+                fontFamily = familyForText(content.displayName),
+                style      = MaterialTheme.typography.bodyMedium,
+                color      = NxInk.main,
+                fontWeight = FontWeight.SemiBold,
+                maxLines   = 1,
+                overflow   = TextOverflow.Ellipsis,
+            )
+            content.version?.let {
+                Text(it, style = MaterialTheme.typography.labelSmall, color = NxInk.quiet, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+        page?.let { url ->
+            NxIconButton(
+                icon               = NxIcon.OpenInNew,
+                contentDescription = s.contentActionOpenPage,
+                onClick            = { dismiss(); follow(url) },
+                tint               = NxInk.quiet,
+            )
+        }
+    }
+
+    Box(Modifier.fillMaxWidth().height(1.dp).background(NxInk.line))
+
+    Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.Top) {
         LockMark()
-        Column(Modifier.widthIn(max = 236.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(
                 text       = s.contentLockedTitle,
-                style      = MaterialTheme.typography.bodyMedium,
+                style      = MaterialTheme.typography.titleSmall,
                 color      = NxInk.main,
                 fontWeight = FontWeight.SemiBold,
             )
@@ -77,11 +132,23 @@ internal fun PackLockNotice(lock: RowLock, onOpenPackSettings: () -> Unit, dismi
             )
         }
     }
-    NxMenuItem(label = s.contentLockedOpenSettings, icon = NxIcon.Settings) {
-        dismiss()
-        onOpenPackSettings()
+
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        NxButton(
+            label   = s.contentLockedOpenSettings,
+            onClick = { dismiss(); onOpenPackSettings() },
+            icon    = NxIcon.Settings,
+            compact = true,
+        )
+        NxButton(
+            label   = s.contentActionDetails,
+            onClick = { dismiss(); onDetails() },
+            style   = NxButtonStyle.Secondary,
+            icon    = NxIcon.Info,
+            compact = true,
+        )
+        Spacer(Modifier.weight(1f))
     }
-    NxMenuDivider()
 }
 
 @Composable
@@ -117,7 +184,7 @@ private fun LockMark() {
     }
     Box(
         modifier = Modifier
-            .size(36.dp)
+            .size(44.dp)
             .drawBehind {
                 val r = size.minDimension / 2f
                 drawCircle(halo, radius = r)
@@ -137,7 +204,7 @@ private fun LockMark() {
             icon     = NxIcon.Lock,
             tint     = lead,
             fill     = fill.value,
-            size     = 20.dp,
+            size     = 24.dp,
             modifier = Modifier.graphicsLayer {
                 scaleX = scale.value
                 scaleY = scale.value

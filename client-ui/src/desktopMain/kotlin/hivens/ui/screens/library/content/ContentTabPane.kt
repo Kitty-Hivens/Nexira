@@ -36,6 +36,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -78,6 +79,7 @@ import hivens.ui.activity.SelectionItem
 import hivens.ui.activity.SelectionRegistry
 import hivens.ui.components.ConfirmDialog
 import hivens.ui.components.DestructiveConfirmDialog
+import hivens.ui.nx.NxAnchoredCard
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.RetryStateBlock
 import hivens.ui.nx.NxChoiceChip
@@ -781,6 +783,10 @@ internal fun ContentRow(
         else -> RowLock.Pack
     }
     var menuAt by remember(content.fileName) { mutableStateOf<Offset?>(null) }
+    // A locked row answers a right-click with a card rather than a menu, see PackLockCard.
+    var cardAt by remember(content.fileName) { mutableStateOf<Offset?>(null) }
+    var cardFromKebab by remember(content.fileName) { mutableStateOf(false) }
+    val currentLock by rememberUpdatedState(lock)
     var rowOrigin by remember(content.fileName) { mutableStateOf(Offset.Zero) }
     NxSurface(SurfaceKind.Card, modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.small) {
         val rowFill = if (selected) NxColor.wash(NxColor.lead(), 0.14f) else Color.Transparent
@@ -797,7 +803,8 @@ internal fun ContentRow(
                                 if (event.type != PointerEventType.Press) continue
                                 if (!event.buttons.isSecondaryPressed) continue
                                 val change = event.changes.first()
-                                menuAt = rowOrigin + change.position
+                                val at = rowOrigin + change.position
+                                if (currentLock != null) cardAt = at else menuAt = at
                                 change.consume()
                             }
                         }
@@ -873,8 +880,30 @@ internal fun ContentRow(
                 // One overflow instead of a bare trash can: Details is always available
                 // (local metadata at minimum); Open page and Delete appear only when the
                 // caller passed them (a mod with a known URL / a user-owned row).
-                NxKebabButton(contentDescription = s.packCardMore) { dismiss ->
-                    ContentRowMenuItems(content, update, resolveProject, onDetails, onUpdate, onDelete, lock, onOpenPackSettings, dismiss)
+                if (lock != null) {
+                    Box {
+                        NxIconButton(
+                            icon               = NxIcon.MoreVert,
+                            contentDescription = s.packCardMore,
+                            onClick            = { cardFromKebab = true },
+                            tint               = NxInk.quiet,
+                        )
+                        NxAnchoredCard(expanded = cardFromKebab, onDismissRequest = { cardFromKebab = false }) {
+                            PackLockCard(
+                                content            = content,
+                                lock               = lock,
+                                mark               = { ContentIcon(iconState, content.fileName, content.displayName, 1f) },
+                                resolveProject     = resolveProject,
+                                onDetails          = onDetails,
+                                onOpenPackSettings = onOpenPackSettings,
+                                dismiss            = { cardFromKebab = false },
+                            )
+                        }
+                    }
+                } else {
+                    NxKebabButton(contentDescription = s.packCardMore) { dismiss ->
+                        ContentRowMenuItems(content, update, resolveProject, onDetails, onUpdate, onDelete, dismiss)
+                    }
                 }
             }
         }
@@ -888,7 +917,21 @@ internal fun ContentRow(
     // answering a question asked about a file in it.
     menuAt?.let { at ->
         NxContextMenu(anchorInWindow = at, expanded = true, onDismissRequest = { menuAt = null }) {
-            ContentRowMenuItems(content, update, resolveProject, onDetails, onUpdate, onDelete, lock, onOpenPackSettings) { menuAt = null }
+            ContentRowMenuItems(content, update, resolveProject, onDetails, onUpdate, onDelete) { menuAt = null }
+        }
+    }
+    cardAt?.let { at ->
+        val held = lock ?: return@let
+        NxAnchoredCard(anchorInWindow = at, expanded = true, onDismissRequest = { cardAt = null }) {
+            PackLockCard(
+                content            = content,
+                lock               = held,
+                mark               = { ContentIcon(iconState, content.fileName, content.displayName, 1f) },
+                resolveProject     = resolveProject,
+                onDetails          = onDetails,
+                onOpenPackSettings = onOpenPackSettings,
+                dismiss            = { cardAt = null },
+            )
         }
     }
 }
@@ -905,15 +948,10 @@ private fun ContentRowMenuItems(
     onDetails: () -> Unit,
     onUpdate: () -> Unit,
     onDelete: (() -> Unit)?,
-    lock: RowLock?,
-    onOpenPackSettings: () -> Unit,
     dismiss: () -> Unit,
 ) {
     val s = LocalStrings.current
     val follow = rememberLinkFollower()
-    // First, because it answers the question a locked row raises before any of the
-    // actions below it is read.
-    lock?.let { PackLockNotice(it, onOpenPackSettings, dismiss) }
     NxMenuItem(label = s.contentActionDetails, icon = NxIcon.Info, onClick = { dismiss(); onDetails() })
     if (update != null) {
         NxMenuItem(label = s.contentUpdateTo(update.versionNumber), icon = NxIcon.Download, onClick = { dismiss(); onUpdate() })

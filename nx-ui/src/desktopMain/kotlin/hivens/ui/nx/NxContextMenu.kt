@@ -482,7 +482,7 @@ internal class MenuBelowAnchor(
  * [anchorBounds] -- the position is the absolute window point the caller passed --
  * and reports the pointer itself as the origin.
  */
-private class MenuAtWindowOffset(
+internal class MenuAtWindowOffset(
     private val x: Int,
     private val y: Int,
     private val gapPx: Int,
