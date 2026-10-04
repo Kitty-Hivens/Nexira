@@ -72,9 +72,14 @@ import org.jetbrains.skia.Image as SkImage
  * - C, tiles: the same plane, the projects as a grid. A view a player could pick,
  *   which is where letting the list be shown in more than one way would lead.
  *
- * The wallpaper is read from the path in build/render/wallpaper.path when that file
- * exists, so a local run can be drawn over a real one without the picture or its
- * path entering the tree. Without it a generated field of colour stands in.
+ * The wallpaper is named from outside the way the other probes name their samples
+ * (see the players' ProbeSample): a picture somebody uses as a wallpaper is theirs
+ * and stays out of the tree, and a run without one draws a generated field of
+ * colour instead.
+ *
+ * ```
+ * ./gradlew :client-ui:desktopTest --tests '*PackContentConceptsProbe' -Dnexira.probe.wallpaper=/path/to/picture.png
+ * ```
  *
  * Kept in the tree: this file is the design, the PNGs are its output.
  */
@@ -330,11 +335,9 @@ class PackContentConceptsProbe {
     // ── rendering ─────────────────────────────────────────────────────────
 
     private fun wallpaper(): ImageBitmap? {
-        val pointer = Path.of("build/render/wallpaper.path")
-        if (!Files.isRegularFile(pointer)) return null
-        val file = Path.of(Files.readString(pointer).trim())
-        if (!Files.isRegularFile(file)) return null
-        return SkImage.makeFromEncoded(Files.readAllBytes(file)).toComposeImageBitmap()
+        val path = System.getProperty(WALLPAPER_PROPERTY) ?: System.getenv("NEXIRA_PROBE_WALLPAPER") ?: return null
+        val file = Path.of(path).takeIf { Files.isRegularFile(it) } ?: return null
+        return runCatching { SkImage.makeFromEncoded(Files.readAllBytes(file)).toComposeImageBitmap() }.getOrNull()
     }
 
     private fun sheet(name: String, width: Int, height: Int, content: @Composable (ImageBitmap?) -> Unit) {
@@ -364,4 +367,9 @@ class PackContentConceptsProbe {
     @Test fun `B plane`() = both("b-plane") { w -> Shell(w) { ConceptPlane() } }
 
     @Test fun `C tiles`() = both("c-tiles") { w -> Shell(w) { ConceptTiles() } }
+
+    private companion object {
+        /** Forwarded to the test JVM by the root build, like every `nexira.probe.` property. */
+        const val WALLPAPER_PROPERTY = "nexira.probe.wallpaper"
+    }
 }
