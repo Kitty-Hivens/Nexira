@@ -134,6 +134,24 @@
                   "uniform": false
                 },
                 "grid": 0
+              },
+              "center": {
+                "widgets": [],
+                "flow": {
+                  "direction": "horizontal",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
+              },
+              "right": {
+                "widgets": [],
+                "flow": {
+                  "direction": "horizontal",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
               }
             }
           }

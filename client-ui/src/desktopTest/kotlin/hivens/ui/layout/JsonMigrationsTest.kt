@@ -246,8 +246,11 @@ class JsonMigrationsTest {
             val now = shipped.surfaces[sid]!!
             oldLayout.families.forEach { (fid, family) ->
                 val nowFamily = assertNotNull(now.family(fid), "family $sid/${fid.value} is not in the shipped bundle")
+                // Slots follow the surfaces' rule: none may vanish, and one may
+                // appear only by name.
                 assertEquals(
-                    family.slots.keys, nowFamily.slots.keys,
+                    family.slots.keys.map { it.value }.toSet() + SLOTS_ADDED_SINCE_FIXTURE["${sid.value}/${fid.value}"].orEmpty(),
+                    nowFamily.slots.keys.map { it.value }.toSet(),
                     "the shipped bundle's slots for $sid/${fid.value} are not the ones the step produces",
                 )
                 family.slots.forEach { (slotId, content) ->
@@ -613,6 +616,11 @@ class JsonMigrationsTest {
         val SURFACES_ADDED_SINCE_FIXTURE = setOf(
             // decor under the content pane, empty in the bundle
             "appshell.backdrop",
+        )
+
+        val SLOTS_ADDED_SINCE_FIXTURE = mapOf(
+            // the top bar rendered these two lanes before any layout declared them
+            "appshell.topbar/general" to setOf("center", "right"),
         )
     }
 }

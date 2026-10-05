@@ -155,7 +155,11 @@ class DefaultLayoutTest {
          * pane holds decor that draws every frame, so it is the reader's to fill:
          * shipping a field of particles to everyone would spend their frames on a
          * choice they did not make. An empty backdrop is the pane as it always was.
+         *
+         * The top bar's centre and right lanes are there to be dropped into. The bar
+         * renders them, so they have to exist in a graph for a drop to land, and the
+         * bundled bar carries only the breadcrumb on its left.
          */
-        val EMPTY_BY_DESIGN = setOf("appshell.backdrop.layers")
+        val EMPTY_BY_DESIGN = setOf("appshell.backdrop.layers", "appshell.topbar.center", "appshell.topbar.right")
     }
 }
