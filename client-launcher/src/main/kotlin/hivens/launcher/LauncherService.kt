@@ -14,6 +14,7 @@ import hivens.core.jvm.SystemMemory
 import hivens.core.launch.LaunchError
 import hivens.core.launch.LaunchHandle
 import hivens.core.launch.SpawnResult
+import hivens.core.logging.Redactor
 import hivens.launcher.component.EarlyLoadingScreen
 import hivens.launcher.component.EnvironmentPreparer
 import hivens.launcher.component.GameCommandBuilder
@@ -202,6 +203,13 @@ internal class LauncherService(
             earlyLoadingScreen = earlyScreen,
         )
 
+        // The game process echoes its token back in ways no log pattern predicts:
+        // authlib logs it verbatim when it fails to read it as a JWT. Registered
+        // before the command line is logged, and released once both of the
+        // process's streams have ended, which can be after the process itself
+        // when a child it started still holds them.
+        val tokenMask = Redactor.registerSecret(sessionData.accessToken)
+
         // Last statement before the process exists: everything is provisioned,
         // the command is built, and nothing else stands between here and the
         // game reading mods/.
@@ -210,10 +218,11 @@ internal class LauncherService(
                 log.error("Refusing to spawn {}: the instance no longer matches the pack", displayName)
                 throw PackPrepBlocked(LaunchError.ContentChangedDuringLaunch)
             }
-            ProcessLaunchHandle(spawnProcess(command, clientRootPath, boundLaunch, onLog), afterExit = restoreScreen)
+            ProcessLaunchHandle(spawnProcess(command, clientRootPath, boundLaunch, onLog, tokenMask::close), afterExit = restoreScreen)
         } catch (e: Throwable) {
             // No game will read the config, so it goes back now.
             restoreScreen()
+            tokenMask.close()
             throw e
         }
         SpawnResult.Started(handle, resolvedLoaderVersion = resolved.loaderVersion)
@@ -282,6 +291,7 @@ internal class LauncherService(
         clientRootPath: Path,
         boundLaunch: Boolean,
         onLog: (String, LauncherLogType) -> Unit,
+        onDrained: () -> Unit,
     ): Process {
         val pb = ProcessBuilder(command)
         pb.directory(clientRootPath.toFile())
@@ -295,7 +305,7 @@ internal class LauncherService(
         }
         onLog("CMD: ${java.lang.String.join(" ", command)}", LauncherLogType.INFO)
         val process = pb.start()
-        logHandler.attach(process, onLog)
+        logHandler.attach(process, onLog, onDrained)
         return process
     }
 

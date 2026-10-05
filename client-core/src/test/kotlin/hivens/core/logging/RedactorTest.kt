@@ -216,4 +216,32 @@ class RedactorTest {
             Redactor.forgetSecrets()
         }
     }
+
+    @Test
+    fun `a released secret is no longer masked`() {
+        val token = "k4j3h2g1f0e9d8c7b6a5z4y3x2w1v0u9"
+        try {
+            Redactor.registerSecret(token).close()
+            assertEquals("echo $token", Redactor.redact("echo $token"))
+        } finally {
+            Redactor.forgetSecrets()
+        }
+    }
+
+    @Test
+    fun `a secret two launches registered stays masked until both release it`() {
+        val token = "m1n2b3v4c5x6z7l8k9j0h1g2f3d4s5a6"
+        try {
+            val first = Redactor.registerSecret(token)
+            val second = Redactor.registerSecret(token)
+            first.close()
+            // Closing the same handle twice must not spend the other one's hold.
+            first.close()
+            assertFalse(Redactor.redact("echo $token").contains(token))
+            second.close()
+            assertEquals("echo $token", Redactor.redact("echo $token"))
+        } finally {
+            Redactor.forgetSecrets()
+        }
+    }
 }

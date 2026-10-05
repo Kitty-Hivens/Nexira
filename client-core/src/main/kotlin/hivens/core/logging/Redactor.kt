@@ -1,5 +1,7 @@
 package hivens.core.logging
 
+import java.util.concurrent.atomic.AtomicBoolean
+
 /**
  * Redactor for sensitive patterns in log messages. Applied at two seams:
  * the Pulse logback pipeline (via `RedactingMessageConverter` in
@@ -33,34 +35,63 @@ object Redactor {
     /**
      * Registered secrets, newest last. Copy-on-write behind [secretsLock]:
      * reads happen on every log line from many threads, writes once per
-     * launch.
+     * launch. [holds] counts the open [registerSecret] handles per value, so
+     * a value two launches registered stays masked until both are done.
      */
     @Volatile
     private var secrets: List<String> = emptyList()
+    private val holds = HashMap<String, Int>()
     private val secretsLock = Any()
 
     /**
-     * Mask [value] wherever it appears from now on. Called with a live
-     * access token as it is handed to the game process, so the process's
-     * own output cannot leak it back through a message shape no pattern
-     * anticipates.
+     * Mask [value] wherever it appears until the returned handle is closed.
+     * Called with a live access token as it is handed to the game process, and
+     * closed once nothing that process wrote can still arrive, so the
+     * process's own output cannot leak it back through a message shape no
+     * pattern anticipates.
+     *
+     * Held for that long and no longer: the list is process-global, and a
+     * token kept in it for the life of the launcher outlived the sign-out and
+     * the account it belonged to. Log files the game itself wrote are not
+     * covered either way, since they never pass through here.
      *
      * Values shorter than [MIN_SECRET_LENGTH] are ignored: a short or
      * placeholder secret ("0" for a blank token) occurs inside ordinary
      * log text, and masking every occurrence would corrupt the log
      * without protecting anything.
      */
-    fun registerSecret(value: String) {
-        if (value.length < MIN_SECRET_LENGTH) return
+    fun registerSecret(value: String): AutoCloseable {
+        if (value.length < MIN_SECRET_LENGTH) return AutoCloseable {}
         synchronized(secretsLock) {
-            if (value in secrets) return
-            secrets = (secrets + value).takeLast(MAX_SECRETS)
+            holds[value] = (holds[value] ?: 0) + 1
+            if (value !in secrets) {
+                val kept = (secrets + value).takeLast(MAX_SECRETS)
+                (secrets - kept.toSet()).forEach { holds.remove(it) }
+                secrets = kept
+            }
+        }
+        val released = AtomicBoolean(false)
+        return AutoCloseable { if (released.compareAndSet(false, true)) release(value) }
+    }
+
+    private fun release(value: String) {
+        synchronized(secretsLock) {
+            val left = (holds[value] ?: return) - 1
+            if (left > 0) {
+                holds[value] = left
+            } else {
+                holds.remove(value)
+                secrets = secrets - value
+            }
         }
     }
 
-    /** Drop every registered secret. Sign-out, and test isolation. */
+    /** Drop every registered secret. Test isolation. */
     fun forgetSecrets() {
-        synchronized(secretsLock) { secrets = emptyList() }
+        synchronized(secretsLock) {
+            holds.clear()
+            secrets = emptyList()
+        }
     }
 
     /**
@@ -127,6 +158,9 @@ object Redactor {
      */
     private const val MIN_SECRET_LENGTH = 12
 
-    /** Retained registered secrets. A session touches one token per account. */
+    /**
+     * Registered secrets kept at once. One game runs at a time, so this is
+     * a ceiling for a handle that was never closed, not a working size.
+     */
     private const val MAX_SECRETS = 8
 }
