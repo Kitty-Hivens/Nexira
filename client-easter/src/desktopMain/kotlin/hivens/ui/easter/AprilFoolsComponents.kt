@@ -332,15 +332,19 @@ fun AprilFoolsCloseDialog(
                     // as the chaos AprilFoolsButton -- no extra
                     // Modifier.hoverable on top of Button.interactionSource,
                     // otherwise hover paints twice.
+                    //
+                    // Enabled throughout and only drawn as refusing. A disabled
+                    // clickable emits no hover, and hover is the one thing that
+                    // advances the count it would be waiting on, so a button
+                    // disabled until it surrendered never surrendered, and with
+                    // no tray the launcher could not be quit at all.
                     Button(
                         onClick  = { if (surrendered) onConfirmClose() },
-                        enabled  = surrendered,
                         modifier = Modifier
                             .align(Alignment.CenterEnd)
                             .offset { IntOffset(animCloseX.toInt(), animCloseY.toInt()) },
                         colors = ButtonDefaults.buttonColors(
-                            containerColor         = NxColor.status(Status.Error),
-                            disabledContainerColor = NxColor.status(Status.Error).copy(alpha = 0.75f),
+                            containerColor = NxColor.status(Status.Error).copy(alpha = if (surrendered) 1f else 0.75f),
                         ),
                         interactionSource = closeBtnInteraction,
                         shape             = MaterialTheme.shapes.small,
