@@ -50,6 +50,13 @@ class SettingsService(
         }
     }
 
+    override fun updateSettings(transform: (SettingsData) -> SettingsData): SettingsData =
+        synchronized(lock) {
+            val next = transform(getSettings())
+            saveSettings(next)
+            next
+        }
+
     /** Caller must hold [lock]. */
     private fun reload() {
         if (!Files.exists(settingsFile)) {

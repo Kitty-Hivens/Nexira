@@ -80,7 +80,7 @@ fun LoginPanel(
     // box off stops future saves and nothing else.
     val setRememberMe: (Boolean) -> Unit = { value ->
         rememberMe = value
-        settingsService.saveSettings(settingsService.getSettings().copy(saveCredentials = value))
+        settingsService.updateSettings { it.copy(saveCredentials = value) }
     }
 
     // 2FA flow state. Which path a TWOAUTH demand takes is decided by the
@@ -182,7 +182,7 @@ fun LoginPanel(
                 val sess = offlineProvider.login(name, "", "")
                 // Remember the offline name so a restart -- or the Settings offline
                 // toggle -- restores this identity without re-typing.
-                settingsService.saveSettings(settingsService.getSettings().copy(offlinePlayerName = name))
+                settingsService.updateSettings { it.copy(offlinePlayerName = name) }
                 sess
             }
             hivens.core.diag.ActionRing.record("Play offline")

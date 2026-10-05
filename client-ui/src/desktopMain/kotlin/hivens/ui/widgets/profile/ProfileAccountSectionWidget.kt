@@ -144,7 +144,7 @@ private fun SmartyCraftAccount(session: SessionData, onChanged: () -> Unit) {
                     accounts.firstOrNull { it.providerId == SC_KEY }
                         ?.let { credentials.removeAccount(it.providerId, it.accountId) }
                     // The face choice goes with the account it named -- see releasingFace.
-                    settingsService.saveSettings(settingsService.getSettings().releasingFace(SC_KEY))
+                    settingsService.updateSettings { it.releasingFace(SC_KEY) }
                     credentials.faceSession(settingsService)
                 }
                 face?.let { ctx.onLogin(it) } ?: ctx.onLogout()

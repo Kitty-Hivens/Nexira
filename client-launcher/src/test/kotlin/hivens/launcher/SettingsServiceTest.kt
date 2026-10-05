@@ -56,6 +56,23 @@ class SettingsServiceTest {
         assertEquals(SettingsData(), svc.getSettings())
     }
 
+    /**
+     * The settings are written from several places at once. Read, changed and saved
+     * back, the slower of two writers put back a field the other had just changed;
+     * every one of these increments survives only if each step is one.
+     */
+    @Test
+    fun `concurrent updates each keep what the others wrote`() = runBlocking {
+        val svc = SettingsService(json, workDir / "settings.json")
+        svc.saveSettings(SettingsData(audioQueueIndex = 0))
+        withContext(Dispatchers.Default) {
+            (1..4).map {
+                async { repeat(100) { svc.updateSettings { s -> s.copy(audioQueueIndex = s.audioQueueIndex + 1) } } }
+            }.awaitAll()
+        }
+        assertEquals(400, svc.getSettings().audioQueueIndex)
+    }
+
     @Test
     fun `saveSettings round-trips through the file`() {
         val file = workDir / "settings.json"

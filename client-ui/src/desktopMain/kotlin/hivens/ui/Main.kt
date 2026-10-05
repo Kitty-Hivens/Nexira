@@ -291,7 +291,7 @@ val uiModule = module {
             scope         = get(),
             initialVolume = saved.audioVolume,
             persistVolume = { level ->
-                settings.saveSettings(settings.getSettings().copy(audioVolume = level))
+                settings.updateSettings { it.copy(audioVolume = level) }
             },
             initialQueue  = saved.audioQueue.mapNotNull { runCatching { Path.of(it) }.getOrNull() },
             initialIndex  = saved.audioQueueIndex,
@@ -301,12 +301,10 @@ val uiModule = module {
             // as well.
             output        = getOrNull(),
             persistQueue  = { files, index ->
-                settings.saveSettings(
-                    settings.getSettings().copy(
+                settings.updateSettings { it.copy(
                         audioQueue      = files.map { it.toString() },
                         audioQueueIndex = index,
-                    ),
-                )
+                    ) }
             },
         )
     }
@@ -414,7 +412,7 @@ val uiModule = module {
             // flip back, so "do not disturb" survives a restart.
             initialDoNotDisturb = settings.getSettings().doNotDisturb,
             persistDoNotDisturb = { value ->
-                settings.saveSettings(settings.getSettings().copy(doNotDisturb = value))
+                settings.updateSettings { it.copy(doNotDisturb = value) }
             },
         )
     }

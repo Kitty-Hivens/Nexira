@@ -138,7 +138,7 @@ private fun MicrosoftAccount(session: SessionData, onChanged: () -> Unit) {
                     accounts.firstOrNull { it.providerId == MS_KEY }
                         ?.let { credentials.removeAccount(it.providerId, it.accountId) }
                     // The face choice goes with the account it named -- see releasingFace.
-                    settingsService.saveSettings(settingsService.getSettings().releasingFace(MS_KEY))
+                    settingsService.updateSettings { it.releasingFace(MS_KEY) }
                     credentials.faceSession(settingsService)
                 }
                 face?.let { ctx.onLogin(it) } ?: ctx.onLogout()

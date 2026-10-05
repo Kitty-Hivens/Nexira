@@ -460,7 +460,7 @@ fun FrameWindowScope.AppShellContent(
     val applyAutomaticDark: suspend (Boolean?) -> Unit = { wanted ->
         if (wanted != null) {
             isDarkTheme = wanted
-            settingsService.saveSettings(settingsService.getSettings().copy(isDarkTheme = wanted))
+            settingsService.updateSettings { it.copy(isDarkTheme = wanted) }
         }
     }
 
@@ -917,7 +917,7 @@ fun FrameWindowScope.AppShellContent(
                 )
             }
             if (posted) withContext(Dispatchers.IO) {
-                settingsService.saveSettings(settingsService.getSettings().copy(trayHintShown = true))
+                settingsService.updateSettings { it.copy(trayHintShown = true) }
             }
         }
 
@@ -1140,22 +1140,22 @@ fun FrameWindowScope.AppShellContent(
                             // drops back to Manual in the same save.
                             isDarkTheme = !isDarkTheme
                             themeMode = ThemeMode.Manual
-                            val current = settingsService.getSettings()
-                            settingsService.saveSettings(current.copy(
-                                isDarkTheme = isDarkTheme,
+                            val dark = isDarkTheme
+                            settingsService.updateSettings { it.copy(
+                                isDarkTheme = dark,
                                 themeMode = ThemeMode.Manual,
                                 themeFromWallpaper = false,
-                            ))
+                            ) }
                         },
                         themeMode = themeMode,
                         onThemeModeChanged = { mode ->
                             themeMode = mode
                             // themeFromWallpaper mirrors the mode so a downgrade to a
                             // pre-mode build keeps the wallpaper opt-in coherent.
-                            settingsService.saveSettings(settingsService.getSettings().copy(
+                            settingsService.updateSettings { it.copy(
                                 themeMode = mode,
                                 themeFromWallpaper = mode == ThemeMode.Wallpaper,
-                            ))
+                            ) }
                         },
                         systemThemeAvailable = systemThemeAvailable,
                         themeLibrary         = themeLibrary,
@@ -1166,8 +1166,7 @@ fun FrameWindowScope.AppShellContent(
                         currentLocale   = currentLocale,
                         onLocaleChanged = { newLocale ->
                             currentLocale = newLocale
-                            val current = settingsService.getSettings()
-                            settingsService.saveSettings(current.copy(locale = newLocale.tag))
+                            settingsService.updateSettings { it.copy(locale = newLocale.tag) }
                         },
                         customization              = customization,
                         onCustomizationChanged     = { newCustomization ->
@@ -1333,9 +1332,7 @@ fun AppRoot(
         logoutScope.launch {
             withContext(Dispatchers.IO) {
                 credentialsManager.clear()
-                settingsService.saveSettings(
-                    settingsService.getSettings().copy(preferredFaceProvider = null, offlinePlayerName = null),
-                )
+                settingsService.updateSettings { it.copy(preferredFaceProvider = null, offlinePlayerName = null) }
             }
             appState = AppState.Unauthenticated
         }

@@ -58,8 +58,7 @@ fun SettingsScreen(
     val sectionRetention = rememberSaveableStateHolder()
 
     fun save() {
-        val toPersist = form.mergeInto(settingsService.getSettings())
-        settingsService.saveSettings(toPersist)
+        val toPersist = settingsService.updateSettings { form.mergeInto(it) }
         // Apply the mimic-version override immediately so the next protocol
         // handshake picks it up. Without this the user would have to restart
         // for the change to take effect, even though the system property

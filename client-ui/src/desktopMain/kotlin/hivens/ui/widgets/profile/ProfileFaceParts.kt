@@ -87,9 +87,7 @@ internal fun FacePicker(modifier: Modifier = Modifier) {
             // directly: naming a provider whose account has since gone must land on
             // the same fallback the shell uses at startup.
             val face = withContext(Dispatchers.IO) {
-                settingsService.saveSettings(
-                    settingsService.getSettings().copy(preferredFaceProvider = providerKey),
-                )
+                settingsService.updateSettings { it.copy(preferredFaceProvider = providerKey) }
                 credentials.faceSession(settingsService)
             }
             face?.let { ctx.onLogin(it) }
