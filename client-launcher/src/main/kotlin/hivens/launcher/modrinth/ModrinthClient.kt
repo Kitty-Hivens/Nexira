@@ -233,10 +233,9 @@ class ModrinthClient(
     /**
      * Fetch a file to [target]; a file already there is left alone.
      *
-     * Held to [sha1] when the caller has it from the version metadata. The mod
-     * browser hands this a bare url and passes none: the transfer is retried and
-     * resumed, and the jar's own structure is what the content scanner checks
-     * afterwards.
+     * Held to [sha1], which every caller has from the version metadata it took the
+     * url from. Without one the transfer is still retried and resumed, and nothing
+     * proves the bytes.
      */
     suspend fun downloadTo(url: String, target: Path, sha1: String? = null): Unit = withContext(Dispatchers.IO) {
         if (Files.exists(target)) return@withContext

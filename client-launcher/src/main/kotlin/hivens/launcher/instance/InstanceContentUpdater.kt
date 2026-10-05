@@ -276,14 +276,15 @@ class InstanceContentUpdater(
     }
 
     /**
-     * Download one update beside its folder, check it against the hash Modrinth
-     * published for it, and swap it in.
+     * Download one update beside its folder, held to the hash Modrinth published
+     * for it, and swap it in.
      *
      * The scratch file lives in the target folder so the swap is a rename within
      * one filesystem, and under a name the scanner does not read as content. The
-     * hash check is the difference between installing a mod and installing a
-     * truncated download of one: unlike the browse-and-install path, an update
-     * knows what it is supposed to receive.
+     * hash is the difference between installing a mod and installing a truncated
+     * download of one, and it goes to the transfer rather than being checked after
+     * it: the engine refetches a body that arrives whole but wrong, and never
+     * writes one out. Checked afterwards, the first bad body failed the update.
      */
     private suspend fun applyOne(instanceDir: Path, target: Target): Boolean {
         val update = target.update
@@ -297,13 +298,7 @@ class InstanceContentUpdater(
             }
         }
         return try {
-            modrinth.downloadTo(update.url, scratch)
-            val got = withContext(Dispatchers.IO) { sha1Of(scratch) }
-            if (!got.equals(update.sha1, ignoreCase = true)) {
-                log.warn("update for {} hashed {}, expected {}", update.ref.fileName, got, update.sha1)
-                withContext(Dispatchers.IO) { Files.deleteIfExists(scratch) }
-                return false
-            }
+            modrinth.downloadTo(update.url, scratch, update.sha1)
             manager.replace(
                 instanceDir = instanceDir,
                 kind        = update.ref.kind,

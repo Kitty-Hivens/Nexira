@@ -994,7 +994,7 @@ class SmrtSyncServiceTest {
 
     /**
      * The manifest names the address, so it can name a plaintext one, or a device on
-     * the player's own network. The bytes are pinned either way; what is refused is
+     * the player's own network. The bytes are pinned either way. What is refused is
      * the request, which used to go out on the manifest's say-so.
      */
     @Test

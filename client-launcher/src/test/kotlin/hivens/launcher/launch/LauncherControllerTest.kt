@@ -862,7 +862,7 @@ class LauncherControllerTest {
     fun `pack with SC requirement and no cached password fails with MissingAuthProvider`() = runTest {
         every { settingsService.getSettings() } returns SettingsData()
 
-        // No credentialsManager.saveAccount(, "smartycraft") -- on-disk file does not
+        // No credentialsManager.saveAccount() -- on-disk file does not
         // exist, so load() returns null. The in-session also has no
         // cachedPassword. The precondition must fail.
 

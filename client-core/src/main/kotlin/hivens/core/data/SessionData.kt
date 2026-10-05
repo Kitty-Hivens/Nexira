@@ -70,7 +70,7 @@ data class SessionData(
     // a stray log line or an exception carrying the session never prints them. The
     // uid is one of them: it is what every signed SmartyCraft action is signed with,
     // and the credential store keeps it in the vault for that reason. The serializer
-    // and equals/hashCode still use every field -- only the human-readable form
+    // and equals/hashCode still use every field. Only the human-readable form
     // masks them.
     override fun toString(): String =
         "SessionData(status=$status, playerName='$playerName', uid=${uid.redactedSecret()}, uuid='$uuid', " +

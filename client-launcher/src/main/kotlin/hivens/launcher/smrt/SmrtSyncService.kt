@@ -1002,7 +1002,7 @@ class SmrtSyncService(
         // local network. Over https the far end has to hold a certificate for the
         // name, which nothing on a LAN does.
         if (!isHttps(url)) {
-            log.warn("smrt sync: skipping {} -- the manifest names a non-https address for it", label)
+            log.warn("smrt sync: skipping {}, the manifest names a non-https address for it", label)
             return Planned.Unfetchable("the pack names an address that is not https for it")
         }
         log.debug("smrt sync: fetching {} <- {}", label, url)
