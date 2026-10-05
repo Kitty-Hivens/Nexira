@@ -278,12 +278,17 @@ private fun Wardrobe(session: SessionData) {
     // local library -- auto-import it (deduped by pixel content) so it shows among the
     // saved skins and reads as the active one. Runs once per player: a genuine server-side
     // skin change surfaces as a new entry on the next open, an identical one dedups.
-    LaunchedEffect(session.playerName) {
-        val bytes = skinManager.getRawSkinBytes(session.playerName) ?: return@LaunchedEffect
+    //
+    // The SmartyCraft account's look, not the face's. The skin host is SmartyCraft's and
+    // is asked by nickname, so a Microsoft face whose name is also taken there imported a
+    // stranger's skin into the library and marked it applied.
+    LaunchedEffect(scSession?.playerName) {
+        val scName = scSession?.playerName ?: return@LaunchedEffect
+        val bytes = skinManager.getRawSkinBytes(scName) ?: return@LaunchedEffect
         val primed = withContext(Dispatchers.IO) {
             // No pixel hash -> no dedup, so skip rather than accumulate a copy per open.
             val sha = skinContentHash(bytes) ?: return@withContext null
-            val entry = library.addUnique(bytes, session.playerName, slim = false, now = System.currentTimeMillis(), sha = sha)
+            val entry = library.addUnique(bytes, scName, slim = false, now = System.currentTimeMillis(), sha = sha)
             library.markApplied(entry.id, System.currentTimeMillis())
             decodeSkin(bytes)?.let { entry.id to it }
         }
@@ -354,7 +359,8 @@ private fun Wardrobe(session: SessionData) {
                 if (bmp != null) {
                     SkinView3D(bmp, Modifier.fillMaxSize(), interactive = true, autoSpin = false, cape = previewCape, state = previewState)
                 } else {
-                    SkinHero(session.playerName, refreshKey, Modifier.fillMaxSize(), interactive = true, autoSpin = false, cape = previewCape, state = previewState)
+                    // The look an apply here would change, which is the SmartyCraft account's.
+                    SkinHero(scSession?.playerName ?: session.playerName, refreshKey, Modifier.fillMaxSize(), interactive = true, autoSpin = false, cape = previewCape, state = previewState)
                 }
             }
             FlowRow(
