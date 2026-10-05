@@ -56,6 +56,22 @@ Stopping a game from the launcher waits for it to actually close before Play com
 
 An update that is interrupted, whether you cancel it, the launcher closes or the power goes, puts the pack back exactly as it was instead of leaving it half updated.
 
+On Linux, a launcher update that crashes shortly after it starts is undone, and the previous version comes back on its own. Before, the old version was deleted two seconds after the new one started, so a build that opened its window and then died left nothing to go back to.
+
+Accounts with two-factor sign-in ask for the code once. If getting a pack ready took longer than half a minute, the launcher signed in again after you had typed the code, which cancelled that code and asked for another. A slow connection also no longer sends you a second code, and no longer reports a correct code as wrong.
+
+Signing in by hand while the launcher is still trying your saved account keeps the account you chose. Saved accounts survive the launcher being closed in the middle of saving them. The key your SmartyCraft account signs things with is now kept in the system keyring with your password, not in a plain file. If you go back to an older version afterwards, sign in again before uploading a skin.
+
+Uploading a skin works after you have played. The wardrobe imports your own SmartyCraft skin, and no longer that of a SmartyCraft player who happens to share your Microsoft name.
+
+A SmartyCraft sign-in the launcher cannot finish now says so when you sign in. Before, the game started anyway and failed at the server with no explanation.
+
+Opening the launcher after using a newer version no longer rewrites your saved accounts in an older format. It tells you that changes to them will not be kept.
+
+Signing out of everything really signs you out: the next start no longer signs you back in offline under your old offline name. The profile no longer freezes while the system keyring is slow to answer.
+
+Crash reports and diagnostic bundles no longer include your account name, and a game's login is forgotten once the game has closed. A pack can no longer make the launcher download from an unencrypted address. A mod update that arrives damaged is downloaded again rather than failing.
+
 ## [2.4.5] - 2026-09-15
 
 A pack that has fallen behind catches itself up when you press Play. Until now the launcher noticed that the files were not the pack's, said nothing on screen, quietly withheld your login and let the game start anyway, so the server turned you away with no explanation anywhere. This was easy to walk into: if a version of the launcher could not install some of a pack's mods and the next one could, the old files were still sitting there. Now the missing pieces are fetched first and the launch goes ahead properly. If the mirror cannot be reached, the launch still happens exactly as it did before.

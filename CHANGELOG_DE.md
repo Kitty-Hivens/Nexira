@@ -48,6 +48,22 @@ Ein Spiel aus dem Launcher zu stoppen wartet, bis es wirklich geschlossen ist, b
 
 Ein unterbrochenes Update, ob abgebrochen, durch das Schließen des Launchers oder einen Stromausfall, stellt das Pack genau so wieder her, wie es war, statt es halb aktualisiert zu lassen.
 
+Unter Linux wird ein Launcher-Update, das kurz nach dem Start abstürzt, rückgängig gemacht, und die vorherige Version kommt von selbst zurück. Vorher wurde die alte Version zwei Sekunden nach dem Start der neuen gelöscht, sodass eine Version, die ihr Fenster öffnete und dann abstürzte, nichts zum Zurückkehren übrig ließ.
+
+Konten mit Zwei-Faktor-Anmeldung fragen den Code einmal ab. Dauerte die Vorbereitung eines Packs länger als eine halbe Minute, meldete sich der Launcher nach deiner Codeeingabe erneut an, was den Code ungültig machte und einen neuen verlangte. Eine langsame Verbindung schickt dir außerdem keinen zweiten Code mehr und meldet einen richtigen Code nicht mehr als falsch.
+
+Meldest du dich von Hand an, während der Launcher noch dein gespeichertes Konto versucht, bleibt das Konto, das du gewählt hast. Gespeicherte Konten überstehen es, wenn der Launcher mitten im Speichern geschlossen wird. Der Schlüssel, mit dem dein SmartyCraft-Konto Aktionen signiert, liegt jetzt mit deinem Passwort im System-Schlüsselbund statt in einer einfachen Datei. Wechselst du danach zu einer älteren Version zurück, melde dich erneut an, bevor du einen Skin hochlädst.
+
+Das Hochladen eines Skins funktioniert auch, nachdem du gespielt hast. Die Garderobe importiert deinen eigenen SmartyCraft-Skin und nicht mehr den eines SmartyCraft-Spielers, der zufällig so heißt wie dein Microsoft-Konto.
+
+Eine SmartyCraft-Anmeldung, die der Launcher nicht abschließen kann, sagt das jetzt bei der Anmeldung. Vorher startete das Spiel trotzdem und scheiterte am Server ohne jede Erklärung.
+
+Den Launcher nach einer neueren Version zu öffnen, schreibt deine gespeicherten Konten nicht mehr in einem älteren Format um. Er sagt dir, dass Änderungen daran nicht erhalten bleiben.
+
+Von allem abmelden meldet dich wirklich ab: Der nächste Start meldet dich nicht mehr offline unter deinem alten Offline-Namen an. Das Profil friert nicht mehr ein, während der System-Schlüsselbund langsam antwortet.
+
+Absturzberichte und Diagnosepakete enthalten deinen Kontonamen nicht mehr, und die Anmeldung eines Spiels wird vergessen, sobald es geschlossen ist. Ein Pack kann den Launcher nicht mehr von einer unverschlüsselten Adresse laden lassen. Ein Mod-Update, das beschädigt ankommt, wird erneut heruntergeladen, statt fehlzuschlagen.
+
 ## [2.4.5] - 2026-09-15
 
 Ein Pack, das zurückgefallen ist, holt sich beim Klick auf Spielen selbst wieder ein. Bisher bemerkte der Launcher, dass die Dateien nicht die des Packs sind, sagte auf dem Bildschirm nichts, hielt die Anmeldung still zurück und startete das Spiel trotzdem, sodass der Server einen ohne jede Erklärung abwies. Hineinzugeraten war leicht: Konnte eine Launcher-Version einige Mods eines Packs nicht installieren und die nächste konnte es, lagen die alten Dateien weiterhin da. Jetzt wird das Fehlende zuerst geladen. Ist der Spiegel nicht erreichbar, läuft der Start genau so ab wie zuvor.
