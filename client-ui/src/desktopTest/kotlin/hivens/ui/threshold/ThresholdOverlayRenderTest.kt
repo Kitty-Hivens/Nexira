@@ -183,11 +183,14 @@ class ThresholdOverlayRenderTest {
     fun `a failed boot still says what went wrong`() {
         // The other half of the same assertion: hiding the bar must not have taken
         // the panel with it.
+        // Every pixel of the band, not a sparse grid: the panel is thin text and
+        // pixel frames, and a grid of points finds it or misses it depending on
+        // where the lines happen to fall, so adding a line to the panel failed this.
         val img = failedFrame()
         var painted = 0
-        for (gy in 8..13) {
-            for (gx in 1..63) {
-                if (!close(img.colorAt(gx * FAIL_W / 64, gy * FAIL_H / 20), FIELD_DARK)) painted++
+        for (y in FAIL_H * 8 / 20 until FAIL_H * 13 / 20) {
+            for (x in 0 until FAIL_W) {
+                if (!close(img.colorAt(x, y), FIELD_DARK)) painted++
             }
         }
         assertTrue(painted > 0, "nothing is drawn where the error panel belongs")
