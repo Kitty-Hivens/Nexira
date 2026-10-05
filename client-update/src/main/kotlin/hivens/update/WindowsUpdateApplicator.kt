@@ -16,6 +16,7 @@ import java.nio.file.Paths
  */
 class WindowsUpdateApplicator : IUpdateApplicator {
     private val logger = LoggerFactory.getLogger(WindowsUpdateApplicator::class.java)
+    private val scheduled = ScheduledInstall()
 
     override fun scheduleUpdate(installerPath: Path) {
         try {
@@ -57,7 +58,7 @@ class WindowsUpdateApplicator : IUpdateApplicator {
 
             logger.info("Scheduled Windows update: {}", installerPath)
 
-            Runtime.getRuntime().addShutdownHook(Thread {
+            scheduled.replace("launcher-update-install") {
                 try {
                     val pb = ProcessBuilder(
                         "powershell.exe",
@@ -74,7 +75,7 @@ class WindowsUpdateApplicator : IUpdateApplicator {
                 } catch (e: Exception) {
                     logger.error("Failed to execute update script", e)
                 }
-            })
+            }
         } catch (e: Exception) {
             logger.error("Failed to schedule Windows update", e)
             throw e

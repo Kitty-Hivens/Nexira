@@ -37,6 +37,7 @@ import java.nio.file.attribute.PosixFilePermission
  */
 class LinuxUpdateApplicator : IUpdateApplicator {
     private val logger = LoggerFactory.getLogger(LinuxUpdateApplicator::class.java)
+    private val scheduled = ScheduledInstall()
 
     /**
      * The download lands here, beside the binary it will replace, so the install
@@ -91,7 +92,7 @@ class LinuxUpdateApplicator : IUpdateApplicator {
 
             logger.info("Scheduled Linux update of {}", exe)
 
-            Runtime.getRuntime().addShutdownHook(Thread {
+            scheduled.replace("launcher-update-install") {
                 try {
                     logger.info("Applying Linux update...")
                     swapBinary(installerPath, exe, backupPath)
@@ -115,7 +116,7 @@ class LinuxUpdateApplicator : IUpdateApplicator {
                 } catch (e: Exception) {
                     logger.error("Could not start the update watchdog; the launcher has to be reopened by hand", e)
                 }
-            })
+            }
         } catch (e: Exception) {
             logger.error("Failed to schedule Linux update", e)
             throw e

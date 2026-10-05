@@ -15,6 +15,7 @@ import java.nio.file.Paths
  */
 class MacUpdateApplicator : IUpdateApplicator {
     private val logger = LoggerFactory.getLogger(MacUpdateApplicator::class.java)
+    private val scheduled = ScheduledInstall()
 
     override fun scheduleUpdate(installerPath: Path) {
         try {
@@ -74,7 +75,7 @@ class MacUpdateApplicator : IUpdateApplicator {
             scriptPath.toFile().setExecutable(true)
             logger.info("Scheduled macOS update: {} targeting {}", installerPath, targetDir)
 
-            Runtime.getRuntime().addShutdownHook(Thread {
+            scheduled.replace("launcher-update-install") {
                 try {
                     val pb = ProcessBuilder("bash", scriptPath.toString())
                     pb.environment().apply {
@@ -87,7 +88,7 @@ class MacUpdateApplicator : IUpdateApplicator {
                 } catch (e: Exception) {
                     logger.error("Failed to execute update script", e)
                 }
-            })
+            }
         } catch (e: Exception) {
             logger.error("Failed to schedule macOS update", e)
             throw e

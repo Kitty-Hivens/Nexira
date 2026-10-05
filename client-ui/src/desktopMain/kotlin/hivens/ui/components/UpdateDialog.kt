@@ -75,7 +75,7 @@ fun UpdateDialog(
         when (downloadState) {
             is DownloadState.Idle, is DownloadState.Ready, is DownloadState.Failed ->
                 runCatching { primaryFocus.requestFocus() }
-            is DownloadState.Downloading -> Unit
+            is DownloadState.Downloading, is DownloadState.Installing -> Unit
         }
     }
 
@@ -86,6 +86,10 @@ fun UpdateDialog(
     // for everything that's about non-dismissability, and keep `isMandatory`
     // separate for the visual + button changes.
     val isBlocking = update.isCritical || update.isMandatory
+
+    // Downloading, or past the install click with the process on its way out:
+    // either way nothing in the dialog may start another action.
+    val busy = downloadState is DownloadState.Downloading || downloadState is DownloadState.Installing
 
     // Both PuppetClick("update.download") and the Idle-state Button onClick
     // run the exact same coroutine flow. Local function captures the state
@@ -111,6 +115,9 @@ fun UpdateDialog(
     // Same shape as launchDownload: PuppetClick("update.install") and the
     // Ready-state Button onClick both schedule + exit identically.
     fun installUpdate(installerPath: String) {
+        // At once, before the coroutine runs: the window stays up for the teardown
+        // grace below, and a second click inside it scheduled the install again.
+        downloadState = DownloadState.Installing
         scope.launch {
             try {
                 updateApplicator.scheduleUpdate(Paths.get(installerPath))
@@ -149,13 +156,13 @@ fun UpdateDialog(
     // Puppet: dialog action set. Marker screen helps drivers detect the
     // dialog is open; ids map to the buttons rendered below.
     PuppetScreen("UpdateDialog")
-    PuppetClick("update.viewOnGithub", enabled = downloadState !is DownloadState.Downloading) {
+    PuppetClick("update.viewOnGithub", enabled = !busy) {
         SystemActions.openUrl(update.releasePageUrl)
     }
-    PuppetClick("update.dismiss", enabled = !isBlocking && downloadState !is DownloadState.Downloading) {
+    PuppetClick("update.dismiss", enabled = !isBlocking && !busy) {
         onDismiss()
     }
-    PuppetClick("update.exitForMandatory", enabled = update.isMandatory && downloadState !is DownloadState.Downloading) {
+    PuppetClick("update.exitForMandatory", enabled = update.isMandatory && !busy) {
         exitProcess(0)
     }
     PuppetClick("update.download", enabled = downloadState is DownloadState.Idle) {
@@ -324,7 +331,7 @@ fun UpdateDialog(
                     // "View on GitHub" sits left, doesn't compete for attention with the
                     // primary install button on the right. Hidden during download so the
                     // user can't accidentally yank focus mid-progress.
-                    if (downloadState !is DownloadState.Downloading) {
+                    if (!busy) {
                         TextButton(onClick = { SystemActions.openUrl(update.releasePageUrl) }) {
                             Symbol(icon = NxIcon.OpenInNew,
                                 contentDescription = null,
@@ -338,7 +345,7 @@ fun UpdateDialog(
 
                     Spacer(Modifier.weight(1f))
 
-                    if (!isBlocking && downloadState !is DownloadState.Downloading) {
+                    if (!isBlocking && !busy) {
                         TextButton(onClick = onDismiss) {
                             Text(s.updateLater, color = NxInk.quiet)
                         }
@@ -349,7 +356,7 @@ fun UpdateDialog(
                     // user's only choices are "install now" or "kill the
                     // process from outside". Hidden mid-download to avoid the
                     // user yanking themselves out of an installation in progress.
-                    if (update.isMandatory && downloadState !is DownloadState.Downloading) {
+                    if (update.isMandatory && !busy) {
                         TextButton(onClick = { exitProcess(0) }) {
                             Text(s.updateExit, color = NxInk.quiet)
                         }
@@ -401,6 +408,18 @@ fun UpdateDialog(
                                 shape  = MaterialTheme.shapes.small
                             ) {
                                 Text(s.updateInstall, color = NxColor.on(fill), fontWeight = FontWeight.Bold)
+                            }
+                        }
+
+                        is DownloadState.Installing -> {
+                            val fill = NxColor.wash(NxColor.status(Status.Success), 0.5f)
+                            Button(
+                                onClick  = {},
+                                enabled  = false,
+                                colors   = ButtonDefaults.buttonColors(disabledContainerColor = fill),
+                                shape    = MaterialTheme.shapes.small
+                            ) {
+                                Text(s.updateInstall, color = NxColor.on(fill))
                             }
                         }
 
@@ -483,5 +502,6 @@ private sealed class DownloadState {
     object Idle : DownloadState()
     data class Downloading(val downloaded: Long, val total: Long, val speed: Double) : DownloadState()
     data class Ready(val installerPath: String) : DownloadState()
+    object Installing : DownloadState()
     object Failed : DownloadState()
 }

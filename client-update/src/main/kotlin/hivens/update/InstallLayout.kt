@@ -28,11 +28,15 @@ class InstallLayout(val root: Path) {
     val manifestFile: Path = root.resolve("manifest.json")
     /** Where an in-flight update downloads + patches before the atomic swap. */
     val stagingDir: Path = root.resolve("staging")
+    /** Present while an apply has started moving files and not yet committed. Outside
+     *  [stagingDir], because staging is emptied at the start of every update and the
+     *  marker is what an interrupted one is finished from. */
+    val applyMarker: Path = root.resolve(".commit.json")
 
     /** Derived / update scaffolding that is NOT shipped content and must never enter
      *  a content manifest: the recorded manifest itself, the version marker, the AOT
-     *  cache (client-generated), and the staging area. */
-    val bookkeeping: Set<Path> = setOf(stagingDir, manifestFile, versionFile, aotCache)
+     *  cache (client-generated), the staging area and the apply marker. */
+    val bookkeeping: Set<Path> = setOf(stagingDir, manifestFile, versionFile, aotCache, applyMarker)
 
     companion object {
         /** The managed layout lives under the launcher data root, not inside the
