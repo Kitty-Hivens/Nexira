@@ -94,7 +94,10 @@ fun MicrosoftSignInButton(
                 requesting = false
                 deviceCodePending = challenge
                 val session = withContext(Dispatchers.IO) { deviceCodeProvider.awaitToken(challenge) }
-                if (rememberAccount) credentialsManager.saveAccount(session, providerId)
+                // Off the composition thread like the two calls above: it writes the
+                // keyring, and a Secret Service that asks for an unlock would hold
+                // the window frozen for as long as its prompt stays up.
+                if (rememberAccount) withContext(Dispatchers.IO) { credentialsManager.saveAccount(session, providerId) }
                 ActionRing.record("Microsoft sign-in OK: ${session.playerName}")
                 deviceCodePending = null
                 onSignedIn(session)
