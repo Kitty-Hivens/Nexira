@@ -27,6 +27,8 @@ import java.nio.file.Paths
  *   - `data-dir`                -- absolute path of user-chosen data dir
  *   - `data-dir-pending-source` -- set by UI when scheduling a move
  *   - `data-dir-pending-target` -- set by UI when scheduling a move
+ *   - `data-dir-stale-source`   -- the old data dir after a committed move,
+ *     until the next start manages to delete what this one could not
  *
  * Lines that don't match `key=value` are ignored on read; lines
  * starting with `#` are also dropped on read. The writer preserves
@@ -47,6 +49,7 @@ object BootstrapConf {
     const val KEY_DATA_DIR = "data-dir"
     const val KEY_PENDING_SOURCE = "data-dir-pending-source"
     const val KEY_PENDING_TARGET = "data-dir-pending-target"
+    const val KEY_STALE_SOURCE = "data-dir-stale-source"
 
     /** Default location -- overridable in tests via [read] / [write] / [update] params. */
     fun defaultPath(): Path = Paths.get(System.getProperty("user.home", "."), ".nexira.conf")

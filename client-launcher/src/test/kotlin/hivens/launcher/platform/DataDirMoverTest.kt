@@ -2,6 +2,7 @@ package hivens.launcher.platform
 
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.attribute.PosixFilePermissions
 import kotlin.io.path.div
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
@@ -10,6 +11,9 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import org.junit.jupiter.api.Assumptions.assumeTrue
+import org.junit.jupiter.api.condition.EnabledOnOs
+import org.junit.jupiter.api.condition.OS
 
 class DataDirMoverTest {
 
@@ -135,6 +139,85 @@ class DataDirMoverTest {
         val conf = BootstrapConf.read(confFile)
         assertNull(conf[BootstrapConf.KEY_PENDING_SOURCE])
         assertNull(conf[BootstrapConf.KEY_DATA_DIR], "no commit on refused apply")
+    }
+
+    /**
+     * On Windows this process holds files in the source open, so deleting it can fail
+     * partway. Deleting before the commit left a half-deleted source as the data dir
+     * and the complete copy unused, and the next start refused the populated target.
+     */
+    @Test
+    @EnabledOnOs(OS.LINUX, OS.MAC)
+    fun `a source that will not delete still leaves the move committed, and goes at the next start`() {
+        DataDirMover.schedule(source, target, confFile)
+        val stuck = source / "subdir"
+        Files.setPosixFilePermissions(stuck, PosixFilePermissions.fromString("r-xr-xr-x"))
+        try {
+            DataDirMover.applyPending(confFile)
+            assumeTrue(Files.exists(stuck / "nested.txt"), "the directory could be emptied anyway (running as root)")
+
+            val conf = BootstrapConf.read(confFile)
+            assertEquals(target.toAbsolutePath().toString(), conf[BootstrapConf.KEY_DATA_DIR])
+            assertEquals(source.toAbsolutePath().toString(), conf[BootstrapConf.KEY_STALE_SOURCE])
+            assertEquals("nested content", Files.readString(target / "subdir" / "nested.txt"))
+        } finally {
+            Files.setPosixFilePermissions(stuck, PosixFilePermissions.fromString("rwxr-xr-x"))
+        }
+
+        DataDirMover.applyPending(confFile)
+
+        assertFalse(Files.exists(source))
+        assertNull(BootstrapConf.read(confFile)[BootstrapConf.KEY_STALE_SOURCE])
+    }
+
+    /** The guard against a populated target used to refuse the move's own unfinished copy for good. */
+    @Test
+    fun `an unfinished copy from an earlier start is copied again rather than refused`() {
+        DataDirMover.schedule(source, target, confFile)
+        Files.createDirectories(target)
+        Files.writeString(target / DataDirMover.IN_PROGRESS_MARKER, source.toString())
+        Files.writeString(target / "credentials.json", "half")
+
+        DataDirMover.applyPending(confFile)
+
+        assertEquals("""{"username":"test"}""", Files.readString(target / "credentials.json"))
+        assertFalse(Files.exists(target / DataDirMover.IN_PROGRESS_MARKER))
+        assertEquals(target.toAbsolutePath().toString(), BootstrapConf.read(confFile)[BootstrapConf.KEY_DATA_DIR])
+    }
+
+    @Test
+    @EnabledOnOs(OS.LINUX, OS.MAC)
+    fun `a copy that fails is removed and the move is tried again next start`() {
+        DataDirMover.schedule(source, target, confFile)
+        val unreadable = source / "subdir" / "nested.txt"
+        Files.setPosixFilePermissions(unreadable, PosixFilePermissions.fromString("---------"))
+        try {
+            DataDirMover.applyPending(confFile)
+            assumeTrue(!Files.exists(target / "subdir" / "nested.txt"), "the file could be read anyway (running as root)")
+            assertTrue(Files.exists(source / "credentials.json"))
+            assertEquals(source.toAbsolutePath().toString(), BootstrapConf.read(confFile)[BootstrapConf.KEY_PENDING_SOURCE])
+        } finally {
+            Files.setPosixFilePermissions(unreadable, PosixFilePermissions.fromString("rw-r--r--"))
+        }
+
+        DataDirMover.applyPending(confFile)
+
+        assertEquals("nested content", Files.readString(target / "subdir" / "nested.txt"))
+        assertEquals(target.toAbsolutePath().toString(), BootstrapConf.read(confFile)[BootstrapConf.KEY_DATA_DIR])
+    }
+
+    /** `.lock` is held under a mandatory lock on Windows, and a read of it failed the whole copy. */
+    @Test
+    fun `the running process's own files are not carried into the new directory`() {
+        Files.writeString(source / ".lock", "")
+        Files.writeString(source / ".lock.pid", "123")
+        DataDirMover.schedule(source, target, confFile)
+
+        DataDirMover.applyPending(confFile)
+
+        assertFalse(Files.exists(target / ".lock"))
+        assertFalse(Files.exists(target / ".lock.pid"))
+        assertEquals(target.toAbsolutePath().toString(), BootstrapConf.read(confFile)[BootstrapConf.KEY_DATA_DIR])
     }
 
     @Test
