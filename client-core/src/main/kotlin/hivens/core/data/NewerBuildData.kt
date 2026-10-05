@@ -3,7 +3,7 @@ package hivens.core.data
 import java.util.Collections
 
 /** A store this build reads but will not write back. */
-enum class ReadOnlyStore { PackLibrary, Layout, Theme }
+enum class ReadOnlyStore { PackLibrary, Layout, Theme, Accounts }
 
 /**
  * Why a store is open read-only. The refusal is the same either way; what the
@@ -32,7 +32,7 @@ enum class ReadOnlyReason {
  *
  * The stores record here at load, and the shell reads it once to say so. A
  * process-global rather than a value threaded through the graph because the fact
- * is decided during construction, in three modules, before anything that could
+ * is decided during construction, in four modules, before anything that could
  * carry it exists -- the same shape as the other boot-time facts.
  */
 object NewerBuildData {

@@ -2,6 +2,8 @@ package hivens.auth
 
 import dev.hivens.libvault.SecretVault
 import dev.hivens.libvault.VaultTier
+import hivens.core.data.NewerBuildData
+import hivens.core.data.ReadOnlyStore
 import hivens.core.data.SessionData
 import hivens.core.security.IKeyringStorage
 import kotlinx.serialization.json.Json
@@ -380,6 +382,31 @@ class CredentialsManagerTest {
             setOf(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE),
             Files.getPosixFilePermissions(workDir / "credentials.json"),
         )
+    }
+
+    // ── a file from a newer build ──────────────────────────────────────────────
+
+    /**
+     * A save stamped the current format over a file a newer build had written and
+     * dropped what that build keeps and this one cannot represent. Every sibling
+     * store already opens such a file read-only.
+     */
+    @Test
+    fun `a file written by a newer build is read and never written back`() {
+        NewerBuildData.reset()
+        val newer = """{"version":7,"activeAccountId":"$scUuid","somethingNewer":{"kept":true},"accounts":[""" +
+            """{"providerId":"smartycraft","accountId":"$scUuid","username":"ChaosA","uuid":"$scUuid"}]}"""
+        Files.writeString(workDir / "credentials.json", newer)
+        vault.entries[scKey("accessToken")] = "fake-game-token".toByteArray()
+
+        assertEquals("ChaosA", manager.load()?.playerName)
+        manager.saveAccount(session(uuid = "other", playerName = "Other"), "smartycraft")
+        manager.markTwoFactor("smartycraft")
+        manager.removeAccount("smartycraft", scUuid)
+
+        assertEquals(newer, Files.readString(workDir / "credentials.json"), "not a byte of it rewritten")
+        assertEquals(setOf(ReadOnlyStore.Accounts), NewerBuildData.affected())
+        NewerBuildData.reset()
     }
 
     // ── refreshStored ─────────────────────────────────────────────────────────

@@ -1673,6 +1673,7 @@ object JapaneseStrings : AppStrings {
     override val readOnlyDataLibrary = "パックのライブラリ"
     override val readOnlyDataLayout = "レイアウト"
     override val readOnlyDataTheme    = "テーマ"
+    override val readOnlyDataAccounts = "保存済みのアカウント"
     override val videoFetchingTool = "ダウンローダーを取得中"
     override val videoResolvingPage = "ページを読み取り中"
     override val videoDownloading = "ダウンロード中"

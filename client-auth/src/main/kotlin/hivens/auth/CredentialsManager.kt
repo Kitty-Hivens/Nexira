@@ -3,6 +3,8 @@ package hivens.auth
 import dev.hivens.libvault.SecretVault
 import hivens.core.io.writeStringOwnerOnly
 import hivens.core.api.interfaces.ICredentialStore
+import hivens.core.data.NewerBuildData
+import hivens.core.data.ReadOnlyStore
 import hivens.core.data.SessionData
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -70,6 +72,15 @@ class CredentialsManager(
     @Volatile
     private var legacyUnreadableThisRun = false
 
+    /**
+     * Whether the file was written by a newer build. Read as far as this build
+     * understands it and never written back: a save would stamp the current
+     * version over it and drop whatever that build keeps that this one cannot
+     * represent, the way every sibling store already refuses to.
+     */
+    @Volatile
+    private var readOnly = false
+
     /** Whether this run has already tried to move cleartext uids into the vault. */
     @Volatile
     private var uidsMovedThisRun = false
@@ -112,6 +123,7 @@ class CredentialsManager(
     private fun saveAccountLocked(session: SessionData, providerId: String, makeActive: Boolean) {
         val accountId = accountIdFor(session)
         val current = readAccountsFile() ?: SavedAccountsFile()
+        if (readOnly) return
         val previous = current.accounts.firstOrNull { it.accountId == accountId && it.providerId == providerId }
         val account = SavedAccount(
             providerId = providerId,
@@ -155,6 +167,7 @@ class CredentialsManager(
     override fun markTwoFactor(providerId: String) {
         synchronized(lock) {
             val file = readAccountsFile() ?: return
+            if (readOnly) return
             val updated = file.accounts.map {
                 if (it.providerId == providerId && !it.twoFactor) it.copy(twoFactor = true) else it
             }
@@ -167,6 +180,7 @@ class CredentialsManager(
     override fun clearTwoFactor(providerId: String) {
         synchronized(lock) {
             val file = readAccountsFile() ?: return
+            if (readOnly) return
             val updated = file.accounts.map {
                 if (it.providerId == providerId && it.twoFactor) it.copy(twoFactor = false) else it
             }
@@ -238,6 +252,7 @@ class CredentialsManager(
     override fun setActive(accountId: String) {
         synchronized(lock) {
             val file = readAccountsFile() ?: return
+            if (readOnly) return
             if (file.accounts.none { it.accountId == accountId }) return
             writeAccountsFile(file.copy(activeAccountId = accountId))
         }
@@ -246,6 +261,7 @@ class CredentialsManager(
     override fun removeAccount(providerId: String, accountId: String) {
         synchronized(lock) {
             val file = readAccountsFile() ?: return
+            if (readOnly) return
             if (file.accounts.none { it.providerId == providerId && it.accountId == accountId }) return
             deleteSecrets(providerId, accountId)
             // This one account, not every record sharing its id: another provider's
@@ -264,7 +280,9 @@ class CredentialsManager(
 
     override fun clear() {
         synchronized(lock) {
-            readAccountsFile()?.accounts?.forEach { deleteSecrets(it.providerId, it.accountId) }
+            val file = readAccountsFile()
+            if (readOnly) return
+            file?.accounts?.forEach { deleteSecrets(it.providerId, it.accountId) }
             // Drop any lingering legacy flat keys too.
             vault.delete(LEGACY_KEY_ACCESS_TOKEN)
             vault.delete(LEGACY_KEY_PASSWORD)
@@ -277,6 +295,7 @@ class CredentialsManager(
     /** Reads the v6 accounts file, migrating a pre-v6 file in place on first read. */
     private fun readAccountsFile(): SavedAccountsFile? {
         val (_, file) = readRaw() ?: return null
+        if (file.version > CURRENT_VERSION) noteNewerBuild(file.version)
         if (file.version >= CURRENT_VERSION) {
             return if (!uidsMovedThisRun && file.accounts.any { it.uid != null }) moveUidsIntoVault() else file
         }
@@ -302,7 +321,7 @@ class CredentialsManager(
      */
     private fun moveUidsIntoVault(): SavedAccountsFile? = synchronized(lock) {
         val (_, file) = readRaw() ?: return@synchronized null
-        if (uidsMovedThisRun) return@synchronized file
+        if (uidsMovedThisRun || readOnly) return@synchronized file
         uidsMovedThisRun = true
         val carrying = file.accounts.filter { it.uid != null }
         if (carrying.isEmpty()) return@synchronized file
@@ -319,6 +338,13 @@ class CredentialsManager(
         writeAccountsFile(cleared)
         log.info("moved {} uid(s) out of credentials.json into the vault", carrying.size)
         cleared
+    }
+
+    private fun noteNewerBuild(version: Int) {
+        if (readOnly) return
+        readOnly = true
+        NewerBuildData.record(ReadOnlyStore.Accounts)
+        log.warn("credentials.json is format {}, newer than {} -- written by a newer build; open read-only", version, CURRENT_VERSION)
     }
 
     private fun readRaw(): Pair<String, SavedAccountsFile>? {

@@ -1752,6 +1752,7 @@ interface AppStrings {
     val readOnlyDataLibrary: String
     val readOnlyDataLayout: String
     val readOnlyDataTheme: String
+    val readOnlyDataAccounts: String
     val videoFetchingTool: String
     val videoResolvingPage: String
     val videoDownloading: String

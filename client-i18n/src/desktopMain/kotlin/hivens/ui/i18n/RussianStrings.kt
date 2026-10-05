@@ -1681,6 +1681,7 @@ object RussianStrings : AppStrings {
     override val readOnlyDataLibrary  = "библиотека сборок"
     override val readOnlyDataLayout   = "раскладка"
     override val readOnlyDataTheme    = "тема"
+    override val readOnlyDataAccounts = "сохранённые аккаунты"
     override val videoFetchingTool    = "Скачиваем загрузчик"
     override val videoResolvingPage   = "Читаем страницу"
     override val videoDownloading     = "Скачивание"

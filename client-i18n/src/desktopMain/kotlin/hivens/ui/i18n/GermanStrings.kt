@@ -1668,6 +1668,7 @@ object GermanStrings : AppStrings {
     override val readOnlyDataLibrary  = "die Pack-Sammlung"
     override val readOnlyDataLayout   = "das Layout"
     override val readOnlyDataTheme    = "das Design"
+    override val readOnlyDataAccounts = "die gespeicherten Konten"
     override val videoFetchingTool    = "Downloader wird geholt"
     override val videoResolvingPage   = "Seite wird gelesen"
     override val videoDownloading     = "Wird heruntergeladen"

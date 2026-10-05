@@ -1666,6 +1666,7 @@ object EnglishStrings : AppStrings {
     override val readOnlyDataLibrary  = "the pack library"
     override val readOnlyDataLayout   = "the layout"
     override val readOnlyDataTheme    = "the theme"
+    override val readOnlyDataAccounts = "the saved accounts"
     override val videoFetchingTool    = "Fetching the downloader"
     override val videoResolvingPage   = "Reading the page"
     override val videoDownloading     = "Downloading"

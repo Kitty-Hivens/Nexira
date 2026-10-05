@@ -715,6 +715,7 @@ fun FrameWindowScope.AppShellContent(
                         ReadOnlyStore.PackLibrary -> s.readOnlyDataLibrary
                         ReadOnlyStore.Layout      -> s.readOnlyDataLayout
                         ReadOnlyStore.Theme       -> s.readOnlyDataTheme
+                        ReadOnlyStore.Accounts    -> s.readOnlyDataAccounts
                     }
                 }
                 notificationCenter.push(
