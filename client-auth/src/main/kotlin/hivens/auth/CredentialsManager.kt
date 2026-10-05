@@ -81,7 +81,7 @@ class CredentialsManager(
 
     override fun activeAccountId(): String? = readAccountsFile()?.activeAccountId
 
-    override fun saveAccount(session: SessionData, providerId: String) {
+    override fun saveAccount(session: SessionData, providerId: String, makeActive: Boolean) {
         if (session.accessToken.isBlank()) return
         val accountId = accountIdFor(session)
         val account = SavedAccount(
@@ -102,7 +102,8 @@ class CredentialsManager(
         val current = readAccountsFile() ?: SavedAccountsFile()
         val merged = current.accounts.filterNot { it.accountId == accountId && it.providerId == providerId } + account
         storeSecrets(providerId, accountId, session)
-        writeAccountsFile(current.copy(version = CURRENT_VERSION, activeAccountId = accountId, accounts = merged))
+        val active = if (makeActive) accountId else current.activeAccountId ?: accountId
+        writeAccountsFile(current.copy(version = CURRENT_VERSION, activeAccountId = active, accounts = merged))
         log.info("Saved account {} ({}) -- vault tier={}", accountId, providerId, vault.tier)
     }
 

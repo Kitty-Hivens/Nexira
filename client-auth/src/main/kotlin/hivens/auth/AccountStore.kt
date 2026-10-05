@@ -22,10 +22,16 @@ data class StoredAccount(
 interface AccountStore : ICredentialStore {
 
     /**
-     * Persist [session] as the [providerId] account and make it active. No-op when
-     * the accessToken is blank (an offline identity carries nothing to store).
+     * Persist [session] as the [providerId] account and, unless [makeActive] says
+     * otherwise, make it active. No-op when the accessToken is blank (an offline
+     * identity carries nothing to store).
+     *
+     * [makeActive] false is for a write that has to land without being a choice of
+     * account: a refresh token the provider has just rotated is the only one that
+     * still works, and it is saved even when the user has signed in as someone else
+     * in the meantime.
      */
-    fun saveAccount(session: SessionData, providerId: String)
+    fun saveAccount(session: SessionData, providerId: String, makeActive: Boolean = true)
 
     /**
      * Records that [providerId]'s account answers to a second factor, so nothing

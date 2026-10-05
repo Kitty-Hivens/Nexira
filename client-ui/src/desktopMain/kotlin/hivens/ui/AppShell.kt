@@ -1387,7 +1387,8 @@ fun AppRoot(
     // credentials stop -- looping on those hammers the upstream for nothing.
     // A bypass policy flip restarts the effect for an immediate fresh attempt
     // with a reset ladder (the flip is a user action). A manual login racing
-    // the loop wins: the loop re-reads the state each pass.
+    // the loop wins: the loop re-reads the state each pass, and a pass whose
+    // sign-in was already in flight checks it again once the answer is back.
     val autoLoginBypasses by bypassStore.bypasses.collectAsState()
     LaunchedEffect(autoLoginBypasses) {
         var attempt = 0
@@ -1407,12 +1408,21 @@ fun AppRoot(
             when (resolution) {
                 is AutoLoginCoordinator.Resolution.Success -> {
                     val session = resolution.session
+                    // The form stays usable while a pass is in flight, so the user may
+                    // have signed in by hand while this one waited on the network.
+                    val manualWon = appState is AppState.Authenticated
                     // A silent MSA refresh rotates the refresh token; persist it so
                     // the next start uses the fresh one instead of re-spending the
-                    // stored token.
+                    // stored token. Saved even when a manual sign-in won, since the
+                    // stored one no longer works, but without taking the active slot
+                    // the user just chose.
                     if (session.refreshToken != null && session.refreshToken != saved?.refreshToken) {
                         withContext(Dispatchers.IO) {
-                            credentialsManager.saveAccount(session, PackAuthRequirement.Microsoft.PROVIDER_KEY)
+                            credentialsManager.saveAccount(
+                                session,
+                                PackAuthRequirement.Microsoft.PROVIDER_KEY,
+                                makeActive = !manualWon,
+                            )
                         }
                     }
                     // The sign-in that just ran met the 2FA gate, and it is the only
@@ -1424,6 +1434,10 @@ fun AppRoot(
                             credentialsManager.markTwoFactor(PackAuthRequirement.SmartyCraft.PROVIDER_KEY)
                         }
                         ActionRing.record("Auto-login met the second factor: the SmartyCraft account is marked")
+                    }
+                    if (appState is AppState.Authenticated) {
+                        ActionRing.record("Auto-login answered after a manual sign-in; the manual one stays")
+                        return@LaunchedEffect
                     }
                     appState = AppState.Authenticated(session)
                     return@LaunchedEffect

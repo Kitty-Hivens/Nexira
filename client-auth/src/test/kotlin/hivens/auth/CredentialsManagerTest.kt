@@ -183,6 +183,31 @@ class CredentialsManagerTest {
         assertNull(manager.accountFor("offline"))
     }
 
+    /**
+     * A rotated refresh token has to be stored, because the old one stops working,
+     * but storing it is not the user choosing that account. Auto-login can finish
+     * after the user has signed in by hand, and it used to take the active slot.
+     */
+    @Test
+    fun `a save that is not a choice of account leaves the active one alone`() {
+        manager.save(session())
+        manager.saveAccount(
+            session(uuid = "msuuid", playerName = "MsGamer", refreshToken = "RT2", password = null),
+            "microsoft",
+            makeActive = false,
+        )
+
+        assertEquals(scUuid, manager.activeAccountId())
+        assertEquals("RT2", vault.entries["microsoft:msuuid:refreshToken"]?.decodeToString())
+    }
+
+    @Test
+    fun `the first account saved without being chosen still becomes active`() {
+        manager.saveAccount(session(), "smartycraft", makeActive = false)
+
+        assertEquals(scUuid, manager.activeAccountId(), "a store with one account has no other to front it")
+    }
+
     @Test
     fun `setActive switches which account load returns`() {
         manager.save(session())
