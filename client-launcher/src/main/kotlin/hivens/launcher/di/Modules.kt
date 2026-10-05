@@ -301,8 +301,14 @@ val networkModule = module {
      * granted for the smartycraft host -- see routing notes in
      * [HttpClientProvider].
      */
+    //
+    // Redirects are left to Ktor here. OkHttp follows them on its own unless told
+    // not to, https to plaintext http included, and Ktor's handling, which refuses
+    // that downgrade, then never sees one. This channel fetches whatever a pack
+    // manifest names, so a redirect is one more address it did not choose. The
+    // OkHttp client itself keeps following them for Coil, which asks it directly.
     single<HttpClientProvider>(named("direct")) {
-        val direct = buildHttpClient(get<OkHttpClient>(named("direct")), get())
+        val direct = buildHttpClient(withoutOwnRedirects(get<OkHttpClient>(named("direct"))), get())
         HttpClientProvider { direct }
     }
 
@@ -1093,6 +1099,13 @@ private fun Scope.loaderRegistry(): LoaderRegistry {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 /** Wraps the given [OkHttpClient] in a Ktor [HttpClient] with our shared timeouts, headers, and JSON content-negotiation. */
+/**
+ * [client] with OkHttp's own redirect following off, so the Ktor client built on
+ * it handles redirects itself. Shares [client]'s pool and dispatcher.
+ */
+internal fun withoutOwnRedirects(client: OkHttpClient): OkHttpClient =
+    client.newBuilder().followRedirects(false).followSslRedirects(false).build()
+
 private fun buildHttpClient(okHttpInstance: OkHttpClient, json: Json): HttpClient =
     HttpClient(OkHttp) {
         engine { preconfigured = okHttpInstance }

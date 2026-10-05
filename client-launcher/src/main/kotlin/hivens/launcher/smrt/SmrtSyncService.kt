@@ -25,6 +25,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
 import java.io.IOException
+import java.net.URI
 import java.nio.file.Files
 import java.nio.file.Path
 import java.security.MessageDigest
@@ -994,6 +995,16 @@ class SmrtSyncService(
             return Planned.Unfetchable("its author disallows third-party distribution, so it has to be installed by hand")
         }
         val url = resolveUrl(source)
+        // The address is the manifest's to name and the bytes are pinned by sha1, so
+        // nothing it points at can install the wrong file. The request itself still
+        // happens on its say-so, and in plaintext it tells anyone on the route what
+        // the player is installing and can be aimed at whatever answers http on the
+        // local network. Over https the far end has to hold a certificate for the
+        // name, which nothing on a LAN does.
+        if (!isHttps(url)) {
+            log.warn("smrt sync: skipping {} -- the manifest names a non-https address for it", label)
+            return Planned.Unfetchable("the pack names an address that is not https for it")
+        }
         log.debug("smrt sync: fetching {} <- {}", label, url)
         return Planned.Fetch(
             Transfer(
@@ -1033,6 +1044,9 @@ class SmrtSyncService(
         // Kept exhaustive so a new SmrtSource variant forces a decision here.
         is SmrtSource.Unknown    -> error("resolveUrl called on an unsupported source")
     }
+
+    private fun isHttps(url: String): Boolean =
+        runCatching { URI(url).scheme.equals("https", ignoreCase = true) }.getOrDefault(false)
 
     /**
      * Up-to-date check: file exists, right size, right sha1. Cheap

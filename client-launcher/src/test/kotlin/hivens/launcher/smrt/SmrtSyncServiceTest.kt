@@ -993,6 +993,33 @@ class SmrtSyncServiceTest {
     }
 
     /**
+     * The manifest names the address, so it can name a plaintext one, or a device on
+     * the player's own network. The bytes are pinned either way; what is refused is
+     * the request, which used to go out on the manifest's say-so.
+     */
+    @Test
+    fun `an entry the manifest puts at a plaintext address is never requested`() = runTest {
+        val dir = tempDir("plaintext")
+        val requested = mutableListOf<String>()
+        val service = serviceWith(
+            MockEngine { req ->
+                requested += req.url.toString()
+                when (req.url.toString()) {
+                    REQ_URL -> respond(ByteReadChannel(reqBytes), HttpStatusCode.OK)
+                    else -> respond(ByteReadChannel(optBytes), HttpStatusCode.OK)
+                }
+            }
+        )
+        val manifest = parsed(manifest().replace(OPT_URL, "http://192.168.0.1/opt.jar"))
+
+        service.sync(manifest, dir, enabledState = mapOf("opt.jar" to true))
+
+        assertEquals(listOf(REQ_URL), requested)
+        assertFalse(Files.exists(dir.resolve("mods/opt.jar")), "nothing is fetched from a plaintext address")
+        assertTrue(Files.exists(dir.resolve("mods/req.jar")), "the rest of the pack still lands")
+    }
+
+    /**
      * The repair used to report such a pack whole. `plan` answered "nothing to
      * fetch" for an entry it was already right about and for one it could never
      * obtain, the two arrived as the same null, and everything outside the suspect
