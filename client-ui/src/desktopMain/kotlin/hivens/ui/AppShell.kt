@@ -3,6 +3,7 @@ package hivens.ui
 import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import hivens.ui.components.QuitWithGameHost
 import hivens.ui.components.QuitGate
@@ -524,7 +525,13 @@ fun FrameWindowScope.AppShellContent(
         }
     }
 
-    val launchState by controller.state.collectAsState()
+    // Collapsed to the changes this shell acts on. Preparing and downloading emit
+    // per chunk and per verified file, and the shell reads neither the stage nor the
+    // progress, so a thousand-file install recomposed the root a few thousand times
+    // and re-ran everything keyed on it.
+    val launchState by remember(controller) {
+        controller.state.distinctUntilChanged { old, new -> old.isPreparing() && new.isPreparing() }
+    }.collectAsState(initial = controller.state.value)
 
     // Drains the controller's event channel into the console pane with
     // localized text. Lives at this level (not Dashboard) so events fire
@@ -1026,7 +1033,9 @@ fun FrameWindowScope.AppShellContent(
                 }
             }
 
-            val layoutGraph by layoutGraphRepo.observe().collectAsState()
+            // Remembered: observe() hands out a new flow per call, and collecting a new
+            // one cancels the collector and starts it again on every recomposition.
+            val layoutGraph by remember(layoutGraphRepo) { layoutGraphRepo.observe() }.collectAsState()
             // The registry as it is now. A module switched on or off, or the folder
             // read again, is a new value here and a whole-tree recomposition, which
             // is what a change to the set of widgets that exist is.
@@ -1574,6 +1583,9 @@ fun AppRoot(
       }
     }
 }
+
+/** Getting a launch ready: the two states that change with every chunk and every file. */
+private fun LaunchState.isPreparing(): Boolean = this is LaunchState.Prepare || this is LaunchState.Downloading
 
 /** The most the image cache keeps on disk before it evicts the least recently used. */
 private const val IMAGE_CACHE_BYTES = 256L * 1024 * 1024
