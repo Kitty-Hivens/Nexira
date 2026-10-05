@@ -504,11 +504,16 @@ class LauncherController(
      * [preparePackLaunch] supplies the manifest resolve + pack auth + spawn
      * binding.
      *
+     * [sessionMintedForLaunch] says [currentSession] was made for this very launch,
+     * as the answer to the second-factor demand the previous attempt stopped on. The
+     * launch carries it as it is instead of signing in again: see [prepareScAuth].
+     *
      * @return false when a launch was already under way and this one was refused.
      */
     fun launchPackInstance(
         currentSession: SessionData,
         packInstance: PackInstance,
+        sessionMintedForLaunch: Boolean = false,
     ) = launchInternal(
         label = packInstance.displayName,
         onAccepted = { _runningPackInstanceId.value = packInstance.id },
@@ -520,7 +525,7 @@ class LauncherController(
             // all when cachedManifest is populated.
             emit(LaunchLogEvent.TargetServer(packInstance.displayName, offline = false))
         },
-        prepare = { preparePackLaunch(currentSession, packInstance) },
+        prepare = { preparePackLaunch(currentSession, packInstance, sessionMintedForLaunch) },
     )
 
     /**
@@ -541,6 +546,7 @@ class LauncherController(
     private suspend fun preparePackLaunch(
         currentSession: SessionData,
         packInstance: PackInstance,
+        sessionMintedForLaunch: Boolean,
     ): Prepared {
         // Before anything reads the instance. The launch controls already say this and
         // do not offer Play, so this is the refusal for a launch that arrives some other
@@ -661,7 +667,7 @@ class LauncherController(
             }
         } else {
             setStage(PrepareStage.AUTH, 0.4f)
-            session = preparePackAuth(authRequirement, currentSession, refreshedInstance)
+            session = preparePackAuth(authRequirement, currentSession, refreshedInstance, sessionMintedForLaunch)
                 ?: return Prepared.Bail
         }
 
@@ -966,13 +972,14 @@ class LauncherController(
         requirement: PackAuthRequirement,
         currentSession: SessionData,
         instance: PackInstance,
+        sessionMintedForLaunch: Boolean,
     ): SessionData? {
         val scSatisfiable = authProviderRegistry.contains(PackAuthRequirement.SmartyCraft.PROVIDER_KEY)
         return when (requirement) {
             is PackAuthRequirement.SmartyCraft ->
-                if (scSatisfiable) prepareScAuth(requirement.serverId, currentSession, instance) else currentSession
+                if (scSatisfiable) prepareScAuth(requirement.serverId, currentSession, instance, sessionMintedForLaunch) else currentSession
             is PackAuthRequirement.Both ->
-                if (scSatisfiable) prepareScAuth(requirement.serverId, currentSession, instance) else currentSession
+                if (scSatisfiable) prepareScAuth(requirement.serverId, currentSession, instance, sessionMintedForLaunch) else currentSession
             PackAuthRequirement.Microsoft ->
                 if (!authProviderRegistry.contains(PackAuthRequirement.Microsoft.PROVIDER_KEY)) {
                     currentSession.toOffline()
@@ -1004,6 +1011,7 @@ class LauncherController(
         serverId: String,
         currentSession: SessionData,
         instance: PackInstance,
+        sessionMintedForLaunch: Boolean,
     ): SessionData? {
         // Multi-active: an SC-bound pack always uses the SmartyCraft account,
         // regardless of which account is the chrome "primary".
@@ -1016,6 +1024,20 @@ class LauncherController(
         if (settingsService.getSettings().experimentalReuseSession && currentSession.reusableForSc()) {
             emit(LaunchLogEvent.AuthSucceeded(currentSession.uuid))
             ActionRing.record("Pack launch ${instance.displayName}: reusing the session in hand (experimental)")
+            return if (currentSession.serverId == serverId) currentSession
+            else currentSession.copy(serverId = serverId)
+        }
+
+        // The relaunch that answers a second-factor demand already holds the session
+        // the code unlocked, minted for exactly this launch. Signing in again here
+        // only worked while the provider's short session cache answered for the
+        // network: a launch that spent longer than that preparing (a roster sweep
+        // over a large mods/, a catch-up fetch) sent a real login, which on
+        // SmartyCraft mints a new uid and kills the session the code had just
+        // unlocked, and the gate asked for the code again.
+        if (sessionMintedForLaunch && currentSession.reusableForSc()) {
+            emit(LaunchLogEvent.AuthSucceeded(currentSession.uuid))
+            ActionRing.record("Pack launch ${instance.displayName}: carrying the session the second factor just unlocked")
             return if (currentSession.serverId == serverId) currentSession
             else currentSession.copy(serverId = serverId)
         }

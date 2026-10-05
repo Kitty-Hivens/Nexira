@@ -1263,6 +1263,46 @@ class LauncherControllerTest {
         assertTrue(stored.twoFactor && !stored.mintedNow, "one restored from disk is not")
     }
 
+    /**
+     * The relaunch after a code used to sign in again and lean on the provider's
+     * thirty-second cache to get the same session back. Preparation that outlasted
+     * the cache sent a real login, which kills the session the code unlocked.
+     */
+    @Test
+    fun `the relaunch that answers a code carries that session and does not sign in again`() = runTest {
+        credentialsManager.save(
+            SessionData(playerName = "tester", uuid = "u", accessToken = "stored", cachedPassword = "pw", twoFactor = true),
+        )
+
+        val session = capturePackSession(
+            SessionData(playerName = "tester", uuid = "u", accessToken = "unlocked", twoFactor = true, mintedNow = true),
+            packInstance = scBoundPackInstance(),
+            sessionMintedForLaunch = true,
+        )
+
+        assertEquals("unlocked", session?.accessToken)
+        assertEquals("Industrial", session?.serverId, "carried for the server this launch is for")
+        coVerify(exactly = 0) { authService.login(any(), any(), any()) }
+    }
+
+    /** Only the gate's relaunch says so. A session minted at sign-in and kept in the shell is not this. */
+    @Test
+    fun `a minted session that was not made for this launch still signs in`() = runTest {
+        credentialsManager.save(
+            SessionData(playerName = "tester", uuid = "u", accessToken = "stored", cachedPassword = "pw"),
+        )
+        coEvery { authService.login("tester", "pw", "Industrial") } returns
+            SessionData(playerName = "tester", uuid = "u", accessToken = "fresh")
+
+        val session = capturePackSession(
+            SessionData(playerName = "tester", uuid = "u", accessToken = "from-sign-in", mintedNow = true),
+            packInstance = scBoundPackInstance(),
+        )
+
+        assertEquals("fresh", session?.accessToken)
+        coVerify(exactly = 1) { authService.login("tester", "pw", "Industrial") }
+    }
+
     @Test
     fun `an unverified instance says so rather than passing for an offline launch`() = runTest {
         coEvery { packSyncService.enforceRoster(any(), any()) } returns RosterVerdict(verified = false)
@@ -1302,6 +1342,7 @@ class LauncherControllerTest {
         currentSession: SessionData,
         packInstance: PackInstance = scBoundPackInstance(authRequirement = null),
         events: MutableList<LaunchLogEvent>? = null,
+        sessionMintedForLaunch: Boolean = false,
     ): SessionData? {
         every { settingsService.getSettings() } returns SettingsData()
         coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/opt/jdk8/bin/java")
@@ -1320,7 +1361,11 @@ class LauncherControllerTest {
 
         val controller = newController(this)
         val collectorJob = events?.let { sink -> launch { controller.events.toList(sink) } }
-        controller.launchPackInstance(currentSession = currentSession, packInstance = packInstance)
+        controller.launchPackInstance(
+            currentSession = currentSession,
+            packInstance = packInstance,
+            sessionMintedForLaunch = sessionMintedForLaunch,
+        )
         advanceUntilIdle()
         collectorJob?.cancel()
         return if (captured.isCaptured) captured.captured else null

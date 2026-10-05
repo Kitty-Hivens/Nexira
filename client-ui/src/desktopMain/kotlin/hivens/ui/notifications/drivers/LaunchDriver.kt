@@ -318,7 +318,7 @@ class LaunchDriver(
                 ?: ""
             twoFactorGate.request(target.displayName, serverId) { session ->
                 appScope.launch {
-                    if (controller.launchPackInstance(session, target.instance)) observe(target)
+                    if (controller.launchPackInstance(session, target.instance, sessionMintedForLaunch = true)) observe(target)
                 }
             }
             return
