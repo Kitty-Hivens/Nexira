@@ -12,6 +12,7 @@ import hivens.auth.AccountStore
 import hivens.auth.AuthProvider
 import hivens.core.api.TwoFactorRequiredException
 import hivens.core.data.PackAuthRequirement
+import hivens.core.data.SessionData
 import hivens.core.diag.ActionRing
 import hivens.ui.notifications.TwoFactorLaunchGate
 import kotlinx.coroutines.Dispatchers
@@ -32,6 +33,11 @@ import org.koin.compose.koinInject
  * saved and returned to the waiting relaunch. An account that has since dropped its
  * second factor logs in cleanly and goes straight through, with the stored flag
  * cleared so background sync stops treating it as gated.
+ *
+ * A login can also come back without a demand because the provider answered from its
+ * own short cache, holding the session a code unlocked moments ago. That session is
+ * the one to relaunch with, and it says nothing about the account having dropped its
+ * second factor: see [provesNoSecondFactor].
  */
 @Composable
 fun TwoFactorPromptHost() {
@@ -64,13 +70,12 @@ fun TwoFactorPromptHost() {
             .onSuccess { fresh ->
                 withContext(Dispatchers.IO) {
                     accounts.saveAccount(fresh, PackAuthRequirement.SmartyCraft.PROVIDER_KEY)
-                    // login() returned a session instead of raising
-                    // TwoFactorRequiredException, so the provider is no longer
-                    // asking this account for a second factor. That is the evidence
-                    // the sticky gate needs; passing twoFactor = false through
-                    // saveAccount never cleared it, because saveAccount ORs the
-                    // stored value back in by design.
-                    accounts.clearTwoFactor(PackAuthRequirement.SmartyCraft.PROVIDER_KEY)
+                    // Passing twoFactor = false through saveAccount never cleared the
+                    // gate, because saveAccount ORs the stored value back in by
+                    // design, so the release is its own call, made on evidence only.
+                    if (fresh.provesNoSecondFactor()) {
+                        accounts.clearTwoFactor(PackAuthRequirement.SmartyCraft.PROVIDER_KEY)
+                    }
                 }
                 gate.resume(fresh.copy(mintedNow = true))
             }
@@ -126,3 +131,15 @@ fun TwoFactorPromptHost() {
         puppetPrefix = "launch.twoFactor",
     )
 }
+
+/**
+ * Whether a login that returned this session, rather than raising a second-factor
+ * demand, shows the account no longer answers to one.
+ *
+ * Only a session that is not itself the product of a code does. The provider keeps
+ * the session a code unlocked in a short cache and hands it back to the next login
+ * under the same credentials, with no request made: that login does not raise the
+ * demand, yet the account is as gated as it was. Clearing the flag on it released the
+ * gate for good, and later launches signed in silently until one met the demand again.
+ */
+internal fun SessionData.provesNoSecondFactor(): Boolean = !twoFactor

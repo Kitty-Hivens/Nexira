@@ -198,6 +198,34 @@ class SmartyCraftAuthProviderTest {
         assertEquals(1, proto.loginCalls.size, "the unlocked session is used as-is")
     }
 
+    /**
+     * The launch gate signs in again to see whether the account still answers to a
+     * second factor, and a session coming back reads as "it does not". Inside the
+     * cache window that session is the one the code unlocked, so it has to say so.
+     */
+    @Test
+    fun `a login answered from the cache after a code still carries the second factor`() = runTest {
+        val proto = FakeServerProtocol().apply {
+            loginResult = {
+                LoginResponse(
+                    status = "TWOAUTH", uid = "abc-uid-128",
+                    uuid = "550e8400e29b41d4a716446655440000",
+                    playername = "TestPlayer",
+                    session = "ZmFrZS1zZXNzaW9uLWJ5dGVz",
+                )
+            }
+            twoauthResult = { _, _, _ -> StatusOnlyResponse(status = "OK") }
+        }
+        val service = SmartyCraftAuthProvider(proto)
+        val ex = assertFailsWith<TwoFactorRequiredException> { service.login("user", "pass", "Industrial") }
+        service.completeTwoFactor(username = "user", password = "pass", serverId = "Industrial", uid = ex.uid!!, code = "123456")
+
+        val again = service.login("user", "pass", "Industrial")
+
+        assertTrue(again.twoFactor, "the cached session is the unlocked one, not evidence the account dropped its factor")
+        assertEquals(1, proto.loginCalls.size)
+    }
+
     @Test
     fun `pending TWOAUTH cache is cleared by a fresh login attempt for the same triple`() = runTest {
         // Audit catch on the 22-commit batch: pendingTwoFactor used to grow
