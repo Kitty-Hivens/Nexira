@@ -89,6 +89,28 @@ object SingleInstance {
     }
 
     /**
+     * Whether another process holds the lock on [dataDir], asked without taking it
+     * for keeps and without signalling anybody. For a process that must not run
+     * beside the launcher (the command line), which needs to know rather than to
+     * raise a window. False when the question itself fails, the same fail-open
+     * reading [acquire] makes.
+     */
+    fun heldElsewhere(dataDir: Path): Boolean {
+        val lockFile = dataDir.resolve(".lock")
+        if (!Files.exists(lockFile)) return false
+        return runCatching {
+            FileChannel.open(lockFile, StandardOpenOption.READ, StandardOpenOption.WRITE).use { channel ->
+                val lock = try {
+                    channel.tryLock()
+                } catch (_: OverlappingFileLockException) {
+                    return@use true
+                }
+                if (lock == null) true else { lock.release(); false }
+            }
+        }.getOrDefault(false)
+    }
+
+    /**
      * Idempotent release -- safe to call from a shutdown hook *and* from
      * an explicit teardown path; the second call is a no-op.
      */

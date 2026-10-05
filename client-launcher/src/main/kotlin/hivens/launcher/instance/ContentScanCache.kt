@@ -28,10 +28,16 @@ import java.util.Base64
  * the ones whose files were deleted.
  */
 class ContentScanCache(
-    private val env: Environment,
+    // Asked for at each operation, null when it could not be opened: a miss, and
+    // a write dropped, rather than a failure. See XodusDiskStore.
+    private val environment: () -> Environment?,
     private val storeName: String,
     private val json: Json,
 ) {
+    constructor(env: Environment, storeName: String, json: Json) : this({ env }, storeName, json)
+
+    private val env: Environment get() = environment() ?: throw IllegalStateException("cache database unavailable")
+
     private val log = LoggerFactory.getLogger(ContentScanCache::class.java)
 
     /**

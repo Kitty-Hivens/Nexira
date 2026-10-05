@@ -484,7 +484,10 @@ val cacheModule = module {
     // Content-scan cache (Xodus-backed) + the scanner that reads it, so re-opening a
     // pack's Content tab reads parsed mod metadata from the DB instead of re-cracking
     // every jar. Keyed by canonical path, validated by size+mtime.
-    single { ContentScanCache(get<CacheFactory>().environment(), "content-scan", get()) }
+    single {
+        val caches: CacheFactory = get()
+        ContentScanCache({ caches.environment() }, "content-scan", get())
+    }
     // Icon processor is bound by the UI module (ImageIO lives outside the
     // headless engine); a GUI-less assembly scans without one.
     single { InstanceContentScanner(get(), getOrNull<IconProcessor>()) }
@@ -914,16 +917,26 @@ val appModule = module {
     // Pack registry on Xodus (<dataDir>/db): installed PackInstances persisted one
     // entry per id so a mutation is an O(1) put, not a full-file rewrite. Migrates a
     // legacy packs.json on first open (renamed to *.migrated). Empty -> empty list.
-    single<IPackRepository> {
-        val dataDir: Path = get()
-        XodusPackRepository(
-            dbDir = dataDir.resolve("db"),
-            legacyPacksFile = dataDir.resolve(Storage.PACKS_FILE),
-            json = get(),
-        )
-    }
+    single<IPackRepository> { packRegistry(get(), get(), holdOpen = true) }
 
 }
+
+/**
+ * The pack registry for a short-lived process: it opens the database for each
+ * operation and closes it after, so its lock is held for milliseconds. Loaded after
+ * the launcher's modules, it replaces their registry. See [XodusPackRepository].
+ */
+val transientPackRegistryModule = module {
+    single<IPackRepository> { packRegistry(get(), get(), holdOpen = false) }
+}
+
+private fun packRegistry(dataDir: Path, json: Json, holdOpen: Boolean): IPackRepository =
+    XodusPackRepository(
+        dbDir = dataDir.resolve("db"),
+        legacyPacksFile = dataDir.resolve(Storage.PACKS_FILE),
+        json = json,
+        holdOpen = holdOpen,
+    )
 
 // ── Module factories ────────────────────────────────────────────────────────
 

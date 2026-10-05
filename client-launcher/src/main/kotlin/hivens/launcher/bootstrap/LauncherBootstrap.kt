@@ -101,8 +101,10 @@ object LauncherBootstrap {
      * Headless variant for the CLI / native-image entrypoint: identical
      * logging, paths, migration and Koin setup, but touches no AWT/Swing.
      * It installs a log-and-persist crash handler (no Swing dialog) and
-     * skips the single-instance lock so the CLI can run alongside a GUI
-     * instance instead of silently exiting when the GUI holds the lock.
+     * skips the single-instance lock, which is the GUI's: a second process
+     * that met it would drop a raise signal and exit with nothing said. The
+     * CLI does not run beside a GUI on the same data directory; it checks for
+     * one itself and refuses with a message.
      */
     fun preBootHeadless(extraModules: List<Module> = emptyList()): Result {
         val pre = preWindow(singleInstance = false)

@@ -7,6 +7,7 @@ import androidx.compose.ui.window.LocalWindowExceptionHandlerFactory
 import androidx.compose.ui.window.WindowExceptionHandler
 import androidx.compose.ui.window.WindowExceptionHandlerFactory
 import androidx.compose.ui.window.application
+import hivens.core.api.interfaces.IPackRepository
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.io.IconProcessor
 import hivens.ui.bootstrap.GuiBootstrap
@@ -549,6 +550,11 @@ fun main(args: Array<String>) {
             // already listening when the first shell Composable registers itself
             // (the threshold overlay registers nothing).
             PuppetServerLoader.instance.startIfRequested()
+            // The pack registry opens its database on first use, so it is used here,
+            // on this thread: the first screen to read it would otherwise open it on
+            // the UI thread. Whatever goes wrong is the registry's to report, and it
+            // is no reason to stop the boot.
+            runCatching { GlobalContext.get().get<IPackRepository>().observe() }
             result
         }.onSuccess { result ->
             bootStage.value   = BootStage.Done

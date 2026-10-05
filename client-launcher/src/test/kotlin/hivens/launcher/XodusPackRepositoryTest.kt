@@ -134,6 +134,33 @@ class XodusPackRepositoryTest {
         assertEquals(listOf("legacy"), repos.first().list().map { it.id })
     }
 
+    /**
+     * Xodus locks the directory for one process, and the registry used to take that
+     * lock when it was built and keep it. One that holds it per operation leaves the
+     * database free between them, which is what lets the launcher start while a
+     * command-line launch is running.
+     */
+    @Test
+    fun `a registry that holds the database per operation leaves it free between them`() = runTest {
+        val d = tempData()
+        val transient = XodusPackRepository(d.resolve("db"), d.resolve("packs.json"), json, holdOpen = false).also { repos.add(it) }
+        transient.put(instance("a"))
+
+        val other = repo(d)
+
+        assertEquals(listOf("a"), other.list().map { it.id })
+    }
+
+    /** Built is not opened: a registry nobody has read takes no lock. */
+    @Test
+    fun `building a registry does not open its database`() = runTest {
+        val d = tempData()
+        repo(d)
+        val reader = repo(d)
+
+        assertEquals(emptyList(), reader.list())
+    }
+
     @Test
     fun `a failed write rolls back the in-memory state`() = runTest {
         val r = repo(tempData())

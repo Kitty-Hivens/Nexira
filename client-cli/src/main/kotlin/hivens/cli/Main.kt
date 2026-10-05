@@ -10,6 +10,9 @@ import hivens.core.launch.LaunchError
 import hivens.core.launch.LaunchLogEvent
 import hivens.core.launch.LaunchState
 import hivens.launcher.bootstrap.LauncherBootstrap
+import hivens.launcher.di.transientPackRegistryModule
+import hivens.launcher.platform.PlatformPaths
+import hivens.launcher.platform.SingleInstance
 import hivens.launcher.launch.LauncherController
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -51,14 +54,31 @@ private fun printVersion() {
     println("${Branding.TITLE} ${Branding.VERSION}")
 }
 
-/** Boots the AWT-free launcher core once and returns the started Koin context. */
-private fun bootLauncher(): Koin {
-    LauncherBootstrap.preBootHeadless()
+/**
+ * Boots the AWT-free launcher core once and returns the started Koin context, or
+ * null when the launcher is running on the same data directory.
+ *
+ * The two cannot share it. Both databases lock their directory for one process, and
+ * this one would either fail on them or hold them while the launcher needs them. So
+ * the command line says so and stops rather than half-working. The pack registry it
+ * does open, it opens for each operation and closes again, so a launcher started
+ * while a launch from here runs is kept waiting for milliseconds, not for the game.
+ */
+private fun bootLauncher(): Koin? {
+    val dataDir = PlatformPaths.system().dataDir
+    if (SingleInstance.heldElsewhere(dataDir)) {
+        System.err.println(
+            "${Branding.TITLE} is running on $dataDir. The command line shares its data and cannot run beside it: " +
+                "close the launcher and try again.",
+        )
+        return null
+    }
+    LauncherBootstrap.preBootHeadless(listOf(transientPackRegistryModule))
     return GlobalContext.get()
 }
 
 private fun runListPacks(): Int {
-    val koin = bootLauncher()
+    val koin = bootLauncher() ?: return EXIT_LAUNCHER_RUNNING
     val packs = runBlocking { koin.get<IPackRepository>().list() }
     if (packs.isEmpty()) {
         println("No installed pack instances. Install one from the GUI, then 'nexira-cli launch <id>'.")
@@ -80,7 +100,7 @@ private fun runListPacks(): Int {
 }
 
 private fun runLaunch(cmd: CliCommand.Launch): Int {
-    val koin = bootLauncher()
+    val koin = bootLauncher() ?: return EXIT_LAUNCHER_RUNNING
     val instance = runBlocking { koin.get<IPackRepository>().get(cmd.packId) }
     if (instance == null) {
         System.err.println("No installed pack instance with id '${cmd.packId}'. Run 'nexira-cli list'.")
@@ -204,6 +224,9 @@ private fun renderError(reason: LaunchError): String = when (reason) {
     is LaunchError.MissingAuthProvider -> "sign in with '${reason.providerKey}' to play this pack (use the GUI)"
     is LaunchError.InstanceBusy -> "the pack is busy (${reason.work.name.lowercase()}), try again when it finishes"
 }
+
+/** Exit code for a command refused because the launcher holds the data directory. */
+private const val EXIT_LAUNCHER_RUNNING = 3
 
 private fun coarseLabel(state: LaunchState): String? = when (state) {
     is LaunchState.Prepare -> "prepare:${state.stage}"

@@ -22,13 +22,21 @@ import java.security.MessageDigest
  * is an O(log n) B-tree put with no PATH_MAX or atomic-rename dance. Pure-JVM (no
  * JNA/JNI). Tolerant by contract: any read failure returns null AND deletes the bad
  * entry so it self-heals instead of re-failing every launch.
+ *
+ * The environment is asked for at each operation, so nothing opens it before a
+ * cache is actually read or written. Null means it could not be opened (another
+ * Nexira process holds it), and the store then holds nothing: a read misses and a
+ * write is dropped, which leaves the cache working from memory alone.
  */
 class XodusDiskStore<V>(
-    private val env: Environment,
+    private val environment: () -> Environment?,
     private val storeName: String,
     private val serializer: KSerializer<V>,
     private val json: Json,
 ) : DiskStore<V> {
+
+    constructor(env: Environment, storeName: String, serializer: KSerializer<V>, json: Json) :
+        this({ env }, storeName, serializer, json)
 
     private val log = LoggerFactory.getLogger(XodusDiskStore::class.java)
     private val envelopeSerializer = Envelope.serializer(serializer)
@@ -47,6 +55,7 @@ class XodusDiskStore<V>(
     private val shape = shapeOf(serializer.descriptor)
 
     override fun read(key: String): StoredEntry<V>? {
+        val env = environment() ?: return null
         val bytes = runCatching {
             env.computeInReadonlyTransaction { txn ->
                 env.openStore(storeName, StoreConfig.WITHOUT_DUPLICATES, txn).get(txn, keyOf(key))?.toByteArray()
@@ -68,6 +77,7 @@ class XodusDiskStore<V>(
     }
 
     override fun write(key: String, value: V, storedAtMillis: Long) {
+        val env = environment() ?: return
         runCatching {
             val payload = json.encodeToString(envelopeSerializer, Envelope(SCHEMA_VERSION, shape, storedAtMillis, value))
                 .encodeToByteArray()
@@ -79,6 +89,7 @@ class XodusDiskStore<V>(
     }
 
     override fun delete(key: String) {
+        val env = environment() ?: return
         runCatching {
             env.executeInTransaction { txn ->
                 env.openStore(storeName, StoreConfig.WITHOUT_DUPLICATES, txn).delete(txn, keyOf(key))
@@ -87,6 +98,7 @@ class XodusDiskStore<V>(
     }
 
     override fun clear() {
+        val env = environment() ?: return
         runCatching { env.executeInTransaction { txn -> env.truncateStore(storeName, txn) } }
             .onFailure { log.warn("cache xodus clear failed for {}", storeName, it) }
     }
