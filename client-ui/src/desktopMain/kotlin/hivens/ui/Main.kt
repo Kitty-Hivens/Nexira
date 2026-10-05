@@ -257,7 +257,10 @@ val uiModule = module {
     // graph; the flush hook lands the debounced write on quit. GC + flush hook are
     // createdAtStart so they wire up before any stateful widget composes / before exit.
     single { WidgetStateStore(get<Path>().resolve("widget-state.json"), get(), get()) }
-    single(createdAtStart = true) { WidgetStateGc(repo = get(), store = get(), scope = get()) }
+    single(createdAtStart = true) {
+        val presets: PresetRepository = get()
+        WidgetStateGc(repo = get(), store = get(), scope = get(), alsoReferenced = presets::referencedInstanceIds)
+    }
     single(createdAtStart = true) { WidgetStateFlushHook(get()) }
 
     // What the mod page is looking at, which the right rail's project-view family

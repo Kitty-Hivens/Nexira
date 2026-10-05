@@ -6,6 +6,10 @@ import hivens.ui.layout.JsonMigrations
 import hivens.ui.layout.LayoutReconcile
 import hivens.widget.model.LayoutGraph
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonObject
 import org.slf4j.LoggerFactory
@@ -119,6 +123,40 @@ class PresetRepository(
         AtomicFiles.writeString(pathFor(name), json.encodeToString(envelope))
     }
 
+    /**
+     * Every widget instance id any saved preset names.
+     *
+     * The state collector keeps what these ids own. A preset brings its widgets back
+     * under the ids it saved them with, and the state those widgets carry (a note's
+     * text, a checklist) lives beside the layout keyed by those ids, so pruning
+     * against the live graph alone emptied every one of them the moment another
+     * preset was loaded. Read from the raw graph rather than a decoded one, so a
+     * preset from an older schema keeps its widgets' state too. A file that will not
+     * parse contributes nothing.
+     */
+    fun referencedInstanceIds(): Set<String> {
+        if (!Files.exists(presetsDir)) return emptySet()
+        val ids = HashSet<String>()
+        Files.list(presetsDir).use { stream ->
+            stream.filter { it.isRegularFile() && it.name.endsWith(".json") }.forEach { path ->
+                runCatching { json.decodeFromString<PresetEnvelope>(Files.readString(path)).graph }
+                    .onSuccess { collectInstanceIds(it, ids) }
+            }
+        }
+        return ids
+    }
+
+    private fun collectInstanceIds(element: JsonElement, into: MutableSet<String>) {
+        when (element) {
+            is JsonObject -> element.forEach { (key, value) ->
+                if (key == INSTANCE_ID_KEY && value is JsonPrimitive && value.isString) into += value.content
+                else collectInstanceIds(value, into)
+            }
+            is JsonArray -> element.forEach { collectInstanceIds(it, into) }
+            else -> Unit
+        }
+    }
+
     fun delete(name: String): Boolean {
         return Files.deleteIfExists(resolveExisting(name))
     }
@@ -176,6 +214,11 @@ class PresetRepository(
      * path -- collisions among legacy files stay as they were, because their
      * distinguishing information was already lost when they were written.
      */
+    private companion object {
+        /** The wire name of [hivens.widget.model.WidgetInstance.instanceId]. */
+        const val INSTANCE_ID_KEY = "instance_id"
+    }
+
     private fun resolveExisting(name: String): Path {
         val current = pathFor(name)
         if (Files.exists(current)) return current

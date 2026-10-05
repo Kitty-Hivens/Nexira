@@ -21,17 +21,22 @@ import kotlin.time.Duration.Companion.milliseconds
  * orphan set only ever shrinks on a destroy, none of which is latency-sensitive.
  * Runs on the app scope so GC happens even when no surface hosting a stateful widget
  * is currently composed.
+ *
+ * Live is not the whole of what is kept. [alsoReferenced] names the ids something
+ * else will bring back, the saved presets: loading one replaces the graph, and an id
+ * the replacement does not carry is not gone for good if another preset still has it.
  */
 @OptIn(FlowPreview::class)
 class WidgetStateGc(
     repo: LayoutGraphRepository,
     store: WidgetStateStore,
     scope: CoroutineScope,
+    alsoReferenced: () -> Set<String> = { emptySet() },
 ) {
     init {
         scope.launch {
             repo.observe().debounce(GC_DEBOUNCE_MS.milliseconds).collect { graph ->
-                store.retain(graph.walkInstances().map { it.instanceId }.toSet())
+                store.retain(graph.walkInstances().map { it.instanceId }.toSet() + alsoReferenced())
             }
         }
     }

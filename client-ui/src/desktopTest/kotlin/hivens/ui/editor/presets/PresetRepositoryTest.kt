@@ -3,6 +3,12 @@ package hivens.ui.editor.presets
 import hivens.ui.customization.CustomizationSettings
 import hivens.ui.layout.LayoutReconcile
 import hivens.widget.model.LayoutGraph
+import hivens.widget.model.SlotContent
+import hivens.widget.model.SlotId
+import hivens.widget.model.SurfaceId
+import hivens.widget.model.SurfaceLayout
+import hivens.widget.model.WidgetInstance
+import hivens.widget.model.WidgetKind
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import java.nio.file.Files
@@ -96,6 +102,28 @@ class PresetRepositoryTest {
         assertEquals(listOf("День"), repo.list().map { it.name })
         assertNull(repo.load("Ночь"))
         assertNotNull(repo.load("День"))
+    }
+
+    /**
+     * The state collector keeps what these ids own, so a widget a preset brings
+     * back returns with its note or checklist rather than empty.
+     */
+    @Test
+    fun `every instance id a saved preset names is reported, nested ones included`() {
+        val repo = newRepo()
+        val inner = WidgetInstance(WidgetKind("notes"), "notes-1")
+        val group = WidgetInstance(
+            kind       = WidgetKind("container.group"),
+            instanceId = "group-1",
+            children   = mapOf(SlotId("body") to SlotContent(listOf(inner))),
+        )
+        fun homeWith(widget: WidgetInstance) = LayoutGraph(
+            surfaces = mapOf(SurfaceId("home.new") to SurfaceLayout(slots = mapOf(SlotId("main") to SlotContent(listOf(widget))))),
+        )
+        repo.save("A", homeWith(group), CustomizationSettings())
+        repo.save("B", homeWith(WidgetInstance(WidgetKind("checklist"), "check-1")), CustomizationSettings())
+
+        assertEquals(setOf("group-1", "notes-1", "check-1"), repo.referencedInstanceIds())
     }
 
     @Test
