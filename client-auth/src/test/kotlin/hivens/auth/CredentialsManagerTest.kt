@@ -148,7 +148,7 @@ class CredentialsManagerTest {
     @Test
     fun `removing an account removes its uid`() {
         manager.save(session())
-        manager.removeAccount(scUuid)
+        manager.removeAccount("smartycraft", scUuid)
         assertNull(vault.entries[scKey("uid")])
     }
 
@@ -224,8 +224,8 @@ class CredentialsManagerTest {
 
         assertEquals(2, manager.listAccounts().size)
         assertEquals("msuuid", manager.activeAccountId())
-        assertEquals("ChaosA", manager.loadSession(scUuid)?.playerName)
-        assertEquals("MsGamer", manager.loadSession("msuuid")?.playerName)
+        assertEquals("ChaosA", manager.loadSession("smartycraft", scUuid)?.playerName)
+        assertEquals("MsGamer", manager.loadSession("microsoft", "msuuid")?.playerName)
     }
 
     @Test
@@ -318,7 +318,7 @@ class CredentialsManagerTest {
     fun `removeAccount drops its secrets and reassigns active`() {
         manager.save(session())
         manager.saveAccount(session(uuid = "msuuid", playerName = "MsGamer", refreshToken = "RT"), "microsoft")
-        manager.removeAccount("msuuid")
+        manager.removeAccount("microsoft", "msuuid")
 
         assertEquals(1, manager.listAccounts().size)
         assertNull(vault.entries["microsoft:msuuid:accessToken"])
@@ -380,6 +380,40 @@ class CredentialsManagerTest {
             setOf(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE),
             Files.getPosixFilePermissions(workDir / "credentials.json"),
         )
+    }
+
+    // ── one id under two providers ─────────────────────────────────────────────
+
+    /** The id is the uuid, or the name without one, so two providers can resolve to the same. */
+    private fun twoProvidersOneId() {
+        manager.saveAccount(session(uuid = "shared", playerName = "Shared", accessToken = "sc-token", password = "sc-pw"), "smartycraft")
+        manager.saveAccount(
+            session(uuid = "shared", playerName = "Shared", accessToken = "ms-token", password = null, refreshToken = "ms-rt"),
+            "microsoft",
+        )
+    }
+
+    @Test
+    fun `each provider's account reads its own secrets when the two share an id`() {
+        twoProvidersOneId()
+
+        assertEquals("sc-token", manager.accountFor("smartycraft")?.accessToken)
+        assertEquals("ms-token", manager.accountFor("microsoft")?.accessToken)
+        assertEquals("ms-rt", manager.accountFor("microsoft")?.refreshToken)
+        assertNull(manager.accountFor("smartycraft")?.refreshToken, "another provider's refresh token")
+    }
+
+    @Test
+    fun `removing one provider's account leaves the other's record and secrets`() {
+        twoProvidersOneId()
+
+        manager.removeAccount("microsoft", "shared")
+
+        assertNull(vault.entries["microsoft:shared:accessToken"])
+        assertNull(vault.entries["microsoft:shared:refreshToken"])
+        assertEquals("sc-token", manager.accountFor("smartycraft")?.accessToken, "the other account is still there")
+        manager.clear()
+        assertTrue(vault.entries.isEmpty(), "nothing left in the vault that no record names")
     }
 
     // ── clear() ──────────────────────────────────────────────────────────────

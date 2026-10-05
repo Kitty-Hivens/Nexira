@@ -92,7 +92,7 @@ class CredentialsManager(
     override fun load(): SessionData? {
         val file = readAccountsFile() ?: return null
         val active = file.activeAccountId ?: return null
-        return loadSession(active)
+        return file.accounts.firstOrNull { it.accountId == active }?.let(::sessionOf)
     }
 
     // ── multi-account API ───────────────────────────────────────────────────────
@@ -170,17 +170,17 @@ class CredentialsManager(
      */
     override fun accountFor(providerId: String): SessionData? {
         val account = readAccountsFile()?.accounts?.firstOrNull { it.providerId == providerId } ?: return null
-        return loadSession(account.accountId)
+        return sessionOf(account)
     }
 
     override fun primarySession(preferredProviderId: String?): SessionData? {
         val accounts = readAccountsFile()?.accounts ?: return null
         if (preferredProviderId != null) {
             accounts.firstOrNull { it.providerId == preferredProviderId }
-                ?.let { account -> loadSession(account.accountId)?.let { return it } }
+                ?.let { account -> sessionOf(account)?.let { return it } }
         }
         for (account in accounts.sortedBy { facePriorityIndex(it.providerId) }) {
-            loadSession(account.accountId)?.let { return it }
+            sessionOf(account)?.let { return it }
         }
         return null
     }
@@ -188,11 +188,23 @@ class CredentialsManager(
     private fun facePriorityIndex(providerId: String): Int =
         FACE_PRIORITY.indexOf(providerId).let { if (it < 0) FACE_PRIORITY.size else it }
 
-    override fun loadSession(accountId: String): SessionData? {
-        val account = readAccountsFile()?.accounts?.firstOrNull { it.accountId == accountId } ?: return null
+    override fun loadSession(providerId: String, accountId: String): SessionData? =
+        readAccountsFile()?.accounts
+            ?.firstOrNull { it.providerId == providerId && it.accountId == accountId }
+            ?.let(::sessionOf)
+
+    /**
+     * The session [account] describes, its secrets read under its own provider.
+     *
+     * An account is a provider and an id together. The id is the uuid, or the
+     * player name where there is none, so two providers can share one, and the
+     * lookups that went from a record to its id and back again read whichever
+     * record came first: another provider's token, password and refresh token.
+     */
+    private fun sessionOf(account: SavedAccount): SessionData? {
         val accessToken = secret(account, FIELD_ACCESS_TOKEN)
         if (accessToken.isNullOrBlank()) {
-            log.warn("account {} has metadata but no accessToken in the vault -- treating as gone", accountId)
+            log.warn("account {} ({}) has metadata but no accessToken in the vault -- treating as gone", account.accountId, account.providerId)
             return null
         }
         return SessionData(
@@ -215,16 +227,20 @@ class CredentialsManager(
         }
     }
 
-    override fun removeAccount(accountId: String) {
+    override fun removeAccount(providerId: String, accountId: String) {
         synchronized(lock) {
             val file = readAccountsFile() ?: return
-            val account = file.accounts.firstOrNull { it.accountId == accountId } ?: return
-            deleteSecrets(account.providerId, accountId)
-            val remaining = file.accounts.filterNot { it.accountId == accountId }
+            if (file.accounts.none { it.providerId == providerId && it.accountId == accountId }) return
+            deleteSecrets(providerId, accountId)
+            // This one account, not every record sharing its id: another provider's
+            // record kept in the file is what still names its secrets, and dropping
+            // it left them in the keyring under keys nothing could reach to clear.
+            val remaining = file.accounts.filterNot { it.providerId == providerId && it.accountId == accountId }
             if (remaining.isEmpty()) {
                 deleteFile()
             } else {
-                val newActive = if (file.activeAccountId == accountId) remaining.first().accountId else file.activeAccountId
+                val activeGone = file.activeAccountId == accountId && remaining.none { it.accountId == accountId }
+                val newActive = if (activeGone) remaining.first().accountId else file.activeAccountId
                 writeAccountsFile(file.copy(activeAccountId = newActive, accounts = remaining))
             }
         }

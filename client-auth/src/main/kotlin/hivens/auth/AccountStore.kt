@@ -78,11 +78,17 @@ interface AccountStore : ICredentialStore {
      */
     fun primarySession(preferredProviderId: String? = null): SessionData?
 
-    fun loadSession(accountId: String): SessionData?
+    /**
+     * The stored session of one account. An account is its provider and its id
+     * together: the id is the uuid, or the player name without one, so two
+     * providers can share it.
+     */
+    fun loadSession(providerId: String, accountId: String): SessionData?
 
     fun setActive(accountId: String)
 
-    fun removeAccount(accountId: String)
+    /** Removes [providerId]'s account [accountId] and its secrets, and no other provider's. */
+    fun removeAccount(providerId: String, accountId: String)
 
     /** Wipe every account's secrets and the file. */
     fun clear()
