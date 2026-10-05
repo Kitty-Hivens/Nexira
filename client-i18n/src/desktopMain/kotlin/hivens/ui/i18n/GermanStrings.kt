@@ -1569,6 +1569,8 @@ object GermanStrings : AppStrings {
     override val editorResetSurfaceTitle = "Oberfläche auf Standard zurücksetzen?"
     override fun editorResetSurfaceBody(name: String) =
         "\"$name\" kehrt zur Widget-Anordnung aus dem eingebauten Standard-Layout zurück. Alle lokalen Änderungen auf dieser Oberfläche (hinzugefügte Widgets, Umsortierungen, Löschungen) gehen verloren. Andere Oberflächen bleiben unberührt."
+    override val editorResetAllTitle = "Alle Oberflächen auf Standard zurücksetzen?"
+    override val editorResetAllBody = "Jede Oberfläche kehrt zur Anordnung aus dem eingebauten Standard-Layout zurück, und alle lokalen Änderungen auf allen Oberflächen gehen verloren. Selbst erstellte Bildschirme bleiben erhalten."
     override val editorPreview           = "Vorschau"
     override val editorPreviewHidden     = "Ausgeblendet"
     override val editorPaletteToggleHide = "Ausblenden"

@@ -1640,6 +1640,8 @@ interface AppStrings {
     // --- Layout editor: host (reset / pill / fab) ---
     val editorResetSurfaceTitle: String
     fun editorResetSurfaceBody(name: String): String
+    val editorResetAllTitle: String
+    val editorResetAllBody: String
     val editorPreview: String
     val editorPreviewHidden: String
     val editorPaletteToggleHide: String

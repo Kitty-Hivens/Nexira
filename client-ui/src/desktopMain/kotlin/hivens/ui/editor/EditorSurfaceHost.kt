@@ -217,6 +217,7 @@ fun EditorSurfaceHost(
     var presetPanelOpen by remember { mutableStateOf(false) }
     var modulesPanelOpen by remember { mutableStateOf(false) }
     var resetSurfaceConfirm by remember { mutableStateOf(false) }
+    var resetAllConfirm by remember { mutableStateOf(false) }
     var selectedSurface by remember { mutableStateOf(availableSurfaces.firstOrNull()) }
     // Whether the selection is the open screen's own page rather than a rail or the
     // top bar. Set by what the person picks, and only by that: a re-point made
@@ -751,19 +752,39 @@ fun EditorSurfaceHost(
                             )
                         },
                         confirmButton = {
+                            TextButton(onClick = {
+                                controller.resetSurface(surfaceForReset)
+                                resetSurfaceConfirm = false
+                            }) { Text(s.editorReset, color = NxColor.status(Status.Error, text = true)) }
+                        },
+                        // Resetting everything is offered from here and asked about on
+                        // its own. It sat beside this surface's reset as a second red
+                        // button, under a body promising that the other surfaces are
+                        // left alone, which is true of one of the two.
+                        dismissButton = {
                             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                                 TextButton(onClick = {
-                                    controller.resetAll()
                                     resetSurfaceConfirm = false
-                                }) { Text(s.editorResetAll, color = NxColor.status(Status.Error, text = true)) }
-                                TextButton(onClick = {
-                                    controller.resetSurface(surfaceForReset)
-                                    resetSurfaceConfirm = false
-                                }) { Text(s.editorReset, color = NxColor.status(Status.Error, text = true)) }
+                                    resetAllConfirm = true
+                                }) { Text(s.editorResetAll) }
+                                TextButton(onClick = { resetSurfaceConfirm = false }) { Text(s.editorCancel) }
                             }
                         },
+                    )
+                }
+                if (resetAllConfirm) {
+                    AlertDialog(
+                        onDismissRequest = { resetAllConfirm = false },
+                        title            = { Text(s.editorResetAllTitle) },
+                        text             = { Text(s.editorResetAllBody, style = MaterialTheme.typography.bodyMedium) },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                controller.resetAll()
+                                resetAllConfirm = false
+                            }) { Text(s.editorResetAll, color = NxColor.status(Status.Error, text = true)) }
+                        },
                         dismissButton = {
-                            TextButton(onClick = { resetSurfaceConfirm = false }) { Text(s.editorCancel) }
+                            TextButton(onClick = { resetAllConfirm = false }) { Text(s.editorCancel) }
                         },
                     )
                 }

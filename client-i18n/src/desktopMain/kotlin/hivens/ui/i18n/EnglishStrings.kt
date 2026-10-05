@@ -1567,6 +1567,8 @@ object EnglishStrings : AppStrings {
     override val editorResetSurfaceTitle = "Reset surface to default?"
     override fun editorResetSurfaceBody(name: String) =
         "\"$name\" will return to the widget arrangement from the built-in default layout. All local changes on this surface (added widgets, reorders, deletions) will be lost. Other surfaces are left untouched."
+    override val editorResetAllTitle = "Reset every surface to default?"
+    override val editorResetAllBody = "Every surface returns to the arrangement in the built-in default layout, and every local change on every one of them is lost. Screens you made are kept."
     override val editorPreview           = "Preview"
     override val editorPreviewHidden     = "Hidden"
     override val editorPaletteToggleHide = "Hide"

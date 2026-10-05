@@ -1582,6 +1582,8 @@ object RussianStrings : AppStrings {
     override val editorResetSurfaceTitle = "Сбросить поверхность к умолчанию?"
     override fun editorResetSurfaceBody(name: String) =
         "\"$name\" вернётся к расстановке виджетов из встроенного default-layout. Все локальные изменения на этой поверхности (добавленные виджеты, перестановки, удаления) пропадут. Другие поверхности не тронем."
+    override val editorResetAllTitle = "Сбросить все поверхности к умолчанию?"
+    override val editorResetAllBody = "Каждая поверхность вернётся к расстановке из встроенного default-layout, и все локальные изменения на всех поверхностях пропадут. Созданные вами экраны останутся."
     override val editorPreview           = "Просмотр"
     override val editorPreviewHidden     = "Скрыто"
     override val editorPaletteToggleHide = "Скрыть"

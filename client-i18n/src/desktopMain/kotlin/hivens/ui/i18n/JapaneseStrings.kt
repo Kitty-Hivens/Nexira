@@ -1574,6 +1574,8 @@ object JapaneseStrings : AppStrings {
     override val editorResetSurfaceTitle = "面を既定に戻しますか?"
     override fun editorResetSurfaceBody(name: String) =
         "「$name」は同梱の既定レイアウトのウィジェット配置に戻ります。この面での変更 (追加したウィジェット、並べ替え、削除) はすべて失われます。ほかの面はそのままです。"
+    override val editorResetAllTitle = "すべての面を既定に戻しますか?"
+    override val editorResetAllBody = "すべての面が同梱の既定レイアウトの配置に戻り、どの面での変更もすべて失われます。自分で作った画面は残ります。"
     override val editorPreview = "プレビュー"
     override val editorPreviewHidden = "非表示"
     override val editorPaletteToggleHide = "隠す"
