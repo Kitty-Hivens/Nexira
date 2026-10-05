@@ -2,6 +2,7 @@ package hivens.launcher.runtime
 
 import hivens.test.testTransferEngine
 import hivens.core.api.HttpClientProvider
+import hivens.launcher.runtime.loader.LibrarySpec
 import hivens.launcher.runtime.loader.LoaderProfile
 import hivens.launcher.runtime.loader.LoaderRegistry
 import hivens.launcher.runtime.loader.LoaderResolver
@@ -455,6 +456,57 @@ class RuntimeProvisionerTest {
 
         val resolved = p.ensureRuntime(mcVersion = "1.21.1", loaderName = "stub", loaderVersion = "any")
         assertEquals(25, resolved.javaMajor, "loader profile.javaMajor must win over vanilla.javaMajor")
+    }
+
+    /**
+     * The overlay's coordinates come from a loader profile or an installer's
+     * version json, and `MavenCoord.parse` validates no segment, so the path built
+     * from one is the document's to choose unless it is bounded.
+     */
+    @Test
+    fun `a loader library whose coordinate climbs out of the libraries root is refused`() = runTest {
+        val clientBytes = "C".toByteArray()
+        val indexJson = """{"objects":{}}"""
+        val versionJson = """
+            {
+              "assetIndex": {"id":"17","sha1":"${sha1(indexJson)}","size":${indexJson.length},"url":"$INDEX_URL"},
+              "downloads": {"client": {"sha1":"${sha1(clientBytes)}","size":${clientBytes.size},"url":"$CLIENT_URL"}},
+              "libraries": []
+            }
+        """.trimIndent()
+        val engine = MockEngine { req ->
+            when (req.url.toString()) {
+                MANIFEST_URL -> respond("""{"versions":[{"id":"1.21.1","url":"$VERSION_URL"}]}""", HttpStatusCode.OK, jsonHeaders)
+                VERSION_URL -> respond(versionJson, HttpStatusCode.OK, jsonHeaders)
+                INDEX_URL -> respond(indexJson, HttpStatusCode.OK, jsonHeaders)
+                CLIENT_URL -> respond(ByteReadChannel(clientBytes), HttpStatusCode.OK)
+                else -> respond("missing", HttpStatusCode.NotFound)
+            }
+        }
+        val climbing = object : LoaderResolver {
+            override val loaderId = "stub"
+            override suspend fun resolve(mcVersion: String, loaderVersion: String) = LoaderProfile(
+                version = "test",
+                libraries = listOf(LibrarySpec(MavenCoord.parse("evil:../../../../escaped:1"), bundled = "X".toByteArray())),
+                mainClass = "fake.Main",
+            )
+        }
+        val p = RuntimeProvisioner(
+            librariesDir = librariesDir,
+            assetsDir = assetsDir,
+            clientProvider = HttpClientProvider { HttpClient(engine) },
+            transfers = testTransferEngine(HttpClientProvider { HttpClient(engine) }),
+            json = json,
+            loaderRegistry = LoaderRegistry(listOf(climbing)),
+            osName = "Linux",
+            versionManifestUrl = MANIFEST_URL,
+            resourcesBaseUrl = RES_BASE,
+        )
+
+        assertFailsWith<IOException> { p.ensureRuntime(mcVersion = "1.21.1", loaderName = "stub", loaderVersion = "any") }
+        Files.walk(tmp).use { walk ->
+            assertTrue(walk.noneMatch { it.fileName.toString() == "escaped-1.jar" }, "nothing is written for the climbing coordinate")
+        }
     }
 
     /**

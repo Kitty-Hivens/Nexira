@@ -1,6 +1,7 @@
 package hivens.launcher.component
 
 import hivens.core.io.deleteTree
+import hivens.core.io.resolveWithinRoot
 import hivens.core.platform.OS
 import hivens.core.util.ZipUtils
 import hivens.launcher.util.ClientFileHelper
@@ -36,7 +37,9 @@ class EnvironmentPreparer {
         nativeJars: List<Path>,
         rebuild: Boolean = false,
     ) = withContext(Dispatchers.IO) {
-        val nativesDir = clientRoot.resolve(nativesDirName)
+        // Built from the pack's Minecraft version, and emptied below: a name that
+        // left the instance would have the clean delete whatever it landed on.
+        val nativesDir = resolveWithinRoot(clientRoot, nativesDirName)
         val osSuffix = OS.platform.lwjgl
 
         // The folder check answers "is there something loadable here", which is

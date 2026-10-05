@@ -3,12 +3,14 @@ package hivens.launcher.component
 import hivens.config.Branding
 import hivens.config.Protocol
 import hivens.core.data.SessionData
+import hivens.core.io.resolveWithinRoot
 import hivens.core.platform.OS
 import hivens.launcher.network.ServerProtocolConfig
 import hivens.launcher.runtime.loader.ResolvedRuntime
 import hivens.launcher.security.JvmArgPolicy
 import org.slf4j.LoggerFactory
 import java.io.File
+import java.io.IOException
 import java.nio.file.Path
 
 internal class GameCommandBuilder(
@@ -149,7 +151,7 @@ internal class GameCommandBuilder(
         args.add("-Dminecraft.launcher.brand=${Branding.UPSTREAM_NAME}")
         args.add("-Dminecraft.launcher.version=${Protocol.MIMIC_LAUNCHER_VERSION}")
 
-        val nativesPath = gameDir.resolve(nativesDirName).toAbsolutePath()
+        val nativesPath = resolveWithinRoot(gameDir, nativesDirName).toAbsolutePath()
         args.add("-Djava.library.path=$nativesPath")
         args.add("-Dfml.ignoreInvalidMinecraftCertificates=true")
         addEarlyWindowGuard(args, earlyLoadingScreen)
@@ -238,8 +240,21 @@ internal class GameCommandBuilder(
         val ordered = libPaths.take(afterBootstrap) +
             listOf(runtime.clientJar) +
             libPaths.drop(afterBootstrap)
-        return ordered.joinToString(File.pathSeparator) { it.toAbsolutePath().toString() }
+        return joinClasspath(ordered)
     }
+
+    /**
+     * The entries as one `-cp` value. An entry that itself carries the separator
+     * is refused rather than joined: its path is built from a coordinate a loader
+     * profile named, and joined as it is it would reach the JVM as two entries,
+     * one of them a location nothing here chose.
+     */
+    private fun joinClasspath(entries: List<Path>): String =
+        entries.joinToString(File.pathSeparator) { entry ->
+            entry.toAbsolutePath().toString().also {
+                if (File.pathSeparator in it) throw IOException("classpath entry '$it' contains the path separator, refusing to launch with it")
+            }
+        }
 
     /** A jar the loader boots through before Minecraft's own classes are touched. */
     private fun isBootstrapJar(path: Path): Boolean {
@@ -266,8 +281,7 @@ internal class GameCommandBuilder(
      * detect "version 0" and mis-patch.
      */
     private fun modernClasspath(runtime: ResolvedRuntime): String =
-        (runtime.libraries.map { it.path } + listOfNotNull(runtime.clientResourcesJar))
-            .joinToString(File.pathSeparator) { it.toAbsolutePath().toString() }
+        joinClasspath(runtime.libraries.map { it.path } + listOfNotNull(runtime.clientResourcesJar))
 
     /**
      * Resolves the modern `arguments.jvm` template to concrete tokens. The

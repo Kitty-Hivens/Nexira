@@ -173,7 +173,7 @@ class RuntimeProvisioner(
         // Processor outputs FML resolves by path under libraryDirectory (the
         // patched/SRG client, neoforge universal) -- on disk, never on -cp.
         profile.placeOnlyFiles.forEach { pf ->
-            placeLocal(librariesDir.resolve(pf.relPath), pf.source, null)
+            placeLocal(inLibraries(pf.relPath), pf.source, null)
         }
         // The installer's resources-only client output (client-<neoform>-extra.jar:
         // version.json + assets, no classes). Placed above like every other output;
@@ -181,7 +181,7 @@ class RuntimeProvisioner(
         // version.json (see [ResolvedRuntime.clientResourcesJar]).
         val clientResources = profile.placeOnlyFiles
             .firstOrNull { it.relPath.startsWith("net/minecraft/client/") && it.relPath.endsWith("-extra.jar") }
-            ?.let { librariesDir.resolve(it.relPath) }
+            ?.let { inLibraries(it.relPath) }
         // A self-contained loader (Cleanroom) supplies the whole classpath, so
         // the vanilla libraries are dropped -- keeping them leaks cross-coord
         // twins the merge cannot dedup (old oshi/icu/netty shadowing the new).
@@ -229,7 +229,10 @@ class RuntimeProvisioner(
      * set so both go through the same verify/skip path.
      */
     private suspend fun provision(spec: LibrarySpec): Path {
-        val dest = librariesDir.resolve(spec.coord.relativePath)
+        // The coordinate comes from a loader profile or an installer's version
+        // json, third-party documents both, and `MavenCoord.parse` validates no
+        // segment, so a `..` in one of them would place the file outside the root.
+        val dest = inLibraries(spec.coord.relativePath, spec.coord.groupArtifact)
         when {
             spec.localFile != null -> placeLocal(dest, spec.localFile, spec.sha1)
             spec.bundled != null -> placeBundled(dest, spec.bundled, spec.sha1)
@@ -271,7 +274,7 @@ class RuntimeProvisioner(
         }
 
         VanillaRuntime(
-            clientJar = librariesDir.resolve(clientJarRelPath(mcVersion)),
+            clientJar = inLibraries(clientJarRelPath(mcVersion), mcVersion),
             assetIndexId = assetIndexId,
             libraries = vanillaLibraries(version),
             jvmArgs = version.arguments?.let { flattenArguments(it.jvm, mojangOs) } ?: emptyList(),
@@ -399,7 +402,7 @@ class RuntimeProvisioner(
         version.downloads.client.let { client ->
             out += DownloadTask(
                 url = client.url,
-                dest = librariesDir.resolve(clientJarRelPath(mcVersion)),
+                dest = inLibraries(clientJarRelPath(mcVersion), mcVersion),
                 sha1 = client.sha1,
                 size = client.size,
             )
@@ -437,6 +440,13 @@ class RuntimeProvisioner(
 
     internal fun assetObjectRelPath(hash: String): String = "objects/${hash.take(2)}/$hash"
 
+    /**
+     * [rel] under the shared libraries root, refused when it leaves it. Every
+     * path here is built from something a document named: a maven coordinate, a
+     * Minecraft version from a pack manifest, an installer's output.
+     */
+    private fun inLibraries(rel: String, label: String = rel): Path = resolveWithinRoot(librariesDir, rel, label)
+
     internal fun assetObjectUrl(hash: String): String =
         "${resourcesBaseUrl.trimEnd('/')}/${hash.take(2)}/$hash"
 
@@ -455,7 +465,7 @@ class RuntimeProvisioner(
      * A corrupt/partial cache (rare; writes are atomic) falls back to a refetch.
      */
     private suspend fun loadOrFetchVersion(mcVersion: String): MojangVersion {
-        val cachePath = librariesDir.resolve(versionJsonRelPath(mcVersion))
+        val cachePath = inLibraries(versionJsonRelPath(mcVersion), mcVersion)
         if (Files.isRegularFile(cachePath)) {
             runCatching { json.decodeFromString(MojangVersion.serializer(), Files.readString(cachePath)) }
                 .onSuccess { return it }
@@ -474,7 +484,7 @@ class RuntimeProvisioner(
      * fetching + verifying + persisting it.
      */
     private suspend fun ensureAssetIndex(id: String, url: String, sha1: String): MojangAssetIndex {
-        val indexPath = assetsDir.resolve(assetIndexRelPath(id))
+        val indexPath = resolveWithinRoot(assetsDir, assetIndexRelPath(id), id)
         val onDisk = if (Files.isRegularFile(indexPath)) runCatching { Files.readAllBytes(indexPath) }.getOrNull() else null
         val bytes = if (onDisk != null && sha1Of(onDisk).equals(sha1, ignoreCase = true)) {
             onDisk

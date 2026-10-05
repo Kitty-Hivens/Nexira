@@ -102,6 +102,26 @@ class ModernInstallerResolverTest {
         }
     }
 
+    /**
+     * The version json is the installer's output, and the path it names is read
+     * and then copied into the shared root. One that leaves the installer's
+     * libraries directory would hand over a file from anywhere on the disk.
+     */
+    @Test
+    fun `harvest refuses a path that leaves the installer's libraries directory`() {
+        val staging = Files.createTempDirectory("modern-harvest-climb")
+        try {
+            Files.writeString(staging.resolve("outside.jar"), "not the installer's")
+            val lib = MojangLibrary(
+                name = "net.evil:lib:1",
+                downloads = MojangLibraryDownloads(MojangArtifact("../outside.jar", "", 0, "")),
+            )
+            assertFailsWith<IOException> { resolver().harvest(lib, staging) }
+        } finally {
+            staging.toFile().deleteRecursively()
+        }
+    }
+
     @Test
     fun `harvest fails when the installer produced no such library`() {
         val staging = Files.createTempDirectory("modern-harvest-missing")

@@ -98,6 +98,24 @@ class EnvironmentPreparerTest {
     }
 
     /**
+     * The name is built from the pack's Minecraft version and the folder is emptied
+     * before it is filled, so a name that leaves the instance would have the clean
+     * delete whatever it landed on.
+     */
+    @Test
+    fun `a natives name that leaves the instance is refused before anything is deleted`() = runBlocking {
+        val instance = (workDir / "instance").also { Files.createDirectories(it) }
+        val outside = (workDir / "outside").also { Files.createDirectories(it) }
+        Files.writeString(outside / "keep.txt", "not the launcher's")
+        val jar = nativeJar("lwjgl-natives.jar", "genuine".toByteArray())
+
+        val failure = runCatching { svc.prepareNativesFromManifest(instance, "bin/natives-x/../../../outside", listOf(jar), rebuild = true) }.exceptionOrNull()
+
+        assertTrue(failure is IOException, "got $failure")
+        assertTrue(Files.exists(outside / "keep.txt"))
+    }
+
+    /**
      * Rebuilt for a bound launch, the folder was cleared one level deep and the
      * flatten then moved a file from a subdirectory over what had been unpacked.
      */

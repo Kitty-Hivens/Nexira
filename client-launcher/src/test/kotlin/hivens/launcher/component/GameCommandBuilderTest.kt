@@ -5,6 +5,7 @@ import hivens.launcher.runtime.MavenCoord
 import hivens.launcher.runtime.loader.ResolvedLibrary
 import hivens.launcher.runtime.loader.ResolvedRuntime
 import java.io.File
+import java.io.IOException
 import java.nio.file.Path
 import kotlin.test.*
 
@@ -97,6 +98,37 @@ class GameCommandBuilderTest {
         jvmArgsOverride     = null,
         earlyLoadingScreen  = earlyLoadingScreen,
     )
+
+    /**
+     * A library path is built from a coordinate a loader profile named. Joined
+     * with the separator inside it, one entry would reach the JVM as two.
+     */
+    @Test
+    fun `a classpath entry carrying the path separator is refused`() {
+        val split = ResolvedLibrary(MavenCoord.parse("evil:lib:1"), Path.of("/libs/evil/lib${sep}tmp/planted.jar"))
+        val runtime = forgeRuntime().let { it.copy(libraries = it.libraries + split) }
+
+        assertFailsWith<IOException> { packCommand(runtime) }
+    }
+
+    @Test
+    fun `a natives name that leaves the game directory is refused`() {
+        assertFailsWith<IOException> {
+            builder.buildPackCommand(
+                javaExec           = "/usr/bin/java",
+                memoryMB           = 4096,
+                gameDir            = Path.of("/tmp/instances/Industrial"),
+                sharedAssetsDir    = Path.of("/tmp/shared/assets"),
+                sharedLibrariesDir = Path.of("/tmp/shared/libraries"),
+                nativesDirName     = "bin/natives-x/../../../../lib",
+                versionLabel       = "Forge 1.12.2",
+                javaMajor          = 8,
+                runtime            = forgeRuntime(),
+                session            = session(),
+                jvmArgsOverride    = null,
+            )
+        }
+    }
 
     @Test
     fun `a launch with the loading screen off carries the property older Forge reads`() {

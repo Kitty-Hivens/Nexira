@@ -5,6 +5,7 @@ import hivens.core.net.SkipIfPresent
 import hivens.core.net.Transfer
 import hivens.core.net.TransferEngine
 import hivens.core.io.deleteTree
+import hivens.core.io.resolveWithinRoot
 import hivens.core.api.interfaces.IJavaManager
 import hivens.core.platform.OS
 import hivens.launcher.runtime.MavenCoord
@@ -187,7 +188,9 @@ class ModernInstallerResolver(
         val coord = MavenCoord.parse(lib.name)
         val artifact = lib.downloads?.artifact
         val relPath = artifact?.path?.takeIf { it.isNotBlank() } ?: coord.relativePath
-        val file = dotMinecraft.resolve("libraries").resolve(relPath)
+        // The version json is the installer's output, so the path is held inside
+        // the directory the installer wrote to before anything reads it.
+        val file = resolveWithinRoot(dotMinecraft.resolve("libraries"), relPath, lib.name)
         if (!Files.isRegularFile(file)) {
             throw IOException("$loaderId installer did not produce library $relPath (for ${lib.name})")
         }
