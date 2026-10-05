@@ -45,7 +45,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
-import org.koin.core.qualifier.named
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.Status
@@ -57,7 +56,6 @@ fun LoginPanel(
     showMicrosoft: Boolean = true,
 ) {
     val authService: AuthProvider              = koinInject()
-    val insecureAuthService: AuthProvider      = koinInject(named("insecure"))
     val credentialsManager: AccountStore       = koinInject()
     val protocolConfig: ServerProtocolConfig   = koinInject()
     val certificateGate: CertificateTrustGate  = koinInject()
@@ -90,13 +88,7 @@ fun LoginPanel(
     // [twoFactorPending] / completeTwoFactor / ConfirmCodeDialog path, which is
     // now what SmartyCraft takes. The [twoFactorUnsupported] banner remains for a
     // provider that raises the demand without being able to answer it.
-    //
-    // [service] is the provider that raised the demand. The SSL-bypass retry
-    // logs in through insecureAuthService, whose pendingTwoFactor cache is a
-    // different instance from the secure provider's -- completing the code
-    // against the wrong one would miss the cached login and re-dial the very
-    // TLS channel the user just bypassed.
-    data class TwoFactorPending(val uid: String, val username: String, val password: String, val serverId: String, val service: AuthProvider)
+    data class TwoFactorPending(val uid: String, val username: String, val password: String, val serverId: String)
     var twoFactorPending      by remember { mutableStateOf<TwoFactorPending?>(null) }
     var twoFactorError        by remember { mutableStateOf<String?>(null) }
     var twoFactorBusy         by remember { mutableStateOf(false) }
@@ -114,7 +106,7 @@ fun LoginPanel(
         unfocusedContainerColor = Color.Transparent
     )
 
-    fun doLogin(service: AuthProvider = authService) {
+    fun doLogin() {
         if (login.isBlank() || password.isBlank()) { errorMessage = s.loginErrorEmpty; return }
         focusManager.clearFocus()
         isLoading             = true
@@ -124,7 +116,7 @@ fun LoginPanel(
         scope.launch {
             try {
                 val session = withContext(Dispatchers.IO) {
-                    val sess = service.login(login, password, Protocol.DEFAULT_SERVER_ID)
+                    val sess = authService.login(login, password, Protocol.DEFAULT_SERVER_ID)
                     if (rememberMe) credentialsManager.save(sess)
                     sess
                 }
@@ -132,7 +124,7 @@ fun LoginPanel(
                 onLogin(session)
             } catch (e: TwoFactorRequiredException) {
                 isLoading = false
-                if (service.capabilities.supports2FA) {
+                if (authService.capabilities.supports2FA) {
                     // Provider runs a real second factor: open the code dialog.
                     hivens.core.diag.ActionRing.record("Login: 2FA required, prompting for code")
                     twoFactorPending = TwoFactorPending(
@@ -140,7 +132,6 @@ fun LoginPanel(
                         username = login,
                         password = password,
                         serverId = Protocol.DEFAULT_SERVER_ID,
-                        service = service,
                     )
                 } else {
                     // The provider raised a second-factor demand it cannot
@@ -160,9 +151,11 @@ fun LoginPanel(
                     // no longer draws its own copy of it: the same refusal reaches the
                     // roster and the news, and one dialog for one decision beats a
                     // banner that only the login path could raise. The retry rides
-                    // along -- accepting here means the user wanted to sign in.
+                    // along -- accepting here means the user wanted to sign in. The
+                    // gate records the grant before it runs, so the same provider
+                    // now reaches the host over the bypassed channel.
                     e.isSslError -> certificateGate.request(protocolConfig.sslBypassHost) {
-                        doLogin(insecureAuthService)
+                        doLogin()
                     }
                     else         -> errorMessage = e.message
                         ?.replace("java.lang.Exception: ", "")
@@ -202,7 +195,7 @@ fun LoginPanel(
         scope.launch {
             try {
                 val session = withContext(Dispatchers.IO) {
-                    val sess = pending.service.completeTwoFactor(
+                    val sess = authService.completeTwoFactor(
                         username = pending.username, password = pending.password,
                         serverId = pending.serverId, uid = pending.uid, code = code,
                     )

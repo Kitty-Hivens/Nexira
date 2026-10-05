@@ -52,11 +52,9 @@ class NetworkModuleGraphTest {
         koin.get<OkHttpClient>(named("insecure"))
         koin.get<HttpClientProvider>()
         koin.get<HttpClientProvider>(named("direct"))
-        koin.get<HttpClientProvider>(named("insecure"))
         koin.get<Call.Factory>()
         koin.get<LauncherHashCache>()
         koin.get<IServerProtocol>()
-        koin.get<IServerProtocol>(named("insecure"))
         koin.get<SslBypassStore>()
     }
 

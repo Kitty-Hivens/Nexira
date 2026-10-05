@@ -212,10 +212,11 @@ val networkModule = module {
 
     /**
      * Smartycraft bypass client. Backs the explicit "connect anyway" user
-     * flow; requested by `named("insecure")` or handed out by the default
-     * [HttpClientProvider] once a grant exists, so a caller that has just
-     * granted a bypass can stay on the regular `authService` and reach the
-     * same transport.
+     * flow by being what the default [HttpClientProvider] and the Coil
+     * [Call.Factory] below hand out once a grant exists, so a caller that has
+     * just granted a bypass stays on the regular `authService` and reaches this
+     * transport on its next request. Only the registrations below, and the
+     * tests of this graph, ask for it by name.
      *
      * It is NOT a trust-nothing client: see [buildBypassScopedSsl]. Skipping
      * verification is scoped to a host the user granted, so this client
@@ -356,16 +357,11 @@ val networkModule = module {
 
     // ── Conduit (network refactor) ──────────────────────────────────────────
     // IServerProtocol abstracts all `*.smartycraft.ru` traffic so repositories
-    // don't know URL paths or `action=` strings. The default binding follows
-    // the bypass-aware provider; the `named("insecure")` one is pinned to the
-    // trust-all client for the explicit "connect anyway" login retry.
+    // don't know URL paths or `action=` strings. It follows the bypass-aware
+    // provider, so the "connect anyway" login retry needs no protocol of its
+    // own: the grant is recorded before the retry runs.
     //
     // Wire spec lives in docs/dev/smartycraft-v1-protocol.md.
-
-    single<HttpClientProvider>(named("insecure")) {
-        val insecure = buildHttpClient(get<OkHttpClient>(named("insecure")), get())
-        HttpClientProvider { insecure }
-    }
 
     // ServerProtocolConfig -- Conduit Phase 3. Loads from
     // <dataDir>/server-config.json with smartycraft.ru defaults if absent.
@@ -392,14 +388,6 @@ val networkModule = module {
     single<IServerProtocol> {
         SmartycraftV1Protocol(get<HttpClientProvider>(), get(), get<LauncherHashCache>(), get<ServerProtocolConfig>())
     }
-    single<IServerProtocol>(named("insecure")) {
-        SmartycraftV1Protocol(
-            get<HttpClientProvider>(named("insecure")),
-            get(),
-            get<LauncherHashCache>(),
-            get<ServerProtocolConfig>(),
-        )
-    }
 
     // Repositories -- thin adapters over IServerProtocol.
     single { SkinRepository(get<IServerProtocol>()) }
@@ -414,8 +402,7 @@ val networkModule = module {
 
 /**
  * Auth + credential storage seam. The load-bearing target of the client-auth
- * extraction: keyring, credential manager, and the SmartyCraft auth provider
- * (secure + insecure-bypass variants).
+ * extraction: keyring, credential manager, and the SmartyCraft auth provider.
  */
 val authModule = module {
     // Secret storage via libvault: OS keyring (Secret Service / Credential
@@ -454,16 +441,12 @@ val authModule = module {
     single<ICredentialStore> { get<CredentialsManager>() }
     single<AccountStore> { get<CredentialsManager>() }
 
+    // One instance, whatever channel it reaches the host on. It holds the session
+    // cache and the pending second-factor state, and a second instance for the
+    // bypassed channel kept its own copy of both: a code completed through one was
+    // unknown to the other, which the launch asked next. The channel is the
+    // protocol's choice per request, so the bypass never needed a provider.
     single<AuthProvider> { SmartyCraftAuthProvider(get<IServerProtocol>()) }
-
-    /**
-     * Insecure [AuthProvider] -- used exclusively for the SSL bypass login retry.
-     * Always connects without certificate verification (via the insecure-channel
-     * IServerProtocol variant bound above in coreModule).
-     */
-    single<AuthProvider>(named("insecure")) {
-        SmartyCraftAuthProvider(get<IServerProtocol>(named("insecure")))
-    }
 
     // Offline-play provider + the Microsoft provider + the registry the content
     // router and launch gate consult. Microsoft is always constructible but only
