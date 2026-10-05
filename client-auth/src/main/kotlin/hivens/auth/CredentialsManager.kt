@@ -146,8 +146,6 @@ class CredentialsManager(
         log.info("Saved account {} ({}) -- vault tier={}", accountId, providerId, vault.tier)
     }
 
-    override fun save(session: SessionData) = saveAccount(session, inferProviderId(session))
-
     override fun refreshStored(providerId: String, session: SessionData) {
         if (session.accessToken.isBlank()) return
         synchronized(lock) {
@@ -477,9 +475,6 @@ class CredentialsManager(
     }
 
     private fun accountIdFor(session: SessionData): String = session.uuid.ifBlank { session.playerName }
-
-    private fun inferProviderId(session: SessionData): String =
-        if (session.refreshToken != null) PROVIDER_MICROSOFT else PROVIDER_SMARTYCRAFT
 
     private fun compositeKey(providerId: String, accountId: String, field: String): String =
         "$providerId:$accountId:$field"

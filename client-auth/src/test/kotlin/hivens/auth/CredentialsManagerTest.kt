@@ -90,7 +90,7 @@ class CredentialsManagerTest {
 
     @Test
     fun `save stores secrets under composite keys and only metadata on disk`() {
-        manager.save(session())
+        manager.saveAccount(session(), "smartycraft")
 
         assertEquals("secret-pw", vault.entries[scKey("password")]?.decodeToString())
         assertEquals("fake-game-token", vault.entries[scKey("accessToken")]?.decodeToString())
@@ -111,7 +111,7 @@ class CredentialsManagerTest {
      */
     @Test
     fun `the uid goes into the vault and never into the file`() {
-        manager.save(session())
+        manager.saveAccount(session(), "smartycraft")
 
         assertEquals("1", vault.entries[scKey("uid")]?.decodeToString())
         assertNull(firstAccount()["uid"]?.jsonPrimitive?.contentOrNull, "no uid in credentials.json")
@@ -149,7 +149,7 @@ class CredentialsManagerTest {
 
     @Test
     fun `removing an account removes its uid`() {
-        manager.save(session())
+        manager.saveAccount(session(), "smartycraft")
         manager.removeAccount("smartycraft", scUuid)
         assertNull(vault.entries[scKey("uid")])
     }
@@ -157,7 +157,7 @@ class CredentialsManagerTest {
     @Test
     fun `save with null password clears the password key, keeps the token`() {
         vault.entries[scKey("password")] = "stale".toByteArray()
-        manager.save(session(password = null))
+        manager.saveAccount(session(password = null), "smartycraft")
 
         assertNull(vault.entries[scKey("password")], "null password must clear the vault entry")
         assertEquals("fake-game-token", vault.entries[scKey("accessToken")]?.decodeToString())
@@ -165,7 +165,7 @@ class CredentialsManagerTest {
 
     @Test
     fun `save with blank accessToken is a no-op`() {
-        manager.save(session(accessToken = ""))
+        manager.saveAccount(session(accessToken = ""), "smartycraft")
         assertFalse(Files.exists(workDir / "credentials.json"))
         assertTrue(vault.entries.isEmpty())
     }
@@ -181,7 +181,7 @@ class CredentialsManagerTest {
 
     @Test
     fun `load round-trips the active account through the vault`() {
-        manager.save(session())
+        manager.saveAccount(session(), "smartycraft")
         val loaded = newManager().load()
         assertNotNull(loaded)
         assertEquals("ChaosA", loaded.playerName)
@@ -191,14 +191,14 @@ class CredentialsManagerTest {
 
     @Test
     fun `load with the access token gone returns null`() {
-        manager.save(session())
+        manager.saveAccount(session(), "smartycraft")
         vault.entries.remove(scKey("accessToken"))
         assertNull(manager.load())
     }
 
     @Test
     fun `load with the password gone yields a null cachedPassword`() {
-        manager.save(session())
+        manager.saveAccount(session(), "smartycraft")
         vault.entries.remove(scKey("password"))
         val loaded = manager.load()
         assertNotNull(loaded)
@@ -221,7 +221,7 @@ class CredentialsManagerTest {
 
     @Test
     fun `two accounts coexist, last saved is active, both load`() {
-        manager.save(session())                                                  // SC
+        manager.saveAccount(session(), "smartycraft")                                                  // SC
         manager.saveAccount(session(uuid = "msuuid", playerName = "MsGamer", refreshToken = "RT", password = null), "microsoft")
 
         assertEquals(2, manager.listAccounts().size)
@@ -232,7 +232,7 @@ class CredentialsManagerTest {
 
     @Test
     fun `accountFor resolves the session for each provider`() {
-        manager.save(session())
+        manager.saveAccount(session(), "smartycraft")
         manager.saveAccount(session(uuid = "msuuid", playerName = "MsGamer", refreshToken = "RT"), "microsoft")
         assertEquals("ChaosA", manager.accountFor("smartycraft")?.playerName)
         assertEquals("MsGamer", manager.accountFor("microsoft")?.playerName)
@@ -246,7 +246,7 @@ class CredentialsManagerTest {
      */
     @Test
     fun `a save that is not a choice of account leaves the active one alone`() {
-        manager.save(session())
+        manager.saveAccount(session(), "smartycraft")
         manager.saveAccount(
             session(uuid = "msuuid", playerName = "MsGamer", refreshToken = "RT2", password = null),
             "microsoft",
@@ -266,7 +266,7 @@ class CredentialsManagerTest {
 
     @Test
     fun `setActive switches which account load returns`() {
-        manager.save(session())
+        manager.saveAccount(session(), "smartycraft")
         manager.saveAccount(session(uuid = "msuuid", playerName = "MsGamer", refreshToken = "RT"), "microsoft")
         manager.setActive(scUuid)
         assertEquals("ChaosA", manager.load()?.playerName)
@@ -274,7 +274,7 @@ class CredentialsManagerTest {
 
     @Test
     fun `primarySession prefers the licensed Microsoft account over SmartyCraft`() {
-        manager.save(session())                                                  // SC saved first
+        manager.saveAccount(session(), "smartycraft")                                                  // SC saved first
         manager.saveAccount(session(uuid = "msuuid", playerName = "MsGamer", refreshToken = "RT", password = null), "microsoft")
         // Even with SC made active, the licensed account fronts the shell.
         manager.setActive(scUuid)
@@ -283,7 +283,7 @@ class CredentialsManagerTest {
 
     @Test
     fun `primarySession falls back to SmartyCraft when no Microsoft account`() {
-        manager.save(session())
+        manager.saveAccount(session(), "smartycraft")
         assertEquals("ChaosA", manager.primarySession()?.playerName)
     }
 
@@ -294,7 +294,7 @@ class CredentialsManagerTest {
 
     @Test
     fun `a named provider outranks licence priority`() {
-        manager.save(session())
+        manager.saveAccount(session(), "smartycraft")
         manager.saveAccount(session(uuid = "msuuid", playerName = "MsGamer", refreshToken = "RT", password = null), "microsoft")
         // Licence priority alone puts Microsoft in front; naming SmartyCraft is
         // the user overruling that, which is the whole point of the setting.
@@ -303,7 +303,7 @@ class CredentialsManagerTest {
 
     @Test
     fun `a named provider with no account falls back to priority`() {
-        manager.save(session())
+        manager.saveAccount(session(), "smartycraft")
         // The choice survives the account it named being signed out, so it must
         // not strand the shell faceless when that happens.
         assertEquals("ChaosA", manager.primarySession("microsoft")?.playerName)
@@ -311,14 +311,14 @@ class CredentialsManagerTest {
 
     @Test
     fun `re-saving the same identity upserts rather than duplicates`() {
-        manager.save(session())
-        manager.save(session(playerName = "ChaosA"))   // same uuid -> same accountId
+        manager.saveAccount(session(), "smartycraft")
+        manager.saveAccount(session(playerName = "ChaosA"), "smartycraft")   // same uuid -> same accountId
         assertEquals(1, manager.listAccounts().size)
     }
 
     @Test
     fun `removeAccount drops its secrets and reassigns active`() {
-        manager.save(session())
+        manager.saveAccount(session(), "smartycraft")
         manager.saveAccount(session(uuid = "msuuid", playerName = "MsGamer", refreshToken = "RT"), "microsoft")
         manager.removeAccount("microsoft", "msuuid")
 
@@ -357,7 +357,7 @@ class CredentialsManagerTest {
 
     @Test
     fun `a flag written beside a save is kept`() {
-        manager.save(session())
+        manager.saveAccount(session(), "smartycraft")
         val start = CountDownLatch(1)
         val marker = thread { start.await(); repeat(50) { manager.markTwoFactor("smartycraft") } }
         val saver = thread {
@@ -374,7 +374,7 @@ class CredentialsManagerTest {
 
     @Test
     fun `the accounts file is owner-only and leaves no temp file behind`() {
-        manager.save(session())
+        manager.saveAccount(session(), "smartycraft")
 
         assertFalse(Files.exists(workDir / "credentials.json.tmp"))
         if (!workDir.fileSystem.supportedFileAttributeViews().contains("posix")) return
@@ -413,7 +413,7 @@ class CredentialsManagerTest {
 
     @Test
     fun `a sign-in the launch made brings the stored account up to its uid and token`() {
-        manager.save(session())
+        manager.saveAccount(session(), "smartycraft")
         manager.saveAccount(session(uuid = "msuuid", playerName = "MsGamer", refreshToken = "RT", password = null), "microsoft")
 
         manager.refreshStored("smartycraft", session(accessToken = "fresh-token", password = null).copy(uid = "fresh-uid"))
@@ -471,7 +471,7 @@ class CredentialsManagerTest {
 
     @Test
     fun `clear wipes every account secret and the file`() {
-        manager.save(session())
+        manager.saveAccount(session(), "smartycraft")
         manager.saveAccount(session(uuid = "msuuid", refreshToken = "RT"), "microsoft")
         manager.clear()
         assertFalse(Files.exists(workDir / "credentials.json"))
@@ -480,7 +480,7 @@ class CredentialsManagerTest {
 
     @Test
     fun `clear is idempotent`() {
-        manager.save(session())
+        manager.saveAccount(session(), "smartycraft")
         manager.clear()
         manager.clear()
         assertFalse(Files.exists(workDir / "credentials.json"))

@@ -117,7 +117,7 @@ fun LoginPanel(
             try {
                 val session = withContext(Dispatchers.IO) {
                     val sess = authService.login(login, password, Protocol.DEFAULT_SERVER_ID)
-                    if (rememberMe) credentialsManager.save(sess)
+                    if (rememberMe) credentialsManager.saveAccount(sess, authService.id)
                     sess
                 }
                 hivens.core.diag.ActionRing.record("Login OK: user=$login")
@@ -199,7 +199,7 @@ fun LoginPanel(
                         username = pending.username, password = pending.password,
                         serverId = pending.serverId, uid = pending.uid, code = code,
                     )
-                    if (rememberMe) credentialsManager.save(sess)
+                    if (rememberMe) credentialsManager.saveAccount(sess, authService.id)
                     sess
                 }
                 hivens.core.diag.ActionRing.record("Login OK after 2FA: user=${pending.username}")

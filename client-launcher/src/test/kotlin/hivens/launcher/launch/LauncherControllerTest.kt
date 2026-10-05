@@ -185,8 +185,9 @@ class LauncherControllerTest {
      * spawn path is stubbed through to a clean exit.
      */
     private suspend fun TestScope.authFailureFor(thrown: Exception): LaunchLogEvent.AuthFailed? {
-        credentialsManager.save(
+        credentialsManager.saveAccount(
             SessionData(playerName = "tester", uuid = "u", accessToken = "stale", cachedPassword = "pw"),
+            "smartycraft",
         )
         coEvery { authService.login(any(), any(), any()) } throws thrown
         val events = mutableListOf<LaunchLogEvent>()
@@ -644,8 +645,9 @@ class LauncherControllerTest {
     fun `an instance behind its pack is brought in line instead of launching without a token`() = runTest {
         every { settingsService.getSettings() } returns SettingsData()
         coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/opt/jdk8/bin/java")
-        credentialsManager.save(
+        credentialsManager.saveAccount(
             SessionData(playerName = "tester", uuid = "u", accessToken = "stale-token", cachedPassword = "pw"),
+            "smartycraft",
         )
         coEvery { authService.login("tester", "pw", "Industrial") } returns
             SessionData(playerName = "tester", uuid = "u", accessToken = "fresh-token")
@@ -750,13 +752,14 @@ class LauncherControllerTest {
         // Pre-populate the on-disk credentials so launchPackInstance
         // resolves a cached password without round-tripping the
         // keyring (relaxed mockk -> AES file fallback).
-        credentialsManager.save(
+        credentialsManager.saveAccount(
             SessionData(
                 playerName     = "tester",
                 uuid           = "u",
                 accessToken    = "stale-token",
                 cachedPassword = "pw",
             ),
+            "smartycraft",
         )
 
         val refreshed = SessionData(
@@ -803,8 +806,9 @@ class LauncherControllerTest {
      */
     @Test
     fun `the sign-in before a bound launch is recorded on the stored account`() = runTest {
-        credentialsManager.save(
+        credentialsManager.saveAccount(
             SessionData(playerName = "tester", uuid = "u", uid = "old-uid", accessToken = "stale", cachedPassword = "pw"),
+            "smartycraft",
         )
         coEvery { authService.login("tester", "pw", "Industrial") } returns
             SessionData(playerName = "tester", uuid = "u", uid = "new-uid", accessToken = "fresh", cachedPassword = "pw")
@@ -823,8 +827,9 @@ class LauncherControllerTest {
     fun `pack spawn failure surfaces the carried LaunchError, not Internal`() = runTest {
         every { settingsService.getSettings() } returns SettingsData()
         coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/opt/jdk8/bin/java")
-        credentialsManager.save(
+        credentialsManager.saveAccount(
             SessionData(playerName = "tester", uuid = "u", accessToken = "stale", cachedPassword = "pw"),
+            "smartycraft",
         )
         coEvery { authService.login("tester", "pw", "Industrial") } returns
             SessionData(playerName = "tester", uuid = "u", accessToken = "fresh")
@@ -857,7 +862,7 @@ class LauncherControllerTest {
     fun `pack with SC requirement and no cached password fails with MissingAuthProvider`() = runTest {
         every { settingsService.getSettings() } returns SettingsData()
 
-        // No credentialsManager.save() -- on-disk file does not
+        // No credentialsManager.saveAccount(, "smartycraft") -- on-disk file does not
         // exist, so load() returns null. The in-session also has no
         // cachedPassword. The precondition must fail.
 
@@ -890,8 +895,9 @@ class LauncherControllerTest {
     fun `an smartycraft-origin record with no auth block launches unbound and offline`() = runTest {
         every { settingsService.getSettings() } returns SettingsData()
         coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/opt/jdk8/bin/java")
-        credentialsManager.save(
+        credentialsManager.saveAccount(
             SessionData(playerName = "tester", uuid = "u", accessToken = "stale", cachedPassword = "pw"),
+            "smartycraft",
         )
 
         val handle = mockk<LaunchHandle>()
@@ -938,8 +944,9 @@ class LauncherControllerTest {
         every { settingsService.getSettings() } returns
             SettingsData(useNetworkAgent = false, useSmartycraftAuthLib = true)
         coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/opt/jdk8/bin/java")
-        credentialsManager.save(
+        credentialsManager.saveAccount(
             SessionData(playerName = "tester", uuid = "u", accessToken = "stale", cachedPassword = "pw"),
+            "smartycraft",
         )
         coEvery { authService.login("tester", "pw", "Industrial") } returns
             SessionData(playerName = "tester", uuid = "u", accessToken = "fresh")
@@ -1006,8 +1013,9 @@ class LauncherControllerTest {
     fun `an SC-bound pack still gets the auth host redirected`() = runTest {
         every { settingsService.getSettings() } returns SettingsData()
         coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/opt/jdk8/bin/java")
-        credentialsManager.save(
+        credentialsManager.saveAccount(
             SessionData(playerName = "tester", uuid = "u", accessToken = "stale", cachedPassword = "pw"),
+            "smartycraft",
         )
         coEvery { authService.login("tester", "pw", "Industrial") } returns
             SessionData(playerName = "tester", uuid = "u", accessToken = "fresh")
@@ -1292,8 +1300,9 @@ class LauncherControllerTest {
      */
     @Test
     fun `the relaunch that answers a code carries that session and does not sign in again`() = runTest {
-        credentialsManager.save(
+        credentialsManager.saveAccount(
             SessionData(playerName = "tester", uuid = "u", accessToken = "stored", cachedPassword = "pw", twoFactor = true),
+            "smartycraft",
         )
 
         val session = capturePackSession(
@@ -1310,8 +1319,9 @@ class LauncherControllerTest {
     /** Only the gate's relaunch says so. A session minted at sign-in and kept in the shell is not this. */
     @Test
     fun `a minted session that was not made for this launch still signs in`() = runTest {
-        credentialsManager.save(
+        credentialsManager.saveAccount(
             SessionData(playerName = "tester", uuid = "u", accessToken = "stored", cachedPassword = "pw"),
+            "smartycraft",
         )
         coEvery { authService.login("tester", "pw", "Industrial") } returns
             SessionData(playerName = "tester", uuid = "u", accessToken = "fresh")
@@ -1344,8 +1354,9 @@ class LauncherControllerTest {
 
     @Test
     fun `a refresh that could not reach the auth server drops to offline`() = runTest {
-        credentialsManager.save(
+        credentialsManager.saveAccount(
             SessionData(playerName = "tester", uuid = "u", accessToken = "stale", cachedPassword = "pw"),
+            "smartycraft",
         )
         coEvery { authService.login(any(), any(), any()) } throws
             AuthException(AuthStatus.INTERNAL_ERROR, "Network Error: connection reset", isNetworkError = true)
@@ -1397,13 +1408,14 @@ class LauncherControllerTest {
     fun `pack with SC requirement and 2FA without cached manifest fails with TwoFactorExpired`() = runTest {
         every { settingsService.getSettings() } returns SettingsData()
         coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/opt/jdk8/bin/java")
-        credentialsManager.save(
+        credentialsManager.saveAccount(
             SessionData(
                 playerName     = "tester",
                 uuid           = "u",
                 accessToken    = "stale-token",
                 cachedPassword = "pw",
             ),
+            "smartycraft",
         )
         coEvery {
             authService.login("tester", "pw", "Industrial")

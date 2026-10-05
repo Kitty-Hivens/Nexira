@@ -58,9 +58,6 @@ interface AccountStore : ICredentialStore {
      */
     fun clearTwoFactor(providerId: String)
 
-    /** Active-account shim for [ICredentialStore] writers; infers the provider from the session shape. */
-    fun save(session: SessionData)
-
     fun listAccounts(): List<StoredAccount>
 
     fun activeAccountId(): String?
