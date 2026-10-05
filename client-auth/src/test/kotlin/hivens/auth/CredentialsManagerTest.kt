@@ -13,6 +13,10 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.attribute.PosixFilePermission
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CountDownLatch
+import kotlin.concurrent.thread
 import kotlin.io.path.div
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
@@ -272,6 +276,62 @@ class CredentialsManagerTest {
         assertEquals("ChaosA", manager.load()?.playerName)
     }
 
+    // ── concurrent writers ─────────────────────────────────────────────────────
+
+    /**
+     * Every mutation reads the whole list, changes one entry and writes the list
+     * back, and one press of Play into the two-factor gate runs two of them side by
+     * side. Unserialised, the slower one wrote back what it had read before the other
+     * landed.
+     */
+    @Test
+    fun `writers running at once do not lose each other's changes`() {
+        val threads = 8
+        val perThread = 25
+        val start = CountDownLatch(1)
+        val workers = (0 until threads).map { t ->
+            thread {
+                start.await()
+                repeat(perThread) { i ->
+                    manager.saveAccount(session(uuid = "u-$t-$i", playerName = "p-$t-$i"), "smartycraft", makeActive = false)
+                }
+            }
+        }
+        start.countDown()
+        workers.forEach { it.join() }
+
+        assertEquals(threads * perThread, manager.listAccounts().size)
+    }
+
+    @Test
+    fun `a flag written beside a save is kept`() {
+        manager.save(session())
+        val start = CountDownLatch(1)
+        val marker = thread { start.await(); repeat(50) { manager.markTwoFactor("smartycraft") } }
+        val saver = thread {
+            start.await()
+            repeat(50) { i -> manager.saveAccount(session(uuid = "other-$i", playerName = "o-$i"), "microsoft", makeActive = false) }
+        }
+        start.countDown()
+        marker.join()
+        saver.join()
+
+        assertTrue(manager.accountFor("smartycraft")?.twoFactor == true)
+        assertEquals(51, manager.listAccounts().size)
+    }
+
+    @Test
+    fun `the accounts file is owner-only and leaves no temp file behind`() {
+        manager.save(session())
+
+        assertFalse(Files.exists(workDir / "credentials.json.tmp"))
+        if (!workDir.fileSystem.supportedFileAttributeViews().contains("posix")) return
+        assertEquals(
+            setOf(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE),
+            Files.getPosixFilePermissions(workDir / "credentials.json"),
+        )
+    }
+
     // ── clear() ──────────────────────────────────────────────────────────────
 
     @Test
@@ -425,7 +485,7 @@ class CredentialsManagerTest {
     // ── Fakes ─────────────────────────────────────────────────────────────────
 
     private class FakeVault : SecretVault {
-        val entries: MutableMap<String, ByteArray> = mutableMapOf()
+        val entries: MutableMap<String, ByteArray> = ConcurrentHashMap()
         override val tier: VaultTier = VaultTier.Memory
         override val backend: String = "fake (test)"
 

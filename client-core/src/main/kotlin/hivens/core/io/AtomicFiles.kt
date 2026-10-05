@@ -56,6 +56,19 @@ object AtomicFiles {
         write(file) { tmp -> Files.write(tmp, content) }
     }
 
+    /**
+     * [writeString] with the temp file made by [createTmp] before any byte lands, so
+     * the attributes it is created with are the ones the published file carries. The
+     * rename keeps the inode, and with it whatever mode the temp file was given.
+     */
+    internal fun writeStringCreatedBy(file: Path, content: String, createTmp: (Path) -> Unit) {
+        write(file) { tmp ->
+            Files.deleteIfExists(tmp)
+            createTmp(tmp)
+            Files.writeString(tmp, content)
+        }
+    }
+
     private inline fun write(file: Path, writeTmp: (Path) -> Unit) = synchronized(stripeFor(file)) {
         val dir = file.parent
         dir?.let { Files.createDirectories(it) }

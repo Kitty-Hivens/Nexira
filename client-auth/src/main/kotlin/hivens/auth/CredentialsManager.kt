@@ -64,6 +64,19 @@ class CredentialsManager(
     @Volatile
     private var legacyUnreadableThisRun = false
 
+    /**
+     * Held across every read-modify-write of the file.
+     *
+     * Each mutation reads the whole account list, changes one entry and writes the
+     * list back, and several run at once: one press of Play into the two-factor gate
+     * starts the gate's own save and the launch's flag write side by side. Without
+     * the lock the slower one wrote back the list it had read before the other
+     * landed, and the change in between was lost, the two-factor flag re-armed
+     * among them. One process holds the data directory (SingleInstance), so a lock
+     * in memory covers every writer there is.
+     */
+    private val lock = Any()
+
     // ── ICredentialStore: the active session ──────────────────────────────────
 
     override fun load(): SessionData? {
@@ -83,6 +96,10 @@ class CredentialsManager(
 
     override fun saveAccount(session: SessionData, providerId: String, makeActive: Boolean) {
         if (session.accessToken.isBlank()) return
+        synchronized(lock) { saveAccountLocked(session, providerId, makeActive) }
+    }
+
+    private fun saveAccountLocked(session: SessionData, providerId: String, makeActive: Boolean) {
         val accountId = accountIdFor(session)
         val account = SavedAccount(
             providerId = providerId,
@@ -110,23 +127,27 @@ class CredentialsManager(
     override fun save(session: SessionData) = saveAccount(session, inferProviderId(session))
 
     override fun markTwoFactor(providerId: String) {
-        val file = readAccountsFile() ?: return
-        val updated = file.accounts.map {
-            if (it.providerId == providerId && !it.twoFactor) it.copy(twoFactor = true) else it
+        synchronized(lock) {
+            val file = readAccountsFile() ?: return
+            val updated = file.accounts.map {
+                if (it.providerId == providerId && !it.twoFactor) it.copy(twoFactor = true) else it
+            }
+            if (updated == file.accounts) return
+            writeAccountsFile(file.copy(accounts = updated))
+            log.info("armed the two-factor gate on {} -- no silent sign-in from here", providerId)
         }
-        if (updated == file.accounts) return
-        writeAccountsFile(file.copy(accounts = updated))
-        log.info("armed the two-factor gate on {} -- no silent sign-in from here", providerId)
     }
 
     override fun clearTwoFactor(providerId: String) {
-        val file = readAccountsFile() ?: return
-        val updated = file.accounts.map {
-            if (it.providerId == providerId && it.twoFactor) it.copy(twoFactor = false) else it
+        synchronized(lock) {
+            val file = readAccountsFile() ?: return
+            val updated = file.accounts.map {
+                if (it.providerId == providerId && it.twoFactor) it.copy(twoFactor = false) else it
+            }
+            if (updated == file.accounts) return
+            writeAccountsFile(file.copy(accounts = updated))
+            log.info("released the two-factor gate on {} -- the provider asked for no second factor", providerId)
         }
-        if (updated == file.accounts) return
-        writeAccountsFile(file.copy(accounts = updated))
-        log.info("released the two-factor gate on {} -- the provider asked for no second factor", providerId)
     }
 
     /**
@@ -177,45 +198,65 @@ class CredentialsManager(
     }
 
     override fun setActive(accountId: String) {
-        val file = readAccountsFile() ?: return
-        if (file.accounts.none { it.accountId == accountId }) return
-        writeAccountsFile(file.copy(activeAccountId = accountId))
+        synchronized(lock) {
+            val file = readAccountsFile() ?: return
+            if (file.accounts.none { it.accountId == accountId }) return
+            writeAccountsFile(file.copy(activeAccountId = accountId))
+        }
     }
 
     override fun removeAccount(accountId: String) {
-        val file = readAccountsFile() ?: return
-        val account = file.accounts.firstOrNull { it.accountId == accountId } ?: return
-        deleteSecrets(account.providerId, accountId)
-        val remaining = file.accounts.filterNot { it.accountId == accountId }
-        if (remaining.isEmpty()) {
-            deleteFile()
-        } else {
-            val newActive = if (file.activeAccountId == accountId) remaining.first().accountId else file.activeAccountId
-            writeAccountsFile(file.copy(activeAccountId = newActive, accounts = remaining))
+        synchronized(lock) {
+            val file = readAccountsFile() ?: return
+            val account = file.accounts.firstOrNull { it.accountId == accountId } ?: return
+            deleteSecrets(account.providerId, accountId)
+            val remaining = file.accounts.filterNot { it.accountId == accountId }
+            if (remaining.isEmpty()) {
+                deleteFile()
+            } else {
+                val newActive = if (file.activeAccountId == accountId) remaining.first().accountId else file.activeAccountId
+                writeAccountsFile(file.copy(activeAccountId = newActive, accounts = remaining))
+            }
         }
     }
 
     override fun clear() {
-        readAccountsFile()?.accounts?.forEach { deleteSecrets(it.providerId, it.accountId) }
-        // Drop any lingering legacy flat keys too.
-        vault.delete(LEGACY_KEY_ACCESS_TOKEN)
-        vault.delete(LEGACY_KEY_PASSWORD)
-        deleteFile()
+        synchronized(lock) {
+            readAccountsFile()?.accounts?.forEach { deleteSecrets(it.providerId, it.accountId) }
+            // Drop any lingering legacy flat keys too.
+            vault.delete(LEGACY_KEY_ACCESS_TOKEN)
+            vault.delete(LEGACY_KEY_PASSWORD)
+            deleteFile()
+        }
     }
 
     // ── persistence + migration ─────────────────────────────────────────────────
 
     /** Reads the v6 accounts file, migrating a pre-v6 file in place on first read. */
     private fun readAccountsFile(): SavedAccountsFile? {
+        val (_, file) = readRaw() ?: return null
+        if (file.version >= CURRENT_VERSION) return file
+        if (legacyUnreadableThisRun) return SavedAccountsFile()
+        // Under the lock and read again: a migration writes, and another reader may
+        // have finished it while this one waited.
+        return synchronized(lock) {
+            val (text, again) = readRaw() ?: return@synchronized null
+            when {
+                again.version >= CURRENT_VERSION -> again
+                legacyUnreadableThisRun -> SavedAccountsFile()
+                else -> migrate(text)
+            }
+        }
+    }
+
+    private fun readRaw(): Pair<String, SavedAccountsFile>? {
         if (!Files.exists(credentialsFile)) return null
         val text = runCatching { Files.readString(credentialsFile) }.getOrElse { return null }
         val file = runCatching { json.decodeFromString(SavedAccountsFile.serializer(), text) }.getOrElse {
             log.warn("credentials.json unreadable -- treating as no saved accounts")
             return null
         }
-        if (file.version >= CURRENT_VERSION) return file
-        if (legacyUnreadableThisRun) return SavedAccountsFile()
-        return migrate(text)
+        return text to file
     }
 
     private fun migrate(rawV5OrOlder: String): SavedAccountsFile {
