@@ -1408,20 +1408,18 @@ fun AppRoot(
             when (resolution) {
                 is AutoLoginCoordinator.Resolution.Success -> {
                     val session = resolution.session
-                    // The form stays usable while a pass is in flight, so the user may
-                    // have signed in by hand while this one waited on the network.
-                    val manualWon = appState is AppState.Authenticated
                     // A silent MSA refresh rotates the refresh token; persist it so
                     // the next start uses the fresh one instead of re-spending the
-                    // stored token. Saved even when a manual sign-in won, since the
-                    // stored one no longer works, but without taking the active slot
-                    // the user just chose.
+                    // stored token. A rotation is not a choice of account, so it never
+                    // takes the active slot: it used to, on every start, so "active"
+                    // came to mean whichever account the boot happened to refresh, and
+                    // a manual sign-in that won the race below lost the slot too.
                     if (session.refreshToken != null && session.refreshToken != saved?.refreshToken) {
                         withContext(Dispatchers.IO) {
                             credentialsManager.saveAccount(
                                 session,
                                 PackAuthRequirement.Microsoft.PROVIDER_KEY,
-                                makeActive = !manualWon,
+                                makeActive = false,
                             )
                         }
                     }
@@ -1435,6 +1433,8 @@ fun AppRoot(
                         }
                         ActionRing.record("Auto-login met the second factor: the SmartyCraft account is marked")
                     }
+                    // The form stays usable while a pass is in flight, so the user may
+                    // have signed in by hand while this one waited on the network.
                     if (appState is AppState.Authenticated) {
                         ActionRing.record("Auto-login answered after a manual sign-in; the manual one stays")
                         return@LaunchedEffect

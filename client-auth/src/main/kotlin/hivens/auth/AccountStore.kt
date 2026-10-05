@@ -27,9 +27,9 @@ interface AccountStore : ICredentialStore {
      * identity carries nothing to store).
      *
      * [makeActive] false is for a write that has to land without being a choice of
-     * account: a refresh token the provider has just rotated is the only one that
-     * still works, and it is saved even when the user has signed in as someone else
-     * in the meantime.
+     * account. A refresh token the provider has just rotated is the only one that
+     * still works, so it is saved, but a refresh at startup is not the user picking
+     * that account, and only an interactive sign-in should move the active slot.
      */
     fun saveAccount(session: SessionData, providerId: String, makeActive: Boolean = true)
 
