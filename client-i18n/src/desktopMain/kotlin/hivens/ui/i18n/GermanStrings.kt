@@ -1252,6 +1252,7 @@ object GermanStrings : AppStrings {
         "widget.appshell.region.top" to "Titelleiste",
         "widget.appshell.region.body" to "Hauptbereich",
         "widget.appshell.topbar.breadcrumb" to "Brotkrümel",
+        "widget.appshell.topbar.sessions" to "Laufende Spiele",
         "widget.appshell.topbar.heightDp" to "Höhe",
         "widget.appshell.topbar.cornerStyle" to "Eckenstil",
         "widget.appshell.topbar.groupStyle" to "Gruppierung",

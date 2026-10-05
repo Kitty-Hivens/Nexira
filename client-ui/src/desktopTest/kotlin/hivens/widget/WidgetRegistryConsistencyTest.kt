@@ -64,6 +64,8 @@ class WidgetRegistryConsistencyTest {
             "appshell.region.top",
             "appshell.region.body",
             "appshell.topbar.breadcrumb",
+            // the running games, for a title bar lane
+            "appshell.topbar.sessions",
             // floating activity account over the content column
             "appshell.activity.pill",
             // editor-2 sample widgets

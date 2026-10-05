@@ -1250,6 +1250,7 @@ object EnglishStrings : AppStrings {
         "widget.appshell.region.top" to "Title bar",
         "widget.appshell.region.body" to "Main area",
         "widget.appshell.topbar.breadcrumb" to "Breadcrumb",
+        "widget.appshell.topbar.sessions" to "Running games",
         "widget.appshell.topbar.heightDp" to "Height",
         "widget.appshell.topbar.cornerStyle" to "Corner style",
         "widget.appshell.topbar.groupStyle" to "Grouping",

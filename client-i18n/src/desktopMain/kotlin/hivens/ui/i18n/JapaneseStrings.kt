@@ -1257,6 +1257,7 @@ object JapaneseStrings : AppStrings {
         "widget.appshell.region.top" to "タイトルバー",
         "widget.appshell.region.body" to "主要領域",
         "widget.appshell.topbar.breadcrumb" to "パンくず",
+        "widget.appshell.topbar.sessions" to "実行中のゲーム",
         "widget.appshell.topbar.heightDp" to "高さ",
         "widget.appshell.topbar.cornerStyle" to "角の形",
         "widget.appshell.topbar.groupStyle" to "まとめ方",

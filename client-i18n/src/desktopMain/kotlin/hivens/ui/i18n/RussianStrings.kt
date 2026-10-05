@@ -1265,6 +1265,7 @@ object RussianStrings : AppStrings {
         "widget.appshell.region.top" to "Шапка окна",
         "widget.appshell.region.body" to "Основная область",
         "widget.appshell.topbar.breadcrumb" to "Хлебные крошки",
+        "widget.appshell.topbar.sessions" to "Запущенные игры",
         "widget.appshell.topbar.heightDp" to "Высота",
         "widget.appshell.topbar.cornerStyle" to "Углы",
         "widget.appshell.topbar.groupStyle" to "Группировка",
