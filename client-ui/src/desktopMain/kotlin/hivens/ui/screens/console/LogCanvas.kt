@@ -12,6 +12,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.delay
 import androidx.compose.ui.ExperimentalComposeUiApi
@@ -169,6 +170,16 @@ internal fun LogCanvas(
         0
     }
 
+    // The gesture handlers read these at the moment they hit-test rather than
+    // being keyed on them. `lines` is a new value on every console snapshot, so a
+    // handler keyed on it was torn down with each appended line, and a selection
+    // stopped following the pointer as soon as a running game printed anything.
+    val currentLines by rememberUpdatedState(lines)
+    val currentStyle by rememberUpdatedState(effStyle)
+    val currentStartPad by rememberUpdatedState(startPadPx)
+    val currentTopPad by rememberUpdatedState(topPadPx)
+    fun hitAt(p: Offset): DocPos = state.hitTest(p.x, p.y, currentLines, currentStyle, currentTopPad, currentStartPad)
+
     // Continuous edge auto-scroll: while a drag-select parks the pointer at the top
     // or bottom edge, keep scrolling and extending the selection to the pointer even
     // though no new pointer events fire.
@@ -178,7 +189,7 @@ internal fun LogCanvas(
         if (autoScroll == 0) return@LaunchedEffect
         while (true) {
             state.scroll.scrollBy(autoScroll * lineHeightPx * AUTO_SCROLL_STEP_FACTOR)
-            selection.extendTo(state.hitTest(dragPos.x, dragPos.y, lines, effStyle, topPadPx, startPadPx))
+            selection.extendTo(hitAt(dragPos))
             delay(AUTO_SCROLL_TICK_MS.milliseconds)
         }
     }
@@ -202,34 +213,41 @@ internal fun LogCanvas(
                 val dy = ev.changes.firstOrNull()?.scrollDelta?.y ?: 0f
                 if (dy != 0f) state.scroll.scrollBy(dy * lineHeightPx * SCROLL_LINES_PER_NOTCH)
             }
-            .pointerInput(lines, effStyle, startPadPx, topPadPx) {
+            .pointerInput(Unit) {
                 detectTapGestures(onTap = { pos ->
                     onInteract()
-                    selection.setCaret(state.hitTest(pos.x, pos.y, lines, effStyle, topPadPx, startPadPx))
+                    selection.setCaret(hitAt(pos))
                 })
             }
-            .pointerInput(lines, effStyle, startPadPx, topPadPx) {
-                detectDragGestures(
-                    onDragStart = { pos ->
-                        onInteract()
-                        dragPos = pos
-                        selection.beginAt(state.hitTest(pos.x, pos.y, lines, effStyle, topPadPx, startPadPx))
-                    },
-                    onDrag = { change, _ ->
-                        val p = change.position
-                        dragPos = p
-                        // Arm / disarm continuous auto-scroll from the pointer's edge
-                        // proximity; the LaunchedEffect drives it while held.
-                        autoScroll = when {
-                            p.y < AUTO_SCROLL_EDGE_PX               -> -1
-                            p.y > size.height - AUTO_SCROLL_EDGE_PX -> 1
-                            else                                    -> 0
-                        }
-                        selection.extendTo(state.hitTest(p.x, p.y, lines, effStyle, topPadPx, startPadPx))
-                    },
-                    onDragEnd = { autoScroll = 0 },
-                    onDragCancel = { autoScroll = 0 },
-                )
+            .pointerInput(Unit) {
+                // A gesture coroutine that is cancelled runs neither end handler, so
+                // the edge scroll is disarmed here too. Left armed, it scrolled and
+                // extended the selection every frame with no button held.
+                try {
+                    detectDragGestures(
+                        onDragStart = { pos ->
+                            onInteract()
+                            dragPos = pos
+                            selection.beginAt(hitAt(pos))
+                        },
+                        onDrag = { change, _ ->
+                            val p = change.position
+                            dragPos = p
+                            // Arm / disarm continuous auto-scroll from the pointer's edge
+                            // proximity; the LaunchedEffect drives it while held.
+                            autoScroll = when {
+                                p.y < AUTO_SCROLL_EDGE_PX               -> -1
+                                p.y > size.height - AUTO_SCROLL_EDGE_PX -> 1
+                                else                                    -> 0
+                            }
+                            selection.extendTo(hitAt(p))
+                        },
+                        onDragEnd = { autoScroll = 0 },
+                        onDragCancel = { autoScroll = 0 },
+                    )
+                } finally {
+                    autoScroll = 0
+                }
             }
             .drawBehind {
                 val offset = state.scroll.offsetPx
