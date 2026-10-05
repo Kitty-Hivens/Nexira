@@ -382,6 +382,30 @@ class CredentialsManagerTest {
         )
     }
 
+    // ── refreshStored ─────────────────────────────────────────────────────────
+
+    @Test
+    fun `a sign-in the launch made brings the stored account up to its uid and token`() {
+        manager.save(session())
+        manager.saveAccount(session(uuid = "msuuid", playerName = "MsGamer", refreshToken = "RT", password = null), "microsoft")
+
+        manager.refreshStored("smartycraft", session(accessToken = "fresh-token", password = null).copy(uid = "fresh-uid"))
+
+        val stored = manager.accountFor("smartycraft")
+        assertEquals("fresh-uid", stored?.uid)
+        assertEquals("fresh-token", stored?.accessToken)
+        assertEquals("secret-pw", stored?.cachedPassword, "a secret the fresh session lacks is not lost")
+        assertEquals("msuuid", manager.activeAccountId(), "and the active account stays")
+    }
+
+    @Test
+    fun `a sign-in the user chose not to remember stays unremembered`() {
+        manager.refreshStored("smartycraft", session())
+
+        assertFalse(Files.exists(workDir / "credentials.json"))
+        assertTrue(vault.entries.isEmpty())
+    }
+
     // ── one id under two providers ─────────────────────────────────────────────
 
     /** The id is the uuid, or the name without one, so two providers can resolve to the same. */

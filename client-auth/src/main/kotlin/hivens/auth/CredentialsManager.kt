@@ -136,6 +136,22 @@ class CredentialsManager(
 
     override fun save(session: SessionData) = saveAccount(session, inferProviderId(session))
 
+    override fun refreshStored(providerId: String, session: SessionData) {
+        if (session.accessToken.isBlank()) return
+        synchronized(lock) {
+            val accountId = accountIdFor(session)
+            val stored = readAccountsFile()?.accounts
+                ?.firstOrNull { it.providerId == providerId && it.accountId == accountId }
+                ?: return
+            // A secret the fresh session does not carry is not one the account lost.
+            val merged = session.copy(
+                cachedPassword = session.cachedPassword ?: secret(stored, FIELD_PASSWORD),
+                refreshToken = session.refreshToken ?: secret(stored, FIELD_REFRESH_TOKEN),
+            )
+            saveAccountLocked(merged, providerId, makeActive = false)
+        }
+    }
+
     override fun markTwoFactor(providerId: String) {
         synchronized(lock) {
             val file = readAccountsFile() ?: return

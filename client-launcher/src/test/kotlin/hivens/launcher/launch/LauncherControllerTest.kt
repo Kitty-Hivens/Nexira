@@ -797,6 +797,28 @@ class LauncherControllerTest {
         coVerify(exactly = 1) { authService.login("tester", "pw", "Industrial") }
     }
 
+    /**
+     * A SmartyCraft login mints a new uid and retires the stored one, and a skin
+     * upload signs with what the store holds.
+     */
+    @Test
+    fun `the sign-in before a bound launch is recorded on the stored account`() = runTest {
+        credentialsManager.save(
+            SessionData(playerName = "tester", uuid = "u", uid = "old-uid", accessToken = "stale", cachedPassword = "pw"),
+        )
+        coEvery { authService.login("tester", "pw", "Industrial") } returns
+            SessionData(playerName = "tester", uuid = "u", uid = "new-uid", accessToken = "fresh", cachedPassword = "pw")
+
+        capturePackSession(
+            SessionData(playerName = "tester", uuid = "u", accessToken = "stale"),
+            packInstance = scBoundPackInstance(),
+        )
+
+        val stored = credentialsManager.accountFor(PackAuthRequirement.SmartyCraft.PROVIDER_KEY)
+        assertEquals("new-uid", stored?.uid)
+        assertEquals("fresh", stored?.accessToken)
+    }
+
     @Test
     fun `pack spawn failure surfaces the carried LaunchError, not Internal`() = runTest {
         every { settingsService.getSettings() } returns SettingsData()

@@ -1065,6 +1065,10 @@ class LauncherController(
         return try {
             val fresh = authService.login(playerName, pass, serverId)
             emit(LaunchLogEvent.AuthSucceeded(fresh.uuid))
+            // The login retired the uid the store holds. Whatever is signed later
+            // from the stored account, a skin upload among them, needs this one.
+            runCatching { credentialsManager.refreshStored(PackAuthRequirement.SmartyCraft.PROVIDER_KEY, fresh) }
+                .onFailure { logger.warn("Pack launch {}: could not record the refreshed session", instance.displayName, it) }
             fresh
         } catch (_: TwoFactorRequiredException) {
             // First contact with the gate, before the account is flagged. Carrying the
