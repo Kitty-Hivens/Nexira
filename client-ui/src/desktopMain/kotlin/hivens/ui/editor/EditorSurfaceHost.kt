@@ -115,6 +115,7 @@ import hivens.widget.api.LocalPlacementReflow
 import hivens.widget.api.LocalMapPanOnPrimary
 import hivens.widget.api.LocalRefusedMount
 import hivens.widget.api.LocalSlotBoundsReporter
+import hivens.widget.api.LocalSlotBoundsWithdrawal
 import hivens.widget.api.LocalSlotChromeModifier
 import hivens.widget.api.LocalSlotMotionMs
 import hivens.widget.api.LocalSlotPath
@@ -629,6 +630,8 @@ fun EditorSurfaceHost(
         }
     }
 
+    val slotBoundsWithdrawal: (SlotPath) -> Unit = remember(registry) { { path -> registry.withdrawSlot(path) } }
+
     CompositionLocalProvider(
         LocalShellChromeBounds  provides chromeBounds,
         LocalEditMode           provides state,
@@ -653,6 +656,7 @@ fun EditorSurfaceHost(
         // Placement slots report their window bounds so palette drops land at the
         // release point (PaletteItem reads slotOrigin to convert the pointer).
         LocalSlotBoundsReporter provides slotBoundsReporter,
+        LocalSlotBoundsWithdrawal provides slotBoundsWithdrawal,
         LocalRefusedMount provides refusedMount,
         // A press on empty map selects the slot while arranging; the middle button
         // moves the map then.

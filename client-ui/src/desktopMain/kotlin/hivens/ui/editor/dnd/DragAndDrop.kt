@@ -101,6 +101,11 @@ class DropTargetRegistry {
     // The whole placement box where it is larger than what is on screen, which is
     // a slot that scrolls. Absent means the two are the same rect.
     private val slotContent: SnapshotStateMap<SlotPath, Rect> = mutableStateMapOf()
+    // An empty slot's placeholder, kept apart from what the slot itself reports.
+    // The two report the same path and leave the composition at different times:
+    // the placeholder goes when the first widget arrives and the slot stays, so one
+    // map would have the placeholder's withdrawal take the slot's bounds with it.
+    private val placeholderBounds: SnapshotStateMap<SlotPath, Rect> = mutableStateMapOf()
 
     /**
      * Which widgets the one being moved is currently sitting on top of.
@@ -145,6 +150,25 @@ class DropTargetRegistry {
         if (content == rect) slotContent.remove(path) else slotContent[path] = content
     }
 
+    /**
+     * The slot that reported [path] has left the composition. Kept, its rectangle
+     * went on answering the hit-test after its screen had gone, and since the
+     * smallest rectangle wins, a stale one beat the live pane beneath it.
+     */
+    fun withdrawSlot(path: SlotPath) {
+        slotBounds.remove(path)
+        slotContent.remove(path)
+    }
+
+    /** Where an empty slot's placeholder is, until [withdrawPlaceholder]. */
+    fun registerPlaceholder(path: SlotPath, rect: Rect) {
+        placeholderBounds[path] = rect
+    }
+
+    fun withdrawPlaceholder(path: SlotPath) {
+        placeholderBounds.remove(path)
+    }
+
     fun registerWidget(path: SlotPath, instanceId: String, index: Int, rect: Rect) {
         val byId = widgets.getOrPut(path) { mutableStateMapOf() }
         byId[instanceId] = WidgetBounds(index, rect)
@@ -162,17 +186,17 @@ class DropTargetRegistry {
     // Window-coord top-left of a registered slot (Canvas slots report bounds via
     // LocalSlotBoundsReporter). Lets a palette drop land at the release point.
     // Null when the slot has not reported bounds.
-    fun slotOrigin(path: SlotPath): Offset? = slotBounds[path]?.topLeft
+    fun slotOrigin(path: SlotPath): Offset? = slotRect(path)?.topLeft
 
     /** The part of a slot that is on screen. */
-    fun slotRect(path: SlotPath): Rect? = slotBounds[path]
+    fun slotRect(path: SlotPath): Rect? = slotBounds[path] ?: placeholderBounds[path]
 
     /**
      * The whole of a slot, on screen or not, for a drop that converts the pointer
      * into the slot's own coordinates. On a page scrolled down by a screen this
      * starts a screen above the window, which is where the page's origin is.
      */
-    fun slotContentRect(path: SlotPath): Rect? = slotContent[path] ?: slotBounds[path]
+    fun slotContentRect(path: SlotPath): Rect? = slotContent[path] ?: slotRect(path)
 
     // Two passes:
     //   1) exact rect hit across all registered sources (widget rects +
@@ -213,6 +237,7 @@ class DropTargetRegistry {
             byId.values.forEach { wb -> consider(wb.rect, path) }
         }
         slotBounds.forEach { (path, rect) -> consider(rect, path) }
+        placeholderBounds.forEach { (path, rect) -> consider(rect, path) }
         if (best != null) return best
 
         // Pass 2: vertical-span fallback. Per-slot virtual bounding
@@ -326,13 +351,6 @@ fun Modifier.dragSource(
 }
 
 // ── Drop-target modifier ────────────────────────────────────────────────────
-
-fun Modifier.slotBounds(
-    registry: DropTargetRegistry,
-    path: SlotPath,
-): Modifier = this.onGloballyPositioned { coords: LayoutCoordinates ->
-    registry.registerSlot(path, coords.boundsInWindow())
-}
 
 fun Modifier.widgetBounds(
     registry: DropTargetRegistry,

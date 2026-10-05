@@ -404,3 +404,9 @@ typealias SlotBoundsReporter = (path: SlotPath, visible: Rect, content: Rect) ->
 
 val LocalSlotBoundsReporter: ProvidableCompositionLocal<SlotBoundsReporter> =
     staticCompositionLocalOf { { _, _, _ -> } }
+
+// Editor-only, the other half of [LocalSlotBoundsReporter]: the slot that reported
+// under this path has left the composition. Without it a report outlived the screen
+// it described, and a drop near where that slot had been landed in it.
+val LocalSlotBoundsWithdrawal: ProvidableCompositionLocal<(SlotPath) -> Unit> =
+    staticCompositionLocalOf { { _ -> } }

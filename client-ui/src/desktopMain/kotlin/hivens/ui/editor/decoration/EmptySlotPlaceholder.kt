@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -52,6 +53,7 @@ fun EmptySlotPlaceholder(
     registry: DropTargetRegistry,
 ) {
     val s = LocalStrings.current
+    DisposableEffect(path, registry) { onDispose { registry.withdrawPlaceholder(path) } }
     val breathRhythm = Motion.ownRhythm(BREATH_MS)
     val breath by rememberInfiniteTransition(label = "empty-slot-breath").animateFloat(
         initialValue  = 0.45f,
@@ -72,7 +74,7 @@ fun EmptySlotPlaceholder(
             // thing on screen, so a drop aimed at the top edge of the dashes
             // missed and was discarded without a word.
             .onGloballyPositioned { c: LayoutCoordinates ->
-                registry.registerSlot(path, c.boundsInWindow())
+                registry.registerPlaceholder(path, c.boundsInWindow())
             }
             .padding(vertical = 6.dp),
         contentAlignment = Alignment.Center,

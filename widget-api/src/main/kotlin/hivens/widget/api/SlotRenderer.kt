@@ -31,6 +31,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.MutableState
@@ -594,6 +595,8 @@ private fun MapPlacement(path: SlotPath, content: SlotContent, pan: State<Offset
     val decorator = LocalWidgetDecorator.current
     val unknownDecorator = LocalUnknownWidgetDecorator.current
     val reportSlotBounds = LocalSlotBoundsReporter.current
+    val withdrawSlotBounds = LocalSlotBoundsWithdrawal.current
+    DisposableEffect(path, withdrawSlotBounds) { onDispose { withdrawSlotBounds(path) } }
     val extent = LocalViewportExtent.current
     val address = path.leafAddress
     val slotDp = Size(extent.width.value, extent.height.value)
@@ -881,6 +884,10 @@ private fun PlacementSlot(
 ) {
     val density = LocalDensity.current
     val reportSlotBounds = if (reportBounds) LocalSlotBoundsReporter.current else NO_REPORT
+    if (reportBounds) {
+        val withdrawSlotBounds = LocalSlotBoundsWithdrawal.current
+        DisposableEffect(path, withdrawSlotBounds) { onDispose { withdrawSlotBounds(path) } }
+    }
     val columns = content.grid.coerceIn(0, GRID_MAX)
     val transposed = scroll?.horizontal == true
     val placementBounds = PlacementBounds(unboundedX = scroll?.horizontal == true, unboundedY = scroll?.horizontal == false)

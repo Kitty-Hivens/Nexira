@@ -23,6 +23,36 @@ class DropTargetRegistryTest {
     private fun rect(top: Float, height: Float = 50f, left: Float = 0f, width: Float = 300f): Rect =
         Rect(left = left, top = top, right = left + width, bottom = top + height)
 
+    /**
+     * A placeholder from a screen that has gone is smaller than the live pane under
+     * it, and the smallest rectangle wins, so kept it took the drop.
+     */
+    @Test
+    fun `a withdrawn placeholder no longer takes a drop meant for the live slot beneath`() {
+        val r = DropTargetRegistry()
+        r.registerSlot(otherSlot, rect(top = 0f, height = 400f))
+        r.registerPlaceholder(slot, rect(top = 100f, height = 80f))
+        assertEquals(slot, r.slotForPoint(Offset(50f, 120f)))
+
+        r.withdrawPlaceholder(slot)
+
+        assertEquals(otherSlot, r.slotForPoint(Offset(50f, 120f)))
+    }
+
+    /** The placeholder goes when the first widget arrives, and the slot it sat in stays. */
+    @Test
+    fun `withdrawing a placeholder leaves the bounds its slot reported`() {
+        val r = DropTargetRegistry()
+        r.registerSlot(slot, rect(top = 0f, height = 300f))
+        r.registerPlaceholder(slot, rect(top = 10f, height = 80f))
+
+        r.withdrawPlaceholder(slot)
+
+        assertEquals(rect(top = 0f, height = 300f), r.slotRect(slot))
+        r.withdrawSlot(slot)
+        assertNull(r.slotRect(slot))
+    }
+
     @Test
     fun `insertionIndexInSlot picks the widget whose midpoint the pointer is above`() {
         val r = DropTargetRegistry()
