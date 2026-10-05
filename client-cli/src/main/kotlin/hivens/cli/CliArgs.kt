@@ -67,6 +67,12 @@ private fun parseLaunch(rest: List<String>): CliCommand {
     if (provider !in PROVIDERS) {
         return CliCommand.Invalid("--provider must be one of ${PROVIDERS.joinToString("|")}")
     }
+    // A stored account plays under its own name. Renaming it here produced a
+    // session whose name was arbitrary while its uuid and token belonged to the
+    // real account, and the command line carried the three together.
+    if (user != null && provider != "offline") {
+        return CliCommand.Invalid("--user names an offline player; a $provider account plays under its own name")
+    }
     return CliCommand.Launch(packId = packId, provider = provider, user = user, dryRun = dryRun)
 }
 
@@ -84,7 +90,7 @@ Commands:
 Launch options:
   --provider <p>   Auth provider: offline (default) | smartycraft | microsoft.
                    smartycraft/microsoft reuse the account stored by the GUI.
-  --user <name>    Player name. Required shape for offline; overrides the
-                   stored account name otherwise.
+  --user <name>    Player name for offline play. Not accepted with a stored
+                   account, which plays under its own name.
   --dry-run        Resolve and print the launch plan without spawning the game.
 """

@@ -142,17 +142,16 @@ private fun resolveSession(koin: Koin, cmd: CliCommand.Launch): SessionData? {
         }
         else -> {
             // smartycraft / microsoft: reuse the session the GUI stored in the
-            // keyring; the controller re-auths SC-bound packs pre-spawn.
-            val store = koin.get<ICredentialStore>()
-            val stored = store.accountFor(cmd.provider) ?: store.load()
+            // keyring; the controller re-auths SC-bound packs pre-spawn. The
+            // provider asked for or nothing: falling back to whichever account was
+            // active ran a launch meant for one provider under another identity.
+            val stored = koin.get<ICredentialStore>().accountFor(cmd.provider)
             if (stored == null) {
                 System.err.println(
                     "No stored '${cmd.provider}' account. Sign in via the GUI first, then retry.",
                 )
-                null
-            } else {
-                cmd.user?.let { stored.copy(playerName = it) } ?: stored
             }
+            stored
         }
     }
 }
