@@ -35,6 +35,7 @@ import hivens.core.data.NewerBuildData
 import hivens.core.data.ReadOnlyReason
 import hivens.core.data.ReadOnlyStore
 import hivens.core.api.interfaces.ISettingsService
+import hivens.core.api.interfaces.IUpdateApplicator
 import hivens.core.data.ModuleId
 import hivens.core.data.PackAuthRequirement
 import hivens.ui.screens.detail.settings.PackSettingsCategory
@@ -771,6 +772,7 @@ fun FrameWindowScope.AppShellContent(
         }
         val packAutoUpdateService: PackAutoUpdateService = koinInject()
         val applyRecovery: ApplyRecovery = koinInject()
+        val updateApplicator: IUpdateApplicator = koinInject()
         val themeManager  = remember { ThemeManager(dataDirectory, AtomicFiles::writeString) }
         var themeLibrary  by remember {
             val loaded = themeManager.load()
@@ -838,6 +840,7 @@ fun FrameWindowScope.AppShellContent(
                 showWindow      = revealWindow,
                 recoverInterrupted  = { applyRecovery.recoverInterrupted() },
                 autoUpdatePacks     = { packAutoUpdateService.runOnce() },
+                confirmLauncherStarted = { withContext(Dispatchers.IO) { updateApplicator.confirmStarted() } },
                 appScope            = applicationScope,
             ).run(windowVisible = { isWindowVisible })
         }

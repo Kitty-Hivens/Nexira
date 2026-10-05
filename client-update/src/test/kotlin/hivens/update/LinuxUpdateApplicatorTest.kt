@@ -4,6 +4,8 @@ import java.nio.file.Files
 import java.nio.file.NoSuchFileException
 import java.nio.file.Path
 import java.nio.file.attribute.PosixFilePermission
+import java.nio.file.attribute.PosixFilePermissions
+import java.util.concurrent.TimeUnit
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -255,5 +257,155 @@ class LinuxUpdateApplicatorTest {
             listOf(dir.resolve("Nexira-2.4.6-x86_64.AppImage.new")),
             applicator.leftoversIn(dir, "Nexira-x86_64.AppImage"),
         )
+    }
+
+    // --- probation: the new version has to prove it started before the backup goes ---
+
+    @Test
+    fun `a confirmed start ends the probation and drops the backup`() {
+        val exe = file("Nexira-x86_64.AppImage", "NEW")
+        val backup = file("Nexira-x86_64.AppImage.backup", "OLD")
+        val pending = file("Nexira-x86_64.AppImage.update-pending", "")
+
+        applicator.confirmFor(exe)
+
+        assertFalse(Files.exists(pending))
+        assertFalse(Files.exists(backup), "a version that proved itself has nothing to roll back to")
+    }
+
+    @Test
+    fun `a start with no update pending leaves an unrelated backup alone`() {
+        val exe = file("Nexira-x86_64.AppImage", "CURRENT")
+        val backup = file("Nexira-x86_64.AppImage.backup", "SOMETHING THE USER KEPT")
+
+        applicator.confirmFor(exe)
+
+        assertEquals("SOMETHING THE USER KEPT", Files.readString(backup))
+    }
+
+    /** The binaries the watchdog runs are stand-ins that write what happened to [log]. */
+    private fun script(name: String, body: String): Path {
+        val path = Files.writeString(dir.resolve(name), "#!/bin/sh\n$body\n")
+        Files.setPosixFilePermissions(path, PosixFilePermissions.fromString("rwxr-xr-x"))
+        return path
+    }
+
+    private val log: Path get() = dir.resolve("log")
+
+    private fun logged(): List<String> = if (Files.exists(log)) Files.readAllLines(log) else emptyList()
+
+    private fun shellAvailable(): Boolean = Files.isExecutable(Path.of("/bin/sh"))
+
+    /**
+     * Runs the watchdog the way the hook starts it, with the launcher that
+     * scheduled the update already gone unless [oldPid] says otherwise.
+     */
+    private fun watch(exe: Path, grace: Int = 30, oldPid: Long? = null) {
+        val gone = oldPid ?: ProcessBuilder("true").start().also { it.waitFor() }.pid()
+        val process = ProcessBuilder("/bin/sh", "-c", LinuxUpdateApplicator.WATCHDOG_SCRIPT)
+            .redirectErrorStream(true)
+            .apply {
+                environment().putAll(
+                    mapOf(
+                        "EXE" to exe.toString(),
+                        "BACKUP" to "$exe.backup",
+                        "PENDING" to applicator.pendingFor(exe).toString(),
+                        "INSTALLER" to dir.resolve("downloaded.AppImage").toString(),
+                        "OLD_PID" to gone.toString(),
+                        "GRACE" to grace.toString(),
+                        "LOG" to log.toString(),
+                    )
+                )
+                environment().remove(LinuxUpdateApplicator.ROLLED_BACK_ENV)
+            }
+            .start()
+        assertTrue(process.waitFor(30, TimeUnit.SECONDS), "the watchdog never finished")
+    }
+
+    @Test
+    fun `a new version that dies before confirming is rolled back and the old one started`() {
+        if (!shellAvailable()) return
+        // The case the two-second check passed: up long enough to look alive, gone
+        // before it ever got anywhere.
+        val exe = script("Nexira-x86_64.AppImage", """echo new >> "${'$'}LOG"; exit 1""")
+        script("Nexira-x86_64.AppImage.backup", """echo "old rolled_back=${'$'}NEXIRA_UPDATE_ROLLED_BACK" >> "${'$'}LOG"""")
+        Files.createFile(applicator.pendingFor(exe))
+
+        watch(exe)
+
+        assertEquals(listOf("new", "old rolled_back=1"), logged())
+        assertTrue(Files.readString(exe).contains("old rolled_back"), "the old version must be back on disk")
+        assertFalse(Files.exists(applicator.pendingFor(exe)))
+        assertFalse(Files.exists(dir.resolve("Nexira-x86_64.AppImage.backup")))
+    }
+
+    @Test
+    fun `a new version that confirms is kept when it later exits`() {
+        if (!shellAvailable()) return
+        // What confirmStarted does, done by the stand-in itself.
+        val exe = script(
+            "Nexira-x86_64.AppImage",
+            """echo new >> "${'$'}LOG"; rm -f "${'$'}PENDING" "${'$'}BACKUP"; exit 1""",
+        )
+        script("Nexira-x86_64.AppImage.backup", """echo old >> "${'$'}LOG"""")
+        Files.createFile(applicator.pendingFor(exe))
+
+        watch(exe)
+
+        assertEquals(listOf("new"), logged())
+        assertTrue(Files.readString(exe).contains("echo new"))
+    }
+
+    @Test
+    fun `a new version that cannot confirm is kept once it outlasts the grace period`() {
+        if (!shellAvailable()) return
+        // An older release picked in the update manager knows nothing of the
+        // confirmation and must not be rolled back for running normally.
+        val exe = script("Nexira-x86_64.AppImage", """sleep 3; echo new >> "${'$'}LOG"""")
+        val backup = script("Nexira-x86_64.AppImage.backup", """echo old >> "${'$'}LOG"""")
+        Files.createFile(applicator.pendingFor(exe))
+
+        watch(exe, grace = 1)
+
+        assertEquals(listOf("new"), logged())
+        assertFalse(Files.exists(backup), "a version kept by the timer has no backup left to restore")
+    }
+
+    @Test
+    fun `with no update pending the launcher on disk is just started again`() {
+        if (!shellAvailable()) return
+        // The swap failed and the hook put the old version back.
+        val exe = script("Nexira-x86_64.AppImage", """echo "old rolled_back=${'$'}NEXIRA_UPDATE_ROLLED_BACK" >> "${'$'}LOG"""")
+
+        watch(exe)
+
+        assertEquals(listOf("old rolled_back="), logged())
+    }
+
+    @Test
+    fun `nothing starts until the launcher that scheduled the update has exited`() {
+        if (!shellAvailable()) return
+        // It holds the single-instance lock until it is gone, and a launcher
+        // started while it is still there finds the lock taken and quits.
+        val exe = script(
+            "Nexira-x86_64.AppImage",
+            """if kill -0 "${'$'}OLD_PID" 2>/dev/null; then echo "old still running" >> "${'$'}LOG"; else echo started >> "${'$'}LOG"; fi""",
+        )
+        val old = ProcessBuilder("sleep", "2").start()
+
+        watch(exe, oldPid = old.pid())
+
+        assertEquals(listOf("started"), logged())
+    }
+
+    @Test
+    fun `the downloaded installer is removed once the old launcher is gone`() {
+        if (!shellAvailable()) return
+        val exe = script("Nexira-x86_64.AppImage", "true")
+        val installer = file("downloaded.AppImage", "NEW")
+
+        watch(exe)
+
+        assertFalse(Files.exists(installer))
     }
 }

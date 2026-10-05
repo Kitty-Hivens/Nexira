@@ -28,6 +28,9 @@ data class StartupPolicy(
  * was previously unverifiable.
  *
  * Order, and why:
+ *  0. Tell the launcher's own updater that this build started. Reaching a
+ *     composed shell is the proof it waits for, and nothing after this point is
+ *     a reason to put the previous build back.
  *  1. Tray and notifier first, because the window's close path asks the tray
  *     whether hiding is possible.
  *  2. If the tray did not come up, put the window back on screen -- a user who
@@ -46,10 +49,19 @@ class ShellStartup(
     private val showWindow: () -> Unit,
     private val recoverInterrupted: suspend () -> Unit,
     private val autoUpdatePacks: suspend () -> Unit,
+    private val confirmLauncherStarted: suspend () -> Unit,
     private val appScope: CoroutineScope,
 ) {
 
     suspend fun run(windowVisible: () -> Boolean) {
+        try {
+            confirmLauncherStarted()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            log.warn("Could not confirm the launcher update; it stays on probation", e)
+        }
+
         bringUpTrayAndNotifier()
 
         if (!trayIsSupported() && !windowVisible()) showWindow()

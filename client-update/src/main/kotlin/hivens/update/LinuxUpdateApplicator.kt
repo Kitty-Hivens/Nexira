@@ -22,10 +22,18 @@ import java.nio.file.attribute.PosixFilePermission
  * The current binary is backed up before the swap, and a new version that fails
  * to start is rolled back and the old one relaunched.
  *
- * All of that happens in a shutdown hook, so it runs with the window already
- * gone and nothing able to report it -- which is why neither half moves the
- * image around. [stagingPath] has the download written where the install is a
- * rename, and the backup is a second name for the bytes already on disk.
+ * The swap happens in a shutdown hook, so it runs with the window already gone
+ * and nothing able to report it -- which is why neither half moves the image
+ * around. [stagingPath] has the download written where the install is a rename,
+ * and the backup is a second name for the bytes already on disk.
+ *
+ * Whether the new version starts is not decided in the hook. Nothing the hook can
+ * observe in the moments before the JVM exits says that: a build that shows its
+ * window and dies a few seconds later looks alive to any check made from here. So
+ * the hook leaves a [pendingFor] marker and hands over to [WATCHDOG_SCRIPT], a
+ * shell process that outlives this JVM, starts the new version once this one is
+ * gone, and puts the backup back if it exits before [confirmStarted] has cleared
+ * the marker.
  */
 class LinuxUpdateApplicator : IUpdateApplicator {
     private val logger = LoggerFactory.getLogger(LinuxUpdateApplicator::class.java)
@@ -79,46 +87,86 @@ class LinuxUpdateApplicator : IUpdateApplicator {
     override fun scheduleUpdate(installerPath: Path) {
         try {
             val exe = resolveExecutable()
-            val backupPath = Paths.get("$exe.backup")
+            val backupPath = backupFor(exe)
 
             logger.info("Scheduled Linux update of {}", exe)
 
             Runtime.getRuntime().addShutdownHook(Thread {
                 try {
                     logger.info("Applying Linux update...")
-
                     swapBinary(installerPath, exe, backupPath)
-
-                    logger.info("Relaunching updated version...")
-                    val process = ProcessBuilder(exe.toString()).start()
-
-                    // Cleanup
-                    Thread.sleep(2000)
-                    if (process.isAlive) {
-                        Files.deleteIfExists(backupPath)
-                        Files.deleteIfExists(installerPath)
-                        logger.info("Update completed successfully")
-                    } else {
-                        logger.error("New version failed to start, rolling back...")
-                        restoreBackup(backupPath, exe)
-                        ProcessBuilder(exe.toString()).start()
-                    }
+                    // Before the watchdog starts, so the new version can never run
+                    // without it: a marker it has not cleared is what says it did
+                    // not start.
+                    Files.deleteIfExists(pendingFor(exe))
+                    Files.createFile(pendingFor(exe))
+                    logger.info("Updated version is on probation until it confirms it started")
                 } catch (e: Exception) {
-                    logger.error("Update failed, attempting rollback", e)
-                    try {
-                        if (Files.exists(backupPath)) {
-                            restoreBackup(backupPath, exe)
-                            ProcessBuilder(exe.toString()).start()
-                        }
-                    } catch (rollbackEx: Exception) {
-                        logger.error("Rollback failed!", rollbackEx)
-                    }
+                    logger.error("Update failed, restoring the installed version", e)
+                    runCatching { if (Files.exists(backupPath)) restoreBackup(backupPath, exe) }
+                        .onFailure { logger.error("Rollback failed!", it) }
+                    runCatching { Files.deleteIfExists(pendingFor(exe)) }
+                }
+                // Either way something has to come back up, and only once this JVM is
+                // gone: it still holds the single-instance lock while its hooks run,
+                // and a launcher started now would find the lock taken and quit.
+                try {
+                    startWatchdog(exe, backupPath, installerPath)
+                } catch (e: Exception) {
+                    logger.error("Could not start the update watchdog; the launcher has to be reopened by hand", e)
                 }
             })
         } catch (e: Exception) {
             logger.error("Failed to schedule Linux update", e)
             throw e
         }
+    }
+
+    /**
+     * Ends the probation an update left behind: the marker goes, and with it the
+     * backup the watchdog would otherwise have put back. A launcher started with
+     * no update pending has nothing here and leaves an unrelated backup alone.
+     */
+    override fun confirmStarted() {
+        val exe = runCatching { resolveExecutable() }.getOrNull() ?: return
+        if (System.getenv(ROLLED_BACK_ENV) != null) {
+            logger.warn("The update installed last time did not start and was rolled back to this version")
+        }
+        runCatching { confirmFor(exe) }
+            .onFailure { logger.warn("Could not clear the update probation of {}", exe, it) }
+    }
+
+    /** Split out so the confirmation is testable without an installed launcher. */
+    internal fun confirmFor(exe: Path) {
+        // The marker first: once it is gone the watchdog no longer acts, so a
+        // backup that outlives a failed delete below is clutter, never a rollback
+        // of a version that has already proven itself.
+        if (!Files.deleteIfExists(pendingFor(exe))) return
+        Files.deleteIfExists(backupFor(exe))
+        logger.info("Updated version confirmed it started; backup removed")
+    }
+
+    private fun startWatchdog(exe: Path, backupPath: Path, installerPath: Path) {
+        ProcessBuilder("/bin/sh", "-c", WATCHDOG_SCRIPT)
+            .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+            .redirectError(ProcessBuilder.Redirect.DISCARD)
+            .apply {
+                environment().apply {
+                    // Paths travel as variables, so nothing a path may contain can
+                    // escape the script's quoting.
+                    put("EXE", exe.toString())
+                    put("BACKUP", backupPath.toString())
+                    put("PENDING", pendingFor(exe).toString())
+                    put("INSTALLER", installerPath.toString())
+                    put("OLD_PID", ProcessHandle.current().pid().toString())
+                    put("GRACE", PROBATION_GRACE_SECONDS.toString())
+                    // One-shot, as in AppRelauncher: carried over it would boot the
+                    // updated launcher straight into recovery.
+                    remove("NEXIRA_RECOVERY")
+                    remove(ROLLED_BACK_ENV)
+                }
+            }
+            .start()
     }
 
     /**
@@ -223,6 +271,11 @@ class LinuxUpdateApplicator : IUpdateApplicator {
     private fun stagedFor(exe: Path): Path =
         exe.resolveSibling("${exe.fileName}$STAGED_SUFFIX")
 
+    private fun backupFor(exe: Path): Path = exe.resolveSibling("${exe.fileName}$BACKUP_SUFFIX")
+
+    /** Present from the swap until the new version confirms it started. */
+    internal fun pendingFor(exe: Path): Path = exe.resolveSibling("${exe.fileName}$PENDING_SUFFIX")
+
     private fun resolveExecutable(): Path {
         // When running as AppImage, the runtime automatically sets $APPIMAGE
         // to the real path of the .AppImage file on disk.
@@ -241,9 +294,56 @@ class LinuxUpdateApplicator : IUpdateApplicator {
         }
     }
 
-    private companion object {
+    internal companion object {
         const val APPIMAGE_EXT = ".AppImage"
         /** Marks a download that is not yet the launcher. */
         const val STAGED_SUFFIX = ".new"
+        const val BACKUP_SUFFIX = ".backup"
+        const val PENDING_SUFFIX = ".update-pending"
+
+        /** Set on the old version the watchdog relaunches after a rollback. */
+        const val ROLLED_BACK_ENV = "NEXIRA_UPDATE_ROLLED_BACK"
+
+        /**
+         * How long a new version that never confirms has to stay up to be kept.
+         *
+         * The confirmation is the real test. This covers a target that cannot
+         * give it: a release older than the confirmation, installed by picking
+         * that version in the update manager, runs fine and would otherwise be
+         * rolled back the first time it is closed.
+         */
+        const val PROBATION_GRACE_SECONDS = 60
+
+        /**
+         * Runs after the hook, outside the JVM, with its paths in the environment.
+         *
+         * It waits for `OLD_PID` to go before it starts anything, because that
+         * process holds the single-instance lock until it is gone. With no
+         * `PENDING` marker the swap did not happen, and the launcher on disk is
+         * simply started again. With one, the new version runs in the foreground
+         * while a timer ends its probation after `GRACE` seconds, and if it exits
+         * with the marker still there, it never confirmed and never outlasted the
+         * timer: the backup goes back and the old version is started with
+         * [ROLLED_BACK_ENV] set.
+         *
+         * `-ef` covers a backup that is still the launcher's own inode, which is
+         * the case [restoreBackup] describes.
+         */
+        val WATCHDOG_SCRIPT = $$"""
+            while kill -0 "$OLD_PID" 2>/dev/null; do sleep 1; done
+            rm -f "$INSTALLER"
+            if [ ! -e "$PENDING" ]; then exec "$EXE"; fi
+            ( sleep "$GRACE"; rm -f "$PENDING" "$BACKUP" ) &
+            timer=$!
+            "$EXE"
+            kill "$timer" 2>/dev/null
+            if [ -e "$PENDING" ]; then
+                rm -f "$PENDING"
+                if [ -e "$BACKUP" ]; then
+                    if [ "$BACKUP" -ef "$EXE" ]; then rm -f "$BACKUP"; else mv -f "$BACKUP" "$EXE"; fi
+                    $$ROLLED_BACK_ENV=1 exec "$EXE"
+                fi
+            fi
+        """.trimIndent()
     }
 }

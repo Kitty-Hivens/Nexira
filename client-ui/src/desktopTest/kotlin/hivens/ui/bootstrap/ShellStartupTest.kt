@@ -4,6 +4,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import java.nio.file.AccessDeniedException
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -23,6 +24,7 @@ class ShellStartupTest {
         autoUpdate: Boolean,
         recover: suspend () -> Unit,
         update: suspend () -> Unit,
+        confirm: suspend () -> Unit = {},
     ) = ShellStartup(
         policy = StartupPolicy(trayEnabled = false, notifierEnabled = false, autoUpdatePacks = autoUpdate),
         bringUpTray = {},
@@ -32,6 +34,7 @@ class ShellStartupTest {
         showWindow = {},
         recoverInterrupted = recover,
         autoUpdatePacks = update,
+        confirmLauncherStarted = confirm,
         appScope = this,
     )
 
@@ -83,5 +86,30 @@ class ShellStartupTest {
 
         assertTrue(recovered)
         assertTrue(!updated)
+    }
+
+    @Test
+    fun `a shell that comes up confirms the launcher update`() = runTest {
+        var confirmed = false
+
+        startup(autoUpdate = false, recover = {}, update = {}, confirm = { confirmed = true })
+            .run(windowVisible = { true })
+
+        assertTrue(confirmed, "an update left on probation is rolled back when this build exits")
+    }
+
+    @Test
+    fun `a confirmation that fails does not stop the bring-up`() = runTest {
+        var recovered = false
+
+        startup(
+            autoUpdate = false,
+            recover = { recovered = true },
+            update = {},
+            confirm = { throw AccessDeniedException("Nexira-x86_64.AppImage.update-pending") },
+        ).run(windowVisible = { true })
+        advanceUntilIdle()
+
+        assertTrue(recovered)
     }
 }
