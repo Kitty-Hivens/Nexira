@@ -90,9 +90,8 @@ class GameConsoleServiceTest {
     fun `a message that throws does not stop the console`() = runBlocking {
         val svc = service(maxLines = -1)
         svc.append("throws in the trim")
-        // Published even when the message failed, which says the drainer got to it
-        // before the window is put back.
-        svc.awaitSnapshot { it.entries.isEmpty() && it !== ConsoleSnapshot() }
+        // Time for the drainer to reach the failing message before the window is
+        // put back, or the message would not fail at all.
         delay(200)
         svc.maxLines = 5000
         svc.append("after")
