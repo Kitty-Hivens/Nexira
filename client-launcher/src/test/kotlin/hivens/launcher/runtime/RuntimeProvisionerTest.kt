@@ -487,7 +487,7 @@ class RuntimeProvisionerTest {
             override val loaderId = "stub"
             override suspend fun resolve(mcVersion: String, loaderVersion: String) = LoaderProfile(
                 version = "test",
-                libraries = listOf(LibrarySpec(MavenCoord.parse("evil:../../../../escaped:1"), bundled = "X".toByteArray())),
+                libraries = listOf(LibrarySpec(MavenCoord.parse("evil:../../out:1"), bundled = "X".toByteArray())),
                 mainClass = "fake.Main",
             )
         }
@@ -503,10 +503,13 @@ class RuntimeProvisionerTest {
             resourcesBaseUrl = RES_BASE,
         )
 
+        // `evil/../../out/1/../../out-1.jar` lands beside the libraries root, in a
+        // directory the test can write to. The directories it climbs through exist,
+        // so only the boundary can refuse it.
+        Files.createDirectories(librariesDir.resolve("evil"))
+        Files.createDirectories(tmp.resolve("out/1"))
         assertFailsWith<IOException> { p.ensureRuntime(mcVersion = "1.21.1", loaderName = "stub", loaderVersion = "any") }
-        Files.walk(tmp).use { walk ->
-            assertTrue(walk.noneMatch { it.fileName.toString() == "escaped-1.jar" }, "nothing is written for the climbing coordinate")
-        }
+        assertTrue(!Files.exists(tmp.resolve("out-1.jar")), "nothing is written for the climbing coordinate")
     }
 
     /**

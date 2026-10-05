@@ -111,6 +111,7 @@ class ModernInstallerResolverTest {
     fun `harvest refuses a path that leaves the installer's libraries directory`() {
         val staging = Files.createTempDirectory("modern-harvest-climb")
         try {
+            Files.createDirectories(staging.resolve("libraries"))
             Files.writeString(staging.resolve("outside.jar"), "not the installer's")
             val lib = MojangLibrary(
                 name = "net.evil:lib:1",

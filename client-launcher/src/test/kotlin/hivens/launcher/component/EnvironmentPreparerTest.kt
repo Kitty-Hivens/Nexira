@@ -104,7 +104,9 @@ class EnvironmentPreparerTest {
      */
     @Test
     fun `a natives name that leaves the instance is refused before anything is deleted`() = runBlocking {
-        val instance = (workDir / "instance").also { Files.createDirectories(it) }
+        // The intermediate directory exists, so the climb resolves on disk and the
+        // refusal has to come from the boundary rather than from a missing parent.
+        val instance = (workDir / "instance").also { Files.createDirectories(it / "bin/natives-x") }
         val outside = (workDir / "outside").also { Files.createDirectories(it) }
         Files.writeString(outside / "keep.txt", "not the launcher's")
         val jar = nativeJar("lwjgl-natives.jar", "genuine".toByteArray())
