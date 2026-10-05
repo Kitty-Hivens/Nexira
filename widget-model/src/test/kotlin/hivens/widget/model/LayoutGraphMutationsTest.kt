@@ -415,6 +415,31 @@ class LayoutGraphMutationsTest {
         assertEquals(listOf(w1, w3), bottom)
     }
 
+    /**
+     * A shell region renders another surface, so on a different surface it can
+     * close a loop the graph has no edge for: the body region inside a container
+     * on home renders a centre that renders home.
+     */
+    @Test
+    fun `a widget that stays on its surface is not moved to another one, and still moves within it`() {
+        val shell = SurfaceId("appshell.root")
+        val graph = LayoutGraph(
+            surfaces = mapOf(
+                shell to SurfaceLayout(slots = mapOf(
+                    SlotId("top")  to SlotContent(listOf(w1)),
+                    SlotId("body") to SlotContent(emptyList()),
+                )),
+                home to SurfaceLayout(slots = mapOf(main to SlotContent(listOf(w2)))),
+            ),
+        )
+
+        val across = graph.moveWidget(SlotPath(shell, SlotId("top")), rootPath, "i1", 0, staysOnSurface = true)
+        assertSame(graph, across)
+
+        val within = graph.moveWidget(SlotPath(shell, SlotId("top")), SlotPath(shell, SlotId("body")), "i1", 0, staysOnSurface = true)
+        assertEquals(listOf(w1), within.surfaces[shell]!!.slotsOf(FamilyId.GENERAL)[SlotId("body")]!!.widgets)
+    }
+
     @Test
     fun `moveWidget within same slot delegates to reorderInSlot`() {
         val out = seed(w1, w2, w3).moveWidget(

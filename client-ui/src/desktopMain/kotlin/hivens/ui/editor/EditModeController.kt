@@ -375,9 +375,9 @@ class EditModeController(
         }
     }
 
-    fun moveWidget(from: SlotPath, to: SlotPath, instanceId: String, toIndex: Int) {
+    fun moveWidget(from: SlotPath, to: SlotPath, instanceId: String, toIndex: Int, staysOnSurface: Boolean = false) {
         scope.launch(writeDispatcher) {
-            edit(key = null) { it.moveWidget(from, to, instanceId, toIndex) }
+            edit(key = null) { it.moveWidget(from, to, instanceId, toIndex, staysOnSurface) }
         }
     }
 

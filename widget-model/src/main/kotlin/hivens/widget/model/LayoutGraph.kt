@@ -169,14 +169,27 @@ fun LayoutGraph.reorderInSlot(path: SlotPath, fromIndex: Int, toIndex: Int): Lay
         )
     }
 
+/**
+ * Moves a widget from one slot to another, anywhere in the graph.
+ *
+ * [staysOnSurface] keeps the widget on the surface it is on. A widget that
+ * renders another surface (a shell region does) can close a loop through
+ * surfaces when it is moved: the body region dropped into a container on the
+ * home surface renders a centre that renders home. Which widget renders which
+ * surface lives in code rather than in this graph, so the nested-path guard
+ * below cannot see that loop, and the caller, which holds the descriptor, says
+ * when a widget must not leave.
+ */
 fun LayoutGraph.moveWidget(
     from: SlotPath,
     to: SlotPath,
     instanceId: String,
     toIndex: Int,
+    staysOnSurface: Boolean = false,
 ): LayoutGraph {
     // Cycle guard: a container cannot be dropped inside its own subtree.
     if (to.nested.any { it.parentInstanceId == instanceId }) return this
+    if (staysOnSurface && to.surface != from.surface) return this
 
     val fromContent = traverse(from) ?: return this
     val widget = fromContent.widgets.firstOrNull { it.instanceId == instanceId } ?: return this

@@ -515,6 +515,10 @@ fun EditorSurfaceHost(
                                 to         = targetPath,
                                 instanceId = instance.instanceId,
                                 toIndex    = targetIdx,
+                                // The kinds the shell cannot do without are the
+                                // ones that render its other surfaces, the regions,
+                                // and moved to another surface one can render itself.
+                                staysOnSurface = !descriptor.removable,
                             )
                         }
                     },
