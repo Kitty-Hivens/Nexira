@@ -1,19 +1,24 @@
 package hivens.auth.smartycraft
 
+import hivens.config.Protocol
 import hivens.core.api.AuthException
 import hivens.core.api.TwoFactorRequiredException
 import hivens.core.api.protocol.LoginResponse
 import hivens.core.api.protocol.StatusOnlyResponse
 import hivens.core.data.AuthStatus
+import hivens.core.util.HashUtils
 import hivens.test.FakeServerProtocol
 import kotlinx.coroutines.test.runTest
 import java.net.ConnectException
 import java.net.SocketTimeoutException
+import java.nio.charset.StandardCharsets
+import java.util.Base64
+import javax.crypto.Cipher
+import javax.crypto.spec.SecretKeySpec
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
@@ -43,6 +48,18 @@ class SmartyCraftAuthProviderTest {
         session = session,
         money = money,
     )
+
+    /**
+     * A session as the server sends it: AES under the key derived from [uid], so the
+     * provider can derive a game token from it. A value that does not decrypt now
+     * fails the sign-in, which is what it should have done all along.
+     */
+    private fun sealedSession(uid: String, plain: String = "fake-session-bytes"): String {
+        val key = HashUtils.md5(uid + Protocol.AUTH_SALT).take(16)
+        val cipher = Cipher.getInstance("AES/ECB/PKCS5Padding")
+        cipher.init(Cipher.ENCRYPT_MODE, SecretKeySpec(key.toByteArray(StandardCharsets.UTF_8), "AES"))
+        return Base64.getEncoder().encodeToString(cipher.doFinal(plain.toByteArray(StandardCharsets.UTF_8)))
+    }
 
     private fun protocol(response: LoginResponse) = FakeServerProtocol().apply {
         loginResult = { response }
@@ -120,7 +137,7 @@ class SmartyCraftAuthProviderTest {
                     uid = "abc-uid-128",
                     uuid = "550e8400e29b41d4a716446655440000",
                     playername = "TestPlayer",
-                    session = "ZmFrZS1zZXNzaW9uLWJ5dGVz",
+                    session = sealedSession("abc-uid-128"),
                     money = 50,
                 )
             }
@@ -182,7 +199,7 @@ class SmartyCraftAuthProviderTest {
                     status = "TWOAUTH", uid = "abc-uid-128",
                     uuid = "550e8400e29b41d4a716446655440000",
                     playername = "TestPlayer",
-                    session = "ZmFrZS1zZXNzaW9uLWJ5dGVz",
+                    session = sealedSession("abc-uid-128"),
                 )
             }
             twoauthResult = { _, _, _ -> StatusOnlyResponse(status = "OK") }
@@ -213,7 +230,7 @@ class SmartyCraftAuthProviderTest {
                     status = "TWOAUTH", uid = "abc-uid-128",
                     uuid = "550e8400e29b41d4a716446655440000",
                     playername = "TestPlayer",
-                    session = "ZmFrZS1zZXNzaW9uLWJ5dGVz",
+                    session = sealedSession("abc-uid-128"),
                 )
             }
             twoauthResult = { _, _, _ -> StatusOnlyResponse(status = "OK") }
@@ -243,14 +260,14 @@ class SmartyCraftAuthProviderTest {
                 status = "TWOAUTH", uid = "first-uid",
                 uuid = "550e8400e29b41d4a716446655440000",
                 playername = "TestPlayer",
-                session = "ZmFrZS1zZXNzaW9uLWJ5dGVz",
+                session = sealedSession("first-uid"),
             ),
             LoginResponse(status = "PASSWORD"),
             LoginResponse(
                 status = "TWOAUTH", uid = "second-uid",
                 uuid = "550e8400e29b41d4a716446655440000",
                 playername = "TestPlayer",
-                session = "ZmFrZS1zZXNzaW9uLWJ5dGVz",
+                session = sealedSession("second-uid"),
             ),
         )
         val proto = FakeServerProtocol().apply {
@@ -465,12 +482,18 @@ class SmartyCraftAuthProviderTest {
         assertEquals(1, proto.twoauthCalls.size, "a spent code checked again reads as a wrong one")
     }
 
+    /**
+     * The encrypted value used to stand in for the token, silently, and the game
+     * then died at the auth host with nothing pointing back at the sign-in.
+     */
     @Test
-    fun `login succeeds when AES token decryption fails (degrades to raw token)`() = runTest {
-        val session = SmartyCraftAuthProvider(protocol(ok(session = "THIS_IS_NOT_VALID_BASE64!!!###")))
-            .login("user", "pass", "Industrial")
-        assertEquals("TestPlayer", session.playerName)
-        assertNotNull(session.accessToken)
+    fun `a session that does not decrypt fails the sign-in instead of becoming the token`() = runTest {
+        val ex = assertFailsWith<AuthException> {
+            SmartyCraftAuthProvider(protocol(ok(session = "THIS_IS_NOT_VALID_BASE64!!!###")))
+                .login("user", "pass", "Industrial")
+        }
+        assertEquals(AuthStatus.INTERNAL_ERROR, ex.status)
+        assertFalse(ex.isNetworkError, "a broken token scheme is not something to retry")
     }
 
     @Test

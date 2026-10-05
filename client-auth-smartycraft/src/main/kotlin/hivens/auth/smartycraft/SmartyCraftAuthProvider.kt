@@ -216,6 +216,16 @@ class SmartyCraftAuthProvider(
         else -> AuthStatus.INTERNAL_ERROR
     }
 
+    /**
+     * The game token derived from the session the server sent. A session that does
+     * not decrypt is a sign-in that failed, and says so.
+     *
+     * It used to fall back to the encrypted value itself, silently, and that went on
+     * to the game's command line as the access token: the game then died at the auth
+     * host with nothing pointing back here, the same dead launch the empty-session
+     * guard in [completeTwoFactor] exists to prevent. A session that did not decrypt
+     * means the scheme or the salt moved under the launcher, which no retry fixes.
+     */
     private fun generateGameToken(uid: String?, sessionV3: String?): String? {
         if (sessionV3 == null || uid == null) return sessionV3
         return try {
@@ -226,7 +236,10 @@ class SmartyCraftAuthProvider(
             val hash1 = HashUtils.md5(decrypted)
             val suffix = if (hash1.length >= 3) hash1.substring(hash1.length - 3) else ""
             HashUtils.md5(hash1 + suffix)
-        } catch (_: Exception) { sessionV3 }
+        } catch (e: Exception) {
+            logger.error("The session SmartyCraft sent did not decrypt into a game token", e)
+            throw AuthException(AuthStatus.INTERNAL_ERROR, "Could not derive the game token from the session the server sent")
+        }
     }
 
     private fun decryptAES(base64Cipher: String, key: String): String {
