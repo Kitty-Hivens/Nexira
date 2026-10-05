@@ -102,6 +102,56 @@ class CredentialsManagerTest {
         assertNull(obj["accessToken"], "accessToken must not be on disk")
     }
 
+    /**
+     * The uid is the input to every signed action. In the file next to a player name
+     * it was enough to sign spawn, two-factor and skin upload for the account, while
+     * the token derived from it sat behind the keyring.
+     */
+    @Test
+    fun `the uid goes into the vault and never into the file`() {
+        manager.save(session())
+
+        assertEquals("1", vault.entries[scKey("uid")]?.decodeToString())
+        assertNull(firstAccount()["uid"]?.jsonPrimitive?.contentOrNull, "no uid in credentials.json")
+        assertEquals("1", newManager().load()?.uid)
+    }
+
+    @Test
+    fun `a file that still carries a uid has it moved into the vault on the first read`() {
+        Files.writeString(
+            workDir / "credentials.json",
+            """{"version":6,"activeAccountId":"$scUuid","accounts":[""" +
+                """{"providerId":"smartycraft","accountId":"$scUuid","username":"ChaosA","uuid":"$scUuid","uid":"legacy-uid"}]}""",
+        )
+        vault.entries[scKey("accessToken")] = "fake-game-token".toByteArray()
+
+        assertEquals("legacy-uid", manager.load()?.uid)
+        assertEquals("legacy-uid", vault.entries[scKey("uid")]?.decodeToString())
+        assertNull(firstAccount()["uid"]?.jsonPrimitive?.contentOrNull, "the file no longer carries it")
+        assertEquals("legacy-uid", newManager().load()?.uid, "and it still loads from the vault")
+    }
+
+    @Test
+    fun `a vault that will not take the uid leaves it in the file`() {
+        Files.writeString(
+            workDir / "credentials.json",
+            """{"version":6,"activeAccountId":"$scUuid","accounts":[""" +
+                """{"providerId":"smartycraft","accountId":"$scUuid","username":"ChaosA","uuid":"$scUuid","uid":"legacy-uid"}]}""",
+        )
+        vault.entries[scKey("accessToken")] = "fake-game-token".toByteArray()
+        vault.refuseStore = true
+
+        assertEquals("legacy-uid", manager.load()?.uid)
+        assertEquals("legacy-uid", firstAccount()["uid"]?.jsonPrimitive?.contentOrNull, "dropped from both, it signs nothing")
+    }
+
+    @Test
+    fun `removing an account removes its uid`() {
+        manager.save(session())
+        manager.removeAccount(scUuid)
+        assertNull(vault.entries[scKey("uid")])
+    }
+
     @Test
     fun `save with null password clears the password key, keeps the token`() {
         vault.entries[scKey("password")] = "stale".toByteArray()
@@ -489,7 +539,11 @@ class CredentialsManagerTest {
         override val tier: VaultTier = VaultTier.Memory
         override val backend: String = "fake (test)"
 
+        /** A vault that answers but will not take anything, the way a locked keyring does. */
+        var refuseStore: Boolean = false
+
         override fun store(key: String, secret: ByteArray): Boolean {
+            if (refuseStore) return false
             entries[key] = secret.copyOf()
             return true
         }
