@@ -18,7 +18,9 @@ import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.rememberWindowState
 import hivens.config.Branding
+import hivens.launcher.platform.AppRelauncher
 import hivens.ui.bootstrap.GuiBootstrap
+import hivens.ui.bootstrap.RecoveryEntry
 import hivens.ui.chrome.IS_TILING_WM
 import hivens.ui.chrome.initialWindowSize
 import hivens.ui.chrome.screenWorkArea
@@ -137,6 +139,10 @@ fun ApplicationScope.ShellHost(
                     dark      = pre.peek.isDarkTheme,
                     onQuit    = { exitApplication() },
                     onDone    = { thresholdDone = true },
+                    onRecovery = {
+                        RecoveryEntry.requestOnNextBoot(pre.core.initialPaths.dataDir)
+                        AppRelauncher.relaunch().also { relaunched -> if (relaunched) exitApplication() }
+                    },
                 )
             }
         }

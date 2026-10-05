@@ -1512,6 +1512,9 @@ interface AppStrings {
     val thresholdErrorTitle: String
     val thresholdOpenLogs: String
     val thresholdQuit: String
+    val thresholdRecovery: String
+    val thresholdRecoveryArmed: String
+    val thresholdRecoveryHint: String
 
     // Toast shown when the shell reloads itself after a recovered crash.
     val recoveryReloadedNotice: String

@@ -114,6 +114,9 @@ fun ThresholdOverlay(
     dark: Boolean,
     onQuit: () -> Unit,
     onDone: () -> Unit,
+    // Arms the next boot into recovery and restarts; false when no restart was
+    // possible (a dev run), and recovery then waits for the next start.
+    onRecovery: () -> Boolean = { false },
 ) {
     val pal = if (dark) ThresholdPalette.Dark else ThresholdPalette.Light
     val stage by stageFlow.collectAsState()
@@ -302,7 +305,14 @@ fun ThresholdOverlay(
                     color      = pal.dim,
                     modifier   = Modifier.padding(top = 10.dp, bottom = 20.dp),
                 )
+                // Recovery is offered here because nothing else can offer it: the
+                // in-app way in belongs to a shell that has started, and this one did
+                // not, so quitting and starting again met the same failure for ever.
+                var recoveryArmed by remember { mutableStateOf(false) }
                 Row(horizontalArrangement = Arrangement.spacedBy(UNIT * 2)) {
+                    ThresholdButton(strings.thresholdRecovery.lowercase(), pixelFont, pal) {
+                        if (!onRecovery()) recoveryArmed = true
+                    }
                     ThresholdButton(strings.thresholdOpenLogs.lowercase(), pixelFont, pal) {
                         thread(isDaemon = true) {
                             runCatching { Desktop.getDesktop().open(logsDir.toFile()) }
@@ -310,6 +320,13 @@ fun ThresholdOverlay(
                     }
                     ThresholdButton(strings.thresholdQuit.lowercase(), pixelFont, pal, onClick = onQuit)
                 }
+                Text(
+                    text       = if (recoveryArmed) strings.thresholdRecoveryArmed else strings.thresholdRecoveryHint,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize   = 11.sp,
+                    color      = pal.dim,
+                    modifier   = Modifier.padding(top = 14.dp),
+                )
             }
         }
     }
