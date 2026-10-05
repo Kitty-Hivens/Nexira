@@ -1309,23 +1309,23 @@ fun AppRoot(
     // accounts are back, so it would decide the face of a session the user set
     // up long after making it.
     //
-    // Signing out of an offline identity forgets its name as well. The name is the
-    // only record of that identity, and startup signs it back in from there.
+    // The offline name goes too, whichever identity was fronting the shell. It is
+    // the only record of the offline identity, and startup signs that identity
+    // back in from it when no account is stored, which after this is always: kept
+    // because the face happened to be an online account, it had the next start
+    // sign straight back in under a name the user had just signed out of. The
+    // offline mode switch stays as it is. It says how to play rather than who
+    // plays, and with no name and no account it has nobody to sign in.
     //
     // The store is cleared off the UI thread, since every secret it deletes is a
     // keyring call, and the shell signs out once it has been.
     val logoutScope = rememberCoroutineScope()
     val doLogout: () -> Unit = {
-        val wasOffline = (appState as? AppState.Authenticated)?.session?.offline == true
         logoutScope.launch {
             withContext(Dispatchers.IO) {
                 credentialsManager.clear()
-                val settings = settingsService.getSettings()
                 settingsService.saveSettings(
-                    settings.copy(
-                        preferredFaceProvider = null,
-                        offlinePlayerName = if (wasOffline) null else settings.offlinePlayerName,
-                    ),
+                    settingsService.getSettings().copy(preferredFaceProvider = null, offlinePlayerName = null),
                 )
             }
             appState = AppState.Unauthenticated
