@@ -98,7 +98,7 @@ fun MicrosoftSignInButton(
                 // keyring, and a Secret Service that asks for an unlock would hold
                 // the window frozen for as long as its prompt stays up.
                 if (rememberAccount) withContext(Dispatchers.IO) { credentialsManager.saveAccount(session, providerId) }
-                ActionRing.record("Microsoft sign-in OK: ${session.playerName}")
+                ActionRing.record("Microsoft sign-in OK")
                 deviceCodePending = null
                 onSignedIn(session)
             } catch (e: CancellationException) {

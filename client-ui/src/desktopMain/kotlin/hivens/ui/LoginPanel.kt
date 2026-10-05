@@ -112,7 +112,9 @@ fun LoginPanel(
         isLoading             = true
         errorMessage          = null
         twoFactorUnsupported  = false
-        hivens.core.diag.ActionRing.record("Login attempt: user=$login")
+        // No account name in any of these: the ring pre-fills a crash report and is
+        // copied into the diagnostic bundle, and what it is for is what happened.
+        hivens.core.diag.ActionRing.record("Login attempt")
         scope.launch {
             try {
                 val session = withContext(Dispatchers.IO) {
@@ -120,7 +122,7 @@ fun LoginPanel(
                     if (rememberMe) credentialsManager.saveAccount(sess, authService.id)
                     sess
                 }
-                hivens.core.diag.ActionRing.record("Login OK: user=$login")
+                hivens.core.diag.ActionRing.record("Login OK")
                 onLogin(session)
             } catch (e: TwoFactorRequiredException) {
                 isLoading = false
@@ -144,7 +146,7 @@ fun LoginPanel(
             } catch (e: AuthException) {
                 isLoading = false
                 hivens.core.diag.ActionRing.record(
-                    "Login failed (auth): user=$login ssl=${e.isSslError} msg=${e.message?.take(80)}"
+                    "Login failed (auth): ssl=${e.isSslError} msg=${e.message?.take(80)}"
                 )
                 when {
                     // The certificate question is the shell's to ask now, so the form
@@ -164,7 +166,7 @@ fun LoginPanel(
                 }
             } catch (e: Exception) {
                 isLoading    = false
-                hivens.core.diag.ActionRing.record("Login failed (generic): user=$login msg=${e.message?.take(80)}")
+                hivens.core.diag.ActionRing.record("Login failed (generic): msg=${e.message?.take(80)}")
                 errorMessage = e.message ?: s.loginErrorGeneric
             }
         }
@@ -183,7 +185,7 @@ fun LoginPanel(
                 settingsService.saveSettings(settingsService.getSettings().copy(offlinePlayerName = name))
                 sess
             }
-            hivens.core.diag.ActionRing.record("Play offline: name=$name")
+            hivens.core.diag.ActionRing.record("Play offline")
             onLogin(session)
         }
     }
@@ -202,14 +204,14 @@ fun LoginPanel(
                     if (rememberMe) credentialsManager.saveAccount(sess, authService.id)
                     sess
                 }
-                hivens.core.diag.ActionRing.record("Login OK after 2FA: user=${pending.username}")
+                hivens.core.diag.ActionRing.record("Login OK after 2FA")
                 twoFactorBusy = false
                 twoFactorPending = null
                 onLogin(session)
             } catch (e: AuthException) {
                 twoFactorBusy = false
                 hivens.core.diag.ActionRing.record(
-                    "2FA verify failed: user=${pending.username} status=${e.status}"
+                    "2FA verify failed: status=${e.status}"
                 )
                 when (e.status) {
                     AuthStatus.WRONG_CODE -> twoFactorError = s.auth2faInvalid
