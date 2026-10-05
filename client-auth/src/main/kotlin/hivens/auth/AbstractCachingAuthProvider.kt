@@ -7,6 +7,11 @@ import hivens.core.util.retryWithBackoff
 import kotlinx.coroutines.CancellationException
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+import io.ktor.client.network.sockets.ConnectTimeoutException
+import java.net.ConnectException
+import java.net.NoRouteToHostException
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -69,15 +74,24 @@ abstract class AbstractCachingAuthProvider : AuthProvider {
 
     /**
      * Runs a single backend round-trip ([block]) through retry-with-backoff for
-     * transient failures, then funnels any non-[AuthException] into an
-     * [AuthException]: an SSL-certificate problem carries [AuthException.isSslError]
-     * (needs user opt-in, not silent retry); anything else becomes a generic
-     * INTERNAL_ERROR. [AuthException]s thrown by [block] (server-side rejections)
-     * pass through untouched -- retrying those only locks the user out faster.
+     * failures that never reached the server, then funnels any non-[AuthException]
+     * into an [AuthException]: an SSL-certificate problem carries
+     * [AuthException.isSslError] (needs user opt-in, not silent retry); anything else
+     * becomes a generic INTERNAL_ERROR. [AuthException]s thrown by [block]
+     * (server-side rejections) pass through untouched -- retrying those only locks
+     * the user out faster.
+     *
+     * Only the failures [neverReachedServer] names are retried. An auth round trip
+     * changes state on the server: a login mints a session and, for a two-factor
+     * account, sends a code; a code check spends the code. A read timeout or a reset
+     * mid-response is a request that may well have been processed, and running it
+     * again sent a second code that made the first one wrong, or checked a spent code
+     * and reported it wrong after the sign-in had gone through. Such a failure is
+     * handed to the caller, whose own ladder decides when to try again.
      */
     protected suspend fun <T> withRetry(operation: String, block: suspend () -> T): T =
         try {
-            retryWithBackoff(operation = operation, shouldRetry = ::isTransientNetworkError) { block() }
+            retryWithBackoff(operation = operation, shouldRetry = ::neverReachedServer) { block() }
         } catch (e: CancellationException) {
             // On the JVM this is an ordinary Exception, so the funnel below would
             // swallow it and hand the caller a Network Error for a login the user
@@ -100,23 +114,23 @@ abstract class AbstractCachingAuthProvider : AuthProvider {
         }
 
     /**
-     * True for the narrow set of transient network failures seen on the auth
-     * channel -- mid-stream h2 frame resets, raw socket resets during TLS,
-     * ktor's wrapped channel-closed exception. NOT true for [AuthException]
-     * (server rejections) or SSL cert errors (those need user opt-in).
+     * True for a failure that leaves no doubt the request was never sent: the
+     * connection was refused or never established, or the host name did not
+     * resolve. NOT true for [AuthException] (server rejections) or SSL cert errors
+     * (those need user opt-in).
      */
-    private fun isTransientNetworkError(t: Throwable): Boolean {
+    internal fun neverReachedServer(t: Throwable): Boolean {
         if (t is AuthException) return false
         if (t.isSslCertificateError()) return false
         var cause: Throwable? = t
         while (cause != null) {
-            if (cause is java.net.ConnectException ||
-                cause is java.net.SocketException ||
-                cause is io.ktor.utils.io.ClosedByteChannelException ||
-                cause is java.net.SocketTimeoutException
-            ) return true
-            if (cause is java.io.IOException &&
-                cause.message?.contains("Connection reset", ignoreCase = true) == true
+            if (cause is ConnectException ||
+                cause is UnknownHostException ||
+                cause is NoRouteToHostException ||
+                cause is ConnectTimeoutException ||
+                // OkHttp reports a connect timeout as a plain SocketTimeoutException;
+                // its message is what tells it from a read that timed out.
+                (cause is SocketTimeoutException && cause.message?.contains("connect", ignoreCase = true) == true)
             ) return true
             cause = cause.cause
         }

@@ -7,6 +7,8 @@ import hivens.core.api.protocol.StatusOnlyResponse
 import hivens.core.data.AuthStatus
 import hivens.test.FakeServerProtocol
 import kotlinx.coroutines.test.runTest
+import java.net.ConnectException
+import java.net.SocketTimeoutException
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -421,6 +423,46 @@ class SmartyCraftAuthProviderTest {
         // Network-shaped: the auto-login coordinator retries on this flag;
         // a server-side rejection must never carry it.
         assertTrue(ex.isNetworkError)
+    }
+
+    /**
+     * A login that timed out reading its answer may have been processed, and for a
+     * two-factor account that means a code was sent. Running it again sends a second
+     * code and the first one stops working.
+     */
+    @Test
+    fun `a login whose answer timed out is not sent again`() = runTest {
+        val proto = FakeServerProtocol().apply {
+            loginResult = { throw SocketTimeoutException("Read timed out") }
+        }
+        val ex = assertFailsWith<AuthException> {
+            SmartyCraftAuthProvider(proto).login("user", "pass", "Industrial")
+        }
+        assertTrue(ex.isNetworkError, "the caller still learns it was the network")
+        assertEquals(1, proto.loginCalls.size)
+    }
+
+    @Test
+    fun `a login that never connected is tried again`() = runTest {
+        var calls = 0
+        val proto = FakeServerProtocol().apply {
+            loginResult = { if (calls++ == 0) throw ConnectException("Connection refused") else ok() }
+        }
+        val session = SmartyCraftAuthProvider(proto).login("user", "pass", "Industrial")
+
+        assertEquals("TestPlayer", session.playerName)
+        assertEquals(2, proto.loginCalls.size)
+    }
+
+    @Test
+    fun `a code check whose answer timed out is not sent again`() = runTest {
+        val proto = FakeServerProtocol().apply {
+            twoauthResult = { _, _, _ -> throw SocketTimeoutException("Read timed out") }
+        }
+        assertFailsWith<AuthException> {
+            SmartyCraftAuthProvider(proto).completeTwoFactor("user", "pass", "Industrial", uid = "abc-uid-128", code = "123456")
+        }
+        assertEquals(1, proto.twoauthCalls.size, "a spent code checked again reads as a wrong one")
     }
 
     @Test
