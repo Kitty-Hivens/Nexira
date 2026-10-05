@@ -22,7 +22,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,6 +49,10 @@ import hivens.ui.platform.SystemActions
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.skin3d.Cycles
 import hivens.ui.skin3d.rememberSkinViewState
+import hivens.ui.utils.rememberReadOffMain
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import hivens.widget.model.Widget
 import org.koin.compose.koinInject
 import hivens.ui.theme.NxInk
@@ -67,11 +73,14 @@ fun ProfileAccountSectionWidget() {
     val ctx = LocalProfileContext.current
     val credentials: AccountStore = koinInject()
     val settingsService: ISettingsService = koinInject()
+    val scope = rememberCoroutineScope()
 
     // The surface's revision rather than a key of this section's own: the nav's
     // face picker has to hear about a sign-out that happens here.
     val revision = ctx.accountsRevision
-    val scSession = remember(revision.value, ctx.session) { credentials.accountFor(SC_KEY) }
+    // Nothing until the store has answered: drawing the sign-in form meanwhile
+    // would offer to sign in an account that is signed in.
+    val scSession = (rememberReadOffMain(revision.value, ctx.session) { credentials.accountFor(SC_KEY) } ?: return).value
 
     Box(Modifier.fillMaxWidth()) {
         Column(Modifier.widthIn(max = 520.dp)) {
@@ -84,10 +93,14 @@ fun ProfileAccountSectionWidget() {
                         // the face up again would find nothing and drop the sign-in.
                         if (session.offline) {
                             ctx.onLogin(session)
+                            revision.value++
                         } else {
-                            credentials.faceSession(settingsService)?.let { ctx.onLogin(it) }
+                            scope.launch {
+                                withContext(Dispatchers.IO) { credentials.faceSession(settingsService) }
+                                    ?.let { ctx.onLogin(it) }
+                                revision.value++
+                            }
                         }
-                        revision.value++
                     },
                     showMicrosoft = false,
                 )
@@ -104,6 +117,8 @@ private fun SmartyCraftAccount(session: SessionData, onChanged: () -> Unit) {
     val credentials: AccountStore = koinInject()
     val settingsService: ISettingsService = koinInject()
     val s = LocalStrings.current
+    val scope = rememberCoroutineScope()
+    var signingOut by remember { mutableStateOf(false) }
 
     // Bumped by the skin uploader so the skin re-loads after upload/refresh.
     var skinKey by remember { mutableIntStateOf(0) }
@@ -112,17 +127,32 @@ private fun SmartyCraftAccount(session: SessionData, onChanged: () -> Unit) {
     // Signing out of SmartyCraft removes its account; if it was the only one, that
     // is a full logout -- route it through the confirm (which clears + signs out)
     // so a dismissed dialog leaves the account intact.
+    //
+    // One at a time: a second press while the first is still at the store would
+    // find one account left and ask to sign that one out too.
     fun signOut() {
-        if (credentials.listAccounts().size <= 1) {
-            ctx.onLogout()
-            return
+        if (signingOut) return
+        signingOut = true
+        scope.launch {
+            try {
+                val accounts = withContext(Dispatchers.IO) { credentials.listAccounts() }
+                if (accounts.size <= 1) {
+                    ctx.onLogout()
+                    return@launch
+                }
+                val face = withContext(Dispatchers.IO) {
+                    accounts.firstOrNull { it.providerId == SC_KEY }
+                        ?.let { credentials.removeAccount(it.providerId, it.accountId) }
+                    // The face choice goes with the account it named -- see releasingFace.
+                    settingsService.saveSettings(settingsService.getSettings().releasingFace(SC_KEY))
+                    credentials.faceSession(settingsService)
+                }
+                face?.let { ctx.onLogin(it) } ?: ctx.onLogout()
+                onChanged()
+            } finally {
+                signingOut = false
+            }
         }
-        credentials.listAccounts().firstOrNull { it.providerId == SC_KEY }
-            ?.let { credentials.removeAccount(it.providerId, it.accountId) }
-        // The face choice goes with the account it named -- see releasingFace.
-        settingsService.saveSettings(settingsService.getSettings().releasingFace(SC_KEY))
-        credentials.faceSession(settingsService)?.let { ctx.onLogin(it) } ?: ctx.onLogout()
-        onChanged()
     }
 
     Column(Modifier.fillMaxSize().padding(top = 4.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {

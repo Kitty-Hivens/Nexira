@@ -79,6 +79,7 @@ import hivens.ui.skin3d.layered
 import hivens.ui.skin3d.rememberSkinViewState
 import hivens.ui.utils.pickFile
 import hivens.ui.utils.rememberFileDialogSettings
+import hivens.ui.utils.rememberReadOffMain
 import hivens.ui.widgets.profile.SkinHero
 import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.path
@@ -258,7 +259,7 @@ private fun Wardrobe(session: SessionData) {
             onDismiss    = { pendingDelete = null },
         )
     }
-    val scSession = remember(refreshKey, session) { credentials.accountFor(SC_KEY) }
+    val scSession = rememberReadOffMain(refreshKey, session) { credentials.accountFor(SC_KEY) }?.value
 
     // Cape capability. Fast path: a fresh login already said "no clan", no
     // network needed. Otherwise the public player page decides -- it works

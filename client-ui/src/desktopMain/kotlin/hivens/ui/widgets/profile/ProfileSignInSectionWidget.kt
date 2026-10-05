@@ -16,7 +16,11 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -40,7 +44,11 @@ import hivens.ui.flexible.FlexibleKind
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.theme.LocalMonoFamily
+import hivens.ui.utils.rememberReadOffMain
 import hivens.widget.model.Widget
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxColor
@@ -62,13 +70,15 @@ fun ProfileSignInSectionWidget() {
     val credentials: AccountStore = koinInject()
     val authRegistry: AuthProviderRegistry = koinInject()
     val settingsService: ISettingsService = koinInject()
+    val scope = rememberCoroutineScope()
 
     // The device-code provider is registered only when a client id is configured.
     val msaConfigured = remember { authRegistry.hasDeviceCodeProvider() }
     // Shared with the account section and the nav's face picker -- see
     // ProfileContext.accountsRevision.
     val revision = ctx.accountsRevision
-    val msSession = remember(revision.value, ctx.session) { credentials.accountFor(MS_KEY) }
+    // Nothing until the store has answered, as in the SmartyCraft section.
+    val msSession = (rememberReadOffMain(revision.value, ctx.session) { credentials.accountFor(MS_KEY) } ?: return).value
 
     // Microsoft / multi-account is deferred to a later release. With no Microsoft
     // client id configured the provider never registers, so there is nothing to
@@ -88,8 +98,11 @@ fun ProfileSignInSectionWidget() {
             } else {
                 MicrosoftSignInButton(
                     onSignedIn = {
-                        credentials.faceSession(settingsService)?.let { ctx.onLogin(it) }
-                        revision.value++
+                        scope.launch {
+                            withContext(Dispatchers.IO) { credentials.faceSession(settingsService) }
+                                ?.let { ctx.onLogin(it) }
+                            revision.value++
+                        }
                     },
                     puppetId = "account.signin.microsoft",
                 )
@@ -104,21 +117,36 @@ private fun MicrosoftAccount(session: SessionData, onChanged: () -> Unit) {
     val credentials: AccountStore = koinInject()
     val settingsService: ISettingsService = koinInject()
     val s = LocalStrings.current
+    val scope = rememberCoroutineScope()
+    var signingOut by remember { mutableStateOf(false) }
 
     // Signing out of Microsoft removes its account; if it was the only one, that
     // is a full logout -- route it through the confirm so a dismissed dialog
     // leaves the account intact (see the SmartyCraft section for the same shape).
+    // One at a time, for the same reason as there.
     fun signOut() {
-        if (credentials.listAccounts().size <= 1) {
-            ctx.onLogout()
-            return
+        if (signingOut) return
+        signingOut = true
+        scope.launch {
+            try {
+                val accounts = withContext(Dispatchers.IO) { credentials.listAccounts() }
+                if (accounts.size <= 1) {
+                    ctx.onLogout()
+                    return@launch
+                }
+                val face = withContext(Dispatchers.IO) {
+                    accounts.firstOrNull { it.providerId == MS_KEY }
+                        ?.let { credentials.removeAccount(it.providerId, it.accountId) }
+                    // The face choice goes with the account it named -- see releasingFace.
+                    settingsService.saveSettings(settingsService.getSettings().releasingFace(MS_KEY))
+                    credentials.faceSession(settingsService)
+                }
+                face?.let { ctx.onLogin(it) } ?: ctx.onLogout()
+                onChanged()
+            } finally {
+                signingOut = false
+            }
         }
-        credentials.listAccounts().firstOrNull { it.providerId == MS_KEY }
-            ?.let { credentials.removeAccount(it.providerId, it.accountId) }
-        // The face choice goes with the account it named -- see releasingFace.
-        settingsService.saveSettings(settingsService.getSettings().releasingFace(MS_KEY))
-        credentials.faceSession(settingsService)?.let { ctx.onLogin(it) } ?: ctx.onLogout()
-        onChanged()
     }
 
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(16.dp)) {

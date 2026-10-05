@@ -13,6 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -23,6 +24,10 @@ import hivens.core.api.interfaces.ISettingsService
 import hivens.core.data.SessionData
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetClick
+import hivens.ui.utils.rememberReadOffMain
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxColor
@@ -60,6 +65,7 @@ internal fun FacePicker(modifier: Modifier = Modifier) {
     val credentials: AccountStore = koinInject()
     val settingsService: ISettingsService = koinInject()
     val s = LocalStrings.current
+    val scope = rememberCoroutineScope()
 
     // Keyed on the surface's account revision as well as the session: the picker's
     // whole job is to name one of the accounts that exist now, and signing out of
@@ -67,7 +73,7 @@ internal fun FacePicker(modifier: Modifier = Modifier) {
     // identical -- so on that alone the picker went on offering a provider that
     // had just been removed, and choosing it wrote the preference for it.
     val revision = ctx.accountsRevision.value
-    val accounts = remember(revision, ctx.session) { credentials.listAccounts() }
+    val accounts = rememberReadOffMain(revision, ctx.session) { credentials.listAccounts() }?.value ?: return
     if (accounts.size < 2) return
 
     var preferred by remember(revision, ctx.session) {
@@ -75,14 +81,19 @@ internal fun FacePicker(modifier: Modifier = Modifier) {
     }
 
     fun choose(providerKey: String?) {
-        settingsService.saveSettings(
-            settingsService.getSettings().copy(preferredFaceProvider = providerKey),
-        )
         preferred = providerKey
-        // Re-resolve through the store rather than loading the named account
-        // directly: naming a provider whose account has since gone must land on
-        // the same fallback the shell uses at startup.
-        credentials.faceSession(settingsService)?.let { ctx.onLogin(it) }
+        scope.launch {
+            // Re-resolve through the store rather than loading the named account
+            // directly: naming a provider whose account has since gone must land on
+            // the same fallback the shell uses at startup.
+            val face = withContext(Dispatchers.IO) {
+                settingsService.saveSettings(
+                    settingsService.getSettings().copy(preferredFaceProvider = providerKey),
+                )
+                credentials.faceSession(settingsService)
+            }
+            face?.let { ctx.onLogin(it) }
+        }
     }
 
     // Auto first: it is the default and the state a user returns to, so it reads

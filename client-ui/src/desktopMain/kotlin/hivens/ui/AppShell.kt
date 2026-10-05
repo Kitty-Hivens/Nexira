@@ -1311,17 +1311,25 @@ fun AppRoot(
     //
     // Signing out of an offline identity forgets its name as well. The name is the
     // only record of that identity, and startup signs it back in from there.
-    val doLogout = {
+    //
+    // The store is cleared off the UI thread, since every secret it deletes is a
+    // keyring call, and the shell signs out once it has been.
+    val logoutScope = rememberCoroutineScope()
+    val doLogout: () -> Unit = {
         val wasOffline = (appState as? AppState.Authenticated)?.session?.offline == true
-        credentialsManager.clear()
-        val settings = settingsService.getSettings()
-        settingsService.saveSettings(
-            settings.copy(
-                preferredFaceProvider = null,
-                offlinePlayerName = if (wasOffline) null else settings.offlinePlayerName,
-            ),
-        )
-        appState = AppState.Unauthenticated
+        logoutScope.launch {
+            withContext(Dispatchers.IO) {
+                credentialsManager.clear()
+                val settings = settingsService.getSettings()
+                settingsService.saveSettings(
+                    settings.copy(
+                        preferredFaceProvider = null,
+                        offlinePlayerName = if (wasOffline) null else settings.offlinePlayerName,
+                    ),
+                )
+            }
+            appState = AppState.Unauthenticated
+        }
     }
 
     // Mouse side buttons (back/forward) -> history navigation. Compose's pointer
