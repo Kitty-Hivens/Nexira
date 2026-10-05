@@ -667,9 +667,19 @@ fun FrameWindowScope.AppShellContent(
         // still-opaque threshold, and a render-path crash happens after this
         // point by construction. Staying up is the evidence, so the crash guard
         // hears about it only once the session has lasted.
+        //
+        // The launcher's own updater waits on the same evidence. A build that has
+        // stayed up this long is kept, and its predecessor's backup goes; one that
+        // dies before it is put back. In this composition's own effect, so a crash
+        // reload in between cancels the confirmation with it.
+        val updateApplicator: IUpdateApplicator = koinInject()
         LaunchedEffect(Unit) {
             delay(UiRecoverySignal.HEALTHY_SESSION_MS.milliseconds)
             UiRecoverySignal.noteShellHealthy()
+            withContext(Dispatchers.IO) {
+                runCatching { updateApplicator.confirmStarted() }
+                    .onFailure { LoggerFactory.getLogger("AppShell").warn("Could not confirm the launcher update", it) }
+            }
         }
 
         val notificationCenter: NotificationCenter = koinInject()
@@ -772,7 +782,6 @@ fun FrameWindowScope.AppShellContent(
         }
         val packAutoUpdateService: PackAutoUpdateService = koinInject()
         val applyRecovery: ApplyRecovery = koinInject()
-        val updateApplicator: IUpdateApplicator = koinInject()
         val themeManager  = remember { ThemeManager(dataDirectory, AtomicFiles::writeString) }
         var themeLibrary  by remember {
             val loaded = themeManager.load()
@@ -840,7 +849,6 @@ fun FrameWindowScope.AppShellContent(
                 showWindow      = revealWindow,
                 recoverInterrupted  = { applyRecovery.recoverInterrupted() },
                 autoUpdatePacks     = { packAutoUpdateService.runOnce() },
-                confirmLauncherStarted = { withContext(Dispatchers.IO) { updateApplicator.confirmStarted() } },
                 appScope            = applicationScope,
             ).run(windowVisible = { isWindowVisible })
         }
