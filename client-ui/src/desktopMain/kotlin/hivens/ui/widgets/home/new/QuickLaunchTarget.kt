@@ -41,14 +41,24 @@ internal fun rememberQuickLaunchTarget(playLabel: String? = null): QuickLaunchTa
     val repo: IPackRepository = koinInject()
     val all by remember { repo.observe() }.collectAsState()
 
-    val target: PackInstance = remember(all) {
-        all.maxByOrNull { it.lastPlayedEpochOrZero }
-            ?: all.maxByOrNull { it.createdAtEpoch }
-    } ?: return null
+    val target: PackInstance = remember(all) { all.minWithOrNull(RecentFirst) } ?: return null
 
     val session = (ctx.appState as? AppState.Authenticated)?.session
     return QuickLaunchTarget(target, rememberLaunchControl(target, session, playLabel))
 }
+
+/**
+ * The order the home widgets put packs in: the most recently played first, and
+ * among packs played equally recently, which is every pack never played, the most
+ * recently installed.
+ *
+ * One comparator for every widget, because the quick-launch target is meant to be
+ * the first row of the lists beside it. Picking it with two separate maxima never
+ * reached the second: the first answers null only for an empty list, so with no
+ * pack played yet the target was whichever the repository happened to list first.
+ */
+internal val RecentFirst: Comparator<PackInstance> =
+    compareByDescending<PackInstance> { it.lastPlayedEpochOrZero }.thenByDescending { it.createdAtEpoch }
 
 /**
  * The shared launch pill for the home widgets. [ground] is what the widget draws it

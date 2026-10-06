@@ -116,9 +116,7 @@ fun HomeNewPackList(instance: WidgetInstance) {
     }
 
     val rows = remember(all, continued, p.skipContinued, p.maxRows) {
-        all.sortedWith(
-            compareByDescending<PackInstance> { it.lastPlayedEpochOrZero }.thenByDescending { it.createdAtEpoch },
-        )
+        all.sortedWith(RecentFirst)
             .filterNot { p.skipContinued && it.id == continued?.id }
             .let { if (p.maxRows > 0) it.take(p.maxRows) else it }
     }

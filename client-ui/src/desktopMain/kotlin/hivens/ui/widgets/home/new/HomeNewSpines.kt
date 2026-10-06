@@ -84,9 +84,7 @@ fun HomeNewSpines() {
     val repo: IPackRepository = koinInject()
     val all by remember { repo.observe() }.collectAsState()
     val packs = remember(all) {
-        all.sortedWith(
-            compareByDescending<PackInstance> { it.lastPlayedEpochOrZero }.thenByDescending { it.createdAtEpoch },
-        )
+        all.sortedWith(RecentFirst)
     }
     if (packs.isEmpty()) return
     var chosen by remember { mutableStateOf<String?>(null) }

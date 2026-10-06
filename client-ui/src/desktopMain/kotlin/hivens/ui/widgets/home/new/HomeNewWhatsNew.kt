@@ -113,7 +113,7 @@ internal fun packNews(
     statuses: Map<String, PackUpdateStatus>,
 ): List<Pair<PackInstance, PackUpdateStatus>> =
     packs
-        .sortedByDescending { it.lastPlayedEpochOrZero }
+        .sortedWith(RecentFirst)
         .mapNotNull { pack ->
             when (val status = statuses[pack.id]) {
                 is PackUpdateStatus.Pending, is PackUpdateStatus.Updated -> pack to status

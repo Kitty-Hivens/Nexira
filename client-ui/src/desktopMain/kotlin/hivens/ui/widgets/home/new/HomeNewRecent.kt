@@ -121,10 +121,7 @@ fun HomeNewRecent(instance: WidgetInstance) {
     }
 
     val sorted = remember(all) {
-        all.sortedWith(
-            compareByDescending<PackInstance> { it.lastPlayedEpochOrZero }
-                .thenByDescending { it.createdAtEpoch },
-        )
+        all.sortedWith(RecentFirst)
     }
 
     Column(Modifier.fillMaxWidth().padding(16.dp)) {
