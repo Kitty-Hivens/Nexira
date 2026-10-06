@@ -791,7 +791,11 @@ internal fun ContentRow(
     val currentLock by rememberUpdatedState(lock)
     var rowOrigin by remember(content.fileName) { mutableStateOf(Offset.Zero) }
     NxSurface(SurfaceKind.Card, modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.small) {
-        val rowFill = if (selected) NxColor.wash(NxColor.lead(), 0.14f) else Color.Transparent
+        val rowFill = when {
+            selected -> NxColor.wash(NxColor.lead(), 0.14f)
+            rules.problem != null -> NxColor.wash(NxColor.status(Status.Error), PROBLEM_WASH)
+            else -> Color.Transparent
+        }
         OnFill(rowFill) {
             Row(
                 modifier              = Modifier
@@ -843,10 +847,10 @@ internal fun ContentRow(
                     content.version?.let { v ->
                         Text(v, style = MaterialTheme.typography.labelSmall, color = if (rules.effectiveEnabled) NxInk.quiet else NxInk.off, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
-                    // Why the switch beside it does not move. A switch that ignores a
-                    // click reads as broken, and the reason is one the pack decided.
-                    rules.lock?.let { lock ->
-                        Text(lockReason(lock, s), style = MaterialTheme.typography.labelSmall, color = NxInk.quiet, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    // What the pack's rules say will go wrong, said on the row and left to
+                    // the player: the switch still does what they ask.
+                    rules.problem?.let { problem ->
+                        Text(problemReason(problem, s), style = MaterialTheme.typography.labelSmall, color = NxColor.status(Status.Error, text = true), maxLines = 2, overflow = TextOverflow.Ellipsis)
                     }
                 }
                 // The chip both reports the newer build and is the way to take it: the
@@ -882,7 +886,6 @@ internal fun ContentRow(
                     NxSwitch(
                         checked         = rules.effectiveEnabled,
                         onCheckedChange = onToggle,
-                        enabled         = rules.lock == null,
                     )
                 }
                 // One overflow instead of a bare trash can: Details is always available
@@ -1185,12 +1188,15 @@ internal fun ModResultRow(
     }
 }
 
-/** The sentence under an optional a required mod holds on or off. */
-internal fun lockReason(lock: OptionalContentRules.Lock, s: AppStrings): String {
-    val name = lock.by.display?.name ?: lock.by.filename
-    return when (lock) {
-        is OptionalContentRules.Lock.ConflictsWithRequired -> s.optionalLockedConflict(name)
-        is OptionalContentRules.Lock.NeededByRequired -> s.optionalLockedNeeded(name)
+/** The light red under a row the pack's rules have something to say about. */
+private const val PROBLEM_WASH = 0.10f
+
+/** The sentence under a mod the pack's rules have something to say about. */
+internal fun problemReason(problem: OptionalContentRules.Problem, s: AppStrings): String {
+    val name = problem.other.display?.name ?: problem.other.filename
+    return when (problem) {
+        is OptionalContentRules.Problem.ConflictsWith -> s.optionalConflictsWith(name)
+        is OptionalContentRules.Problem.NeedsDisabled -> s.optionalNeedsOff(name)
     }
 }
 

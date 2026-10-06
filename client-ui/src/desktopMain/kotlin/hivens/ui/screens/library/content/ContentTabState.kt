@@ -282,9 +282,9 @@ internal class ContentTabState(
         manifestMods.values.filterNot { it.required }.map { it.filename }.toSet()
     }
 
-    /** Optionals a required mod holds on or off, by filename. Once per manifest, not per row. */
-    private val optionalLocks: Map<String, OptionalContentRules.Lock> by derivedStateOf {
-        manifest?.let { OptionalContentRules.locks(it.mods) }.orEmpty()
+    /** What is wrong with the pack's mods as the player has them set, by filename. Once per change, not per row. */
+    private val packProblems: Map<String, List<OptionalContentRules.Problem>> by derivedStateOf {
+        manifest?.let { OptionalContentRules.problems(it.mods, optionalState) }.orEmpty()
     }
 
     /**
@@ -503,7 +503,7 @@ internal class ContentTabState(
         manifestEntry   = entryFor(content),
         userOwned       = userOwns(content),
         optionalEnabled = optionalState[content.fileName],
-        optionalLock    = optionalLocks[content.fileName],
+        problems        = packProblems[content.fileName].orEmpty(),
     )
 
     /**
@@ -950,16 +950,15 @@ internal fun rememberContentTabState(instance: PackInstance): ContentTabState {
  * mod it is the pack's optional-content state, which may differ from the raw
  * on-disk `.disabled` until the async relabel lands. [optional] says the toggle
  * routes through the pack rather than through a rename. A required pack mod gets
- * no toggle at all -- you cannot disable what the pack mandates. [lock] is set on
- * an optional a required mod holds on or off: the switch is shown, since the mod
- * is still the player's choice in principle, and does not move.
+ * no toggle at all -- you cannot disable what the pack mandates. [problem] is what
+ * is wrong with the mod as the pack is set, shown on the row and never acted on.
  */
 internal data class ContentRowRules(
     val effectiveEnabled: Boolean,
     val showToggle: Boolean,
     val optional: Boolean,
     val canDelete: Boolean,
-    val lock: OptionalContentRules.Lock? = null,
+    val problem: OptionalContentRules.Problem? = null,
 )
 
 /**
@@ -968,7 +967,7 @@ internal data class ContentRowRules(
  * [userOwned] says the file is the player's rather than the pack's, which is the
  * caller's reading of the instance and not something derivable from the row.
  * [optionalEnabled] is the pack's optional-content state for the file, if any,
- * and [optionalLock] what holds it there, if anything does.
+ * and [problems] what the pack's rules say is wrong with it as things are set.
  *
  * Resource and shader packs are cosmetic rather than part of the pack contract,
  * so they stay user-managed even while the instance is tracked; mods do not.
@@ -978,7 +977,7 @@ internal fun contentRowRules(
     manifestEntry: SmrtModEntry?,
     userOwned: Boolean,
     optionalEnabled: Boolean?,
-    optionalLock: OptionalContentRules.Lock? = null,
+    problems: List<OptionalContentRules.Problem> = emptyList(),
 ): ContentRowRules {
     val freeEdit = userOwned || content.kind != ContentKind.Mod
     val optional = manifestEntry != null && !manifestEntry.required
@@ -991,7 +990,7 @@ internal fun contentRowRules(
         showToggle = freeEdit || optional,
         optional   = optional,
         canDelete  = freeEdit,
-        lock       = optionalLock.takeIf { optional },
+        problem    = problems.firstOrNull().takeIf { manifestEntry != null },
     )
 }
 

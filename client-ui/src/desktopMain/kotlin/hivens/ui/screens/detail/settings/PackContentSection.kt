@@ -18,7 +18,7 @@ import hivens.core.api.interfaces.IMirrorPackClient
 import hivens.core.data.OptionalContentRules
 import hivens.core.data.PackInstance
 import hivens.launcher.launch.LauncherController
-import hivens.ui.screens.library.content.lockReason
+import hivens.ui.screens.library.content.problemReason
 import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.nx.NxMetaChip
@@ -28,6 +28,10 @@ import hivens.ui.nx.NxSettingGroup
 import hivens.ui.nx.NxSettingRow
 import hivens.ui.nx.NxSwitch
 import hivens.ui.theme.NxInk
+import hivens.ui.theme.Status
+import hivens.ui.theme.NxColor
+import hivens.ui.icons.Symbol
+import hivens.ui.icons.NxIcon
 import kotlinx.coroutines.CancellationException
 import org.koin.compose.koinInject
 
@@ -81,7 +85,7 @@ internal fun PackContentSection(pack: PackInstance, adopt: (PackEdit) -> Unit) {
     }
 
     val optional = remember(manifest) { manifest?.let { OptionalContentRules.optionalMods(it.mods) }.orEmpty() }
-    val locks = remember(manifest) { manifest?.let { OptionalContentRules.locks(it.mods) }.orEmpty() }
+    val problems = remember(manifest, state) { manifest?.let { OptionalContentRules.problems(it.mods, state) }.orEmpty() }
 
     NxSettingGroup(s.packSettingsOptional) {
         when {
@@ -92,13 +96,14 @@ internal fun PackContentSection(pack: PackInstance, adopt: (PackEdit) -> Unit) {
                 Muted(s.packSettingsOptionalCoToggle)
                 optional.forEach { mod ->
                     val presence = mod.display?.presenceClass
-                    val lock = locks[mod.filename]
-                    // The lock's reason in place of the description: it is the one thing
-                    // about this row the reader needs before reaching for the switch.
-                    NxSettingRow(mod.display?.name ?: mod.filename, detail = lock?.let { lockReason(it, s) } ?: mod.display?.description) {
+                    val problem = problems[mod.filename]?.firstOrNull()
+                    // What the rules say will go wrong in place of the description, and
+                    // nothing more: the switch still does what the player asks.
+                    NxSettingRow(mod.display?.name ?: mod.filename, detail = problem?.let { problemReason(it, s) } ?: mod.display?.description) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            if (problem != null) Symbol(NxIcon.Warning, contentDescription = null, tint = NxColor.status(Status.Error), size = 18.dp)
                             presenceLabel(presence, s)?.let { NxMetaChip(it, tone = NxMetaChipTone.Surface) }
-                            NxSwitch(state[mod.filename] ?: mod.defaultEnabled, enabled = lock == null, onCheckedChange = { enable ->
+                            NxSwitch(state[mod.filename] ?: mod.defaultEnabled, onCheckedChange = { enable ->
                                 val m = manifest ?: return@NxSwitch
                                 val next = OptionalContentRules.applyToggle(m.mods, state, mod.filename, enable)
                                 val toggles = OptionalContentRules.togglesFrom(m.mods, next)

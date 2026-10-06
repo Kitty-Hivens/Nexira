@@ -112,30 +112,29 @@ class ContentTabRulesTest {
     }
 
     @Test
-    fun `an optional a required mod holds keeps its switch and carries the reason`() {
+    fun `a pack mod the rules have something to say about carries it and keeps its switch`() {
         val core = entry("core.jar", required = true)
         val rules = contentRowRules(
             content("alt.jar"),
             manifestEntry   = entry("alt.jar", required = false),
             userOwned       = false,
-            optionalEnabled = false,
-            optionalLock    = OptionalContentRules.Lock.ConflictsWithRequired(core),
+            optionalEnabled = true,
+            problems        = listOf(OptionalContentRules.Problem.ConflictsWith(core)),
         )
-        assertTrue(rules.showToggle, "the row still shows what state it is in")
-        assertEquals(OptionalContentRules.Lock.ConflictsWithRequired(core), rules.lock)
+        assertTrue(rules.showToggle, "the player may still turn it either way")
+        assertEquals(OptionalContentRules.Problem.ConflictsWith(core), rules.problem)
     }
 
     @Test
-    fun `a lock is never carried by a row that is not optional`() {
-        val core = entry("core.jar", required = true)
+    fun `a row the pack does not curate carries no problem`() {
         val rules = contentRowRules(
-            content("x.jar"),
-            manifestEntry   = entry("x.jar", required = true),
-            userOwned       = false,
+            content("stray.jar"),
+            manifestEntry   = null,
+            userOwned       = true,
             optionalEnabled = null,
-            optionalLock    = OptionalContentRules.Lock.NeededByRequired(core),
+            problems        = listOf(OptionalContentRules.Problem.NeedsDisabled(entry("lib.jar", required = false))),
         )
-        assertNull(rules.lock)
+        assertNull(rules.problem)
     }
 
     // -- the list -------------------------------------------------------------

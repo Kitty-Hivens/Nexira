@@ -7,6 +7,7 @@ import hivens.core.api.dto.smrt.SmrtSource
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class OptionalContentRulesTest {
@@ -62,88 +63,67 @@ class OptionalContentRulesTest {
 
     @Test
     fun `enabledState forces required on and uses toggle-or-default for optionals`() {
-        val plain = listOf(
-            mod("required.jar"),
-            mod("a.jar", required = false, defaultEnabled = false),
-            mod("b.jar", required = false, defaultEnabled = true),
-        )
-        val state = OptionalContentRules.enabledState(plain, listOf(ContentToggle("a.jar", true)))
-        assertEquals(true, state["required.jar"], "required always on")
-        assertEquals(true, state["a.jar"], "user toggle wins over default")
-        assertEquals(true, state["b.jar"], "untouched optional uses default_enabled")
-    }
-
-    @Test
-    fun `a saved pair that a later build declares incompatible keeps the one listed first`() {
-        // Both on is what the default gives mixinbooter beside a foamfix the player
-        // turned on: the selection the rules cannot keep.
         val state = OptionalContentRules.enabledState(mods, listOf(ContentToggle("foamfix.jar", true)))
-        assertEquals(true, state["foamfix.jar"])
-        assertEquals(false, state["mixinbooter.jar"], "two incompatible mods are never both installed")
+        assertEquals(true, state["required.jar"], "required always on")
+        assertEquals(true, state["foamfix.jar"], "user toggle wins over default")
+        assertEquals(true, state["mixinbooter.jar"], "untouched optional uses default_enabled, conflict or not")
     }
 
     @Test
-    fun `an optional that conflicts with a required mod is locked off`() {
+    fun `a saved conflicting pair is reported on both sides and left as it is`() {
+        val state = OptionalContentRules.enabledState(mods, listOf(ContentToggle("foamfix.jar", true)))
+        val problems = OptionalContentRules.problems(mods, state)
+        assertEquals(listOf("mixinbooter.jar"), problems["foamfix.jar"]?.map { it.other.filename })
+        assertEquals(listOf("foamfix.jar"), problems["mixinbooter.jar"]?.map { it.other.filename })
+        assertTrue(problems["foamfix.jar"]!!.single() is OptionalContentRules.Problem.ConflictsWith)
+        assertNull(problems["required.jar"])
+    }
+
+    @Test
+    fun `enabling an optional beside a required mod it conflicts with is allowed and reported`() {
         val m = listOf(
             mod("core.jar", role = "renderer"),
-            mod("alt.jar", required = false, defaultEnabled = true, role = "renderer"),
+            mod("alt.jar", required = false, defaultEnabled = false, role = "renderer"),
         )
-        val lock = OptionalContentRules.lockOf(m, "alt.jar")
-        assertTrue(lock is OptionalContentRules.Lock.ConflictsWithRequired && lock.by.filename == "core.jar")
-        assertEquals(false, OptionalContentRules.enabledState(m, emptyList())["alt.jar"], "its default cannot put it beside core")
-        val current = mapOf("core.jar" to true, "alt.jar" to false)
-        assertEquals(current, OptionalContentRules.applyToggle(m, current, "alt.jar", true), "the flip is refused")
+        val after = OptionalContentRules.applyToggle(m, mapOf("core.jar" to true, "alt.jar" to false), "alt.jar", true)
+        assertEquals(true, after["alt.jar"], "the player asked for it")
+        assertEquals(true, after["core.jar"], "a required mod is never switched off")
+        assertTrue(OptionalContentRules.problems(m, after)["alt.jar"]!!.single() is OptionalContentRules.Problem.ConflictsWith)
     }
 
     @Test
-    fun `an optional library a required mod needs is locked on`() {
+    fun `turning off a library something still needs is allowed and reported on the consumer`() {
+        val m = listOf(
+            mod("consumer.jar", required = false, defaultEnabled = true, requires = listOf("lib.jar")),
+            mod("lib.jar", required = false, defaultEnabled = true),
+        )
+        val after = OptionalContentRules.applyToggle(m, mapOf("consumer.jar" to true, "lib.jar" to true), "lib.jar", false)
+        assertEquals(false, after["lib.jar"])
+        assertEquals(true, after["consumer.jar"], "nothing is turned off behind the player")
+        val problem = OptionalContentRules.problems(m, after)["consumer.jar"]!!.single()
+        assertTrue(problem is OptionalContentRules.Problem.NeedsDisabled && problem.other.filename == "lib.jar")
+    }
+
+    @Test
+    fun `a required mod whose optional library is off is reported`() {
         val m = listOf(
             mod("core.jar", requires = listOf("lib.jar")),
             mod("lib.jar", required = false, defaultEnabled = false),
         )
-        assertTrue(OptionalContentRules.lockOf(m, "lib.jar") is OptionalContentRules.Lock.NeededByRequired)
-        val state = OptionalContentRules.enabledState(m, listOf(ContentToggle("lib.jar", false)))
-        assertEquals(true, state["lib.jar"], "a saved off cannot leave core without it")
-        assertEquals(state, OptionalContentRules.applyToggle(m, state, "lib.jar", false))
+        val state = OptionalContentRules.enabledState(m, emptyList())
+        assertEquals(false, state["lib.jar"])
+        assertTrue(OptionalContentRules.problems(m, state)["core.jar"]!!.single() is OptionalContentRules.Problem.NeedsDisabled)
     }
 
     @Test
-    fun `disabling a library takes down what needs it`() {
+    fun `a selection the rules can keep has no problems`() {
         val m = listOf(
             mod("consumer.jar", required = false, defaultEnabled = true, requires = listOf("lib.jar")),
             mod("lib.jar", required = false, defaultEnabled = true),
-            mod("other.jar", required = false, defaultEnabled = true),
-        )
-        val current = mapOf("consumer.jar" to true, "lib.jar" to true, "other.jar" to true)
-        val after = OptionalContentRules.applyToggle(m, current, "lib.jar", false)
-        assertEquals(false, after["lib.jar"])
-        assertEquals(false, after["consumer.jar"], "a consumer is not left on without its library")
-        assertEquals(true, after["other.jar"])
-    }
-
-    @Test
-    fun `an exclusion takes down the dependents of what it switched off`() {
-        val m = listOf(
             mod("jei.jar", required = false, defaultEnabled = true, role = "recipe_viewer"),
             mod("rei.jar", required = false, defaultEnabled = false, role = "recipe_viewer"),
-            mod("addon.jar", required = false, defaultEnabled = true, requires = listOf("jei.jar")),
         )
-        val current = mapOf("jei.jar" to true, "rei.jar" to false, "addon.jar" to true)
-        val after = OptionalContentRules.applyToggle(m, current, "rei.jar", true)
-        assertEquals(true, after["rei.jar"], "the player's choice stands")
-        assertEquals(false, after["jei.jar"])
-        assertEquals(false, after["addon.jar"], "the addon goes with the viewer it needs")
-    }
-
-    @Test
-    fun `a saved consumer pulls its default-off library on`() {
-        val m = listOf(
-            mod("consumer.jar", required = false, defaultEnabled = true, requires = listOf("lib.jar")),
-            mod("lib.jar", required = false, defaultEnabled = false),
-        )
-        val state = OptionalContentRules.enabledState(m, OptionalContentRules.defaultToggles(m))
-        assertEquals(true, state["consumer.jar"])
-        assertEquals(true, state["lib.jar"], "a library shipped off follows its consumer on")
+        assertTrue(OptionalContentRules.problems(m, OptionalContentRules.enabledState(m, emptyList())).isEmpty())
     }
 
     @Test
