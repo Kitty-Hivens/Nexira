@@ -994,6 +994,7 @@ object GermanStrings : AppStrings {
     override fun packSettingsForkedFrom(name: String) = "Abgeleitet von $name"
     override val packSettingsPackId             = "Pack-ID"
     override val packSettingsMemory             = "Arbeitsspeicher"
+    override fun packSettingsMemoryFromArgs(flags: String) = "In den JVM-Argumenten festgelegt ($flags), diese Einstellung gilt daher nicht"
     override val packSettingsEnvironment        = "Umgebung"
     override val packSettingsJava               = "Java"
     override fun packSettingsJavaManaged(major: Int) = "Vom Launcher verwaltet: Java $major"

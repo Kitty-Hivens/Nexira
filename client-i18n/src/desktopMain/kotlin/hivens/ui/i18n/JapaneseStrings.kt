@@ -1002,6 +1002,7 @@ object JapaneseStrings : AppStrings {
     override fun packSettingsForkedFrom(name: String) = "$name から派生"
     override val packSettingsPackId = "パック ID"
     override val packSettingsMemory = "メモリ"
+    override fun packSettingsMemoryFromArgs(flags: String) = "JVM 引数で指定されているため（$flags）、この設定は適用されません"
     override val packSettingsEnvironment = "実行環境"
     override val packSettingsJava = "Java"
     override fun packSettingsJavaManaged(major: Int) = "ランチャーが管理: Java ${major}"

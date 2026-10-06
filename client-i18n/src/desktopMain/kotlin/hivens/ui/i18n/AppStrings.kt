@@ -1152,6 +1152,9 @@ interface AppStrings {
     val packSettingsPackId: String
     // Runtime
     val packSettingsMemory: String
+
+    /** Under the memory setting when the instance's JVM arguments name the heap themselves; [flags] are those flags. */
+    fun packSettingsMemoryFromArgs(flags: String): String
     val packSettingsEnvironment: String
     val packSettingsJava: String
     fun packSettingsJavaManaged(major: Int): String

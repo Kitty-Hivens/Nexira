@@ -997,6 +997,7 @@ object RussianStrings : AppStrings {
     override fun packSettingsForkedFrom(name: String) = "Ответвление от $name"
     override val packSettingsPackId             = "ID пака"
     override val packSettingsMemory             = "Память"
+    override fun packSettingsMemoryFromArgs(flags: String) = "Задана в JVM-аргументах ($flags), эта настройка не применяется"
     override val packSettingsEnvironment        = "Среда"
     override val packSettingsJava               = "Java"
     override fun packSettingsJavaManaged(major: Int) = "Управляется лаунчером: Java $major"

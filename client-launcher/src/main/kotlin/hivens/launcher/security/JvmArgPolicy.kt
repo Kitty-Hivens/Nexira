@@ -56,7 +56,7 @@ object JvmArgPolicy {
     /** Size-suffixed integers (`4G`, `512m`), plain integers, and percentages. */
     private val NUMERIC = Regex("^[0-9]+(\\.[0-9]+)?[kKmMgGtT]?%?$")
 
-    /** `-Xmx4G` and friends: a size the builder also models. */
+    /** `-Xmx4G` and friends: a size the builder also models, and yields to when typed. */
     private val SIZED_X = Regex("^-X(mx|ms|mn|ss)[0-9].*$")
 
     /**

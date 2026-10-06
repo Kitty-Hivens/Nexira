@@ -26,6 +26,7 @@ import hivens.core.jvm.JvmConfig
 import hivens.core.jvm.SystemMemory
 import hivens.launcher.ProfilerProfileStore
 import hivens.launcher.component.EarlyLoadingScreen
+import hivens.launcher.component.JvmHeapArgs
 import hivens.ui.components.JvmArgsBuilderDialog
 import hivens.ui.components.RamSelector
 import hivens.ui.i18n.LocalStrings
@@ -97,6 +98,18 @@ internal fun PackRuntimeSection(
             onAutoSelected = { commit { rt -> rt.copy(fixedMemory = false) } },
             onValueChanged = { commit { rt -> rt.copy(memoryMb = it, fixedMemory = true) } },
         )
+        // What is typed by hand wins, so a heap named in the arguments is the one
+        // the game gets and this setting is left on screen saying it does not apply.
+        val typedHeap = remember(runtime.jvmArgs) { JvmHeapArgs.inArgs(runtime.jvmArgs) }
+        if (typedHeap.isNotEmpty()) {
+            NxSettingBlock {
+                Text(
+                    s.packSettingsMemoryFromArgs(typedHeap.joinToString(" ")),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = NxInk.quiet,
+                )
+            }
+        }
     }
 
     NxSettingGroup(s.packSettingsEnvironment) {

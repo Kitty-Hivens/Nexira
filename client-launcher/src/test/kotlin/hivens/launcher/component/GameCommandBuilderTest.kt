@@ -380,10 +380,30 @@ class GameCommandBuilderTest {
     )
 
     @Test
+    fun `a typed heap replaces the builder's, minimum included`() {
+        // A typed maximum with the builder's minimum kept beside it could ask for a
+        // minimum above the maximum, which the JVM refuses to start with.
+        val cmd = packCmd("-Xmx256M", bound = false)
+        assertEquals(listOf("-Xmx256M"), cmd.filter { it.startsWith("-Xm") })
+
+        val byPercent = packCmd("-XX:MaxRAMPercentage=50", bound = true)
+        assertTrue(byPercent.none { it.startsWith("-Xm") }, "a typed percentage is a typed heap too")
+    }
+
+    @Test
+    fun `without a typed heap the builder's applies`() {
+        val cmd = packCmd("-XX:+UseZGC", bound = true)
+        assertEquals("-Xmx4096M", cmd.last { it.startsWith("-Xmx") })
+        assertTrue("-Xms512M" in cmd)
+    }
+
+    @Test
     fun `a bound launch carries the user's tuning and not their agent`() {
         val cmd = packCmd("-Xmx6G -XX:+UseZGC -Dmixin.debug=true -javaagent:/tmp/cheat.jar", bound = true)
 
-        assertTrue(cmd.contains("-Xmx6G"), "heap is the user's call")
+        // The JVM takes the last occurrence, so presence alone proves nothing: the
+        // builder used to append its own after this one and the typed flag never applied.
+        assertEquals("-Xmx6G", cmd.last { it.startsWith("-Xmx") }, "heap is the user's call")
         assertTrue(cmd.contains("-XX:+UseZGC"), "collector choice is the user's call")
         assertTrue(cmd.contains("-Dmixin.debug=true"), "mod properties pass")
         assertFalse(

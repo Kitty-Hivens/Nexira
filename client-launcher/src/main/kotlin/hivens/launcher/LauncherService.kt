@@ -18,6 +18,7 @@ import hivens.core.logging.Redactor
 import hivens.launcher.component.EarlyLoadingScreen
 import hivens.launcher.component.EnvironmentPreparer
 import hivens.launcher.component.GameCommandBuilder
+import hivens.launcher.component.JvmHeapArgs
 import hivens.launcher.component.ProcessLogHandler
 import hivens.launcher.launch.PackPrepBlocked
 import hivens.launcher.runtime.RuntimeProvisioner
@@ -145,7 +146,13 @@ internal class LauncherService(
             resolvePackJavaPath(runtime, defaultJava)
         }
 
-        log.info("Session initialization (pack): {}, Java: {} (major {}), Heap: {}MB", displayName, javaExec, javaMajor, memory)
+        val typedHeap = JvmHeapArgs.inArgs(runtime.jvmArgs)
+        if (typedHeap.isEmpty()) {
+            log.info("Session initialization (pack): {}, Java: {} (major {}), Heap: {}MB", displayName, javaExec, javaMajor, memory)
+        } else {
+            log.info("Session initialization (pack): {}, Java: {} (major {}), Heap: {} (typed)", displayName, javaExec, javaMajor, typedHeap)
+            onLog("Memory is set in the JVM arguments (${typedHeap.joinToString(" ")}), the memory setting does not apply", LauncherLogType.INFO)
+        }
 
         // A launch that will carry a token runs the interpreter it was given, and
         // that interpreter decides everything the command line just decided. A

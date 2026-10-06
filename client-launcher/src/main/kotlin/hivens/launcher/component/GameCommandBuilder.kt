@@ -156,7 +156,8 @@ internal class GameCommandBuilder(
         args.add("-Dfml.ignoreInvalidMinecraftCertificates=true")
         addEarlyWindowGuard(args, earlyLoadingScreen)
 
-        args.addAll(userJvmArgs(jvmArgsOverride, restrictJvmArgs))
+        val userArgs = userJvmArgs(jvmArgsOverride, restrictJvmArgs)
+        args.addAll(userArgs)
         addAttachGuard(args, restrictJvmArgs)
         if (usesModernArgs) {
             args.addAll(modernJvmArgs(runtime, gameDir, sharedAssetsDir, sharedLibrariesDir, nativesPath, versionLabel))
@@ -166,8 +167,11 @@ internal class GameCommandBuilder(
         } else {
             args.addAll(runtime.jvmArgs)
         }
-        args.add("-Xms${minOf(memoryMB, 512)}M")
-        args.add("-Xmx${memoryMB}M")
+        // A heap typed into the arguments is the one the game gets. See JvmHeapArgs.
+        if (JvmHeapArgs.inArgs(userArgs).isEmpty()) {
+            args.add("-Xms${minOf(memoryMB, 512)}M")
+            args.add("-Xmx${memoryMB}M")
+        }
         addProfilerArgs(args, agentJarPath, metricsOutPath)
         addAuthlibAgentArg(args, authlibAgentJarPath)
 
