@@ -313,6 +313,37 @@ class JavaManagerServiceTest {
         assertFalse(svc.isJavaUsable(slow))
     }
 
+    // ── an install interrupted between its two renames ───────────────────
+
+    @Test
+    fun `a runtime left aside by an unfinished swap is put back, not deleted`() {
+        val target = workDir / "runtimes" / "java-21-linux-x64"
+        val aside = workDir / "runtimes" / "java-21-linux-x64.previous"
+        Files.createDirectories(aside / "bin")
+        Files.writeString(aside / "bin" / "java", "#!/bin/sh\nexit 0\n")
+
+        // The next attempt fails to unpack, which is the case where the copy aside is all there is.
+        val notAnArchive = workDir / "broken.zip"
+        Files.writeString(notAnArchive, "not a zip")
+        assertFails { svc.installUnpacked(notAnArchive, target, isZip = true) }
+
+        assertTrue(Files.exists(target / "bin" / "java"), "the only working copy survived the failed attempt")
+        assertFalse(Files.exists(aside))
+    }
+
+    @Test
+    fun `recovery leaves a complete install alone`() {
+        val target = workDir / "runtimes" / "java-17-linux-x64"
+        val aside = workDir / "runtimes" / "java-17-linux-x64.previous"
+        Files.createDirectories(target / "bin")
+        Files.createDirectories(aside / "bin")
+
+        svc.recoverInterruptedSwap(target)
+
+        assertTrue(Files.exists(aside), "a complete install is left as it is")
+        assertTrue(Files.exists(target / "bin"))
+    }
+
     // ── unzip: zip-slip protection (security-relevant) ───────────────────
 
     @Test

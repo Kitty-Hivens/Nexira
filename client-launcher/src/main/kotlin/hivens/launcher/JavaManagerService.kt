@@ -44,6 +44,7 @@ class JavaManagerService(
 
         val folderName = "java-$javaMajor-$os-$arch"
         val targetDir = runtimesDir.resolve(folderName)
+        recoverInterruptedSwap(targetDir)
 
         val existing = findJavaExecutable(targetDir)
         if (existing != null && isJavaUsable(existing)) {
@@ -227,8 +228,13 @@ class JavaManagerService(
      */
     internal fun installUnpacked(archive: Path, targetDir: Path, isZip: Boolean) {
         val incoming = targetDir.resolveSibling("${targetDir.fileName}.incoming")
-        val previous = targetDir.resolveSibling("${targetDir.fileName}.previous")
+        val previous = previousOf(targetDir)
         deleteDirectoryRecursively(incoming)
+        // Whatever is under `.previous` now is either the only copy, left there by a
+        // swap that never finished, or a stale one beside a complete install. Put the
+        // first back before clearing the name: deleted here, it went before the new
+        // archive had even been fetched.
+        recoverInterruptedSwap(targetDir)
         deleteDirectoryRecursively(previous)
         Files.createDirectories(incoming)
 
@@ -259,6 +265,23 @@ class JavaManagerService(
             throw e
         }
     }
+
+    /**
+     * Puts back an install that a swap left under `.previous`.
+     *
+     * The swap renames the working copy aside and the new one into place. A crash
+     * between the two leaves the working copy under the other name and nothing
+     * where the launcher looks, and nothing else ever read it back.
+     */
+    internal fun recoverInterruptedSwap(targetDir: Path) {
+        val previous = previousOf(targetDir)
+        if (Files.exists(targetDir) || !Files.exists(previous)) return
+        runCatching { Files.move(previous, targetDir) }
+            .onSuccess { log.info("Restored the Java runtime an unfinished install left at {}", previous) }
+            .onFailure { log.warn("Could not restore the Java runtime left at {}", previous, it) }
+    }
+
+    private fun previousOf(targetDir: Path): Path = targetDir.resolveSibling("${targetDir.fileName}.previous")
 
     private fun deleteDirectoryRecursively(path: Path) {
         if (!Files.exists(path)) return
