@@ -988,6 +988,8 @@ object EnglishStrings : AppStrings {
     override fun optionalConflictsWith(name: String) = "Conflicts with $name"
     override fun optionalNeedsOff(name: String) = "Needs $name, which is off"
     override fun contentBehindPin(neededBy: String, version: String) = "$neededBy needs $version or newer"
+    override fun contentDependencyMissing(id: String) = "Needs $id, which is not installed or is off"
+    override fun contentDependencyVersion(name: String, wanted: String, installed: String) = "Needs $name $wanted, $installed is installed"
     override val packVersionCheckTitle          = "Updates"
     override val packSettingsCategoryGeneral    = "General"
     override val packSettingsCategoryRuntime    = "Launch"

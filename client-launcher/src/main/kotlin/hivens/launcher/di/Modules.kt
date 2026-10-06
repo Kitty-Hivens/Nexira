@@ -769,6 +769,7 @@ val launchPipelineModule = module {
             authlibSwapper     = get(),
             sharedAssetsDir    = get<PlatformPaths>().assetsDir,
             sharedLibrariesDir = get<PlatformPaths>().librariesDir,
+            contentScanner     = get(),
         )
     }
 }

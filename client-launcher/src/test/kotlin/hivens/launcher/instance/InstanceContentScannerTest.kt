@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
+import java.io.ByteArrayOutputStream
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.zip.ZipEntry
@@ -163,5 +164,81 @@ class InstanceContentScannerTest {
         assertEquals("Dropped", item.displayName)
         assertEquals("2.0", item.version)
         assertNull(item.iconBytes)
+    }
+
+    private fun jarBytes(entries: Map<String, ByteArray>): ByteArray {
+        val out = ByteArrayOutputStream()
+        ZipOutputStream(out).use { zos ->
+            entries.forEach { (name, bytes) ->
+                zos.putNextEntry(ZipEntry(name))
+                zos.write(bytes)
+                zos.closeEntry()
+            }
+        }
+        return out.toByteArray()
+    }
+
+    @Test
+    fun `a mods toml gives its ids and its hard dependencies with their ranges`() = runBlocking {
+        val toml = listOf(
+            "modLoader=\"javafml\"",
+            "[[mods]]",
+            "modId=\"reeses_sodium_options\"",
+            "version=\"\${file.jarVersion}\"",
+            "description='''",
+            "[[dependencies.fake]]",
+            "modId=\"not_a_real_dependency\"",
+            "'''",
+            "[[dependencies.reeses_sodium_options]]",
+            "modId=\"sodium\"",
+            "type=\"required\"",
+            "versionRange=\"[0.8.12,)\"",
+            "side=\"CLIENT\"",
+            "[[dependencies.reeses_sodium_options]]",
+            "modId=\"iris\"",
+            "type=\"optional\"",
+            "versionRange=\"[1.0,)\"",
+            "[[dependencies.reeses_sodium_options]]",
+            "modId = 'serverthing'",
+            "mandatory = true",
+            "side = \"SERVER\"",
+            "[[dependencies.reeses_sodium_options]]",
+            "modId=\"old_forge_optional\"",
+            "mandatory=false",
+            "# [[dependencies.reeses_sodium_options]]",
+            "# modId=\"commented_out\"",
+        ).joinToString("\n")
+        zip(dir.resolve("mods/reeses.jar"), mapOf(
+            "META-INF/neoforge.mods.toml" to toml.toByteArray(),
+            "META-INF/MANIFEST.MF" to "Manifest-Version: 1.0\nImplementation-Version: 1.8.3\n".toByteArray(),
+        ))
+
+        val item = InstanceContentScanner().scan(dir).single()
+
+        assertEquals(listOf(ProvidedMod("reeses_sodium_options", "1.8.3")), item.provides)
+        assertEquals(listOf(ModRequirement("sodium", listOf("[0.8.12,)"), RangeScheme.Maven)), item.requires)
+    }
+
+    @Test
+    fun `a fabric mod provides its nested jars and requires what it depends on`() = runBlocking {
+        val nested = jarBytes(mapOf("fabric.mod.json" to """{"id":"fabric-api-base","version":"0.4.42"}""".toByteArray()))
+        zip(dir.resolve("mods/fabric-api.jar"), mapOf(
+            "fabric.mod.json" to """{"id":"fabric-api","version":"0.100.0","provides":["fabric"],"depends":{"fabricloader":">=0.15","minecraft":["1.21","1.21.1"]}}""".toByteArray(),
+            "META-INF/jars/fabric-api-base.jar" to nested,
+        ))
+
+        val item = InstanceContentScanner().scan(dir).single()
+
+        assertEquals(
+            setOf(ProvidedMod("fabric-api", "0.100.0"), ProvidedMod("fabric", "0.100.0"), ProvidedMod("fabric-api-base", "0.4.42")),
+            item.provides.toSet(),
+        )
+        assertEquals(
+            listOf(
+                ModRequirement("fabricloader", listOf(">=0.15"), RangeScheme.Fabric),
+                ModRequirement("minecraft", listOf("1.21", "1.21.1"), RangeScheme.Fabric),
+            ),
+            item.requires,
+        )
     }
 }

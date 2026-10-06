@@ -21,6 +21,8 @@ import hivens.core.data.PackOrigin
 import hivens.core.smrt.ModIconResolver
 import hivens.launcher.instance.ContentKind
 import hivens.launcher.instance.ContentRef
+import hivens.launcher.instance.DependencyIssue
+import hivens.launcher.instance.dependencyIssues
 import hivens.launcher.instance.InstalledContent
 import hivens.launcher.instance.InstanceContentManager
 import hivens.launcher.instance.ContentFolderWatch
@@ -224,6 +226,19 @@ internal class ContentTabState(
         private set
     var switchingTo by mutableStateOf<String?>(null)
         private set
+
+    /**
+     * What each enabled mod needs and nothing enabled meets, read from the archives
+     * themselves. Local, so it is known as soon as the scan lands and follows every
+     * toggle.
+     */
+    val dependencyProblems: Map<ContentRef, List<DependencyIssue>> by derivedStateOf {
+        dependencyIssues(items.orEmpty())
+    }
+
+    /** The name of whatever provides mod id [id], for a sentence about it, or the id itself. */
+    fun providerName(id: String): String =
+        items.orEmpty().firstOrNull { c -> c.provides.any { it.id.equals(id, ignoreCase = true) } }?.displayName ?: id
 
     /**
      * Rows older than the build another installed mod pinned, from the last check.

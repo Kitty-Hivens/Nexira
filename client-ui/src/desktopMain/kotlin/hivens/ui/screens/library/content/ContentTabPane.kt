@@ -66,6 +66,7 @@ import hivens.core.api.dto.modrinth.ModrinthVersion
 import hivens.core.update.VersionChannel
 import hivens.launcher.instance.ContentKind
 import hivens.launcher.instance.ContentRef
+import hivens.launcher.instance.DependencyIssue
 import hivens.launcher.instance.InstalledContent
 import hivens.launcher.instance.InstanceContentScanner
 import hivens.launcher.instance.InstanceContentUpdater
@@ -299,6 +300,7 @@ internal fun ContentTabPane(
                                 resolveProject = { state.resolveProject(c) },
                                 update         = state.liveUpdates[ref],
                                 warning        = rules.problem?.let { problemReason(it, s) }
+                                    ?: state.dependencyProblems[ref]?.firstOrNull()?.let { dependencyReason(it, state::providerName, s) }
                                     ?: state.liveBehind[ref]?.let { s.contentBehindPin(it.neededBy, it.pinned.versionNumber) },
                                 onUpdate       = { state.update(c) },
                                 // Switching versions is the same write as an update,
@@ -1206,6 +1208,16 @@ internal fun problemReason(problem: OptionalContentRules.Problem, s: AppStrings)
     return when (problem) {
         is OptionalContentRules.Problem.ConflictsWith -> s.optionalConflictsWith(name)
         is OptionalContentRules.Problem.NeedsDisabled -> s.optionalNeedsOff(name)
+    }
+}
+
+/** The sentence under a mod whose own metadata asks for something nothing enabled gives it. */
+internal fun dependencyReason(issue: DependencyIssue, nameOf: (String) -> String, s: AppStrings): String {
+    val wanted = issue.requirement.ranges.joinToString(" / ")
+    return when (issue) {
+        is DependencyIssue.Missing -> s.contentDependencyMissing(issue.requirement.id)
+        is DependencyIssue.WrongVersion ->
+            s.contentDependencyVersion(nameOf(issue.requirement.id), wanted, issue.installed.joinToString(", "))
     }
 }
 

@@ -995,6 +995,8 @@ object JapaneseStrings : AppStrings {
     override fun optionalConflictsWith(name: String) = "$name と競合しています"
     override fun optionalNeedsOff(name: String) = "無効になっている $name が必要です"
     override fun contentBehindPin(neededBy: String, version: String) = "$neededBy には $version 以降が必要です"
+    override fun contentDependencyMissing(id: String) = "$id が必要ですが、入っていないか無効です"
+    override fun contentDependencyVersion(name: String, wanted: String, installed: String) = "$name $wanted が必要ですが、入っているのは $installed です"
     override val packVersionCheckTitle = "アップデート"
     override val packSettingsCategoryGeneral = "全般"
     override val packSettingsCategoryRuntime = "起動"

@@ -1146,6 +1146,10 @@ interface AppStrings {
     fun optionalNeedsOff(name: String): String
     /** Under a library older than the build [neededBy] was made against, [version] being that build. */
     fun contentBehindPin(neededBy: String, version: String): String
+    /** Under a mod that needs mod id [id], which nothing enabled provides. */
+    fun contentDependencyMissing(id: String): String
+    /** Under a mod that needs [name] in [wanted], with [installed] being what is there. */
+    fun contentDependencyVersion(name: String, wanted: String, installed: String): String
     val packVersionCheckTitle: String
     val packSettingsCategoryGeneral: String
     val packSettingsCategoryRuntime: String

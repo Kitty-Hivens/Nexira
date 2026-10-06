@@ -20,6 +20,10 @@ import hivens.launcher.component.EnvironmentPreparer
 import hivens.launcher.component.GameCommandBuilder
 import hivens.launcher.component.JvmHeapArgs
 import hivens.launcher.component.ProcessLogHandler
+import hivens.launcher.instance.ContentRef
+import hivens.launcher.instance.DependencyIssue
+import hivens.launcher.instance.InstanceContentScanner
+import hivens.launcher.instance.dependencyIssues
 import hivens.launcher.launch.PackPrepBlocked
 import hivens.launcher.runtime.RuntimeProvisioner
 import hivens.launcher.runtime.loader.ResolvedLibrary
@@ -56,6 +60,8 @@ internal class LauncherService(
     private val authlibSwapper: SmrtAuthlibSwapper,
     private val sharedAssetsDir: Path,
     private val sharedLibrariesDir: Path,
+    /** Reads what is in `mods/`, for the dependency check before a spawn. */
+    private val contentScanner: InstanceContentScanner = InstanceContentScanner(),
 ) : ILauncherService {
 
     private val log = LoggerFactory.getLogger(LauncherService::class.java)
@@ -168,6 +174,11 @@ internal class LauncherService(
         // for any MC version. Assets are the shared root the provisioner just
         // populated.
         envPreparer.prepareNativesFromManifest(clientRootPath, nativesDir, resolved.natives, rebuild = boundLaunch)
+
+        // 4a. What the mods need and do not have, said before the game is started
+        // and never acted on. The loader refuses such a pack minutes later with a
+        // crash that names the mod only in its report, if at all.
+        warnAboutDependencies(clientRootPath, onLog)
 
         // 4b. FML's loading screen, set for this launch and put back when the game
         // exits. A config that could not be written leaves the screen as the pack
@@ -296,6 +307,23 @@ internal class LauncherService(
     }
 
     /**
+     * One warning line per requirement a mod in `mods/` has that nothing enabled
+     * meets. A scan that fails is logged and left: the check is advice, and a
+     * folder the scanner cannot read is no reason to stop the launch.
+     */
+    private suspend fun warnAboutDependencies(clientRootPath: Path, onLog: (String, LauncherLogType) -> Unit) {
+        val issues = try {
+            dependencyIssues(contentScanner.scan(clientRootPath))
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            log.warn("Could not check the mods' dependencies in {}", clientRootPath, e)
+            return
+        }
+        for ((ref, list) in issues) for (issue in list) onLog(describeDependencyIssue(ref, issue), LauncherLogType.WARN)
+    }
+
+    /**
      * Builds, starts, and log-attaches the game process. The launch runs on the
      * caller's IO dispatcher, so the blocking ProcessBuilder.start happens on IO
      * without an extra context switch.
@@ -397,6 +425,18 @@ internal class LauncherService(
             useNetworkAgent ->
                 "The network agent could not be prepared and the SmartyCraft authlib is not enabled; the SC join will be rejected"
             else -> "Neither the network agent nor the SmartyCraft authlib is enabled; the SC join will be rejected"
+        }
+
+        /** The console line for one unmet requirement of the mod at [ref]. */
+        internal fun describeDependencyIssue(ref: ContentRef, issue: DependencyIssue): String {
+            val req = issue.requirement
+            val wanted = req.ranges.joinToString(" or ")
+            return when (issue) {
+                is DependencyIssue.Missing ->
+                    "mods/${ref.fileName} needs ${req.id}${if (wanted.isEmpty()) "" else " $wanted"}, which is not installed or is turned off"
+                is DependencyIssue.WrongVersion ->
+                    "mods/${ref.fileName} needs ${req.id} $wanted, the installed one is ${issue.installed.joinToString(", ")}"
+            }
         }
 
         /** The vanilla `com.mojang:authlib` classpath entry in [runtime], or null if absent. */
