@@ -2,9 +2,11 @@ package hivens.ui.chrome
 
 import java.awt.Component
 import java.awt.Toolkit
+import java.awt.Window
 import java.awt.event.InputEvent
 import java.awt.event.MouseEvent
 import java.awt.event.MouseWheelEvent
+import javax.swing.SwingUtilities
 
 /** What a press of a mouse button past the third one means. */
 internal enum class ExtraButton { Back, Forward, ScrollLeft, ScrollRight, None }
@@ -26,6 +28,17 @@ internal fun extraButton(button: Int, x11: Boolean): ExtraButton = when {
     button == 4 || button == 6 -> ExtraButton.Back
     button == 5 || button == 7 -> ExtraButton.Forward
     else -> ExtraButton.None
+}
+
+/**
+ * Whether this event happened in [window]. True when there is no window to compare
+ * against, so a shell that has not published its window yet still answers.
+ */
+internal fun MouseEvent.isFrom(window: Window?): Boolean {
+    if (window == null) return true
+    val source = component ?: return false
+    val owner = source as? Window ?: SwingUtilities.getWindowAncestor(source)
+    return owner === window
 }
 
 /** Whether AWT is running on X11, where the extra buttons are numbered the X way. */

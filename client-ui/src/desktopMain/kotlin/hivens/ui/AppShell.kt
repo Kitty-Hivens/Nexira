@@ -82,6 +82,7 @@ import hivens.ui.background.CustomBackground
 import hivens.ui.theme.WallpaperTone
 import hivens.ui.chrome.LocalChromeClose
 import hivens.ui.chrome.LocalComposeWindow
+import hivens.ui.chrome.isFrom
 import hivens.ui.chrome.LocalWindowHide
 import hivens.ui.chrome.ShellChord
 import hivens.ui.chrome.resolveShellChord
@@ -1349,13 +1350,19 @@ fun AppRoot(
     //
     // Which number is which depends on the toolkit (see extraButton): on X11 the
     // sideways wheel arrives here too, and goes back to the window as a wheel.
+    //
+    // A toolkit listener hears every window the process has, so history moves only
+    // for a press in this one. Unfiltered, a thumb press in the separate console
+    // window paged the main window's history behind it. The sideways wheel goes back
+    // to whichever window it came from.
+    val mainWindow by rememberUpdatedState(LocalComposeWindow.current)
     DisposableEffect(Unit) {
         val toolkit = Toolkit.getDefaultToolkit()
         val listener = AWTEventListener { ev ->
             if (ev is MouseEvent && ev.id == MouseEvent.MOUSE_PRESSED) {
                 when (extraButton(ev.button, awtOnX11)) {
-                    ExtraButton.Back        -> backStack.back()
-                    ExtraButton.Forward     -> backStack.forward()
+                    ExtraButton.Back        -> if (ev.isFrom(mainWindow)) backStack.back()
+                    ExtraButton.Forward     -> if (ev.isFrom(mainWindow)) backStack.forward()
                     ExtraButton.ScrollLeft  -> resendAsSidewaysWheel(ev, toRight = false)
                     ExtraButton.ScrollRight -> resendAsSidewaysWheel(ev, toRight = true)
                     ExtraButton.None        -> Unit

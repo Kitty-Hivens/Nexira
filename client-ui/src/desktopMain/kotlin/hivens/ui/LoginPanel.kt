@@ -41,6 +41,7 @@ import hivens.ui.puppet.PuppetField
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.puppet.PuppetToggle
 import hivens.ui.platform.SystemActions
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -123,6 +124,10 @@ fun LoginPanel(
                     sess
                 }
                 hivens.core.diag.ActionRing.record("Login OK")
+                // Cleared on success as well. Where the panel stays on screen after a
+                // sign-in, a profile section signing in a second provider, it went on
+                // showing the spinner over a form that was done.
+                isLoading = false
                 onLogin(session)
             } catch (e: TwoFactorRequiredException) {
                 isLoading = false
@@ -178,12 +183,23 @@ fun LoginPanel(
         focusManager.clearFocus()
         errorMessage = null
         scope.launch {
-            val session = withContext(Dispatchers.IO) {
-                val sess = offlineProvider.login(name, "", "")
-                // Remember the offline name so a restart -- or the Settings offline
-                // toggle -- restores this identity without re-typing.
-                settingsService.updateSettings { it.copy(offlinePlayerName = name) }
-                sess
+            // Caught like the sign-in above. Unguarded, a settings file that could not
+            // be written threw out of the composition's scope and raised the crash
+            // dialog over a press of "play offline".
+            val session = try {
+                withContext(Dispatchers.IO) {
+                    val sess = offlineProvider.login(name, "", "")
+                    // Remember the offline name so a restart -- or the Settings offline
+                    // toggle -- restores this identity without re-typing.
+                    settingsService.updateSettings { it.copy(offlinePlayerName = name) }
+                    sess
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                hivens.core.diag.ActionRing.record("Play offline failed: msg=${e.message?.take(80)}")
+                errorMessage = e.message ?: s.loginErrorGeneric
+                return@launch
             }
             hivens.core.diag.ActionRing.record("Play offline")
             onLogin(session)

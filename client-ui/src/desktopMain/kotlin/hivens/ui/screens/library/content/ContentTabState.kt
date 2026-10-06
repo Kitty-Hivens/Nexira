@@ -600,9 +600,16 @@ internal class ContentTabState(
 
     // -- add / delete ---------------------------------------------------------
 
-    /** Drop files into the folder the active filter points at (mods by default). */
+    /**
+     * Drop files into the folder the active filter points at (mods by default).
+     *
+     * The dialog belongs to the screen and the copy to the app. Opened on the app's
+     * scope, the native dialog outlived the tab that asked for it, which is the
+     * thing the picker helper's callers are meant to avoid. Once files are chosen,
+     * the copy is the disk's business and runs to the end wherever the reader goes.
+     */
     fun addFiles(dialogSettings: FileKitDialogSettings) {
-        writeScope.launch {
+        scope.launch {
             val kind = filter.kind ?: ContentKind.Mod
             val extensions = if (kind == ContentKind.Mod) listOf("jar") else listOf("zip")
             val picked = pickFiles(
@@ -610,7 +617,8 @@ internal class ContentTabState(
                 settings = dialogSettings,
             )
             val sources = picked.orEmpty().map { Path.of(it.path) }
-            if (sources.isNotEmpty()) {
+            if (sources.isEmpty()) return@launch
+            writeScope.launch {
                 manager.addFiles(instanceDir, kind, sources)
                 rescan()
             }

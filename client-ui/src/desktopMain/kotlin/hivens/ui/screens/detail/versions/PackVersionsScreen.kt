@@ -366,7 +366,11 @@ private fun BuildListPane(
             val runs = remember(builds) { groupRebuildRuns(builds) }
             // The run hiding the installed build starts expanded -- the "current"
             // marker must be findable in the list without digging.
-            var expandedRuns by remember(builds) {
+            //
+            // Kept across a refresh of the listing, which is a new list of the same
+            // builds: keyed on it, every refresh folded up what the reader had opened.
+            // Seeded again only when a different build is installed.
+            var expandedRuns by remember(installedKey) {
                 mutableStateOf(
                     setOfNotNull(
                         runs.firstOrNull { run -> run.drop(1).any { it.key == installedKey } }

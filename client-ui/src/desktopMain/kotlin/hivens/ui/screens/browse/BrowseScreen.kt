@@ -311,7 +311,11 @@ fun BrowseScreen(
     // Where the reader had got to, kept with the list it belongs to. Written on
     // the way out rather than on every scroll: the position only matters to a
     // return, and a write per frame of scrolling is a write per frame.
-    DisposableEffect(origin, submittedQuery) {
+    //
+    // Keyed on everything the cursor is keyed on. A retry makes page and endReached
+    // new states, and an effect that outlived it went on reading the old ones, so a
+    // retry followed by paging was put away with the new list and the old cursor.
+    DisposableEffect(origin, submittedQuery, retryTick) {
         val forOrigin = origin
         val forQuery = submittedQuery
         onDispose {
