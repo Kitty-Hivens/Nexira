@@ -6,6 +6,7 @@ import hivens.core.net.TransferStaging
 import hivens.core.time.Clock
 import hivens.core.time.SystemClock
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -70,9 +71,9 @@ class InstanceSizeService(
     fun measure(instance: PackInstance, force: Boolean = false) {
         val id = instance.id
         if (!force && isFresh(_sizes.value[id])) return
-        walks[id]?.let { if (it.isActive) return }
 
-        val job = scope.launch {
+        lateinit var job: Job
+        job = scope.launch(start = CoroutineStart.LAZY) {
             try {
                 val bytes = withContext(ioDispatcher) { walk(instanceDirOf(instance)) }
                 _sizes.update { it + (id to InstanceSize(bytes, clock.nowMillis())) }
@@ -81,10 +82,17 @@ class InstanceSizeService(
                 // the row keeps its last honest number instead of blanking.
                 log.warn("size: could not measure instance {}", instance.instanceDirName, e)
             } finally {
-                walks.remove(id)
+                // This walk's own entry only. Removed by key, a walk that finished
+                // took out the one started after it, and the next caller saw no walk
+                // running and began a second over the same tree.
+                walks.remove(id, job)
             }
         }
-        walks[id] = job
+        // Claimed and checked in one step. Checked and then claimed, two callers at
+        // once both found nothing running and both walked. Not yet started counts as
+        // running: the claim is made before the start.
+        val running = walks.compute(id) { _, current -> if (current != null && !current.isCompleted) current else job }
+        if (running === job) job.start() else job.cancel()
     }
 
     /** Drop the published size for [instanceId] -- the instance is gone. */
