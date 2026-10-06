@@ -1,6 +1,9 @@
 package hivens.ui.i18n
 
 import hivens.core.data.PackAuthRequirement
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 object GermanStrings : AppStrings {
@@ -1087,11 +1090,7 @@ object GermanStrings : AppStrings {
     override fun notifGroupCount(count: Int) = "×$count"
     override fun notifCountTitle(count: Int) = if (count == 1) "$count Nachricht" else "$count Nachrichten"
     override fun notificationShowMore(count: Int)               = "+$count weitere"
-    override fun notificationAbsoluteTime(instant: java.time.Instant): String =
-        java.time.format.DateTimeFormatter
-            .ofPattern("d. MMMM yyyy, HH:mm:ss", java.util.Locale.GERMAN)
-            .withZone(java.time.ZoneId.systemDefault())
-            .format(instant)
+    override fun notificationAbsoluteTime(instant: Instant): String = germanNotificationTime.format(instant)
 
     override fun notifPackPreparing(packName: String)   = "Vorbereitung: $packName"
     override fun notifPackStage(stage: String)          = "Phase: $stage"
@@ -1702,3 +1701,7 @@ object GermanStrings : AppStrings {
     override val sessionsActiveTitle = "Aktive Sitzungen"
     override val aboutLogoDesc       = "App-Logo"
 }
+
+/** Built once, as the other catalogues do, rather than on every notification's tooltip. */
+private val germanNotificationTime: DateTimeFormatter =
+    DateTimeFormatter.ofPattern("d. MMMM yyyy, HH:mm:ss", Locale.GERMAN).withZone(ZoneId.systemDefault())

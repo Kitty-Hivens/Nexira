@@ -1,6 +1,9 @@
 package hivens.ui.i18n
 
 import hivens.core.data.PackAuthRequirement
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 object RussianStrings : AppStrings {
@@ -1100,11 +1103,7 @@ object RussianStrings : AppStrings {
         return "$count $word"
     }
     override fun notificationShowMore(count: Int)               = "ещё $count"
-    override fun notificationAbsoluteTime(instant: java.time.Instant): String =
-        java.time.format.DateTimeFormatter
-            .ofPattern("d MMMM yyyy, HH:mm:ss", java.util.Locale.of("ru", "RU"))
-            .withZone(java.time.ZoneId.systemDefault())
-            .format(instant)
+    override fun notificationAbsoluteTime(instant: Instant): String = russianNotificationTime.format(instant)
 
     override fun notifPackPreparing(packName: String)   = "Подготовка $packName"
     override fun notifPackStage(stage: String)          = "Этап: $stage"
@@ -1715,3 +1714,7 @@ object RussianStrings : AppStrings {
     override val sessionsActiveTitle = "Активные сессии"
     override val aboutLogoDesc       = "Логотип приложения"
 }
+
+/** Built once, as the other catalogues do, rather than on every notification's tooltip. */
+private val russianNotificationTime: DateTimeFormatter =
+    DateTimeFormatter.ofPattern("d MMMM yyyy, HH:mm:ss", Locale.of("ru", "RU")).withZone(ZoneId.systemDefault())
