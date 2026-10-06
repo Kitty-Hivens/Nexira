@@ -246,27 +246,24 @@ class SmartyCraftAuthProviderTest {
     }
 
     @Test
-    fun `pending TWOAUTH cache is cleared by a fresh login attempt for the same triple`() = runTest {
-        // Audit catch on the 22-commit batch: pendingTwoFactor used to grow
-        // unbounded if the user canceled the dialog and retried with a
-        // different password. The fresh-login invalidation guards that --
-        // verify by chaining a TWOAUTH-yielding login, a wrong-password
-        // attempt (clears the cache), then a TWOAUTH-yielding login again,
-        // and confirming the second TWOAUTH path goes through the cache-promotion
-        // fallback (which is only possible if the entry was
-        // re-inserted, not pre-existing from the first attempt).
+    fun `a later TWOAUTH for the same credentials is the one a code unlocks`() = runTest {
+        // A TWOAUTH-yielding login, an attempt with another password, then a
+        // TWOAUTH-yielding login again: the code unlocks the session of the last
+        // demand, not the abandoned first one.
         val responses = mutableListOf(
+            // Named apart from the second, so promoting the stale entry and promoting
+            // the fresh one cannot come out the same.
             LoginResponse(
                 status = "TWOAUTH", uid = "first-uid",
                 uuid = "550e8400e29b41d4a716446655440000",
-                playername = "TestPlayer",
+                playername = "StaleName",
                 session = sealedSession("first-uid"),
             ),
             LoginResponse(status = "PASSWORD"),
             LoginResponse(
                 status = "TWOAUTH", uid = "second-uid",
                 uuid = "550e8400e29b41d4a716446655440000",
-                playername = "TestPlayer",
+                playername = "FreshName",
                 session = sealedSession("second-uid"),
             ),
         )
@@ -301,7 +298,41 @@ class SmartyCraftAuthProviderTest {
             uid = second.uid!!, code = "111111",
         )
         // Promote-from-cache used the most recent response, not a stale one.
-        assertEquals("TestPlayer", session.playerName)
+        assertEquals("FreshName", session.playerName)
+        assertEquals("second-uid", session.uid)
+    }
+
+    @Test
+    fun `a fresh login with the same credentials drops the pending second factor`() = runTest {
+        // The dialog was abandoned and the same account signed in again, and this
+        // time the server answered with an error rather than a new demand. The
+        // held response belongs to a demand nobody is answering any more, so a code
+        // arriving now must not unlock it.
+        val responses = mutableListOf(
+            LoginResponse(
+                status = "TWOAUTH", uid = "first-uid",
+                uuid = "550e8400e29b41d4a716446655440000",
+                playername = "StaleName",
+                session = sealedSession("first-uid"),
+            ),
+            LoginResponse(status = "ERROR"),
+        )
+        val proto = FakeServerProtocol().apply {
+            loginResult = { responses.removeAt(0) }
+            twoauthResult = { _, _, _ -> StatusOnlyResponse(status = "OK") }
+        }
+        val service = SmartyCraftAuthProvider(proto)
+
+        val first = assertFailsWith<TwoFactorRequiredException> { service.login("user", "pass", "Industrial") }
+        assertFailsWith<AuthException> { service.login("user", "pass", "Industrial") }
+
+        val failure = assertFailsWith<AuthException> {
+            service.completeTwoFactor(
+                username = "user", password = "pass", serverId = "Industrial",
+                uid = first.uid!!, code = "111111",
+            )
+        }
+        assertEquals(AuthStatus.TWO_FACTOR_EXPIRED, failure.status)
     }
 
     @Test
