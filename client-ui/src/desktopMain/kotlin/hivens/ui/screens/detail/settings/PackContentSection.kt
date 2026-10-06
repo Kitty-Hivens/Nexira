@@ -18,6 +18,7 @@ import hivens.core.api.interfaces.IMirrorPackClient
 import hivens.core.data.OptionalContentRules
 import hivens.core.data.PackInstance
 import hivens.launcher.launch.LauncherController
+import hivens.ui.screens.library.content.lockReason
 import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.nx.NxMetaChip
@@ -80,6 +81,7 @@ internal fun PackContentSection(pack: PackInstance, adopt: (PackEdit) -> Unit) {
     }
 
     val optional = remember(manifest) { manifest?.let { OptionalContentRules.optionalMods(it.mods) }.orEmpty() }
+    val locks = remember(manifest) { manifest?.let { OptionalContentRules.locks(it.mods) }.orEmpty() }
 
     NxSettingGroup(s.packSettingsOptional) {
         when {
@@ -90,10 +92,13 @@ internal fun PackContentSection(pack: PackInstance, adopt: (PackEdit) -> Unit) {
                 Muted(s.packSettingsOptionalCoToggle)
                 optional.forEach { mod ->
                     val presence = mod.display?.presenceClass
-                    NxSettingRow(mod.display?.name ?: mod.filename, detail = mod.display?.description) {
+                    val lock = locks[mod.filename]
+                    // The lock's reason in place of the description: it is the one thing
+                    // about this row the reader needs before reaching for the switch.
+                    NxSettingRow(mod.display?.name ?: mod.filename, detail = lock?.let { lockReason(it, s) } ?: mod.display?.description) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             presenceLabel(presence, s)?.let { NxMetaChip(it, tone = NxMetaChipTone.Surface) }
-                            NxSwitch(state[mod.filename] ?: mod.defaultEnabled, { enable ->
+                            NxSwitch(state[mod.filename] ?: mod.defaultEnabled, enabled = lock == null, onCheckedChange = { enable ->
                                 val m = manifest ?: return@NxSwitch
                                 val next = OptionalContentRules.applyToggle(m.mods, state, mod.filename, enable)
                                 val toggles = OptionalContentRules.togglesFrom(m.mods, next)

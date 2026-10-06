@@ -2,6 +2,7 @@ package hivens.ui.screens.library.content
 
 import hivens.core.api.dto.smrt.SmrtModEntry
 import hivens.core.api.dto.smrt.SmrtSource
+import hivens.core.data.OptionalContentRules
 import hivens.launcher.instance.ContentKind
 import hivens.launcher.instance.InstalledContent
 import kotlin.test.Test
@@ -108,6 +109,33 @@ class ContentTabRulesTest {
         val rules = contentRowRules(content("stray.jar"), manifestEntry = null, userOwned = false, optionalEnabled = null)
         assertFalse(rules.showToggle)
         assertFalse(rules.canDelete)
+    }
+
+    @Test
+    fun `an optional a required mod holds keeps its switch and carries the reason`() {
+        val core = entry("core.jar", required = true)
+        val rules = contentRowRules(
+            content("alt.jar"),
+            manifestEntry   = entry("alt.jar", required = false),
+            userOwned       = false,
+            optionalEnabled = false,
+            optionalLock    = OptionalContentRules.Lock.ConflictsWithRequired(core),
+        )
+        assertTrue(rules.showToggle, "the row still shows what state it is in")
+        assertEquals(OptionalContentRules.Lock.ConflictsWithRequired(core), rules.lock)
+    }
+
+    @Test
+    fun `a lock is never carried by a row that is not optional`() {
+        val core = entry("core.jar", required = true)
+        val rules = contentRowRules(
+            content("x.jar"),
+            manifestEntry   = entry("x.jar", required = true),
+            userOwned       = false,
+            optionalEnabled = null,
+            optionalLock    = OptionalContentRules.Lock.NeededByRequired(core),
+        )
+        assertNull(rules.lock)
     }
 
     // -- the list -------------------------------------------------------------

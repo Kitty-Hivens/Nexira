@@ -282,6 +282,11 @@ internal class ContentTabState(
         manifestMods.values.filterNot { it.required }.map { it.filename }.toSet()
     }
 
+    /** Optionals a required mod holds on or off, by filename. Once per manifest, not per row. */
+    private val optionalLocks: Map<String, OptionalContentRules.Lock> by derivedStateOf {
+        manifest?.let { OptionalContentRules.locks(it.mods) }.orEmpty()
+    }
+
     /**
      * Whether the optional axis has anything to offer. A local pack curates nothing
      * and a pack whose manifest names no optional mods would give that filter an
@@ -498,6 +503,7 @@ internal class ContentTabState(
         manifestEntry   = entryFor(content),
         userOwned       = userOwns(content),
         optionalEnabled = optionalState[content.fileName],
+        optionalLock    = optionalLocks[content.fileName],
     )
 
     /**
@@ -944,13 +950,16 @@ internal fun rememberContentTabState(instance: PackInstance): ContentTabState {
  * mod it is the pack's optional-content state, which may differ from the raw
  * on-disk `.disabled` until the async relabel lands. [optional] says the toggle
  * routes through the pack rather than through a rename. A required pack mod gets
- * no toggle at all -- you cannot disable what the pack mandates.
+ * no toggle at all -- you cannot disable what the pack mandates. [lock] is set on
+ * an optional a required mod holds on or off: the switch is shown, since the mod
+ * is still the player's choice in principle, and does not move.
  */
 internal data class ContentRowRules(
     val effectiveEnabled: Boolean,
     val showToggle: Boolean,
     val optional: Boolean,
     val canDelete: Boolean,
+    val lock: OptionalContentRules.Lock? = null,
 )
 
 /**
@@ -958,7 +967,8 @@ internal data class ContentRowRules(
  * does not curate it and when the instance is not on a mirror pack at all.
  * [userOwned] says the file is the player's rather than the pack's, which is the
  * caller's reading of the instance and not something derivable from the row.
- * [optionalEnabled] is the pack's optional-content state for the file, if any.
+ * [optionalEnabled] is the pack's optional-content state for the file, if any,
+ * and [optionalLock] what holds it there, if anything does.
  *
  * Resource and shader packs are cosmetic rather than part of the pack contract,
  * so they stay user-managed even while the instance is tracked; mods do not.
@@ -968,6 +978,7 @@ internal fun contentRowRules(
     manifestEntry: SmrtModEntry?,
     userOwned: Boolean,
     optionalEnabled: Boolean?,
+    optionalLock: OptionalContentRules.Lock? = null,
 ): ContentRowRules {
     val freeEdit = userOwned || content.kind != ContentKind.Mod
     val optional = manifestEntry != null && !manifestEntry.required
@@ -980,6 +991,7 @@ internal fun contentRowRules(
         showToggle = freeEdit || optional,
         optional   = optional,
         canDelete  = freeEdit,
+        lock       = optionalLock.takeIf { optional },
     )
 }
 

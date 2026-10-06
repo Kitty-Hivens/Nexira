@@ -60,6 +60,7 @@ import coil3.request.ImageRequest
 import coil3.compose.LocalPlatformContext
 import hivens.core.api.dto.modrinth.ModrinthProject
 import hivens.core.api.dto.modrinth.ModrinthSearchHit
+import hivens.core.data.OptionalContentRules
 import hivens.core.data.PackInstance
 import hivens.core.api.dto.modrinth.ModrinthVersion
 import hivens.core.update.VersionChannel
@@ -98,6 +99,7 @@ import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxVerticalScrollbar
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
+import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
@@ -841,6 +843,11 @@ internal fun ContentRow(
                     content.version?.let { v ->
                         Text(v, style = MaterialTheme.typography.labelSmall, color = if (rules.effectiveEnabled) NxInk.quiet else NxInk.off, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
+                    // Why the switch beside it does not move. A switch that ignores a
+                    // click reads as broken, and the reason is one the pack decided.
+                    rules.lock?.let { lock ->
+                        Text(lockReason(lock, s), style = MaterialTheme.typography.labelSmall, color = NxInk.quiet, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    }
                 }
                 // The chip both reports the newer build and is the way to take it: the
                 // row already says what is installed, so the one thing worth a control
@@ -875,6 +882,7 @@ internal fun ContentRow(
                     NxSwitch(
                         checked         = rules.effectiveEnabled,
                         onCheckedChange = onToggle,
+                        enabled         = rules.lock == null,
                     )
                 }
                 // One overflow instead of a bare trash can: Details is always available
@@ -1174,6 +1182,15 @@ internal fun ModResultRow(
                 else      -> NxButton(label = s.browseDetailInstallButton, onClick = onInstall)
             }
         }
+    }
+}
+
+/** The sentence under an optional a required mod holds on or off. */
+internal fun lockReason(lock: OptionalContentRules.Lock, s: AppStrings): String {
+    val name = lock.by.display?.name ?: lock.by.filename
+    return when (lock) {
+        is OptionalContentRules.Lock.ConflictsWithRequired -> s.optionalLockedConflict(name)
+        is OptionalContentRules.Lock.NeededByRequired -> s.optionalLockedNeeded(name)
     }
 }
 
