@@ -20,9 +20,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.rememberScrollbarAdapter
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -352,9 +350,9 @@ private fun TextPreview(file: Path) {
                 } else {
                     Files.readAllBytes(file)
                 }
-                TextLoadResult(text = String(bytes, Charsets.UTF_8), truncated = limited, totalSize = size)
+                TextLoadResult(previewLines(String(bytes, Charsets.UTF_8)), truncated = limited, totalSize = size)
             }.getOrElse {
-                TextLoadResult(text = "[error: ${it.message}]", truncated = false, totalSize = 0L)
+                TextLoadResult(listOf("[error: ${it.message}]"), truncated = false, totalSize = 0L)
             }
         }
     }.value
@@ -381,17 +379,19 @@ private fun TextPreview(file: Path) {
             )
             Spacer(Modifier.height(6.dp))
         }
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState()),
-        ) {
-            Text(
-                text       = state.text,
-                style      = MaterialTheme.typography.bodySmall,
-                color      = NxInk.main,
-                fontFamily = LocalMonoFamily.current,
-            )
+        // A row per line, laid out as it scrolls into view. One Text over the whole
+        // read was a single layout pass over up to a quarter of a megabyte on the UI
+        // thread each time a large log was opened.
+        val mono = LocalMonoFamily.current
+        LazyColumn(Modifier.fillMaxSize()) {
+            items(state.lines) { line ->
+                Text(
+                    text       = line,
+                    style      = MaterialTheme.typography.bodySmall,
+                    color      = NxInk.main,
+                    fontFamily = mono,
+                )
+            }
         }
     }
 }
@@ -456,7 +456,16 @@ private fun PreviewHeader(file: Path, sizeLabel: String) {
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-private data class TextLoadResult(val text: String, val truncated: Boolean, val totalSize: Long)
+private data class TextLoadResult(val lines: List<String>, val truncated: Boolean, val totalSize: Long)
+
+/**
+ * [text] as the preview's rows: one per line, and a line longer than
+ * [PREVIEW_LINE_CHUNK] in pieces of that length. A minified file is one line, and
+ * as one row it would be the single huge layout the rows exist to avoid. The
+ * pieces wrap like the line did, so the only visible seam is where one ends.
+ */
+internal fun previewLines(text: String): List<String> =
+    text.lines().flatMap { line -> if (line.length <= PREVIEW_LINE_CHUNK) listOf(line) else line.chunked(PREVIEW_LINE_CHUNK) }
 
 private fun Path.fileSizeLabel(): String = runCatching {
     when (val n = fileSize()) {
@@ -475,3 +484,5 @@ private val TEXT_EXTENSIONS = setOf(
 private val IMAGE_EXTENSIONS = setOf("png", "jpg", "jpeg", "gif", "webp", "bmp")
 
 private const val TEXT_PREVIEW_MAX_BYTES = 256L * 1024L
+
+private const val PREVIEW_LINE_CHUNK = 4096
