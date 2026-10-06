@@ -1,6 +1,5 @@
 package hivens.ui.nx
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -18,6 +17,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -53,6 +53,7 @@ fun NxNavRow(
     val shape = MaterialTheme.shapes.medium
     val interaction = remember { MutableInteractionSource() }
     val alpha = softHoverAlpha(interaction)
+    val tint = NxInk.main
     NxSurface(
         // A panel, like the section planes around it, so a standalone nav card reads
         // as the same material rather than as an odd one out.
@@ -66,7 +67,7 @@ fun NxNavRow(
         Row(
             modifier              = Modifier
                 .fillMaxWidth()
-                .background(NxInk.main.copy(alpha = alpha))
+                .drawBehind { drawSoftHover(tint, alpha.value) }
                 .padding(Spacing.s16),
             verticalAlignment     = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,

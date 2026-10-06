@@ -1,7 +1,6 @@
 package hivens.ui.nx
 
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -19,12 +18,15 @@ import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -77,11 +79,12 @@ fun NxRow(
         val shape = MaterialTheme.shapes.medium
         val interaction = remember { MutableInteractionSource() }
         val alpha = softHoverAlpha(interaction)
+        val tint = NxInk.main
         Modifier
             .bleedHorizontally(edgeBleed)
             .fillMaxWidth()
             .clip(shape)
-            .background(NxInk.main.copy(alpha = alpha))
+            .drawBehind { drawSoftHover(tint, alpha.value) }
             .clickable(interactionSource = interaction, indication = null, onClick = onClick)
             .padding(horizontal = edgeBleed, vertical = Spacing.s8)
     } else {
@@ -131,9 +134,13 @@ fun NxRow(
  * onSurface overlay that fades in on hover-enter / out on hover-exit -- steady while
  * hovered, never pulsing, and instant when motion is off. Shared by [NxRow] (in-plane)
  * and [NxNavRow] (own plane) so a navigable row reads the same wherever it sits.
+ *
+ * Handed back as state for the draw phase to read, as [hivens.ui.surface.NxSurface]
+ * does: read in composition, the fade recomposed the row and everything in it once
+ * per animation frame, to change one rectangle.
  */
 @Composable
-internal fun softHoverAlpha(interaction: MutableInteractionSource): Float {
+internal fun softHoverAlpha(interaction: MutableInteractionSource): State<Float> {
     val hovered by interaction.collectIsHoveredAsState()
     val pressed by interaction.collectIsPressedAsState()
     val target = when {
@@ -141,12 +148,16 @@ internal fun softHoverAlpha(interaction: MutableInteractionSource): Float {
         hovered -> 0.06f
         else    -> 0f
     }
-    val alpha by animateFloatAsState(
+    return animateFloatAsState(
         targetValue   = target,
         animationSpec = Motion.tap,
         label         = "softHoverAlpha",
     )
-    return alpha
+}
+
+/** The [softHoverAlpha] overlay, nothing at all while it is zero. */
+internal fun DrawScope.drawSoftHover(tint: Color, alpha: Float) {
+    if (alpha > 0f) drawRect(tint.copy(alpha = alpha))
 }
 
 /**
