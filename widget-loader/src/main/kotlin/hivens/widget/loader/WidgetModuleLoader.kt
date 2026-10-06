@@ -183,7 +183,20 @@ class WidgetModuleLoader(
                 loader.release()
                 RejectedWidgetModule(jar, "declares the widget API but carries no registry service")
             }
-            1 -> LoadedWidgetModule(id, name, jar, registries.single(), loader)
+            1 -> {
+                // Listed once here, where a failure is this module's alone. Everything
+                // downstream reads the list outside any guard, building the registry
+                // the whole shell resolves from, so a registry that throws there took
+                // the shell down on every start instead of being refused by name.
+                val registry = registries.single()
+                runCatching { registry.all().keys }.fold(
+                    onSuccess = { LoadedWidgetModule(id, name, jar, registry, loader) },
+                    onFailure = {
+                        loader.release()
+                        RejectedWidgetModule(jar, "its registry failed to list its widgets: ${it.message ?: it.javaClass.simpleName}")
+                    },
+                )
+            }
             // The processor emits exactly one per module. More than one means a
             // hand-assembled or merged jar, where which registry wins is not
             // something this can decide for the author.

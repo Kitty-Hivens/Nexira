@@ -165,6 +165,20 @@ class WidgetModuleLoaderTest {
     }
 
     @Test
+    fun `a module whose registry cannot list its widgets is refused, not loaded`() {
+        install("good.jar")
+        System.setProperty("fixture.failListing", "1")
+        val scan = try {
+            scan()
+        } finally {
+            System.clearProperty("fixture.failListing")
+        }
+
+        assertEquals(emptyList(), scan.loaded)
+        assertTrue("list its widgets" in scan.rejected.single().reason, scan.rejected.single().reason)
+    }
+
+    @Test
     fun `a refused module leaves its jar closed`() {
         // Vacuous on a host that will unlink an open file; the point is the host
         // that will not, where a loader left behind by a refused jar makes that

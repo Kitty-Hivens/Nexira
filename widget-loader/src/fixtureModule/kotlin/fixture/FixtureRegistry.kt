@@ -25,7 +25,8 @@ class FixtureRegistry : WidgetRegistry {
 
     private val map = mapOf(descriptor.kind to descriptor)
 
-    override fun all(): Map<WidgetKind, WidgetDescriptor> = map
+    override fun all(): Map<WidgetKind, WidgetDescriptor> =
+        if (System.getProperty(FAIL_LISTING) != null) throw IllegalStateException("the fixture module failed to list on purpose") else map
     override fun get(kind: WidgetKind): WidgetDescriptor? = map[kind]
 
     /** Fails from inside the module's own code, for tracing a failure back to the module. */
@@ -33,5 +34,8 @@ class FixtureRegistry : WidgetRegistry {
 
     companion object {
         const val FIXTURE_KIND = "fixture.widget"
+
+        /** Set, the registry throws when asked for its widgets, as a broken module's would. */
+        const val FAIL_LISTING = "fixture.failListing"
     }
 }
