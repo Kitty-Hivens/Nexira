@@ -220,17 +220,37 @@ class WidgetModuleLoader(
      * Props whose own defaults do not decode through their serializer open an empty
      * panel with nothing saying why, and a declared plane beside drawsOwnSurface is
      * two claims that cannot both hold. The processor refuses both at build time.
+     *
+     * Every read is guarded, a linkage error included: the generated registry
+     * resolves its props serializer and its plane lazily, so a class the module
+     * needs and does not carry, or a plane this build does not know, surfaces
+     * here. Thrown on, it failed the whole scan and the shell with it, on every
+     * start, over one module that is now rejected instead.
      */
     private fun descriptorFault(descriptor: WidgetDescriptor): String? {
-        val kind = runCatching { descriptor.kind.value }.getOrElse { return "a widget's kind could not be read: ${it.message}" }
-        descriptor.propsSerializer?.let { serializer ->
-            val decodes = runCatching { widgetPropsJson.decodeFromJsonElement(serializer, descriptor.defaultPropsJson) }.isSuccess
+        val kind = guarded { descriptor.kind.value }.getOrElse { return "a widget's kind could not be read: ${it.message}" }
+        val serializer = guarded { descriptor.propsSerializer }
+            .getOrElse { return "widget '$kind' has a props class that could not be loaded: ${it.message}" }
+        if (serializer != null) {
+            val decodes = guarded { widgetPropsJson.decodeFromJsonElement(serializer, descriptor.defaultPropsJson) }.isSuccess
             if (!decodes) return "widget '$kind' has default props its own props class cannot read"
         }
-        if (descriptor.defaultSurface != null && descriptor.drawsOwnSurface) {
+        val surface = guarded { descriptor.defaultSurface }
+            .getOrElse { return "widget '$kind' declares a surface this build cannot read: ${it.message}" }
+        val ownSurface = guarded { descriptor.drawsOwnSurface }.getOrElse { return "widget '$kind' could not be read: ${it.message}" }
+        if (surface != null && ownSurface) {
             return "widget '$kind' declares a surface and drawsOwnSurface together"
         }
         return null
+    }
+
+    /** [block]'s value, or its failure, a linkage error counted among failures. */
+    private inline fun <T> guarded(block: () -> T): Result<T> = try {
+        Result.success(block())
+    } catch (e: Exception) {
+        Result.failure(e)
+    } catch (e: LinkageError) {
+        Result.failure(e)
     }
 
     /**

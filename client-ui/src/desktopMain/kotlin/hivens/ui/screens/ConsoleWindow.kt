@@ -78,10 +78,8 @@ import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -340,7 +338,7 @@ internal fun ConsoleContent(
 
     // ── Render: filter + counts + annotate, all OFF the UI thread ──────────
     // The whole O(n) pass -- severity/query filtering, warn/error counts, and
-    // the AnnotatedString build -- runs on Dispatchers.Default and swaps in once
+    // the line models -- runs on Dispatchers.Default and swaps in once
     // via produceState. Nothing O(n) touches composition, so a 5000-line buffer
     // (or a live flood) never blocks Main. In-flight builds cancel when any key
     // changes, so rapid filter/search edits collapse to one final rebuild.

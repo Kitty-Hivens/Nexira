@@ -179,6 +179,20 @@ class WidgetModuleLoaderTest {
     }
 
     @Test
+    fun `a module whose props class cannot be loaded is refused, not the whole scan`() {
+        install("good.jar")
+        System.setProperty("fixture.failProps", "1")
+        val scan = try {
+            scan()
+        } finally {
+            System.clearProperty("fixture.failProps")
+        }
+
+        assertEquals(emptyList(), scan.loaded)
+        assertTrue("props class" in scan.rejected.single().reason, scan.rejected.single().reason)
+    }
+
+    @Test
     fun `a refused module leaves its jar closed`() {
         // Vacuous on a host that will unlink an open file; the point is the host
         // that will not, where a loader left behind by a refused jar makes that

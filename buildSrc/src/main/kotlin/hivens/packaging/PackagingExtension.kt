@@ -142,7 +142,8 @@ abstract class JlinkOptionsExtension {
      * to cut class-loading off the cold start.
      *
      * The dump runs as `<image>/bin/java -Xshare:dump` under the module-system flags
-     * taken from [PackagingExtension.jvmArgs], rather than through jlink's
+     * taken from [PackagingExtension.jvmArgs] (from [PackagingExtension.appImageJvmArgs]
+     * for the AppImage's own archive), rather than through jlink's
      * `--generate-cds-archive`; see [ModuleSystemArgs] for why the flag set at dump
      * time has to equal the one the launcher uses.
      *

@@ -5,6 +5,7 @@ import hivens.widget.api.WidgetDescriptor
 import hivens.widget.api.WidgetRegistry
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
+import kotlinx.serialization.KSerializer
 
 /**
  * A widget module the loader's tests can actually load.
@@ -20,6 +21,9 @@ class FixtureRegistry : WidgetRegistry {
         override val kind = WidgetKind(FIXTURE_KIND)
         override val displayName = "Fixture Widget"
         override val removable = true
+        // Resolved lazily in a generated registry, so a class the module lacks fails here.
+        override val propsSerializer: KSerializer<*>?
+            get() = if (System.getProperty(FAIL_PROPS) != null) throw NoClassDefFoundError("fixture/MissingProps") else null
         @Composable override fun Render(instance: WidgetInstance) = Unit
     }
 
@@ -37,5 +41,8 @@ class FixtureRegistry : WidgetRegistry {
 
         /** Set, the registry throws when asked for its widgets, as a broken module's would. */
         const val FAIL_LISTING = "fixture.failListing"
+
+        /** Set, reading the widget's props class fails as a class missing from the module would. */
+        const val FAIL_PROPS = "fixture.failProps"
     }
 }
