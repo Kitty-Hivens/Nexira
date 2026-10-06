@@ -414,9 +414,16 @@ internal class ContentTabState(
         // Re-read alongside the scan rather than once at open: an update rewrites
         // the record and the folder together, and the rows would otherwise keep
         // classifying against the file set of the build that was replaced.
-        placed = withContext(Dispatchers.IO) { placedKeysFrom(PackPlacedContent.paths(instanceDir)) }
-        items = scanned
-        prefetchIcons(scanned)
+        val placedKeys = withContext(Dispatchers.IO) { placedKeysFrom(PackPlacedContent.paths(instanceDir)) }
+        // Written on the composition's thread, for the reason the icon prefetch
+        // gives below. A rescan that follows a change to the disk runs on the app's
+        // scope, and these fields used to be assigned from whichever IO thread that
+        // left it on.
+        withContext(Dispatchers.Main) {
+            placed = placedKeys
+            items = scanned
+            prefetchIcons(scanned)
+        }
     }
 
     /**
@@ -637,7 +644,7 @@ internal class ContentTabState(
         if (targets.isEmpty()) return
         writeScope.launch {
             targets.forEach { manager.delete(instanceDir, it.kind, it.fileName) }
-            if (single == null) clearSelection()
+            if (single == null) withContext(Dispatchers.Main) { clearSelection() }
             rescan()
         }
     }
@@ -673,12 +680,14 @@ internal class ContentTabState(
         // has not been read yet has no game version to match against, and saying
         // "everything is up to date" off the back of a question never asked is the
         // one answer here that would be a lie.
+        // Every field is written on the composition's thread: a finished batch calls
+        // this from the app's scope.
         if (targets.isEmpty()) {
-            checked = true
+            withContext(Dispatchers.Main) { checked = true }
             return
         }
         if (mcVersion.isBlank()) return
-        checkingUpdates = true
+        withContext(Dispatchers.Main) { checkingUpdates = true }
         try {
             val outcome = updater.check(
                 instanceDir = instanceDir,
