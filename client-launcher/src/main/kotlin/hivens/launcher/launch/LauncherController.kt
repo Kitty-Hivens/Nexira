@@ -804,23 +804,27 @@ class LauncherController(
      * for that version by name. A version the pack does name is left as it is,
      * including a legacy Forge build the resolver had to substitute.
      */
-    private suspend fun pinLoaderVersion(
+    private fun pinLoaderVersion(
         instanceId: String,
         manifest: CachedManifestSnapshot,
         result: SpawnResult,
     ): SpawnResult {
         val resolved = (result as? SpawnResult.Started)?.resolvedLoaderVersion?.takeIf { it.isNotBlank() }
         if (resolved != null && manifest.loaderVersion.isBlank()) {
-            runCatchingUnlessStopped {
-                packRepository.update(instanceId) { current ->
+            // Written behind the launch, not in it. The process exists by now and is not
+            // yet the launch's to stop: a suspension here was a window in which a stop
+            // found no game to end, cancelled the launch, and left the game running with
+            // nothing holding it.
+            appScope.launch {
+                runCatching { packRepository.update(instanceId) { current ->
                     val cached = current.cachedManifest ?: return@update current
                     // Only onto the loader it was resolved for: the loader can be changed
                     // in the pack's settings while a first launch is still preparing.
                     val sameLoader = cached.loaderName.equals(manifest.loaderName, ignoreCase = true)
                     if (cached.loaderVersion.isNotBlank() || !sameLoader) current
                     else current.copy(cachedManifest = cached.copy(loaderVersion = resolved))
-                }
-            }.onFailure { logger.warn("Could not record the loader version {} for {}", resolved, instanceId, it) }
+                } }.onFailure { logger.warn("Could not record the loader version {} for {}", resolved, instanceId, it) }
+            }
         }
         return result
     }

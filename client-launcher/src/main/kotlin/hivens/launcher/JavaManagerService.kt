@@ -18,7 +18,10 @@ import org.slf4j.LoggerFactory
 import java.io.*
 import java.nio.file.*
 import java.nio.file.attribute.PosixFilePermission
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 class JavaManagerService(
     baseDir: Path,
@@ -44,11 +47,19 @@ class JavaManagerService(
 
         val folderName = "java-$javaMajor-$os-$arch"
         val targetDir = runtimesDir.resolve(folderName)
+        // One provisioning per runtime directory at a time, the same rule the loader
+        // installer keeps. A stop during the unpack does not stop the unpack, it runs
+        // to the end on IO, and a second Play started meanwhile deleted `.incoming`
+        // under it or swapped the directory out from under the first.
+        installLock(targetDir).withLock { provision(javaMajor, os, arch, targetDir, onProgress) }
+    }
+
+    private suspend fun provision(javaMajor: Int, os: String, arch: String, targetDir: Path, onProgress: (String) -> Unit): Path {
         recoverInterruptedSwap(targetDir)
 
         val existing = findJavaExecutable(targetDir)
         if (existing != null && isJavaUsable(existing)) {
-            return@withContext existing
+            return existing
         }
         if (existing != null) {
             log.warn("Java at {} failed -version check, treating as broken and re-downloading", existing)
@@ -70,7 +81,7 @@ class JavaManagerService(
         }
 
         onProgress("Java $javaMajor ready")
-        return@withContext executable
+        return executable
     }
 
     private suspend fun downloadAndUnpack(version: Int, targetDir: Path, onProgress: (String) -> Unit = {}) {
@@ -538,5 +549,10 @@ class JavaManagerService(
         internal const val DOWNLOAD_UA =
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
                 "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+
+        /** One lock per runtime directory, shared by every instance of the service in the process. */
+        private val installLocks = ConcurrentHashMap<Path, Mutex>()
+
+        private fun installLock(dir: Path): Mutex = installLocks.computeIfAbsent(dir.toAbsolutePath().normalize()) { Mutex() }
     }
 }

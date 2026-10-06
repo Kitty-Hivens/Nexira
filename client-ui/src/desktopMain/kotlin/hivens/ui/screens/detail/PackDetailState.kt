@@ -100,7 +100,10 @@ internal class PackDetailState(
     fun dismissNotes() {
         val target = pack ?: return
         if (target.notes.isBlank()) return
-        writeScope.launch { repo.put(target.copy(notes = "")) }
+        // The one field, on the record as it stands: the copy in hand can predate an
+        // update commit or a playtime write, and putting it back whole undid them, or
+        // brought back an instance deleted meanwhile.
+        writeScope.launch { repo.update(target.id) { it.copy(notes = "") } }
     }
 
     fun openFolder() {

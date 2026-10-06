@@ -204,8 +204,10 @@ internal class LauncherService(
         }
 
         // 5. Profile-driven command: main class / classpath / args come from the
-        // resolved runtime; assets point at the shared root.
-        val command = commandBuilder.buildPackCommand(
+        // resolved runtime; assets point at the shared root. A command that cannot be
+        // built ends the launch with the loading screen config already written, so it
+        // goes back here, as it does when the spawn itself fails.
+        val command = try { commandBuilder.buildPackCommand(
             javaExec = javaExec,
             memoryMB = memory,
             gameDir = clientRootPath,
@@ -226,7 +228,10 @@ internal class LauncherService(
             windowHeight = runtime.windowHeight.takeIf { runtime.windowSizeOverride },
             fullScreen = runtime.fullScreen,
             earlyLoadingScreen = earlyScreen,
-        )
+        ) } catch (e: Throwable) {
+            restoreScreen()
+            throw e
+        }
 
         // The game process echoes its token back in ways no log pattern predicts:
         // authlib logs it verbatim when it fails to read it as a JWT. Registered

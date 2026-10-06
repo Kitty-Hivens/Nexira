@@ -15,6 +15,7 @@ import hivens.core.data.PackAuthRequirement
 import hivens.core.data.SessionData
 import hivens.core.diag.ActionRing
 import hivens.ui.notifications.TwoFactorLaunchGate
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -66,27 +67,37 @@ fun TwoFactorPromptHost() {
             gate.cancel()
             return@LaunchedEffect
         }
-        runCatching { withContext(Dispatchers.IO) { auth.login(stored.playerName, pass, request.serverId) } }
-            .onSuccess { fresh ->
-                withContext(Dispatchers.IO) {
-                    accounts.saveAccount(fresh, PackAuthRequirement.SmartyCraft.PROVIDER_KEY)
-                    // Passing twoFactor = false through saveAccount never cleared the
-                    // gate, because saveAccount ORs the stored value back in by
-                    // design, so the release is its own call, made on evidence only.
-                    if (fresh.provesNoSecondFactor()) {
-                        accounts.clearTwoFactor(PackAuthRequirement.SmartyCraft.PROVIDER_KEY)
-                    }
+        // A cancellation is not a failure. A second launch asking the gate restarts
+        // this effect, and a cancellation read as a failure called gate.cancel() on
+        // that newer request, so neither launch ever happened. The account save sits
+        // inside the same handling: a vault write that throws would otherwise leave
+        // the gate pending with no dialog.
+        val fresh = try {
+            withContext(Dispatchers.IO) {
+                val session = auth.login(stored.playerName, pass, request.serverId)
+                // Not made the active account: a launch signing in is no reason to
+                // change which account fronts the shell.
+                accounts.saveAccount(session, PackAuthRequirement.SmartyCraft.PROVIDER_KEY, makeActive = false)
+                // Passing twoFactor = false through saveAccount never cleared the
+                // gate, because saveAccount ORs the stored value back in by
+                // design, so the release is its own call, made on evidence only.
+                if (session.provesNoSecondFactor()) {
+                    accounts.clearTwoFactor(PackAuthRequirement.SmartyCraft.PROVIDER_KEY)
                 }
-                gate.resume(fresh.copy(mintedNow = true))
+                session
             }
-            .onFailure { failure ->
-                if (failure is TwoFactorRequiredException) {
-                    uid = failure.uid.orEmpty()
-                } else {
-                    ActionRing.record("2FA launch of ${request.label} could not start: ${failure.message?.take(60)}")
-                    gate.cancel()
-                }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (failure: Exception) {
+            if (failure is TwoFactorRequiredException) {
+                uid = failure.uid.orEmpty()
+            } else {
+                ActionRing.record("2FA launch of ${request.label} could not start: ${failure.message?.take(60)}")
+                gate.cancel()
             }
+            return@LaunchedEffect
+        }
+        gate.resume(fresh.copy(mintedNow = true))
     }
 
     val request = pending
@@ -114,7 +125,7 @@ fun TwoFactorPromptHost() {
                     // Inside the same runCatching: a vault write can fail, and letting
                     // that escape leaves the dialog open with no error and the gate stuck.
                     withContext(Dispatchers.IO) {
-                        accounts.saveAccount(session, PackAuthRequirement.SmartyCraft.PROVIDER_KEY)
+                        accounts.saveAccount(session, PackAuthRequirement.SmartyCraft.PROVIDER_KEY, makeActive = false)
                     }
                     session
                 }.onSuccess { session ->
