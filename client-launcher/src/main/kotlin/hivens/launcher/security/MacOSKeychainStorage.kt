@@ -187,7 +187,7 @@ internal class MacOSKeychainStorage : IKeyringStorage {
     }
 
     override fun store(service: String, account: String, secret: String): Boolean {
-        require(service.isNotBlank() && account.isNotBlank()) { "service and account must be non-blank" }
+        requireKeyringIds(service, account)
         if (!symbolsReady) return false
         return Arena.ofConfined().use { call ->
             try {
@@ -233,7 +233,7 @@ internal class MacOSKeychainStorage : IKeyringStorage {
     }
 
     override fun retrieve(service: String, account: String): String? {
-        require(service.isNotBlank() && account.isNotBlank()) { "service and account must be non-blank" }
+        requireKeyringIds(service, account)
         if (!symbolsReady) return null
         return Arena.ofConfined().use { call ->
             try {
@@ -282,7 +282,7 @@ internal class MacOSKeychainStorage : IKeyringStorage {
     }
 
     override fun clear(service: String, account: String): Boolean {
-        require(service.isNotBlank() && account.isNotBlank()) { "service and account must be non-blank" }
+        requireKeyringIds(service, account)
         if (!symbolsReady) return false
         return Arena.ofConfined().use { call ->
             try {

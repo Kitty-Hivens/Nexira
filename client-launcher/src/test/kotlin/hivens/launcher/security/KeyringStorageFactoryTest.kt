@@ -1,12 +1,15 @@
 package hivens.launcher.security
 
 import hivens.core.security.IKeyringStorage
+import org.junit.jupiter.api.condition.EnabledOnOs
+import org.junit.jupiter.api.condition.OS
 import java.util.concurrent.CountDownLatch
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class KeyringStorageFactoryTest {
@@ -21,29 +24,55 @@ class KeyringStorageFactoryTest {
     }
 
     @Test
-    fun `system() on unrecognised OS returns NoOp`() {
-        // Linux libsecret, macOS Keychain, Windows Credential Manager are
-        // all wired. Anything else (BSD without Secret Service, Plan9,
-        // exotic embedded) gets the NoOp fallback and CredentialsManager
-        // degrades to its AES-GCM file path.
-        val osName = System.getProperty("os.name", "").lowercase()
-        if (!osName.contains("linux") && !osName.contains("mac") &&
-            !osName.contains("darwin") && !osName.contains("windows") &&
-            !osName.contains("bsd")) {
-            assertTrue(KeyringStorageFactory.system() is NoOpKeyringStorage)
-        }
+    fun `an unrecognised OS gets the NoOp fallback without probing anything`() {
+        // Linux libsecret, macOS Keychain, Windows Credential Manager are wired.
+        // Anything else gets the NoOp fallback and CredentialsManager degrades to
+        // its AES-GCM file path. Asked of the choice directly, so it runs on every
+        // host rather than only on the one host nothing here builds for.
+        val probed = mutableListOf<String>()
+        val chosen = KeyringStorageFactory.forOs("Plan9") { label, _ -> probed += label; null }
+        assertSame(NoOpKeyringStorage, chosen)
+        assertEquals(emptyList(), probed)
     }
 
     @Test
-    fun `IKeyringStorage instances reject blank service or account`() {
-        // Defensive: blank ids would silently coexist in the real store
-        // (libsecret happily stores a "" attribute). Catch at the boundary.
-        val noop: IKeyringStorage = NoOpKeyringStorage
-        // NoOp doesn't enforce -- it's the platform impls that throw.
-        // This test pins the API surface so a future refactor doesn't
-        // accidentally weaken the contract by swapping NoOp into the
-        // checked path.
-        assertNotNull(noop)
+    fun `each known OS probes its own store, and a failed probe falls back`() {
+        val probed = mutableListOf<String>()
+        val fallback = { os: String -> KeyringStorageFactory.forOs(os) { label, _ -> probed += label; null } }
+        assertSame(NoOpKeyringStorage, fallback("Linux"))
+        assertSame(NoOpKeyringStorage, fallback("FreeBSD"))
+        assertSame(NoOpKeyringStorage, fallback("Windows 11"))
+        assertSame(NoOpKeyringStorage, fallback("Mac OS X"))
+        assertEquals(listOf("LinuxLibsecret", "LinuxLibsecret", "WindowsCredentialManager", "MacOSKeychain"), probed)
+    }
+
+    @Test
+    fun `a blank service or account is refused at the boundary`() {
+        // Blank ids would silently coexist in the real store (libsecret happily
+        // stores a "" attribute). Every native storage calls this first.
+        assertFailsWith<IllegalArgumentException> { requireKeyringIds("", "session") }
+        assertFailsWith<IllegalArgumentException> { requireKeyringIds("Nexira", " ") }
+        requireKeyringIds("Nexira", "session")
+    }
+
+    // Each native storage, on the host it is for, refuses a blank id before any
+    // native call: the check is the first thing each of its three methods does.
+    @Test
+    @EnabledOnOs(OS.LINUX)
+    fun `the libsecret storage refuses blank ids`() = assertRefusesBlank(LinuxLibsecretKeyringStorage())
+
+    @Test
+    @EnabledOnOs(OS.MAC)
+    fun `the Keychain storage refuses blank ids`() = assertRefusesBlank(MacOSKeychainStorage())
+
+    @Test
+    @EnabledOnOs(OS.WINDOWS)
+    fun `the Credential Manager storage refuses blank ids`() = assertRefusesBlank(WindowsCredentialManagerKeyringStorage())
+
+    private fun assertRefusesBlank(storage: IKeyringStorage) {
+        assertFailsWith<IllegalArgumentException> { storage.store("", "session", "secret") }
+        assertFailsWith<IllegalArgumentException> { storage.retrieve("Nexira", "") }
+        assertFailsWith<IllegalArgumentException> { storage.clear(" ", "session") }
     }
 
     @Test

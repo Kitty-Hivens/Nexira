@@ -28,8 +28,18 @@ import java.util.concurrent.TimeoutException
 object KeyringStorageFactory {
     private val log = LoggerFactory.getLogger(KeyringStorageFactory::class.java)
 
-    fun system(): IKeyringStorage {
-        val osName = System.getProperty("os.name", "").lowercase()
+    fun system(): IKeyringStorage = forOs(System.getProperty("os.name", ""))
+
+    /**
+     * The storage for a host reporting [osName], with [probe] trying each native
+     * candidate. Separate from [system] so the choice can be asked about for a
+     * host the tests are not running on.
+     */
+    internal fun forOs(
+        osName: String,
+        probe: (label: String, factory: () -> IKeyringStorage) -> IKeyringStorage? = ::tryProbe,
+    ): IKeyringStorage {
+        val osName = osName.lowercase()
         val candidate: IKeyringStorage? = when {
             // BSDs ship the same Secret Service / libsecret stack as
             // Linux desktops (FreeBSD ports: security/libsecret +
@@ -37,11 +47,11 @@ object KeyringStorageFactory {
             // resolution flow on ELF, same DBus protocol. The "Linux"
             // name in the class is historical.
             osName.contains("linux") || osName.contains("bsd") ->
-                tryProbe("LinuxLibsecret") { LinuxLibsecretKeyringStorage() }
+                probe("LinuxLibsecret") { LinuxLibsecretKeyringStorage() }
             osName.contains("windows") ->
-                tryProbe("WindowsCredentialManager") { WindowsCredentialManagerKeyringStorage() }
+                probe("WindowsCredentialManager") { WindowsCredentialManagerKeyringStorage() }
             osName.contains("mac") || osName.contains("darwin") ->
-                tryProbe("MacOSKeychain") { MacOSKeychainStorage() }
+                probe("MacOSKeychain") { MacOSKeychainStorage() }
             else -> null
         }
         return when {

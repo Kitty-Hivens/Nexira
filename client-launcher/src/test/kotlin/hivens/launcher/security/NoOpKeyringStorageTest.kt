@@ -1,9 +1,9 @@
 package hivens.launcher.security
 
 import kotlin.test.Test
-import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 
 class NoOpKeyringStorageTest {
 
@@ -28,11 +28,14 @@ class NoOpKeyringStorageTest {
     }
 
     @Test
-    fun `singleton identity -- same instance across calls`() {
-        // The factory hands out NoOpKeyringStorage by reference; if a
-        // future refactor accidentally turns it into a class, the
-        // unnecessary allocations on every Koin resolve would matter.
-        // This test pins the singleton contract.
-        assertEquals(NoOpKeyringStorage, NoOpKeyringStorage)
+    fun `the fallback is one shared object, handed out by reference`() {
+        // A Kotlin object compiles to a class holding its one instance in a static
+        // INSTANCE field. Turned into a class, that field goes and this fails.
+        val instance = NoOpKeyringStorage::class.java.getField("INSTANCE").get(null)
+        assertSame(NoOpKeyringStorage, instance)
+        assertSame(
+            KeyringStorageFactory.forOs("Plan9") { _, _ -> null },
+            KeyringStorageFactory.forOs("Plan9") { _, _ -> null },
+        )
     }
 }
