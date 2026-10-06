@@ -6,6 +6,7 @@ import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.IntSize
 import java.time.LocalDate
+import java.time.temporal.ChronoUnit
 
 // ─── Calendar logic ───────────────────────────────────────────────────────────
 
@@ -56,11 +57,20 @@ object AprilFools {
     /**
      * Normalized chaos intensity: 0.07 on day 1, 1.0 on day 14.
      * Used as a multiplier everywhere -- crank it to 1.0 for local testing.
+     *
+     * The day is counted from the window's first day, and a run forced on outside
+     * the window counts as its first day. Read off the day of the month instead, a
+     * forced run was at full strength on the twentieth of any month.
      */
     fun intensity(): Float {
         if (!isActive()) return 0f
         debugIntensity?.let { return it.coerceIn(0f, 1f) }
-        val day = (LocalDate.now().dayOfMonth - 1).coerceIn(0, 13)
+        return intensityOn(LocalDate.now())
+    }
+
+    internal fun intensityOn(date: LocalDate): Float {
+        val start = LocalDate.of(date.year, 4, 1)
+        val day = ChronoUnit.DAYS.between(start, date).takeIf { it in 0..13 } ?: 0L
         return (day + 1) / 14f
     }
 

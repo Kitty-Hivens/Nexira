@@ -35,6 +35,13 @@ object AprilFoolsProgress {
         }
  
         val real = downloaded.toFloat() / total
+        // A finished download reads as finished. The lerp only closes a quarter of
+        // the gap per tick and the ticks stop at completion, so the bar always
+        // stopped short of full.
+        if (real >= 1f) {
+            displayProgress = 0f
+            return 1f
+        }
  
         // 15% chance to regress display by a small random step
         displayProgress = if (Random.nextFloat() < 0.15f) {

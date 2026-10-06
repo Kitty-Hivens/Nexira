@@ -2,6 +2,7 @@ package hivens.ui.easter
 
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.IntSize
+import java.time.LocalDate
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
@@ -50,5 +51,20 @@ class AprilFoolsEngineTest {
 
         assertTrue(btn.originalVisible)
         assertEquals(ChaosPhase.IDLE, btn.phase)
+    }
+
+    @Test
+    fun `intensity counts days from the first of April, and a forced run off season is a first day`() {
+        assertEquals(1f / 14f, AprilFools.intensityOn(LocalDate.of(2026, 4, 1)))
+        assertEquals(1f, AprilFools.intensityOn(LocalDate.of(2026, 4, 14)))
+        assertEquals(1f / 14f, AprilFools.intensityOn(LocalDate.of(2026, 10, 20)), "not the twentieth's full strength")
+    }
+
+    @Test
+    fun `a finished download reads as finished`() {
+        AprilFools.debugForceActive = true
+        AprilFoolsProgress.reset()
+        repeat(5) { AprilFoolsProgress.wrap(it * 10L, 100L) }
+        assertEquals(1f, AprilFoolsProgress.wrap(100L, 100L))
     }
 }
