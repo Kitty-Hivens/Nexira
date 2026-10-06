@@ -38,6 +38,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -90,6 +91,9 @@ fun NotificationCard(
 
     val scope = rememberCoroutineScope()
     val offsetX = remember(group.sourceKey) { Animatable(0f) }
+    // The gesture outlives a recomposition, so it reads the latest dismiss rather
+    // than the one in hand when the card first appeared.
+    val currentOnDismiss by rememberUpdatedState(onDismiss)
     val cardShape = MaterialTheme.shapes.medium
     val density = LocalDensity.current
     // Fade the card as it is dragged toward the edge; the slide-off + the
@@ -117,12 +121,16 @@ fun NotificationCard(
                             val target = if (dx > 0) size.width.toFloat() else -size.width.toFloat()
                             scope.launch {
                                 offsetX.animateTo(target, swipeSpec)
-                                onDismiss()
+                                currentOnDismiss()
                             }
                         } else {
                             scope.launch { offsetX.animateTo(0f, swipeSpec) }
                         }
                     },
+                    // A drag that ends without a release, taken by another gesture or
+                    // lost with the pointer, is not a swipe: without this it left the
+                    // card parked half off screen and faded until its group went.
+                    onDragCancel = { scope.launch { offsetX.animateTo(0f, swipeSpec) } },
                     onHorizontalDrag = { change, delta ->
                         change.consume()
                         scope.launch { offsetX.snapTo(offsetX.value + delta) }
