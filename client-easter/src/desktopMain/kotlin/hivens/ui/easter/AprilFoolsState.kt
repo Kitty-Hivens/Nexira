@@ -113,9 +113,9 @@ enum class ChaosPhase {
     SPINNING,
 
     /**
-     * Runs away from cursor on hover.
-     * The original button is still visible but keeps fleeing --
-     * no overlay clone for this one, pure local offset.
+     * Runs away from the cursor whenever it comes close. Drawn in the overlay like
+     * every other escape: the engine moves it there in window coordinates and hides
+     * the original, so it has to be.
      */
     FLEEING,
 
@@ -163,7 +163,10 @@ class FloatingButton(
     var hasLegs  by mutableStateOf(false)
     var legCycle by mutableStateOf(0f)   // 0..1 walking cycle
 
-    fun isEscaped() = phase !in setOf(ChaosPhase.IDLE, ChaosPhase.FLEEING)
+    // Every phase but IDLE draws in the overlay. FLEEING was left out on the strength
+    // of a design where it stayed in the layout, while the engine hides the original
+    // for it like any other escape, so a fleeing button was simply gone.
+    fun isEscaped() = phase != ChaosPhase.IDLE
 
     /** Snap overlay transform to match current origin -- call before escaping. */
     suspend fun snapToOrigin() {
