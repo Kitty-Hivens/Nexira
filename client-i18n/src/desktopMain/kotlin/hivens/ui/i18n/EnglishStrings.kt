@@ -1432,6 +1432,7 @@ object EnglishStrings : AppStrings {
     override val thresholdOpenLogs       = "open logs folder"
     override val thresholdQuit           = "quit"
     override val widgetStateTooLong = "Too long to save"
+    override val editorPropUnreadable = "The saved value could not be read, so the default is used"
     override val thresholdRecovery = "restart into recovery"
     override val thresholdRecoveryArmed = "recovery opens at the next start"
     override val thresholdRecoveryHint = "recovery also opens when the launcher is started with --recovery or NEXIRA_RECOVERY=1"

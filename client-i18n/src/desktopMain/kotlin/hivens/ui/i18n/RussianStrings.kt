@@ -1447,6 +1447,7 @@ object RussianStrings : AppStrings {
     override val thresholdOpenLogs       = "папка логов"
     override val thresholdQuit           = "выйти"
     override val widgetStateTooLong = "Слишком длинно для сохранения"
+    override val editorPropUnreadable = "Сохранённое значение не читается, используется значение по умолчанию"
     override val thresholdRecovery = "перезапуск в восстановление"
     override val thresholdRecoveryArmed = "восстановление откроется при следующем запуске"
     override val thresholdRecoveryHint = "восстановление также открывается при запуске с --recovery или NEXIRA_RECOVERY=1"

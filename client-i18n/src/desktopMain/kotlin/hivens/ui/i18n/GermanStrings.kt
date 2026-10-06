@@ -1434,6 +1434,7 @@ object GermanStrings : AppStrings {
     override val thresholdOpenLogs       = "log-ordner öffnen"
     override val thresholdQuit           = "beenden"
     override val widgetStateTooLong = "Zu lang zum Speichern"
+    override val editorPropUnreadable = "Der gespeicherte Wert ist nicht lesbar, daher gilt der Standardwert"
     override val thresholdRecovery = "neustart in wiederherstellung"
     override val thresholdRecoveryArmed = "die wiederherstellung öffnet beim nächsten start"
     override val thresholdRecoveryHint = "die wiederherstellung öffnet auch, wenn der launcher mit --recovery oder NEXIRA_RECOVERY=1 gestartet wird"

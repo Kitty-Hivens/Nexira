@@ -1513,6 +1513,9 @@ interface AppStrings {
     val thresholdOpenLogs: String
     val thresholdQuit: String
     val widgetStateTooLong: String
+
+    /** Under a prop row whose saved value the widget could not read and replaced with its default. */
+    val editorPropUnreadable: String
     val thresholdRecovery: String
     val thresholdRecoveryArmed: String
     val thresholdRecoveryHint: String

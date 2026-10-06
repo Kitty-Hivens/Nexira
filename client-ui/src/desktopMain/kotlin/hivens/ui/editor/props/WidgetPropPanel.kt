@@ -50,6 +50,7 @@ import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.LocalWidgetRegistry
 import hivens.widget.api.resolveSurface
 import hivens.widget.api.resolveEntrance
+import hivens.widget.api.readableProps
 import hivens.widget.model.Entrance
 import hivens.widget.model.WidgetMotion
 import hivens.ui.i18n.AppStrings
@@ -73,6 +74,7 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.JsonObject
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxColor
+import hivens.ui.theme.Status
 
 // Right-edge prop editor. Opened by a widget's "tune" chrome affordance,
 // which sets the host's prop target (path + instanceId). Resolves the
@@ -155,10 +157,15 @@ private fun PropPanelBody(
     val s = LocalStrings.current
     val sd = serializer?.descriptor
     // Effective values: the encoded default baseline overlaid with the
-    // instance's stored overrides. Every key is present, so each field's
-    // current value is non-null.
-    val effective: JsonObject = remember(descriptor.defaultPropsJson, instance.props) {
-        JsonObject(descriptor.defaultPropsJson + instance.props)
+    // instance's stored overrides, the ones the widget can read. Every key is
+    // present, so each field's current value is non-null. A stored value the
+    // widget cannot read is left out here as it is when the widget decodes, so
+    // the row shows the default the widget is drawing with and says why.
+    val readable: JsonObject = remember(serializer, instance.props) {
+        serializer?.let { readableProps(it, instance.props) } ?: instance.props
+    }
+    val effective: JsonObject = remember(descriptor.defaultPropsJson, readable) {
+        JsonObject(descriptor.defaultPropsJson + readable)
     }
 
     NxSurface(
@@ -218,6 +225,13 @@ private fun PropPanelBody(
                     val name = sd.getElementName(i)
                     val cur = effective[name] ?: continue
                     val label = s.widgetLabel(anns.filterIsInstance<PropLabel>().firstOrNull()?.value ?: name)
+                    if (name in instance.props && name !in readable) {
+                        Text(
+                            text  = s.editorPropUnreadable,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = NxColor.status(Status.Warning, text = true),
+                        )
+                    }
                     PropFieldRow(
                         label       = label,
                         element     = sd.getElementDescriptor(i),
