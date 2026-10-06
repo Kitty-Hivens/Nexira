@@ -15,6 +15,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -154,6 +156,10 @@ private fun EscapedButtonRenderer(btn: FloatingButton, isGhost: Boolean) {
     val rot   = btn.overlayRot.value
     val scale = btn.overlayScale.value
     val alpha = btn.overlayAlpha.value
+    // The overlay places the clone in window pixels, and the size it records is in
+    // pixels too, so it is converted here. Used as dp, the clone came out at the
+    // wrong size beside the control it stands in for at any scale other than one.
+    val (width, height) = with(LocalDensity.current) { btn.widthPx.toDp() to btn.heightPx.toDp() }
 
     Box(
         Modifier
@@ -170,8 +176,8 @@ private fun EscapedButtonRenderer(btn: FloatingButton, isGhost: Boolean) {
             Button(
                 onClick = { if (!isGhost) btn.onClick() },
                 modifier = Modifier
-                    .width(btn.widthPx.dp)
-                    .height(btn.heightPx.dp),
+                    .width(width)
+                    .height(height),
                 shape = MaterialTheme.shapes.small,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = if (isGhost)
@@ -196,7 +202,7 @@ private fun EscapedButtonRenderer(btn: FloatingButton, isGhost: Boolean) {
 
             // ── Walking legs (only when LEGS_WALKING phase) ───────────────────
             if (btn.hasLegs && !isGhost) {
-                LegsCanvas(widthPx = btn.widthPx, cycle = btn.legCycle)
+                LegsCanvas(width = width, cycle = btn.legCycle)
             }
         }
     }
@@ -209,15 +215,15 @@ private fun EscapedButtonRenderer(btn: FloatingButton, isGhost: Boolean) {
  * Each leg is a line + a horizontal "foot" at the bottom.
  * The legs alternate between forward and backward step using a sine wave on [cycle].
  *
- * @param widthPx Button width in layout pixels (used to position legs under button).
- * @param cycle   Walking cycle 0..1 -- updated by the engine each frame.
+ * @param width Button width (used to position legs under button).
+ * @param cycle Walking cycle 0..1 -- updated by the engine each frame.
  */
 @Composable
-private fun LegsCanvas(widthPx: Float, cycle: Float) {
+private fun LegsCanvas(width: Dp, cycle: Float) {
     val legColor  = NxInk.main.copy(alpha = 0.9f)
     Canvas(
         modifier = Modifier
-            .width(widthPx.dp)
+            .width(width)
             .height(26.dp)
     ) {
         val strokeW   = 2.8f
