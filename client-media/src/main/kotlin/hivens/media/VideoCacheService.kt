@@ -123,7 +123,7 @@ class VideoCacheService(
     private fun evictOverCap() {
         runCatching {
             val files = Files.list(dir).use { stream ->
-                stream.filter { Files.isRegularFile(it) && !it.fileName.toString().endsWith(".part") }.toList()
+                stream.filter { Files.isRegularFile(it) && !VideoCacheFiles.isPartial(it.fileName.toString()) }.toList()
             }
             var total = files.sumOf { runCatching { Files.size(it) }.getOrDefault(0L) }
             if (total <= maxBytes) return

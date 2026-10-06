@@ -119,11 +119,8 @@ class YtDlpService(
     private fun existingCached(hash: String): Path? {
         if (!Files.isDirectory(videoCacheDir)) return null
         val match = Files.list(videoCacheDir).use { s ->
-            s.filter {
-                Files.isRegularFile(it) &&
-                    it.fileName.toString().startsWith("$hash.") &&
-                    !it.fileName.toString().endsWith(".part")
-            }.findFirst().orElse(null)
+            s.filter { Files.isRegularFile(it) && VideoCacheFiles.isFinishedFetch(it.fileName.toString(), hash) }
+                .findFirst().orElse(null)
         } ?: return null
         return match.takeIf { runCatching { Files.size(it) > 0L }.getOrDefault(false) }
     }
@@ -251,9 +248,17 @@ class YtDlpService(
         }
     }
 
+    /**
+     * Ends yt-dlp and whatever it started. The release builds are one-file
+     * bundles whose launcher runs the program as a child, so killing the launcher
+     * alone can leave the download going. The children are listed first, because
+     * an orphan no longer shows up among the parent's descendants.
+     */
     private fun kill(proc: Process) {
-        proc.destroyForcibly()
-        proc.waitFor(5, TimeUnit.SECONDS)
+        val children = runCatching { proc.descendants().toList() }.getOrDefault(emptyList())
+        runCatching { proc.destroyForcibly() }
+        children.forEach { runCatching { it.destroyForcibly() } }
+        runCatching { proc.waitFor(5, TimeUnit.SECONDS) }
     }
 
     // -- cache eviction (shared video-cache dir) -----------------------------
@@ -261,7 +266,7 @@ class YtDlpService(
     private fun evictOverCap() {
         runCatching {
             val files = Files.list(videoCacheDir).use { s ->
-                s.filter { Files.isRegularFile(it) && !it.fileName.toString().endsWith(".part") }.toList()
+                s.filter { Files.isRegularFile(it) && !VideoCacheFiles.isPartial(it.fileName.toString()) }.toList()
             }
             var total = files.sumOf { runCatching { Files.size(it) }.getOrDefault(0L) }
             if (total <= maxCacheBytes) return
@@ -287,9 +292,9 @@ class YtDlpService(
          * timeout -- so a stopped fetch left a truncated video sitting under the
          * name of a complete one. Nothing downstream could tell: the cache lookup
          * accepts any non-`.part` file of non-zero size, so every later request for
-         * that URL returned the short file and never downloaded again. Both the
-         * lookup and the eviction sweep already filter `.part`; the flag was what
-         * made those filters match nothing.
+         * that URL returned the short file and never downloaded again. The lookup
+         * and the eviction sweep skip partial files (see [VideoCacheFiles]), and
+         * the flag was what left them nothing to skip.
          *
          * Without it yt-dlp writes `<name>.part` and renames only when the file is
          * whole, and a leftover part-file is resumed by the next attempt.
