@@ -580,7 +580,7 @@ class LauncherController(
         // game had them open. That game has exited, and nothing but a launch comes
         // round again: left alone, a mod the player switched off went on loading.
         // Before the roster check, which reads the result.
-        val owed = runCatching { smrtSyncService.settlePending(clientDir) }
+        val owed = runCatchingUnlessStopped { smrtSyncService.settlePending(clientDir) }
             .onFailure { logger.warn("Pack launch {}: pending content changes not applied", refreshedInstance.displayName, it) }
             .getOrDefault(emptyList())
         if (owed.isNotEmpty()) {
@@ -781,7 +781,7 @@ class LauncherController(
     ): SpawnResult {
         val resolved = (result as? SpawnResult.Started)?.resolvedLoaderVersion?.takeIf { it.isNotBlank() }
         if (resolved != null && manifest.loaderVersion.isBlank()) {
-            runCatching {
+            runCatchingUnlessStopped {
                 packRepository.update(instanceId) { current ->
                     val cached = current.cachedManifest ?: return@update current
                     if (cached.loaderVersion.isNotBlank()) current else current.copy(cachedManifest = cached.copy(loaderVersion = resolved))
@@ -817,7 +817,7 @@ class LauncherController(
         ActionRing.record(
             "Pack launch ${instance.displayName}: instance does not match the pack, fetching what is missing",
         )
-        val repaired = runCatching {
+        val repaired = runCatchingUnlessStopped {
             val manifest = if (version != null) {
                 smrtPackClient.fetchManifestVersion(instance.packRef.id, version)
             } else {
@@ -940,7 +940,7 @@ class LauncherController(
         val refreshed = instance.copy(cachedManifest = snapshot)
         // Onto the record as it stands, for the same reason onSpawned re-reads: the
         // fetch is a network round trip, and the copy in hand may be older than it.
-        runCatching {
+        runCatchingUnlessStopped {
             packRepository.update(instance.id) { it.copy(cachedManifest = snapshot) }
         }.onFailure { logger.warn("Failed to persist cachedManifest for ${instance.id}", it) }
         return snapshot to refreshed
@@ -1080,6 +1080,11 @@ class LauncherController(
             ActionRing.record("Pack launch ${instance.displayName}: second factor required for '$serverId'")
             fail(LaunchError.TwoFactorExpired)
             null
+        } catch (e: CancellationException) {
+            // The launch was stopped while it signed in. Caught below, the stop was
+            // narrated as a session that could not be refreshed and the launch went
+            // on offline to its next suspension point.
+            throw e
         } catch (e: Exception) {
             // A refresh that did not go through means this launch has no session it
             // earned, so it gets none: the pack starts offline with the token
@@ -1189,6 +1194,14 @@ class LauncherController(
         val record = live.record ?: return
         runCatching { record(live.take()) }.onFailure { logger.warn("Recording the session before quit failed", it) }
     }
+
+    /**
+     * [runCatching] that lets a stopped launch stop. A plain one catches the
+     * cancellation with everything else, and a launch stopped during that call was
+     * narrated as the call failing and carried on to its next suspension point.
+     */
+    private inline fun <T> runCatchingUnlessStopped(block: () -> T): Result<T> =
+        runCatching(block).onFailure { if (it is CancellationException) throw it }
 
     private fun setStage(stage: PrepareStage, progress: Float) {
         _state.value = LaunchState.Prepare(stage, progress)

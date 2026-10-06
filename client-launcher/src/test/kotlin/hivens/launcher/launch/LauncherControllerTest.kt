@@ -47,6 +47,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.serialization.json.Json
 import java.nio.file.Files
 import java.nio.file.Path
@@ -1402,6 +1403,44 @@ class LauncherControllerTest {
         advanceUntilIdle()
         collectorJob?.cancel()
         return if (captured.isCaptured) captured.captured else null
+    }
+
+    /**
+     * A stop pressed while the launch signs in is a stop. Caught with the other
+     * failures, it was narrated as a session that could not be refreshed, a sticky
+     * warning, and the launch went on offline towards the spawn.
+     */
+    @Test
+    fun `stopping a launch while it signs in is not a refresh failure`() = runTest {
+        credentialsManager.saveAccount(
+            SessionData(playerName = "tester", uuid = "u", accessToken = "stale", cachedPassword = "pw"),
+            "smartycraft",
+        )
+        coEvery { authService.login(any(), any(), any()) } coAnswers { awaitCancellation() }
+        every { settingsService.getSettings() } returns SettingsData()
+        val events = mutableListOf<LaunchLogEvent>()
+        val controller = newController(this)
+        val collector = launch { controller.events.toList(events) }
+
+        controller.launchPackInstance(
+            currentSession = SessionData(playerName = "tester", uuid = "u", accessToken = "stale", cachedPassword = "pw"),
+            packInstance = scBoundPackInstance(),
+        )
+        advanceUntilIdle()
+        controller.abort()
+        advanceUntilIdle()
+        collector.cancel()
+
+        assertTrue(events.none { it is LaunchLogEvent.AuthFailed || it is LaunchLogEvent.OfflineSkipAuth }, "got $events")
+        coVerify(exactly = 0) {
+            launcherService.launchPackClient(
+                sessionData = any(), manifest = any(), runtime = any(), clientRootPath = any(),
+                javaPathOverride = any(), adaptiveEnabled = any(),
+                redirectAuthHost = any(), useNetworkAgent = any(),
+                useSmartycraftAuthLib = any(), boundLaunch = any(), seal = any(), displayName = any(), onLog = any(),
+            )
+        }
+        assertEquals(LaunchState.Idle, controller.state.value)
     }
 
     @Test
