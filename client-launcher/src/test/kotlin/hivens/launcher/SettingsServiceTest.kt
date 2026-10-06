@@ -152,6 +152,28 @@ class SettingsServiceTest {
     }
 
     /**
+     * The recovery surface switches a module off through the raw file while this
+     * process may still hold its copy. The next ordinary change, a track ending and
+     * the queue position saved, used to write that copy back and switch the module
+     * on again.
+     */
+    @Test
+    fun `a change made to the file by another writer is built on, not written over`() {
+        val file = workDir / "settings.json"
+        val svc = SettingsService(json, file)
+        svc.updateSettings { it.copy(audioQueueIndex = 1) }
+
+        val elsewhere = json.decodeFromString<SettingsData>(Files.readString(file)).copy(disabledModules = setOf(ModuleId.Tray.id))
+        Files.writeString(file, json.encodeToString(elsewhere))
+
+        svc.updateSettings { it.copy(audioQueueIndex = 2) }
+
+        val onDisk = json.decodeFromString<SettingsData>(Files.readString(file))
+        assertEquals(setOf("tray"), onDisk.disabledModules, "the module came back on")
+        assertEquals(2, onDisk.audioQueueIndex)
+    }
+
+    /**
      * The in-process lock below serialises this launcher's own writers. It says
      * nothing about what the FILE looks like mid-write, and that is what matters
      * on a crash or a full disk: `reload` cannot tell truncated JSON from absent

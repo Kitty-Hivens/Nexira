@@ -83,6 +83,7 @@ import hivens.ui.utils.rememberReadOffMain
 import hivens.ui.widgets.profile.SkinHero
 import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.path
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -180,6 +181,9 @@ private fun Wardrobe(session: SessionData) {
     val defaultSkinProvider: DefaultSkinProvider = koinInject()
     val clanRoles: ClanRoleProvider = koinInject()
     val scope = rememberCoroutineScope()
+    // The apply is a POST that does not stop because the reader left the screen,
+    // the same as the profile's own upload.
+    val applyScope: CoroutineScope = koinInject()
 
     var refreshKey by remember { mutableIntStateOf(0) }
     var selectedId by remember { mutableStateOf<String?>(null) }
@@ -323,14 +327,17 @@ private fun Wardrobe(session: SessionData) {
         val sc = scSession ?: return
         busy = true
         error = null
-        scope.launch {
+        // Left mid-request on the composition, the request was cancelled whether or not
+        // the server had taken it: an apply that landed was never marked or shown, and
+        // the next visit's import marked the old skin applied again.
+        applyScope.launch(Dispatchers.Main) {
             val result = withContext(Dispatchers.IO) {
                 runCatching { skinRepository.uploadSkin(file, isCloak = isCloak, session = sc) }
                     .getOrElse { it.message ?: "error" }
             }
             busy = false
             if (result == "OK") {
-                markId?.let { library.markApplied(it, System.currentTimeMillis()) }
+                withContext(Dispatchers.IO) { markId?.let { library.markApplied(it, System.currentTimeMillis()) } }
                 skinManager.invalidate(sc.playerName)
                 refreshKey++
             } else {
