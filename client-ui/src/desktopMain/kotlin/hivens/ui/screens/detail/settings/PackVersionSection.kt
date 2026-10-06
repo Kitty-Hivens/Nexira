@@ -50,7 +50,8 @@ import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
 /**
- * Compact version panel for a mirror instance: the installed build with its
+ * Compact version panel for a tracked instance (a local pack gets
+ * [PackLoaderSection] instead): the installed build with its
  * channel, the mirror's latest-build line, a manual check, follow-latest, and
  * the available-update banner. A green update applies right here (progress in
  * the window's footer strip, narrated from [operation]); an amber one routes to
@@ -66,6 +67,12 @@ internal fun PackVersionSection(
     onOpenVersions: () -> Unit = {},
     onNotice: (String?) -> Unit = {},
 ) {
+    // A pack the player owns has no builds to move between. What it does have is
+    // the loader it was made with, and this is the section where a version is set.
+    if (pack.packRef.origin == PackOrigin.Local) {
+        PackLoaderSection(pack, save)
+        return
+    }
     val s = LocalStrings.current
     val updater: PackUpdater = koinInject()
     val mirror: IMirrorPackClient = koinInject()

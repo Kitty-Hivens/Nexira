@@ -10,8 +10,8 @@ import hivens.ui.icons.NxIcon
  * label accessor, order here = display order.
  *
  * [needsVersionFeed] hides a section for an instance whose source cannot offer
- * other builds: version management has nothing to manage for a local or imported
- * pack, so it is absent there. Deliberately a capability and not an origin -- it
+ * other builds and that is not the player's own either: a local pack shows the
+ * Version section with its loader in it instead of builds, see PackLoaderSection. Deliberately a capability and not an origin -- it
  * read "mirror only" while the mirror was the only source that could update, and
  * stayed that way after another one learned to, which is how a Modrinth pack ended
  * up able to switch versions with no way to say so.

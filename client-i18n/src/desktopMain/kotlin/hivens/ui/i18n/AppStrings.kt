@@ -1135,6 +1135,11 @@ interface AppStrings {
     val packSettingsLoader: String
     val packSettingsJavaPickOwn: String
     val packSettingsOptionalCoToggle: String
+    val packLoaderInstalled: String
+    val packLoaderNextLaunch: String
+    val packLoaderModsStay: String
+    val packLoaderApply: String
+    val packLoaderRevert: String
     /** Under an optional mod held off because it cannot run beside [name], which the pack requires. */
     fun optionalLockedConflict(name: String): String
     /** Under an optional mod held on because [name], which the pack requires, needs it. */

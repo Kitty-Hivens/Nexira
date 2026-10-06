@@ -13,7 +13,6 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -46,7 +45,6 @@ import hivens.launcher.PackImportService
 import hivens.launcher.PackInstallService
 import hivens.launcher.imports.LocalPackCreator
 import hivens.launcher.runtime.RuntimeProvisioner
-import hivens.launcher.runtime.loader.LoaderVersionOption
 import hivens.ui.AppState
 import hivens.ui.Screen
 import hivens.ui.i18n.LocalStrings
@@ -54,7 +52,6 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
-import hivens.ui.nx.NxChoiceChip
 import hivens.ui.nx.NxContextMenu
 import hivens.ui.nx.NxField
 import hivens.ui.nx.NxMenuAlign
@@ -77,7 +74,6 @@ import hivens.widget.model.SurfaceId
 import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.path
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
@@ -275,45 +271,19 @@ private fun NewLocalPackDialog(
     var showSnapshots by remember { mutableStateOf(false) }
     var loaderVersion by remember { mutableStateOf("") }
     var versions by remember { mutableStateOf<List<String>>(emptyList()) }
-    val loaders = remember {
-        listOf(
-            "Vanilla" to null, "Fabric" to "fabric", "Forge" to "forge", "NeoForge" to "neoforge", "Quilt" to "quilt",
-            "Cleanroom" to "cleanroom", "lwjgl3ify" to "lwjgl3ify",
-        )
-    }
-    var loaderSel by remember { mutableStateOf(0) }
-    val loaderId = loaders[loaderSel].second
+    var loaderId by remember { mutableStateOf<String?>(null) }
     // Cleanroom and lwjgl3ify publish their builds as release pages with no index to
     // ask for the latest, so they need a version named.
-    val versionRequired = loaderId in LOADERS_WITHOUT_LATEST
+    val versionRequired = loaderNeedsVersion(loaderId)
 
     // Smart default name from the loader + version ("Fabric 1.20.1"); the name
     // field is optional and falls back to it.
-    val defaultName = remember(loaderSel, mc) {
-        listOf(loaders[loaderSel].first, mc.trim()).filter { it.isNotBlank() }.joinToString(" ")
+    val defaultName = remember(loaderId, mc) {
+        val loaderLabel = LOADER_CHOICES.first { it.second == loaderId }.first
+        listOf(loaderLabel, mc.trim()).filter { it.isNotBlank() }.joinToString(" ")
     }
     val effectiveName = name.ifBlank { defaultName }
     val canCreate = mc.isNotBlank() && (!versionRequired || loaderVersion.isNotBlank())
-
-    // What the loader publishes for the chosen Minecraft version, asked once the
-    // version is one Mojang lists rather than on every keystroke of one being typed.
-    // The field stays free text: a build the listing does not carry is still one
-    // a person may name.
-    var loaderVersions by remember { mutableStateOf<List<LoaderVersionOption>>(emptyList()) }
-    var loaderMenuOpen by remember { mutableStateOf(false) }
-    LaunchedEffect(loaderId, mc.trim(), versions) {
-        loaderVersions = emptyList()
-        val target = mc.trim()
-        if (loaderId == null || target !in versions) return@LaunchedEffect
-        delay(300)
-        loaderVersions = runCatching {
-            withContext(Dispatchers.IO) { provisioner.availableLoaderVersions(loaderId, target) }
-        }.getOrDefault(emptyList())
-    }
-    val loaderMatches = remember(loaderVersion, loaderVersions) {
-        val typed = loaderVersion.trim()
-        (if (typed.isEmpty()) loaderVersions else loaderVersions.filter { it.version.contains(typed, ignoreCase = true) }).take(60)
-    }
 
     LaunchedEffect(Unit) {
         versions = runCatching { withContext(Dispatchers.IO) { provisioner.availableMinecraftVersions() } }.getOrDefault(emptyList())
@@ -398,51 +368,16 @@ private fun NewLocalPackDialog(
                     PuppetField("createPack.mc", mc) { mc = it; mcMenuOpen = true }
 
                     FieldLabel(s.createPackLoader)
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        loaders.forEachIndexed { i, (label, _) ->
-                            // A version typed for one loader is not a version of another.
-                            NxChoiceChip(label = label, selected = loaderSel == i) {
-                                if (loaderSel != i) loaderVersion = ""
-                                loaderSel = i
-                            }
-                        }
-                    }
-
-                    if (loaderId != null) {
-                        FieldLabel(s.createPackLoaderVersion)
-                        Box {
-                            NxField(
-                                value = loaderVersion,
-                                onValueChange = { loaderVersion = it; loaderMenuOpen = true },
-                                placeholder = if (versionRequired) s.createPackLoaderVersionRequired else s.createPackLoaderVersionLatest,
-                                modifier = Modifier.fillMaxWidth().onFocusChanged { if (it.isFocused) loaderMenuOpen = true },
-                            )
-                            NxContextMenu(
-                                expanded         = loaderMenuOpen && loaderMatches.isNotEmpty(),
-                                onDismissRequest = { loaderMenuOpen = false },
-                                align            = NxMenuAlign.Start,
-                                maxHeight        = 240.dp,
-                                matchAnchorWidth = true,
-                            ) {
-                                loaderMatches.forEach { option ->
-                                    NxMenuItem(
-                                        label = option.version,
-                                        hint = when {
-                                            option.recommended -> s.createPackLoaderRecommended
-                                            !option.stable -> s.createPackLoaderPreRelease
-                                            else -> null
-                                        },
-                                        selected = option.version == loaderVersion,
-                                        mark = NxMenuMark.Radio,
-                                    ) {
-                                        loaderVersion = option.version
-                                        loaderMenuOpen = false
-                                    }
-                                }
-                            }
-                        }
-                        PuppetField("createPack.loaderVersion", loaderVersion) { loaderVersion = it; loaderMenuOpen = true }
-                    }
+                    LoaderPicker(
+                        mcVersion       = mc.trim(),
+                        mcKnown         = mc.trim() in versions,
+                        loaderId        = loaderId,
+                        onLoader        = { loaderId = it },
+                        loaderVersion   = loaderVersion,
+                        onLoaderVersion = { loaderVersion = it },
+                        puppetKey       = "createPack.loaderVersion",
+                        label           = { FieldLabel(it) },
+                    )
 
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End)) {
                         NxButton(label = s.createPackCancel, onClick = onDismiss, style = NxButtonStyle.Tertiary, compact = true)
@@ -471,6 +406,3 @@ private fun FieldLabel(text: String) {
 }
 
 private const val SURFACE = "library"
-
-/** Loaders whose builds have no index to resolve a latest from. */
-private val LOADERS_WITHOUT_LATEST = setOf("cleanroom", "lwjgl3ify")

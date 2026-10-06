@@ -188,9 +188,11 @@ fun PackSettingsSheet(
     // rather than inferred from where the pack came from.
     val updater: PackUpdater = koinInject()
     val hasVersionFeed = remember(pack.packRef.origin) { updater.handles(pack) }
-    val categories = remember(hasVersionFeed, isMirror) {
+    // A local pack has no feed and still has a version to set: its loader's.
+    val isLocal = pack.packRef.origin == PackOrigin.Local
+    val categories = remember(hasVersionFeed, isMirror, isLocal) {
         PackSettingsCategory.entries.filter {
-            (hasVersionFeed || !it.needsVersionFeed) && (isMirror || !it.needsOptionalContent)
+            (hasVersionFeed || isLocal || !it.needsVersionFeed) && (isMirror || !it.needsOptionalContent)
         }
     }
     var selected by remember(pack.id) { mutableStateOf(initialCategory ?: PackSettingsCategory.General) }
