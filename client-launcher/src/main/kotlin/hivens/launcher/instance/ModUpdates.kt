@@ -40,6 +40,11 @@ data class ModUpdate(
     val url: String,
     val sha1: String,
     val sizeBytes: Long,
+    /**
+     * What the build being installed declares it needs. Carried so a swap can
+     * bring a dependency the build pinned up to that build, see [pinnedRequirements].
+     */
+    val dependencies: List<ModrinthDependency> = emptyList(),
 )
 
 /**
@@ -92,6 +97,7 @@ fun updateFrom(
         url              = file.url,
         sha1             = file.hashes.sha1,
         sizeBytes        = file.size,
+        dependencies     = newest.dependencies,
     )
 }
 
@@ -135,6 +141,7 @@ fun ModrinthVersion.swapFor(ref: ContentRef, installedVersion: String?): ModUpda
         url              = file.url,
         sha1             = file.hashes.sha1,
         sizeBytes        = file.size,
+        dependencies     = dependencies,
     )
 }
 
@@ -147,9 +154,10 @@ fun ModrinthVersion.swapFor(ref: ContentRef, installedVersion: String?): ModUpda
  * thing to install.
  *
  * [present] is the set of project ids the instance already carries. A
- * dependency already there is dropped whatever version it is on: replacing a
- * working build because a newer one exists is the behaviour that took Sodium
- * out from under Iris.
+ * dependency already there is not fetched again here: replacing a working build
+ * because a newer one exists is the behaviour that took Sodium out from under
+ * Iris. One the author pinned to a build newer than the installed one is a
+ * different case, and [pinnedRequirements] with [isBehind] is how it is caught.
  */
 fun requiredDependencies(
     version: ModrinthVersion,
@@ -159,6 +167,25 @@ fun requiredDependencies(
         (dep.projectId != null || dep.versionId != null) &&
         dep.projectId !in present
 }
+
+/**
+ * The required dependencies that name an exact build.
+ *
+ * Modrinth has no version ranges. A pin is the only way an author says which
+ * build of a dependency theirs was made against, so it is the only thing a
+ * dependency already installed can be held to.
+ */
+fun pinnedRequirements(dependencies: List<ModrinthDependency>): List<ModrinthDependency> =
+    dependencies.filter { it.dependencyType == "required" && it.projectId != null && it.versionId != null }
+
+/**
+ * Whether [installed] is an older build than [pinned], the one a dependent was
+ * made against. Newer is left alone: a mod built against 4.0 runs on 4.1, and
+ * stepping a dependency backwards would break whatever else needed the newer one.
+ * ISO-8601 in UTC, so lexicographic order is chronological order.
+ */
+fun isBehind(installed: ModrinthVersion, pinned: ModrinthVersion): Boolean =
+    installed.id != pinned.id && installed.datePublished < pinned.datePublished
 
 /**
  * Which loader ids to ask about for a folder.

@@ -511,7 +511,7 @@ val mirrorModule = module {
     // Per-file updates for an instance's own folders: checks Modrinth by hash and
     // swaps jars in place. App-scoped, so a batch of forty survives leaving the tab
     // that started it.
-    single { InstanceContentUpdater(modrinth = get(), manager = InstanceContentManager(), scope = get(), work = get()) }
+    single { InstanceContentUpdater(modrinth = get(), manager = InstanceContentManager(), scope = get(), work = get(), installer = get()) }
     // Installing a mod means installing what it cannot run without: the browser
     // used to fetch the one jar that was clicked and leave the player to meet the
     // missing dependency on the loading screen.

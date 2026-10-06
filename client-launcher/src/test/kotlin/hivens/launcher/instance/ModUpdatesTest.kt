@@ -284,4 +284,33 @@ class ModUpdatesTest {
         assertTrue(ok)
         assertEquals("new", Files.readString(folder.resolve("mod.jar")), "same name, new bytes -- and the delete must not run after the move")
     }
+
+    // ── pinned dependencies ──────────────────────────────────────────────────
+
+    @Test
+    fun `only a required dependency that names a build is a pin`() {
+        val deps = listOf(
+            ModrinthDependency(projectId = "a", versionId = "a-2"),
+            ModrinthDependency(projectId = "b"),
+            ModrinthDependency(projectId = "c", versionId = "c-1", dependencyType = "optional"),
+            ModrinthDependency(versionId = "d-1"),
+        )
+        assertEquals(listOf("a"), pinnedRequirements(deps).map { it.projectId })
+    }
+
+    @Test
+    fun `an installed build is behind a pin only when it is older`() {
+        val pinned = version("2.0", "2026-03-01", sha1 = "b")
+        assertTrue(isBehind(version("1.0", "2026-01-01", sha1 = "a"), pinned))
+        assertFalse(isBehind(version("2.0", "2026-03-01", sha1 = "b"), pinned), "the pinned build itself")
+        assertFalse(isBehind(version("3.0", "2026-05-01", sha1 = "c"), pinned), "newer stays, stepping back would break whatever needed it")
+    }
+
+    @Test
+    fun `an update and a picked build carry what the build declares it needs`() {
+        val deps = listOf(ModrinthDependency(projectId = "lib", versionId = "lib-2"))
+        val newer = version("2.0", "2026-03-01", sha1 = "bbbb").copy(dependencies = deps)
+        assertEquals(deps, updateFrom(ref, "aaaa", "1.0", listOf(newer))?.dependencies)
+        assertEquals(deps, newer.swapFor(ref, "1.0")?.dependencies)
+    }
 }

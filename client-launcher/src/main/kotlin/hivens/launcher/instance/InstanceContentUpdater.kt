@@ -8,6 +8,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -47,6 +48,8 @@ class InstanceContentUpdater(
     private val manager: InstanceContentManager,
     private val scope: CoroutineScope,
     private val work: InstanceWorkRegistry,
+    /** What the instance already carries, for the dependencies an update pins. */
+    private val installer: ModInstaller,
 ) {
 
     private val log = LoggerFactory.getLogger(InstanceContentUpdater::class.java)
@@ -248,9 +251,11 @@ class InstanceContentUpdater(
         // behind. The scanner ignores those, so nobody would ever see them
         // and nothing else would ever remove them.
         sweepScratch(instanceDir, targets.map { it.update.ref.kind }.distinct())
+        val batch = targets + dependencyTargets(instanceDir, targets)
+        if (batch.size != targets.size) mark(key) { it.copy(total = batch.size) }
         val gate = Semaphore(DOWNLOAD_CONCURRENCY)
         coroutineScope {
-            targets.map { target ->
+            batch.map { target ->
                 async {
                     val name = target.update.ref.fileName
                     mark(key) { it.copy(current = name) }
@@ -267,6 +272,31 @@ class InstanceContentUpdater(
         }
         mark(key) { it.copy(current = null, finished = true) }
         runCatching { onChanged() }
+    }
+
+    /**
+     * The dependencies [targets] pinned that this instance carries at an older
+     * build, as swaps to the pinned one.
+     *
+     * An update used to take the newest build of a mod and leave its library where
+     * it was, and a build made against a newer library fails in the game, often as
+     * an AbstractMethodError naming neither. A dependency the batch already
+     * replaces is left to that replacement. Nothing is asked of the network when
+     * no target pins anything, and a lookup that fails costs the follow-up and
+     * not the batch.
+     */
+    private suspend fun dependencyTargets(instanceDir: Path, targets: List<Target>): List<Target> {
+        val pins = targets.flatMap { pinnedRequirements(it.update.dependencies) }
+        if (pins.isEmpty()) return emptyList()
+        val targeted = targets.mapTo(mutableSetOf()) { it.update.projectId }
+        return try {
+            installer.pinnedUpgrades(instanceDir, pins.filterNot { it.projectId in targeted })
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            log.warn("checking the dependencies an update pins failed: {}", e.message)
+            emptyList()
+        }
     }
 
     /** Drop a finished run once the screen has shown its outcome. */
@@ -286,33 +316,8 @@ class InstanceContentUpdater(
      * it: the engine refetches a body that arrives whole but wrong, and never
      * writes one out. Checked afterwards, the first bad body failed the update.
      */
-    private suspend fun applyOne(instanceDir: Path, target: Target): Boolean {
-        val update = target.update
-        val dir = instanceDir.resolve(update.ref.kind.folderName())
-        withContext(Dispatchers.IO) { Files.createDirectories(dir) }
-        val scratch = withContext(Dispatchers.IO) {
-            Files.createTempFile(dir, SCRATCH_PREFIX, SCRATCH_SUFFIX).also {
-                // The transfer skips a target that already exists, and
-                // createTempFile has just made one.
-                Files.deleteIfExists(it)
-            }
-        }
-        return try {
-            modrinth.downloadTo(update.url, scratch, update.sha1)
-            manager.replace(
-                instanceDir = instanceDir,
-                kind        = update.ref.kind,
-                oldFileName = update.ref.fileName,
-                source      = scratch,
-                newFileName = update.fileName,
-                enabled     = target.enabled,
-            )
-        } catch (e: Exception) {
-            log.warn("updating {} to {} failed: {}", update.ref.fileName, update.versionNumber, e.message)
-            withContext(Dispatchers.IO) { runCatching { Files.deleteIfExists(scratch) } }
-            false
-        }
-    }
+    private suspend fun applyOne(instanceDir: Path, target: Target): Boolean =
+        swapIn(modrinth, manager, instanceDir, target)
 
     /** Remove scratch files an interrupted batch left in the folders being touched. */
     private suspend fun sweepScratch(instanceDir: Path, kinds: List<ContentKind>) = withContext(Dispatchers.IO) {
@@ -332,13 +337,13 @@ class InstanceContentUpdater(
         _runs.update { runs -> runs[key]?.let { runs + (key to edit(it)) } ?: runs }
     }
 
-    private companion object {
+    internal companion object {
         /**
          * Four at a time. The transfer engine retries and resumes, so the cap is
          * about not saturating a home connection while the launcher is also the
          * thing the player is looking at -- not about the server.
          */
-        const val DOWNLOAD_CONCURRENCY = 4
+        private const val DOWNLOAD_CONCURRENCY = 4
 
         /**
          * Scratch naming. The prefix is what the sweep recognises; both halves
@@ -354,6 +359,59 @@ class InstanceContentUpdater(
          * nothing, short enough that it cannot be the reason a fix published
          * this morning is invisible this afternoon.
          */
-        val CHECK_TTL_NANOS = 10L * 60 * 1_000_000_000
+        private val CHECK_TTL_NANOS = 10L * 60 * 1_000_000_000
     }
 }
+
+/**
+ * Download [target]'s file beside its folder, held to the hash Modrinth published
+ * for it, and swap it in for the file it replaces. True when it landed.
+ *
+ * The scratch file lives in the target folder so the swap is a rename within one
+ * filesystem, and under a name the scanner does not read as content and the
+ * updater's sweep clears. The hash is the difference between installing a mod and
+ * installing a truncated download of one, and it goes to the transfer rather than
+ * being checked after it: the engine refetches a body that arrives whole but
+ * wrong, and never writes one out. Checked afterwards, the first bad body failed
+ * the update.
+ *
+ * Shared by the updater and the installer, which brings a pinned dependency up to
+ * its pin the same way.
+ */
+internal suspend fun swapIn(
+    modrinth: ModrinthClient,
+    manager: InstanceContentManager,
+    instanceDir: Path,
+    target: InstanceContentUpdater.Target,
+): Boolean {
+    val update = target.update
+    val dir = instanceDir.resolve(update.ref.kind.folderName())
+    withContext(Dispatchers.IO) { Files.createDirectories(dir) }
+    val scratch = withContext(Dispatchers.IO) {
+        Files.createTempFile(dir, InstanceContentUpdater.SCRATCH_PREFIX, InstanceContentUpdater.SCRATCH_SUFFIX).also {
+            // The transfer skips a target that already exists, and
+            // createTempFile has just made one.
+            Files.deleteIfExists(it)
+        }
+    }
+    return try {
+        modrinth.downloadTo(update.url, scratch, update.sha1)
+        manager.replace(
+            instanceDir = instanceDir,
+            kind        = update.ref.kind,
+            oldFileName = update.ref.fileName,
+            source      = scratch,
+            newFileName = update.fileName,
+            enabled     = target.enabled,
+        )
+    } catch (e: CancellationException) {
+        withContext(NonCancellable + Dispatchers.IO) { runCatching { Files.deleteIfExists(scratch) } }
+        throw e
+    } catch (e: Exception) {
+        swapLog.warn("updating {} to {} failed: {}", update.ref.fileName, update.versionNumber, e.message)
+        withContext(Dispatchers.IO) { runCatching { Files.deleteIfExists(scratch) } }
+        false
+    }
+}
+
+private val swapLog = LoggerFactory.getLogger("hivens.launcher.instance.Swap")

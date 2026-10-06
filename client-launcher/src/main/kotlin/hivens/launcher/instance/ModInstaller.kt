@@ -1,5 +1,6 @@
 package hivens.launcher.instance
 
+import hivens.core.api.dto.modrinth.ModrinthDependency
 import hivens.core.api.dto.modrinth.ModrinthVersion
 import hivens.launcher.modrinth.ModrinthClient
 import hivens.launcher.util.sha1Of
@@ -22,20 +23,23 @@ import java.nio.file.Path
  *
  * Only `required` dependencies are followed. Optional means the author suggests
  * it, and acting on a suggestion would quietly grow the folder by things the
- * player did not ask for. A dependency already present is left alone, whatever
- * version it is on: the pack is the player's, and a working older build is not
- * ours to replace behind their back.
+ * player did not ask for. A dependency already present is left alone unless the
+ * author pinned a build of it and the one installed is older: the pack is the
+ * player's, and a working build is not ours to replace for being old, only for
+ * being older than what the mod was made against.
  */
 class ModInstaller(
     private val modrinth: ModrinthClient,
     private val scanner: InstanceContentScanner,
+    private val manager: InstanceContentManager = InstanceContentManager(),
 ) {
 
     private val log = LoggerFactory.getLogger(ModInstaller::class.java)
 
     /**
      * What an install did. [installed] is the file names that landed, head of the
-     * list first; [skipped] and [missing] are PROJECT ids, the first for
+     * list first, and [upgraded] the names of dependencies brought up to the build
+     * a mod pinned. [skipped] and [missing] are PROJECT ids, the first for
      * dependencies already present and the second for required ones with no build
      * for this instance, which is the one case the caller has to show rather than
      * swallow.
@@ -51,6 +55,7 @@ class ModInstaller(
         val present: Set<String> = emptySet(),
         val skipped: List<String> = emptyList(),
         val missing: List<String> = emptyList(),
+        val upgraded: List<String> = emptyList(),
     ) {
         val ok: Boolean get() = installed.isNotEmpty()
     }
@@ -75,11 +80,13 @@ class ModInstaller(
 
         // What the folder already holds, by project. Resolved by hash, so a jar
         // renamed by hand still counts as installed.
-        val present = presentProjects(instanceDir).toMutableSet()
+        val held = installedProjects(instanceDir)
+        val present = held.keys.toMutableSet()
 
         val installed = mutableListOf<String>()
         val skipped = mutableListOf<String>()
         val missing = mutableListOf<String>()
+        val upgraded = mutableListOf<String>()
         val seen = mutableSetOf<String>()
 
         var frontier = listOf(version)
@@ -96,9 +103,15 @@ class ModInstaller(
                 installed += v.primaryFile().filename
                 present += v.projectId
 
-                skipped += v.dependencies
-                    .filter { it.dependencyType == "required" && it.projectId in present }
-                    .mapNotNull { it.projectId }
+                // Present already: kept, unless the build just fetched pinned a newer
+                // one, which is then put in its place.
+                val presentDeps = v.dependencies.filter { it.dependencyType == "required" && it.projectId in present }
+                val raised = pinnedUpgrades(presentDeps, held)
+                for (target in raised) {
+                    if (swapIn(modrinth, manager, instanceDir, target)) upgraded += target.update.fileName
+                }
+                val raisedIds = raised.mapTo(mutableSetOf()) { it.update.projectId }
+                skipped += presentDeps.mapNotNull { it.projectId }.filterNot { it in raisedIds }
                 for (dep in requiredDependencies(v, present)) {
                     val projectId = dep.projectId
                     val resolved = resolveDependency(dep.versionId, projectId, mcVersion, loader)
@@ -115,7 +128,62 @@ class ModInstaller(
             frontier = next
             level++
         }
-        Outcome(installed, present.toSet(), skipped.distinct(), missing.distinct())
+        Outcome(installed, present.toSet(), skipped.distinct(), missing.distinct(), upgraded.distinct())
+    }
+
+    /** One project the instance carries: the row it is, the build it is, and whether it is on. */
+    data class Installed(val ref: ContentRef, val version: ModrinthVersion, val enabled: Boolean)
+
+    /**
+     * The mods the instance carries that Modrinth knows, by project id.
+     *
+     * A file Modrinth has never indexed is absent, see [presentProjects].
+     */
+    suspend fun installedProjects(instanceDir: Path): Map<String, Installed> = withContext(Dispatchers.IO) {
+        val items = runCatching { scanner.scan(instanceDir) }.getOrDefault(emptyList())
+            .filter { it.kind == ContentKind.Mod }
+        val hashed = items.mapNotNull { c -> runCatching { c to sha1Of(c.pathIn(instanceDir)) }.getOrNull() }
+        val versions = runCatching { modrinth.versionsForHashes(hashed.map { it.second }) }.getOrDefault(emptyMap())
+        hashed.mapNotNull { (c, hash) ->
+            versions[hash]?.let { v -> v.projectId to Installed(ContentRef(c.kind, c.fileName), v, c.enabled) }
+        }.toMap()
+    }
+
+    /**
+     * The [dependencies] that pin a build newer than the one the instance has, as
+     * swaps to the pinned build in the state the installed file is in.
+     *
+     * Only pins are acted on, see [pinnedRequirements]. A dependency the instance
+     * does not carry is not this function's business, and neither is one whose
+     * pinned build cannot be fetched: that one is logged and left, since the
+     * installed build may well run.
+     */
+    suspend fun pinnedUpgrades(instanceDir: Path, dependencies: List<ModrinthDependency>): List<InstanceContentUpdater.Target> =
+        pinnedUpgrades(dependencies, installedProjects(instanceDir))
+
+    private suspend fun pinnedUpgrades(
+        dependencies: List<ModrinthDependency>,
+        held: Map<String, Installed>,
+    ): List<InstanceContentUpdater.Target> {
+        val out = LinkedHashMap<String, InstanceContentUpdater.Target>()
+        for (dep in pinnedRequirements(dependencies)) {
+            val projectId = dep.projectId ?: continue
+            val versionId = dep.versionId ?: continue
+            val have = held[projectId] ?: continue
+            if (projectId in out) continue
+            val pinned = try {
+                modrinth.resolveVersion(projectId, versionId)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                log.warn("resolving the pinned {}/{} failed: {}", projectId, versionId, e.message)
+                continue
+            }
+            if (!isBehind(have.version, pinned)) continue
+            log.info("{} is on {}, older than the {} a dependent pins", have.ref.fileName, have.version.versionNumber, pinned.versionNumber)
+            pinned.swapFor(have.ref, have.version.versionNumber)?.let { out[projectId] = InstanceContentUpdater.Target(it, have.enabled) }
+        }
+        return out.values.toList()
     }
 
     /**
@@ -131,15 +199,7 @@ class ModInstaller(
      * It is the honest answer to the question asked, and the reason a jar from
      * elsewhere still reads as installable.
      */
-    suspend fun presentProjects(instanceDir: Path): Set<String> {
-        val items = runCatching { scanner.scan(instanceDir) }.getOrDefault(emptyList())
-            .filter { it.kind == ContentKind.Mod }
-        val hashes = items.mapNotNull { runCatching { sha1Of(it.pathIn(instanceDir)) }.getOrNull() }
-        return runCatching { modrinth.versionsForHashes(hashes) }
-            .getOrDefault(emptyMap())
-            .values
-            .mapTo(mutableSetOf()) { it.projectId }
-    }
+    suspend fun presentProjects(instanceDir: Path): Set<String> = installedProjects(instanceDir).keys
 
     /**
      * The exact build when the author pinned one, otherwise the newest that fits
