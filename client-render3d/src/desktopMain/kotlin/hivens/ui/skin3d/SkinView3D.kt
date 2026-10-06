@@ -179,7 +179,14 @@ fun SkinView3D(
         state = scene,
         modifier = modifier.then(gestureModifier),
         interactive = false,
-        prepareFrame = { rig.apply(state.animator.poseAt(state.timeMs)) },
+        prepareFrame = {
+            // Read here so a snap redraws. A snap moves the animator, which is not
+            // snapshot state, and leaves the clock where it was, so with motion off
+            // nothing the draw read had changed and the new pose waited for a drag
+            // or a resize to appear.
+            state.animationRevision
+            rig.apply(state.animator.poseAt(state.timeMs))
+        },
         cameraFor = { w, h ->
             // Full: figure spans ~33 model units tall / ~18 wide once limbs
             // rotate in; fit to the smaller axis with margin so it never
