@@ -80,7 +80,7 @@ internal fun PropFieldRow(
             ColorRow(label, cur.content) { onChange(JsonPrimitive(it)) }
         element.kind == PrimitiveKind.BOOLEAN ->
             BoolRow(label, cur.booleanOrNull ?: false) { onChange(JsonPrimitive(it)) }
-        element.kind == PrimitiveKind.INT && range != null ->
+        element.kind.isWhole() && range != null ->
             LabeledSlider(
                 label         = label,
                 value         = (cur.intOrNull ?: range.min.toInt()).toFloat(),
@@ -101,7 +101,7 @@ internal fun PropFieldRow(
         // through to the free-text row below, which writes whatever was typed: a
         // word went into an integer field, the props then failed to decode, and
         // the widget came back at its defaults with nothing saying why.
-        element.kind == PrimitiveKind.INT ->
+        element.kind.isWhole() ->
             NumberRow(label, cur.content, decimals = false) { onChange(JsonPrimitive(it.toLong())) }
         element.kind == PrimitiveKind.FLOAT || element.kind == PrimitiveKind.DOUBLE ->
             NumberRow(label, cur.content, decimals = true) { onChange(JsonPrimitive(it)) }
@@ -109,6 +109,13 @@ internal fun PropFieldRow(
             StringRow(label, cur.content) { onChange(JsonPrimitive(it)) }
     }
 }
+
+/**
+ * A whole-number field of any width. A Long, Short or Byte prop went past the Int
+ * check to the free-text row, and the string it wrote back failed the decode.
+ */
+private fun SerialKind.isWhole(): Boolean =
+    this == PrimitiveKind.INT || this == PrimitiveKind.LONG || this == PrimitiveKind.SHORT || this == PrimitiveKind.BYTE
 
 /**
  * One row of the panel: the library's row, with the label column every other row
