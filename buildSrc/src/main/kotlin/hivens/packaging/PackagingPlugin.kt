@@ -157,12 +157,17 @@ class PackagingPlugin : Plugin<Project> {
         }
 
         // DMG wrap -- macOS-only, consumes the .app bundle from
-        // customJpackageImage. Registered unconditionally so the task
-        // surface is consistent across hosts; the task body self-skips
-        // when not on macOS.
+        // customJpackageImage. Registered on every host so the task surface is
+        // the same, and skipped off macOS before Gradle looks at its inputs: the
+        // bundle it reads is never produced there, and a skip inside the action
+        // came after input validation had already failed the task. Nor is the
+        // bundle wired there, which would build a whole jpackage image only to
+        // skip the step that uses it.
+        val onMac = OperatingSystem.current().isMacOsX
         project.tasks.register<CustomDmgTask>("customDmg") {
             group = "packaging"
             description = "Wraps the macOS .app bundle from customJpackageImage into a DMG."
+            onlyIf("jpackage --type dmg runs on macOS only") { onMac }
 
             appName.convention(ext.appName)
             appVersion.convention(ext.appVersion)
@@ -174,11 +179,13 @@ class PackagingPlugin : Plugin<Project> {
             // <outputDir>/<appName>.app. The provider chain resolves
             // lazily and carries the implicit dependency on
             // customJpackageImage.
-            appImage.convention(
-                ext.appName.flatMap { name ->
-                    customJpackageImage.flatMap { it.outputDir.dir("$name.app") }
-                }
-            )
+            if (onMac) {
+                appImage.convention(
+                    ext.appName.flatMap { name ->
+                        customJpackageImage.flatMap { it.outputDir.dir("$name.app") }
+                    }
+                )
+            }
 
             javaHome.convention(resolvedJavaHome)
             outputDir.convention(project.layout.buildDirectory.dir("customDmg"))

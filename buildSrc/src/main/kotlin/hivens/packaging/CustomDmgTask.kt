@@ -14,7 +14,6 @@ import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
-import org.gradle.internal.os.OperatingSystem
 import org.gradle.process.ExecOperations
 import javax.inject.Inject
 
@@ -25,9 +24,10 @@ import javax.inject.Inject
  * workflow leg.
  *
  * macOS-only by construction. jpackage on Linux / Windows hosts rejects
- * `--type dmg`; the task self-skips when run off macOS so that local
- * `./gradlew customDmg` on a Linux dev box logs cleanly instead of
- * failing the build. CI is always macOS-latest for this job.
+ * `--type dmg`, so the plugin registers the task with an `onlyIf` on the host
+ * and leaves [appImage] unwired off macOS: a local `./gradlew customDmg` on a
+ * Linux box reports the task skipped instead of failing it. CI is always
+ * macOS-latest for this job.
  *
  * Two flag classes go through:
  *   - identity (name, version, mac-package-identifier) -- need to match
@@ -47,10 +47,8 @@ abstract class CustomDmgTask : DefaultTask() {
     // ── Inputs ────────────────────────────────────────────────────────────
 
     /**
-     * Path of the `.app` bundle produced by [CustomJpackageImageTask] on
-     * macOS. On other host platforms this points at a directory that
-     * does not exist; the task self-skips before the @InputDirectory
-     * snapshotter runs, so the non-existence is moot.
+     * Path of the `.app` bundle produced by [CustomJpackageImageTask] on macOS.
+     * Unset on other hosts, where the task is skipped before its inputs are read.
      */
     @get:InputDirectory
     @get:PathSensitive(PathSensitivity.RELATIVE)
@@ -91,14 +89,6 @@ abstract class CustomDmgTask : DefaultTask() {
 
     @TaskAction
     fun runJpackage() {
-        if (!OperatingSystem.current().isMacOsX) {
-            logger.lifecycle(
-                "customDmg: skipping on non-macOS host -- jpackage --type dmg " +
-                    "only runs on macOS. The CI macOS leg invokes this task."
-            )
-            return
-        }
-
         val out = outputDir.get().asFile
         fileSystem.delete { delete(out) }
         out.mkdirs()
