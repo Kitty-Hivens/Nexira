@@ -15,16 +15,24 @@ import java.io.IOException
 import java.nio.file.Path
 
 /**
- * Fabric + Quilt resolver. Both expose a meta API that returns a ready launch
- * profile (mainClass + maven libraries, inheriting the vanilla version) with no
- * jar patching, so one resolver serves both -- only the meta base URL and the
- * loader id differ. Verified shapes 2026-05-29:
- *   fabric: https://meta.fabricmc.net/v2/versions/loader/<mc>/<ver>/profile/json
- *   quilt:  https://meta.quiltmc.org/v3/versions/loader/<mc>/<ver>/profile/json
+ * Fabric, Quilt and Legacy Fabric resolver. All three expose a meta API that
+ * returns a ready launch profile (mainClass + maven libraries, inheriting the
+ * vanilla version) with no jar patching, so one resolver serves them -- only the
+ * meta base URL and the loader id differ. Verified shapes 2026-05-29, Legacy
+ * Fabric 2026-10-06:
+ *   fabric:       https://meta.fabricmc.net/v2/versions/loader/<mc>/<ver>/profile/json
+ *   quilt:        https://meta.quiltmc.org/v3/versions/loader/<mc>/<ver>/profile/json
+ *   legacy-fabric: https://meta.legacyfabric.net/v2/versions/loader/<mc>/<ver>/profile/json
  *
  * Each library entry is `{name, url, sha1?, size?}` where `url` is a maven BASE;
  * the artifact URL is that base + the coordinate's repo path. Quilt omits sha1
  * on some entries -- those download without verification.
+ *
+ * An entry with a `natives` map is a natives-only artifact in the old Mojang
+ * shape: one jar per platform under a classifier, and no plain jar at all. Legacy
+ * Fabric ships its own LWJGL 2 this way, and the Java half it ships beside it
+ * does not run against vanilla's natives. Such an entry becomes the loader's
+ * natives in place of vanilla's for the same artifact, see [nativesOf].
  */
 class FabricLikeResolver(
     private val clientProvider: HttpClientProvider,
@@ -53,10 +61,16 @@ class FabricLikeResolver(
                     val text = fetchText(url)
                     json.decodeFromString(FabricProfileJson.serializer(), text).also { cache.writeText(kept, text) }
                 }
+            val (natives, plain) = profile.libraries.partition { !it.natives.isNullOrEmpty() }
+            val swapped = natives.mapTo(HashSet()) { MavenCoord.parse(it.name).groupArtifact }
             LoaderProfile(
-                libraries = profile.libraries.map { it.toSpec() },
+                libraries = plain.map { it.toSpec() },
                 mainClass = profile.mainClass,
                 version = version,
+                nativesOverride = natives.flatMap { nativesOf(it) }.ifEmpty { null },
+                // Vanilla's natives for the same artifact go: two LWJGL native sets
+                // in one library path load whichever the JVM finds first.
+                removeFromBase = { it.groupArtifact in swapped },
             )
         }
 
@@ -81,6 +95,24 @@ class FabricLikeResolver(
         return chosen.loader.version
     }
 
+    /**
+     * One spec per platform a natives-only [lib] names, each under its classifier.
+     * The provisioner keeps the host's, the same way it filters vanilla's. A
+     * classifier still carrying a `${arch}` placeholder names a 32/64-bit split no
+     * host here needs, and is dropped.
+     */
+    internal fun nativesOf(lib: FabricProfileLib): List<LibrarySpec> {
+        val coord = MavenCoord.parse(lib.name)
+        val base = (lib.url ?: MAVEN_CENTRAL).trimEnd('/')
+        return lib.natives.orEmpty().values
+            .filterNot { it.contains($$"${") }
+            .distinct()
+            .map { classifier ->
+                val c = coord.copy(classifier = classifier)
+                LibrarySpec(coord = c, url = "$base/${c.relativePath}")
+            }
+    }
+
     private fun FabricProfileLib.toSpec(): LibrarySpec {
         val coord = MavenCoord.parse(name)
         val base = (url ?: MAVEN_CENTRAL).trimEnd('/')
@@ -96,6 +128,7 @@ class FabricLikeResolver(
     companion object {
         const val FABRIC_META = "https://meta.fabricmc.net/v2"
         const val QUILT_META = "https://meta.quiltmc.org/v3"
+        const val LEGACY_FABRIC_META = "https://meta.legacyfabric.net/v2"
         const val MAVEN_CENTRAL = "https://repo1.maven.org/maven2"
     }
 }
@@ -113,6 +146,8 @@ data class FabricProfileLib(
     val url: String? = null,
     val sha1: String? = null,
     val size: Long = 0,
+    /** Platform to classifier, on a natives-only entry. See the class KDoc. */
+    val natives: Map<String, String>? = null,
 )
 
 /** One entry of a Fabric/Quilt meta loader LIST (`/versions/loader/<mc>`), newest first. */

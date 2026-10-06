@@ -37,6 +37,15 @@ class VanillaProfileVersionTest {
     }
 
     @Test
+    fun `the fabric loader over legacy fabric's mappings is legacy fabric`() {
+        folder(
+            "fabric-loader-0.19.5-1.8.9",
+            """{"id":"fabric-loader-0.19.5-1.8.9","inheritsFrom":"1.8.9","libraries":[{"name":"net.legacyfabric:intermediary:1.8.9"},{"name":"net.fabricmc:fabric-loader:0.19.5"}]}""",
+        )
+        assertEquals(ProfileVersion("1.8.9", "legacy-fabric", "0.19.5"), vanillaProfileVersion(root, "fabric-loader-0.19.5-1.8.9", json))
+    }
+
+    @Test
     fun `a forge folder gives the loader's own version, not the maven one`() {
         folder(
             "1.20.1-forge-47.2.0",

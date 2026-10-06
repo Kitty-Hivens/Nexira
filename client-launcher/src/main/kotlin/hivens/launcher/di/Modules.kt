@@ -1110,6 +1110,7 @@ private fun Scope.loaderRegistry(): LoaderRegistry {
             ModernInstallerResolver.neoforge(get(named("direct")), get(), get(), get(), loaderCacheDir),
             FabricLikeResolver(get(named("direct")), get(), "fabric", FabricLikeResolver.FABRIC_META, loaderCacheDir),
             FabricLikeResolver(get(named("direct")), get(), "quilt", FabricLikeResolver.QUILT_META, loaderCacheDir),
+            FabricLikeResolver(get(named("direct")), get(), "legacy-fabric", FabricLikeResolver.LEGACY_FABRIC_META, loaderCacheDir),
             CleanroomResolver(get(named("direct")), get(), get(), cacheDir = loaderCacheDir),
             Lwjgl3ifyResolver(get(named("direct")), get(), cacheDir = loaderCacheDir),
         ),

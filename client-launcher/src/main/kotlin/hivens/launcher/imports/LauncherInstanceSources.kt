@@ -122,6 +122,10 @@ internal fun vanillaProfileVersion(root: Path, versionId: String, json: Json): P
     // Forge's maven version carries the Minecraft version in front of its own.
     fun forgeOwn(v: String) = v.removePrefix("$mc-").substringBefore("-$mc")
     val (loader, loaderVersion) = when {
+        // Legacy Fabric runs the same loader over its own mappings, and its meta is
+        // the only one that serves the versions it covers.
+        library("net.fabricmc:fabric-loader:") != null && library("net.legacyfabric:intermediary:") != null ->
+            "legacy-fabric" to library("net.fabricmc:fabric-loader:")
         library("net.fabricmc:fabric-loader:") != null -> "fabric" to library("net.fabricmc:fabric-loader:")
         library("org.quiltmc:quilt-loader:") != null -> "quilt" to library("org.quiltmc:quilt-loader:")
         argument("--fml.neoForgeVersion") != null -> "neoforge" to argument("--fml.neoForgeVersion")
@@ -200,6 +204,7 @@ class PrismLauncherSource(
         var mc: String? = null
         var loader: String? = null
         var loaderVersion: String? = null
+        var legacyMappings = false
         // mmc-pack.json's `components` is an array of {uid, version}; walk it tolerantly.
         runCatching {
             val comps = json.parseToJsonElement(Files.readString(dir.resolve("mmc-pack.json")))
@@ -214,9 +219,12 @@ class PrismLauncherSource(
                     "net.neoforged" -> { loader = "neoforge"; loaderVersion = ver }
                     "net.fabricmc.fabric-loader" -> { loader = "fabric"; loaderVersion = ver }
                     "org.quiltmc.quilt-loader" -> { loader = "quilt"; loaderVersion = ver }
+                    "net.legacyfabric.intermediary" -> legacyMappings = true
                 }
             }
         }
+        // The Fabric loader over Legacy Fabric's mappings is Legacy Fabric.
+        if (legacyMappings && loader == "fabric") loader = "legacy-fabric"
         return DiscoveredInstance(
             launcher = launcher,
             id = dir.fileName.toString(),
