@@ -572,8 +572,11 @@ fun FrameWindowScope.AppShellContent(
         val showFile = boot.paths.dataDir.resolve(".show").toFile()
         while (true) {
             delay(500.milliseconds)
-            if (showFile.exists()) {
-                showFile.delete()
+            // The check and the delete off the UI thread: twice a second for the
+            // life of the process, and a stall per tick on a data directory that is
+            // network-mounted or asleep.
+            val signalled = withContext(Dispatchers.IO) { showFile.exists().also { if (it) showFile.delete() } }
+            if (signalled) {
                 revealWindow()
                 raiseTick++
             }
