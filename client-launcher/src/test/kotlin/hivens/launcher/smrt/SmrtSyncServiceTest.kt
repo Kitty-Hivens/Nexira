@@ -15,6 +15,8 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import java.io.ByteArrayOutputStream
 import java.io.IOException
+import java.io.InputStream
+import java.nio.file.AccessDeniedException
 import java.nio.file.FileSystems
 import java.nio.file.Files
 import java.nio.file.Path
@@ -130,10 +132,13 @@ class SmrtSyncServiceTest {
         }
     )
 
-    private fun serviceWith(engine: MockEngine): SmrtSyncService {
+    private fun serviceWith(
+        engine: MockEngine,
+        openForDigest: (Path) -> InputStream = { Files.newInputStream(it) },
+    ): SmrtSyncService {
         val provider = HttpClientProvider { HttpClient(engine) }
         val modrinth = ModrinthClient(provider, testTransferEngine(provider), json)
-        return SmrtSyncService(modrinth, testTransferEngine(provider))
+        return SmrtSyncService(modrinth, testTransferEngine(provider), openForDigest)
     }
 
 
@@ -351,22 +356,17 @@ class SmrtSyncServiceTest {
         val genuine = sha1Hex("GENUINE".toByteArray())
         val baseline = mapOf("req.jar" to genuine, "opt.jar" to genuine)
 
-        // Same POSIX caveat as the blocked-delete test above: what varies by
-        // platform is only how one arranges for a read to fail.
-        if (!FileSystems.getDefault().supportedFileAttributeViews().contains("posix")) return@runTest
-        val perms = Files.getPosixFilePermissions(locked)
-        Files.setPosixFilePermissions(locked, emptySet())
-        // Root is not bound by the mode bits, so there would be nothing to observe.
-        if (Files.isReadable(locked)) return@runTest
-        try {
-            val verdict = syncService().enforceRoster(dir, baseline)
-
-            assertEquals(listOf("req.jar"), verdict.unreadable)
-            assertEquals(listOf("opt.jar"), verdict.mismatched, "only the one actually compared is accused")
-            assertFalse(verdict.verified, "unchecked is not cleared -- it still denies the token")
-        } finally {
-            Files.setPosixFilePermissions(locked, perms)
+        // The lock, as the reader meets it, whatever the host and whoever runs the
+        // tests. Mode bits would not bind root, so arranging it through them left
+        // this switched off in container CI.
+        val service = serviceWith(MockEngine { respond("", HttpStatusCode.NotFound) }) { file ->
+            if (file == locked) throw AccessDeniedException(file.toString()) else Files.newInputStream(file)
         }
+        val verdict = service.enforceRoster(dir, baseline)
+
+        assertEquals(listOf("req.jar"), verdict.unreadable)
+        assertEquals(listOf("opt.jar"), verdict.mismatched, "only the one actually compared is accused")
+        assertFalse(verdict.verified, "unchecked is not cleared -- it still denies the token")
     }
 
     /**

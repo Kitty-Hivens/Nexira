@@ -25,6 +25,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
 import java.io.IOException
+import java.io.InputStream
 import java.net.URI
 import java.nio.file.Files
 import java.nio.file.Path
@@ -43,6 +44,13 @@ import java.util.Comparator
 class SmrtSyncService(
     private val modrinth: ModrinthClient,
     private val transfers: TransferEngine,
+    /**
+     * How a mod is opened to be hashed. A seam for the case that matters most and
+     * is hardest to arrange: a jar that cannot be read. Mode bits do not bind root
+     * or some filesystems, so a test that made the file unreadable switched itself
+     * off in exactly the containers CI runs in.
+     */
+    private val openForDigest: (Path) -> InputStream = { Files.newInputStream(it) },
 ) : IPackSyncService {
     private val log = LoggerFactory.getLogger(SmrtSyncService::class.java)
 
@@ -435,7 +443,7 @@ class SmrtSyncService(
 
     private fun sha1Of(file: Path): String {
         val digest = MessageDigest.getInstance("SHA-1")
-        Files.newInputStream(file).use { input ->
+        openForDigest(file).use { input ->
             val buffer = ByteArray(1 shl 16)
             while (true) {
                 val read = input.read(buffer)
