@@ -1,11 +1,12 @@
 package hivens.core.diag
 
+import java.time.Instant
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class ActionRingTest {
 
@@ -43,10 +44,14 @@ class ActionRingTest {
     }
 
     @Test
-    fun `every entry carries a non-null timestamp`() {
+    fun `an entry is stamped with when it was recorded`() {
+        val before = Instant.now()
         ActionRing.record("x")
-        val entry = ActionRing.snapshot().first()
-        assertNotNull(entry.timestamp)
+        ActionRing.record("y")
+        val after = Instant.now()
+        val (first, second) = ActionRing.snapshot()
+        assertTrue(!first.timestamp.isBefore(before) && !first.timestamp.isAfter(after), "stamped at the call, got ${first.timestamp}")
+        assertTrue(!second.timestamp.isBefore(first.timestamp), "a later entry is never stamped earlier")
     }
 
     @Test
