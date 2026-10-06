@@ -19,6 +19,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.core.api.interfaces.IMirrorPackClient
 import hivens.core.data.PackInstance
+import hivens.core.data.PackOrigin
 import hivens.core.update.PackUpdateStatus
 import hivens.core.update.PackUpdateStatusHub
 import hivens.core.update.PackUpdater
@@ -44,6 +45,7 @@ import hivens.ui.nx.NxSettingRow
 import hivens.ui.nx.NxSwitch
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.theme.NxInk
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
@@ -86,16 +88,21 @@ internal fun PackVersionSection(
     }
 
     // Both reads are best-effort: offline settings stay usable, the lines just
-    // do not render.
+    // do not render. Asked of the mirror only for a mirror pack: the section also
+    // serves a Modrinth instance, whose id the mirror has never heard of, and asking
+    // anyway spent two requests on a pair of 404s.
+    val isMirror = pack.packRef.origin == PackOrigin.Mirror
     val installedChannel by produceState<VersionChannel?>(null, pack.id, current) {
-        value = runCatching { mirror.fetchManifestVersion(pack.packRef.id, current).versionChannel }.getOrNull()
+        if (!isMirror) return@produceState
+        value = bestEffort { mirror.fetchManifestVersion(pack.packRef.id, current).versionChannel }
     }
     val latestLine by produceState<String?>(null, pack.id) {
-        value = runCatching {
+        if (!isMirror) return@produceState
+        value = bestEffort {
             val summary = mirror.fetchSummary(pack.packRef.id)
             val built = formatBuildTimestamp(summary.latestBuiltAt)
             if (built != null) s.packVersionLatestBuilt(summary.latestPackVersion, built) else null
-        }.getOrNull()
+        }
     }
 
     fun runCheck() {
@@ -230,3 +237,16 @@ internal fun PackVersionSection(
 
     runningGuard.Dialog()
 }
+
+/**
+ * [read]'s answer, or null when it failed. A cancellation is not a failure: it is
+ * passed on, so a producer the screen has left does not go on to write its null.
+ */
+private suspend fun <T> bestEffort(read: suspend () -> T): T? =
+    try {
+        read()
+    } catch (e: CancellationException) {
+        throw e
+    } catch (_: Exception) {
+        null
+    }

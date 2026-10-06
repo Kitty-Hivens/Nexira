@@ -27,6 +27,7 @@ import hivens.ui.nx.NxSettingGroup
 import hivens.ui.nx.NxSettingRow
 import hivens.ui.nx.NxSwitch
 import hivens.ui.theme.NxInk
+import kotlinx.coroutines.CancellationException
 import org.koin.compose.koinInject
 
 /**
@@ -56,10 +57,17 @@ internal fun PackContentSection(pack: PackInstance, adopt: (PackEdit) -> Unit) {
     // offers belongs to the build that is now on disk.
     LaunchedEffect(pack.id, version) {
         loading = true
-        val fetched = runCatching {
+        // A cancellation is passed on rather than read as offline: the effect is
+        // restarted by a new build, and the old one finishing as "unavailable" wrote
+        // over the loading state of the fetch that replaced it.
+        val fetched = try {
             if (!version.isNullOrBlank()) mirrorClient.fetchManifestVersion(pack.packRef.id, version)
             else mirrorClient.fetchManifest(pack.packRef.id)
-        }.getOrNull()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            null
+        }
         manifest = fetched
         loading = false
     }
