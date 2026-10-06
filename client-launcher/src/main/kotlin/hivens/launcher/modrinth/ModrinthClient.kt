@@ -250,7 +250,11 @@ class ModrinthClient(
         )
     }
 
-    private suspend inline fun <reified B, reified T> postJson(url: String, body: B): T {
+    // Every read below runs on IO, request and decode both, so a caller may ask from
+    // the UI thread. A screen or a crumb asking straight out of a composition decoded
+    // a whole payload on the event thread, and a rule that each caller remember to
+    // switch first had already been missed in several.
+    private suspend inline fun <reified B, reified T> postJson(url: String, body: B): T = withContext(Dispatchers.IO) {
         val resp: HttpResponse = httpProvider.current.post(url) {
             headers.append("User-Agent", USER_AGENT)
             headers.append("Accept", "application/json")
@@ -265,13 +269,13 @@ class ModrinthClient(
             val text = runCatching { resp.bodyAsText() }.getOrDefault("")
             throw IOException("POST $url failed: ${resp.status} body=$text")
         }
-        return json.decodeFromString(resp.bodyAsText())
+        json.decodeFromString<T>(resp.bodyAsText())
     }
 
-    private suspend inline fun <reified T> getJson(url: String): T {
+    private suspend inline fun <reified T> getJson(url: String): T = withContext(Dispatchers.IO) {
         val resp = requestJson(url)
         failUnlessSuccess(resp, url)
-        return json.decodeFromString(resp.bodyAsText())
+        json.decodeFromString<T>(resp.bodyAsText())
     }
 
     /**
@@ -279,11 +283,11 @@ class ModrinthClient(
      * has no such thing. Every other status still throws, so "we could not ask"
      * never reads as "there is nothing to find".
      */
-    private suspend inline fun <reified T> getJsonOrNull(url: String): T? {
+    private suspend inline fun <reified T> getJsonOrNull(url: String): T? = withContext(Dispatchers.IO) {
         val resp = requestJson(url)
-        if (resp.status == HttpStatusCode.NotFound) return null
+        if (resp.status == HttpStatusCode.NotFound) return@withContext null
         failUnlessSuccess(resp, url)
-        return json.decodeFromString(resp.bodyAsText())
+        json.decodeFromString<T>(resp.bodyAsText())
     }
 
     /** The GET every metadata read here shares: the agent, the accept, the tighter timeout. */

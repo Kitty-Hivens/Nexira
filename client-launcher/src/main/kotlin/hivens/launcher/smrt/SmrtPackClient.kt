@@ -15,8 +15,10 @@ import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.encodeURLParameter
 import io.ktor.http.isSuccess
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import java.io.IOException
 
@@ -144,7 +146,11 @@ class SmrtPackClient(
         return getJson(url)
     }
 
-    private suspend inline fun <reified T> getJson(url: String): T {
+    // On IO, request and decode both, so a caller may ask from the UI thread. A
+    // settings pane or a crumb asking straight out of a composition decoded a whole
+    // manifest on the event thread, and a rule that each caller remember to switch
+    // first had already been missed in several.
+    private suspend inline fun <reified T> getJson(url: String): T = withContext(Dispatchers.IO) {
         val resp: HttpResponse = httpProvider.current.get(url) {
             headers.append("User-Agent", USER_AGENT)
             headers.append("Accept", "application/json")
@@ -154,7 +160,6 @@ class SmrtPackClient(
             val body = runCatching { resp.bodyAsText() }.getOrDefault("")
             throw IOException("GET $url failed: ${resp.status} body=$body")
         }
-        val text = resp.bodyAsText()
-        return json.decodeFromString(text)
+        json.decodeFromString<T>(resp.bodyAsText())
     }
 }
