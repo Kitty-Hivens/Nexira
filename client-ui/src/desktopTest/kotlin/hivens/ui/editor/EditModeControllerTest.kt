@@ -21,6 +21,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.AfterTest
@@ -101,6 +102,39 @@ class EditModeControllerTest {
 
         repeat(GRID_MAX + 5) { ctl.nudgeWrap(path, 1) }
         awaitWrap(repo, path, GRID_MAX)
+    }
+
+    // The prop panel and a region's own toggle write the same record. Each change
+    // is read against the props as they stand when it lands, so neither undoes the
+    // other however close together the two arrive.
+    @Test
+    fun `two prop writers keep each other's change`() = runBlocking {
+        val repo = LayoutGraphRepository(
+            tmpDir.resolve("layout-graph.json"),
+            Json { ignoreUnknownKeys = true; encodeDefaults = true },
+            scope,
+        ) { LayoutGraph.EMPTY }
+        val ctl  = EditModeController(repo, scope)
+        val path = SlotPath(SurfaceId("home.new"), SlotId("main"))
+        repo.update {
+            LayoutGraph(surfaces = mapOf(
+                SurfaceId("home.new") to SurfaceLayout(slots = mapOf(
+                    SlotId("main") to SlotContent(
+                        widgets = listOf(WidgetInstance(WidgetKind("a"), "i1", JsonObject(emptyMap()))),
+                    ),
+                )),
+            ))
+        }
+
+        ctl.updatePropsFrom(path, "i1", historyKey = "opacityPct") { JsonObject(it + ("opacityPct" to JsonPrimitive(40))) }
+        ctl.updatePropsFrom(path, "i1", historyKey = "collapsed") { JsonObject(it + ("collapsed" to JsonPrimitive(true))) }
+
+        withTimeout(3000) {
+            while (repo.value().traverse(path)?.widgets?.single()?.props?.size != 2) delay(5)
+        }
+        val props = repo.value().traverse(path)?.widgets?.single()?.props
+        assertEquals(JsonPrimitive(40), props?.get("opacityPct"))
+        assertEquals(JsonPrimitive(true), props?.get("collapsed"))
     }
 
     private suspend fun awaitWrap(repo: LayoutGraphRepository, path: SlotPath, expected: Int) {

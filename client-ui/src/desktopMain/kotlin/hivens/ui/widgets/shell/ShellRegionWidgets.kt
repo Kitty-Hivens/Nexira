@@ -78,6 +78,7 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import org.koin.compose.koinInject
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxColor
@@ -373,13 +374,13 @@ fun ShellRightRegion(instance: WidgetInstance) {
     val path = LocalSlotPath.current
     val controller: EditModeController = koinInject()
     val toggleCollapse: () -> Unit = {
-        // Merge over the raw stored props so widthDp (and other tuning) survives
-        // the flip -- updateProps replaces the whole object.
-        controller.updateProps(
-            path,
-            instance.instanceId,
-            JsonObject(instance.props + ("collapsed" to JsonPrimitive(!props.collapsed))),
-        )
+        // Flipped from the props as they are when the write lands, not as this
+        // composition last saw them: a slider in the prop panel writes the same
+        // record, and a flip built on an older copy undid it, or was undone by it.
+        controller.updatePropsFrom(path, instance.instanceId, historyKey = "collapsed") { stored ->
+            val collapsed = (stored["collapsed"] as? JsonPrimitive)?.booleanOrNull ?: ShellRightRegionProps().collapsed
+            JsonObject(stored + ("collapsed" to JsonPrimitive(!collapsed)))
+        }
     }
     // Ctrl+N (window-level, see AppShell) toggles the rail. rememberUpdatedState
     // keeps the flip reading the latest collapsed value across recompositions.

@@ -241,6 +241,27 @@ class EditModeController(
         }
     }
 
+    // Changes a widget's props from what they are at the moment the change is
+    // applied, read inside the serialized update. The prop panel and a region's own
+    // collapse toggle both write here; handing over a whole object built from what
+    // each had last seen, either one put back what the other had changed between
+    // that read and its write. [historyKey] folds a run of writes to one field, a
+    // dragged slider, into one undo step without folding in a different control.
+    fun updatePropsFrom(
+        path: SlotPath,
+        instanceId: String,
+        historyKey: String,
+        transform: (stored: JsonObject) -> JsonObject,
+    ) {
+        scope.launch(writeDispatcher) {
+            edit(key = "props:$instanceId:$historyKey") { g ->
+                val stored = g.traverse(path)?.widgets?.firstOrNull { it.instanceId == instanceId }?.props
+                    ?: return@edit g
+                g.updateWidgetProps(path, instanceId, transform(stored))
+            }
+        }
+    }
+
     // The widget's own surface. An all-default one normalizes to null in the
     // transform, so it never bloats the file.
     fun updateSurface(path: SlotPath, instanceId: String, surface: SurfaceSpec?) {

@@ -249,11 +249,9 @@ private fun PropPanelBody(
                             // out of the record again and follows the
                             // declaration, which is the same rule read by
                             // [effective] one screen up.
-                            controller.updateProps(
-                                path,
-                                instanceId,
-                                propsWith(descriptor.defaultPropsJson, instance.props, name, newValue),
-                            )
+                            controller.updatePropsFrom(path, instanceId, historyKey = name) { stored ->
+                                propsWith(descriptor.defaultPropsJson, stored, name, newValue)
+                            }
                         },
                     )
                 }
