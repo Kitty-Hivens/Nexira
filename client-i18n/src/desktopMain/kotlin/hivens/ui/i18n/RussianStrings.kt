@@ -992,6 +992,7 @@ object RussianStrings : AppStrings {
     override val packLoaderRevert = "Отменить"
     override fun optionalConflictsWith(name: String) = "Несовместим с $name"
     override fun optionalNeedsOff(name: String) = "Нужен $name, а он выключен"
+    override fun optionalNeededBy(name: String) = "Выключен, а он нужен $name"
     override fun contentBehindPin(neededBy: String, version: String) = "$neededBy нужна версия $version или новее"
     override fun contentDependencyMissing(id: String) = "Нужен $id, а его нет или он выключен"
     override fun contentDependencyVersion(name: String, wanted: String, installed: String) = "Нужен $name $wanted, а стоит $installed"

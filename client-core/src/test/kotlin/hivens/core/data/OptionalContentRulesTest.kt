@@ -116,6 +116,40 @@ class OptionalContentRulesTest {
     }
 
     @Test
+    fun `the library that is off says who needs it`() {
+        val m = listOf(
+            mod("core.jar", requires = listOf("lib.jar")),
+            mod("lib.jar", required = false, defaultEnabled = false),
+        )
+        val problem = OptionalContentRules.problems(m, OptionalContentRules.enabledState(m, emptyList()))["lib.jar"]!!.single()
+        assertTrue(problem is OptionalContentRules.Problem.NeededBy && problem.other.filename == "core.jar")
+    }
+
+    @Test
+    fun `a key two entries share names both of them`() {
+        val m = listOf(
+            mod("viewer.jar", required = false, defaultEnabled = true, incompatibleWith = listOf("modrinth:SHARED")),
+            mod("a-1.jar", required = false, defaultEnabled = true, projectId = "SHARED"),
+            mod("b-1.jar", required = false, defaultEnabled = true, projectId = "SHARED"),
+        )
+        val problems = OptionalContentRules.problems(m, OptionalContentRules.enabledState(m, emptyList()))
+        assertEquals(setOf("a-1.jar", "b-1.jar"), problems["viewer.jar"]!!.map { it.other.filename }.toSet())
+    }
+
+    @Test
+    fun `enabling a mod never switches off what it is turning on`() {
+        // A contradictory manifest: the consumer requires a library it also declares incompatible.
+        val m = listOf(
+            mod("consumer.jar", required = false, defaultEnabled = false, requires = listOf("lib.jar"), incompatibleWith = listOf("lib.jar")),
+            mod("lib.jar", required = false, defaultEnabled = false),
+        )
+        val after = OptionalContentRules.applyToggle(m, mapOf("consumer.jar" to false, "lib.jar" to false), "consumer.jar", true)
+        assertEquals(true, after["consumer.jar"])
+        assertEquals(true, after["lib.jar"])
+        assertTrue(OptionalContentRules.problems(m, after)["consumer.jar"]!!.isNotEmpty(), "the contradiction is shown instead")
+    }
+
+    @Test
     fun `a selection the rules can keep has no problems`() {
         val m = listOf(
             mod("consumer.jar", required = false, defaultEnabled = true, requires = listOf("lib.jar")),

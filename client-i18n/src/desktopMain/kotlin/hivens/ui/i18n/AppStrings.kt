@@ -1144,6 +1144,8 @@ interface AppStrings {
     fun optionalConflictsWith(name: String): String
     /** Under an enabled mod that needs [name], which is off. */
     fun optionalNeedsOff(name: String): String
+    /** Under a mod that is off while [name], which is on, needs it. */
+    fun optionalNeededBy(name: String): String
     /** Under a library older than the build [neededBy] was made against, [version] being that build. */
     fun contentBehindPin(neededBy: String, version: String): String
     /** Under a mod that needs mod id [id], which nothing enabled provides. */

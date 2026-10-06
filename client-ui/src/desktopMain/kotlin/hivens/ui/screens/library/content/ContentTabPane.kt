@@ -1208,6 +1208,7 @@ internal fun problemReason(problem: OptionalContentRules.Problem, s: AppStrings)
     return when (problem) {
         is OptionalContentRules.Problem.ConflictsWith -> s.optionalConflictsWith(name)
         is OptionalContentRules.Problem.NeedsDisabled -> s.optionalNeedsOff(name)
+        is OptionalContentRules.Problem.NeededBy -> s.optionalNeededBy(name)
     }
 }
 

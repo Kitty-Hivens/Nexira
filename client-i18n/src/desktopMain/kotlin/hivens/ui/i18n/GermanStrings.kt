@@ -989,6 +989,7 @@ object GermanStrings : AppStrings {
     override val packLoaderRevert = "Zurücksetzen"
     override fun optionalConflictsWith(name: String) = "Verträgt sich nicht mit $name"
     override fun optionalNeedsOff(name: String) = "Braucht $name, der aus ist"
+    override fun optionalNeededBy(name: String) = "Aus, aber $name braucht es"
     override fun contentBehindPin(neededBy: String, version: String) = "$neededBy braucht $version oder neuer"
     override fun contentDependencyMissing(id: String) = "Braucht $id, das fehlt oder aus ist"
     override fun contentDependencyVersion(name: String, wanted: String, installed: String) = "Braucht $name $wanted, installiert ist $installed"

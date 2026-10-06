@@ -74,6 +74,13 @@ object OptionalContentRules {
 
         /** A mod it hard-requires is off. */
         data class NeedsDisabled(override val other: SmrtModEntry) : Problem
+
+        /**
+         * It is off and [other], which is on, hard-requires it. The other side of
+         * [NeedsDisabled], so a screen that lists only optionals still shows a
+         * required mod's missing library on the library's own row.
+         */
+        data class NeededBy(override val other: SmrtModEntry) : Problem
     }
 
     /**
@@ -84,7 +91,9 @@ object OptionalContentRules {
      * with, or turn off a library something still needs: the launcher does what
      * they asked and the row says what will go wrong, which is the difference
      * between a pack they broke on purpose and one they cannot tell is broken.
-     * Both sides of a conflict carry it, since either may be the one to turn off.
+     * Both sides of a conflict carry it, since either may be the one to turn off,
+     * and a requirement that is off is reported on both the mod that needs it and
+     * the mod that is off.
      */
     fun problems(mods: List<SmrtModEntry>, state: Map<String, Boolean>): Map<String, List<Problem>> {
         val index = Index(mods)
@@ -99,7 +108,10 @@ object OptionalContentRules {
             }
             for (req in index.hardRequires(mod.filename)) {
                 val needed = index.byName[req] ?: continue
-                if (!on(needed)) out.getOrPut(mod.filename) { mutableListOf() } += Problem.NeedsDisabled(needed)
+                if (!on(needed)) {
+                    out.getOrPut(mod.filename) { mutableListOf() } += Problem.NeedsDisabled(needed)
+                    out.getOrPut(needed.filename) { mutableListOf() } += Problem.NeededBy(mod)
+                }
             }
         }
         return out
@@ -139,7 +151,11 @@ object OptionalContentRules {
         for (f in toEnable) {
             val mod = index.byName[f] ?: continue
             for (other in mods) {
-                if (other.filename != f && !other.required && index.excludes(mod, other)) next[other.filename] = false
+                // Never one of the mods being turned on: a manifest whose requires and
+                // exclusions contradict each other would otherwise switch off the very
+                // mod the player just enabled, and [problems] reports the contradiction.
+                if (other.filename in toEnable || other.required) continue
+                if (index.excludes(mod, other)) next[other.filename] = false
             }
         }
         return next
@@ -152,21 +168,24 @@ object OptionalContentRules {
      * A reference in `requires` or `incompatibleWith` names a mod either by its
      * filename, which carries the mod's version and moves with every build, or by
      * the [SmrtModEntry.stableKey] the toggles are already keyed on, which does
-     * not. A filename wins where the two would name different entries. A
-     * reference to a mod this manifest does not carry is dropped (the resolver
-     * surfaces those as warnings).
+     * not. A filename names one entry and wins over a key. A key can name several:
+     * two assets of one GitHub repository share it unless the curator gave them a
+     * slug, and a reference by that key is about each of them. A reference to a
+     * mod this manifest does not carry is dropped.
      */
     private class Index(mods: List<SmrtModEntry>) {
         val byName: Map<String, SmrtModEntry> = mods.associateBy { it.filename }
-        private val byRef: Map<String, SmrtModEntry> = buildMap {
-            mods.forEach { put(it.stableKey, it) }
-            mods.forEach { put(it.filename, it) }
-        }
+        private val byKey: Map<String, List<String>> = mods.groupBy({ it.stableKey }, { it.filename })
+
+        /** The filenames [ref] names: the one file it is, or every entry carrying it as a key. */
+        private fun resolve(ref: String): List<String> =
+            if (ref in byName) listOf(ref) else byKey[ref].orEmpty()
+
         private val requires: Map<String, List<String>> = mods.associate { m ->
-            m.filename to m.display?.requires.orEmpty().filter { !it.optional }.mapNotNull { byRef[it.filename]?.filename }
+            m.filename to m.display?.requires.orEmpty().filter { !it.optional }.flatMap { resolve(it.filename) }.distinct()
         }
         private val incompatible: Map<String, Set<String>> = mods.associate { m ->
-            m.filename to m.display?.incompatibleWith.orEmpty().mapNotNullTo(HashSet()) { byRef[it]?.filename }
+            m.filename to m.display?.incompatibleWith.orEmpty().flatMapTo(HashSet()) { resolve(it) }
         }
 
         fun hardRequires(filename: String): List<String> = requires[filename].orEmpty()
