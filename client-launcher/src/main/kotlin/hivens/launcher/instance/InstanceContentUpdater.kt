@@ -2,6 +2,7 @@ package hivens.launcher.instance
 
 import hivens.core.launch.InstanceWork
 import hivens.core.launch.InstanceWorkRegistry
+import hivens.core.api.dto.modrinth.ModrinthVersion
 import hivens.launcher.modrinth.ModrinthClient
 import hivens.launcher.util.sha1Of
 import kotlinx.coroutines.CancellationException
@@ -48,8 +49,6 @@ class InstanceContentUpdater(
     private val manager: InstanceContentManager,
     private val scope: CoroutineScope,
     private val work: InstanceWorkRegistry,
-    /** What the instance already carries, for the dependencies an update pins. */
-    private val installer: ModInstaller,
 ) {
 
     private val log = LoggerFactory.getLogger(InstanceContentUpdater::class.java)
@@ -65,7 +64,19 @@ class InstanceContentUpdater(
      * showing, while [complete] is what stops "we could not ask" being drawn as
      * "there is nothing new".
      */
-    data class CheckOutcome(val updates: Map<ContentRef, ModUpdate>, val complete: Boolean)
+    data class CheckOutcome(
+        val updates: Map<ContentRef, ModUpdate>,
+        val complete: Boolean,
+        /** Files older than the build another installed mod pinned, see [PinBehind]. */
+        val behind: Map<ContentRef, PinBehind> = emptyMap(),
+    )
+
+    /**
+     * A file older than the build [neededBy] was made against, which pinned
+     * [pinned]. Reported and offered, never acted on: [update] is the swap to the
+     * pinned build, put among the updates when the check found none newer.
+     */
+    data class PinBehind(val neededBy: String, val pinned: ModrinthVersion, val update: ModUpdate)
 
     /**
      * How a batch is going. [current] is the file being worked on, for a line
@@ -121,7 +132,7 @@ class InstanceContentUpdater(
         // is there for exactly that.
         val key = keyOf(instanceDir)
         if (!force) {
-            cached[key]?.takeIf { it.fresh(items) }?.let { return@withContext CheckOutcome(it.updates, true) }
+            cached[key]?.takeIf { it.fresh(items) }?.let { return@withContext CheckOutcome(it.updates, true, it.behind) }
         }
 
         // One hash per file, and a file that cannot be read is skipped rather
@@ -191,12 +202,53 @@ class InstanceContentUpdater(
                 remaining = remaining - answers.keys
             }
         }
+        // The installed versions already say what each mod pinned. A mod made
+        // against a newer build of a library than the one in the folder fails in the
+        // game, often as an AbstractMethodError naming neither, so the library is
+        // named here and its update offered where the check found none.
+        val behind = pinnedBehind(hashed, current)
+        for ((ref, pin) in behind) if (ref !in found) found[ref] = pin.update
         // Only a complete answer is worth remembering; a partial one is handed
         // back for what it has and asked again next time.
         if (complete) {
-            cached[key] = Checked(found, items.map { ContentRef(it.kind, it.fileName) }.toSet(), System.nanoTime())
+            cached[key] = Checked(found, behind, items.map { ContentRef(it.kind, it.fileName) }.toSet(), System.nanoTime())
         }
-        CheckOutcome(found, complete)
+        CheckOutcome(found, complete, behind)
+    }
+
+    /**
+     * Installed files older than a build another installed file pinned, keyed by
+     * the older file. Where two mods pin different builds, the newer pin is the
+     * one reported. A pinned build that cannot be looked up is skipped: nothing
+     * here can tell whether the installed one is behind it.
+     */
+    private suspend fun pinnedBehind(
+        hashed: List<Pair<InstalledContent, String>>,
+        current: Map<String, ModrinthVersion>,
+    ): Map<ContentRef, PinBehind> {
+        val byProject = hashed.mapNotNull { (item, hash) -> current[hash]?.let { it.projectId to (item to it) } }.toMap()
+        val out = LinkedHashMap<ContentRef, PinBehind>()
+        for ((item, hash) in hashed) {
+            val version = current[hash] ?: continue
+            for (dep in pinnedRequirements(version.dependencies)) {
+                val (depItem, depVersion) = byProject[dep.projectId] ?: continue
+                val pinned = try {
+                    modrinth.resolveVersion(dep.projectId!!, dep.versionId!!)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    log.debug("looking up the build {} pins failed: {}", item.fileName, e.message)
+                    continue
+                }
+                if (!isBehind(depVersion, pinned)) continue
+                val ref = ContentRef(depItem.kind, depItem.fileName)
+                val held = out[ref]
+                if (held != null && held.pinned.datePublished >= pinned.datePublished) continue
+                val swap = pinned.swapFor(ref, depItem.version) ?: continue
+                out[ref] = PinBehind(neededBy = item.displayName, pinned = pinned, update = swap)
+            }
+        }
+        return out
     }
 
     /**
@@ -205,7 +257,12 @@ class InstanceContentUpdater(
      * and a folder someone just dropped a jar into is precisely when the answer
      * matters.
      */
-    private class Checked(val updates: Map<ContentRef, ModUpdate>, val of: Set<ContentRef>, val at: Long) {
+    private class Checked(
+        val updates: Map<ContentRef, ModUpdate>,
+        val behind: Map<ContentRef, PinBehind>,
+        val of: Set<ContentRef>,
+        val at: Long,
+    ) {
         fun fresh(items: List<InstalledContent>): Boolean =
             System.nanoTime() - at < CHECK_TTL_NANOS &&
                 of == items.mapTo(mutableSetOf()) { ContentRef(it.kind, it.fileName) }
@@ -251,11 +308,9 @@ class InstanceContentUpdater(
         // behind. The scanner ignores those, so nobody would ever see them
         // and nothing else would ever remove them.
         sweepScratch(instanceDir, targets.map { it.update.ref.kind }.distinct())
-        val batch = targets + dependencyTargets(instanceDir, targets)
-        if (batch.size != targets.size) mark(key) { it.copy(total = batch.size) }
         val gate = Semaphore(DOWNLOAD_CONCURRENCY)
         coroutineScope {
-            batch.map { target ->
+            targets.map { target ->
                 async {
                     val name = target.update.ref.fileName
                     mark(key) { it.copy(current = name) }
@@ -272,31 +327,6 @@ class InstanceContentUpdater(
         }
         mark(key) { it.copy(current = null, finished = true) }
         runCatching { onChanged() }
-    }
-
-    /**
-     * The dependencies [targets] pinned that this instance carries at an older
-     * build, as swaps to the pinned one.
-     *
-     * An update used to take the newest build of a mod and leave its library where
-     * it was, and a build made against a newer library fails in the game, often as
-     * an AbstractMethodError naming neither. A dependency the batch already
-     * replaces is left to that replacement. Nothing is asked of the network when
-     * no target pins anything, and a lookup that fails costs the follow-up and
-     * not the batch.
-     */
-    private suspend fun dependencyTargets(instanceDir: Path, targets: List<Target>): List<Target> {
-        val pins = targets.flatMap { pinnedRequirements(it.update.dependencies) }
-        if (pins.isEmpty()) return emptyList()
-        val targeted = targets.mapTo(mutableSetOf()) { it.update.projectId }
-        return try {
-            installer.pinnedUpgrades(instanceDir, pins.filterNot { it.projectId in targeted })
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            log.warn("checking the dependencies an update pins failed: {}", e.message)
-            emptyList()
-        }
     }
 
     /** Drop a finished run once the screen has shown its outcome. */
@@ -375,8 +405,8 @@ class InstanceContentUpdater(
  * wrong, and never writes one out. Checked afterwards, the first bad body failed
  * the update.
  *
- * Shared by the updater and the installer, which brings a pinned dependency up to
- * its pin the same way.
+ * Kept apart from the updater's batch so a single swap has one definition of a
+ * successful one.
  */
 internal suspend fun swapIn(
     modrinth: ModrinthClient,

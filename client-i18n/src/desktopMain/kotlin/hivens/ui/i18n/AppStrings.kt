@@ -1144,6 +1144,8 @@ interface AppStrings {
     fun optionalConflictsWith(name: String): String
     /** Under an enabled mod that needs [name], which is off. */
     fun optionalNeedsOff(name: String): String
+    /** Under a library older than the build [neededBy] was made against, [version] being that build. */
+    fun contentBehindPin(neededBy: String, version: String): String
     val packVersionCheckTitle: String
     val packSettingsCategoryGeneral: String
     val packSettingsCategoryRuntime: String

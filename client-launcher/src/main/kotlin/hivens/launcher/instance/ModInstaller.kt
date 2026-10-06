@@ -23,26 +23,24 @@ import java.nio.file.Path
  *
  * Only `required` dependencies are followed. Optional means the author suggests
  * it, and acting on a suggestion would quietly grow the folder by things the
- * player did not ask for. A dependency already present is left alone unless the
- * author pinned a build of it and the one installed is older: the pack is the
- * player's, and a working build is not ours to replace for being old, only for
- * being older than what the mod was made against.
+ * player did not ask for. A dependency already present is left alone, whatever
+ * version it is on: the pack is the player's, and a working older build is not
+ * ours to replace behind their back. One older than the build the mod pinned is
+ * reported as [Outcome.behind], and the Content tab offers the update.
  */
 class ModInstaller(
     private val modrinth: ModrinthClient,
     private val scanner: InstanceContentScanner,
-    private val manager: InstanceContentManager = InstanceContentManager(),
 ) {
 
     private val log = LoggerFactory.getLogger(ModInstaller::class.java)
 
     /**
      * What an install did. [installed] is the file names that landed, head of the
-     * list first, and [upgraded] the names of dependencies brought up to the build
-     * a mod pinned. [skipped] and [missing] are PROJECT ids, the first for
-     * dependencies already present and the second for required ones with no build
-     * for this instance, which is the one case the caller has to show rather than
-     * swallow.
+     * list first. [skipped], [missing] and [behind] are PROJECT ids: dependencies
+     * already present, required ones with no build for this instance, which is the
+     * one case the caller has to show rather than swallow, and present ones older
+     * than the build a fetched mod pinned, which are left as they are.
      *
      * [present] is every project the instance carries afterwards, the untouched
      * ninety of them included. A browser showing search results needs to know what
@@ -55,7 +53,7 @@ class ModInstaller(
         val present: Set<String> = emptySet(),
         val skipped: List<String> = emptyList(),
         val missing: List<String> = emptyList(),
-        val upgraded: List<String> = emptyList(),
+        val behind: List<String> = emptyList(),
     ) {
         val ok: Boolean get() = installed.isNotEmpty()
     }
@@ -86,7 +84,7 @@ class ModInstaller(
         val installed = mutableListOf<String>()
         val skipped = mutableListOf<String>()
         val missing = mutableListOf<String>()
-        val upgraded = mutableListOf<String>()
+        val behind = mutableListOf<String>()
         val seen = mutableSetOf<String>()
 
         var frontier = listOf(version)
@@ -103,15 +101,11 @@ class ModInstaller(
                 installed += v.primaryFile().filename
                 present += v.projectId
 
-                // Present already: kept, unless the build just fetched pinned a newer
-                // one, which is then put in its place.
+                // Present already: kept, and named when the build just fetched pinned
+                // a newer one.
                 val presentDeps = v.dependencies.filter { it.dependencyType == "required" && it.projectId in present }
-                val raised = pinnedUpgrades(presentDeps, held)
-                for (target in raised) {
-                    if (swapIn(modrinth, manager, instanceDir, target)) upgraded += target.update.fileName
-                }
-                val raisedIds = raised.mapTo(mutableSetOf()) { it.update.projectId }
-                skipped += presentDeps.mapNotNull { it.projectId }.filterNot { it in raisedIds }
+                skipped += presentDeps.mapNotNull { it.projectId }
+                behind += pinnedBehind(presentDeps, held).map { it.update.projectId }
                 for (dep in requiredDependencies(v, present)) {
                     val projectId = dep.projectId
                     val resolved = resolveDependency(dep.versionId, projectId, mcVersion, loader)
@@ -128,7 +122,7 @@ class ModInstaller(
             frontier = next
             level++
         }
-        Outcome(installed, present.toSet(), skipped.distinct(), missing.distinct(), upgraded.distinct())
+        Outcome(installed, present.toSet(), skipped.distinct(), missing.distinct(), behind.distinct())
     }
 
     /** One project the instance carries: the row it is, the build it is, and whether it is on. */
@@ -150,18 +144,14 @@ class ModInstaller(
     }
 
     /**
-     * The [dependencies] that pin a build newer than the one the instance has, as
-     * swaps to the pinned build in the state the installed file is in.
+     * The [dependencies] that pin a build newer than the one in [held], as the swap
+     * that would bring each up to it, in the state the installed file is in. Nothing
+     * is swapped here.
      *
-     * Only pins are acted on, see [pinnedRequirements]. A dependency the instance
-     * does not carry is not this function's business, and neither is one whose
-     * pinned build cannot be fetched: that one is logged and left, since the
-     * installed build may well run.
+     * Only pins count, see [pinnedRequirements]. A pinned build that cannot be
+     * fetched is logged and left, since the installed build may well run.
      */
-    suspend fun pinnedUpgrades(instanceDir: Path, dependencies: List<ModrinthDependency>): List<InstanceContentUpdater.Target> =
-        pinnedUpgrades(dependencies, installedProjects(instanceDir))
-
-    private suspend fun pinnedUpgrades(
+    private suspend fun pinnedBehind(
         dependencies: List<ModrinthDependency>,
         held: Map<String, Installed>,
     ): List<InstanceContentUpdater.Target> {

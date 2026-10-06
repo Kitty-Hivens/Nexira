@@ -994,6 +994,7 @@ object JapaneseStrings : AppStrings {
     override val packLoaderRevert = "元に戻す"
     override fun optionalConflictsWith(name: String) = "$name と競合しています"
     override fun optionalNeedsOff(name: String) = "無効になっている $name が必要です"
+    override fun contentBehindPin(neededBy: String, version: String) = "$neededBy には $version 以降が必要です"
     override val packVersionCheckTitle = "アップデート"
     override val packSettingsCategoryGeneral = "全般"
     override val packSettingsCategoryRuntime = "起動"

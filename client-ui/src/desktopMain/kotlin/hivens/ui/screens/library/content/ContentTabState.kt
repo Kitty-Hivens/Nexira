@@ -226,6 +226,19 @@ internal class ContentTabState(
         private set
 
     /**
+     * Rows older than the build another installed mod pinned, from the last check.
+     * Shown on the row with its update offered, and never swapped on their own.
+     */
+    var behind by mutableStateOf<Map<ContentRef, InstanceContentUpdater.PinBehind>>(emptyMap())
+        private set
+
+    /** [behind] for rows still on disk under the name they were found by. */
+    val liveBehind: Map<ContentRef, InstanceContentUpdater.PinBehind> by derivedStateOf {
+        val present = items.orEmpty().mapTo(mutableSetOf()) { ContentRef(it.kind, it.fileName) }
+        behind.filterKeys { it in present }
+    }
+
+    /**
      * Updates for rows that are still on disk under the name they were found by.
      *
      * An applied update renames the file, so its entry here would otherwise keep
@@ -674,7 +687,14 @@ internal class ContentTabState(
      * flag lives beside the tab index now, which is saved for exactly that reason.
      */
     fun refreshAfterBrowse() {
-        scope.launch { rescan() }
+        // Asked again after the rescan: a mod installed from the browser can pin a
+        // newer build of a library the folder already had, and the check is what
+        // says so. The check's own cache is keyed on the file set, so an unchanged
+        // folder costs nothing.
+        scope.launch {
+            rescan()
+            checkUpdates()
+        }
     }
 
     // -- updates --------------------------------------------------------------
@@ -715,6 +735,7 @@ internal class ContentTabState(
             // rather than drawn as an answer.
             withContext(Dispatchers.Main) {
                 updates = outcome.updates
+                behind = outcome.behind
                 checkFailed = !outcome.complete
                 checked = true
             }

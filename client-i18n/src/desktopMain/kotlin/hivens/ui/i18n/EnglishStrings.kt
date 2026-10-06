@@ -987,6 +987,7 @@ object EnglishStrings : AppStrings {
     override val packLoaderRevert = "Revert"
     override fun optionalConflictsWith(name: String) = "Conflicts with $name"
     override fun optionalNeedsOff(name: String) = "Needs $name, which is off"
+    override fun contentBehindPin(neededBy: String, version: String) = "$neededBy needs $version or newer"
     override val packVersionCheckTitle          = "Updates"
     override val packSettingsCategoryGeneral    = "General"
     override val packSettingsCategoryRuntime    = "Launch"

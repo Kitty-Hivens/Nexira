@@ -60,7 +60,7 @@ class InstanceContentUpdaterTest {
             })
         }
         val modrinth = ModrinthClient(provider, testTransferEngine(provider), Json { ignoreUnknownKeys = true })
-        val updater = InstanceContentUpdater(modrinth, InstanceContentManager(), backgroundScope, InstanceWorkRegistry(), ModInstaller(modrinth, InstanceContentScanner()))
+        val updater = InstanceContentUpdater(modrinth, InstanceContentManager(), backgroundScope, InstanceWorkRegistry())
         val update = ModUpdate(
             ref = ContentRef(ContentKind.Mod, "old.jar"),
             installedVersion = "1.0",
@@ -103,47 +103,50 @@ class InstanceContentUpdaterTest {
         )
 
     /**
-     * An update to a build made against a newer library brings the library up to
-     * the build it pinned, in the same batch. Left as it was, the game fails on
-     * the first call into an API the old library does not have.
+     * A mod made against a newer library than the one in the folder is reported on
+     * the library's row with its pinned build offered, and the update batch does
+     * not swap the library on its own.
      */
     @Test
-    fun `an update that pins a newer library brings the installed one up to it`() = runTest {
+    fun `a library behind a pin is reported and offered, and an update leaves it alone`() = runTest {
         val dir = Files.createTempDirectory("content-update").also { temps.add(it) }
         Files.createDirectories(dir.resolve("mods"))
         val oldMod = jar("mod 1"); val newMod = jar("mod 2"); val oldLib = jar("lib 1"); val newLib = jar("lib 2")
         Files.write(dir.resolve("mods/mod-1.jar"), oldMod)
         Files.write(dir.resolve("mods/lib-1.jar"), oldLib)
         val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
-        val modV1 = version("mod", "mod-1", "2026-01-01T00:00:00Z", "mod-1.jar", oldMod)
+        val pin = listOf(ModrinthDependency(projectId = "lib", versionId = "lib-2"))
+        val modV2 = version("mod", "mod-2", "2026-03-02T00:00:00Z", "mod-2.jar", newMod, pin)
         val libV1 = version("lib", "lib-1", "2026-01-01T00:00:00Z", "lib-1.jar", oldLib)
         val libV2 = version("lib", "lib-2", "2026-03-01T00:00:00Z", "lib-2.jar", newLib)
-        val hashes = json.encodeToString(MapSerializer(String.serializer(), ModrinthVersion.serializer()), mapOf(sha1(oldMod) to modV1, sha1(oldLib) to libV1))
+        val hashes = json.encodeToString(MapSerializer(String.serializer(), ModrinthVersion.serializer()), mapOf(sha1(newMod) to modV2, sha1(oldLib) to libV1))
         val provider = HttpClientProvider {
             HttpClient(MockEngine { req ->
                 val path = req.url.encodedPath
                 val (body, type) = when {
                     path.endsWith("/v2/version_files") -> hashes.toByteArray() to "application/json"
+                    path.endsWith("/v2/version_files/update_many") -> "{}".toByteArray() to "application/json"
                     path.endsWith("/v2/project/lib/version/lib-2") -> json.encodeToString(ModrinthVersion.serializer(), libV2).toByteArray() to "application/json"
                     path.endsWith("/mod-2.jar") -> newMod to "application/java-archive"
-                    path.endsWith("/lib-2.jar") -> newLib to "application/java-archive"
                     else -> return@MockEngine respond(ByteReadChannel("no"), HttpStatusCode.NotFound)
                 }
                 respond(ByteReadChannel(body), HttpStatusCode.OK, headersOf("Content-Type", type))
             })
         }
         val modrinth = ModrinthClient(provider, testTransferEngine(provider), json)
-        val updater = InstanceContentUpdater(modrinth, InstanceContentManager(), backgroundScope, InstanceWorkRegistry(), ModInstaller(modrinth, InstanceContentScanner()))
-        val update = version("mod", "mod-2", "2026-03-02T00:00:00Z", "mod-2.jar", newMod, listOf(ModrinthDependency(projectId = "lib", versionId = "lib-2")))
-            .swapFor(ContentRef(ContentKind.Mod, "mod-1.jar"), "mod-1")!!
+        val updater = InstanceContentUpdater(modrinth, InstanceContentManager(), backgroundScope, InstanceWorkRegistry())
+        val update = modV2.swapFor(ContentRef(ContentKind.Mod, "mod-1.jar"), "mod-1")!!
 
         assertTrue(updater.start("instance", dir, "Pack", listOf(InstanceContentUpdater.Target(update, enabled = true))))
         val run = updater.runs.first { it[updater.keyOf(dir)]?.finished == true }.getValue(updater.keyOf(dir))
+        assertEquals(1, run.total, "the library is not added to the batch")
+        assertContentEquals(oldLib, Files.readAllBytes(dir.resolve("mods/lib-1.jar")), "the library is left as it was")
 
-        assertEquals(emptyList(), run.failed)
-        assertEquals(2, run.total, "the library joined the batch")
-        assertContentEquals(newLib, Files.readAllBytes(dir.resolve("mods/lib-2.jar")))
-        assertFalse(Files.exists(dir.resolve("mods/lib-1.jar")))
-        assertContentEquals(newMod, Files.readAllBytes(dir.resolve("mods/mod-2.jar")))
+        val items = InstanceContentScanner().scan(dir).filter { it.kind == ContentKind.Mod }
+        val outcome = updater.check(dir, items, mcVersion = "1.21.1", loader = "neoforge", force = true)
+        val libRef = ContentRef(ContentKind.Mod, "lib-1.jar")
+        val behind = outcome.behind.getValue(libRef)
+        assertEquals("lib-2", behind.pinned.id)
+        assertEquals("lib-2.jar", outcome.updates.getValue(libRef).fileName, "the pinned build is offered as the library's update")
     }
 }

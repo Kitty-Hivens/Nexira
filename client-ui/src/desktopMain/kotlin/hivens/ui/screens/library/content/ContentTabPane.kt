@@ -285,6 +285,7 @@ internal fun ContentTabPane(
                     ) {
                         items(items = visible, key = { it.selectionKey() }) { c ->
                             val rules = state.rulesFor(c)
+                            val ref = ContentRef(c.kind, c.fileName)
                             ContentRow(
                                 content        = c,
                                 selected       = c.selectionKey() in state.selectedKeys,
@@ -296,7 +297,9 @@ internal fun ContentTabPane(
                                     onOpenProject(ModTarget.Installed(instance.id, c.kind, c.fileName))
                                 },
                                 resolveProject = { state.resolveProject(c) },
-                                update         = state.liveUpdates[ContentRef(c.kind, c.fileName)],
+                                update         = state.liveUpdates[ref],
+                                warning        = rules.problem?.let { problemReason(it, s) }
+                                    ?: state.liveBehind[ref]?.let { s.contentBehindPin(it.neededBy, it.pinned.versionNumber) },
                                 onUpdate       = { state.update(c) },
                                 // Switching versions is the same write as an update,
                                 // so it is offered on the same rows.
@@ -774,6 +777,12 @@ internal fun ContentRow(
     onUpdate: () -> Unit,
     onVersions: (() -> Unit)?,
     onOpenPackSettings: () -> Unit = {},
+    /**
+     * What will go wrong with this file as things are set: a conflict or a missing
+     * requirement the pack's rules name, or a library older than a build another
+     * mod pinned. Drawn light red with the sentence under the name, never acted on.
+     */
+    warning: String? = null,
 ) {
     val s = LocalStrings.current
     val dim = if (rules.effectiveEnabled) 1f else 0.5f
@@ -793,7 +802,7 @@ internal fun ContentRow(
     NxSurface(SurfaceKind.Card, modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.small) {
         val rowFill = when {
             selected -> NxColor.wash(NxColor.lead(), 0.14f)
-            rules.problem != null -> NxColor.wash(NxColor.status(Status.Error), PROBLEM_WASH)
+            warning != null -> NxColor.wash(NxColor.status(Status.Error), PROBLEM_WASH)
             else -> Color.Transparent
         }
         OnFill(rowFill) {
@@ -847,10 +856,10 @@ internal fun ContentRow(
                     content.version?.let { v ->
                         Text(v, style = MaterialTheme.typography.labelSmall, color = if (rules.effectiveEnabled) NxInk.quiet else NxInk.off, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
-                    // What the pack's rules say will go wrong, said on the row and left to
-                    // the player: the switch still does what they ask.
-                    rules.problem?.let { problem ->
-                        Text(problemReason(problem, s), style = MaterialTheme.typography.labelSmall, color = NxColor.status(Status.Error, text = true), maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    // Said on the row and left to the player: the switch still does what
+                    // they ask, and an update on offer is the chip beside it.
+                    warning?.let {
+                        Text(it, style = MaterialTheme.typography.labelSmall, color = NxColor.status(Status.Error, text = true), maxLines = 2, overflow = TextOverflow.Ellipsis)
                     }
                 }
                 // The chip both reports the newer build and is the way to take it: the
@@ -1188,7 +1197,7 @@ internal fun ModResultRow(
     }
 }
 
-/** The light red under a row the pack's rules have something to say about. */
+/** The light red under a row with a [ContentRow] warning. */
 private const val PROBLEM_WASH = 0.10f
 
 /** The sentence under a mod the pack's rules have something to say about. */

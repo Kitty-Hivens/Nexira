@@ -992,6 +992,7 @@ object RussianStrings : AppStrings {
     override val packLoaderRevert = "Отменить"
     override fun optionalConflictsWith(name: String) = "Несовместим с $name"
     override fun optionalNeedsOff(name: String) = "Нужен $name, а он выключен"
+    override fun contentBehindPin(neededBy: String, version: String) = "$neededBy нужна версия $version или новее"
     override val packVersionCheckTitle          = "Обновления"
     override val packSettingsCategoryGeneral    = "Основное"
     override val packSettingsCategoryRuntime    = "Запуск"
