@@ -57,18 +57,30 @@ class MirrorPackCatalogue(
      *
      * The listing is the one call nothing else refreshes: a pack published on the
      * mirror stayed out of Browse until the stored copy expired, and a restart
-     * did not help, because the copy is on disk. A failed poll keeps what is
-     * shown and asks again on the next one. Only the first answer can fail the
-     * stream, since before it there is nothing to keep.
+     * did not help, because the copy is on disk. A failed refresh or poll keeps
+     * what is shown and asks again on the next one. Only a failure before anything
+     * was shown ends the stream, since then there is nothing to keep.
      */
     override fun searchStream(query: String, page: Int): Flow<List<CataloguePack>> = flow {
         var last: List<CataloguePack>? = null
-        client.packsStream().collect { listing ->
-            val packs = matching(listing, query)
-            if (packs != last) {
-                last = packs
-                emit(packs)
+        // The stored listing is handed over before the refresh behind it is asked,
+        // so that refresh can fail with a list already on screen. Thrown on from
+        // there, it ended the stream before the first poll and the list stayed the
+        // stored one for the whole visit. Only a failure with nothing shown yet
+        // ends the stream, which the screen then reports with its retry.
+        try {
+            client.packsStream().collect { listing ->
+                val packs = matching(listing, query)
+                if (packs != last) {
+                    last = packs
+                    emit(packs)
+                }
             }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            if (last == null) throw e
+            log.debug("mirror listing refresh failed, keeping the stored list and polling", e)
         }
         while (true) {
             delay(pollIntervalMs)

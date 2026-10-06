@@ -226,12 +226,13 @@ fun PackVersionsScreen(instanceId: String, onBack: () -> Unit) {
             .catch { loadFailed = true }
             .collect { list ->
                 builds = list
-                // Keep the user's pick across the refresh; only seed a selection
-                // when there is none, or when the pick is gone from the listing.
+                // Keep the user's pick across the refresh, as the refreshed object:
+                // the stale one can carry notes in another language or none at all.
+                // Seed a selection when there is none, or when the pick is gone.
                 val current = selected?.key
-                if (current == null || list.none { it.key == current }) {
-                    selected = installedBuildOf(list, pack) ?: list.firstOrNull()
-                }
+                selected = list.firstOrNull { it.key == current }
+                    ?: installedBuildOf(list, pack)
+                    ?: list.firstOrNull()
             }
     }
 

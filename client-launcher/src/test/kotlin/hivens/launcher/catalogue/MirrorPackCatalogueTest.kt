@@ -2,6 +2,12 @@ package hivens.launcher.catalogue
 
 import hivens.core.api.HttpClientProvider
 import hivens.core.api.catalogue.CataloguePack
+import hivens.core.api.dto.smrt.SmrtPackListing
+import hivens.core.cache.Cache
+import hivens.core.cache.CacheValue
+import hivens.core.cache.Freshness
+import hivens.core.cache.PassthroughCache
+import hivens.launcher.cache.SmrtPackCaches
 import hivens.launcher.smrt.SmrtPackClient
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
@@ -9,10 +15,14 @@ import io.ktor.client.engine.mock.respond
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import io.ktor.utils.io.ByteReadChannel
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.serialization.json.Json
+import java.io.IOException
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -27,7 +37,7 @@ class MirrorPackCatalogueTest {
         """{"schema_version":2,"generated_at":"t","packs":[${ids.joinToString(",") { pack(it) }}]}"""
 
     /** Answers the n-th request with the n-th body, the last one from then on. A null body is a 500. */
-    private fun mirror(vararg bodies: String?): Pair<SmrtPackClient, AtomicInteger> {
+    private fun mirror(vararg bodies: String?, caches: SmrtPackCaches = SmrtPackCaches.passthrough()): Pair<SmrtPackClient, AtomicInteger> {
         val calls = AtomicInteger(0)
         val client = HttpClient(MockEngine) {
             engine {
@@ -41,7 +51,7 @@ class MirrorPackCatalogueTest {
                 }
             }
         }
-        return SmrtPackClient(HttpClientProvider { client }, "https://mirror.test") to calls
+        return SmrtPackClient(HttpClientProvider { client }, "https://mirror.test", caches = caches) to calls
     }
 
     private fun ids(answers: List<List<CataloguePack>>) = answers.map { a -> a.map { it.id } }
@@ -95,6 +105,29 @@ class MirrorPackCatalogueTest {
         val (client, _) = mirror(translated)
         val catalogue = MirrorPackCatalogue(client, language = { "en" })
         assertEquals(listOf("t"), catalogue.search("industry").map { it.id })
+    }
+
+    /** A listing cache holding [stored], whose stale-then-fresh view fails after handing it over. */
+    private class FailingRefreshCache(private val stored: SmrtPackListing) : Cache<SmrtPackListing> {
+        override suspend fun get(key: String, loader: suspend () -> SmrtPackListing) = loader()
+        override suspend fun refresh(key: String, loader: suspend () -> SmrtPackListing) = loader()
+        override fun flow(key: String, loader: suspend () -> SmrtPackListing): Flow<CacheValue<SmrtPackListing>> = flow {
+            emit(CacheValue(stored, Freshness.STALE))
+            throw IOException("mirror unreachable")
+        }
+        override suspend fun invalidate(key: String) {}
+        override suspend fun invalidateAll() {}
+    }
+
+    @Test
+    fun `a refresh that fails behind the stored list still leaves the poll running`() = runBlocking {
+        val stored = Json { ignoreUnknownKeys = true }.decodeFromString(SmrtPackListing.serializer(), listing("a"))
+        val caches = SmrtPackCaches(FailingRefreshCache(stored), PassthroughCache(), PassthroughCache(), PassthroughCache())
+        val (client, _) = mirror(listing("a", "b"), caches = caches)
+        val answers = withTimeout(5_000) {
+            MirrorPackCatalogue(client, pollIntervalMs = 10).searchStream("").take(2).toList()
+        }
+        assertEquals(listOf(listOf("a"), listOf("a", "b")), ids(answers))
     }
 
     @Test
