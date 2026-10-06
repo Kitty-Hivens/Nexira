@@ -91,6 +91,11 @@ object AprilFoolsEngine {
             delay(AprilFools.intervalMs().milliseconds)
             if (!AprilFools.isActive()) break
 
+            // Nothing is placed by position until the window has a size. The first
+            // layout reports one after the composition that starts the engine.
+            val size = ws()
+            if (size.width <= 0 || size.height <= 0) continue
+
             // Spawn up to maxParallel events simultaneously
             val slots = AprilFools.maxParallel() - ChaosState.activeCount()
             if (slots <= 0) continue
@@ -99,8 +104,20 @@ object AprilFoolsEngine {
                 val btn = ChaosState.randomIdle() ?: return@repeat
                 val event = pickEvent()
                 scope.launch {
-                    runCatching { event(btn, cursor, ws) }
-                        .onFailure { /* event coroutines should never crash the app */ }
+                    try {
+                        event(btn, cursor, ws)
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (_: Exception) {
+                        // An event coroutine must never crash the app, and must not
+                        // leave its button behind either: swallowed as it was, a
+                        // failure mid-event left the button hidden from the layout
+                        // and holding a parallel slot for the rest of the session.
+                        runCatching { returnToOrigin(btn) }.onFailure {
+                            btn.originalVisible = true
+                            btn.phase = ChaosPhase.IDLE
+                        }
+                    }
                 }
                 delay(Random.nextLong(300L, 800L).milliseconds) // stagger multi-event starts
             }
@@ -246,8 +263,8 @@ object AprilFoolsEngine {
                 val spd   = (fleeRadius - dist) / fleeRadius * 18f + 3f
                 val nx    = dx / dist
                 val ny    = dy / dist
-                val newX  = (btn.overlayX.value + nx * spd).coerceIn(0f, w.width  - btn.widthPx)
-                val newY  = (btn.overlayY.value + ny * spd).coerceIn(0f, w.height - btn.heightPx)
+                val newX  = (btn.overlayX.value + nx * spd).within(w.width  - btn.widthPx)
+                val newY  = (btn.overlayY.value + ny * spd).within(w.height - btn.heightPx)
 
                 // Lean in the direction of movement
                 val lean  = (atan2(ny, nx) * (180f / PI.toFloat())).coerceIn(-30f, 30f)
@@ -419,7 +436,7 @@ object AprilFoolsEngine {
 
         while (System.currentTimeMillis() < end) {
             val newX = (btn.overlayX.value + speed * dirSign)
-                .coerceIn(0f, w.width - btn.widthPx)
+                .within(w.width - btn.widthPx)
             val bobY = sin(btn.legCycle * 2f * PI.toFloat()) * 3.5f
 
             btn.overlayX.snapTo(newX)
@@ -498,6 +515,9 @@ object AprilFoolsEngine {
     // ─── Math helpers ─────────────────────────────────────────────────────────
 
     private fun lerp(a: Float, b: Float, t: Float) = a + (b - a) * t
+
+    /** Held between zero and [max], and at zero when a button is wider than the window. */
+    private fun Float.within(max: Float): Float = coerceIn(0f, max.coerceAtLeast(0f))
     private fun easeInOut(t: Float): Float =
         if (t < 0.5f) 2f * t * t else -1f + (4f - 2f * t) * t
 

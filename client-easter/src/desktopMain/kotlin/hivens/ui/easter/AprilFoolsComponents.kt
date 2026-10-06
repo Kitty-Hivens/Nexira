@@ -59,6 +59,11 @@ fun AprilFoolsWrapper(
     }
 
     val scope = rememberCoroutineScope()
+    // Read through the latest composition. Captured by value, the engine kept the
+    // size of the composition that started it, which comes before the first layout
+    // reports one: zero for the whole session, so every event placed by position
+    // resolved to a corner and a range coerced against it threw.
+    val currentWindowSize by rememberUpdatedState(windowSize)
 
     // The engine owns its own child scope (cancelled in stop()); start it and
     // tear it down on dispose from one effect so the lifecycle is explicit and
@@ -67,7 +72,7 @@ fun AprilFoolsWrapper(
         AprilFoolsEngine.start(
             parent      = scope,
             cursorState = { pixelCursorState.value },
-            windowSize  = { windowSize },
+            windowSize  = { currentWindowSize },
         )
         onDispose { AprilFoolsEngine.stop() }
     }
