@@ -7,6 +7,7 @@ import hivens.core.net.SkipIfPresent
 import hivens.core.net.Transfer
 import hivens.core.net.TransferEngine
 import hivens.core.platform.OS
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
@@ -136,6 +137,11 @@ class JavaManagerService(
                     Files.deleteIfExists(archive)
                 }
                 return
+            } catch (e: CancellationException) {
+                // A stopped launch, not a failed mirror. Caught below, it walked on to
+                // the next mirror, which threw at once, and the launch reported every
+                // mirror failing for a download nobody let finish.
+                throw e
             } catch (e: Exception) {
                 // Whatever arrived is left where it is. The partial beside this
                 // archive is what the next attempt continues from, and on the route

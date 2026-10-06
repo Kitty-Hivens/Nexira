@@ -9,6 +9,11 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import io.ktor.utils.io.ByteReadChannel
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.runBlocking
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream
@@ -25,6 +30,7 @@ import java.io.FileOutputStream
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 import kotlin.io.path.div
@@ -554,6 +560,38 @@ class JavaManagerServiceTest {
                 assertEquals("java", resolved.fileName.toString())
                 assertTrue(Files.isExecutable(resolved),
                     "post-download +x must be applied on non-Windows so isExecutable passes")
+            }
+        }
+    }
+
+    /**
+     * Stopping a launch while the JDK downloads used to be caught as a failed mirror:
+     * the loop walked on to the next one, which threw at once, and the launch reported
+     * every mirror failing for a download nobody let finish.
+     */
+    @Test
+    fun `a download that is cancelled stops at the first mirror and stays a cancellation`() {
+        val requested = AtomicInteger()
+        val started = CompletableDeferred<Unit>()
+        val provider = HttpClientProvider {
+            HttpClient(MockEngine { _ ->
+                requested.incrementAndGet()
+                started.complete(Unit)
+                awaitCancellation()
+            })
+        }
+        withSystemProp("os.name", "Linux") {
+            withSystemProp("os.arch", "amd64") {
+                val failure = runBlocking {
+                    val download = async(Dispatchers.IO) {
+                        JavaManagerService(workDir, testTransferEngine(provider)).getJavaPathForMajor(21) {}
+                    }
+                    started.await()
+                    download.cancel()
+                    runCatching { download.await() }.exceptionOrNull()
+                }
+                assertTrue(failure is CancellationException, "a stop is not a mirror failure, got $failure")
+                assertEquals(1, requested.get(), "the next mirror was tried for a cancelled download")
             }
         }
     }
