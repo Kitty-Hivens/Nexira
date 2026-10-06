@@ -74,6 +74,29 @@ class MirrorPackCatalogueTest {
         assertEquals(listOf(listOf("a"), listOf("a", "b")), ids(answers))
     }
 
+    private val translated =
+        """{"schema_version":2,"generated_at":"t","packs":[""" +
+            """{"pack_id":"t","display_name":"T","tagline":"Тяжёлая промышленность.","minecraft_version":"1.21.1",""" +
+            """"latest_pack_version":"1","tagline_i18n":{"en":"Heavy industry."}},""" +
+            """{"pack_id":"u","display_name":"U","tagline":"Без перевода","minecraft_version":"1.21.1","latest_pack_version":"1"}]}"""
+
+    @Test
+    fun `a card reads in the reader's language where the curator wrote it, and untagged where not`() = runBlocking {
+        val (client, _) = mirror(translated)
+        var tag = "en"
+        val catalogue = MirrorPackCatalogue(client, language = { tag })
+        assertEquals(listOf("Heavy industry.", "Без перевода"), catalogue.search("").map { it.tagline })
+        tag = "de"
+        assertEquals(listOf("Тяжёлая промышленность.", "Без перевода"), catalogue.search("").map { it.tagline })
+    }
+
+    @Test
+    fun `a search matches the tagline the reader sees`() = runBlocking {
+        val (client, _) = mirror(translated)
+        val catalogue = MirrorPackCatalogue(client, language = { "en" })
+        assertEquals(listOf("t"), catalogue.search("industry").map { it.id })
+    }
+
     @Test
     fun `the mirror answers its whole listing, so it does not page`() {
         val (client, _) = mirror(listing("a"))

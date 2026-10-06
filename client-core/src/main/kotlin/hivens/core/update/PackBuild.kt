@@ -1,5 +1,6 @@
 package hivens.core.update
 
+import hivens.core.api.dto.smrt.inLanguage
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -29,6 +30,12 @@ data class PackBuild(
     val fingerprint: String? = null,
     /** Curator-authored release notes for this build (CommonMark); absent when none were given. */
     val changelog: String? = null,
+    /**
+     * [changelog] by language tag. Only the mirror publishes it, and
+     * [forLanguage] folds it into [changelog] where the listing becomes something
+     * a screen reads, so nothing downstream has to know it exists.
+     */
+    @SerialName("changelog_i18n") val changelogI18n: Map<String, String>? = null,
     @SerialName("mods_count") val modsCount: Int? = null,
     @SerialName("assets_count") val assetsCount: Int? = null,
     /**
@@ -54,4 +61,8 @@ data class PackBuild(
 
     /** Stable identity: the source's own id where it has one, the label otherwise. */
     val key: String get() = id ?: versionNumber
+
+    /** This build with its release notes in the reader's language [tag], where the source wrote them. */
+    fun forLanguage(tag: String): PackBuild =
+        if (changelogI18n == null) this else copy(changelog = inLanguage(changelog, changelogI18n, tag))
 }

@@ -434,6 +434,10 @@ data class SmrtPackSummary(
     @SerialName("gallery_urls") val galleryUrls: List<String> = emptyList(),
     /** Long-form CommonMark description for the BrowsePackDetail About section. HTML is not parsed. */
     @SerialName("description_md") val descriptionMd: String? = null,
+    /** [tagline] by language tag, for [inLanguage]. Absent from a mirror that predates it. */
+    @SerialName("tagline_i18n") val taglineI18n: Map<String, String>? = null,
+    /** [descriptionMd] by language tag, for [inLanguage]. Absent from a mirror that predates it. */
+    @SerialName("description_md_i18n") val descriptionMdI18n: Map<String, String>? = null,
     /** When the latest build was published (RFC 3339); read-time derived by the mirror. */
     @SerialName("latest_built_at") val latestBuiltAt: String? = null,
     /** Channel of the latest build (`release` / `beta` / `alpha`); derived by the mirror. */

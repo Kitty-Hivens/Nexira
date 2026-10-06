@@ -59,6 +59,8 @@ class PackUpdateService(
     private val snapshotService: PackSnapshotService,
     private val journal: ApplyJournal,
     private val dataDir: Path,
+    /** The reader's language tag, for the release notes the mirror writes per language. */
+    private val language: () -> String = { "" },
 ) : PackUpdater {
     private val log = LoggerFactory.getLogger(PackUpdateService::class.java)
     private val guard = ApplyGuard(snapshotService, journal, repository)
@@ -344,12 +346,18 @@ class PackUpdateService(
      * and the listing already arrives sorted by it.
      */
     override suspend fun availableBuilds(instance: PackInstance): List<PackBuild> = withContext(Dispatchers.IO) {
-        client.listBuilds(instance.packRef.id).builds
+        val tag = language()
+        client.listBuilds(instance.packRef.id).builds.map { it.forLanguage(tag) }
     }
 
     /** The same listing, stale-then-fresh, for a screen that must not miss a build the cache predates. */
     override fun availableBuildsStream(instance: PackInstance): Flow<List<PackBuild>> =
-        client.buildsStream(instance.packRef.id).map { it.builds }.flowOn(Dispatchers.IO)
+        client.buildsStream(instance.packRef.id)
+            .map { listing ->
+                val tag = language()
+                listing.builds.map { it.forLanguage(tag) }
+            }
+            .flowOn(Dispatchers.IO)
 
     /** Snapshots [instance] can be rolled back to, newest first. */
     override fun listSnapshots(instance: PackInstance): List<PackSnapshot> =

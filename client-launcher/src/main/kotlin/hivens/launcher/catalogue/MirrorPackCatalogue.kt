@@ -7,6 +7,7 @@ import hivens.core.api.catalogue.CataloguePackVersion
 import hivens.core.api.dto.smrt.SmrtPackListing
 import hivens.core.api.dto.smrt.SmrtPackManifest
 import hivens.core.api.dto.smrt.SmrtPackSummary
+import hivens.core.api.dto.smrt.inLanguage
 import hivens.core.api.interfaces.IPackCatalogueService
 import hivens.core.data.PackOrigin
 import hivens.launcher.smrt.SmrtPackClient
@@ -28,10 +29,17 @@ import org.slf4j.LoggerFactory
  * Not wrapped in [CachedPackCatalogue]: a search is a filter over the listing,
  * which [SmrtPackClient] already keeps on disk, and a second cache over it took
  * the inner one's stale answer as a fresh one of its own.
+ *
+ * The mirror carries its text per language beside the untagged copy. It is
+ * picked here, where the wire shape becomes the catalogue's, by [language]: the
+ * reader's tag, asked on every read so a change of interface language reaches
+ * the next answer. The catalogue's models keep one string per field, and no
+ * screen that draws them has to know there were several.
  */
 class MirrorPackCatalogue(
     private val client: SmrtPackClient,
     private val pollIntervalMs: Long = POLL_INTERVAL_MS,
+    private val language: () -> String = { "" },
 ) : IPackCatalogueService {
     private val log = LoggerFactory.getLogger(MirrorPackCatalogue::class.java)
 
@@ -81,25 +89,30 @@ class MirrorPackCatalogue(
         }
     }
 
-    private fun matching(listing: SmrtPackListing, query: String): List<CataloguePack> =
-        listing.packs
-            .filter {
+    private fun matching(listing: SmrtPackListing, query: String): List<CataloguePack> {
+        val tag = language()
+        return listing.packs
+            .map { it to taglineOf(it, tag) }
+            .filter { (s, tagline) ->
                 query.isBlank() ||
-                    it.displayName.contains(query, ignoreCase = true) ||
-                    it.tagline.contains(query, ignoreCase = true)
+                    s.displayName.contains(query, ignoreCase = true) ||
+                    tagline.contains(query, ignoreCase = true)
             }
-            .map { s ->
+            .map { (s, tagline) ->
                 CataloguePack(
                     origin = origin,
                     id = s.packId,
                     title = s.displayName,
-                    tagline = s.tagline,
+                    tagline = tagline,
                     iconUrl = s.iconUrl,
                     bannerUrl = s.bannerUrl,
                     tags = s.tags,
                     mcVersion = s.minecraftVersion,
                 )
             }
+    }
+
+    private fun taglineOf(s: SmrtPackSummary, tag: String): String = inLanguage(s.tagline, s.taglineI18n, tag) ?: s.tagline
 
     override suspend fun details(packId: String): CataloguePackDetails = coroutineScope {
         // Summary + manifest + build listing in parallel: the manifest carries
@@ -110,7 +123,9 @@ class MirrorPackCatalogue(
         val buildsD = async { runCatching { client.listBuilds(packId).builds }.getOrDefault(emptyList()) }
         val s = summaryD.await()
         val m = manifestD.await()
+        val tag = language()
         val versions = buildsD.await()
+            .map { it.forLanguage(tag) }
             .map { b ->
                 CataloguePackVersion(
                     id = b.versionNumber,
@@ -128,13 +143,13 @@ class MirrorPackCatalogue(
             origin = origin,
             id = s.packId,
             title = s.displayName,
-            tagline = s.tagline,
+            tagline = taglineOf(s, tag),
             iconUrl = s.iconUrl,
             bannerUrl = s.bannerUrl,
             // The mirror publishes URLs and no captions, so one size serves both
             // the grid and the lightbox and the shots go uncaptioned.
             gallery = s.galleryUrls.map { CatalogueGalleryItem(full = it, thumb = it) },
-            bodyMarkdown = s.descriptionMd,
+            bodyMarkdown = inLanguage(s.descriptionMd, s.descriptionMdI18n, tag),
             tags = s.tags,
             runtimeLabel = "Java ${m.java.major}",
             versions = versions,
@@ -148,7 +163,8 @@ class MirrorPackCatalogue(
         val summaryD = async { client.fetchSummary(packId) }
         val buildsD = async { runCatching { client.listBuilds(packId).builds }.getOrDefault(emptyList()) }
         val s = summaryD.await()
-        val builds = buildsD.await()
+        val tag = language()
+        val builds = buildsD.await().map { it.forLanguage(tag) }
         if (builds.isEmpty()) listOf(versionOf(s, null))
         else builds.map { b ->
             CataloguePackVersion(

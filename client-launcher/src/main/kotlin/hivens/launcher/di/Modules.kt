@@ -22,6 +22,7 @@ import hivens.launcher.protocol.SmartycraftV1Protocol
 import hivens.core.api.HttpClientProvider
 import hivens.core.net.TransferEngine
 import hivens.core.api.SkinRepository
+import hivens.core.api.interfaces.ISettingsService
 import hivens.core.api.interfaces.*
 import dev.hivens.libvault.SecretVault
 import dev.hivens.libvault.Vault
@@ -519,7 +520,10 @@ val mirrorModule = module {
 
     // Pack-catalogue read side: one provider per browsable source, indexed by
     // origin so the Browse UI stays source-agnostic.
-    single { MirrorPackCatalogue(get()) }
+    single {
+        val settings = get<ISettingsService>()
+        MirrorPackCatalogue(get(), language = { settings.getSettings().locale })
+    }
     single { ModrinthPackCatalogue(get()) }
     single {
         val searches = catalogueSearchCache()
@@ -621,6 +625,7 @@ val mirrorModule = module {
     // Startup rollback for updates a hard crash interrupted (journal + snapshot).
     single { ApplyRecovery(snapshotService = get(), repository = get(), journal = get(), dataDir = get(), work = get()) }
     single {
+        val settings = get<ISettingsService>()
         PackUpdateService(
             client = get<SmrtPackClient>(),
             syncService = get(),
@@ -628,6 +633,7 @@ val mirrorModule = module {
             snapshotService = get(),
             journal = get(),
             dataDir = get(),
+            language = { settings.getSettings().locale },
         )
     }
     single {
