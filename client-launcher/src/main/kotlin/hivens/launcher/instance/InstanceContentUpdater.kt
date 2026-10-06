@@ -72,11 +72,17 @@ class InstanceContentUpdater(
     )
 
     /**
-     * A file older than the build [neededBy] was made against, which pinned
-     * [pinned]. Reported and offered, never acted on: [update] is the swap to the
-     * pinned build, put among the updates when the check found none newer.
+     * A file older than the build [neededBy] (the file at [neededByRef]) was made
+     * against, which pinned [pinned]. Reported and offered, never acted on:
+     * [update] is the swap to the pinned build, put among the updates of a file
+     * the player owns when the check found none at least that new.
      */
-    data class PinBehind(val neededBy: String, val pinned: ModrinthVersion, val update: ModUpdate)
+    data class PinBehind(
+        val neededBy: String,
+        val neededByRef: ContentRef,
+        val pinned: ModrinthVersion,
+        val update: ModUpdate,
+    )
 
     /**
      * How a batch is going. [current] is the file being worked on, for a line
@@ -115,6 +121,11 @@ class InstanceContentUpdater(
      *
      * Blank [mcVersion] means the instance has no manifest to check against yet,
      * and every answer would be for the wrong game version -- so nothing is asked.
+     *
+     * [context] is the rest of the instance's mods, the ones the player does not
+     * own: no update is offered for them, but they take part in the pinned-build
+     * check, since a mod the pack placed can pin a library the player added and
+     * the other way round.
      */
     suspend fun check(
         instanceDir: Path,
@@ -123,8 +134,11 @@ class InstanceContentUpdater(
         loader: String,
         channel: ModUpdateChannel = ModUpdateChannel.Release,
         force: Boolean = false,
+        context: List<InstalledContent> = emptyList(),
     ): CheckOutcome = withContext(Dispatchers.IO) {
-        if (mcVersion.isBlank() || items.isEmpty()) return@withContext CheckOutcome(emptyMap(), true)
+        if (mcVersion.isBlank() || (items.isEmpty() && context.isEmpty())) return@withContext CheckOutcome(emptyMap(), true)
+        val all = (items + context).distinctBy { ContentRef(it.kind, it.fileName) }
+        val owned = items.mapTo(HashSet()) { ContentRef(it.kind, it.fileName) }
 
         // Leaving the tab and coming back is one click, and without this it was
         // also a full round of requests. Short-lived on purpose: the answer goes
@@ -132,16 +146,17 @@ class InstanceContentUpdater(
         // is there for exactly that.
         val key = keyOf(instanceDir)
         if (!force) {
-            cached[key]?.takeIf { it.fresh(items) }?.let { return@withContext CheckOutcome(it.updates, true, it.behind) }
+            cached[key]?.takeIf { it.fresh(items, all) }?.let { return@withContext CheckOutcome(it.updates, true, it.behind) }
         }
 
         // One hash per file, and a file that cannot be read is skipped rather
         // than failing the check for everything beside it.
-        val hashed = items.mapNotNull { c ->
+        val hashedAll = all.mapNotNull { c ->
             runCatching { c to sha1Of(c.pathIn(instanceDir)) }
                 .onFailure { log.debug("cannot hash {}: {}", c.fileName, it.message) }
                 .getOrNull()
         }
+        val hashed = hashedAll.filter { (c, _) -> ContentRef(c.kind, c.fileName) in owned }
         // Two identical files under different names are two rows, and both of
         // them are owed the same answer.
         val byHash = hashed.groupBy({ it.second }, { it.first })
@@ -152,7 +167,7 @@ class InstanceContentUpdater(
         // from a year earlier is an update.
         var complete = true
         val current = try {
-            modrinth.versionsForHashes(hashed.map { it.second })
+            modrinth.versionsForHashes(hashedAll.map { it.second })
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -206,38 +221,56 @@ class InstanceContentUpdater(
         // against a newer build of a library than the one in the folder fails in the
         // game, often as an AbstractMethodError naming neither, so the library is
         // named here and its update offered where the check found none.
-        val behind = pinnedBehind(hashed, current)
-        for ((ref, pin) in behind) if (ref !in found) found[ref] = pin.update
+        val (behind, pinsComplete) = pinnedBehind(hashedAll, current)
+        if (!pinsComplete) complete = false
+        for ((ref, pin) in behind) {
+            if (ref !in owned) continue
+            // An update older than the pin would leave the file behind it, and the
+            // row would ask for one build while the chip offered another.
+            val offered = found[ref]
+            if (offered == null || offered.datePublished < pin.pinned.datePublished) found[ref] = pin.update
+        }
         // Only a complete answer is worth remembering; a partial one is handed
         // back for what it has and asked again next time.
         if (complete) {
-            cached[key] = Checked(found, behind, items.map { ContentRef(it.kind, it.fileName) }.toSet(), System.nanoTime())
+            cached[key] = Checked(found, behind, owned, all.mapTo(HashSet()) { ContentRef(it.kind, it.fileName) }, System.nanoTime())
         }
         CheckOutcome(found, complete, behind)
     }
 
     /**
      * Installed files older than a build another installed file pinned, keyed by
-     * the older file. Where two mods pin different builds, the newer pin is the
-     * one reported. A pinned build that cannot be looked up is skipped: nothing
-     * here can tell whether the installed one is behind it.
+     * the older file, and whether every pinned build could be looked up. Where two
+     * mods pin different builds, the newer pin is the one reported.
+     *
+     * Only enabled files count: a disabled mod pins nothing the game loads, and a
+     * disabled copy of a library kept beside the enabled one is not the one in
+     * use. A mod pinning its own project, and a library already on the pinned
+     * build, ask nothing of the network.
      */
     private suspend fun pinnedBehind(
         hashed: List<Pair<InstalledContent, String>>,
         current: Map<String, ModrinthVersion>,
-    ): Map<ContentRef, PinBehind> {
-        val byProject = hashed.mapNotNull { (item, hash) -> current[hash]?.let { it.projectId to (item to it) } }.toMap()
+    ): Pair<Map<ContentRef, PinBehind>, Boolean> {
+        val enabled = hashed.filter { (item, _) -> item.enabled }
+        val byProject = enabled.mapNotNull { (item, hash) -> current[hash]?.let { it.projectId to (item to it) } }.toMap()
         val out = LinkedHashMap<ContentRef, PinBehind>()
-        for ((item, hash) in hashed) {
+        var complete = true
+        for ((item, hash) in enabled) {
             val version = current[hash] ?: continue
             for (dep in pinnedRequirements(version.dependencies)) {
+                if (dep.projectId == version.projectId) continue
                 val (depItem, depVersion) = byProject[dep.projectId] ?: continue
+                if (depVersion.id == dep.versionId) continue
                 val pinned = try {
                     modrinth.resolveVersion(dep.projectId!!, dep.versionId!!)
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
+                    // Not an answer: remembered as one, the library would stay
+                    // unmarked for as long as the check is cached.
                     log.debug("looking up the build {} pins failed: {}", item.fileName, e.message)
+                    complete = false
                     continue
                 }
                 if (!isBehind(depVersion, pinned)) continue
@@ -245,10 +278,10 @@ class InstanceContentUpdater(
                 val held = out[ref]
                 if (held != null && held.pinned.datePublished >= pinned.datePublished) continue
                 val swap = pinned.swapFor(ref, depItem.version) ?: continue
-                out[ref] = PinBehind(neededBy = item.displayName, pinned = pinned, update = swap)
+                out[ref] = PinBehind(item.displayName, ContentRef(item.kind, item.fileName), pinned, swap)
             }
         }
-        return out
+        return out to complete
     }
 
     /**
@@ -261,11 +294,13 @@ class InstanceContentUpdater(
         val updates: Map<ContentRef, ModUpdate>,
         val behind: Map<ContentRef, PinBehind>,
         val of: Set<ContentRef>,
+        val among: Set<ContentRef>,
         val at: Long,
     ) {
-        fun fresh(items: List<InstalledContent>): Boolean =
+        fun fresh(items: List<InstalledContent>, all: List<InstalledContent>): Boolean =
             System.nanoTime() - at < CHECK_TTL_NANOS &&
-                of == items.mapTo(mutableSetOf()) { ContentRef(it.kind, it.fileName) }
+                of == items.mapTo(mutableSetOf()) { ContentRef(it.kind, it.fileName) } &&
+                among == all.mapTo(mutableSetOf()) { ContentRef(it.kind, it.fileName) }
     }
 
     /**

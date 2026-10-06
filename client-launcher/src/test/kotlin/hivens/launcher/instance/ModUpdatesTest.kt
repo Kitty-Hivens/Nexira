@@ -307,10 +307,9 @@ class ModUpdatesTest {
     }
 
     @Test
-    fun `an update and a picked build carry what the build declares it needs`() {
-        val deps = listOf(ModrinthDependency(projectId = "lib", versionId = "lib-2"))
-        val newer = version("2.0", "2026-03-01", sha1 = "bbbb").copy(dependencies = deps)
-        assertEquals(deps, updateFrom(ref, "aaaa", "1.0", listOf(newer))?.dependencies)
-        assertEquals(deps, newer.swapFor(ref, "1.0")?.dependencies)
+    fun `an update and a picked build carry when they were published`() {
+        val newer = version("2.0", "2026-03-01", sha1 = "bbbb")
+        assertEquals("2026-03-01", updateFrom(ref, "aaaa", "1.0", listOf(newer))?.datePublished)
+        assertEquals("2026-03-01", newer.swapFor(ref, "1.0")?.datePublished)
     }
 }

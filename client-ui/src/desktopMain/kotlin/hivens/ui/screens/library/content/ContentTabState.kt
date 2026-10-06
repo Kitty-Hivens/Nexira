@@ -247,10 +247,15 @@ internal class ContentTabState(
     var behind by mutableStateOf<Map<ContentRef, InstanceContentUpdater.PinBehind>>(emptyMap())
         private set
 
-    /** [behind] for rows still on disk under the name they were found by. */
+    /**
+     * [behind] for rows still on disk under the name they were found by, while the
+     * mod that needs the newer build is still there and on: a warning about a mod
+     * that was deleted or turned off since would name something no longer loaded.
+     */
     val liveBehind: Map<ContentRef, InstanceContentUpdater.PinBehind> by derivedStateOf {
-        val present = items.orEmpty().mapTo(mutableSetOf()) { ContentRef(it.kind, it.fileName) }
-        behind.filterKeys { it in present }
+        val present = items.orEmpty().filter { it.enabled }.mapTo(mutableSetOf()) { ContentRef(it.kind, it.fileName) }
+        val all = items.orEmpty().mapTo(mutableSetOf()) { ContentRef(it.kind, it.fileName) }
+        behind.filter { (ref, pin) -> ref in all && pin.neededByRef in present }
     }
 
     /**
@@ -708,7 +713,9 @@ internal class ContentTabState(
         // folder costs nothing.
         scope.launch {
             rescan()
-            checkUpdates()
+            // One at a time: the pane starts a check of its own when the list lands,
+            // and two finishing out of order left the older answer on screen.
+            if (!checkingUpdates) checkUpdates()
         }
     }
 
@@ -744,6 +751,9 @@ internal class ContentTabState(
                 mcVersion   = mcVersion,
                 loader      = loaderId(),
                 force       = force,
+                // The pack's own mods too, for the pinned-build check alone: either
+                // side can pin a library the other side carries.
+                context     = items.orEmpty().filter { it.kind == ContentKind.Mod },
             )
             // Whatever came back is worth keeping even when the round was not
             // complete; what the round could not answer is reported separately

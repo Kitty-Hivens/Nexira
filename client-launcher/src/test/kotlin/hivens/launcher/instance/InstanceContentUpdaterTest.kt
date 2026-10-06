@@ -14,8 +14,10 @@ import io.ktor.client.engine.mock.respond
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import io.ktor.utils.io.ByteReadChannel
+import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
@@ -148,5 +150,79 @@ class InstanceContentUpdaterTest {
         val behind = outcome.behind.getValue(libRef)
         assertEquals("lib-2", behind.pinned.id)
         assertEquals("lib-2.jar", outcome.updates.getValue(libRef).fileName, "the pinned build is offered as the library's update")
+    }
+
+    /** A folder with mod-2 (pinning lib-2) and lib-1, and a Modrinth that answers as told. */
+    private inner class PinWorld(
+        val pinLookupFails: Boolean = false,
+        val offerLib15: Boolean = false,
+        modEnabled: Boolean = true,
+    ) {
+        val dir: Path = Files.createTempDirectory("content-pins").also { temps.add(it) }
+        val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
+        val newMod = jar("mod 2"); val oldLib = jar("lib 1"); val midLib = jar("lib 1.5"); val newLib = jar("lib 2")
+        val modV2 = version("mod", "mod-2", "2026-03-02T00:00:00Z", "mod-2.jar", newMod, listOf(ModrinthDependency(projectId = "lib", versionId = "lib-2")))
+        val libV1 = version("lib", "lib-1", "2026-01-01T00:00:00Z", "lib-1.jar", oldLib)
+        val libV15 = version("lib", "lib-15", "2026-02-01T00:00:00Z", "lib-15.jar", midLib)
+        val libV2 = version("lib", "lib-2", "2026-03-01T00:00:00Z", "lib-2.jar", newLib)
+        val updater: InstanceContentUpdater
+
+        init {
+            Files.createDirectories(dir.resolve("mods"))
+            Files.write(dir.resolve(if (modEnabled) "mods/mod-2.jar" else "mods/mod-2.jar.disabled"), newMod)
+            Files.write(dir.resolve("mods/lib-1.jar"), oldLib)
+            val hashes = json.encodeToString(MapSerializer(String.serializer(), ModrinthVersion.serializer()), mapOf(sha1(newMod) to modV2, sha1(oldLib) to libV1))
+            val updates = if (offerLib15) {
+                json.encodeToString(MapSerializer(String.serializer(), ListSerializer(ModrinthVersion.serializer())), mapOf(sha1(oldLib) to listOf(libV15)))
+            } else "{}"
+            val provider = HttpClientProvider {
+                HttpClient(MockEngine { req ->
+                    val path = req.url.encodedPath
+                    val body = when {
+                        path.endsWith("/v2/version_files") -> hashes
+                        path.endsWith("/v2/version_files/update_many") -> updates
+                        path.endsWith("/v2/project/lib/version/lib-2") && !pinLookupFails -> json.encodeToString(ModrinthVersion.serializer(), libV2)
+                        else -> return@MockEngine respond(ByteReadChannel("no"), HttpStatusCode.ServiceUnavailable)
+                    }
+                    respond(ByteReadChannel(body.toByteArray()), HttpStatusCode.OK, headersOf("Content-Type", "application/json"))
+                })
+            }
+            updater = InstanceContentUpdater(ModrinthClient(provider, testTransferEngine(provider), json), InstanceContentManager(), GlobalScope, InstanceWorkRegistry())
+        }
+
+        suspend fun check(ownLib: Boolean = true): InstanceContentUpdater.CheckOutcome {
+            val mods = InstanceContentScanner().scan(dir).filter { it.kind == ContentKind.Mod }
+            val owned = if (ownLib) mods else mods.filter { it.fileName != "lib-1.jar" }
+            return updater.check(dir, owned, mcVersion = "1.21.1", loader = "neoforge", force = true, context = mods)
+        }
+
+        val libRef = ContentRef(ContentKind.Mod, "lib-1.jar")
+    }
+
+    @Test
+    fun `a pin that could not be looked up leaves the check incomplete instead of clean`() = runTest {
+        val outcome = PinWorld(pinLookupFails = true).check()
+        assertFalse(outcome.complete, "not remembered as nothing behind")
+        assertTrue(outcome.behind.isEmpty())
+    }
+
+    @Test
+    fun `an update older than the pin gives way to the pinned build`() = runTest {
+        val world = PinWorld(offerLib15 = true)
+        val outcome = world.check()
+        assertEquals("lib-2.jar", outcome.updates.getValue(world.libRef).fileName)
+    }
+
+    @Test
+    fun `a library the player does not own is named and not offered`() = runTest {
+        val world = PinWorld()
+        val outcome = world.check(ownLib = false)
+        assertEquals("lib-2", outcome.behind.getValue(world.libRef).pinned.id)
+        assertFalse(world.libRef in outcome.updates)
+    }
+
+    @Test
+    fun `a disabled mod pins nothing`() = runTest {
+        assertTrue(PinWorld(modEnabled = false).check().behind.isEmpty())
     }
 }

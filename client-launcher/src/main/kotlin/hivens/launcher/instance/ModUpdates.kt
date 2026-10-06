@@ -40,11 +40,8 @@ data class ModUpdate(
     val url: String,
     val sha1: String,
     val sizeBytes: Long,
-    /**
-     * What the build being installed declares it needs. Carried so a swap can
-     * bring a dependency the build pinned up to that build, see [pinnedRequirements].
-     */
-    val dependencies: List<ModrinthDependency> = emptyList(),
+    /** When the build was published (ISO-8601, UTC), for comparing it with a pinned one. */
+    val datePublished: String = "",
 )
 
 /**
@@ -97,7 +94,7 @@ fun updateFrom(
         url              = file.url,
         sha1             = file.hashes.sha1,
         sizeBytes        = file.size,
-        dependencies     = newest.dependencies,
+        datePublished    = newest.datePublished,
     )
 }
 
@@ -141,7 +138,7 @@ fun ModrinthVersion.swapFor(ref: ContentRef, installedVersion: String?): ModUpda
         url              = file.url,
         sha1             = file.hashes.sha1,
         sizeBytes        = file.size,
-        dependencies     = dependencies,
+        datePublished    = datePublished,
     )
 }
 
