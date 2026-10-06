@@ -46,22 +46,34 @@ class SkinViewSnapRedrawTest {
         }
         try {
             var t = 0L
+            fun render(): ByteArray {
+                t += 16_000_000L
+                return Bitmap.makeFromImage(scene.render(t)).readPixels()!!
+            }
             // The rasterize runs off the frame thread and publishes when it is done,
-            // so a frame is taken once the picture has stopped changing.
-            fun frame(): ByteArray {
-                var last: ByteArray? = null
-                repeat(60) {
-                    t += 16_000_000L
-                    val now = Bitmap.makeFromImage(scene.render(t)).readPixels()!!
-                    if (last != null && now.contentEquals(last) && now.any { it != 0.toByte() }) return now
-                    last = now
+            // so frames are taken until the picture arrives, and then until it changes.
+            fun firstDrawn(): ByteArray {
+                repeat(100) {
+                    val now = render()
+                    if (now.any { it != 0.toByte() }) return now
                     Thread.sleep(20)
                 }
-                return last!!
+                error("the figure was never drawn")
             }
-            val before = frame()
+            fun changedFrom(old: ByteArray): ByteArray {
+                var now = old
+                repeat(100) {
+                    now = render()
+                    if (!now.contentEquals(old)) return now
+                    Thread.sleep(20)
+                }
+                return now
+            }
+            // Settle the first picture: a frame or two may still be the empty one.
+            var before = firstDrawn()
+            repeat(5) { Thread.sleep(20); before = render() }
             state.setPose(Pose(rightArm = PartAngles(roll = -2.7f), leftArm = PartAngles(roll = 2.7f)))
-            val after = frame()
+            val after = changedFrom(before)
             assertFalse(before.contentEquals(after), "the figure kept its old pose")
         } finally {
             scene.close()
