@@ -1,18 +1,27 @@
 package hivens.ui.background
 
 import hivens.core.io.AtomicFiles
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
 
 /**
- * The wallpaper settings on disk, written behind a short debounce.
+ * The wallpaper settings: the one copy everything reads, and its file.
  *
- * The shell [stage]s every change at once and [flush]es after the debounce. What is
- * staged and not yet written is flushed by a JVM shutdown hook, and is what [load]
- * answers, so a quit from the tray or a crash-restart inside the debounce keeps the
- * last slider position. One per process: a remembered copy per shell would add a hook per restart.
+ * One copy because there are several writers. The settings screen, the player's
+ * volume and a transcode finishing after the screen that started it has gone all
+ * change it, and a writer holding a copy of its own put back whatever the others
+ * had changed in the meantime.
+ *
+ * A change is live at once and written behind a short debounce, by [flush]. What is
+ * still unwritten at exit is flushed by a JVM shutdown hook, so a quit from the tray
+ * or a crash-restart inside the debounce keeps the last adjustment. One per process:
+ * a copy per shell would add a hook per restart.
  */
 class BackgroundManager(
     configPath: Path,
@@ -22,8 +31,11 @@ class BackgroundManager(
     private val settingsFile = configPath.resolve("background.json")
     private val lock = Any()
 
+    private val _settings = MutableStateFlow(read())
+    val settings: StateFlow<BackgroundSettings> = _settings.asStateFlow()
+
     @Volatile
-    private var pending: BackgroundSettings? = null
+    private var written: BackgroundSettings = _settings.value
 
     // Built here rather than at shutdown, for the reason WidgetStateFlushHook gives:
     // a class first loaded while the process exits may no longer be readable.
@@ -33,9 +45,26 @@ class BackgroundManager(
         Runtime.getRuntime().addShutdownHook(Thread(onShutdown, "nexira-background-flush"))
     }
 
-    /** The settings as they stand, the staged ones included. */
-    fun load(): BackgroundSettings {
-        pending?.let { return it }
+    /** Applies [transform] to the settings as they stand now, not to a copy read earlier. */
+    fun update(transform: (BackgroundSettings) -> BackgroundSettings) {
+        _settings.update(transform)
+    }
+
+    /** Writes the settings if they changed since the last write. */
+    fun flush() {
+        synchronized(lock) {
+            val current = _settings.value
+            if (current == written) return
+            try {
+                AtomicFiles.writeString(settingsFile, json.encodeToString(current))
+                written = current
+            } catch (e: Exception) {
+                logger.error("Failed to save background settings", e)
+            }
+        }
+    }
+
+    private fun read(): BackgroundSettings {
         if (!Files.exists(settingsFile)) return BackgroundSettings()
         return try {
             json.decodeFromString<BackgroundSettings>(Files.readString(settingsFile))
@@ -43,28 +72,5 @@ class BackgroundManager(
             logger.error("Failed to load background settings", e)
             BackgroundSettings()
         }
-    }
-
-    /** Takes [settings] as the current ones, to be written by the next [flush]. */
-    fun stage(settings: BackgroundSettings) {
-        pending = settings
-    }
-
-    /** Writes what is staged, if anything. */
-    fun flush() {
-        synchronized(lock) {
-            val toWrite = pending ?: return
-            try {
-                AtomicFiles.writeString(settingsFile, json.encodeToString(toWrite))
-                if (pending === toWrite) pending = null
-            } catch (e: Exception) {
-                logger.error("Failed to save background settings", e)
-            }
-        }
-    }
-
-    fun save(settings: BackgroundSettings) {
-        stage(settings)
-        flush()
     }
 }

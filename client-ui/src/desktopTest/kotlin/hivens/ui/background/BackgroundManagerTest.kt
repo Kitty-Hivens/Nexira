@@ -2,9 +2,9 @@ package hivens.ui.background
 
 import kotlinx.serialization.json.Json
 import java.nio.file.Files
+import kotlin.io.path.ExperimentalPathApi
 import kotlin.io.path.createTempDirectory
 import kotlin.io.path.deleteRecursively
-import kotlin.io.path.ExperimentalPathApi
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -22,35 +22,41 @@ class BackgroundManagerTest {
     }
 
     @Test
-    fun `a staged change is what load answers before it is written`() {
+    fun `a change is live before it is written`() {
         val manager = BackgroundManager(dir, json)
-        val staged = BackgroundSettings(enabled = true, blurRadius = 12f)
-        manager.stage(staged)
+        manager.update { it.copy(enabled = true, blurRadius = 12f) }
 
-        assertEquals(staged, manager.load())
+        assertEquals(BackgroundSettings(enabled = true, blurRadius = 12f), manager.settings.value)
         assertFalse(Files.exists(dir.resolve("background.json")))
     }
 
     @Test
-    fun `flush writes the staged change for the next process`() {
+    fun `flush writes the change for the next process`() {
         val manager = BackgroundManager(dir, json)
-        val staged = BackgroundSettings(enabled = true, darkenAmount = 0.7f)
-        manager.stage(staged)
+        manager.update { it.copy(enabled = true, darkenAmount = 0.7f) }
         manager.flush()
 
-        assertEquals(staged, BackgroundManager(dir, json).load())
+        assertEquals(manager.settings.value, BackgroundManager(dir, json).settings.value)
     }
 
     @Test
-    fun `a later stage wins over the one being flushed`() {
+    fun `nothing changed is nothing written`() {
         val manager = BackgroundManager(dir, json)
-        manager.stage(BackgroundSettings(opacity = 0.5f))
         manager.flush()
-        val later = BackgroundSettings(opacity = 0.9f)
-        manager.stage(later)
 
-        assertEquals(later, manager.load())
-        manager.flush()
-        assertEquals(later, BackgroundManager(dir, json).load())
+        assertFalse(Files.exists(dir.resolve("background.json")))
+    }
+
+    // Two writers each changing their own field. The volume used to be set on a copy
+    // the settings screen held, so the screen's next change put the old volume back.
+    @Test
+    fun `one writer's change survives another's`() {
+        val manager = BackgroundManager(dir, json)
+        manager.update { it.copy(audioVolume = 0.25f) }
+        manager.update { it.copy(imagePath = "/w/clip.mp4", enabled = true) }
+
+        val now = manager.settings.value
+        assertEquals(0.25f, now.audioVolume)
+        assertEquals("/w/clip.mp4", now.imagePath)
     }
 }

@@ -9,8 +9,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import hivens.core.data.ThemeMode
@@ -48,7 +48,7 @@ private val THEME_PANEL_WIDTH = 320.dp
 @Composable
 fun BgSettingsSurface(
     currentSettings: BackgroundSettings,
-    onSettingsChanged: (BackgroundSettings) -> Unit,
+    onSettingsChanged: (BackgroundSettings.() -> BackgroundSettings) -> Unit,
     onBack: () -> Unit,
     isDarkTheme: Boolean,
     onToggleDarkTheme: () -> Unit,
@@ -62,29 +62,25 @@ fun BgSettingsSurface(
     onReduceMotionChanged: (Boolean) -> Unit,
     onOpenThemePicker: () -> Unit,
 ) {
-    val settings = remember { mutableStateOf(currentSettings) }
+    // The shell's value, not a copy taken on the way in. The screen is not the
+    // only writer: the player's volume and a transcode that finishes after the
+    // screen closed change it too, and a copy put back what they had changed the
+    // next time a slider here moved.
+    val settings = rememberUpdatedState(currentSettings)
 
-    val update: (BackgroundSettings.() -> BackgroundSettings) -> Unit = remember(onSettingsChanged) {
-        { block ->
-            settings.value = settings.value.block()
-            onSettingsChanged(settings.value)
-        }
+    val ctx = remember(settings, onSettingsChanged) {
+        BgSettingsContext(settings = settings, update = onSettingsChanged)
     }
-
-    val ctx = remember(settings, update) { BgSettingsContext(settings = settings, update = update) }
 
     PuppetScreen("BackgroundSettings")
     PuppetClick("background.back") { onBack() }
-    PuppetToggle("background.enabled", settings.value.enabled) { update { copy(enabled = it) } }
+    PuppetToggle("background.enabled", settings.value.enabled) { onSettingsChanged { copy(enabled = it) } }
     PuppetClick("background.clearImage", enabled = settings.value.imagePath != null) {
-        update { copy(imagePath = null, enabled = false) }
+        onSettingsChanged { copy(imagePath = null, enabled = false) }
     }
     PuppetToggle("background.surfaceBlur", surfaceBlur, onValueChange = onSurfaceBlurChanged)
     PuppetToggle("background.reduceMotion", reduceMotion, onValueChange = onReduceMotionChanged)
-    PuppetClick("background.reset") {
-        settings.value = BackgroundSettings()
-        onSettingsChanged(settings.value)
-    }
+    PuppetClick("background.reset") { onSettingsChanged { BackgroundSettings() } }
 
     CompositionLocalProvider(LocalBgSettingsContext provides ctx) {
         Row(Modifier.fillMaxSize().padding(16.dp)) {

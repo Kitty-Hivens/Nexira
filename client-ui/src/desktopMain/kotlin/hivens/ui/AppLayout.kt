@@ -82,7 +82,7 @@ fun AppLayout(
     currentLocale: AppLocale,
     onLocaleChanged: (AppLocale) -> Unit,
     backgroundSettings: BackgroundSettings = BackgroundSettings(),
-    onBackgroundSettingsChanged: (BackgroundSettings) -> Unit = {},
+    onBackgroundSettingsChanged: (BackgroundSettings.() -> BackgroundSettings) -> Unit = {},
     customization: CustomizationSettings = CustomizationSettings(),
     onCustomizationChanged: (CustomizationSettings) -> Unit = {},
 ) {

@@ -1379,21 +1379,16 @@ fun AppRoot(
 
     // ── Background settings ───────────────────────────────────────────────
     val backgroundManager: BackgroundManager = koinInject()
-    var backgroundSettings by remember { mutableStateOf(backgroundManager.load()) }
+    val backgroundSettings by backgroundManager.settings.collectAsState()
     // Persist background settings debounced and OFF the UI thread: the fx
     // sliders fire per tick, and a synchronous write per tick both janks the
     // drag and multiplies disk writes. The effect restarts on every value
-    // change (keyed), so one write lands ~300ms after the drag settles. Each
-    // change is staged on the manager first, before the delay, and the manager
-    // flushes what is staged at shutdown, so a quit or a crash-restart inside the
-    // debounce keeps the last slider position.
-    var persistedBackground by remember { mutableStateOf(backgroundSettings) }
+    // change (keyed), so one write lands ~300ms after the drag settles. The
+    // manager flushes whatever is still unwritten at shutdown, so a quit or a
+    // crash-restart inside the debounce keeps the last slider position.
     LaunchedEffect(backgroundSettings) {
-        if (backgroundSettings == persistedBackground) return@LaunchedEffect
-        backgroundManager.stage(backgroundSettings)
         delay(300.milliseconds)
         withContext(Dispatchers.IO) { backgroundManager.flush() }
-        persistedBackground = backgroundSettings
     }
 
     // ── Auto-login with offline mode support ──────────────────────────────
@@ -1525,9 +1520,9 @@ fun AppRoot(
           onTone           = { tone = it; onWallpaperColours(it.colours) },
           // The one setting a player widget can move while the wallpaper is what
           // its transport is pointed at. Through the same state the appearance
-          // panel writes, so the two sliders are one value and the debounce below
+          // panel writes, so the two sliders are one value and the debounce above
           // persists it once.
-          onAudioVolume    = { backgroundSettings = backgroundSettings.copy(audioVolume = it) },
+          onAudioVolume    = { volume -> backgroundManager.update { it.copy(audioVolume = volume) } },
       )
 
       af.WrapContent(
@@ -1560,7 +1555,7 @@ fun AppRoot(
               currentLocale = currentLocale,
               onLocaleChanged = onLocaleChanged,
               backgroundSettings = backgroundSettings,
-              onBackgroundSettingsChanged = { backgroundSettings = it },
+              onBackgroundSettingsChanged = { change -> backgroundManager.update(change) },
               customization              = customization,
               onCustomizationChanged     = onCustomizationChanged,
           )
