@@ -9,10 +9,9 @@ import hivens.ui.utils.HighlightRule
 import hivens.ui.utils.LogEntry
 import hivens.ui.utils.LogType
 
-// One displayed line, ready to lay out on its own. This is the per-line successor
-// to the old whole-buffer ConsoleDoc: the same filter + span logic, but the text
-// and span offsets are LINE-LOCAL, so a line lays out independently and the canvas
-// never concatenates the buffer into one giant string.
+// One displayed line, ready to lay out on its own. The text and span offsets are
+// LINE-LOCAL, so a line lays out independently and the canvas never concatenates
+// the buffer into one giant string.
 internal class LineSpan(
     val start: Int,
     val end: Int,
@@ -50,11 +49,10 @@ internal class LineModels(
 }
 
 /**
- * Filter [all] down to the displayed lines and build a [LineModel] for each. Mirrors
- * the old buildConsoleDoc pass exactly -- severity gate, search-as-filter narrowing,
- * user mute rules, dividers-always-pass, timestamp prefix, severity/highlight/marker/
- * search spans, warn/error counts, MAX_SEARCH_MATCHES cap -- minus the single-string
- * concatenation. Spans carry line-local offsets.
+ * Filter [all] down to the displayed lines and build a [LineModel] for each: severity
+ * gate, search-as-filter narrowing, user mute rules, dividers-always-pass, timestamp
+ * prefix, severity/highlight/marker/search spans, warn/error counts and the
+ * MAX_SEARCH_MATCHES cap. Spans carry line-local offsets.
  */
 internal fun buildLineModels(
     all: List<LogEntry>,

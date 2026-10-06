@@ -122,9 +122,7 @@ import hivens.ui.theme.LocalMonoFamily
 import hivens.ui.theme.nexiraBrailleFamily
 import hivens.ui.utils.ConsoleSettings
 import hivens.ui.utils.ConsoleSettingsStore
-import hivens.ui.utils.FilterRule
 import hivens.ui.utils.GameConsoleService
-import hivens.ui.utils.HighlightRule
 import hivens.ui.utils.LogEntry
 import hivens.ui.utils.LogType
 import hivens.ui.widgets.toWidgetColorOrNull
@@ -149,15 +147,14 @@ private val FONT_SIZES = listOf(11, 12, 14)
 
 // Upper bound on search-highlight spans / match offsets kept per render. A broad
 // query ("e") over a 50k-line buffer would otherwise allocate tens of thousands of
-// DocSpans + IntRanges + AnnotatedString entries -- a memory spike out of all
-// proportion to a highlight aid. Past this, scanning stops: F3 navigates the first
+// spans and matches, a memory spike out of all proportion to a highlight aid. Past this, scanning stops: F3 navigates the first
 // MAX_SEARCH_MATCHES hits, which is far more than anyone steps through by hand.
 internal const val MAX_SEARCH_MATCHES = 5000
 
 // ── Palette ──────────────────────────────────────────────────────────────────
 // Theme colours are asked for (NxInk, NxColor) at every composable call site.
-// This small record carries the subset that pure helpers (the AnnotatedString
-// builder) consume off the composition. Only console-only tokens (the yellow
+// This small record carries the subset that pure helpers (the per-line layout
+// cache) consume off the composition. Only console-only tokens (the yellow
 // search highlight, the orange pause accent) live as constants. Everything
 // else is a request and follows the user's theme.
 internal data class ConsolePalette(
@@ -179,70 +176,10 @@ private val CONSOLE_SEARCH_MATCH_BG = Color(0xFFFFEB3B)
 private val CONSOLE_SEARCH_MATCH_FG = Color(0xFF212121)
 private val CONSOLE_PAUSE_ACCENT   = Color(0xFFFFA726)
 
-// ── Match index for F3/n navigation ─────────────────────────────────────────
-// `ranges` carries each match's [start, endExclusive) so regex hits with
-// per-match variable length highlight the actual matched text instead of a
-// zero-width caret. `lineSeverities` is the parallel per-entry record the
-// severity gutter strip needs -- one entry per LogEntry, carrying the char
-// range it occupies in `annotated` so the painter can ask layoutResult for
-// the y-extent of each visual line that range spans.
-// The full off-thread render result: the annotated document, F3/n match ranges,
-// the per-entry severity spans for the gutter, plus the scalar counts the
-// toolbar / footer show. Everything the UI needs is computed once on
-// Dispatchers.Default and swapped in together, so composition stays O(1).
-internal data class ConsoleRender(
-    val annotated:      AnnotatedString,
-    val ranges:         List<IntRange>,
-    val lineSeverities: List<LineSeverity>,
-    val filteredCount:  Int,
-    val totalCount:     Int,
-    val warnCount:      Int,
-    val errorCount:     Int,
-    /** true when search matches hit MAX_SEARCH_MATCHES and scanning stopped early. */
-    val searchCapped:   Boolean = false,
-)
-
-
-internal data class LineSeverity(
-    val startOffset: Int,
-    val endOffset:   Int,
-    val type:        LogType,
-)
-
-// Colour role of one span, resolved to an actual SpanStyle only in the styling
-// pass. Keeping the structural pass palette-free is what lets a theme change
-// skip the expensive filter/regex/annotate rebuild -- see [buildConsoleDoc].
+// Colour role of one span, resolved to an actual SpanStyle only when a line is
+// laid out. Keeping the line models palette-free is what lets a theme change skip
+// the filter/regex pass -- see buildLineModels.
 internal enum class SpanRole { Divider, Info, Warn, Error, Marker, Search }
-
-// [colorHex] != null is a user highlight rule: an explicit colour (and [bold])
-// that overrides the role->palette mapping for this span. Emitted right after the
-// base line span so it wins over severity colour, but before marker / search
-// overlays so those stay visible on their sub-ranges.
-internal class DocSpan(
-    val start: Int,
-    val end: Int,
-    val role: SpanRole,
-    val colorHex: String? = null,
-    val bold: Boolean = false,
-)
-
-// Palette-independent render document: the plain text, the span layout (roles
-// not colours), the F3/n match ranges, the gutter severities, and the scalar
-// counts. Built once per content / filter / search change; [styleDoc] colours
-// it per palette.
-internal data class ConsoleDoc(
-    val text:           String,
-    val spans:          List<DocSpan>,
-    val ranges:         List<IntRange>,
-    val lineSeverities: List<LineSeverity>,
-    val filteredCount:  Int,
-    val totalCount:     Int,
-    val warnCount:      Int,
-    val errorCount:     Int,
-    /** true when search matches hit MAX_SEARCH_MATCHES and scanning stopped early. */
-    val searchCapped:   Boolean = false,
-)
-
 
 /**
  * Where [ConsoleContent] reads its entries from.
@@ -315,9 +252,9 @@ internal fun ConsoleContent(
     val warnText = NxColor.status(Status.Warning, text = true)
     val errorText = NxColor.status(Status.Error, text = true)
 
-    // Pure-function helpers (the AnnotatedString builder) consume a value-
-    // type palette off the composition; build it once per theme change so
-    // the builder stays @Composable-free.
+    // Pure-function helpers (the per-line layout cache) consume a value-type
+    // palette off the composition; build it once per theme change so they stay
+    // @Composable-free.
     val palette = remember(inkMain, inkQuiet, inkLine, warnText, errorText, settings.infoColor, settings.warnColor, settings.errorColor) {
         ConsolePalette(
             textPrimary    = inkMain,
@@ -1486,14 +1423,6 @@ private fun handleKey(
     }
 }
 
-// ── Render document builder + styling ────────────────────────────────────────
-// buildConsoleDoc is the structural pass: one walk over the entries emitting the
-// plain text, a palette-free span layout (severity base, ERROR_MARKERS overlay,
-// search overlay), the F3/n match ranges, the gutter severities, and the counts.
-// styleDoc then colours those spans for a given palette. Splitting the two keeps
-// a theme change off the expensive filter/regex/annotate path -- only styleDoc
-// re-runs. DIVIDERs render inline as their own dimmed line.
-
 /**
  * Idle filler for a console with no log lines yet (`totalCount == 0`) -- a friendly
  * stand-in instead of a blank panel, plus a hint to launch something. ASCII + mono
@@ -1684,170 +1613,6 @@ private val CONSOLE_EMPTY_ARTS: List<String> = listOf(
     brailleArt(ART_CRESCENT),
     brailleArt(ART_STAR),
 )
-
-internal fun buildConsoleDoc(
-    all: List<LogEntry>,
-    filterInfo: Boolean,
-    filterWarn: Boolean,
-    filterError: Boolean,
-    searchAsFilter: Boolean,
-    rawQuery: String,
-    regexMode: Boolean,
-    regexCompiled: Regex?,
-    showTimestamps: Boolean,
-    highlightRules: List<HighlightRule> = emptyList(),
-    filterRules: List<FilterRule> = emptyList(),
-): ConsoleDoc {
-    // Pre-compile the user rules once (regex rules with a bad pattern compile to
-    // null and are skipped). A line is muted if it matches any enabled filter
-    // rule; it takes the colour of the first enabled highlight rule it matches.
-    val activeFilters = filterRules.asSequence()
-        .filter { it.enabled && it.pattern.isNotBlank() }
-        .map { it to (if (it.regex) runCatching { Regex(it.pattern) }.getOrNull() else null) }
-        .toList()
-    val activeHighlights = highlightRules.asSequence()
-        .filter { it.enabled && it.pattern.isNotBlank() }
-        .map { it to (if (it.regex) runCatching { Regex(it.pattern) }.getOrNull() else null) }
-        .toList()
-    fun matchesFilter(text: String) = activeFilters.any { (r, rx) ->
-        if (rx != null) rx.containsMatchIn(text) else text.contains(r.pattern, ignoreCase = true)
-    }
-    fun highlightFor(text: String): HighlightRule? = activeHighlights.firstOrNull { (r, rx) ->
-        if (rx != null) rx.containsMatchIn(text) else text.contains(r.pattern, ignoreCase = true)
-    }?.first
-    // One pass for counts (over ALL entries) + the severity/query filter that
-    // produces the displayed list. Severity gates first; query-narrowing only
-    // when search-as-filter is on. Dividers always pass so session boundaries
-    // stay visible.
-    var warnCount = 0
-    var errorCount = 0
-    val entries = ArrayList<LogEntry>(all.size)
-    for (e in all) {
-        when (e.type) {
-            LogType.WARN  -> warnCount++
-            LogType.ERROR -> errorCount++
-            else          -> {}
-        }
-        val severityOk = when (e.type) {
-            LogType.INFO    -> filterInfo
-            LogType.WARN    -> filterWarn
-            LogType.ERROR   -> filterError
-            LogType.DIVIDER -> true
-        }
-        if (!severityOk) continue
-        val queryOk = if (!searchAsFilter || rawQuery.isBlank() || e.type == LogType.DIVIDER) {
-            true
-        } else if (regexMode) {
-            regexCompiled?.containsMatchIn(e.text) ?: false
-        } else {
-            e.text.contains(rawQuery, ignoreCase = true)
-        }
-        if (!queryOk) continue
-        // User mute rules hide matching lines entirely; dividers always survive so
-        // session boundaries stay visible.
-        if (e.type != LogType.DIVIDER && matchesFilter(e.text)) continue
-        entries.add(e)
-    }
-
-    val sb = StringBuilder()
-    val spans = ArrayList<DocSpan>()
-    val matches = mutableListOf<IntRange>()
-    val severities = mutableListOf<LineSeverity>()
-    var searchCapped = false
-
-    for ((idx, e) in entries.withIndex()) {
-        val lineStart = sb.length
-        val lineText: String
-
-        if (e.type == LogType.DIVIDER) {
-            lineText = e.text
-            sb.append(lineText)
-            spans.add(DocSpan(lineStart, sb.length, SpanRole.Divider))
-        } else {
-            val role = when (e.type) {
-                LogType.WARN  -> SpanRole.Warn
-                LogType.ERROR -> SpanRole.Error
-                // DIVIDER is handled in the if-branch above; INFO is the
-                // remaining reachable case.
-                else          -> SpanRole.Info
-            }
-            lineText = if (showTimestamps) "[${e.timestamp}] ${e.text}" else e.text
-            sb.append(lineText)
-            spans.add(DocSpan(lineStart, sb.length, role))
-            // User highlight rule wins over severity colour for the whole line;
-            // marker / search overlays added below still paint over their sub-ranges.
-            highlightFor(lineText)?.let { spans.add(DocSpan(lineStart, sb.length, role, it.colorHex, it.bold)) }
-            if (e.type == LogType.ERROR || e.type == LogType.WARN) {
-                ERROR_MARKERS.findAll(lineText).forEach { m ->
-                    spans.add(DocSpan(lineStart + m.range.first, lineStart + m.range.last + 1, SpanRole.Marker))
-                }
-            }
-        }
-        severities.add(LineSeverity(lineStart, sb.length, e.type))
-
-        // Search highlight + match-offset collection, scanning the just-appended
-        // line text directly. Bounded by MAX_SEARCH_MATCHES so a broad query over a
-        // huge buffer can't blow up memory; once the cap is hit the scan stops.
-        if (rawQuery.isNotBlank() && matches.size < MAX_SEARCH_MATCHES) {
-            val matchRanges = if (regexMode) {
-                regexCompiled?.findAll(lineText)?.map { it.range }?.toList().orEmpty()
-            } else {
-                findAllSubstring(lineText, rawQuery)
-            }
-            for (range in matchRanges) {
-                if (range.isEmpty()) continue
-                val absStart = lineStart + range.first
-                val absEnd   = lineStart + range.last + 1
-                spans.add(DocSpan(absStart, absEnd, SpanRole.Search))
-                // Inclusive end so the IntRange size mirrors the match span.
-                matches.add(absStart until absEnd)
-                if (matches.size >= MAX_SEARCH_MATCHES) { searchCapped = true; break }
-            }
-        }
-
-        if (idx != entries.lastIndex) sb.append('\n')
-    }
-
-    return ConsoleDoc(
-        text           = sb.toString(),
-        spans          = spans,
-        ranges         = matches,
-        lineSeverities = severities,
-        filteredCount  = entries.size,
-        totalCount     = all.size,
-        warnCount      = warnCount,
-        errorCount     = errorCount,
-        searchCapped   = searchCapped,
-    )
-}
-
-// Colour the palette-free [doc] for the active [palette]. Base-line spans are
-// added before their marker / search overlays (preserved by [buildConsoleDoc]'s
-// emission order) so the overlay colour + weight win on the sub-range they
-// cover -- a later addStyle merges over an earlier one.
-internal fun styleDoc(doc: ConsoleDoc, palette: ConsolePalette): ConsoleRender {
-    val annotated = buildAnnotatedString {
-        append(doc.text)
-        for (sp in doc.spans) {
-            val style = if (sp.colorHex != null) {
-                SpanStyle(color = sp.colorHex.toWidgetColorOrNull() ?: Color.Unspecified, fontWeight = if (sp.bold) FontWeight.Bold else null)
-            } else {
-                spanStyleFor(sp.role, palette)
-            }
-            addStyle(style, sp.start, sp.end)
-        }
-    }
-    return ConsoleRender(
-        annotated      = annotated,
-        ranges         = doc.ranges,
-        lineSeverities = doc.lineSeverities,
-        filteredCount  = doc.filteredCount,
-        totalCount     = doc.totalCount,
-        warnCount      = doc.warnCount,
-        errorCount     = doc.errorCount,
-        searchCapped   = doc.searchCapped,
-    )
-}
 
 internal fun spanStyleFor(role: SpanRole, p: ConsolePalette): SpanStyle = when (role) {
     SpanRole.Divider -> SpanStyle(color = p.divider, fontWeight = FontWeight.Light)
