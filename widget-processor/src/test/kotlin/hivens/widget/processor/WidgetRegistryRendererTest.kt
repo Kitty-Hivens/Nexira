@@ -377,4 +377,9 @@ class WidgetEntranceDeclarationTest {
         assertContains(fault, "spiral")
         assertContains(fault, "none, fade, rise, settle")
     }
+
+    @Test
+    fun `an annotation value with a dollar or a line break stays inside its literal`() {
+        assertEquals("a\\${'$'}b\\nc\\\"d\\\\e", "a${'$'}b\nc\"d\\e".kotlinEscape())
+    }
 }

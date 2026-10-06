@@ -238,5 +238,22 @@ private fun List<String>.toSlotIdListLiteral(): String =
     if (isEmpty()) "emptyList()"
     else joinToString(prefix = "listOf(", postfix = ")") { "SlotId(\"${it.kotlinEscape()}\")" }
 
-private fun String.kotlinEscape(): String =
-    replace("\\", "\\\\").replace("\"", "\\\"")
+/**
+ * [this] as the inside of a Kotlin string literal. Quotes and backslashes alone left
+ * a dollar sign to start a template and a line break to end the literal, so an
+ * annotation value with either generated a file the author never wrote that did
+ * not compile.
+ */
+internal fun String.kotlinEscape(): String = buildString {
+    for (c in this@kotlinEscape) {
+        when (c) {
+            '\\' -> append("\\\\")
+            '"' -> append("\\\"")
+            '$' -> append("\\$")
+            '\n' -> append("\\n")
+            '\r' -> append("\\r")
+            '\t' -> append("\\t")
+            else -> append(c)
+        }
+    }
+}

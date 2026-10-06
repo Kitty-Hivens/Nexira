@@ -147,6 +147,16 @@ internal object WidgetValidator {
             }
             sanitized.add(raw)
         }
+        // A container reaches its child slots through its own instance id, so slots
+        // on a declaration that takes no instance are places nothing can render.
+        if (sanitized.isNotEmpty() && !takesInstance) {
+            env.logger.error(
+                "@Widget '$id' declares slots but takes no instance " +
+                    "-- add `instance: WidgetInstance` to render them",
+                symbol,
+            )
+            return null
+        }
 
         // propsClass: a KClass<*> annotation arg arrives as a KSType.
         // Unit::class (the default) means "no props". Anything else must
@@ -191,7 +201,6 @@ internal object WidgetValidator {
             }
         }
 
-        // Until now nothing in the processor referenced the two service
         // A malformed default plane is a build error rather than a widget that
         // quietly draws none: it is a literal in source, so the author is right here
         // and the cost of telling them is one line.
@@ -208,6 +217,15 @@ internal object WidgetValidator {
                 return null
             }
             rawSurface
+        }
+        // drawsOwnSurface says nothing should paint a plane for this widget, so a
+        // declared plane beside it is one of the two claims that cannot hold.
+        if (surface != null && drawsOwnSurface) {
+            env.logger.error(
+                "@Widget '$id' declares a surface and drawsOwnSurface together -- keep one",
+                symbol,
+            )
+            return null
         }
 
         val sizing = SizingArgs(
@@ -229,6 +247,7 @@ internal object WidgetValidator {
             return null
         }
 
+        // Until now nothing in the processor referenced the two service
         // annotations, so a widget could claim a contract it never registers,
         // or read one no widget provides, and the build stayed quiet either
         // way. Carrying them through is what lets the mismatch be seen.

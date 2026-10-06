@@ -168,12 +168,15 @@ fun PaletteItem(
                             targetPath, descriptor.kind, descriptor.slots,
                             index     = target.widgets.size,
                             placement = placement,
-                            surface   = descriptor.defaultSurface,
                         )
                     } else {
                         val flow = target?.flow ?: FlowSpec.Column
                         val index = registry.insertionIndexInSlot(targetPath, pointer, flow)
-                        editController.addWidget(targetPath, descriptor.kind, descriptor.slots, index, surface = descriptor.defaultSurface)
+                        // No plane copied onto the new instance: resolveSurface reads the
+                        // declaration whenever the instance names none, the same as for a
+                        // widget the bundled layout places. A copy froze today's declaration
+                        // into it and drifted the first time the widget's own changed.
+                        editController.addWidget(targetPath, descriptor.kind, descriptor.slots, index)
                     }
                 },
             )

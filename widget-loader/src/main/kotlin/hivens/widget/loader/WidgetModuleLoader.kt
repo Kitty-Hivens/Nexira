@@ -1,7 +1,9 @@
 package hivens.widget.loader
 
 import hivens.widget.api.WidgetApi
+import hivens.widget.api.WidgetDescriptor
 import hivens.widget.api.WidgetRegistry
+import hivens.widget.api.widgetPropsJson
 import org.slf4j.LoggerFactory
 import java.net.URLClassLoader
 import java.nio.file.Files
@@ -189,13 +191,18 @@ class WidgetModuleLoader(
                 // the whole shell resolves from, so a registry that throws there took
                 // the shell down on every start instead of being refused by name.
                 val registry = registries.single()
-                runCatching { registry.all().keys }.fold(
-                    onSuccess = { LoadedWidgetModule(id, name, jar, registry, loader) },
-                    onFailure = {
-                        loader.release()
-                        RejectedWidgetModule(jar, "its registry failed to list its widgets: ${it.message ?: it.javaClass.simpleName}")
-                    },
-                )
+                val listed = runCatching { registry.all().values.toList() }.getOrElse {
+                    loader.release()
+                    return RejectedWidgetModule(jar, "its registry failed to list its widgets: ${it.message ?: it.javaClass.simpleName}")
+                }
+                // The runtime half of the compile-time validator, for what a built
+                // descriptor still shows. A module is someone else's build, and
+                // nothing guarantees it went through the processor that checks these.
+                listed.firstNotNullOfOrNull { descriptorFault(it) }?.let { fault ->
+                    loader.release()
+                    return RejectedWidgetModule(jar, fault)
+                }
+                LoadedWidgetModule(id, name, jar, registry, loader)
             }
             // The processor emits exactly one per module. More than one means a
             // hand-assembled or merged jar, where which registry wins is not
@@ -205,6 +212,25 @@ class WidgetModuleLoader(
                 RejectedWidgetModule(jar, "carries ${registries.size} registries; a module must carry one")
             }
         }
+    }
+
+    /**
+     * Why [descriptor] cannot work as declared, or null when it can.
+     *
+     * Props whose own defaults do not decode through their serializer open an empty
+     * panel with nothing saying why, and a declared plane beside drawsOwnSurface is
+     * two claims that cannot both hold. The processor refuses both at build time.
+     */
+    private fun descriptorFault(descriptor: WidgetDescriptor): String? {
+        val kind = runCatching { descriptor.kind.value }.getOrElse { return "a widget's kind could not be read: ${it.message}" }
+        descriptor.propsSerializer?.let { serializer ->
+            val decodes = runCatching { widgetPropsJson.decodeFromJsonElement(serializer, descriptor.defaultPropsJson) }.isSuccess
+            if (!decodes) return "widget '$kind' has default props its own props class cannot read"
+        }
+        if (descriptor.defaultSurface != null && descriptor.drawsOwnSurface) {
+            return "widget '$kind' declares a surface and drawsOwnSurface together"
+        }
+        return null
     }
 
     /**
