@@ -255,6 +255,23 @@ class ModUpdatesTest {
     }
 
     @Test
+    fun `a new name that leaves the folder is refused and nothing is placed`() = runBlocking {
+        val folder = mods()
+        Files.writeString(folder.resolve("mod-1.0.jar"), "old")
+        val scratch = Files.writeString(folder.resolve(".part"), "new")
+
+        val ok = InstanceContentManager().replace(
+            instanceDir = dir, kind = ContentKind.Mod,
+            oldFileName = "mod-1.0.jar", source = scratch, newFileName = "../../escaped.jar", enabled = true,
+        )
+
+        assertFalse(ok)
+        assertFalse(Files.exists(dir.parent.resolve("escaped.jar")))
+        assertEquals("old", Files.readString(folder.resolve("mod-1.0.jar")), "the installed file is left alone")
+        assertFalse(Files.exists(scratch), "the download is taken down with the refusal")
+    }
+
+    @Test
     fun `a disabled item stays disabled after an update`() = runBlocking {
         val folder = mods()
         Files.writeString(folder.resolve("mod-1.0.jar.disabled"), "old")

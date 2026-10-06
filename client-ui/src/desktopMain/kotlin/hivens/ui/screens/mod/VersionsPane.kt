@@ -1,5 +1,8 @@
 package hivens.ui.screens.mod
 
+import org.koin.compose.koinInject
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineScope
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
@@ -99,6 +102,9 @@ internal fun VersionsPane(
 ) {
     val s = LocalStrings.current
     val scope = rememberCoroutineScope()
+    // Installs run on the app's scope: one fetches the clicked jar and then its
+    // dependencies, and leaving the screen between the two left a mod without them.
+    val installScope: CoroutineScope = koinInject()
     // Keyed on the project too. The page resolves it asynchronously, and a tab
     // opened before it lands used to ask with nothing to ask about, give up
     // silently, and leave a spinner running for the rest of the visit.
@@ -217,7 +223,7 @@ internal fun VersionsPane(
                         columns = columns,
                         v = v,
                         state = state,
-                        scope = scope,
+                        scope = installScope,
                         filters = filters,
                         onFilters = { filters = it },
                         expanded = expanded == v.id,
@@ -452,7 +458,8 @@ private fun VersionTableRow(
     columns: ScrollState,
     v: ModrinthVersion,
     state: ModDetailState,
-    scope: kotlinx.coroutines.CoroutineScope,
+    /** The app's scope, which the install runs on. */
+    scope: CoroutineScope,
     filters: VersionFilters,
     onFilters: (VersionFilters) -> Unit,
     expanded: Boolean,
@@ -595,7 +602,7 @@ private fun VersionTableRow(
                 NxIconButton(
                     icon = NxIcon.Download,
                     contentDescription = if (fits) s.modPageInstallShort else s.versionsIncompatibleHint,
-                    onClick = { scope.launch { state.installVersion(v) } },
+                    onClick = { scope.launch(Dispatchers.Main) { state.installVersion(v) } },
                     enabled = !state.installing,
                     tint = if (fits) NxColor.lead() else NxColor.status(Status.Warning),
                 )

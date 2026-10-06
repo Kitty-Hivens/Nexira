@@ -1,5 +1,6 @@
 package hivens.ui.screens.library.content
 
+import kotlinx.coroutines.CoroutineScope
 import androidx.compose.foundation.background
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -81,6 +82,7 @@ import hivens.ui.activity.SelectionItem
 import hivens.ui.activity.SelectionRegistry
 import hivens.ui.components.ConfirmDialog
 import hivens.ui.components.DestructiveConfirmDialog
+import hivens.ui.components.rememberRunningPackGuard
 import hivens.ui.nx.NxAnchoredCard
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.RetryStateBlock
@@ -158,6 +160,10 @@ internal fun ContentTabPane(
 ) {
     val s = LocalStrings.current
     val selections: SelectionRegistry = koinInject()
+    // Replacing files the running game has open is the pack update's risk too, and
+    // asked about the same way: on Windows the old jar cannot be removed and the
+    // next start finds two builds of one mod.
+    val runningGuard = rememberRunningPackGuard(instance.id)
     val scope = rememberCoroutineScope()
     val addDialogSettings = rememberFileDialogSettings(s.contentAddFiles)
 
@@ -302,7 +308,7 @@ internal fun ContentTabPane(
                                 warning        = rules.problem?.let { problemReason(it, s) }
                                     ?: state.dependencyProblems[ref]?.firstOrNull()?.let { dependencyReason(it, state::providerName, s) }
                                     ?: state.liveBehind[ref]?.let { s.contentBehindPin(it.neededBy, it.pinned.versionNumber) },
-                                onUpdate       = { state.update(c) },
+                                onUpdate       = { runningGuard.run { state.update(c) } },
                                 // Switching versions is the same write as an update,
                                 // so it is offered on the same rows.
                                 onVersions     = if (rules.canDelete) ({ state.openVersions(c) }) else null,
@@ -327,7 +333,7 @@ internal fun ContentTabPane(
             title        = s.contentUpdateConfirmTitle,
             body         = s.contentUpdateConfirmBody(state.pendingUpdateAll),
             confirmLabel = s.contentUpdateConfirmAction,
-            onConfirm    = state::updateAll,
+            onConfirm    = { runningGuard.run(state::updateAll) },
             onDismiss    = state::cancelUpdateAll,
         )
     }
@@ -352,6 +358,8 @@ internal fun ContentTabPane(
         )
     }
 
+    runningGuard.Dialog()
+
 }
 
 /**
@@ -365,6 +373,8 @@ internal fun ContentTabPane(
  */
 @Composable
 internal fun ContentVersionsOverlay(instance: PackInstance, state: ContentTabState) {
+    val runningGuard = rememberRunningPackGuard(instance.id)
+    runningGuard.Dialog()
     val target = state.versionsOf ?: return
     ModVersionsWindow(
         content       = target,
@@ -378,7 +388,7 @@ internal fun ContentVersionsOverlay(instance: PackInstance, state: ContentTabSta
         loader        = instance.cachedManifest?.loaderName
             ?.takeIf { it.isNotBlank() && !it.equals("vanilla", ignoreCase = true) }
             ?.lowercase().orEmpty(),
-        onPick        = { v -> state.switchTo(target, v) },
+        onPick        = { v -> runningGuard.run { state.switchTo(target, v) } },
         onDismiss     = state::closeVersions,
     )
 }
@@ -1084,7 +1094,9 @@ private fun ModBrowser(
 ) {
     val s = LocalStrings.current
     val state = rememberModBrowserState(mcVersion, loader, modsDir)
-    val scope = rememberCoroutineScope()
+    // Installs run on the app's scope: one fetches the clicked jar and then its
+    // dependencies, and leaving the browser between the two left a mod without them.
+    val installScope: CoroutineScope = koinInject()
 
     // What the instance already holds, asked once when the browser opens. Without
     // it every result offers an install, including the ninety already in the
@@ -1137,7 +1149,7 @@ private fun ModBrowser(
                                 installed = hit.projectId in state.installed,
                                 working   = hit.projectId in state.working,
                                 failed    = hit.projectId in state.failed,
-                                onInstall = { scope.launch { state.installMod(hit) } },
+                                onInstall = { installScope.launch(Dispatchers.Main) { state.installMod(hit) } },
                                 // A result was a row that led nowhere: the only
                                 // thing a reader could do with it was install it
                                 // sight unseen. It opens the page now.

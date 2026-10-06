@@ -145,13 +145,18 @@ class PackSnapshotService(
     /** Every snapshot of an instance, for one that is gone: nothing can restore into it now. */
     fun deleteAll(instanceDirName: String) {
         val root = rootFor(instanceDirName)
-        runCatching { if (Files.exists(root)) deleteTree(root) }
+        runCatching { if (Files.exists(root)) deleteTree(root, clearReadOnly = false) }
             .onFailure { log.warn("snapshot: failed to remove the snapshots of {}", instanceDirName, it) }
     }
 
+    /**
+     * Without clearing read-only marks: a snapshot holds the live files by hardlink,
+     * and on Windows clearing the mark through the link clears it on the file the
+     * player marked.
+     */
     fun delete(instanceDirName: String, id: String) {
         val dir = rootFor(instanceDirName).resolve(id)
-        runCatching { deleteTree(dir) }
+        runCatching { deleteTree(dir, clearReadOnly = false) }
             .onFailure { log.warn("snapshot: failed to delete {} for {}", id, instanceDirName, it) }
     }
 

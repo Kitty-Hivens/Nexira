@@ -1,5 +1,7 @@
 package hivens.ui.screens.mod
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineScope
 import androidx.compose.foundation.background
 import hivens.ui.theme.decorativeColor
 import hivens.ui.nx.InitialsAvatar
@@ -144,7 +146,9 @@ internal fun ModVersionBody(
     modifier: Modifier = Modifier,
 ) {
     val s = LocalStrings.current
-    val scope = rememberCoroutineScope()
+    // Installs run on the app's scope: one fetches the clicked jar and then its
+    // dependencies, and leaving the screen between the two left a mod without them.
+    val installScope: CoroutineScope = koinInject()
     NxSurface(SurfaceKind.Panel, modifier = modifier) {
         val v = build.version
         when {
@@ -161,7 +165,7 @@ internal fun ModVersionBody(
                 modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(SECTION_GAP),
             ) {
-                BuildHeader(v, project, scope)
+                BuildHeader(v, project, installScope)
                 HorizontalDivider(color = NxColor.wash(NxInk.line, 0.25f))
                 Compatibility(v, project)
                 Dependencies(build)
@@ -179,7 +183,7 @@ internal fun ModVersionBody(
  * reader who came down to a specific build came to take THAT one.
  */
 @Composable
-private fun BuildHeader(v: ModrinthVersion, project: ModDetailState, scope: kotlinx.coroutines.CoroutineScope) {
+private fun BuildHeader(v: ModrinthVersion, project: ModDetailState, scope: CoroutineScope) {
     val s = LocalStrings.current
     val channel = remember(v) { VersionChannel.of(v.versionType, v.versionNumber) }
     Row(
@@ -225,7 +229,7 @@ private fun BuildHeader(v: ModrinthVersion, project: ModDetailState, scope: kotl
         (project.install as? InstallAction.Install)?.let { action ->
             NxButton(
                 label = if (project.installing) s.modPageInstalling else s.modPageInstallInto(action.packName),
-                onClick = { scope.launch { project.installVersion(v) } },
+                onClick = { scope.launch(Dispatchers.Main) { project.installVersion(v) } },
                 icon = NxIcon.Download,
                 enabled = !project.installing,
             )

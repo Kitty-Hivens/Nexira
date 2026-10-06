@@ -349,7 +349,17 @@ class InstanceContentUpdater(
                 async {
                     val name = target.update.ref.fileName
                     mark(key) { it.copy(current = name) }
-                    val ok = gate.withPermit { runCatching { applyOne(instanceDir, target) }.getOrDefault(false) }
+                    // A cancellation passes: caught here it was counted as a failed file and
+                    // the batch reported failures for work nobody asked to finish.
+                    val ok = gate.withPermit {
+                        try {
+                            applyOne(instanceDir, target)
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            false
+                        }
+                    }
                     mark(key) { run ->
                         run.copy(
                             done   = run.done + 1,

@@ -1,5 +1,6 @@
 package hivens.ui.screens.mod
 
+import kotlinx.coroutines.Dispatchers
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -256,6 +257,9 @@ private fun Unknown(text: String) = Text(
 @Composable
 internal fun Header(state: ModDetailState) {
     val scope = rememberCoroutineScope()
+    // Installs run on the app's scope: one fetches the clicked jar and then its
+    // dependencies, and leaving the screen between the two left a mod without them.
+    val installScope: CoroutineScope = koinInject()
     val s = LocalStrings.current
     val uriHandler = LocalUriHandler.current
     val clipboard = LocalClipboard.current
@@ -352,7 +356,7 @@ internal fun Header(state: ModDetailState) {
                 // Reserving the width would mean knowing the label, and the label
                 // names the pack.
                 if (state.installPossible) {
-                    Box(contentAlignment = Alignment.Center) { InstallButton(state, scope) }
+                    Box(contentAlignment = Alignment.Center) { InstallButton(state, installScope) }
                 }
                 val pageUrl = project?.let { "https://modrinth.com/${it.projectType}/${it.slug}" }
                 val homepage = installed?.homepageUrl?.takeIf { it.isNotBlank() }
@@ -457,7 +461,7 @@ private fun InstallButton(state: ModDetailState, scope: CoroutineScope) {
                 state.installFailed -> s.modPageInstallRetry
                 else -> s.modPageInstallInto(action.packName)
             },
-            onClick = { scope.launch { state.installIntoPack() } },
+            onClick = { scope.launch(Dispatchers.Main) { state.installIntoPack() } },
             icon = if (state.installFailed) NxIcon.Refresh else NxIcon.Download,
             enabled = !state.installing,
         )

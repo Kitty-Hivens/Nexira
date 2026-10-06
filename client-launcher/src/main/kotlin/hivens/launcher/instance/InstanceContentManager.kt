@@ -1,5 +1,6 @@
 package hivens.launcher.instance
 
+import hivens.core.io.resolveWithinRoot
 import hivens.core.io.InstanceMutationLock
 import hivens.core.io.fileOpRetry
 import kotlinx.coroutines.Dispatchers
@@ -85,7 +86,13 @@ class InstanceContentManager {
     ): Boolean = withContext(Dispatchers.IO) {
         InstanceMutationLock.withLock(instanceDir) {
             val dir = instanceDir.resolve(kind.folderName())
-            val target = dir.resolve(if (enabled) newFileName else newFileName + DISABLED_SUFFIX)
+            // The new name comes from a catalogue's answer: held inside the folder.
+            val target = runCatching { resolveWithinRoot(dir, if (enabled) newFileName else newFileName + DISABLED_SUFFIX) }
+                .getOrElse {
+                    log.warn("Refusing to place {}: {}", newFileName, it.message)
+                    runCatching { Files.deleteIfExists(source) }
+                    return@withLock false
+                }
             runCatching {
                 Files.createDirectories(dir)
                 fileOpRetry("install $newFileName") {

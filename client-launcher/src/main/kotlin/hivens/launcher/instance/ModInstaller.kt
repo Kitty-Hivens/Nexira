@@ -1,6 +1,7 @@
 package hivens.launcher.instance
 
 import hivens.core.api.dto.modrinth.ModrinthVersion
+import hivens.core.io.resolveWithinRoot
 import hivens.launcher.modrinth.ModrinthClient
 import hivens.launcher.util.sha1Of
 import kotlinx.coroutines.CancellationException
@@ -130,10 +131,21 @@ class ModInstaller(
      * A file Modrinth has never indexed is absent, see [presentProjects].
      */
     suspend fun installedProjects(instanceDir: Path): Map<String, Installed> = withContext(Dispatchers.IO) {
-        val items = runCatching { scanner.scan(instanceDir) }.getOrDefault(emptyList())
-            .filter { it.kind == ContentKind.Mod }
+        val items = try {
+            scanner.scanMods(instanceDir)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            emptyList()
+        }
         val hashed = items.mapNotNull { c -> runCatching { c to sha1Of(c.pathIn(instanceDir)) }.getOrNull() }
-        val versions = runCatching { modrinth.versionsForHashes(hashed.map { it.second }) }.getOrDefault(emptyMap())
+        val versions = try {
+            modrinth.versionsForHashes(hashed.map { it.second })
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            emptyMap()
+        }
         hashed.mapNotNull { (c, hash) ->
             versions[hash]?.let { v -> v.projectId to Installed(ContentRef(c.kind, c.fileName), v, c.enabled) }
         }.toMap()
@@ -181,7 +193,10 @@ class ModInstaller(
     private suspend fun fetch(dir: Path, v: ModrinthVersion): Boolean {
         val file = v.files.firstOrNull { it.primary } ?: v.files.firstOrNull() ?: return false
         return try {
-            modrinth.downloadTo(file.url, dir.resolve(file.filename), file.hashes.sha1)
+            // The name comes from the catalogue's answer, so it is held inside the
+            // folder like every other path a server names: the hash comes from the
+            // same answer and does not guard where the file lands.
+            modrinth.downloadTo(file.url, resolveWithinRoot(dir, file.filename), file.hashes.sha1)
             true
         } catch (e: CancellationException) {
             throw e
