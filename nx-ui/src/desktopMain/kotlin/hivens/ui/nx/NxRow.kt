@@ -154,10 +154,15 @@ internal fun softHoverAlpha(interaction: MutableInteractionSource): Float {
  * while reporting the original width to the parent -- so a row's highlight bleeds to
  * the plane edges without disturbing the column layout. Content re-insets via its own
  * horizontal padding.
+ *
+ * An unbounded width stays unbounded. Adding to it overflowed the Int, and the
+ * negative maximum it left threw in the middle of the layout pass, so a clickable
+ * row in a horizontal scroller took the whole window down.
  */
 private fun Modifier.bleedHorizontally(amount: Dp): Modifier = layout { measurable, constraints ->
     val extra = amount.roundToPx() * 2
-    val placeable = measurable.measure(constraints.copy(maxWidth = constraints.maxWidth + extra))
+    val maxWidth = if (constraints.hasBoundedWidth) constraints.maxWidth + extra else constraints.maxWidth
+    val placeable = measurable.measure(constraints.copy(maxWidth = maxWidth))
     layout((placeable.width - extra).coerceAtLeast(0), placeable.height) {
         placeable.place(-amount.roundToPx(), 0)
     }
