@@ -63,6 +63,17 @@ class ForeignInstanceImporter(
                 "Cannot import '${instance.displayName}' from ${instance.launcher.displayName}: " +
                     "its Minecraft version could not be determined.",
             )
+        // A named loader with no version would resolve to that loader's newest build
+        // rather than the one the pack was put together on, which is a crash on
+        // launch instead of a refusal here.
+        if (!instance.loader.isNullOrBlank() && !instance.loader.equals("vanilla", ignoreCase = true) &&
+            instance.loaderVersion.isNullOrBlank()
+        ) {
+            throw IOException(
+                "Cannot import '${instance.displayName}' from ${instance.launcher.displayName}: " +
+                    "the version of its ${instance.loader} loader could not be determined.",
+            )
+        }
         val displayName = instance.displayName.ifBlank { instance.gameDir.fileName.toString() }
         val instanceId = UUID.randomUUID().toString()
         val instanceDirName = instanceDirName(displayName, instanceId)

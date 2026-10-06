@@ -47,6 +47,11 @@ private fun looksLikeGameDir(dir: Path): Boolean =
  * instance for the shared root, plus one for each `launcher_profiles.json`
  * profile that points at its own `gameDir`. Pseudo-versions (`latest-release` /
  * `latest-snapshot`) are left as a null [DiscoveredInstance.mcVersion].
+ *
+ * A profile's `lastVersionId` names a version folder, not a Minecraft version: a
+ * modded profile names the loader's, like `fabric-loader-0.16.0-1.21.1`. The
+ * version and the loader are read out of that folder's json; see
+ * [vanillaProfileVersion].
  */
 class MinecraftLauncherSource(
     private val locator: LauncherRootLocator,
@@ -74,18 +79,62 @@ class MinecraftLauncherSource(
             val gameDir = prof.str("gameDir")?.let { Path.of(it) } ?: return@forEach
             if (!Files.isDirectory(gameDir) || gameDir.normalize() == root.normalize()) return@forEach
             val version = prof.str("lastVersionId")?.takeIf { !it.startsWith("latest-") }
+                ?.let { vanillaProfileVersion(root, it, json) }
             found += DiscoveredInstance(
                 launcher = launcher,
                 id = "profile:$key",
                 displayName = prof.str("name") ?: gameDir.fileName.toString(),
                 gameDir = gameDir,
-                mcVersion = version,
+                mcVersion = version?.mc,
+                loader = version?.loader,
+                loaderVersion = version?.loaderVersion,
                 modCount = countMods(gameDir),
             )
         }
         found
     }
 }
+
+/** What a vanilla-launcher version folder turned out to run. */
+internal data class ProfileVersion(val mc: String, val loader: String? = null, val loaderVersion: String? = null)
+
+/**
+ * The Minecraft version and loader behind the version folder [versionId] under
+ * [root], or null when they cannot be told.
+ *
+ * A loader's folder names the Minecraft version it builds on in `inheritsFrom`,
+ * and itself in its libraries or its launch arguments. A folder with no json is
+ * taken at its name only when that name is a plain Minecraft version: guessing at
+ * a loader's id handed the runtime step a version Mojang has never heard of.
+ * Null for a modded folder whose loader cannot be named, rather than a vanilla
+ * answer that would import the pack without its loader.
+ */
+internal fun vanillaProfileVersion(root: Path, versionId: String, json: Json): ProfileVersion? {
+    val meta = readJsonObject(root.resolve("versions").resolve(versionId).resolve("$versionId.json"), json)
+        ?: return ProfileVersion(versionId).takeIf { PLAIN_MC_VERSION.matches(versionId) }
+    val mc = meta.str("inheritsFrom") ?: return ProfileVersion(meta.str("id") ?: versionId)
+    val libraries = (meta["libraries"] as? JsonArray).orEmpty().mapNotNull { (it as? JsonObject)?.str("name") }
+    fun library(prefix: String): String? =
+        libraries.firstOrNull { it.startsWith(prefix) }?.removePrefix(prefix)?.substringBefore(':')
+    val gameArgs = ((meta["arguments"] as? JsonObject)?.get("game") as? JsonArray).orEmpty()
+        .mapNotNull { runCatching { it.jsonPrimitive.contentOrNull }.getOrNull() }
+    fun argument(name: String): String? = gameArgs.indexOf(name).takeIf { it >= 0 }?.let { gameArgs.getOrNull(it + 1) }
+    // Forge's maven version carries the Minecraft version in front of its own.
+    fun forgeOwn(v: String) = v.removePrefix("$mc-").substringBefore("-$mc")
+    val (loader, loaderVersion) = when {
+        library("net.fabricmc:fabric-loader:") != null -> "fabric" to library("net.fabricmc:fabric-loader:")
+        library("org.quiltmc:quilt-loader:") != null -> "quilt" to library("org.quiltmc:quilt-loader:")
+        argument("--fml.neoForgeVersion") != null -> "neoforge" to argument("--fml.neoForgeVersion")
+        library("net.neoforged:neoforge:") != null -> "neoforge" to library("net.neoforged:neoforge:")
+        argument("--fml.forgeVersion") != null -> "forge" to argument("--fml.forgeVersion")
+        library("net.minecraftforge:forge:") != null -> "forge" to library("net.minecraftforge:forge:")?.let(::forgeOwn)
+        else -> return null
+    }
+    return ProfileVersion(mc, loader, loaderVersion?.takeIf { it.isNotBlank() })
+}
+
+/** A Minecraft release, pre-release, release candidate or snapshot id. */
+private val PLAIN_MC_VERSION = Regex("""^(\d+\.\d+(\.\d+)?(-(pre|rc)\d+)?|\d{2}w\d{2}[a-z])$""")
 
 /**
  * Modrinth App. Each subdirectory of `<root>/profiles` is a full game dir. The

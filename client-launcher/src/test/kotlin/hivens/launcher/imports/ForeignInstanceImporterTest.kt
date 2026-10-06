@@ -137,6 +137,21 @@ class ForeignInstanceImporterTest {
     }
 
     @Test
+    fun `refuses a named loader whose version is unknown`() = runTest {
+        val dataDir = tmp("nexira-data4")
+        val repo = FakeRepo()
+        assertFailsWith<java.io.IOException> {
+            importer(dataDir, repo).import(
+                DiscoveredInstance(
+                    launcher = ForeignLauncher.Vanilla, id = "profile:x", displayName = "Modded",
+                    gameDir = tmp("modded"), mcVersion = "1.20.1", loader = "forge", loaderVersion = null,
+                ),
+            )
+        }
+        assertTrue(repo.stored.isEmpty())
+    }
+
+    @Test
     fun `an instance without a vanilla-layout runtime still imports (no seeding)`() = runTest {
         val src = tmp("modrinth-like")
         write(src.resolve("mods/A.jar"), "A")
