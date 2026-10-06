@@ -191,4 +191,20 @@ class IssueReporterTest {
         assertTrue(decodedTitle.contains("<redacted>"),
             "redaction marker expected in title where the token was")
     }
+
+    @Test
+    fun `the home directory in a crash folds to a tilde in the title and the body`() {
+        val home = System.getProperty("user.home")
+        val report = fakeCrashReport(
+            stack = "java.nio.file.AccessDeniedException: $home/.local/share/nexira/settings.json\n\tat foo.Bar.baz(Bar.kt:1)"
+        )
+        val url = IssueReporter.crashIssueUrl(report)
+        val titleParam = url.substringAfter("?").split("&").first { it.startsWith("title=") }.removePrefix("title=")
+        val title = URLDecoder.decode(titleParam, Charsets.UTF_8)
+        val body = decodedBody(url)
+
+        assertFalse(title.contains(home), "the account name reaches the URL through the title")
+        assertFalse(body.contains(home), "the account name reaches the URL through the body")
+        assertTrue(title.contains("~/.local/share/nexira/settings.json"), "the path stays readable, folded")
+    }
 }

@@ -179,6 +179,17 @@ object DiagnosticBundle {
         }
     }
 
+    /**
+     * [abbreviateHome] for every occurrence inside free text, such as a stack
+     * trace whose exception message names a file under the home directory. Only
+     * a whole path segment is folded: `/home/al` does not swallow `/home/alice`.
+     */
+    internal fun foldHome(text: String, home: String = System.getProperty("user.home") ?: ""): String {
+        val normalisedHome = home.trimEnd('/', '\\')
+        if (normalisedHome.isBlank()) return text
+        return Regex(Regex.escape(normalisedHome) + "(?![\\w.-])").replace(text, "~")
+    }
+
     private fun buildActionRing(): String = buildString {
         val entries = ActionRing.snapshot()
         appendLine("Action ring (oldest first, last ${ActionRing.CAPACITY} entries):")

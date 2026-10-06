@@ -1,5 +1,6 @@
 package hivens.cli
 
+import hivens.core.logging.Redactor
 import hivens.config.Branding
 import hivens.core.api.interfaces.ICredentialStore
 import hivens.core.api.interfaces.IPackRepository
@@ -119,7 +120,10 @@ private fun runLaunch(cmd: CliCommand.Launch): Int {
         // Console output: the controller emits semantic events + game stdout
         // on `events`; render to stdout. Cancelled once a terminal state lands.
         val output = launch {
-            controller.events.collect { println(renderEvent(it)) }
+            // Through the redactor, as the GUI console is: the command line carries the
+            // access token and authlib echoes it, and terminal output is what gets
+            // pasted into a bug report.
+            controller.events.collect { println(Redactor.redact(renderEvent(it))) }
         }
         // Coarse progress: dedup consecutive same-class states so the per-byte
         // Downloading storm does not flood the terminal.
@@ -141,7 +145,7 @@ private fun runLaunch(cmd: CliCommand.Launch): Int {
 
         when (terminal) {
             is LaunchState.Error -> {
-                System.err.println("Launch failed: ${renderError(terminal.reason)}")
+                System.err.println(Redactor.redact("Launch failed: ${renderError(terminal.reason)}"))
                 1
             }
             else -> 0

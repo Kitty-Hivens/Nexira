@@ -1,5 +1,6 @@
 package hivens.ui.notifications
 
+import hivens.core.logging.Redactor
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -48,12 +49,17 @@ class NotificationCenter(
         actions: List<NotifAction> = emptyList(),
         glyph: NotifGlyph? = null,
     ): String {
+        // The body is where a failure's reason lands, an exception message that
+        // the HTTP layer may have filled with a response body. The activity surface
+        // redacts the same text on its way in, and the archive below writes it to
+        // disk, so it is redacted here once. The title is a display name.
+        val cleanBody = body?.let(Redactor::redact)
         val event = NotificationEvent(
             id        = UUID.randomUUID(),
             severity  = severity,
             kind      = kind,
             title     = title,
-            body      = body,
+            body      = cleanBody,
             progress  = progress,
             actions   = actions,
             createdAt = clock(),
@@ -67,7 +73,7 @@ class NotificationCenter(
                 severity       = severity,
                 kind           = kind,
                 title          = title,
-                body           = body,
+                body           = cleanBody,
                 createdAtEpoch = event.createdAt.epochSecond,
             )
         )

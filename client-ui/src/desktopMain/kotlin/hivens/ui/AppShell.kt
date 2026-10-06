@@ -1449,6 +1449,18 @@ fun AppRoot(
                     // thing that could have told us. Unpersisted, the coordinator would
                     // spend another login on the next start -- and each one invalidates
                     // whatever session the player has in hand.
+                    // The sign-in retired the uid the store holds, and whatever is
+                    // signed later from the stored account, a skin upload among them,
+                    // needs the one it minted.
+                    if (resolution.signedIn) {
+                        withContext(Dispatchers.IO) {
+                            runCatching {
+                                credentialsManager.refreshStored(PackAuthRequirement.SmartyCraft.PROVIDER_KEY, session)
+                            }.onFailure {
+                                LoggerFactory.getLogger("AppShell").warn("Auto-login could not record the refreshed session", it)
+                            }
+                        }
+                    }
                     if (session.twoFactor && saved?.twoFactor != true) {
                         withContext(Dispatchers.IO) {
                             credentialsManager.markTwoFactor(PackAuthRequirement.SmartyCraft.PROVIDER_KEY)

@@ -15,6 +15,7 @@ import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
@@ -143,6 +144,18 @@ class AutoLoginCoordinatorTest {
     fun `an ordinary account is still signed in`() = runTest {
         coEvery { authService.login("ScUser", "hunter2", any()) } returns scSaved.copy(accessToken = "fresh-token")
         assertEquals("fresh-token", session(resolve(SettingsData(), saved = scSaved)).accessToken)
+    }
+
+    @Test
+    fun `only a session minted by a sign-in here is marked for the store`() = runTest {
+        coEvery { authService.login("ScUser", "hunter2", any()) } returns scSaved.copy(accessToken = "fresh-token")
+        val signedIn = resolve(SettingsData(), saved = scSaved)
+        assertIs<Resolution.Success>(signedIn)
+        assertTrue(signedIn.signedIn, "the caller writes the minted uid back only when told")
+
+        val carried = resolve(SettingsData(), saved = scSaved.copy(twoFactor = true))
+        assertIs<Resolution.Success>(carried)
+        assertFalse(carried.signedIn, "the stored session is not a fresh one")
     }
 
     @Test

@@ -604,6 +604,40 @@ class CredentialsManagerTest {
     }
 
     @Test
+    fun `a v5 migration the vault will not write keeps the flat keys and the file`() {
+        Files.writeString(
+            workDir / "credentials.json",
+            """{"username":"ChaosA","uuid":"$scUuid","uid":"1","version":5}""",
+        )
+        vault.entries["accessToken"] = "fake-game-token".toByteArray()
+        vault.entries["password"] = "secret-pw".toByteArray()
+        vault.refuseStore = true
+
+        manager.load()
+
+        assertEquals(5, fileJson()["version"]?.jsonPrimitive?.int, "the v5 file names whose secrets these are")
+        assertEquals("fake-game-token", vault.entries["accessToken"]?.decodeToString(), "the only copy of the token")
+        assertEquals("secret-pw", vault.entries["password"]?.decodeToString(), "the only copy of the password")
+
+        vault.refuseStore = false
+        assertEquals("fake-game-token", newManager().load()?.accessToken, "recovered once the vault writes")
+    }
+
+    @Test
+    fun `a legacy migration the vault will not write keeps the old keyring`() {
+        LegacyCredentialsManager(workDir, json, legacyKeyring).save(session())
+        vault.refuseStore = true
+
+        manager.load()
+
+        assertEquals(4, fileJson()["version"]?.jsonPrimitive?.int)
+        assertTrue(legacyKeyring.entries.isNotEmpty(), "purged with nothing written, the account is gone")
+
+        vault.refuseStore = false
+        assertEquals("fake-game-token", newManager().load()?.accessToken)
+    }
+
+    @Test
     fun `a failed migration is attempted once per run, not per read`() {
         LegacyCredentialsManager(workDir, json, legacyKeyring).save(session())
         legacyKeyring.available = false

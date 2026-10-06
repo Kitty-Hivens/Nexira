@@ -43,7 +43,8 @@ import java.nio.file.Path
  * recurse through the same read path.
  *
  * A migration that recovers nothing stamps the v6 format over the old file only
- * when the store it asked actually answered. A store that could not be read leaves
+ * when the store it asked actually answered, and one that recovers something
+ * stamps it only once the vault has taken what it recovered. A store that could not be read leaves
  * the file alone: the stamp is one-way, so writing it on an unreachable keyring
  * would trade a temporary outage for a permanent loss of the account.
  *
@@ -377,10 +378,18 @@ class CredentialsManager(
             log.warn("v5 credentials present and the vault returned no token -- leaving them for the next launch")
             return SavedAccountsFile()
         }
-        vault.store(compositeKey(PROVIDER_SMARTYCRAFT, accountId, FIELD_ACCESS_TOKEN), token.toByteArray())
+        val tokenStored = vault.store(compositeKey(PROVIDER_SMARTYCRAFT, accountId, FIELD_ACCESS_TOKEN), token.toByteArray())
         val pass = vault.retrieve(LEGACY_KEY_PASSWORD)?.decodeToString()
             ?: vault.retrieve(compositeKey(PROVIDER_SMARTYCRAFT, accountId, FIELD_PASSWORD))?.decodeToString()
-        if (pass != null) vault.store(compositeKey(PROVIDER_SMARTYCRAFT, accountId, FIELD_PASSWORD), pass.toByteArray())
+        val passStored = pass == null || vault.store(compositeKey(PROVIDER_SMARTYCRAFT, accountId, FIELD_PASSWORD), pass.toByteArray())
+        if (!tokenStored || !passStored) {
+            // The flat keys are the only copy until the new ones are written, and the
+            // stamp below drops them, so a vault that reads but refuses a write keeps
+            // the v5 file and its keys for the next launch.
+            legacyUnreadableThisRun = true
+            log.warn("the vault did not take the v5 secrets -- leaving them for the next launch")
+            return SavedAccountsFile()
+        }
         // Into the vault with the other secrets, or left in the file when it will not
         // take it: the v5 file is the only other copy.
         val uidStored = v5.uid.isNullOrBlank() ||
@@ -422,7 +431,13 @@ class CredentialsManager(
             }
         }
         val accountId = accountIdFor(recovered)
-        storeSecrets(PROVIDER_SMARTYCRAFT, accountId, recovered)
+        if (!storeSecrets(PROVIDER_SMARTYCRAFT, accountId, recovered)) {
+            // The old keyring is purged below, so it stays the only copy until the
+            // vault has taken every secret.
+            legacyUnreadableThisRun = true
+            log.warn("the vault did not take the legacy secrets -- leaving them for the next launch")
+            return SavedAccountsFile()
+        }
         // The uid went into the vault with the other secrets above.
         val account = SavedAccount(
             PROVIDER_SMARTYCRAFT, accountId, recovered.playerName, recovered.uuid,
@@ -435,13 +450,17 @@ class CredentialsManager(
         return file
     }
 
-    private fun storeSecrets(providerId: String, accountId: String, session: SessionData) {
-        vault.store(compositeKey(providerId, accountId, FIELD_ACCESS_TOKEN), session.accessToken.toByteArray())
-        putOrDelete(compositeKey(providerId, accountId, FIELD_PASSWORD), session.cachedPassword)
-        putOrDelete(compositeKey(providerId, accountId, FIELD_REFRESH_TOKEN), session.refreshToken)
+    /** Whether the vault took every secret [session] carries. */
+    private fun storeSecrets(providerId: String, accountId: String, session: SessionData): Boolean {
+        val token = vault.store(compositeKey(providerId, accountId, FIELD_ACCESS_TOKEN), session.accessToken.toByteArray())
+        val password = putOrDelete(compositeKey(providerId, accountId, FIELD_PASSWORD), session.cachedPassword)
+        val refresh = putOrDelete(compositeKey(providerId, accountId, FIELD_REFRESH_TOKEN), session.refreshToken)
         // Stored when known and otherwise left as it is: a session rebuilt without
         // one says nothing about the account no longer having one.
-        session.uid.takeIf { it.isNotBlank() }?.let { vault.store(compositeKey(providerId, accountId, FIELD_UID), it.toByteArray()) }
+        val uid = session.uid.takeIf { it.isNotBlank() }
+            ?.let { vault.store(compositeKey(providerId, accountId, FIELD_UID), it.toByteArray()) }
+            ?: true
+        return token && password && refresh && uid
     }
 
     private fun deleteSecrets(providerId: String, accountId: String) {
@@ -451,8 +470,11 @@ class CredentialsManager(
         vault.delete(compositeKey(providerId, accountId, FIELD_UID))
     }
 
-    private fun putOrDelete(key: String, value: String?) {
-        if (value != null) vault.store(key, value.toByteArray()) else vault.delete(key)
+    /** False only when a value to keep was refused. A delete of nothing is not a failure. */
+    private fun putOrDelete(key: String, value: String?): Boolean {
+        if (value != null) return vault.store(key, value.toByteArray())
+        vault.delete(key)
+        return true
     }
 
     private fun secret(account: SavedAccount, field: String): String? =

@@ -57,7 +57,12 @@ object AutoLoginCoordinator {
     private val log = LoggerFactory.getLogger(AutoLoginCoordinator::class.java)
 
     sealed interface Resolution {
-        data class Success(val session: SessionData) : Resolution
+        /**
+         * [signedIn] says the session came from a sign-in made here rather than from
+         * the store. A SmartyCraft login retires the uid the store holds, so the
+         * caller writes the fresh one back, the same as a launch that signs in.
+         */
+        data class Success(val session: SessionData, val signedIn: Boolean = false) : Resolution
 
         /** No saved account, password, or offline name -- nothing to attempt. */
         data object NoCredentials : Resolution
@@ -145,7 +150,7 @@ object AutoLoginCoordinator {
         val server = Protocol.DEFAULT_SERVER_ID
 
         return try {
-            Resolution.Success(authService.login(saved.playerName, cachedPass, server))
+            Resolution.Success(authService.login(saved.playerName, cachedPass, server), signedIn = true)
         } catch (e: TwoFactorRequiredException) {
             // First contact with the gate: the flag is set by whoever meets it, and
             // an account restored from a build that predates the flag meets it here.

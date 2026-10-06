@@ -97,4 +97,19 @@ class DiagnosticBundleTest {
         // Elsewhere on disk there is no account name to fold.
         assertEquals("/mnt/games/nexira", DiagnosticBundle.abbreviateHome("/mnt/games/nexira", "/home/alice"))
     }
+
+    @Test
+    fun `foldHome folds every home path inside free text and nothing that only shares the prefix`() {
+        val trace = "java.nio.file.AccessDeniedException: /home/alice/.local/share/nexira/x.json\n" +
+            "\tCaused by: /home/alice-backup/y (copied from /home/alice)\n" +
+            "C:\\Users\\alice\\AppData\\nexira"
+        assertEquals(
+            "java.nio.file.AccessDeniedException: ~/.local/share/nexira/x.json\n" +
+                "\tCaused by: /home/alice-backup/y (copied from ~)\n" +
+                "C:\\Users\\alice\\AppData\\nexira",
+            DiagnosticBundle.foldHome(trace, "/home/alice/"),
+        )
+        assertEquals("~\\AppData\\nexira", DiagnosticBundle.foldHome("C:\\Users\\alice\\AppData\\nexira", "C:\\Users\\alice"))
+        assertEquals("/home/alice/x", DiagnosticBundle.foldHome("/home/alice/x", ""))
+    }
 }
