@@ -111,6 +111,15 @@ class LayoutGraphRepository(
     // flush, so a long-completed job left flush believing a write was still owed.
     @Volatile private var dirty = false
 
+    @Volatile private var _writesLanded = 0
+
+    /**
+     * How many writes have reached the file since this repository was made. What the
+     * debounce is for is a count of writes, and counting them is the one way to ask
+     * about it that neither a scheduler nor a filesystem's clock can blur.
+     */
+    internal val writesLanded: Int get() = _writesLanded
+
     fun observe(): StateFlow<LayoutGraph> = state.asStateFlow()
 
     fun value(): LayoutGraph = state.value
@@ -345,6 +354,7 @@ class LayoutGraphRepository(
             val envelope = Envelope(schemaVersion = SCHEMA_VERSION, graph = state.value)
             AtomicFiles.writeString(file, json.encodeToString(envelope))
             dirty = false
+            _writesLanded++
         } catch (e: Exception) {
             log.error("Failed to persist layout graph at {}", file, e)
         }

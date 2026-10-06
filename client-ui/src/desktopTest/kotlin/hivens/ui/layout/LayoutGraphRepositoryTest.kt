@@ -27,6 +27,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -120,12 +121,10 @@ class LayoutGraphRepositoryTest {
     fun `update with identity transform does not rewrite file`() = runBlocking {
         val repo = repo()
         repo.flush()  // ensure seeded write completed
-        val beforeMtime = Files.getLastModifiedTime(file)
-        Thread.sleep(50)
+        val before = repo.writesLanded
         repo.update { it }
         repo.flush()
-        val afterMtime = Files.getLastModifiedTime(file)
-        assertEquals(beforeMtime, afterMtime, "no-op update must not touch the file")
+        assertEquals(before, repo.writesLanded, "no-op update must not touch the file")
     }
 
     @Test
@@ -193,14 +192,14 @@ class LayoutGraphRepositoryTest {
     // ── Debounce + flush ──────────────────────────────────────────────
 
     @Test
-    fun `drag-thrash collapses to roughly one write per debounce window`() = runBlocking {
+    fun `drag-thrash collapses to one write`() = runBlocking {
         val repo = repo()
         repo.flush()  // settle the seed write
-        val beforeMtime = Files.getLastModifiedTime(file)
+        val before = repo.writesLanded
 
-        // Fire 30 updates rapidly. Without debounce this would produce
-        // 30 file writes; with 200ms debounce we expect 0 (still pending)
-        // until we flush or wait out the window.
+        // Fire 30 updates rapidly. Without debounce this would produce 30 file
+        // writes; each update restarts the window, so the flush that follows lands
+        // them as one.
         repeat(30) { i ->
             repo.update { graph ->
                 graph.copy(
@@ -208,16 +207,10 @@ class LayoutGraphRepositoryTest {
                 )
             }
         }
-
-        // Immediately after, the file must NOT yet reflect the writes
-        // (within 200ms debounce window, give or take scheduling slop).
-        val midMtime = Files.getLastModifiedTime(file)
-        assertEquals(beforeMtime, midMtime, "writes must not have landed within debounce window")
-
-        // Flush completes the single coalesced write.
         repo.flush()
-        val afterMtime = Files.getLastModifiedTime(file)
-        assertTrue(afterMtime > beforeMtime, "flush must land the coalesced write on disk")
+
+        assertEquals(before + 1, repo.writesLanded, "thirty updates and a flush are one write")
+        assertTrue("scratch-29" in Files.readString(file), "and it is the last state that landed")
     }
 
     @Test
@@ -242,29 +235,25 @@ class LayoutGraphRepositoryTest {
     fun `flush() with no pending write is a no-op and does not touch the file`() = runBlocking {
         val repo = repo()
         repo.flush()  // settle seed
-        val beforeMtime = Files.getLastModifiedTime(file)
-        Thread.sleep(50)
+        val before = repo.writesLanded
         repo.flush()  // no pending write
-        val afterMtime = Files.getLastModifiedTime(file)
-        assertEquals(beforeMtime, afterMtime)
+        assertEquals(before, repo.writesLanded)
     }
 
     @Test
     fun `debounce window eventually persists without explicit flush`() = runBlocking {
         val repo = repo()
         repo.flush()  // settle seed
-        val beforeMtime = Files.getLastModifiedTime(file)
-        Thread.sleep(50)
+        val before = repo.writesLanded
 
         repo.update {
             it.copy(surfaces = it.surfaces + (SurfaceId("debounce-test") to SurfaceLayout()))
         }
 
-        // Wait past the debounce window plus dispatch slop.
-        delay(400)
-
-        val afterMtime = Files.getLastModifiedTime(file)
-        assertTrue(afterMtime > beforeMtime, "debounce coroutine must have written on its own")
+        // Waited for rather than slept past: the window is a lower bound, and how
+        // long the write takes after it is the scheduler's business.
+        withTimeout(5_000) { while (repo.writesLanded == before) delay(10) }
+        assertTrue("debounce-test" in Files.readString(file), "debounce coroutine must have written on its own")
     }
 
     // ── Tree-wide uniqueness ──────────────────────────────────────────
@@ -662,11 +651,11 @@ class LayoutGraphRepositoryTest {
         repo.update { it.copy(surfaces = it.surfaces + (SurfaceId("scratch") to SurfaceLayout())) }
         repo.flush()
 
-        val stamp = Files.getLastModifiedTime(file)
+        val written = repo.writesLanded
         Files.delete(file)
         repo.flush()
         assertFalse(Files.exists(file), "flush wrote again with nothing owed")
-        assertTrue(stamp.toMillis() > 0)
+        assertEquals(written, repo.writesLanded)
     }
 
     @Test
