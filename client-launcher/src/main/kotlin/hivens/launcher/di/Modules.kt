@@ -573,8 +573,6 @@ val mirrorModule = module {
             javaManager = get(),
             repository = get(),
             dataDir = get(),
-            librariesDir = get<PlatformPaths>().librariesDir,
-            assetsDir = get<PlatformPaths>().assetsDir,
         )
     }
     // Create an empty local pack from scratch (name + MC + loader); the Content

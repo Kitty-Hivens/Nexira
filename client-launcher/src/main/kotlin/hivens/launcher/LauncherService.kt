@@ -102,7 +102,8 @@ internal class LauncherService(
             mcVersion = mcVersion,
             loaderName = manifest.loaderName,
             loaderVersion = manifest.loaderVersion,
-        ) { current, total, file -> onLog("Runtime $current/$total: $file", LauncherLogType.INFO) }
+            progress = { current, total, file -> onLog("Runtime $current/$total: $file", LauncherLogType.INFO) },
+        )
 
         // 2b. SC binding: an SC-bound pack provisions the VANILLA authlib (sends the
         // join to Mojang -> 403 for an SC token). Two mechanisms steer it back to

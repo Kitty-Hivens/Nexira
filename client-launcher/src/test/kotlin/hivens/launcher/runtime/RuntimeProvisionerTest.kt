@@ -342,6 +342,64 @@ class RuntimeProvisionerTest {
         assertTrue(requests.isEmpty(), "a warm relaunch must make ZERO network requests, got: $requests")
     }
 
+    // Another launcher's tree is offered, not trusted: what matches the manifest is
+    // taken without a download, and what does not is downloaded as if absent.
+    @Test
+    fun `an offered tree is taken where it matches and downloaded where it does not`() = runTest {
+        val libBytes = "PATCHY-JAR".toByteArray()
+        val clientBytes = "CLIENT-JAR".toByteArray()
+        val objBytes = "EN-US-LANG".toByteArray()
+        val objHash = sha1(objBytes)
+        val indexJson = """{"objects":{"minecraft/lang/en_us.lang":{"hash":"$objHash","size":${objBytes.size}}}}"""
+        val versionJson = """
+            {
+              "assetIndex": {"id":"1.12","sha1":"${sha1(indexJson)}","size":${indexJson.length},"url":"$INDEX_URL"},
+              "downloads": {"client": {"sha1":"${sha1(clientBytes)}","size":${clientBytes.size},"url":"$CLIENT_URL"}},
+              "libraries": [
+                {"name":"com.mojang:patchy:1.1","downloads":{"artifact":{"path":"com/mojang/patchy/1.1/patchy-1.1.jar","sha1":"${sha1(libBytes)}","size":${libBytes.size},"url":"$LIB_URL"}}}
+              ]
+            }
+        """.trimIndent()
+        val manifestJson = """{"versions":[{"id":"1.12.2","url":"$VERSION_URL"}]}"""
+
+        // The foreign tree: the asset and the client jar are genuine, the library is
+        // the same size as the real one and is not it.
+        val foreign = tmp.resolve("foreign")
+        val seedAssets = foreign.resolve("assets")
+        val seedLibs = foreign.resolve("libraries")
+        val seedClient = foreign.resolve("versions/1.12.2/1.12.2.jar")
+        Files.createDirectories(seedAssets.resolve("objects/${objHash.take(2)}"))
+        Files.write(seedAssets.resolve("objects/${objHash.take(2)}/$objHash"), objBytes)
+        Files.createDirectories(seedLibs.resolve("com/mojang/patchy/1.1"))
+        Files.write(seedLibs.resolve("com/mojang/patchy/1.1/patchy-1.1.jar"), "PATCHY-BAD".toByteArray())
+        Files.createDirectories(seedClient.parent)
+        Files.write(seedClient, clientBytes)
+
+        val requests = mutableListOf<String>()
+        val engine = MockEngine { req ->
+            val url = req.url.toString()
+            requests += url
+            when (url) {
+                MANIFEST_URL -> respond(manifestJson, HttpStatusCode.OK, jsonHeaders)
+                VERSION_URL -> respond(versionJson, HttpStatusCode.OK, jsonHeaders)
+                INDEX_URL -> respond(indexJson, HttpStatusCode.OK, jsonHeaders)
+                LIB_URL -> respond(ByteReadChannel(libBytes), HttpStatusCode.OK)
+                CLIENT_URL -> respond(ByteReadChannel(clientBytes), HttpStatusCode.OK)
+                "$RES_BASE/${objHash.take(2)}/$objHash" -> respond(ByteReadChannel(objBytes), HttpStatusCode.OK)
+                else -> respond("missing: $url", HttpStatusCode.NotFound)
+            }
+        }
+        val p = provisioner(HttpClient(engine))
+
+        p.ensureVanilla("1.12.2", seed = RuntimeSeed(librariesDir = seedLibs, assetsDir = seedAssets, clientJar = seedClient))
+
+        assertEquals("PATCHY-JAR", librariesDir.resolve("com/mojang/patchy/1.1/patchy-1.1.jar").readText(), "the mismatching library was downloaded")
+        assertTrue(LIB_URL in requests)
+        assertEquals("EN-US-LANG", assetsDir.resolve("objects/${objHash.take(2)}/$objHash").readText())
+        assertTrue(requests.none { it.startsWith(RES_BASE) }, "the matching asset was taken, not downloaded")
+        assertTrue(CLIENT_URL !in requests, "the matching client jar was taken, not downloaded")
+    }
+
     @Test
     fun `ensureVanilla throws on sha1 mismatch and leaves no partial file`() = runTest {
         val libBytes = "REAL-LIB".toByteArray()
