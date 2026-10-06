@@ -204,4 +204,24 @@ class XodusPackRepositoryTest {
         assertNull(r.update("ghost") { it.copy(notes = "x") })
         assertTrue(r.list().isEmpty())
     }
+
+    // A database made before a schema bump, opened by the build after it, then by the
+    // build before it again. The stamp has to move, or the older build never learns
+    // it is looking at newer data and writes its own shape over it.
+    @Test
+    fun `a schema bump is stamped on an existing database and an older build reads it read-only`() = runTest {
+        val d = tempData()
+        fun at(version: Int) =
+            XodusPackRepository(d.resolve("db"), d.resolve("packs.json"), json, schemaVersion = version).also { repos.add(it) }
+
+        at(1).apply { put(instance("a")); close() }
+        at(2).apply { list(); close() }
+
+        val older = at(1)
+        older.put(instance("b"))
+        older.close()
+
+        val ids = at(2).list().map { it.id }
+        assertEquals(listOf("a"), ids, "the older build did not write over the newer database")
+    }
 }

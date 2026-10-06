@@ -56,6 +56,8 @@ class XodusPackRepository(
     private val legacyPacksFile: Path,
     private val json: Json,
     private val holdOpen: Boolean = true,
+    /** The schema this build writes. A parameter so a test can play an older and a newer build. */
+    private val schemaVersion: Int = SCHEMA_VERSION,
 ) : IPackRepository {
 
     private val log = LoggerFactory.getLogger(XodusPackRepository::class.java)
@@ -193,6 +195,7 @@ class XodusPackRepository(
     private fun load(): List<PackInstance> = runCatching {
         checkSchema()
         migrateLegacyIfNeeded()
+        stampSchema()
         readAll()
     }.getOrElse { e ->
         log.error("Pack registry could not be opened; the library is empty and read-only this session", e)
@@ -202,14 +205,32 @@ class XodusPackRepository(
 
     private fun checkSchema() {
         val stored = metaGet(SCHEMA_KEY)?.toIntOrNull() ?: return
-        if (stored > SCHEMA_VERSION) {
+        if (stored > schemaVersion) {
             readOnly = true
             NewerBuildData.record(ReadOnlyStore.PackLibrary)
             log.warn(
                 "Pack registry schema {} > supported {} -- written by a newer build; loading read-only.",
-                stored, SCHEMA_VERSION,
+                stored, schemaVersion,
             )
         }
+    }
+
+    /**
+     * Records this build's schema on a database that carries an older one, or none.
+     *
+     * The stamp used to be written only inside the legacy migration, which runs once,
+     * so a database made before a bump kept the old number for good. The newer-build
+     * check above then never fired for it, and an older build went on writing entries
+     * of its own shape over the newer ones.
+     */
+    private fun stampSchema() {
+        if (readOnly) return
+        val stored = metaGet(SCHEMA_KEY)?.toIntOrNull()
+        if (stored != null && stored >= schemaVersion) return
+        withEnv { env -> env.executeInTransaction { txn ->
+            meta(env, txn).put(txn, key(SCHEMA_KEY), StringBinding.stringToEntry(schemaVersion.toString()))
+        } }
+        log.info("Pack registry schema stamped {} (was {})", schemaVersion, stored ?: "none")
     }
 
     private fun migrateLegacyIfNeeded() {
@@ -233,7 +254,7 @@ class XodusPackRepository(
             }
             val meta = meta(env, txn)
             meta.put(txn, key(MIGRATED_KEY), StringBinding.stringToEntry("1"))
-            meta.put(txn, key(SCHEMA_KEY), StringBinding.stringToEntry(SCHEMA_VERSION.toString()))
+            meta.put(txn, key(SCHEMA_KEY), StringBinding.stringToEntry(schemaVersion.toString()))
         } }
         if (legacy.isNotEmpty()) {
             runCatching {
