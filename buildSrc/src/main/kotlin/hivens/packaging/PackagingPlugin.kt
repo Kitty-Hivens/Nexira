@@ -6,6 +6,7 @@ import org.gradle.internal.os.OperatingSystem
 import org.gradle.jvm.tasks.Jar
 import org.gradle.kotlin.dsl.named
 import org.gradle.kotlin.dsl.register
+import java.io.File
 
 /**
  * Convention plugin for Nexira's packaging tasks. Apply via:
@@ -79,6 +80,7 @@ class PackagingPlugin : Plugin<Project> {
             cdsDumpArgs.convention(cdsDump)
 
             javaHome.convention(resolvedJavaHome)
+            jdkRelease.convention(project.layout.file(project.provider { File(resolvedJavaHome, "release") }))
             outputDir.convention(
                 project.layout.buildDirectory.dir("customRuntime")
             )

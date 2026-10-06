@@ -3,12 +3,16 @@ package hivens.packaging
 import org.gradle.api.DefaultTask
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.FileSystemOperations
+import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.provider.ListProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.tasks.CacheableTask
 import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.InputFile
 import org.gradle.api.tasks.Optional
 import org.gradle.api.tasks.OutputDirectory
+import org.gradle.api.tasks.PathSensitive
+import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
 import org.gradle.process.ExecOperations
 import javax.inject.Inject
@@ -27,9 +31,9 @@ import javax.inject.Inject
  *
  * UP-TO-DATE behaviour: every flag is declared as `@Input`; the output
  * runtime directory is `@OutputDirectory`. Changing a flag invalidates and
- * rebuilds; running twice with no changes is a no-op. The JDK path is
- * declared as `@Input` (string) too -- swapping the toolchain JDK
- * invalidates the cache, which is the desired semantic.
+ * rebuilds; running twice with no changes is a no-op. The JDK is tracked by
+ * its path and by the content of its `release` file, so both a different JDK
+ * and an upgrade of the same one in place invalidate the image.
  *
  * `@CacheableTask` makes the output relocatable through the Gradle build
  * cache (local + remote); jlink output is deterministic for fixed inputs
@@ -87,6 +91,16 @@ abstract class CustomRuntimeTask : DefaultTask() {
      */
     @get:Input
     abstract val javaHome: Property<String>
+
+    /**
+     * The JDK's own `release` file, which names its exact build. The path alone
+     * left the task up to date across an in-place upgrade of the same JDK, and the
+     * release then shipped the runtime of the build that had been replaced. Read
+     * by content, so a new build at the same path rebuilds the image.
+     */
+    @get:InputFile
+    @get:PathSensitive(PathSensitivity.NONE)
+    abstract val jdkRelease: RegularFileProperty
 
     // ── Outputs ───────────────────────────────────────────────────────────
 
