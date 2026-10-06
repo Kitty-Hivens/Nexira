@@ -1,8 +1,11 @@
 package hivens.launcher
 
+import hivens.core.data.SessionData
 import hivens.launcher.LauncherService.Companion.adaptiveApplies
 import hivens.launcher.LauncherService.Companion.baselineMemory
 import hivens.launcher.LauncherService.Companion.findAuthlibLibrary
+import hivens.launcher.LauncherService.Companion.joinMechanismWarning
+import hivens.launcher.LauncherService.Companion.joinsBoundServer
 import hivens.launcher.LauncherService.Companion.normalizeMemory
 import hivens.launcher.LauncherService.Companion.swapAuthlibPath
 import hivens.launcher.runtime.MavenCoord
@@ -12,6 +15,8 @@ import java.nio.file.Path
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -102,5 +107,23 @@ class LauncherServiceTest {
         assertEquals(patched, out.libraries.first { it.coord.artifact == "authlib" }.path, "authlib path is swapped")
         assertEquals(lwjgl.path, out.libraries.first { it.coord.artifact == "lwjgl" }.path, "other libraries untouched")
         assertEquals(2, out.libraries.size, "no entry added or dropped")
+    }
+
+    @Test
+    fun `an offline session does not join the bound server`() {
+        val online = SessionData(playerName = "p", accessToken = "t")
+        assertTrue(joinsBoundServer(scBound = true, session = online))
+        assertFalse(joinsBoundServer(scBound = true, session = online.copy(offline = true, accessToken = "")))
+        assertFalse(joinsBoundServer(scBound = false, session = online))
+    }
+
+    @Test
+    fun `an agent that was switched on but not produced still warns`() {
+        val agent = Path.of("agent.jar")
+        assertNotNull(joinMechanismWarning(joins = true, useNetworkAgent = true, agentJar = null, swapAuthlib = false))
+        assertNull(joinMechanismWarning(joins = true, useNetworkAgent = true, agentJar = agent, swapAuthlib = false))
+        assertNull(joinMechanismWarning(joins = true, useNetworkAgent = false, agentJar = null, swapAuthlib = true))
+        assertNotNull(joinMechanismWarning(joins = true, useNetworkAgent = false, agentJar = null, swapAuthlib = false))
+        assertNull(joinMechanismWarning(joins = false, useNetworkAgent = false, agentJar = null, swapAuthlib = false))
     }
 }

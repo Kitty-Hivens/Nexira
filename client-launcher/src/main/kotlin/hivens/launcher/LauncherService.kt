@@ -76,6 +76,11 @@ internal class LauncherService(
     ): SpawnResult = try {
         val mcVersion = manifest.minecraftVersion
         val scBound = manifest.authRequirement?.scServerId != null
+        // Whether this launch can join the server it is bound to at all. An offline
+        // session carries no token, so there is no join for either mechanism below to
+        // steer, and requiring one turned a launch that could still reach
+        // singleplayer into a refused one.
+        val joins = joinsBoundServer(scBound, sessionData)
 
         // 1. Heap: pinned -> explicit value, else the machine-aware Automatic
         // baseline that the adaptive sizer refines from.
@@ -105,21 +110,22 @@ internal class LauncherService(
         // SC's patched authlib jar (opt-in fallback, swapped onto the classpath
         // here). No-op for Hivens-native packs. The pack's own mods (open-smrt
         // interop included) come from the sync; nothing is injected here.
+        if (scBound && !joins) {
+            onLog("Offline launch: the SmartyCraft join is not possible, so no authlib binding is applied", LauncherLogType.INFO)
+        }
         val resolved = applySmrtBinding(
             manifest, sessionData, mcVersion, baseRuntime,
-            swapAuthlib = useSmartycraftAuthLib, onLog = onLog,
+            swapAuthlib = useSmartycraftAuthLib && joins, onLog = onLog,
         )
 
         // An SC-bound join needs at least one mechanism; with neither, the vanilla
         // authlib hits Mojang and the server rejects the session. Surface it rather
-        // than spawn a guaranteed-to-fail join silently.
-        if (scBound && !useNetworkAgent && !useSmartycraftAuthLib) {
-            onLog(
-                "Neither the network agent nor the SmartyCraft authlib is enabled; the SC join will be rejected",
-                LauncherLogType.WARN,
-            )
+        // than spawn a guaranteed-to-fail join silently. Asked of what was actually
+        // produced: the agent switched on but not extracted is no mechanism either.
+        val authlibAgent = if (joins && useNetworkAgent) agentExtractor.ensureAuthlibAgent() else null
+        joinMechanismWarning(joins, useNetworkAgent, authlibAgent, useSmartycraftAuthLib)?.let {
+            onLog(it, LauncherLogType.WARN)
         }
-        val authlibAgent = if (scBound && useNetworkAgent) agentExtractor.ensureAuthlibAgent() else null
 
         // 3. Java. Major precedence: loader-resolved override -> the pack manifest's
         // own declaration (authoritative for the pack) -> Mojang's per-version field
@@ -360,6 +366,31 @@ internal class LauncherService(
     }
 
     internal companion object {
+        /**
+         * Whether a launch bound to a SmartyCraft server can join it: bound, and
+         * carrying a session with a token. An offline session has none to send.
+         */
+        internal fun joinsBoundServer(scBound: Boolean, session: SessionData): Boolean =
+            scBound && !session.offline && session.accessToken.isNotBlank()
+
+        /**
+         * What to tell the player when a bound join has nothing to steer it to the
+         * server's auth, or null when something does. [agentJar] is the agent as it
+         * was produced, not the setting: extraction can fail on a full or read-only
+         * disk, and the setting then still reads as covered.
+         */
+        internal fun joinMechanismWarning(
+            joins: Boolean,
+            useNetworkAgent: Boolean,
+            agentJar: Path?,
+            swapAuthlib: Boolean,
+        ): String? = when {
+            !joins || swapAuthlib || agentJar != null -> null
+            useNetworkAgent ->
+                "The network agent could not be prepared and the SmartyCraft authlib is not enabled; the SC join will be rejected"
+            else -> "Neither the network agent nor the SmartyCraft authlib is enabled; the SC join will be rejected"
+        }
+
         /** The vanilla `com.mojang:authlib` classpath entry in [runtime], or null if absent. */
         internal fun findAuthlibLibrary(runtime: ResolvedRuntime): ResolvedLibrary? =
             runtime.libraries.firstOrNull { it.coord.group == "com.mojang" && it.coord.artifact == "authlib" }
