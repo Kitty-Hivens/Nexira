@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -33,10 +34,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.currentCompositionLocalContext
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -46,6 +45,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -54,6 +54,9 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.layer.GraphicsLayer
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.isSecondaryPressed
@@ -244,14 +247,14 @@ fun EditableWidgetChrome(
     // and we clip at 0.40/0.85 so deep stacks stay readable.
     val depthBoost = (path.nested.size * 0.06f).coerceAtMost(0.22f)
 
-    // The ghost lambda is invoked by DragGhostOverlay at the host
-    // level -- outside the surface composable's CompositionLocalProvider
-    // chain. Widgets like HomeNewRecent read surface-scoped locals
-    // (LocalHomeNewContext, LocalLibraryContext, ...) and would throw
-    // when the ghost recomposes them. Snapshot the locals here and
-    // restore them inside the ghost so the widget renders identically
-    // wherever it lands.
-    val capturedLocals = currentCompositionLocalContext
+    // What the drag ghost shows: the widget's own drawing, recorded as it draws.
+    // The ghost used to compose the widget a second time, so for the length of a
+    // drag two live copies ran under one instance id. Anything a widget registers
+    // by that id, a service a neighbour reads, was taken over by the copy and then
+    // withdrawn when it went, leaving the neighbour with nothing to read. A picture
+    // of the widget has no effects, and it is the widget as it was drawn, surface
+    // locals and all, without carrying them across.
+    val contentLayer = rememberGraphicsLayer()
 
     // Drop this widget's drop-target rect when it leaves composition (deleted /
     // moved): the registry persists across the edit session, so without this a
@@ -396,7 +399,14 @@ fun EditableWidgetChrome(
                     registry.registerWidget(path, instance.instanceId, index, rect)
                 },
         ) {
-            Box(Modifier.alpha(sourceAlpha)) { content() }
+            Box(
+                Modifier
+                    .alpha(sourceAlpha)
+                    .drawWithContent {
+                        contentLayer.record { this@drawWithContent.drawContent() }
+                        drawLayer(contentLayer)
+                    },
+            ) { content() }
 
             // Whole-widget drag surface -- no separate handle. A press anywhere
             // on the body (above the content, below the hover affordances) drags
@@ -558,7 +568,7 @@ fun EditableWidgetChrome(
                                         pointerInWindow = bounds.topLeft + slop.position,
                                         pickupOffset    = slop.position,
                                         widgetSize      = Offset(bounds.width, bounds.height),
-                                        ghost           = { CompositionLocalProvider(capturedLocals) { content() } },
+                                        ghost           = { RecordedGhost(contentLayer) },
                                     )
                                     // Accumulated from the start, not re-read from the
                                     // widget's live bounds each frame. The drop indicator
@@ -929,6 +939,13 @@ private fun anchorLabel(anchor: String, s: AppStrings): String = when (anchor) {
     Placement.BOTTOM_START -> s.editorAnchorBottomStart
     Placement.BOTTOM_CENTER -> s.editorAnchorBottomCenter
     else -> s.editorAnchorBottomEnd
+}
+
+/** The widget as [layer] last recorded it, at the size it was drawn. */
+@Composable
+private fun RecordedGhost(layer: GraphicsLayer) {
+    val size = with(LocalDensity.current) { DpSize(layer.size.width.toDp(), layer.size.height.toDp()) }
+    Spacer(Modifier.size(size).drawBehind { drawLayer(layer) })
 }
 
 // Drop insertion bar. Horizontal (full width, 2dp tall) for a Column
