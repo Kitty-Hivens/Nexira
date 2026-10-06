@@ -1378,19 +1378,21 @@ fun AppRoot(
     }
 
     // ── Background settings ───────────────────────────────────────────────
-    val backgroundManager = remember { BackgroundManager(dataDirectory, json) }
+    val backgroundManager: BackgroundManager = koinInject()
     var backgroundSettings by remember { mutableStateOf(backgroundManager.load()) }
     // Persist background settings debounced and OFF the UI thread: the fx
     // sliders fire per tick, and a synchronous write per tick both janks the
     // drag and multiplies disk writes. The effect restarts on every value
-    // change (keyed), so one write lands ~300ms after the drag settles; the
-    // in-memory state above is already live, so a killed tail loses at most
-    // the final slider position (same contract as the layout-graph debounce).
+    // change (keyed), so one write lands ~300ms after the drag settles. Each
+    // change is staged on the manager first, before the delay, and the manager
+    // flushes what is staged at shutdown, so a quit or a crash-restart inside the
+    // debounce keeps the last slider position.
     var persistedBackground by remember { mutableStateOf(backgroundSettings) }
     LaunchedEffect(backgroundSettings) {
         if (backgroundSettings == persistedBackground) return@LaunchedEffect
+        backgroundManager.stage(backgroundSettings)
         delay(300.milliseconds)
-        withContext(Dispatchers.IO) { backgroundManager.save(backgroundSettings) }
+        withContext(Dispatchers.IO) { backgroundManager.flush() }
         persistedBackground = backgroundSettings
     }
 

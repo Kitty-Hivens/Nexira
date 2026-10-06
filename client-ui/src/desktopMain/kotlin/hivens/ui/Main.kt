@@ -57,6 +57,7 @@ import hivens.media.VideoCacheService
 import hivens.media.YtDlpService
 import hivens.tray.LibTrayController
 import hivens.tray.TrayController
+import hivens.ui.background.BackgroundManager
 import hivens.ui.layout.LayoutGraphFlushHook
 import hivens.launcher.legacy.RetiredDataSweeper
 import hivens.ui.legacy.RetiredClientsGate
@@ -263,6 +264,10 @@ val uiModule = module {
         WidgetStateGc(repo = get(), store = get(), scope = get(), alsoReferenced = presets::referencedInstanceIds)
     }
     single(createdAtStart = true) { WidgetStateFlushHook(get()) }
+
+    // The wallpaper settings, one per process because the manager carries the
+    // shutdown flush for its debounced writes.
+    single { BackgroundManager(get<Path>(), get()) }
 
     // What the mod page is looking at, which the right rail's project-view family
     // reads. A singleton because the page that writes it and the rail that reads
