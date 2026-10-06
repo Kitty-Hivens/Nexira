@@ -1,11 +1,14 @@
 package hivens.ui.skin3d
 
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.unit.Density
+import hivens.ui.customization.CustomizationSettings
+import hivens.ui.customization.LocalCustomization
 import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.ColorAlphaType
 import org.jetbrains.skia.ColorType
@@ -39,10 +42,12 @@ class SkinViewSnapRedrawTest {
     @Test
     fun `a snapped pose is drawn on the next frame`() {
         val state = SkinViewState(initialYaw = 0.5f)
-        state.motionMultiplier = 0f
         val texture = skin()
         val scene = ImageComposeScene(160, 240, density = Density(1f)) {
-            SkinView3D(texture, Modifier.fillMaxSize(), interactive = false, autoSpin = false, state = state)
+            // Motion reduced: no frame loop runs, so nothing but the snap can redraw.
+            CompositionLocalProvider(LocalCustomization provides CustomizationSettings(reduceMotion = true)) {
+                SkinView3D(texture, Modifier.fillMaxSize(), interactive = false, autoSpin = false, state = state)
+            }
         }
         try {
             var t = 0L

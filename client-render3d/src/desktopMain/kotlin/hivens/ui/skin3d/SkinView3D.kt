@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalWindowInfo
+import hivens.ui.customization.LocalCustomization
 import hivens.ui.render3d.Texture
 import hivens.ui.scene3d.Node
 import hivens.ui.scene3d.OrthoCamera
@@ -105,11 +106,11 @@ fun SkinView3D(
     var dragging by remember { mutableStateOf(false) }
 
     // The scene drives its own clock and takes a multiplier rather than a
-    // still/not question, so an idle spin slows before it stops. Nothing varies it
-    // today -- the style axis that carried a motion token is gone -- so the state's
-    // own default stands and nothing is pushed. A reduce-motion preference would
-    // arrive from the customization layer and write here.
-    val motion = state.motionMultiplier
+    // still/not question, so an idle spin slows before it stops. The reduce-motion
+    // preference is what sets it: zero stops the spin and makes a retarget snap.
+    val still = LocalCustomization.current.reduceMotion
+    SideEffect { state.motionMultiplier = if (still) 0f else 1f }
+    val motion = if (still) 0f else 1f
 
     // A spin nobody is looking at is a spin worth not drawing. The window
     // losing focus does not hide the figure, so this trades a frozen model in

@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -57,6 +58,20 @@ fun Symbol(
         contentAlignment = Alignment.Center,
     ) {
         val px = with(LocalDensity.current) { maxHeight.toSp() }
+        // Remembered per axis value: every icon on screen built a fresh settings
+        // object and font family on each composition, so a list of rows recomposing
+        // allocated a font family per glyph per frame.
+        val opsz = px.value.coerceIn(24f, 48f)
+        val settings = remember(fill, weight, opsz) {
+            FontVariation.Settings(
+                FontVariation.Setting("FILL", fill.coerceIn(0f, 1f)),
+                FontVariation.Setting("wght", weight.toFloat()),
+                FontVariation.Setting("opsz", opsz),
+                FontVariation.Setting("GRAD", 0f),
+            )
+        }
+        val font = Font(Res.font.material_symbols, variationSettings = settings)
+        val family = remember(font) { FontFamily(font) }
         Text(
             // Unbounded so a dense glyph (globe, description) whose ink reaches the
             // em edges isn't clipped by the size-px box -- it overflows by a hair
@@ -65,17 +80,7 @@ fun Symbol(
             text = String(Character.toChars(icon.codepoint)),
             color = tint,
             fontSize = px,
-            fontFamily = FontFamily(
-                Font(
-                    Res.font.material_symbols,
-                    variationSettings = FontVariation.Settings(
-                        FontVariation.Setting("FILL", fill.coerceIn(0f, 1f)),
-                        FontVariation.Setting("wght", weight.toFloat()),
-                        FontVariation.Setting("opsz", px.value.coerceIn(24f, 48f)),
-                        FontVariation.Setting("GRAD", 0f),
-                    ),
-                ),
-            ),
+            fontFamily = family,
             style = TextStyle(
                 lineHeightStyle = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.Both),
             ),

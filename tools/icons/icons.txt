@@ -34,7 +34,6 @@ ExitToApp
 ExpandLess
 ExpandMore
 Favorite
-FavoriteBorder=favorite
 FilterAlt
 FilterAltOff
 FlipToBack

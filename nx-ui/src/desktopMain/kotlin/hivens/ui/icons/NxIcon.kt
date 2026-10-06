@@ -36,7 +36,6 @@ object NxIcon {
     val ExpandLess = IconKey(0xe5ce)
     val ExpandMore = IconKey(0xe5cf)
     val Favorite = IconKey(0xe87d)
-    val FavoriteBorder = IconKey(0xe87d)
     val FilterAlt = IconKey(0xef4f)
     val FilterAltOff = IconKey(0xeb32)
     val FlipToBack = IconKey(0xe882)

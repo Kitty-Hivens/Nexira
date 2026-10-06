@@ -1,5 +1,6 @@
 package hivens.ui.background
 
+import hivens.ui.widgets.toWidgetColorOrNull
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -102,9 +103,10 @@ fun CustomBackground(
 
         // Color tint overlay
         if (settings.tintColor != null && settings.tintOpacity > 0f) {
-            val tint = try {
-                Color(("FF" + settings.tintColor.removePrefix("#")).toLong(16))
-            } catch (_: Exception) { null }
+            // The parser every other colour the launcher reads goes through. Prefixed
+            // with FF by hand, a three-digit value parsed as a wrong colour, and an
+            // eight-digit one lost its own alpha.
+            val tint = settings.tintColor.toWidgetColorOrNull()
             if (tint != null) {
                 Box(Modifier.fillMaxSize().background(tint.copy(alpha = settings.tintOpacity)))
             }

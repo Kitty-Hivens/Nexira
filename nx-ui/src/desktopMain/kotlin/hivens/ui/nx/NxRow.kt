@@ -1,6 +1,7 @@
 package hivens.ui.nx
 
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -34,6 +35,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.Symbol
+import hivens.ui.customization.LocalCustomization
 import hivens.ui.theme.Motion
 import hivens.ui.theme.Spacing
 import hivens.ui.theme.NxInk
@@ -148,9 +150,10 @@ internal fun softHoverAlpha(interaction: MutableInteractionSource): State<Float>
         hovered -> 0.06f
         else    -> 0f
     }
+    val still = LocalCustomization.current.reduceMotion
     return animateFloatAsState(
         targetValue   = target,
-        animationSpec = Motion.tap,
+        animationSpec = if (still) snap() else Motion.tap,
         label         = "softHoverAlpha",
     )
 }
