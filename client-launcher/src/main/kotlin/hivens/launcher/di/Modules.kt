@@ -525,7 +525,7 @@ val mirrorModule = module {
         val searches = catalogueSearchCache()
         PackCatalogueRegistry(
             listOf(
-                CachedPackCatalogue(get<MirrorPackCatalogue>(), searches),
+                get<MirrorPackCatalogue>(),
                 CachedPackCatalogue(get<ModrinthPackCatalogue>(), searches),
             ),
         )
@@ -939,10 +939,10 @@ private fun packRegistry(dataDir: Path, json: Json, holdOpen: Boolean): IPackRep
 // ── Module factories ────────────────────────────────────────────────────────
 
 /**
- * Pack-metadata cache namespaces. Browse listing + per-pack summary change
- * occasionally (serve stale for a day on outage); manifests change on a pack
- * release but pinned-version manifests are immutable (a week stale); Modrinth
- * project / version metadata rarely changes (a version is immutable).
+ * Pack-metadata cache namespaces. The Browse listing is kept for a month and
+ * polled while Browse is open. The per-pack summary changes occasionally and is
+ * served stale for a day on an outage. Manifests change on a pack release, but
+ * pinned-version manifests are immutable and are served stale for a week.
  */
 private fun Scope.smrtPackCaches(): SmrtPackCaches {
     val f: CacheFactory = get()
@@ -951,12 +951,15 @@ private fun Scope.smrtPackCaches(): SmrtPackCaches {
     val day = 24 * hour
     return SmrtPackCaches(
         // An empty listing is not stored. This one is on disk, so a mirror that
-        // answered once with nothing would otherwise serve that nothing for a day,
-        // across restarts -- the case shouldStore is documented for.
+        // answered once with nothing would otherwise serve that nothing for weeks,
+        // across restarts -- the case shouldStore is documented for. Kept long
+        // because it is what Browse draws while it asks: an open Browse polls the
+        // mirror itself (MirrorPackCatalogue), so the TTL is only when an ambient
+        // read considers the copy worth asking about again.
         listing = f.create(
             "pack-listing",
             SmrtPackListing.serializer(),
-            CacheConfig(ttlMs = 5 * min, staleTtlMs = day, shouldStore = { it.packs.isNotEmpty() }),
+            CacheConfig(ttlMs = 5 * min, staleTtlMs = 30 * day, shouldStore = { it.packs.isNotEmpty() }),
         ),
         summary = f.create("pack-summary", SmrtPackSummary.serializer(), CacheConfig(ttlMs = 10 * min, staleTtlMs = day)),
         manifest = f.create("pack-manifest", SmrtPackManifest.serializer(), CacheConfig(ttlMs = 10 * min, staleTtlMs = 7 * day)),

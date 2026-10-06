@@ -99,9 +99,20 @@ class SmrtPackClient(
         return caches.summary.read(url, forceRefresh) { getJson(url) }
     }
 
-    suspend fun listPacks(): SmrtPackListing {
+    /** Every pack the mirror lists. See [fetchManifest] for what [forceRefresh] costs. */
+    suspend fun listPacks(forceRefresh: Boolean = false): SmrtPackListing {
         val url = "$mirrorBase/v1/packs"
-        return caches.listing.get(url) { getJson(url) }
+        return caches.listing.read(url, forceRefresh) { getJson(url) }
+    }
+
+    /**
+     * Stale-then-fresh view of the pack listing, the way [buildsStream] is for the
+     * build listing: the stored one at once when it is merely stale, then the
+     * reloaded one.
+     */
+    fun packsStream(): Flow<SmrtPackListing> {
+        val url = "$mirrorBase/v1/packs"
+        return caches.listing.flow(url) { getJson(url) }.map { it.value }
     }
 
     /**

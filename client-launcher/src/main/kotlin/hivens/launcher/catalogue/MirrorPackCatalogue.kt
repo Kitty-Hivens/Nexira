@@ -4,13 +4,19 @@ import hivens.core.api.catalogue.CatalogueGalleryItem
 import hivens.core.api.catalogue.CataloguePack
 import hivens.core.api.catalogue.CataloguePackDetails
 import hivens.core.api.catalogue.CataloguePackVersion
+import hivens.core.api.dto.smrt.SmrtPackListing
 import hivens.core.api.dto.smrt.SmrtPackManifest
 import hivens.core.api.dto.smrt.SmrtPackSummary
 import hivens.core.api.interfaces.IPackCatalogueService
 import hivens.core.data.PackOrigin
 import hivens.launcher.smrt.SmrtPackClient
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import org.slf4j.LoggerFactory
 
 /**
  * The Hivens mirror as a [IPackCatalogueService]. The mirror has no query
@@ -18,12 +24,65 @@ import kotlinx.coroutines.coroutineScope
  * carries the full retained build list so the Browse install picker can offer
  * any version -- the coordinator installs the picked build's own manifest --
  * degrading to the single latest when the listing is unavailable.
+ *
+ * Not wrapped in [CachedPackCatalogue]: a search is a filter over the listing,
+ * which [SmrtPackClient] already keeps on disk, and a second cache over it took
+ * the inner one's stale answer as a fresh one of its own.
  */
-class MirrorPackCatalogue(private val client: SmrtPackClient) : IPackCatalogueService {
+class MirrorPackCatalogue(
+    private val client: SmrtPackClient,
+    private val pollIntervalMs: Long = POLL_INTERVAL_MS,
+) : IPackCatalogueService {
+    private val log = LoggerFactory.getLogger(MirrorPackCatalogue::class.java)
+
     override val origin = PackOrigin.Mirror
 
+    override val paged = false
+
     override suspend fun search(query: String, page: Int): List<CataloguePack> =
-        client.listPacks().packs
+        matching(client.listPacks(), query)
+
+    /**
+     * The stored listing at once, then the mirror asked again every
+     * [pollIntervalMs] for as long as the screen collects, and a new list only
+     * when the answer differs.
+     *
+     * The listing is the one call nothing else refreshes: a pack published on the
+     * mirror stayed out of Browse until the stored copy expired, and a restart
+     * did not help, because the copy is on disk. A failed poll keeps what is
+     * shown and asks again on the next one. Only the first answer can fail the
+     * stream, since before it there is nothing to keep.
+     */
+    override fun searchStream(query: String, page: Int): Flow<List<CataloguePack>> = flow {
+        var last: List<CataloguePack>? = null
+        client.packsStream().collect { listing ->
+            val packs = matching(listing, query)
+            if (packs != last) {
+                last = packs
+                emit(packs)
+            }
+        }
+        while (true) {
+            delay(pollIntervalMs)
+            val listing = try {
+                client.listPacks(forceRefresh = true)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                log.debug("mirror listing poll failed, keeping the shown list", e)
+                continue
+            }
+            val packs = matching(listing, query)
+            if (packs != last) {
+                log.info("mirror listing changed: {} pack(s) for \"{}\"", packs.size, query)
+                last = packs
+                emit(packs)
+            }
+        }
+    }
+
+    private fun matching(listing: SmrtPackListing, query: String): List<CataloguePack> =
+        listing.packs
             .filter {
                 query.isBlank() ||
                     it.displayName.contains(query, ignoreCase = true) ||
@@ -112,4 +171,9 @@ class MirrorPackCatalogue(private val client: SmrtPackClient) : IPackCatalogueSe
         mcVersions = listOf(m?.minecraft?.version ?: s.minecraftVersion),
         loaders = m?.loader?.name?.let { listOf(it) } ?: emptyList(),
     )
+
+    companion object {
+        /** How often an open Browse asks the mirror whether its listing changed. */
+        const val POLL_INTERVAL_MS = 60_000L
+    }
 }

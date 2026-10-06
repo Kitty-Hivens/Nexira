@@ -178,6 +178,9 @@ fun BrowseScreen(
                 logger.warn("browse: no catalogue is registered for {}", origin)
                 if (state !is BrowseState.Loaded) state = BrowseState.Empty
             }
+        // A source that answers with its whole listing has no further pages, and
+        // asking it for one only returns the same list again.
+        if (!catalogue.paged) endReached = true
         try {
             // Stale first, fresh behind it. Assigning an equal list is not a
             // repaint -- the state is compared, not trusted -- so a refresh that
@@ -213,6 +216,30 @@ fun BrowseScreen(
                     // not get them back either. Only entries the list does not
                     // already hold are a reason to start again.
                     val shown = (state as? BrowseState.Loaded)?.packs
+                    // A source with no pages hands over the entire list each time,
+                    // so its answer IS the list: a pack published or withdrawn, or a
+                    // card reworded, replaces it where it stands. Nothing was scrolled
+                    // onto it to lose, and the reader is not sent back to the top.
+                    if (!catalogue.paged) {
+                        if (packs == shown) {
+                            logger.debug("browse: {} re-listed the same {} pack(s)", origin, packs.size)
+                            return@collect
+                        }
+                        logger.info("browse: {} listed {} pack(s)", origin, packs.size)
+                        state = BrowseState.Loaded(packs)
+                        session.put(
+                            origin,
+                            submittedQuery,
+                            BrowseSession.Snapshot(
+                                packs = packs,
+                                nextPage = 0,
+                                endReached = true,
+                                firstVisibleIndex = listState.firstVisibleItemIndex,
+                                firstVisibleOffset = listState.firstVisibleItemScrollOffset,
+                            ),
+                        )
+                        return@collect
+                    }
                     if (shown != null && newIn(packs, shown).isEmpty()) {
                         logger.info("browse: {} re-listed the same {} pack(s)", origin, packs.size)
                         return@collect
