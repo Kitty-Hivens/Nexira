@@ -1,5 +1,6 @@
 package hivens.launcher.legacy
 
+import hivens.core.io.deleteTree
 import hivens.launcher.instance.instanceDirName
 import hivens.core.api.interfaces.IJavaManager
 import hivens.core.api.interfaces.IPackRepository
@@ -18,7 +19,6 @@ import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Instant
-import java.util.Comparator
 import java.util.UUID
 import kotlin.io.path.isDirectory
 import kotlin.io.path.isRegularFile
@@ -169,10 +169,7 @@ class RetiredClientAdopter(
     /** Removes a reservation that will never be finished. */
     private fun discard(dir: Path) {
         runCatching {
-            if (!Files.exists(dir)) return
-            Files.walk(dir).use { tree ->
-                tree.sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) }
-            }
+            deleteTree(dir)
         }.onFailure { log.warn("adopt: could not remove the unfinished {}", dir, it) }
     }
 

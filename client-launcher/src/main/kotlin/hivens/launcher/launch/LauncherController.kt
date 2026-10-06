@@ -380,6 +380,8 @@ class LauncherController(
         // The game this launch started, so a stop that interrupts the launch
         // before the wait is armed can still end it.
         var spawned: LaunchHandle? = null
+        // Set when the session guard could not be armed and the game was stopped for it.
+        var guardFailed = false
         try {
             _state.value = LaunchState.Prepare(PrepareStage.INIT, 0.0f)
             onStart()
@@ -424,11 +426,21 @@ class LauncherController(
                             }
                         }
                     }
-                    // Post-spawn hook guarded centrally: a throwing hook must
-                    // not flip the running game into an Error state.
+                    // What the hook still throws is the session guard failing to arm,
+                    // since its own bookkeeping is guarded inside it. A game that may
+                    // be holding a token and that nothing is watching is not one to
+                    // leave running, so it is stopped, and the stop is reported as the
+                    // failure it is once the process has gone. A cancellation passes.
                     prepared.onSpawned?.let { hook ->
-                        runCatching { sessionGuard = hook(handle) }
-                            .onFailure { logger.warn("Post-spawn hook failed for {}", label, it) }
+                        try {
+                            sessionGuard = hook(handle)
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            logger.error("The session guard could not be armed for {}, stopping the game", label, e)
+                            guardFailed = true
+                            runCatching { handle.terminate() }
+                        }
                     }
 
                     // Reads its OWN captured abortToken, never the
@@ -465,6 +477,7 @@ class LauncherController(
                                 // one. Read before the exit code, which is the
                                 // watchdog's own doing.
                                 prepared.contentFailed.get() -> fail(LaunchError.ContentChangedDuringLaunch)
+                                guardFailed -> fail(LaunchError.Internal("session-guard"))
                                 exitCode != 0 && !abortToken.get() -> fail(LaunchError.ExitCode(exitCode))
                                 else -> _state.value = LaunchState.Idle
                             }
@@ -474,7 +487,10 @@ class LauncherController(
                     }
                 }
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
+            // Throwable, so an Error is wound down like an exception: caught as
+            // Exception only, it skipped this and left the state on Prepare or
+            // GameRunning with no launch behind it. It is still thrown on below.
             sessionGuard?.cancel()
             // A game the person asked to stop is ended whatever interrupted the
             // wait. Not otherwise: when the launcher itself is shutting down the
@@ -495,6 +511,7 @@ class LauncherController(
                     _state.value = LaunchState.Idle
                 }
             }
+            if (e is Error) throw e
         }
     }
 
@@ -738,20 +755,25 @@ class LauncherController(
                 ))
             },
             onSpawned = { handle ->
+                // Armed first, for exactly the launches the seal covers. A launch that
+                // got no token has nothing to lend to a jar that arrives late, and its
+                // owner's `mods/` is their own business. First, because the record
+                // write below used to come before it, and a write that threw left a
+                // bound game running with nothing watching it.
+                val guard = if (serverBound && verdict.verified) {
+                    watchSessionContent(handle, clientDir, refreshedInstance, contentFailed)
+                } else {
+                    null
+                }
                 // The one field this owns, set on the record as it stands. The record in
                 // hand was captured before the click, and preparing a launch takes long
                 // enough (a sign-in, a catch-up repair) for an update or a settings edit
                 // to commit meanwhile. Writing the captured copy back whole put all of
                 // that back to how it was. Nothing is written when the instance is gone.
-                packRepository.update(refreshedInstance.id) { it.copy(lastPlayedEpochOrZero = Instant.now().epochSecond) }
-                // Armed for exactly the launches the seal covers. A launch that got
-                // no token has nothing to lend to a jar that arrives late, and its
-                // owner's `mods/` is their own business.
-                if (serverBound && verdict.verified) {
-                    watchSessionContent(handle, clientDir, refreshedInstance, contentFailed)
-                } else {
-                    null
-                }
+                runCatchingUnlessStopped {
+                    packRepository.update(refreshedInstance.id) { it.copy(lastPlayedEpochOrZero = Instant.now().epochSecond) }
+                }.onFailure { logger.warn("Could not record when {} was last played", refreshedInstance.displayName, it) }
+                guard
             },
             onExit = { secs ->
                 // Added onto the record as it stands (onSpawned wrote lastPlayed, the

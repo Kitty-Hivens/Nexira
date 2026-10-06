@@ -1,5 +1,6 @@
 package hivens.launcher.platform
 
+import hivens.core.io.deleteTree
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.LinkOption
@@ -225,13 +226,6 @@ object DataDirMover {
                     else -> Files.copy(src, dst, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES)
                 }
             }
-        }
-    }
-
-    private fun deleteTree(root: Path) {
-        if (!Files.exists(root)) return
-        Files.walk(root).use { stream ->
-            stream.sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) }
         }
     }
 

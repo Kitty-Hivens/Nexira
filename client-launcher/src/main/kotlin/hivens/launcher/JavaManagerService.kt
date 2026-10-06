@@ -1,6 +1,7 @@
 package hivens.launcher
 
 import hivens.core.io.UnpackBudget
+import hivens.core.io.deleteTree
 import hivens.core.io.UnpackLimits
 import hivens.core.api.interfaces.IJavaManager
 import hivens.core.net.SkipIfPresent
@@ -16,7 +17,6 @@ import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream
 import org.slf4j.LoggerFactory
 import java.io.*
 import java.nio.file.*
-import java.nio.file.attribute.BasicFileAttributes
 import java.nio.file.attribute.PosixFilePermission
 import java.util.concurrent.TimeUnit
 
@@ -229,13 +229,13 @@ class JavaManagerService(
     internal fun installUnpacked(archive: Path, targetDir: Path, isZip: Boolean) {
         val incoming = targetDir.resolveSibling("${targetDir.fileName}.incoming")
         val previous = previousOf(targetDir)
-        deleteDirectoryRecursively(incoming)
+        deleteTree(incoming)
         // Whatever is under `.previous` now is either the only copy, left there by a
         // swap that never finished, or a stale one beside a complete install. Put the
         // first back before clearing the name: deleted here, it went before the new
         // archive had even been fetched.
         recoverInterruptedSwap(targetDir)
-        deleteDirectoryRecursively(previous)
+        deleteTree(previous)
         Files.createDirectories(incoming)
 
         try {
@@ -252,16 +252,16 @@ class JavaManagerService(
             // short as the filesystem allows.
             if (Files.exists(targetDir)) Files.move(targetDir, previous)
             Files.move(incoming, targetDir)
-            deleteDirectoryRecursively(previous)
+            deleteTree(previous)
         } catch (e: Exception) {
-            runCatching { deleteDirectoryRecursively(incoming) }
+            runCatching { deleteTree(incoming) }
             // A swap that failed between the two renames leaves the install
             // under `.previous`; put it back rather than leaving the user with
             // nothing.
             if (!Files.exists(targetDir) && Files.exists(previous)) {
                 runCatching { Files.move(previous, targetDir) }
             }
-            runCatching { deleteDirectoryRecursively(previous) }
+            runCatching { deleteTree(previous) }
             throw e
         }
     }
@@ -282,25 +282,6 @@ class JavaManagerService(
     }
 
     private fun previousOf(targetDir: Path): Path = targetDir.resolveSibling("${targetDir.fileName}.previous")
-
-    private fun deleteDirectoryRecursively(path: Path) {
-        if (!Files.exists(path)) return
-        Files.walkFileTree(path, object : SimpleFileVisitor<Path>() {
-            override fun visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult {
-                // Remove Read-Only attributes before deleting
-                try {
-                    Files.setAttribute(file, "dos:readonly", false)
-                } catch (_: Exception) { /* Ignorable on non-Windows */ }
-
-                Files.delete(file)
-                return FileVisitResult.CONTINUE
-            }
-            override fun postVisitDirectory(dir: Path, exc: IOException?): FileVisitResult {
-                Files.delete(dir)
-                return FileVisitResult.CONTINUE
-            }
-        })
-    }
 
     private fun setExecutablePermissions(path: Path) {
         try {
