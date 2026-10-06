@@ -58,11 +58,28 @@ object AprilFoolsEngine {
         ChaosState.clean()
     }
 
+    /** Whether an engine is running. For tests. */
+    internal val running: Boolean get() = engineScope != null
+
+    /**
+     * The window is over, so the engine ends itself.
+     *
+     * The wrapper decides at composition whether chaos is on, and the date is not
+     * state anything recomposes on, so nothing outside noticed the window close. The
+     * tilt loop never looked either, and went on writing the global tilt for a launcher
+     * left open past the last day until the process exited. The first edge stays with
+     * the next start: turning chaos on under a running interface would mean mounting
+     * the whole of it again.
+     */
+    private fun windowClosed() {
+        stop()
+    }
+
     // ─── Tilt drift ───────────────────────────────────────────────────────────
     // Slowly tilts the entire UI back and forth -- more extreme each day.
 
     private suspend fun runTiltDrift() {
-        while (true) {
+        while (AprilFools.isActive()) {
             val maxTilt   = AprilFools.intensity() * 5f
             val target    = (Random.nextFloat() * 2f - 1f) * maxTilt
             val current   = ChaosState.globalTiltDeg
@@ -78,6 +95,7 @@ object AprilFoolsEngine {
             }
             delay(holdDelay.milliseconds)
         }
+        windowClosed()
     }
 
     // ─── Main event loop ──────────────────────────────────────────────────────
@@ -89,7 +107,10 @@ object AprilFoolsEngine {
     ) {
         while (true) {
             delay(AprilFools.intervalMs().milliseconds)
-            if (!AprilFools.isActive()) break
+            if (!AprilFools.isActive()) {
+                windowClosed()
+                return
+            }
 
             // Nothing is placed by position until the window has a size. The first
             // layout reports one after the composition that starts the engine.

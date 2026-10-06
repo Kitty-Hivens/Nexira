@@ -223,7 +223,17 @@ object ChaosState {
     fun activeCount(): Int =
         buttons.count { it.phase != ChaosPhase.IDLE }
 
+    /**
+     * Resets every piece of chaos state. A button out in the overlay is put back in
+     * its layout first: the trackers keep the button after it leaves this list, and
+     * one dropped while escaped would stay invisible where it belongs.
+     */
     fun clean() {
+        buttons.forEach {
+            it.originalVisible = true
+            it.phase = ChaosPhase.IDLE
+            it.hasLegs = false
+        }
         buttons.clear()
         ghosts.clear()
         shakeOffset = Offset.Zero
