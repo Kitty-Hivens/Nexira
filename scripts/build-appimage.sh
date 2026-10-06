@@ -84,8 +84,9 @@ if [ ! -f "$PACKAGING_PROFILE" ]; then
     echo "       or set PACKAGING_PROFILE=<path> to override." >&2
     exit 1
 fi
-# Populates NEXIRA_JLINK_MODULES (comma-joined string) and NEXIRA_JLINK_OPTIONS
-# (bash array). See buildSrc/.../EmitAppImageProfileTask.kt for the writer.
+# Populates NEXIRA_JLINK_MODULES (comma-joined string), NEXIRA_JLINK_OPTIONS,
+# NEXIRA_JVM_MODULE_OPTIONS and NEXIRA_APPIMAGE_JVM_OPTIONS (bash arrays). See
+# buildSrc/.../EmitAppImageProfileTask.kt for the writer.
 source "$PACKAGING_PROFILE"
 
 # ── 1. Minimal JRE via jlink ────────────────────────────────────────────────
@@ -108,9 +109,9 @@ jlink \
 # An archive records the module-system flags in force when it was written, and
 # a run whose flags differ gets the archived module graph thrown away with an
 # error line per flag ("Mismatched values for property jdk.module.addopens ...
-# specified during runtime but not during dump time") on every launch. The
-# AppRun below is written from the same NEXIRA_JVM_MODULE_OPTIONS, so the two
-# sides cannot drift apart.
+# specified during runtime but not during dump time") on every launch.
+# NEXIRA_JVM_MODULE_OPTIONS is the module-system subset of the AppRun's own
+# launch line below, so the two sides cannot drift apart.
 #
 # -Xshare:dump also writes the compressed-oops archive only. jlink additionally
 # emitted classes_nocoops.jsa for the >32 GB heap mode the launcher never
@@ -163,48 +164,16 @@ cp "$ROOT/resources/dev.hivens.nexira.metainfo.xml" \
 # Written after the jar is final: the class-data archive name below is keyed to
 # the jar's digest, which the JNA strip above changes.
 #
-# WM_CLASS hygiene: Main.kt reflects into sun.awt.X11.XToolkit.awtAppClassName
-# before the first window is created so the X11 WM_CLASS hint matches
-# StartupWMClass=Nexira in resources/nexira.desktop. The
-# reflection is JPMS-guarded behind --add-opens=java.desktop/sun.awt.X11.
-# Stock OpenJDK derives WM_CLASS from argv[0] by default; without the
-# reflection the launcher would show up as "java" in the taskbar. The fat
-# jar bypasses the Compose-generated launcher script, so the jvmArgs in
-# client-ui/build.gradle.kts do not flow through here -- the AppRun is the
-# only place where flags reach the AppImage runtime, so the ones that matter
-# are mirrored here: the Linux AWT/X11 rendering + tiling-WM hints
-# (_JAVA_AWT_WM_NONREPARENTING fixes AWT window sizing under tiling WMs like
-# Hyprland/sway) and G1 + string dedup. Heap caps are deliberately NOT
-# mirrored: the default (1/4 RAM) suits a GUI that spikes on skins / 3D /
-# backgrounds better than a hard -Xmx512m. (Windows/macOS still cap via
-# jpackage --java-options; reconcile separately.)
+# The JVM flags are not typed here. They come from the packaging profile as
+# NEXIRA_APPIMAGE_JVM_OPTIONS, built in client-ui/build.gradle.kts from the
+# launch profile every build shares plus the AppImage's own heap delta, with the
+# reasons and measurements for each next to them. A list typed into this script
+# had drifted from the other two. Its module-system subset is what the base
+# archive in step 1b was dumped under.
 #
-# What is mirrored instead is the idle give-back set: a concurrent G1 cycle every
-# 15 s without one plus a 25% free-space target hands committed heap back to the
-# system, which reaches the footprint a cap would buy without taking the ceiling
-# away from the spikes above. Measured on an idle 2.4.0 session, committed heap
-# goes from 260 MB to 65 MB and RSS from 611 MB to 375 MB, with the glibc trim
-# threshold below carrying about 40 MB of that and time to first frame unchanged.
-#
-# TrimNativeHeapInterval is the JVM's own half of the glibc trim below: every ten
-# seconds it hands memory the JVM has freed back to the system. The threshold
-# alone leaves what a burst allocated through malloc resident until something
-# else happens to trim. Measured on an idle home screen with the environment this
-# AppRun sets, RSS goes from 370 MB to 344 MB with time to first frame unchanged.
-# Heap caps, SerialGC and running without the class-data archive were measured
-# in the same pass and each came out worse or no better.
-#
-# InvokesConcurrent is passed rather than assumed. It defaults to true on the JDK
-# this ships with, but it defaulted to false when the periodic collection was
-# introduced, and the difference is a 2 ms young pause against a full stop the
-# world every interval. The load gate is left alone: its default of 0 already
-# means "no gate", which is what an idle launcher wants.
-#
-# The module-system flags -- the X11 open above, the sun.nio.ch one Xodus
-# reflects through, --enable-native-access for the Panama bindings -- are not
-# retyped here: they come from the packaging profile, which is also what the
-# CDS dump in step 1b ran under.
-NX_MODULE_OPTS="${NEXIRA_JVM_MODULE_OPTIONS[*]}"
+# What stays here is what only a shell can do: the glibc allocator environment
+# and the per-build name of the class-data archive in the user data dir.
+NX_JVM_OPTS="${NEXIRA_APPIMAGE_JVM_OPTIONS[*]}"
 NX_JAR_ID="$(sha256sum "$APPDIR/usr/lib/nexira.jar" | cut -c1-12)"
 cat > "$APPDIR/AppRun" << EOF
 #!/bin/sh
@@ -234,26 +203,16 @@ NX_ARCHIVE="\$NX_DATA/app-${APP_VERSION}-${NX_JAR_ID}.jsa"
 for old in "\$NX_DATA"/app-*.jsa; do
     [ "\$old" = "\$NX_ARCHIVE" ] || rm -f "\$old"
 done
-# Baked from the packaging profile at build time; must stay the flag set the
-# base archive in usr/lib/server was dumped under. Word splitting is the point
-# -- each flag is one argv element and none of them contain whitespace.
-NX_MODULE_OPTS="$NX_MODULE_OPTS"
+# Baked from the packaging profile at build time. Its module-system flags must
+# stay the set the base archive in usr/lib/server was dumped under, which they
+# are by construction. Word splitting is the point -- each flag is one argv
+# element and none of them contain whitespace.
+NX_JVM_OPTS="$NX_JVM_OPTS"
 # shellcheck disable=SC2086
 exec "\$HERE/usr/bin/java" \\
-     \$NX_MODULE_OPTS \\
+     \$NX_JVM_OPTS \\
      -XX:+AutoCreateSharedArchive \\
      -XX:SharedArchiveFile="\$NX_ARCHIVE" \\
-     -Dawt.useSystemAAFontSettings=on \\
-     -Djdk.gtk.version=3 \\
-     -D_JAVA_AWT_WM_NONREPARENTING=1 \\
-     -Drobot.need_x11=false \\
-     -XX:+UseG1GC \\
-     -XX:+UseStringDeduplication \\
-     -XX:MinHeapFreeRatio=10 \\
-     -XX:MaxHeapFreeRatio=25 \\
-     -XX:G1PeriodicGCInterval=15000 \\
-     -XX:+G1PeriodicGCInvokesConcurrent \\
-     -XX:TrimNativeHeapInterval=10000 \\
      -jar "\$HERE/usr/lib/nexira.jar" \\
      "\$@"
 EOF

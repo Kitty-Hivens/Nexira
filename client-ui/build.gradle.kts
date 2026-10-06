@@ -287,6 +287,83 @@ buildConfig {
     buildConfigField("String", "COIL_VERSION",    "\"${libs.versions.coil.get()}\"")
 }
 
+// ── The launcher's JVM launch profile ───────────────────────────────────────
+// One list for every way the launcher is started: the dev run (compose block
+// below), the jpackage launchers on Windows and macOS (packaging.jvmArgs) and the
+// Linux AppImage's AppRun (packaging.appImageJvmArgs, read by
+// scripts/build-appimage.sh through the generated profile). It was typed out in
+// all three and the AppImage copy had already lost four flags. What differs by
+// platform is a named delta below, with its reason, and nothing else.
+val launcherJvmBase = listOf(
+    // Linux window-manager identity. Main.kt reflects into
+    // sun.awt.X11.XToolkit.awtAppClassName before the first window is created so
+    // the X11 WM_CLASS hint matches StartupWMClass=Nexira in
+    // resources/nexira.desktop. KDE / Hyprland / GNOME associate the live window
+    // with the .desktop entry on that match and pick up the hicolor icon at the
+    // size the compositor actually wants. Stock OpenJDK derives WM_CLASS from
+    // argv[0], so without the reflection the launcher shows up as "java".
+    "--add-opens=java.desktop/sun.awt.X11=ALL-UNNAMED",
+    // Xodus (the registry + disk caches) reflects into
+    // sun.nio.ch.FileChannelImpl.setUninterruptible() to keep its DB file channels
+    // from being closed when a thread doing store IO is interrupted (a cancelled
+    // coroutine). Without this it falls back to interruptible channels, where an
+    // interrupt mid-write can corrupt the environment.
+    "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED",
+    // libtray's Panama bindings, the macOS keyring and Linux libsecret.
+    "--enable-native-access=ALL-UNNAMED",
+
+    // X11/Linux desktop tuning. macOS and Windows JVMs ignore these (the XToolkit
+    // code path is never loaded), so they ship everywhere rather than behind a
+    // per-platform split Compose-MP does not offer.
+    "-Dawt.useSystemAAFontSettings=on",
+    "-Djdk.gtk.version=3",
+    "-D_JAVA_AWT_WM_NONREPARENTING=1",
+    "-Drobot.need_x11=false",
+
+    "-XX:+UseG1GC",
+    "-XX:+UseStringDeduplication",
+    "-XX:+OptimizeStringConcat",
+    "-XX:+UseCompressedOops",
+    // No JIT-level lock: launcher sessions are long-running (downloads, a game
+    // launch, the tray), so C2 pays for itself and a C1-only cap is not here.
+
+    // Committed heap follows the live set down after a real GC: G1 does not
+    // uncommit below the floor, so the floor stays low.
+    "-XX:MinHeapFreeRatio=10",
+    "-XX:MaxMetaspaceSize=256m",
+    "-XX:ReservedCodeCacheSize=128m",
+)
+
+// Windows, macOS and the dev run: a capped heap. A boot measured a 44 MB live set
+// after a full GC with 133 MB committed when Xms was the floor, so the floor is low
+// and the ceiling is the cap. No periodic idle GC here: the only form that
+// uncommitted on an idle launcher in that measurement was a stop-the-world one, and
+// its pause froze the audio-feed thread every interval.
+val cappedHeap = listOf(
+    "-Xms64m",
+    "-Xmx512m",
+    "-XX:MaxHeapFreeRatio=30",
+)
+
+// The Linux AppImage: no cap, and the idle give-back set instead. The default
+// ceiling (a quarter of RAM) suits a GUI that spikes on skins, 3D and backgrounds
+// better than a hard 512m. A concurrent G1 cycle every 15 s without one plus a 25%
+// free-space target hands committed heap back: measured on an idle 2.4.0 session,
+// committed heap went from 260 MB to 65 MB and RSS from 611 MB to 375 MB with time
+// to first frame unchanged. InvokesConcurrent is passed rather than assumed: it
+// defaulted to false when periodic collection was introduced, and the difference is
+// a 2 ms young pause against a full stop of the world every interval. Measured
+// beside the other platforms' note above, the two disagree about the periodic
+// collection; this is the one place both are written down. TrimNativeHeapInterval
+// hands what the JVM freed through malloc back every ten seconds (RSS 370 to 344 MB
+// on an idle home screen).
+val appImageHeap = listOf(
+    "-XX:MaxHeapFreeRatio=25",
+    "-XX:G1PeriodicGCInterval=15000",
+    "-XX:+G1PeriodicGCInvokesConcurrent",
+    "-XX:TrimNativeHeapInterval=10000",
+)
+
 compose.desktop {
     application {
         mainClass = "hivens.ui.MainKt"
@@ -415,91 +492,14 @@ compose.desktop {
             }
         }
 
-        // ====================================================================
-        // JVM ARGUMENTS OPTIMIZATION
-        // ====================================================================
+        // The launch profile, from the shared list above; see launcherJvmBase.
         jvmArgs(
-            // Linux window-manager identity. Main.kt reflects into
-            // sun.awt.X11.XToolkit.awtAppClassName before the first window is
-            // created so the X11 WM_CLASS hint matches StartupWMClass=Nexira
-            // in resources/nexira.desktop. KDE / Hyprland / GNOME associate
-            // the live window with the .desktop entry on that match and pick up
-            // the hicolor icon at the size the compositor actually wants. The
-            // --add-opens below is what allows the reflection. Stock OpenJDK
-            // derives WM_CLASS from argv[0] by default; without the reflection
-            // the launcher would show up as "java" in the taskbar.
-            "--add-opens=java.desktop/sun.awt.X11=ALL-UNNAMED",
+            *(launcherJvmBase + cappedHeap).toTypedArray(),
 
-            // Xodus (the registry + disk caches) reflects into
-            // sun.nio.ch.FileChannelImpl.setUninterruptible() to keep its DB file
-            // channels from being closed when a thread doing store IO is
-            // interrupted (a cancelled coroutine). Without this package open it
-            // falls back to interruptible channels -- an interrupt mid-write can
-            // corrupt the environment -- and logs a full InaccessibleObjectException
-            // at boot.
-            "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED",
-
-            // X11/Linux desktop tuning. macOS/Windows JVMs silently ignore
-            // these properties (XToolkit code path is not even loaded), so
-            // shipping them unconditionally is noise rather than wrong. If
-            // Compose-MP ever gains per-platform jvmArgs support upstream we
-            // should move them into a linux { ... } block; until then keep
-            // here with a comment so a contributor reading the file does
-            // not waste time wondering why a Mac build sets _JAVA_AWT_WM_*.
-            "-Dawt.useSystemAAFontSettings=on",
-            "-Djdk.gtk.version=3",
-            "-D_JAVA_AWT_WM_NONREPARENTING=1",
-            "-Drobot.need_x11=false",
-
-            // Performance flags
-            "-XX:+UseG1GC",
-            "-XX:+UseStringDeduplication",
-            "-XX:+OptimizeStringConcat",
-            "-XX:+UseCompressedOops",
-
-            // No JIT-level lock. The previous block here set TieredStopAtLevel=1
-            // (cap at C1, no C2) plus an explicit +TieredCompilation (already the
-            // HotSpot default since Java 8). The cap was wrong for Nexira's shape:
-            // launcher sessions are long-running (multi-minute downloads + game
-            // launch + tray idle), Compose recompose is hot, file verify + jdk
-            // extract are CPU-bound. C2 compilation pays for itself many times
-            // over once the steady state kicks in; the startup ms saved by C1-only
-            // are noise next to the 5+ seconds we spend on first window paint.
-
-            // Memory optimization. A low floor plus a tight free-ratio let a real GC
-            // hand committed heap back to the OS: the launcher grows to Xmx for a
-            // download or a game launch and shrinks afterwards. Measured on a boot the
-            // live set after a full GC was 44 MB while 133 MB stayed committed, because
-            // Xms was the floor and G1 does not uncommit below it.
-            //
-            // No periodic idle GC here. The only form that actually uncommitted on an
-            // idle launcher was a non-concurrent (stop-the-world) periodic collection,
-            // and that full pause froze the audio-feed thread every interval, so a
-            // playing track stuttered once per cycle. A few MB of idle heap is not
-            // worth stalling playback, and the free-ratio still trims after any real GC.
-            "-Xms64m",
-            "-Xmx512m",
-            "-XX:MinHeapFreeRatio=10",
-            "-XX:MaxHeapFreeRatio=30",
-            "-XX:MaxMetaspaceSize=256m",
-            "-XX:ReservedCodeCacheSize=128m",
-
-            // Security — libtray's Panama bindings need native memory +
-            // downcall stubs. Same flag also enables the macOS keyring
-            // and Linux libsecret bindings.
-            "--enable-native-access=ALL-UNNAMED",
-
-            // Puppet mode (hivens.ui.puppet.PuppetServer) -- opt-in HTTP
-            // control surface for CLI-driven UI testing. Activated when
-            // the launcher is run with `-PnexiraPuppetPort=N` (forwarded
-            // into the JVM as -Dnexira.puppet.port=N). Without the property
-            // the puppet server's startIfRequested() is a no-op.
-            //
-            // providers.gradleProperty(...) over project.findProperty(...):
-            // the Provider variant registers the read with the configuration
-            // cache, so a property flip invalidates correctly; findProperty
-            // bypasses the cache hook and bakes the value in on first
-            // config-resolve.
+            // Puppet mode (hivens.ui.puppet.PuppetServer): the opt-in HTTP control
+            // surface for CLI-driven UI testing, on with `-PnexiraPuppetPort=N`.
+            // providers.gradleProperty registers the read with the configuration
+            // cache, so a flip invalidates it, where findProperty would bake it in.
             *(providers.gradleProperty("nexiraPuppetPort").orNull
                 ?.let { arrayOf("-Dnexira.puppet.port=$it") }
                 ?: emptyArray()),
@@ -520,11 +520,9 @@ compose.resources {
     generateResClass = always
 }
 
-// Nexira's distribution-build profile. Single source of truth: the gradle
-// `customRuntime` task consumes these values, and (in a follow-up commit)
-// the AppImage shell script will read them from a generated profile
-// fragment. Mirror of what scripts/build-appimage.sh currently hardcodes;
-// once the emitter task lands, the hardcode goes away.
+// Nexira's distribution-build profile. The gradle `customRuntime` and
+// `customJpackageImage` tasks consume it directly, and scripts/build-appimage.sh
+// reads it through the profile `emitAppImageProfile` writes.
 packaging {
     appName.set("Nexira")
     mainClass.set("hivens.ui.MainKt")
@@ -571,42 +569,12 @@ packaging {
         "jdk.jfr",
     ))
 
-    // jvmArgs baked into the jpackage launcher script via repeated
-    // --java-options. Same set as compose.desktop.application.jvmArgs
-    // above (still authoritative until B-3 retires that block).
-    // NEXIRA_WAYLAND_TRIAL flow is gone (Liberica swap commit e573318);
-    // -Dawt.appClassName is JBR-only honour, dropped in the same
-    // commit; jna.nosys was a dorkbox/JBR rudiment, also dropped.
-    //
-    // The module-system entries below (--add-opens / --enable-native-access)
-    // are read a second time by the packaging plugin: the base CDS archive is
-    // dumped under exactly them, and the AppImage AppRun is written from them.
-    // Adding one here is enough -- nothing downstream needs a matching edit.
+    // The jpackage launchers (Windows, macOS): the shared profile with a capped
+    // heap. See launcherJvmBase. Its module-system entries (--add-opens /
+    // --enable-native-access) are read a second time by the packaging plugin,
+    // which dumps the base CDS archive under exactly them.
     jvmArgs.set(buildList {
-        addAll(listOf(
-            "--add-opens=java.desktop/sun.awt.X11=ALL-UNNAMED",
-            // Xodus uninterruptible file channels (DB integrity under thread interrupts).
-            "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED",
-            "--enable-native-access=ALL-UNNAMED",
-            "-Dawt.useSystemAAFontSettings=on",
-            "-Djdk.gtk.version=3",
-            "-D_JAVA_AWT_WM_NONREPARENTING=1",
-            "-Drobot.need_x11=false",
-            "-XX:+UseG1GC",
-            "-XX:+UseStringDeduplication",
-            "-XX:+OptimizeStringConcat",
-            "-XX:+UseCompressedOops",
-            // Idle heap trimmed by a real GC: a low floor plus a tight free-ratio, so
-            // committed follows the live set down after a burst. No periodic idle GC:
-            // its only uncommitting form was a stop-the-world collection that froze the
-            // audio-feed thread each interval (see the application block above).
-            "-Xms64m",
-            "-Xmx512m",
-            "-XX:MinHeapFreeRatio=10",
-            "-XX:MaxHeapFreeRatio=30",
-            "-XX:MaxMetaspaceSize=256m",
-            "-XX:ReservedCodeCacheSize=128m",
-        ))
+        addAll(launcherJvmBase + cappedHeap)
         // Windows: the class-data archive lives next to the app. The Inno installer
         // is per-user (PrivilegesRequired=lowest, {localappdata}\Nexira\Programs), so
         // $APPDIR -- expanded by the jpackage launcher at run time -- is writable.
@@ -627,6 +595,12 @@ packaging {
             add($$"-XX:SharedArchiveFile=$APPDIR/app.jsa")
         }
     })
+
+    // The Linux AppImage's AppRun: the shared profile with the measured idle
+    // give-back set in place of the cap. Its class-data archive lives in the user
+    // data dir and is named by scripts/build-appimage.sh, since the image is
+    // mounted read-only.
+    appImageJvmArgs.set(launcherJvmBase + appImageHeap)
 
     windowsIcon.set(rootProject.file("resources/icons/icon.ico"))
     macosIcon.set(rootProject.file("resources/icons/icon.icns"))

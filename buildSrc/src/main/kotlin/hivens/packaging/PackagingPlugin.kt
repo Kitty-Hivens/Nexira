@@ -99,7 +99,10 @@ class PackagingPlugin : Plugin<Project> {
             vmKind.convention(ext.jlink.vmKind)
             includeLocales.convention(ext.jlink.includeLocales)
             generateCdsArchive.convention(ext.jlink.generateCdsArchive)
-            cdsDumpArgs.convention(cdsDump)
+            // The AppImage dumps its base archive under its own launch line's
+            // module-system flags, for the reason cdsDump gives above.
+            cdsDumpArgs.convention(ext.appImageJvmArgs.map { ModuleSystemArgs.filter(it) })
+            appImageJvmArgs.convention(ext.appImageJvmArgs)
 
             outputFile.convention(
                 project.layout.buildDirectory.file("generated/packaging/packaging-profile.sh")

@@ -38,6 +38,11 @@ import org.gradle.api.tasks.TaskAction
  *     --add-opens=java.desktop/sun.awt.X11=ALL-UNNAMED
  *     --enable-native-access=ALL-UNNAMED
  * )
+ * NEXIRA_APPIMAGE_JVM_OPTIONS=(
+ *     --add-opens=java.desktop/sun.awt.X11=ALL-UNNAMED
+ *     ...
+ *     -XX:+UseG1GC
+ * )
  * ```
  *
  * Bash array form (rather than space-joined string) is deliberate: it
@@ -45,9 +50,10 @@ import org.gradle.api.tasks.TaskAction
  * argv element even if jlink ever gains a flag whose value contains
  * whitespace. The shell script unpacks with `"${NEXIRA_JLINK_OPTIONS[@]}"`.
  *
- * `NEXIRA_JVM_MODULE_OPTIONS` is consumed twice by the script -- once to dump
- * the base CDS archive, once to write the AppRun launch line -- which is the
- * point: [ModuleSystemArgs] explains why those two have to be the same set.
+ * `NEXIRA_JVM_MODULE_OPTIONS` dumps the base CDS archive, and
+ * `NEXIRA_APPIMAGE_JVM_OPTIONS` is the whole AppRun launch line. The first is the
+ * module-system subset of the second, which is the point: [ModuleSystemArgs]
+ * explains why the dump and the launch have to share that set.
  *
  * Inputs are the same `Property` values that [CustomRuntimeTask] reads
  * from [PackagingExtension]. UP-TO-DATE works for free; the script only
@@ -90,6 +96,10 @@ abstract class EmitAppImageProfileTask : DefaultTask() {
     @get:Input
     abstract val cdsDumpArgs: ListProperty<String>
 
+    /** The AppRun's full JVM launch line. */
+    @get:Input
+    abstract val appImageJvmArgs: ListProperty<String>
+
     // ── Output ────────────────────────────────────────────────────────────
 
     @get:OutputFile
@@ -126,6 +136,11 @@ abstract class EmitAppImageProfileTask : DefaultTask() {
             append("NEXIRA_GENERATE_CDS=").append(if (generateCdsArchive.get()) "1" else "0").append("\n")
             append("NEXIRA_JVM_MODULE_OPTIONS=(\n")
             for (flag in cdsDumpArgs.get()) {
+                append("    ").append(flag).append("\n")
+            }
+            append(")\n")
+            append("NEXIRA_APPIMAGE_JVM_OPTIONS=(\n")
+            for (flag in appImageJvmArgs.get()) {
                 append("    ").append(flag).append("\n")
             }
             append(")\n")
