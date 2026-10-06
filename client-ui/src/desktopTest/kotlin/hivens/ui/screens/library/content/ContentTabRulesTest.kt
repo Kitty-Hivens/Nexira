@@ -131,7 +131,10 @@ class ContentTabRulesTest {
     fun `search matches the shown name and the file name, either case`() {
         assertEquals(listOf("sodium.jar"), filterContent(items, "SODIUM", ContentFilter.All).map { it.fileName })
         assertEquals(listOf("faithful.zip"), filterContent(items, "faith", ContentFilter.All).map { it.fileName })
-        assertEquals(listOf("iris.jar"), filterContent(items, ".jar", ContentFilter.Mods).map { it.fileName }.filter { it == "iris.jar" })
+        // The whole result, not one entry picked out of it: a search that stopped
+        // narrowing would still contain the one it was asked about.
+        assertEquals(listOf("sodium.jar", "iris.jar"), filterContent(items, ".jar", ContentFilter.All).map { it.fileName })
+        assertEquals(emptyList(), filterContent(items, "nothing-like-this", ContentFilter.All))
     }
 
     @Test
