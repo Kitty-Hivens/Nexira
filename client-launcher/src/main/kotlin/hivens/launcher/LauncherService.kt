@@ -458,7 +458,7 @@ internal class LauncherService(
  * `process.waitFor()` -- cancelling the launch job does not interrupt it, so
  * the orchestrator sends [terminate] first to let the wait return.
  */
-private class ProcessLaunchHandle(
+internal class ProcessLaunchHandle(
     private val process: Process,
     /** Runs once the game has exited, for what the launch changed only for its own duration. */
     private val afterExit: () -> Unit = {},

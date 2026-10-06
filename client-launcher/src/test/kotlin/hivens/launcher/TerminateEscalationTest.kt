@@ -24,17 +24,10 @@ class TerminateEscalationTest {
 
     private val unix = !System.getProperty("os.name").lowercase().contains("win")
 
-    /** Mirrors ProcessLaunchHandle.terminate, which is private to LauncherService. */
-    private fun terminateWithEscalation(process: Process, graceSeconds: Long) {
-        runCatching { process.destroy() }
-        Thread {
-            val exited = runCatching { process.waitFor(graceSeconds, TimeUnit.SECONDS) }.getOrDefault(false)
-            if (!exited) {
-                runCatching { process.descendants().forEach { it.destroyForcibly() } }
-                runCatching { process.destroyForcibly() }
-            }
-        }.apply { isDaemon = true }.start()
-    }
+    // The handle the launch hands out, not a copy of its code: a copy kept here had
+    // already drifted from the real grace period, and could not fail on the change
+    // that matters, the wait moving onto the caller's thread.
+    private fun terminate(process: Process) = ProcessLaunchHandle(process).terminate()
 
     @Test
     fun `a process that honours SIGTERM exits without being forced`() {
@@ -43,7 +36,7 @@ class TerminateEscalationTest {
         // its own terms rather than being shot. Exit 143 is 128 + SIGTERM.
         val process = ProcessBuilder("sh", "-c", "sleep 60").start()
         try {
-            terminateWithEscalation(process, graceSeconds = 30)
+            terminate(process)
 
             assertTrue(process.waitFor(10, TimeUnit.SECONDS), "SIGTERM should have been enough")
             assertFalse(process.isAlive)
@@ -60,7 +53,7 @@ class TerminateEscalationTest {
         val process = ProcessBuilder("sh", "-c", "trap '' TERM; sleep 60").start()
         try {
             val startedAt = System.nanoTime()
-            terminateWithEscalation(process, graceSeconds = 30)
+            terminate(process)
             val elapsedMs = (System.nanoTime() - startedAt) / 1_000_000
 
             assertTrue(elapsedMs < 1_000, "terminate blocked the caller for ${elapsedMs}ms")
