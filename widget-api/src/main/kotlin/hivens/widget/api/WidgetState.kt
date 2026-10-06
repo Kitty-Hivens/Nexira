@@ -2,11 +2,16 @@ package hivens.widget.api
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
 import hivens.widget.model.WidgetInstance
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.drop
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
@@ -26,6 +31,24 @@ import kotlinx.serialization.serializer
 interface WidgetStateHost {
     fun load(instanceId: String): JsonObject?
     fun store(instanceId: String, value: JsonObject)
+
+    /**
+     * The instances whose latest state the host refused to keep, too large to store.
+     * What is kept for one of them is its last state that fit, so a widget showing
+     * more than that has to say so: the screen and the next start would disagree.
+     * Empty for a host that refuses nothing.
+     */
+    val refused: StateFlow<Set<String>> get() = NOTHING_REFUSED
+}
+
+/** The [WidgetStateHost.refused] of a host that keeps everything. */
+val NOTHING_REFUSED: StateFlow<Set<String>> = MutableStateFlow(emptySet<String>()).asStateFlow()
+
+/** Whether the host refused this instance's latest state. See [WidgetStateHost.refused]. */
+@Composable
+fun WidgetInstance.widgetStateRefused(): Boolean {
+    val refused by LocalWidgetStateHost.current.refused.collectAsState()
+    return instanceId in refused
 }
 
 // Reuse the prop Json: same round-trip needs (ignoreUnknownKeys for cross-version

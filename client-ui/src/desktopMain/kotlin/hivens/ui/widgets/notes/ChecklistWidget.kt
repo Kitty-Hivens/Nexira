@@ -39,10 +39,12 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
+import hivens.ui.theme.Status
 import hivens.ui.widgets.AdaptiveWidget
 import hivens.ui.widgets.scaled
 import hivens.widget.api.rememberProps
 import hivens.widget.api.rememberWidgetState
+import hivens.widget.api.widgetStateRefused
 import hivens.widget.model.PropLabel
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
@@ -84,6 +86,7 @@ fun ChecklistWidget(instance: WidgetInstance) {
     val p = instance.rememberProps<ChecklistProps>()
     val strings = LocalStrings.current
     var state by instance.rememberWidgetState { ChecklistState() }
+    val tooLong = instance.widgetStateRefused()
 
     fun add(text: String) {
         val t = text.trim()
@@ -115,10 +118,12 @@ fun ChecklistWidget(instance: WidgetInstance) {
                     modifier   = Modifier.weight(1f),
                 )
                 Spacer(Modifier.width(8.dp * scale))
+                // As in the notes widget: past what the store keeps, the tally gives
+                // way to the reason.
                 Text(
-                    text  = "$doneCount/${state.items.size}",
+                    text  = if (tooLong) strings.widgetStateTooLong else "$doneCount/${state.items.size}",
                     style = MaterialTheme.typography.labelSmall.scaled(scale),
-                    color = NxInk.quiet,
+                    color = if (tooLong) NxColor.status(Status.Error, text = true) else NxInk.quiet,
                 )
             }
 

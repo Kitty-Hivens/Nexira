@@ -51,6 +51,24 @@ class WidgetStateStoreTest {
     // interactions in the test harness; it is covered for real by flush() above
     // (durability) and by the live Xvfb smoke (type a note -> persists on its own).
 
+    /**
+     * A state past the cap is not kept, and that used to be a log line and nothing
+     * else: the widget showed the text while the next start brought back the last
+     * state that fit. The refusal is named now, and lifted by a state that fits.
+     */
+    @Test
+    fun `a state past the cap is refused out loud, and the last one that fit is what stays`() = runTest {
+        val store = WidgetStateStore(dir.resolve("ws.json"), json, backgroundScope, maxEntryBytes = 64)
+        store.store("a", obj("body" to "short"))
+        store.store("a", obj("body" to "x".repeat(200)))
+
+        assertEquals(setOf("a"), store.refused.value)
+        assertEquals(obj("body" to "short"), store.load("a"))
+
+        store.store("a", obj("body" to "short again"))
+        assertEquals(emptySet(), store.refused.value)
+    }
+
     @Test
     fun `remove prunes one entry`() = runTest {
         val file = dir.resolve("ws.json")

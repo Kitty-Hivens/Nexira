@@ -1512,6 +1512,7 @@ interface AppStrings {
     val thresholdErrorTitle: String
     val thresholdOpenLogs: String
     val thresholdQuit: String
+    val widgetStateTooLong: String
     val thresholdRecovery: String
     val thresholdRecoveryArmed: String
     val thresholdRecoveryHint: String

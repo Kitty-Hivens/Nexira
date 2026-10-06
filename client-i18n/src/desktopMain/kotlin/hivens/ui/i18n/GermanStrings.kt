@@ -1433,6 +1433,7 @@ object GermanStrings : AppStrings {
     override val thresholdErrorTitle     = "start fehlgeschlagen"
     override val thresholdOpenLogs       = "log-ordner öffnen"
     override val thresholdQuit           = "beenden"
+    override val widgetStateTooLong = "Zu lang zum Speichern"
     override val thresholdRecovery = "neustart in wiederherstellung"
     override val thresholdRecoveryArmed = "die wiederherstellung öffnet beim nächsten start"
     override val thresholdRecoveryHint = "die wiederherstellung öffnet auch, wenn der launcher mit --recovery oder NEXIRA_RECOVERY=1 gestartet wird"

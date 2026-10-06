@@ -1438,6 +1438,7 @@ object JapaneseStrings : AppStrings {
     override val thresholdErrorTitle = "起動に失敗"
     override val thresholdOpenLogs = "ログフォルダーを開く"
     override val thresholdQuit = "終了"
+    override val widgetStateTooLong = "長すぎて保存できません"
     override val thresholdRecovery = "リカバリーで再起動"
     override val thresholdRecoveryArmed = "次の起動でリカバリーが開きます"
     override val thresholdRecoveryHint = "--recovery または NEXIRA_RECOVERY=1 を付けて起動してもリカバリーが開きます"
