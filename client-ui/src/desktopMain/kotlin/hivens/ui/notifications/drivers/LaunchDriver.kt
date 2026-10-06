@@ -222,7 +222,6 @@ class LaunchDriver(
     }
 
     private fun onPrepare(target: LaunchTarget, state: LaunchState.Prepare) {
-        val s = stringsProvider()
         indications.setLaunchIndication(target.id, LaunchIndication.Preparing)
         reportActivity(
             target,
@@ -235,9 +234,7 @@ class LaunchDriver(
     }
 
     private fun onDownloading(target: LaunchTarget, state: LaunchState.Downloading) {
-        // null = indeterminate per LaunchIndication.Downloading.progress
-        // contract; NaN sentinel goes only to NotificationEvent.progress
-        // where the renderer branches on isNaN.
+        // null = indeterminate per LaunchIndication.Downloading.progress contract.
         val fraction: Float? = when {
             state.totalBytes > 0L      -> state.downloadedBytes.toFloat() / state.totalBytes
             state.downloadedBytes > 0L -> null
@@ -250,12 +247,6 @@ class LaunchDriver(
             ActivityPhase.Running(state.downloadedBytes, state.totalBytes),
             actions = setOf(ActivityAction.Cancel),
         )
-
-        val s = stringsProvider()
-        val notifProgress: Float = fraction ?: Float.NaN
-        val displayPct =
-            if (fraction == null) s.notifPackSyncIndeterminate
-            else s.notifPackSyncPercent((fraction * 100).toInt())
         // Live progress is the activity surface's job; the notification
         // centre keeps outcomes, which are what its history is for.
     }

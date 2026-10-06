@@ -202,7 +202,11 @@ class GameConsoleService(
                 // so it sits at or near the end. Scanning from the front cost a
                 // walk of the whole window per tick, and a provisioning run is
                 // thousands of ticks.
-                val idx = if (prev != null) buffer.lastIndexOf(prev) else -1
+                //
+                // By identity, as forgetSlot below matches: an entry is a data class,
+                // and an equal line elsewhere in the window, an ordinary line that
+                // reads the same, would be the one replaced.
+                val idx = if (prev != null) lastIndexOfSame(prev) else -1
                 if (idx >= 0) {
                     buffer[idx] = entry
                 } else {
@@ -235,6 +239,15 @@ class GameConsoleService(
             // into the file than the window actually begins.
             if (!forgetSlot(aged)) historyOffset += 1
         }
+    }
+
+    /** The last position holding [entry] itself, not an equal one; -1 when none does. */
+    private fun lastIndexOfSame(entry: LogEntry): Int {
+        val it = buffer.listIterator(buffer.size)
+        while (it.hasPrevious()) {
+            if (it.previous() === entry) return it.nextIndex()
+        }
+        return -1
     }
 
     /**

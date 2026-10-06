@@ -59,22 +59,29 @@ class SessionRegistry(
             abort            = abort,
             showConsole      = showConsole,
         )
-        // update {} is CAS-retry; plain `value = value + ...` is non-atomic
-        // and loses entries under concurrent register/unregister.
-        _active.update { it + (packInstanceId to session) }
-
-        val newJob = appScope.launch(Dispatchers.Default) {
-            while (true) {
-                uptime.value = Duration.between(startedAt, clock())
-                delay(1_000L.milliseconds)
+        // The ticker is stored and the session published as one step, against an
+        // unregister doing the reverse as one step. Published first and stored
+        // after, an unregister landing in between found no ticker to cancel, and the
+        // one stored next ran for the life of the process.
+        synchronized(lock) {
+            val newJob = appScope.launch(Dispatchers.Default) {
+                while (true) {
+                    uptime.value = Duration.between(startedAt, clock())
+                    delay(1_000L.milliseconds)
+                }
             }
+            uptimeJobs.put(packInstanceId, newJob)?.cancel()
+            _active.update { it + (packInstanceId to session) }
         }
-        uptimeJobs.put(packInstanceId, newJob)?.cancel()
         return session
     }
 
     fun unregister(packInstanceId: String) {
-        uptimeJobs.remove(packInstanceId)?.cancel()
-        _active.update { it - packInstanceId }
+        synchronized(lock) {
+            uptimeJobs.remove(packInstanceId)?.cancel()
+            _active.update { it - packInstanceId }
+        }
     }
+
+    private val lock = Any()
 }

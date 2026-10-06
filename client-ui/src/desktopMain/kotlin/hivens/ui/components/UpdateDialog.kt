@@ -29,6 +29,7 @@ import java.nio.file.Paths
 import kotlin.math.roundToInt
 import kotlin.system.exitProcess
 import kotlin.time.Duration.Companion.milliseconds
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -104,6 +105,10 @@ fun UpdateDialog(
                     downloadState = DownloadState.Downloading(dl, total, speed)
                 }
                 downloadState = DownloadState.Ready(path.toString())
+            } catch (e: CancellationException) {
+                // The dialog was dismissed. Not a failed download, and not a state
+                // to write into a composition that is going away.
+                throw e
             } catch (e: Exception) {
                 logger.error("Download failed", e)
                 errorMessage  = e.message ?: s.updateErrorUnknown
@@ -121,6 +126,8 @@ fun UpdateDialog(
         scope.launch {
             try {
                 updateApplicator.scheduleUpdate(Paths.get(installerPath))
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 logger.error("Failed to schedule update", e)
                 errorMessage  = "${s.updateScheduleFailed}: ${e.message}"
