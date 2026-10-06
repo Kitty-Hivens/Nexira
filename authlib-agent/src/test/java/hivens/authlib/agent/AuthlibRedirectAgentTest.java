@@ -5,6 +5,8 @@ import org.junit.jupiter.api.Test;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.io.PrintStream;
+import java.lang.instrument.Instrumentation;
+import java.lang.reflect.Proxy;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -241,6 +243,21 @@ class AuthlibRedirectAgentTest {
         byte[] original = readClassBytes(Sample.class);
         byte[] out = AuthlibRedirectAgent.rewriteConstants(original, java.util.Collections.<String, byte[]>emptyMap());
         assertSame(original, out, "no matching constants -> the input array is returned unchanged");
+    }
+
+    @Test
+    void aFailedRegistrationSaysSo() throws Exception {
+        Instrumentation refusing = (Instrumentation) Proxy.newProxyInstance(
+            AuthlibRedirectAgentTest.class.getClassLoader(),
+            new Class<?>[] { Instrumentation.class },
+            (proxy, method, args) -> {
+                if (method.getName().equals("addTransformer")) throw new IllegalStateException("refused");
+                return null;
+            });
+
+        String err = captureErr(() -> AuthlibRedirectAgent.premain("host=mirror.example", refusing));
+
+        assertTrue(err.contains("could not register the redirect"), "no breadcrumb for a failed registration, got: " + err);
     }
 
     private static String str(byte[] b) {
