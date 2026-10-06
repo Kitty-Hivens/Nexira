@@ -1,6 +1,7 @@
 package hivens.ui.utils
 
 import hivens.core.io.AtomicFiles
+import hivens.ui.bootstrap.RecoveryIo
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -197,6 +198,13 @@ class ConsoleSettingsStore(
     }
 
     private fun save(settings: ConsoleSettings) {
+        // The recovery surface deleted this file to put the console back to its
+        // defaults. Writing the copy in memory would undo that at the next start,
+        // the debounce or the shutdown hook bringing back what was reset.
+        if (RecoveryIo.stateWasReset) {
+            log.debug("Console settings were reset from the recovery surface -- not writing the in-memory copy back")
+            return
+        }
         try {
             AtomicFiles.writeString(settingsFile, json.encodeToString(settings))
         } catch (e: Exception) {

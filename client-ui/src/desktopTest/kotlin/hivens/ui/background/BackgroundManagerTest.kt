@@ -1,5 +1,6 @@
 package hivens.ui.background
 
+import hivens.ui.bootstrap.RecoveryIo
 import kotlinx.serialization.json.Json
 import java.nio.file.Files
 import kotlin.io.path.ExperimentalPathApi
@@ -18,6 +19,7 @@ class BackgroundManagerTest {
 
     @AfterTest
     fun tearDown() {
+        RecoveryIo.resetForTests()
         dir.deleteRecursively()
     }
 
@@ -42,6 +44,19 @@ class BackgroundManagerTest {
     @Test
     fun `nothing changed is nothing written`() {
         val manager = BackgroundManager(dir, json)
+        manager.flush()
+
+        assertFalse(Files.exists(dir.resolve("background.json")))
+    }
+
+    @Test
+    fun `a reset from the recovery surface is not written back over`() {
+        val manager = BackgroundManager(dir, json)
+        manager.update { it.copy(enabled = true) }
+        manager.flush()
+        manager.update { it.copy(blurRadius = 4f) }
+
+        RecoveryIo.resetCustomization(dir)
         manager.flush()
 
         assertFalse(Files.exists(dir.resolve("background.json")))

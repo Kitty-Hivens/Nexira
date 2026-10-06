@@ -1,6 +1,7 @@
 package hivens.ui.background
 
 import hivens.core.io.AtomicFiles
+import hivens.ui.bootstrap.RecoveryIo
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -55,6 +56,12 @@ class BackgroundManager(
         synchronized(lock) {
             val current = _settings.value
             if (current == written) return
+            // The recovery surface deleted the file to put the wallpaper back to its
+            // defaults, and writing the copy in memory would undo that at the next start.
+            if (RecoveryIo.stateWasReset) {
+                logger.debug("Background settings were reset from the recovery surface -- not writing the in-memory copy back")
+                return
+            }
             try {
                 AtomicFiles.writeString(settingsFile, json.encodeToString(current))
                 written = current
