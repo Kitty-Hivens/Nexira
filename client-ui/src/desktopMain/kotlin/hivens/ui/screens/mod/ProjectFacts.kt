@@ -31,6 +31,7 @@ fun loaderLabel(loader: String): String = when (loader.lowercase()) {
     "neoforge" -> "NeoForge"
     "quilt" -> "Quilt"
     "legacy-fabric" -> "Legacy Fabric"
+    "liteloader" -> "LiteLoader"
     "optifine" -> "OptiFine"
     "iris" -> "Iris"
     "canvas" -> "Canvas"

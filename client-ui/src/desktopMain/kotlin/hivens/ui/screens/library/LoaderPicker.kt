@@ -31,7 +31,7 @@ import org.koin.compose.koinInject
 /** The loaders a local pack can be made with, as label and registry id. Null is vanilla. */
 internal val LOADER_CHOICES: List<Pair<String, String?>> = listOf(
     "Vanilla" to null, "Fabric" to "fabric", "Legacy Fabric" to "legacy-fabric", "Forge" to "forge", "NeoForge" to "neoforge",
-    "Quilt" to "quilt",
+    "Quilt" to "quilt", "LiteLoader" to "liteloader",
     "Cleanroom" to "cleanroom", "lwjgl3ify" to "lwjgl3ify",
 )
 

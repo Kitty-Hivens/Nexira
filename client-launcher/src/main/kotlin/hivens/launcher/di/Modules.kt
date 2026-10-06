@@ -44,6 +44,7 @@ import hivens.launcher.platform.PlatformPaths
 import hivens.launcher.runtime.RuntimeProvisioner
 import hivens.launcher.runtime.loader.CleanroomResolver
 import hivens.launcher.runtime.loader.FabricLikeResolver
+import hivens.launcher.runtime.loader.LiteLoaderResolver
 import hivens.launcher.runtime.loader.ForgeLegacyResolver
 import hivens.launcher.runtime.loader.Lwjgl3ifyResolver
 import hivens.launcher.runtime.loader.ForgeResolver
@@ -1114,6 +1115,7 @@ private fun Scope.loaderRegistry(): LoaderRegistry {
             FabricLikeResolver(get(named("direct")), get(), "legacy-fabric", FabricLikeResolver.LEGACY_FABRIC_META, loaderCacheDir),
             CleanroomResolver(get(named("direct")), get(), get(), cacheDir = loaderCacheDir),
             Lwjgl3ifyResolver(get(named("direct")), get(), cacheDir = loaderCacheDir),
+            LiteLoaderResolver(get(named("direct")), get(), cacheDir = loaderCacheDir),
         ),
     )
 }

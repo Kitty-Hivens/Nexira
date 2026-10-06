@@ -220,6 +220,9 @@ class PrismLauncherSource(
                     "net.fabricmc.fabric-loader" -> { loader = "fabric"; loaderVersion = ver }
                     "org.quiltmc.quilt-loader" -> { loader = "quilt"; loaderVersion = ver }
                     "net.legacyfabric.intermediary" -> legacyMappings = true
+                    // LiteLoader beside Forge is a mod in mods/, so only a pack
+                    // with no other loader runs it as its loader.
+                    "com.mumfrey.liteloader" -> if (loader == null) { loader = "liteloader"; loaderVersion = ver }
                 }
             }
         }
