@@ -569,6 +569,22 @@ class UpdateServiceTest {
         assertNull(svc.findAssetForCurrentOS(emptyList(), "v2.0.0"))
     }
 
+    // The installer-over-portable preference, pinned on every host by reporting
+    // Windows for the length of the test. Gated on the real OS instead, it ran
+    // nowhere this project is developed or built.
+    @Test
+    fun `findAssetForCurrentOS picks the Setup installer over the portable ZIP on Windows`() {
+        val svc = createService("{}")
+        val assets = listOf(
+            GitHubAsset("AuraLauncher-2.0.0-Setup.exe", "https://example.com/setup.exe", 50_000_000),
+            GitHubAsset("AuraLauncher-2.0.0-Windows-Portable.zip", "https://example.com/portable.zip", 60_000_000),
+            GitHubAsset("AuraLauncher-2.0.0-x86_64.AppImage", "https://example.com/appimage", 70_000_000),
+        )
+        asOs("Windows 11", "amd64") {
+            assertEquals("AuraLauncher-2.0.0-Setup.exe", svc.findAssetForCurrentOS(assets, "v2.0.0")?.name)
+        }
+    }
+
     @Test
     fun `findAssetForCurrentOS does not select portable ZIP on Windows`() {
         val svc = createService("{}")
@@ -576,10 +592,23 @@ class UpdateServiceTest {
         val assets = listOf(
             GitHubAsset("AuraLauncher-2.0.0-Windows-Portable.zip", "https://example.com/portable.zip", 60_000_000),
         )
-        val os = System.getProperty("os.name").lowercase()
-        if (os.contains("windows")) {
+        asOs("Windows 11", "amd64") {
             // Portable ZIP doesn't end with .exe -- should return null
             assertNull(svc.findAssetForCurrentOS(assets, "v2.0.0"))
+        }
+    }
+
+    /** Runs [block] with the JVM reporting [os] on [arch], and puts the real values back. */
+    private fun asOs(os: String, arch: String, block: () -> Unit) {
+        val originalOs = System.getProperty("os.name")
+        val originalArch = System.getProperty("os.arch")
+        try {
+            System.setProperty("os.name", os)
+            System.setProperty("os.arch", arch)
+            block()
+        } finally {
+            System.setProperty("os.name", originalOs)
+            System.setProperty("os.arch", originalArch)
         }
     }
 
