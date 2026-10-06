@@ -122,6 +122,13 @@ class LayoutGraphRepository(
 
     fun observe(): StateFlow<LayoutGraph> = state.asStateFlow()
 
+    /**
+     * Whether this session leaves the file as it found it: one a newer build wrote,
+     * or one in a form this build cannot read. The graph in memory is then a stand-in
+     * for the file, and what it lacks says nothing about what the file holds.
+     */
+    val isReadOnly: Boolean get() = readOnly
+
     fun value(): LayoutGraph = state.value
 
     /**

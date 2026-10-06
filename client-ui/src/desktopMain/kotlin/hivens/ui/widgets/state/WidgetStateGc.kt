@@ -25,6 +25,11 @@ import kotlin.time.Duration.Companion.milliseconds
  * Live is not the whole of what is kept. [alsoReferenced] names the ids something
  * else will bring back, the saved presets: loading one replaces the graph, and an id
  * the replacement does not carry is not gone for good if another preset still has it.
+ *
+ * Nothing is pruned while the layout is read-only. The graph is then the bundled
+ * default standing in for a file this build will not touch, and the state of every
+ * widget in that file would be swept as orphaned: going back to the build that can
+ * read it brought the arrangement back with every note and list empty.
  */
 @OptIn(FlowPreview::class)
 class WidgetStateGc(
@@ -36,6 +41,7 @@ class WidgetStateGc(
     init {
         scope.launch {
             repo.observe().debounce(GC_DEBOUNCE_MS.milliseconds).collect { graph ->
+                if (repo.isReadOnly) return@collect
                 store.retain(graph.walkInstances().map { it.instanceId }.toSet() + alsoReferenced())
             }
         }

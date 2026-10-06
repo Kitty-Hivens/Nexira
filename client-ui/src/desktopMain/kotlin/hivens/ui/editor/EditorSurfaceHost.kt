@@ -838,7 +838,7 @@ fun EditorSurfaceHost(
                                             meta.name, seeded.seededSlots,
                                         )
                                     }
-                                    layoutRepo.update { seeded.graph }
+                                    controller.loadArrangement(seeded.graph)
                                     onCustomizationChanged(env.customization)
                                     presetPanelOpen = false
                                 }
@@ -880,7 +880,7 @@ fun EditorSurfaceHost(
                             // Only the surfaces the preset is about change. The look and
                             // every other surface stay as the person left them, which is
                             // what separates a shipped arrangement from a saved snapshot.
-                            layoutRepo.update { graph ->
+                            controller.rearrange { graph ->
                                 WidgetGraphReconciler.reconcile(
                                     graph    = graph.withSurfacesFrom(preset),
                                     registry = widgetRegistry,

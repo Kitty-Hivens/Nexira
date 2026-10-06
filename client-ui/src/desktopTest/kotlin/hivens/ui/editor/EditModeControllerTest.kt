@@ -4,6 +4,7 @@ import hivens.ui.layout.LayoutGraphRepository
 import hivens.widget.model.FlowSpec
 import hivens.widget.model.GRID_MAX
 import hivens.widget.model.LayoutGraph
+import hivens.widget.model.ScreenSpec
 import hivens.widget.model.SlotContent
 import hivens.widget.model.SlotId
 import hivens.widget.model.SlotPath
@@ -11,7 +12,9 @@ import hivens.widget.model.SurfaceId
 import hivens.widget.model.SurfaceLayout
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
+import hivens.widget.model.screen
 import hivens.widget.model.traverse
+import hivens.widget.model.walkInstances
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -28,6 +31,7 @@ import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 // Pins the keybind bridge contract: requestEditToggle() is the only
 // mutator of the observable signal the active EditorSurfaceHost watches,
@@ -135,6 +139,53 @@ class EditModeControllerTest {
         val props = repo.value().traverse(path)?.widgets?.single()?.props
         assertEquals(JsonPrimitive(40), props?.get("opacityPct"))
         assertEquals(JsonPrimitive(true), props?.get("collapsed"))
+    }
+
+    // A saved arrangement knows nothing of a screen made after it, and loading it
+    // used to delete that screen along with what was on it. It stays, its link on
+    // the rail comes back, and the load is one step in the history.
+    @Test
+    fun `loading a saved arrangement keeps the screens somebody made and can be undone`() = runBlocking {
+        val repo = LayoutGraphRepository(
+            tmpDir.resolve("layout-graph.json"),
+            Json { ignoreUnknownKeys = true; encodeDefaults = true },
+            scope,
+        ) { LayoutGraph.EMPTY }
+        val ctl = EditModeController(repo, scope)
+        val rail = SurfaceId("appshell.leftrail")
+        val home = SurfaceId("home.new")
+        val note = WidgetInstance(WidgetKind("note"), "note-1", JsonObject(emptyMap()))
+        val screen = ScreenSpec(id = "s1", title = "Mine", surface = SurfaceId("screen.s1"))
+        repo.update {
+            LayoutGraph(
+                surfaces = mapOf(
+                    rail to SurfaceLayout(slots = mapOf(SlotId("top") to SlotContent())),
+                    home to SurfaceLayout(slots = mapOf(SlotId("main") to SlotContent())),
+                    screen.surface to SurfaceLayout(slots = mapOf(SlotId("main") to SlotContent(widgets = listOf(note)))),
+                ),
+                screens = listOf(screen),
+            )
+        }
+        val before = repo.value()
+        val saved = LayoutGraph(
+            surfaces = mapOf(
+                rail to SurfaceLayout(slots = mapOf(SlotId("top") to SlotContent())),
+                home to SurfaceLayout(slots = mapOf(SlotId("main") to SlotContent(
+                    widgets = listOf(WidgetInstance(WidgetKind("clock"), "clock-1", JsonObject(emptyMap()))),
+                ))),
+            ),
+        )
+
+        ctl.loadArrangement(saved)
+        withTimeout(3000) { while (repo.value().traverse(SlotPath(home, SlotId("main")))?.widgets.isNullOrEmpty()) delay(5) }
+
+        val after = repo.value()
+        assertEquals(screen, after.screen("s1"), "the made screen is still there")
+        assertEquals(listOf(note), after.traverse(SlotPath(screen.surface, SlotId("main")))?.widgets, "and what was on it")
+        assertTrue(after.walkInstances().any { it.props["screen"] == JsonPrimitive("s1") }, "the rail links it again")
+
+        ctl.undo()
+        withTimeout(3000) { while (repo.value() != before) delay(5) }
     }
 
     private suspend fun awaitWrap(repo: LayoutGraphRepository, path: SlotPath, expected: Int) {

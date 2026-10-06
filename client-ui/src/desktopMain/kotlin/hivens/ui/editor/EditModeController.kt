@@ -45,6 +45,7 @@ import hivens.widget.model.updateWidgetSurface
 import hivens.widget.model.updateWidgetMotion
 import hivens.widget.model.WidgetMotion
 import hivens.widget.model.updateWidgetProps
+import hivens.widget.model.withScreensFrom
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -426,6 +427,30 @@ class EditModeController(
             history.record(key = null, before = before, after = repo.value())
             publishHistory()
         }
+    }
+
+    /**
+     * Puts a saved arrangement in place of the current one.
+     *
+     * The same two promises a full reset keeps, for the same reason: the screens
+     * somebody made stay, content and all, and the rail keeps a way to each. A
+     * saved arrangement knows nothing of a screen made after it was saved, and
+     * loaded as it stood it deleted that screen, and the widget state behind its
+     * notes went with the next sweep. Recorded like a reset, so loading the wrong
+     * one is a step back rather than a loss.
+     */
+    fun loadArrangement(saved: LayoutGraph) {
+        scope.launch(writeDispatcher) {
+            edit(key = null) { current -> ScreenLinks.ensureLinks(saved.withScreensFrom(current)) }
+        }
+    }
+
+    /**
+     * Changes the arrangement as a whole by [arrange], a shipped arrangement laid
+     * over some of the surfaces. One step in the history, like any other edit.
+     */
+    fun rearrange(arrange: (LayoutGraph) -> LayoutGraph) {
+        scope.launch(writeDispatcher) { edit(key = null, transform = arrange) }
     }
 
     // ── Screens somebody made ──────────────────────────────────────────
