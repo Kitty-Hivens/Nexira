@@ -16,7 +16,6 @@ import androidx.compose.ui.unit.dp
 import hivens.config.ExperimentalProtocolOverride
 import hivens.config.Protocol
 import hivens.core.data.AmberUpdatePolicy
-import hivens.core.data.SettingsData
 import hivens.core.diag.ActionRing
 import hivens.launcher.platform.DataDirMover
 import hivens.launcher.platform.PlatformPaths
@@ -77,7 +76,6 @@ internal fun AdvancedSection(
     paths: PlatformPaths,
     form: SettingsFormState,
     save: () -> Unit,
-    initialSettings: SettingsData,
 ) {
     val s = LocalStrings.current
     val desktop: DesktopIntegration = koinInject()
@@ -87,6 +85,11 @@ internal fun AdvancedSection(
     var desktopDone   by remember { mutableStateOf(false) }
     val moveScope     = rememberCoroutineScope()
     val dialogSettings = rememberFileDialogSettings(s.settingsDataDirMove)
+    // What each debounced field below last saved, so its effect saves a change and
+    // nothing else. Compared with the settings as the screen opened, a field cleared
+    // after a save matched them again and the clear was never written.
+    var savedMimic    by remember { mutableStateOf(form.mimicVersionText) }
+    var savedNewsFeed by remember { mutableStateOf(form.altNewsFeedUrl) }
 
     NxSection(s.settingsSectionUpdates) {
         NxToggle(s.settingsPreReleases, form.preReleasesEnabled, description = s.settingsPreReleasesDesc) {
@@ -187,10 +190,10 @@ internal fun AdvancedSection(
                 }
             }
             LaunchedEffect(form.mimicVersionText) {
-                // Skip the initial-composition fire when the field equals the persisted value.
-                if (form.mimicVersionText == (initialSettings.mimicVersionOverride ?: "")) return@LaunchedEffect
+                if (form.mimicVersionText == savedMimic) return@LaunchedEffect
                 delay(400.milliseconds)
                 save()
+                savedMimic = form.mimicVersionText
             }
         }
     }
@@ -216,9 +219,10 @@ internal fun AdvancedSection(
         )
         PuppetField("settings.altNewsFeed", form.altNewsFeedUrl) { form.altNewsFeedUrl = it }
         LaunchedEffect(form.altNewsFeedUrl) {
-            if (form.altNewsFeedUrl == (initialSettings.altNewsFeedUrl ?: "")) return@LaunchedEffect
+            if (form.altNewsFeedUrl == savedNewsFeed) return@LaunchedEffect
             delay(400.milliseconds)
             save()
+            savedNewsFeed = form.altNewsFeedUrl
         }
     }
 

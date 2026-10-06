@@ -119,10 +119,9 @@ fun SettingsScreen(
                             save = ::save,
                         )
                         SettingsCategory.Advanced -> AdvancedSection(
-                            paths           = paths,
-                            form            = form,
-                            save            = ::save,
-                            initialSettings = initialSettings,
+                            paths = paths,
+                            form  = form,
+                            save  = ::save,
                         )
                         SettingsCategory.Diagnostics -> DiagnosticsSection(
                             paths       = paths,
