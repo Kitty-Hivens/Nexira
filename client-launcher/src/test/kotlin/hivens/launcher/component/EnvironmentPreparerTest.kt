@@ -59,10 +59,29 @@ class EnvironmentPreparerTest {
         val jar = nativeJar("lwjgl-natives.jar", "genuine".toByteArray())
         val nativesDir = (workDir / "bin/natives").also { Files.createDirectories(it) }
         Files.write(nativesDir / hostNativeName(), "tampered".toByteArray())
+        Files.writeString(nativesDir / ".nexira-natives-from", "lwjgl-natives.jar")
 
         svc.prepareNativesFromManifest(workDir, "bin/natives", listOf(jar), rebuild = false)
 
         assertEquals("tampered", Files.readString(nativesDir / hostNativeName()))
+    }
+
+    /**
+     * The folder is named after the Minecraft version alone, so a pack whose loader
+     * changed found the previous loader's natives there and loaded them under its
+     * own LWJGL. A folder built from other jars is built again.
+     */
+    @Test
+    fun `a folder built from other jars is rebuilt`() = runBlocking {
+        val jar = nativeJar("lwjgl-platform-2.9.4+legacyfabric.17-natives-linux.jar", "legacy fabric".toByteArray())
+        val nativesDir = (workDir / "bin/natives").also { Files.createDirectories(it) }
+        Files.write(nativesDir / hostNativeName(), "vanilla".toByteArray())
+        Files.writeString(nativesDir / ".nexira-natives-from", "lwjgl-platform-2.9.4-nightly-20150209-natives-linux.jar")
+
+        svc.prepareNativesFromManifest(workDir, "bin/natives", listOf(jar), rebuild = false)
+
+        assertEquals("legacy fabric", Files.readString(nativesDir / hostNativeName()))
+        assertEquals("lwjgl-platform-2.9.4+legacyfabric.17-natives-linux.jar", Files.readString(nativesDir / ".nexira-natives-from"))
     }
 
     /**

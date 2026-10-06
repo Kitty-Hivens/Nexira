@@ -228,11 +228,11 @@ class RuntimeLoaderTest {
         }
     }
 
-    private fun swapProvisioner(registry: LoaderRegistry, requests: MutableList<String>) = RuntimeProvisioner(
+    private fun swapProvisioner(registry: LoaderRegistry, requests: MutableList<String>, osArch: String = "amd64") = RuntimeProvisioner(
         librariesDir = librariesDir, assetsDir = assetsDir,
         clientProvider = HttpClientProvider { HttpClient(swapEngine(requests)) },
         transfers = testTransferEngine(HttpClientProvider { HttpClient(swapEngine(requests)) }),
-        json = json, loaderRegistry = registry, osName = "Linux", osArch = "amd64",
+        json = json, loaderRegistry = registry, osName = "Linux", osArch = osArch,
         versionManifestUrl = MANIFEST_URL, resourcesBaseUrl = RES_BASE,
     )
 
@@ -276,6 +276,18 @@ class RuntimeLoaderTest {
             rt.natives,
         )
         assertEquals("LWJGL3-NATIVES", rt.natives.single().toFile().readText())
+    }
+
+    @Test
+    fun `an arm64 host takes the plain OS natives when no arm64 build is on offer`() = runTest {
+        // Legacy Fabric publishes one natives jar per OS, each carrying every architecture.
+        val nativeSpec = LibrarySpec(MavenCoord.parse("org.lwjgl:lwjgl:3.3.3:natives-linux"), NATIVE_URL, sha1(nativeBytes), nativeBytes.size.toLong())
+        val profile = LoaderProfile(version = "test", libraries = emptyList(), mainClass = "m", nativesOverride = listOf(nativeSpec))
+        val p = swapProvisioner(LoaderRegistry(listOf(swapResolver(profile))), mutableListOf(), osArch = "aarch64")
+
+        val rt = p.ensureRuntime("1.12.2", "cleanroom", "0.3.0")
+
+        assertEquals(listOf(librariesDir.resolve("org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3-natives-linux.jar")), rt.natives)
     }
 
     @Test

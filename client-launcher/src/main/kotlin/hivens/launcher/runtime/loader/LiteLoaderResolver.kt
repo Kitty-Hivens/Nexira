@@ -4,8 +4,8 @@ import hivens.core.api.HttpClientProvider
 import hivens.launcher.runtime.MavenCoord
 import io.ktor.client.request.prepareGet
 import io.ktor.client.statement.bodyAsText
+import io.ktor.http.HttpStatusCode
 import io.ktor.http.isSuccess
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
@@ -35,9 +35,16 @@ import java.nio.file.Path
  * The index writes its repositories as plain http, and both answer over https,
  * so every fetch is made over https. A snapshot repository keeps the jar under a
  * timestamped name, read out of its `maven-metadata.xml`, and the md5 the index
- * carries does not match the file it serves, so each jar is held to the sha1 its
- * repository publishes beside it instead. A named version's resolved profile is
- * kept, so a relaunch needs no network.
+ * carries for a snapshot does not match the file it serves, so a snapshot is held
+ * to the sha1 its repository publishes beside it. A release in the older ivy
+ * repository has no sha1 beside it, and there the index's md5 is the file's own:
+ * each release is filed under it. A named version's resolved profile is kept, so
+ * a relaunch needs no network.
+ *
+ * The index's `latest` entry repeats one of the builds under a shortened file name
+ * (`liteloader-1.7.10.jar` for the build filed as `liteloader-1.7.10_04.jar`),
+ * which the repository does not serve, so it only says which build is newest and
+ * the build itself is read from its own entry.
  */
 class LiteLoaderResolver(
     private val clientProvider: HttpClientProvider,
@@ -60,7 +67,7 @@ class LiteLoaderResolver(
                 cache.writeText(cache.fileFor(loaderId, "$mcVersion-${it.version}", "profile.json"), json.encodeToString(KeptProfile.serializer(), it))
             }
         LoaderProfile(
-            libraries = profile.libraries.map { LibrarySpec(MavenCoord.parse(it.name), url = it.url, sha1 = it.sha1) },
+            libraries = profile.libraries.map { LibrarySpec(MavenCoord.parse(it.name), url = it.url, sha1 = it.sha1, md5 = it.md5) },
             mainClass = LAUNCHWRAPPER_MAIN,
             version = profile.version,
             gameArgs = listOf("--tweakClass", profile.tweakClass),
@@ -81,7 +88,11 @@ class LiteLoaderResolver(
         } ?: throw IOException("LiteLoader has no build '$named' for Minecraft $mcVersion")
         val jarUrl = jarUrl(entry.repoUrl, entry.repoType, build)
         log.info("liteloader: {} for {} from {}", build.version, mcVersion, jarUrl)
-        val jar = KeptLibrary("com.mumfrey:liteloader:${build.version}", jarUrl, sidecarSha1(jarUrl))
+        val jar = if (entry.repoType == "m2") {
+            KeptLibrary("com.mumfrey:liteloader:${build.version}", jarUrl, sidecarSha1(jarUrl))
+        } else {
+            KeptLibrary("com.mumfrey:liteloader:${build.version}", jarUrl, sidecarSha1(jarUrl), md5 = build.md5)
+        }
         val libraries = build.libraries.map { lib ->
             val coord = MavenCoord.parse(lib.name)
             val base = (lib.url ?: if (coord.group == "net.minecraft") MOJANG_LIBRARIES else MAVEN_CENTRAL).https().trimEnd('/')
@@ -106,17 +117,25 @@ class LiteLoaderResolver(
         return "$dir/liteloader-${build.version.removeSuffix("-SNAPSHOT")}-$timestamp-$number.jar"
     }
 
-    /** The sha1 a repository publishes beside [url], or null when it publishes none. */
-    private suspend fun sidecarSha1(url: String): String? = try {
-        fetchText("$url.sha1").trim().take(40).takeIf { SHA1.matches(it) }
-    } catch (e: CancellationException) {
-        throw e
-    } catch (e: Exception) {
-        log.info("liteloader: no sha1 published for {}, fetched on https alone", url)
-        null
+    /**
+     * The sha1 a repository publishes beside [url], or null when it publishes none.
+     * Any other failure is thrown: answered as "none", it would be kept with the
+     * profile and leave that build unverified for good.
+     */
+    private suspend fun sidecarSha1(url: String): String? {
+        val text = fetchTextOrNull("$url.sha1")
+        if (text == null) log.info("liteloader: no sha1 published for {}", url)
+        return text?.trim()?.take(40)?.takeIf { SHA1.matches(it) }
     }
 
-    private class Build(val version: String, val file: String, val tweakClass: String, val libraries: List<IndexLibrary>, val stable: Boolean)
+    private class Build(
+        val version: String,
+        val file: String,
+        val tweakClass: String,
+        val libraries: List<IndexLibrary>,
+        val stable: Boolean,
+        val md5: String?,
+    )
     private class IndexLibrary(val name: String, val url: String?)
     private class IndexEntry(val repoUrl: String, val repoType: String, val builds: List<Build>)
 
@@ -128,9 +147,13 @@ class LiteLoaderResolver(
         val repoUrl = repo.string("url") ?: return null
         val builds = listOf("artefacts" to true, "snapshots" to false).flatMap { (key, stable) ->
             val stream = version[key]?.jsonObject?.get(ARTIFACT)?.jsonObject ?: return@flatMap emptyList()
-            // "latest" first, then the rest by the index's own order.
-            val ordered = listOfNotNull(stream["latest"]) + stream.filterKeys { it != "latest" }.values
-            ordered.mapNotNull { el -> runCatching { el.jsonObject.toBuild(stable) }.getOrNull() }
+            val latest = runCatching { stream["latest"]?.jsonObject?.string("version") }.getOrNull()
+            val filed = stream.filterKeys { it != "latest" }.values
+                .mapNotNull { el -> runCatching { el.jsonObject.toBuild(stable) }.getOrNull() }
+            // The newest first, the rest in the index's own order. The latest entry
+            // itself is used only when no build is filed on its own.
+            val own = filed.sortedByDescending { it.version == latest }
+            own.ifEmpty { listOfNotNull(runCatching { stream["latest"]?.jsonObject?.toBuild(stable) }.getOrNull()) }
         }.distinctBy { it.version }
         return IndexEntry(repoUrl, repo.string("type") ?: "m2", builds)
     }
@@ -143,7 +166,7 @@ class LiteLoaderResolver(
             val o = el.jsonObject
             o.string("name")?.let { IndexLibrary(it, o.string("url")) }
         }
-        return Build(version, file, tweak, libs, stable)
+        return Build(version, file, tweak, libs, stable, string("md5"))
     }
 
     private fun JsonObject.string(key: String): String? = this[key]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
@@ -151,7 +174,12 @@ class LiteLoaderResolver(
     private fun String.https(): String = if (startsWith("http://")) "https://" + removePrefix("http://") else this
 
     private suspend fun fetchText(url: String): String =
+        fetchTextOrNull(url) ?: throw IOException("GET $url -> HTTP 404")
+
+    /** The body at [url], or null when it is not there. Any other failure throws. */
+    private suspend fun fetchTextOrNull(url: String): String? =
         clientProvider.current.prepareGet(url).execute { resp ->
+            if (resp.status == HttpStatusCode.NotFound) return@execute null
             if (!resp.status.isSuccess()) throw IOException("GET $url -> HTTP ${resp.status}")
             resp.bodyAsText()
         }
@@ -173,4 +201,4 @@ class LiteLoaderResolver(
 internal data class KeptProfile(val version: String, val tweakClass: String, val libraries: List<KeptLibrary>)
 
 @Serializable
-internal data class KeptLibrary(val name: String, val url: String, val sha1: String? = null)
+internal data class KeptLibrary(val name: String, val url: String, val sha1: String? = null, val md5: String? = null)

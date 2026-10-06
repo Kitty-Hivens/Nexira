@@ -124,7 +124,8 @@ internal fun vanillaProfileVersion(root: Path, versionId: String, json: Json): P
     val (loader, loaderVersion) = when {
         // Legacy Fabric runs the same loader over its own mappings, and its meta is
         // the only one that serves the versions it covers.
-        library("net.fabricmc:fabric-loader:") != null && library("net.legacyfabric:intermediary:") != null ->
+        library("net.fabricmc:fabric-loader:") != null &&
+            (library("net.legacyfabric:intermediary:") != null || library("net.legacyfabric.v2:intermediary:") != null) ->
             "legacy-fabric" to library("net.fabricmc:fabric-loader:")
         library("net.fabricmc:fabric-loader:") != null -> "fabric" to library("net.fabricmc:fabric-loader:")
         library("org.quiltmc:quilt-loader:") != null -> "quilt" to library("org.quiltmc:quilt-loader:")

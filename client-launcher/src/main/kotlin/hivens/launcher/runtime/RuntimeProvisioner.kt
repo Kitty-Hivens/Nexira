@@ -90,6 +90,13 @@ class RuntimeProvisioner(
         }
     }
 
+    /** This OS's native classifiers without an architecture, see [ensureRuntime]'s override natives. */
+    private val hostOsClassifiers: Set<String> = when (mojangOs) {
+        "windows" -> setOf("natives-windows")
+        "osx" -> setOf("natives-macos", "natives-osx")
+        else -> setOf("natives-linux")
+    }
+
     /** Resolved vanilla layout: the client jar, the asset index id, the
      *  vanilla library set (with coords, for merging a loader overlay), and
      *  the modern jvm/game arg tokens (empty on legacy versions) that a
@@ -116,6 +123,8 @@ class RuntimeProvisioner(
         val dest: Path,
         val sha1: String,
         val size: Long,
+        /** Held to when there is no [sha1], for a source that publishes only an md5. */
+        val md5: String = "",
     )
 
     /**
@@ -169,7 +178,13 @@ class RuntimeProvisioner(
         // filter as the vanilla natives keeps only this machine's set, so the
         // resolver stays platform-agnostic.
         val overrideNatives = profile.nativesOverride
-            ?.filterNot { isForeignNative(it.coord) }
+            ?.let { natives ->
+                // An arm64 host with no `-arm64` classifier on offer takes the plain
+                // one for its OS: Legacy Fabric publishes only those, each carrying
+                // every architecture, and dropping them left the game no LWJGL at all.
+                natives.filterNot { isForeignNative(it.coord) }
+                    .ifEmpty { natives.filter { it.coord.nativeClassifier in hostOsClassifiers } }
+            }
             ?.map { provision(it, seed) }
             .orEmpty()
         // Processor outputs FML resolves by path under libraryDirectory (the
@@ -240,7 +255,7 @@ class RuntimeProvisioner(
             spec.bundled != null -> placeBundled(dest, spec.bundled, spec.sha1)
             else -> {
                 val url = spec.url ?: throw IOException("library ${spec.coord.groupArtifact} has neither url, bundled bytes, nor a local file")
-                val task = DownloadTask(url, dest, spec.sha1.orEmpty(), spec.size)
+                val task = DownloadTask(url, dest, spec.sha1.orEmpty(), spec.size, spec.md5.orEmpty())
                 seed?.let { adoptFromSeed(task, it) }
                 fetchIfNeeded(task)
             }
@@ -587,7 +602,8 @@ class RuntimeProvisioner(
     private fun DownloadTask.toTransfer(): Transfer = Transfer(
         url = url,
         dest = dest,
-        expect = sha1.takeIf { it.isNotBlank() }?.let { Digest(DigestAlgorithm.SHA1, it) },
+        expect = sha1.takeIf { it.isNotBlank() }?.let { Digest(DigestAlgorithm.SHA1, it) }
+            ?: md5.takeIf { it.isNotBlank() }?.let { Digest(DigestAlgorithm.MD5, it) },
         size = size,
         skip = if (size > 0L) SkipIfPresent.BySize else SkipIfPresent.Presence,
     )

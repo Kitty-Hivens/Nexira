@@ -29,7 +29,11 @@ class LiteLoaderResolverTest {
                 "libraries":[{"name":"net.minecraft:launchwrapper:1.12"},{"name":"org.ow2.asm:asm-all:5.2"}]}}}},
           "1.7.10":{"repo":{"stream":"RELEASE","type":"ivy","url":"http://dl.test/versions/","classifier":"mcpnames"},
             "artefacts":{"com.mumfrey:liteloader":{
-              "latest":{"version":"1.7.10","file":"liteloader-1.7.10.jar","tweakClass":"com.mumfrey.liteloader.launch.LiteLoaderTweaker",
+              "db7235ae":{"version":"1.7.10_00","file":"liteloader-1.7.10_00.jar","md5":"db7235aedb7235aedb7235aedb7235ae","tweakClass":"com.mumfrey.liteloader.launch.LiteLoaderTweaker",
+                "libraries":[{"name":"net.minecraft:launchwrapper:1.11"}]},
+              "63ada46e":{"version":"1.7.10_04","file":"liteloader-1.7.10_04.jar","md5":"63ada46e63ada46e63ada46e63ada46e","tweakClass":"com.mumfrey.liteloader.launch.LiteLoaderTweaker",
+                "libraries":[{"name":"net.minecraft:launchwrapper:1.11"}]},
+              "latest":{"version":"1.7.10_04","file":"liteloader-1.7.10.jar","md5":"63ada46e63ada46e63ada46e63ada46e","tweakClass":"com.mumfrey.liteloader.launch.LiteLoaderTweaker",
                 "libraries":[{"name":"net.minecraft:launchwrapper:1.11"}]}}}}
         }}
     """.trimIndent()
@@ -78,12 +82,28 @@ class LiteLoaderResolverTest {
     }
 
     @Test
-    fun `a released build in an ivy repository is taken by its own file name`() = runTest {
+    fun `a released build in an ivy repository is the newest one's own entry, held to its md5`() = runTest {
+        // The latest entry names a shortened file the repository does not serve.
         val profile = resolver(mutableListOf()).resolve("1.7.10", "")
-        assertEquals(
-            "https://dl.test/versions/com/mumfrey/liteloader/1.7.10/liteloader-1.7.10.jar",
-            profile.libraries.first { it.coord.groupArtifact == "com.mumfrey:liteloader" }.url,
-        )
+        assertEquals("1.7.10_04", profile.version)
+        val jar = profile.libraries.first { it.coord.groupArtifact == "com.mumfrey:liteloader" }
+        assertEquals("https://dl.test/versions/com/mumfrey/liteloader/1.7.10_04/liteloader-1.7.10_04.jar", jar.url)
+        assertEquals("63ada46e63ada46e63ada46e63ada46e", jar.md5)
+    }
+
+    @Test
+    fun `a sha1 that could not be fetched fails the resolve instead of being kept as none`() = runTest {
+        val engine = MockEngine { req ->
+            val url = req.url.toString()
+            when {
+                url == "https://index.test/versions.json" -> respond(index, HttpStatusCode.OK)
+                url.endsWith("/1.12.2-SNAPSHOT/maven-metadata.xml") -> respond(metadata, HttpStatusCode.OK)
+                url.endsWith(".sha1") -> respond("busy", HttpStatusCode.ServiceUnavailable)
+                else -> respond("nope", HttpStatusCode.NotFound)
+            }
+        }
+        val r = LiteLoaderResolver(HttpClientProvider { HttpClient(engine) }, json, null, "https://index.test/versions.json")
+        assertFailsWith<IOException> { r.resolve("1.12.2", "") }
     }
 
     @Test
@@ -113,5 +133,6 @@ class LiteLoaderResolverTest {
     fun `the versions on offer are the index's for that game version`() = runTest {
         val options = resolver(mutableListOf()).availableVersions("1.12.2")
         assertEquals(listOf(LoaderVersionOption("1.12.2-SNAPSHOT", stable = false)), options)
+        assertEquals(listOf("1.7.10_04", "1.7.10_00"), resolver(mutableListOf()).availableVersions("1.7.10").map { it.version })
     }
 }

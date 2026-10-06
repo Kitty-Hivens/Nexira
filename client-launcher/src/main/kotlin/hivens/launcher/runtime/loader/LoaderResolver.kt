@@ -18,6 +18,8 @@ class LibrarySpec(
     val url: String? = null,
     val sha1: String? = null,
     val size: Long = 0,
+    /** Checked when [sha1] is null, for a source that publishes only an md5 (LiteLoader's releases). */
+    val md5: String? = null,
     /**
      * Raw jar bytes when the artifact is bundled inside an installer rather
      * than published at a URL (the Forge universal jar lives in the installer's

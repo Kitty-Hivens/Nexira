@@ -49,13 +49,22 @@ class EnvironmentPreparer {
         // the game process, which is a stronger position than any mod has. The
         // contents are wholly derived from jars already verified on download, so
         // a bound launch re-derives them rather than trusting what it finds.
-        val trustFolder = !rebuild || !allPresent(nativeJars)
+        //
+        // A folder built from other jars is not one to trust either. The folder is
+        // named after the Minecraft version alone, and a pack whose loader changed
+        // (vanilla to Legacy Fabric, which brings its own LWJGL) kept the old
+        // natives, which the new LWJGL then failed to load. The jars it was built
+        // from are written beside it and compared.
+        val source = sourceStamp(nativeJars)
+        val sameSource = runCatching { Files.readString(nativesDir.resolve(SOURCE_STAMP)) }.getOrNull() == source
+        val canRebuild = allPresent(nativeJars)
+        val trustFolder = (!rebuild && sameSource) || !canRebuild
         // A folder whose last extraction did not finish is not one to trust, however
         // loadable it looks: the check below finds one lwjgl library and passes, and
         // the game then dies inside the child JVM on the one that is missing.
         val interrupted = Files.isRegularFile(nativesDir.resolve(EXTRACTING_MARKER))
         if (trustFolder && !interrupted && isFolderValidForOs(nativesDir, osSuffix)) {
-            if (rebuild) {
+            if (!canRebuild && (rebuild || !sameSource)) {
                 // Wiping with no complete source to rebuild from would cost the
                 // instance its natives for a reason the user cannot act on.
                 log.error("Natives cannot be re-derived for $osSuffix -- source jars incomplete, keeping what is on disk")
@@ -89,8 +98,13 @@ class EnvironmentPreparer {
         if (!isFolderValidForOs(nativesDir, osSuffix)) {
             throw IOException("The native libraries for $osSuffix are incomplete, so the game could not start")
         }
+        Files.writeString(nativesDir.resolve(SOURCE_STAMP), source)
         Files.deleteIfExists(nativesDir.resolve(EXTRACTING_MARKER))
     }
+
+    /** The jars a natives folder is built from, by name, which carries the artifact and its version. */
+    private fun sourceStamp(nativeJars: List<Path>): String =
+        nativeJars.map { it.fileName.toString() }.sorted().joinToString("\n")
 
     /** Every declared native jar is on disk, so a rebuild can complete. */
     private fun allPresent(nativeJars: List<Path>): Boolean =
@@ -161,5 +175,8 @@ class EnvironmentPreparer {
     private companion object {
         /** Present while an extraction is under way, so one that died partway is not trusted next time. */
         const val EXTRACTING_MARKER = ".nexira-extracting"
+
+        /** The jars the folder was last built from, see [sourceStamp]. */
+        const val SOURCE_STAMP = ".nexira-natives-from"
     }
 }
