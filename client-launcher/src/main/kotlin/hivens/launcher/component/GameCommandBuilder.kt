@@ -168,9 +168,10 @@ internal class GameCommandBuilder(
             args.addAll(runtime.jvmArgs)
         }
         // A heap typed into the arguments is the one the game gets. See JvmHeapArgs.
-        if (JvmHeapArgs.inArgs(userArgs).isEmpty()) {
-            args.add("-Xms${minOf(memoryMB, 512)}M")
-            args.add("-Xmx${memoryMB}M")
+        if (JvmHeapArgs.maxIn(userArgs).isEmpty()) {
+            val typedMin = JvmHeapArgs.minIn(userArgs).isNotEmpty()
+            if (!typedMin) args.add("-Xms${minOf(memoryMB, 512)}M")
+            args.add("-Xmx${maxOf(memoryMB.toLong(), JvmHeapArgs.minMb(userArgs) ?: 0L)}M")
         }
         addProfilerArgs(args, agentJarPath, metricsOutPath)
         addAuthlibAgentArg(args, authlibAgentJarPath)

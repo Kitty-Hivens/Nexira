@@ -98,9 +98,10 @@ internal fun PackRuntimeSection(
             onAutoSelected = { commit { rt -> rt.copy(fixedMemory = false) } },
             onValueChanged = { commit { rt -> rt.copy(memoryMb = it, fixedMemory = true) } },
         )
-        // What is typed by hand wins, so a heap named in the arguments is the one
-        // the game gets and this setting is left on screen saying it does not apply.
-        val typedHeap = remember(runtime.jvmArgs) { JvmHeapArgs.inArgs(runtime.jvmArgs) }
+        // What is typed by hand wins, so a heap ceiling named in the arguments is the
+        // one the game gets and this setting is left on screen saying it does not
+        // apply. A typed minimum alone leaves the ceiling to this setting.
+        val typedHeap = remember(runtime.jvmArgs) { JvmHeapArgs.maxIn(runtime.jvmArgs) }
         if (typedHeap.isNotEmpty()) {
             NxSettingBlock {
                 Text(

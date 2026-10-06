@@ -169,7 +169,8 @@ class RetiredClientAdopter(
     /** Removes a reservation that will never be finished. */
     private fun discard(dir: Path) {
         runCatching {
-            deleteTree(dir)
+            // Hardlinks into the client being adopted, which stays: its files keep their attributes.
+            deleteTree(dir, clearReadOnly = false)
         }.onFailure { log.warn("adopt: could not remove the unfinished {}", dir, it) }
     }
 

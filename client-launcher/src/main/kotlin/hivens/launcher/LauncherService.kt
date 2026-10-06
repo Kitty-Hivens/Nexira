@@ -152,7 +152,7 @@ internal class LauncherService(
             resolvePackJavaPath(runtime, defaultJava)
         }
 
-        val typedHeap = JvmHeapArgs.inArgs(runtime.jvmArgs)
+        val typedHeap = JvmHeapArgs.maxIn(runtime.jvmArgs)
         if (typedHeap.isEmpty()) {
             log.info("Session initialization (pack): {}, Java: {} (major {}), Heap: {}MB", displayName, javaExec, javaMajor, memory)
         } else {
@@ -178,7 +178,7 @@ internal class LauncherService(
         // 4a. What the mods need and do not have, said before the game is started
         // and never acted on. The loader refuses such a pack minutes later with a
         // crash that names the mod only in its report, if at all.
-        warnAboutDependencies(clientRootPath, onLog)
+        warnAboutDependencies(clientRootPath, manifest.loaderName, onLog)
 
         // 4b. FML's loading screen, set for this launch and put back when the game
         // exits. A config that could not be written leaves the screen as the pack
@@ -311,9 +311,9 @@ internal class LauncherService(
      * meets. A scan that fails is logged and left: the check is advice, and a
      * folder the scanner cannot read is no reason to stop the launch.
      */
-    private suspend fun warnAboutDependencies(clientRootPath: Path, onLog: (String, LauncherLogType) -> Unit) {
+    private suspend fun warnAboutDependencies(clientRootPath: Path, loader: String, onLog: (String, LauncherLogType) -> Unit) {
         val issues = try {
-            dependencyIssues(contentScanner.scan(clientRootPath))
+            dependencyIssues(contentScanner.scanMods(clientRootPath), loader)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {

@@ -1,6 +1,7 @@
 package hivens.launcher.instance
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
@@ -144,7 +145,16 @@ class InstanceContentScanner(
         items
     }
 
-    private fun scanArchives(dir: Path, kind: ContentKind): List<InstalledContent> {
+    /**
+     * The mods folder alone, for a question about mods: the dependency check before
+     * a launch has no use for resource and shader packs. Checks for cancellation
+     * between archives, so a stopped launch does not finish reading the folder.
+     */
+    suspend fun scanMods(instanceDir: Path): List<InstalledContent> = withContext(Dispatchers.IO) {
+        scanArchives(instanceDir.resolve(ContentKind.Mod.folderName()), ContentKind.Mod) { ensureActive() }
+    }
+
+    private fun scanArchives(dir: Path, kind: ContentKind, beforeEach: () -> Unit = {}): List<InstalledContent> {
         if (!dir.isDirectory()) return emptyList()
         val files = Files.list(dir).use { stream ->
             stream.filter { it.isRegularFile() && isArchive(it.name) }.toList()
@@ -157,6 +167,7 @@ class InstanceContentScanner(
         return files
             .filterNot { it.name.endsWith(DISABLED_SUFFIX) && it.name.removeSuffix(DISABLED_SUFFIX) in loadable }
             .mapNotNull {
+                beforeEach()
                 runCatching { read(it, kind) }.getOrElse { e ->
                     log.warn("Skipping unreadable content at {}: {}", it, e.message)
                     null
@@ -235,17 +246,32 @@ class InstanceContentScanner(
             if (fabric != null) add("fabric")
             if (quilt != null) add("quilt")
         }
+        val nested = nestedProvides(zip)
         val meta = when {
             neoforge != null -> parseForgeToml(zip, neoforge)
             forge != null -> parseForgeToml(zip, forge)
             fabric != null -> parseFabric(zip, fabric)
             quilt != null -> parseQuilt(zip, quilt)
-            else -> return@use null
+            // No manifest of its own but mods inside it: Kotlin for Forge ships its
+            // mod only as a nested jar, and it is installed all the same.
+            else -> return@use if (nested.isEmpty()) null else Meta(null, null, null, null, provides = nested)
         }
-        // The game versions come from whichever manifest was parsed; the loaders
-        // come from all of them. Nested jars add what they provide: a library
-        // bundled inside a mod is installed as far as anything requiring it knows.
-        meta.withLoaders(loaders).withProvides(meta.provides + nestedProvides(zip))
+        // The display fields come from whichever manifest was parsed. What the jar
+        // provides and requires comes from every manifest it carries: a jar built
+        // for several loaders can name itself and its needs differently in each,
+        // and the pack's loader decides which requirements count, see
+        // dependencyIssues. Nested jars add what they provide: a library bundled
+        // inside a mod is installed as far as anything requiring it knows.
+        val identities = listOfNotNull(
+            neoforge?.let { forgeIdentity(uncomment(it), "neoforge") { manifestImplementationVersion(zip) } },
+            forge?.let { forgeIdentity(uncomment(it), "forge") { manifestImplementationVersion(zip) } },
+            fabric?.let { runCatching { fabricIdentity(json.parseToJsonElement(it.decodeToString()).jsonObject) }.getOrNull() },
+            quilt?.let { q ->
+                runCatching { json.parseToJsonElement(q.decodeToString()).jsonObject["quilt_loader"]?.jsonObject?.let(::quiltIdentity) }.getOrNull()
+            },
+        )
+        meta.withLoaders(loaders)
+            .withIdentity(identities.flatMap { it.first } + nested, identities.flatMap { it.second }.distinct())
     }
 
     /**
@@ -258,15 +284,15 @@ class InstanceContentScanner(
             .filter { (it.startsWith("META-INF/jars/") || it.startsWith("META-INF/jarjar/")) && it.endsWith(".jar") }
             .toList()
             .flatMap { name ->
-                runCatching {
-                    val bytes = zip.readEntry(name) ?: return@runCatching emptyList()
+                try {
+                    val bytes = zip.readEntry(name) ?: return@flatMap emptyList()
                     val inner = readEntries(bytes, NESTED_MANIFESTS)
                     val jarVersion = { inner["META-INF/MANIFEST.MF"]?.let(::implementationVersion) }
                     when {
                         inner["META-INF/neoforge.mods.toml"] != null ->
-                            forgeIdentity(uncomment(inner.getValue("META-INF/neoforge.mods.toml")), jarVersion).first
+                            forgeIdentity(uncomment(inner.getValue("META-INF/neoforge.mods.toml")), "neoforge", jarVersion).first
                         inner["META-INF/mods.toml"] != null ->
-                            forgeIdentity(uncomment(inner.getValue("META-INF/mods.toml")), jarVersion).first
+                            forgeIdentity(uncomment(inner.getValue("META-INF/mods.toml")), "forge", jarVersion).first
                         inner["fabric.mod.json"] != null ->
                             fabricIdentity(json.parseToJsonElement(inner.getValue("fabric.mod.json").decodeToString()).jsonObject).first
                         inner["quilt.mod.json"] != null ->
@@ -274,8 +300,8 @@ class InstanceContentScanner(
                                 ?.jsonObject?.let { quiltIdentity(it).first }.orEmpty()
                         else -> emptyList()
                     }
-                }.getOrElse {
-                    log.debug("nested jar {} unreadable: {}", name, it.message)
+                } catch (e: Exception) {
+                    log.debug("nested jar {} unreadable: {}", name, e.message)
                     emptyList()
                 }
             }
@@ -299,24 +325,26 @@ class InstanceContentScanner(
         }
         val dependsObject = root["depends"]?.let { runCatching { it.jsonObject }.getOrNull() }
         val depends = dependsObject?.keys?.toList().orEmpty().filterNot { it in PLATFORM_DEPS }
-        val (provides, requires) = fabricIdentity(root)
         return Meta(
             name, version, description, iconPath?.let { readEntryBytes(zip, it) },
             homepageUrl = homepage, license = firstString(root["license"]), authors = authors, dependencies = depends,
             gameVersions = allStrings(dependsObject?.get("minecraft")),
-            provides = provides, requires = requires,
         )
     }
 
     /**
      * A fabric.mod.json's id, its `provides` and its `depends`. A dependency's
-     * value is one predicate or an array of alternatives.
+     * value is one predicate or an array of alternatives. A mod marked for the
+     * server environment is never loaded by a client, so it requires nothing here.
      */
     private fun fabricIdentity(root: JsonObject): Pair<List<ProvidedMod>, List<ModRequirement>> {
         val version = root["version"]?.jsonPrimitive?.contentOrNull
         val ids = listOfNotNull(root["id"]?.jsonPrimitive?.contentOrNull) + allStrings(root["provides"])
+        val serverOnly = root["environment"]?.jsonPrimitive?.contentOrNull == "server"
         val depends = root["depends"]?.let { runCatching { it.jsonObject }.getOrNull() }
-        val requires = depends?.map { (id, value) -> ModRequirement(id, allStrings(value), RangeScheme.Fabric) }.orEmpty()
+        val requires = if (serverOnly) emptyList() else {
+            depends?.map { (id, value) -> ModRequirement(id, allStrings(value), RangeScheme.Fabric, "fabric") }.orEmpty()
+        }
         return ids.map { ProvidedMod(it, version) } to requires
     }
 
@@ -351,12 +379,10 @@ class InstanceContentScanner(
                 }
             }.getOrNull()
         }.orEmpty()
-        val (provides, requires) = loader?.let { quiltIdentity(it) } ?: (emptyList<ProvidedMod>() to emptyList())
         return Meta(
             name, version, description, iconPath?.let { readEntryBytes(zip, it) },
             homepageUrl = homepage, license = firstString(meta?.get("license")), authors = authors, dependencies = depends,
             gameVersions = minecraft,
-            provides = provides, requires = requires,
         )
     }
 
@@ -377,12 +403,16 @@ class InstanceContentScanner(
                 }.getOrNull()
         }
         val requires = loader["depends"]?.let { runCatching { it.jsonArray }.getOrNull() }.orEmpty().mapNotNull { el ->
-            runCatching { el.jsonPrimitive.contentOrNull }.getOrNull()?.let { ModRequirement(it, emptyList(), RangeScheme.Fabric) }
+            runCatching { el.jsonPrimitive.contentOrNull }.getOrNull()?.let { ModRequirement(it, emptyList(), RangeScheme.Fabric, "quilt") }
                 ?: runCatching {
                     val o = el.jsonObject
                     val optional = o["optional"]?.jsonPrimitive?.contentOrNull == "true"
+                    // Conditional on something else not being installed: left out
+                    // rather than judged without the condition.
+                    val conditional = o["unless"] != null
                     val id = o["id"]?.jsonPrimitive?.contentOrNull
-                    if (optional || id == null) null else ModRequirement(id, allStrings(o["versions"]), RangeScheme.Fabric)
+                    if (optional || conditional || id == null) null
+                    else ModRequirement(id, allStrings(o["versions"]), RangeScheme.Fabric, "quilt")
                 }.getOrNull()
         }
         return (own + provided) to requires
@@ -411,20 +441,18 @@ class InstanceContentScanner(
         val license = TOML_LICENSE.tomlValue(text)?.takeIf { it.isNotBlank() }
         val authors = TOML_AUTHORS.tomlValue(text)
             ?.split(',')?.map { it.trim() }?.filter { it.isNotBlank() }.orEmpty()
-        val (provides, requires) = forgeIdentity(text) { manifestImplementationVersion(zip) }
         return Meta(
             name, version, null, logo?.let { readEntryBytes(zip, it) },
             homepageUrl = homepage, license = license, authors = authors,
             gameVersions = listOfNotNull(
                 TOML_MINECRAFT_RANGE.find(text)?.groupValues?.getOrNull(1)?.takeIf { it.isNotBlank() },
             ),
-            provides = provides, requires = requires,
         )
     }
 
-    /** A mods.toml's text with its comment lines dropped. */
+    /** A mods.toml's text with a byte-order mark and its comment lines dropped. */
     private fun uncomment(bytes: ByteArray): String =
-        bytes.decodeToString().lineSequence().filterNot { it.trimStart().startsWith("#") }.joinToString("\n")
+        bytes.decodeToString().removePrefix("\uFEFF").lineSequence().filterNot { it.trimStart().startsWith("#") }.joinToString("\n")
 
     /**
      * Every `[[mods]]` id with its version, and every hard `[[dependencies.<x>]]`
@@ -433,7 +461,7 @@ class InstanceContentScanner(
      * NeoForge, or `side = "SERVER"`, which a client never loads.
      * `${file.jarVersion}` resolves through [jarVersion].
      */
-    private fun forgeIdentity(text: String, jarVersion: () -> String?): Pair<List<ProvidedMod>, List<ModRequirement>> {
+    private fun forgeIdentity(text: String, loader: String, jarVersion: () -> String?): Pair<List<ProvidedMod>, List<ModRequirement>> {
         val tables = tomlTables(text)
         val provides = tables.filter { it.first == "mods" }.mapNotNull { (_, values) ->
             val id = values["modId"] ?: return@mapNotNull null
@@ -451,7 +479,7 @@ class InstanceContentScanner(
                 else -> true
             }
             if (!hard || side == "SERVER") null
-            else ModRequirement(id, listOfNotNull(values["versionRange"]?.takeIf { it.isNotBlank() }), RangeScheme.Maven)
+            else ModRequirement(id, listOfNotNull(values["versionRange"]?.takeIf { it.isNotBlank() }), RangeScheme.Maven, loader)
         }
         return provides to requires
     }
@@ -473,8 +501,10 @@ class InstanceContentScanner(
                 continue
             }
             when {
-                line.startsWith("[[") && line.endsWith("]]") -> {
-                    val name = line.removePrefix("[[").removeSuffix("]]").trim().replace("\"", "").replace("'", "")
+                // `[[mods]] #mandatory` is how the Forge and NeoForge templates write
+                // it, so the header ends at its brackets, not at the line's end.
+                line.startsWith("[[") && line.indexOf("]]") > 2 -> {
+                    val name = line.substring(2, line.indexOf("]]")).trim().replace("\"", "").replace("'", "")
                     current = mutableMapOf()
                     out += name to current
                 }
@@ -622,8 +652,8 @@ class InstanceContentScanner(
     private fun Meta.withLoaders(loaders: List<String>): Meta =
         Meta(name, version, description, icon, homepageUrl, license, authors, dependencies, loaders, gameVersions, provides, requires)
 
-    /** The same metadata with [provides] in place of its own. */
-    private fun Meta.withProvides(provides: List<ProvidedMod>): Meta =
+    /** The same metadata with what the jar [provides] and [requires] across all its manifests. */
+    private fun Meta.withIdentity(provides: List<ProvidedMod>, requires: List<ModRequirement>): Meta =
         Meta(name, version, description, icon, homepageUrl, license, authors, dependencies, loaders, gameVersions, provides.distinct(), requires)
 
     /** Runs the icon through the bound [icons] processor; identity when none is bound or there is no icon. */

@@ -24,22 +24,28 @@ import java.nio.file.attribute.BasicFileAttributes
  * [Files.walkFileTree] does not follow links unless asked, so a link is
  * visited as a file and unlinked.
  *
- * A file Windows marks read-only refuses deletion until the mark is cleared, so a
- * refused delete clears it and tries once more. Elsewhere there is no such
- * attribute and the retry never runs.
+ * On Windows a file marked read-only refuses deletion until the mark is cleared,
+ * so with [clearReadOnly] a refused delete clears it and tries once more. Only
+ * there: elsewhere a refusal is a permission, and setting the DOS view's flag
+ * would only write an extended attribute onto the file that stayed. A caller
+ * whose tree holds hardlinks to files it does not own passes false, since the
+ * mark lives on the file and clearing it through the link clears it on the
+ * original too.
  *
  * Missing [path] is a no-op. Anything that cannot be removed propagates:
  * callers that would rather continue already wrap this in `runCatching`, and
  * swallowing here would hide a half-deleted tree from the ones that would not.
  */
 @Throws(IOException::class)
-fun deleteTree(path: Path) {
+fun deleteTree(path: Path, clearReadOnly: Boolean = true) {
+    val retry = clearReadOnly && IS_WINDOWS
     if (!Files.exists(path, LinkOption.NOFOLLOW_LINKS)) return
     Files.walkFileTree(path, object : SimpleFileVisitor<Path>() {
         override fun visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult {
             try {
                 Files.deleteIfExists(file)
             } catch (e: AccessDeniedException) {
+                if (!retry) throw e
                 // Not a read-only mark, or not a filesystem that has one: the first
                 // refusal is the answer.
                 runCatching { Files.setAttribute(file, "dos:readonly", false, LinkOption.NOFOLLOW_LINKS) }
@@ -55,3 +61,5 @@ fun deleteTree(path: Path) {
         }
     })
 }
+
+private val IS_WINDOWS = System.getProperty("os.name", "").startsWith("Windows", ignoreCase = true)

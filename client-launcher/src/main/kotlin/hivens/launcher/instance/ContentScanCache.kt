@@ -127,7 +127,8 @@ class ContentScanCache(
         // 2: quote-aware TOML values, TOML-over-stub priority, jarVersion resolve.
         // 3: every loader the archive declares, and every game version it names.
         // 4: the ids an archive provides, nested jars included, and its requirements.
-        const val FORMAT = 4
+        // 5: requirements per manifest, a template [[mods]] header, nested-only jars.
+        const val FORMAT = 5
     }
 }
 

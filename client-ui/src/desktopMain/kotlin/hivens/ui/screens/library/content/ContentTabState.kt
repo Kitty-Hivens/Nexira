@@ -233,7 +233,7 @@ internal class ContentTabState(
      * toggle.
      */
     val dependencyProblems: Map<ContentRef, List<DependencyIssue>> by derivedStateOf {
-        dependencyIssues(items.orEmpty())
+        dependencyIssues(items.orEmpty(), instance.cachedManifest?.loaderName)
     }
 
     /** The name of whatever provides mod id [id], for a sentence about it, or the id itself. */

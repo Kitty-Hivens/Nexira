@@ -23,6 +23,12 @@ data class ModRequirement(
     val id: String,
     val ranges: List<String> = emptyList(),
     val scheme: RangeScheme = RangeScheme.Maven,
+    /**
+     * Which manifest said so: `forge`, `neoforge`, `fabric` or `quilt`. A jar built
+     * for several loaders declares its needs per loader, often under different
+     * ids, and only the manifest the pack's loader reads is the one that counts.
+     */
+    val loader: String? = null,
 )
 
 /** What is wrong with one requirement of one installed mod. */
@@ -48,14 +54,25 @@ sealed interface DependencyIssue {
  *
  * A requirement is met by any enabled archive providing the id, nested jars
  * included, so a library bundled inside another mod counts as installed.
+ *
+ * [packLoader] picks which of a multi-loader jar's manifests is read: the one the
+ * pack's loader reads, see [manifestsFor]. Null reads them all.
  */
-fun dependencyIssues(items: List<InstalledContent>): Map<ContentRef, List<DependencyIssue>> {
+fun dependencyIssues(items: List<InstalledContent>, packLoader: String?): Map<ContentRef, List<DependencyIssue>> {
     val mods = items.filter { it.kind == ContentKind.Mod && it.enabled }
     val providers = HashMap<String, MutableList<String?>>()
     for (mod in mods) for (p in mod.provides) providers.getOrPut(p.id.lowercase()) { mutableListOf() } += p.version
+    val accepted = manifestsFor(packLoader)
     val out = LinkedHashMap<ContentRef, List<DependencyIssue>>()
     for (mod in mods) {
-        val issues = mod.requires.mapNotNull { req ->
+        val requires = if (accepted == null) {
+            mod.requires
+        } else {
+            // The first manifest the loader would read, of those this jar carries.
+            val tag = accepted.firstOrNull { t -> mod.requires.any { it.loader == t } }
+            if (tag == null) emptyList() else mod.requires.filter { it.loader == tag }
+        }
+        val issues = requires.mapNotNull { req ->
             val id = req.id.lowercase()
             if (id in PLATFORM_IDS) return@mapNotNull null
             val versions = providers[id] ?: return@mapNotNull DependencyIssue.Missing(req)
@@ -69,10 +86,28 @@ fun dependencyIssues(items: List<InstalledContent>): Map<ContentRef, List<Depend
     return out
 }
 
-/** Ids every loader satisfies itself, which no archive in `mods/` provides. */
+/**
+ * The manifests [packLoader] reads, most specific first, or null when it is not
+ * known and every manifest counts. Quilt loads Fabric mods, NeoForge reads a
+ * Forge mods.toml on the versions it shared with Forge, and the Forge forks read
+ * Forge's. A loader that reads none of them (vanilla, LiteLoader) checks nothing.
+ */
+internal fun manifestsFor(packLoader: String?): List<String>? = when (packLoader?.trim()?.lowercase()) {
+    null, "" -> null
+    "fabric", "legacy-fabric" -> listOf("fabric")
+    "quilt" -> listOf("quilt", "fabric")
+    "neoforge" -> listOf("neoforge", "forge")
+    "forge", "cleanroom", "lwjgl3ify" -> listOf("forge")
+    else -> emptyList()
+}
+
+/**
+ * Ids every loader satisfies itself, which no archive in `mods/` provides.
+ * MixinExtras is one too: Fabric Loader and NeoForge ship it built in.
+ */
 private val PLATFORM_IDS = setOf(
     "minecraft", "java", "forge", "neoforge", "fml", "javafml", "lowcodefml", "mcp",
-    "fabricloader", "fabric-loader", "quilt_loader", "quilt-loader",
+    "fabricloader", "fabric-loader", "quilt_loader", "quilt-loader", "mixinextras",
 )
 
 /**
@@ -83,7 +118,10 @@ private val PLATFORM_IDS = setOf(
  * whatever it likes, and plenty carry the game version in them
  * (`0.6.13+mc1.21.1`, `1.21.1-0.6.13`). Build metadata after `+` is ignored, as
  * semver says. A pre-release that itself starts with a digit is most likely a
- * second version glued on with a dash, and is not guessed at.
+ * second version glued on with a dash, and is not guessed at, and so is one that
+ * is not a known pre-release word: Maven reads `final` or `ga` as the release
+ * itself and an unknown qualifier as after it, so `2.1.0-forge` or
+ * `1.20-Forge-4.0.6` say nothing certain about their order.
  */
 object VersionRanges {
 
@@ -117,8 +155,38 @@ object VersionRanges {
             va.pre == null && vb.pre == null -> 0
             va.pre == null -> 1
             vb.pre == null -> -1
-            else -> va.pre.compareTo(vb.pre)
+            else -> comparePre(va.pre, vb.pre)
         }
+    }
+
+    /** The release parts of [a] and [b] alone, a pre-release on either ignored. */
+    private fun compareRelease(a: String, b: String): Int? {
+        val va = parse(a) ?: return null
+        val vb = parse(b.removeSuffix("-")) ?: return null
+        val size = maxOf(va.release.size, vb.release.size)
+        for (i in 0 until size) {
+            val c = va.release.getOrElse(i) { 0 }.compareTo(vb.release.getOrElse(i) { 0 })
+            if (c != 0) return c
+        }
+        return 0
+    }
+
+    /** Dot-separated identifiers, numbers compared as numbers, as semver and Maven both do. */
+    private fun comparePre(a: String, b: String): Int {
+        val pa = a.split('.')
+        val pb = b.split('.')
+        for (i in 0 until minOf(pa.size, pb.size)) {
+            val na = pa[i].toIntOrNull()
+            val nb = pb[i].toIntOrNull()
+            val c = when {
+                na != null && nb != null -> na.compareTo(nb)
+                na != null -> -1
+                nb != null -> 1
+                else -> pa[i].lowercase().compareTo(pb[i].lowercase())
+            }
+            if (c != 0) return c
+        }
+        return pa.size.compareTo(pb.size)
     }
 
     private class Parsed(val release: List<Int>, val pre: String?)
@@ -127,8 +195,16 @@ object VersionRanges {
         val core = v.trim().removePrefix("v").substringBefore('+')
         if (core.isEmpty()) return null
         val release = core.substringBefore('-')
-        val pre = core.substringAfter('-', "").ifEmpty { null }
-        if (pre != null && pre.first().isDigit()) return null
+        var pre = core.substringAfter('-', "").ifEmpty { null }
+        if (pre != null) {
+            val word = pre.split('.', '-').first().lowercase().trimEnd { it.isDigit() }
+            when {
+                pre.first().isDigit() -> return null
+                word in RELEASE_WORDS && pre.lowercase() == word -> pre = null
+                word !in PRE_RELEASE_WORDS -> return null
+                VERSION_INSIDE.containsMatchIn(pre) -> return null
+            }
+        }
         val parts = release.split('.').map { it.toIntOrNull() ?: return null }
         return Parsed(parts, pre)
     }
@@ -185,6 +261,12 @@ object VersionRanges {
         if (term == "*") return true
         val op = listOf(">=", "<=", ">", "<", "=", "~", "^").firstOrNull { term.startsWith(it) }
         val target = if (op == null) term else term.removePrefix(op)
+        // A trailing dash means "the lowest pre-release of": `>=0.6.0-` admits
+        // 0.6.0-beta.2, and `<1.21-` stops before any 1.21 build.
+        if (target.endsWith("-") && op in setOf(">=", ">", "<", "<=")) {
+            val c = compareRelease(version, target) ?: return null
+            return if (op == ">=" || op == ">") c >= 0 else c < 0
+        }
         if (target.contains('x') || target.contains('X') || target.contains('*')) {
             if (op != null && op != "=") return null
             val prefix = target.substringBefore(".x").substringBefore(".X").substringBefore(".*")
@@ -216,6 +298,15 @@ object VersionRanges {
         val ceiling = kept.toMutableList().also { it[it.lastIndex] = it.last() + 1 }
         return compare(version, ceiling.joinToString("."))?.let { it < 0 }
     }
+
+    /** Words that mark a build before its release, in Maven's and semver's usage. */
+    private val PRE_RELEASE_WORDS = setOf("alpha", "a", "beta", "b", "milestone", "m", "rc", "cr", "pre", "snapshot", "dev")
+
+    /** Words Maven reads as the release itself. */
+    private val RELEASE_WORDS = setOf("final", "ga", "release")
+
+    /** A version written inside a qualifier: `beta-1.20.1` carries a game version, not an order. */
+    private val VERSION_INSIDE = Regex("""\d+\.\d+""")
 
     private val MAVEN_RANGE = Regex("""([\[(])([^,\])]*)(,?)([^\])]*)([\])])""")
 }

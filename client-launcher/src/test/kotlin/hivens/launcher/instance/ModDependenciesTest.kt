@@ -84,7 +84,7 @@ class ModDependenciesTest {
             ),
         )
         val sodium = mod("sodium.jar", listOf(ProvidedMod("sodium", "0.6.13+mc1.21.1")))
-        val issues = dependencyIssues(listOf(options, sodium)).getValue(ContentRef(ContentKind.Mod, "reeses.jar"))
+        val issues = dependencyIssues(listOf(options, sodium), null).getValue(ContentRef(ContentKind.Mod, "reeses.jar"))
         assertEquals(2, issues.size, "platform ids are the loader's business: $issues")
         val wrong = issues.filterIsInstance<DependencyIssue.WrongVersion>().single()
         assertEquals("sodium", wrong.requirement.id)
@@ -96,10 +96,10 @@ class ModDependenciesTest {
     fun `a library nested in another mod counts, and a disabled one does not`() {
         val needs = mod("a.jar", listOf(ProvidedMod("a", "1")), listOf(ModRequirement("fabric-api-base", listOf(">=0.4"), RangeScheme.Fabric)))
         val api = mod("fabric-api.jar", listOf(ProvidedMod("fabric-api", "0.100"), ProvidedMod("fabric-api-base", "0.4.42")))
-        assertTrue(dependencyIssues(listOf(needs, api)).isEmpty())
+        assertTrue(dependencyIssues(listOf(needs, api), null).isEmpty())
 
         val off = mod("fabric-api.jar", api.provides, enabled = false)
-        val issue = dependencyIssues(listOf(needs, off)).getValue(ContentRef(ContentKind.Mod, "a.jar")).single()
+        val issue = dependencyIssues(listOf(needs, off), null).getValue(ContentRef(ContentKind.Mod, "a.jar")).single()
         assertTrue(issue is DependencyIssue.Missing)
     }
 
@@ -107,6 +107,56 @@ class ModDependenciesTest {
     fun `a provider whose version cannot be read is not called too old`() {
         val needs = mod("a.jar", emptyList(), listOf(ModRequirement("lib", listOf("[2.0,)"))))
         val lib = mod("lib.jar", listOf(ProvidedMod("lib", null)))
-        assertTrue(dependencyIssues(listOf(needs, lib)).isEmpty())
+        assertTrue(dependencyIssues(listOf(needs, lib), null).isEmpty())
+    }
+
+    @Test
+    fun `pre-release numbers compare as numbers`() {
+        assertEquals(true, maven("1.0.0-beta.10", "[1.0.0-beta.9,)"))
+        assertEquals(true, fabric("1.0.0-beta.10", ">=1.0.0-beta.9"))
+        assertEquals(true, fabric("0.15.0-rc.2", ">=0.15.0-rc.1"))
+    }
+
+    @Test
+    fun `a qualifier that is not a known pre-release word says nothing`() {
+        assertNull(maven("2.1.0-forge", "[2.1.0,)"))
+        assertNull(maven("1.20-Forge-4.0.6", "[4.0.0,)"), "a game version in front of the mod's own")
+        assertEquals(true, maven("2.1.0-final", "[2.1.0,)"), "final is the release itself")
+    }
+
+    @Test
+    fun `a trailing dash in a fabric bound reaches the pre-releases`() {
+        assertEquals(true, fabric("0.6.0-beta.2", ">=0.6.0-"))
+        assertEquals(false, fabric("1.21-rc.1", "<1.21-"))
+    }
+
+    @Test
+    fun `a multi-loader jar is held to the manifest the pack's loader reads`() {
+        val both = mod(
+            "both.jar", listOf(ProvidedMod("both", "1")),
+            listOf(
+                ModRequirement("kotlinforforge", emptyList(), RangeScheme.Maven, "neoforge"),
+                ModRequirement("fabric-language-kotlin", emptyList(), RangeScheme.Fabric, "fabric"),
+            ),
+        )
+        val flk = mod("flk.jar", listOf(ProvidedMod("fabric-language-kotlin", "1.12")))
+        assertTrue(dependencyIssues(listOf(both, flk), "fabric").isEmpty(), "a Fabric pack does not read the NeoForge manifest")
+        val missing = dependencyIssues(listOf(both, flk), "neoforge").getValue(ContentRef(ContentKind.Mod, "both.jar")).single()
+        assertEquals("kotlinforforge", missing.requirement.id)
+        assertTrue(dependencyIssues(listOf(both), "vanilla").isEmpty(), "vanilla loads no mods to check")
+    }
+
+    @Test
+    fun `quilt reads fabric manifests and neoforge reads forge ones`() {
+        val fabricOnly = mod("f.jar", emptyList(), listOf(ModRequirement("lib", emptyList(), RangeScheme.Fabric, "fabric")))
+        assertTrue(dependencyIssues(listOf(fabricOnly), "quilt").isNotEmpty())
+        val forgeOnly = mod("g.jar", emptyList(), listOf(ModRequirement("lib", emptyList(), RangeScheme.Maven, "forge")))
+        assertTrue(dependencyIssues(listOf(forgeOnly), "neoforge").isNotEmpty())
+    }
+
+    @Test
+    fun `mixinextras is the loader's`() {
+        val needs = mod("a.jar", emptyList(), listOf(ModRequirement("mixinextras", listOf(">=0.3.0"), RangeScheme.Fabric, "fabric")))
+        assertTrue(dependencyIssues(listOf(needs), "fabric").isEmpty())
     }
 }

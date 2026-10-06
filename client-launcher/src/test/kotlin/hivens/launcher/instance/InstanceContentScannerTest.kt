@@ -216,7 +216,7 @@ class InstanceContentScannerTest {
         val item = InstanceContentScanner().scan(dir).single()
 
         assertEquals(listOf(ProvidedMod("reeses_sodium_options", "1.8.3")), item.provides)
-        assertEquals(listOf(ModRequirement("sodium", listOf("[0.8.12,)"), RangeScheme.Maven)), item.requires)
+        assertEquals(listOf(ModRequirement("sodium", listOf("[0.8.12,)"), RangeScheme.Maven, "neoforge")), item.requires)
     }
 
     @Test
@@ -235,10 +235,63 @@ class InstanceContentScannerTest {
         )
         assertEquals(
             listOf(
-                ModRequirement("fabricloader", listOf(">=0.15"), RangeScheme.Fabric),
-                ModRequirement("minecraft", listOf("1.21", "1.21.1"), RangeScheme.Fabric),
+                ModRequirement("fabricloader", listOf(">=0.15"), RangeScheme.Fabric, "fabric"),
+                ModRequirement("minecraft", listOf("1.21", "1.21.1"), RangeScheme.Fabric, "fabric"),
             ),
             item.requires,
         )
+    }
+
+    @Test
+    fun `a template header with a comment after it is still a table`() = runBlocking {
+        val toml = listOf(
+            "﻿modLoader=\"javafml\" #mandatory",
+            "[[mods]] #mandatory",
+            "modId=\"examplemod\" #mandatory",
+            "version=\"1.0.0\"",
+            "[[dependencies.examplemod]] #optional",
+            "modId=\"examplelib\" #mandatory",
+            "mandatory=true",
+            "versionRange=\"[2.0,)\"",
+        ).joinToString("\r\n")
+        zip(dir.resolve("mods/example.jar"), mapOf("META-INF/mods.toml" to toml.toByteArray()))
+
+        val item = InstanceContentScanner().scan(dir).single()
+
+        assertEquals(listOf(ProvidedMod("examplemod", "1.0.0")), item.provides)
+        assertEquals(listOf(ModRequirement("examplelib", listOf("[2.0,)"), RangeScheme.Maven, "forge")), item.requires)
+    }
+
+    @Test
+    fun `a jar whose mod is only nested inside it provides that mod`() = runBlocking {
+        val inner = jarBytes(mapOf(
+            "META-INF/mods.toml" to "[[mods]]\nmodId=\"kotlinforforge\"\nversion=\"4.11.0\"\n".toByteArray(),
+        ))
+        zip(dir.resolve("mods/kotlinforforge-all.jar"), mapOf("META-INF/jarjar/kffmod.jar" to inner))
+
+        val item = InstanceContentScanner().scan(dir).single()
+
+        assertEquals(listOf(ProvidedMod("kotlinforforge", "4.11.0")), item.provides)
+    }
+
+    @Test
+    fun `a multi-loader jar provides every name and keeps each loader's requirements apart`() = runBlocking {
+        zip(dir.resolve("mods/both.jar"), mapOf(
+            "META-INF/neoforge.mods.toml" to "[[mods]]\nmodId=\"both_mod\"\nversion=\"1.0\"\n[[dependencies.both_mod]]\nmodId=\"kotlinforforge\"\ntype=\"required\"\n".toByteArray(),
+            "fabric.mod.json" to """{"id":"both-mod","version":"1.0","depends":{"fabric-language-kotlin":"*"}}""".toByteArray(),
+        ))
+
+        val item = InstanceContentScanner().scan(dir).single()
+
+        assertEquals(setOf("both_mod", "both-mod"), item.provides.map { it.id }.toSet())
+        assertEquals(setOf("neoforge", "fabric"), item.requires.map { it.loader }.toSet())
+    }
+
+    @Test
+    fun `a server-side fabric mod requires nothing of a client`() = runBlocking {
+        zip(dir.resolve("mods/server.jar"), mapOf(
+            "fabric.mod.json" to """{"id":"serverthing","version":"1","environment":"server","depends":{"lib":"*"}}""".toByteArray(),
+        ))
+        assertTrue(InstanceContentScanner().scan(dir).single().requires.isEmpty())
     }
 }

@@ -312,6 +312,12 @@ class LauncherController(
              * construction: it lives on the value the launch coroutine holds.
              */
             val contentFailed: AtomicBoolean = AtomicBoolean(false),
+            /**
+             * Raised when the session guard could not be armed, or died while it
+             * watched, and the game was stopped for it. Read after [contentFailed]
+             * for the same reason, and per launch the same way.
+             */
+            val guardFailed: AtomicBoolean = AtomicBoolean(false),
         ) : Prepared
 
         data object Bail : Prepared
@@ -380,8 +386,6 @@ class LauncherController(
         // The game this launch started, so a stop that interrupts the launch
         // before the wait is armed can still end it.
         var spawned: LaunchHandle? = null
-        // Set when the session guard could not be armed and the game was stopped for it.
-        var guardFailed = false
         try {
             _state.value = LaunchState.Prepare(PrepareStage.INIT, 0.0f)
             onStart()
@@ -438,7 +442,7 @@ class LauncherController(
                             throw e
                         } catch (e: Exception) {
                             logger.error("The session guard could not be armed for {}, stopping the game", label, e)
-                            guardFailed = true
+                            prepared.guardFailed.set(true)
                             runCatching { handle.terminate() }
                         }
                     }
@@ -477,7 +481,7 @@ class LauncherController(
                                 // one. Read before the exit code, which is the
                                 // watchdog's own doing.
                                 prepared.contentFailed.get() -> fail(LaunchError.ContentChangedDuringLaunch)
-                                guardFailed -> fail(LaunchError.Internal("session-guard"))
+                                prepared.guardFailed.get() -> fail(LaunchError.Internal("session-guard"))
                                 exitCode != 0 && !abortToken.get() -> fail(LaunchError.ExitCode(exitCode))
                                 else -> _state.value = LaunchState.Idle
                             }
@@ -493,10 +497,12 @@ class LauncherController(
             // GameRunning with no launch behind it. It is still thrown on below.
             sessionGuard?.cancel()
             // A game the person asked to stop is ended whatever interrupted the
-            // wait. Not otherwise: when the launcher itself is shutting down the
-            // scope is cancelled with no stop requested, and a game the person
-            // chose to leave running on quit has to stay running.
-            if (abortToken.get()) spawned?.let { runCatching { it.terminate() } }
+            // wait, and so is one this launch is about to lose track of through a
+            // failure: the handle is forgotten below, after which no stop could
+            // reach it. Not on a plain cancellation: when the launcher itself is
+            // shutting down the scope is cancelled with no stop requested, and a
+            // game the person chose to leave running on quit has to stay running.
+            if (abortToken.get() || e !is CancellationException) spawned?.let { runCatching { it.terminate() } }
             synchronized(launchLock) {
                 val mine = ownsController(launchTag)
                 if (mine) {
@@ -701,8 +707,10 @@ class LauncherController(
 
         // 5. Spawn binding handed back to launchInternal.
         val contentFailed = AtomicBoolean(false)
+        val guardFailed = AtomicBoolean(false)
         return Prepared.Ready(
             contentFailed = contentFailed,
+            guardFailed = guardFailed,
             spawn = { onLog ->
                 pinLoaderVersion(refreshedInstance.id, manifestSnapshot, launcherService.launchPackClient(
                     sessionData          = session,
@@ -761,7 +769,7 @@ class LauncherController(
                 // write below used to come before it, and a write that threw left a
                 // bound game running with nothing watching it.
                 val guard = if (serverBound && verdict.verified) {
-                    watchSessionContent(handle, clientDir, refreshedInstance, contentFailed)
+                    watchSessionContent(handle, clientDir, refreshedInstance, contentFailed, guardFailed)
                 } else {
                     null
                 }
@@ -806,7 +814,11 @@ class LauncherController(
             runCatchingUnlessStopped {
                 packRepository.update(instanceId) { current ->
                     val cached = current.cachedManifest ?: return@update current
-                    if (cached.loaderVersion.isNotBlank()) current else current.copy(cachedManifest = cached.copy(loaderVersion = resolved))
+                    // Only onto the loader it was resolved for: the loader can be changed
+                    // in the pack's settings while a first launch is still preparing.
+                    val sameLoader = cached.loaderName.equals(manifest.loaderName, ignoreCase = true)
+                    if (cached.loaderVersion.isNotBlank() || !sameLoader) current
+                    else current.copy(cachedManifest = cached.copy(loaderVersion = resolved))
                 }
             }.onFailure { logger.warn("Could not record the loader version {} for {}", resolved, instanceId, it) }
         }
@@ -883,18 +895,36 @@ class LauncherController(
      * running JVM by then, so removing it neither stops the code nor leaves a
      * working install -- what is left to do is take the session away. The instance
      * is reported as it stands, and the repair path is what puts it right.
+     *
+     * A watch that fails is treated like one that could not be armed: the game is
+     * stopped and [guardFailed] says why. Left to the scope's handler it was a log
+     * line, and the bound game ran on with nothing watching it.
      */
     private fun watchSessionContent(
         handle: LaunchHandle,
         clientDir: Path,
         instance: PackInstance,
         contentFailed: AtomicBoolean,
+        guardFailed: AtomicBoolean,
     ): Job = appScope.launch {
-        val findings = LaunchContentWatchdog(
-            sync = smrtSyncService,
-            clientDir = clientDir,
-            expected = modBaseline(instance),
-        ).run()
+        val findings = try {
+            LaunchContentWatchdog(
+                sync = smrtSyncService,
+                clientDir = clientDir,
+                expected = modBaseline(instance),
+            ).run()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            logger.error("The session guard for {} failed while watching, stopping the game", instance.displayName, e)
+            synchronized(launchLock) {
+                if (runningHandle !== handle) return@launch
+                guardFailed.set(true)
+                _state.value = LaunchState.Stopping(handle)
+            }
+            runCatching { handle.terminate() }
+            return@launch
+        }
         if (findings.isEmpty()) return@launch
         // The process this was armed for must still be the controller's live one.
         // An aborted launch stays parked in its blocking wait, so its guard can

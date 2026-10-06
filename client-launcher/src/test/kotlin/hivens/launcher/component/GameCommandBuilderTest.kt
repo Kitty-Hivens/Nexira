@@ -391,6 +391,18 @@ class GameCommandBuilderTest {
     }
 
     @Test
+    fun `a typed minimum alone keeps the builder's ceiling, raised to the minimum`() {
+        // Dropping the ceiling with the minimum handed the game the JVM's default of a
+        // quarter of the machine, which is less than the pack asked for.
+        val small = packCmd("-Xms2G -XX:+UseG1GC", bound = false)
+        assertEquals(listOf("-Xms2G", "-Xmx4096M"), small.filter { it.startsWith("-Xm") })
+        val large = packCmd("-Xms6G", bound = false)
+        assertEquals("-Xmx6144M", large.last { it.startsWith("-Xmx") }, "never a ceiling below the typed minimum")
+        val byPercent = packCmd("-XX:InitialRAMPercentage=25", bound = false)
+        assertEquals(listOf("-Xmx4096M"), byPercent.filter { it.startsWith("-Xm") })
+    }
+
+    @Test
     fun `without a typed heap the builder's applies`() {
         val cmd = packCmd("-XX:+UseZGC", bound = true)
         assertEquals("-Xmx4096M", cmd.last { it.startsWith("-Xmx") })

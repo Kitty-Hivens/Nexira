@@ -195,7 +195,9 @@ class XodusPackRepository(
     private fun load(): List<PackInstance> = runCatching {
         checkSchema()
         migrateLegacyIfNeeded()
-        stampSchema()
+        // On its own: a stamp that could not be written is no reason to show an
+        // empty library over entries that read fine. The next open tries again.
+        runCatching { stampSchema() }.onFailure { log.warn("Pack registry schema stamp could not be written", it) }
         readAll()
     }.getOrElse { e ->
         log.error("Pack registry could not be opened; the library is empty and read-only this session", e)
