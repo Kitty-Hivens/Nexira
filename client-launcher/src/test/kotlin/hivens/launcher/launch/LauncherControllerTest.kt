@@ -45,6 +45,7 @@ import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.awaitCancellation
@@ -1441,6 +1442,79 @@ class LauncherControllerTest {
             )
         }
         assertEquals(LaunchState.Idle, controller.state.value)
+    }
+
+    /**
+     * A stop lands at the launch's next suspension point, and a sign-in that answers
+     * without suspending runs on to that answer. Its error went over the Idle the stop
+     * had just set.
+     */
+    @Test
+    fun `a launch stopped before its sign-in answers does not report the answer`() = runTest {
+        credentialsManager.saveAccount(
+            SessionData(playerName = "tester", uuid = "u", accessToken = "stale", cachedPassword = "pw"),
+            "smartycraft",
+        )
+        every { settingsService.getSettings() } returns SettingsData()
+        lateinit var controller: LauncherController
+        coEvery { authService.login(any(), any(), any()) } answers {
+            controller.abort()
+            throw TwoFactorRequiredException(uid = "uid-stub", login = "tester")
+        }
+        controller = newController(this)
+
+        controller.launchPackInstance(
+            currentSession = SessionData(playerName = "tester", uuid = "u", accessToken = "stale"),
+            packInstance   = scBoundPackInstance(),
+        )
+        advanceUntilIdle()
+
+        assertEquals(LaunchState.Idle, controller.state.value)
+        assertNull(controller.runningPackInstanceId.value)
+    }
+
+    /**
+     * The same stop with a launch started straight after it. The stale error landed
+     * on the new launch, and an error reads as Play: a third launch could be accepted
+     * while the second was still on its way to a game.
+     */
+    @Test
+    fun `a stopped launch does not report its failure over the launch that followed`() = runTest {
+        credentialsManager.saveAccount(
+            SessionData(playerName = "tester", uuid = "u", accessToken = "stale", cachedPassword = "pw"),
+            "smartycraft",
+        )
+        every { settingsService.getSettings() } returns SettingsData()
+        coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/opt/jdk8/bin/java")
+        val handle = mockk<LaunchHandle>()
+        coEvery { handle.awaitExit() } returns 0
+        coEvery {
+            launcherService.launchPackClient(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+        } returns SpawnResult.Started(handle)
+        coJustRun { packRepository.put(any()) }
+        val next = scBoundPackInstance(id = "i-next", authRequirement = null)
+        val session = SessionData(playerName = "tester", uuid = "u", accessToken = "stale")
+        lateinit var controller: LauncherController
+        var nextAccepted = false
+        coEvery { authService.login(any(), any(), any()) } answers {
+            controller.abort()
+            nextAccepted = controller.launchPackInstance(session, next)
+            throw TwoFactorRequiredException(uid = "uid-stub", login = "tester")
+        }
+        controller = newController(this)
+        val states = mutableListOf<LaunchState>()
+        val watcher = launch(UnconfinedTestDispatcher(testScheduler)) { controller.state.toList(states) }
+
+        controller.launchPackInstance(currentSession = session, packInstance = scBoundPackInstance())
+        advanceUntilIdle()
+        watcher.cancel()
+
+        assertTrue(nextAccepted, "the stop reopened the launcher")
+        assertTrue(states.none { it is LaunchState.Error }, "got $states")
+        assertEquals(LaunchState.Idle, controller.state.value, "and the launch that followed ran to its end")
+        coVerify(exactly = 1) {
+            launcherService.launchPackClient(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+        }
     }
 
     @Test

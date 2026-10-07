@@ -261,6 +261,30 @@ class LauncherController(
     private fun ownsController(tag: Any): Boolean = currentLaunchTag === tag
 
     /**
+     * One accepted launch's hold on [_state], for what it writes while it prepares
+     * and spawns.
+     *
+     * A stop during preparation cancels the launch and reopens the gate at once, but
+     * the cancellation lands only at the launch's next suspension point, and it runs
+     * on until then. A stage or an error written in that stretch went over Idle, or
+     * over the launch that had started since. An error there reads as Play, so
+     * another launch could be accepted while that one went on to spawn a game nothing
+     * would track. These writes land only while this launch is the current one and
+     * nobody has stopped it.
+     */
+    private inner class Attempt(private val tag: Any, private val abortToken: AtomicBoolean) {
+        private fun holds(): Boolean = ownsController(tag) && !abortToken.get()
+
+        fun fail(reason: LaunchError, cause: Throwable? = null) {
+            synchronized(launchLock) { if (holds()) this@LauncherController.fail(reason, cause) }
+        }
+
+        fun setStage(stage: PrepareStage, progress: Float) {
+            synchronized(launchLock) { if (holds()) _state.value = LaunchState.Prepare(stage, progress) }
+        }
+    }
+
+    /**
      * The session of the game that is up: which launch it belongs to, where its
      * playtime has been counted up to, and what records it.
      *
@@ -287,8 +311,8 @@ class LauncherController(
 
     /**
      * Outcome of a prepare phase. [Ready] carries the path-specific spawn (and
-     * an optional post-spawn hook); [Bail] means prepare already called [fail]
-     * and the flow must stop WITHOUT overwriting that error state.
+     * an optional post-spawn hook); [Bail] means prepare already reported its
+     * failure through [Attempt.fail] and the flow must stop WITHOUT overwriting it.
      */
     private sealed interface Prepared {
         class Ready(
@@ -335,7 +359,7 @@ class LauncherController(
         onStart: () -> Unit,
         /** Runs under the gate, once this launch is accepted, before anything else can observe it. */
         onAccepted: () -> Unit = {},
-        prepare: suspend CoroutineScope.() -> Prepared,
+        prepare: suspend CoroutineScope.(Attempt) -> Prepared,
     ): Boolean {
         // Tag every log line for this attempt with a stable launchId so a user
         // dump can be sliced per-play-click (`grep launchId=abcd1234 *.log`).
@@ -377,8 +401,9 @@ class LauncherController(
         launchTag: Any,
         abortToken: AtomicBoolean,
         onStart: () -> Unit,
-        prepare: suspend CoroutineScope.() -> Prepared,
+        prepare: suspend CoroutineScope.(Attempt) -> Prepared,
     ) {
+        val attempt = Attempt(launchTag, abortToken)
         // Local, not a field: a field would let an aborted launch's tail cancel
         // the guard of the launch that started after it -- the same shape of
         // race currentAbortToken's KDoc describes.
@@ -387,12 +412,12 @@ class LauncherController(
         // before the wait is armed can still end it.
         var spawned: LaunchHandle? = null
         try {
-            _state.value = LaunchState.Prepare(PrepareStage.INIT, 0.0f)
+            attempt.setStage(PrepareStage.INIT, 0.0f)
             onStart()
             ActionRing.record("Launching: $label (launchId=$launchId)")
 
-            val prepared = when (val r = prepare()) {
-                // prepare() already called fail(); stop without touching _state.
+            val prepared = when (val r = prepare(attempt)) {
+                // prepare() already reported its failure; stop without touching _state.
                 is Prepared.Bail -> {
                     if (ownsController(launchTag)) _runningPackInstanceId.value = null
                     return
@@ -400,7 +425,7 @@ class LauncherController(
                 is Prepared.Ready -> r
             }
 
-            setStage(PrepareStage.LAUNCH, 0.95f)
+            attempt.setStage(PrepareStage.LAUNCH, 0.95f)
             ActionRing.record("Game running: $label")
             emit(LaunchLogEvent.Launching)
 
@@ -409,7 +434,7 @@ class LauncherController(
                 // SC-binding block) to a semantic LaunchError; surface it.
                 is SpawnResult.Failed -> {
                     if (ownsController(launchTag)) _runningPackInstanceId.value = null
-                    fail(result.error)
+                    attempt.fail(result.error)
                 }
                 is SpawnResult.Started -> {
                     val handle = result.handle
@@ -548,7 +573,7 @@ class LauncherController(
             // all when cachedManifest is populated.
             emit(LaunchLogEvent.TargetServer(packInstance.displayName, offline = false))
         },
-        prepare = { preparePackLaunch(currentSession, packInstance, sessionMintedForLaunch) },
+        prepare = { attempt -> preparePackLaunch(attempt, currentSession, packInstance, sessionMintedForLaunch) },
     )
 
     /**
@@ -567,6 +592,7 @@ class LauncherController(
      * recently-played sort).
      */
     private suspend fun preparePackLaunch(
+        attempt: Attempt,
         currentSession: SessionData,
         packInstance: PackInstance,
         sessionMintedForLaunch: Boolean,
@@ -576,7 +602,7 @@ class LauncherController(
         // way: a notification's relaunch, the second-factor retry, a tray entry.
         work.workOn(packInstance.id)?.let { busy ->
             ActionRing.record("Pack launch ${packInstance.displayName}: refused, the instance is busy (${busy.name})")
-            fail(LaunchError.InstanceBusy(busy))
+            attempt.fail(LaunchError.InstanceBusy(busy))
             return Prepared.Bail
         }
 
@@ -585,7 +611,7 @@ class LauncherController(
         // 1. Resolve the manifest snapshot. Stored on the instance after
         // install; one-shot fetch + write-back covers instances that predate
         // the field.
-        setStage(PrepareStage.SYNC, 0.2f)
+        attempt.setStage(PrepareStage.SYNC, 0.2f)
         val (manifestSnapshot, refreshedInstance) = resolveOrFetchManifest(packInstance)
 
         // 2. Local sanity: instance directory must exist before we run a network
@@ -595,7 +621,7 @@ class LauncherController(
             .resolve("instances")
             .resolve(refreshedInstance.instanceDirName)
         if (!Files.exists(clientDir)) {
-            fail(LaunchError.OfflineNoClient)
+            attempt.fail(LaunchError.OfflineNoClient)
             return Prepared.Bail
         }
 
@@ -649,7 +675,7 @@ class LauncherController(
         // and the launch would go on with no token and no word about why, over files
         // the launcher can simply fetch. So it fetches them and asks again.
         val verdict = if (serverBound && !firstLook.verified && !settings.isOfflineMode) {
-            catchUpWithPack(clientDir, refreshedInstance, firstLook)
+            catchUpWithPack(attempt, clientDir, refreshedInstance, firstLook)
         } else {
             firstLook
         }
@@ -689,8 +715,8 @@ class LauncherController(
                 currentSession.toOffline()
             }
         } else {
-            setStage(PrepareStage.AUTH, 0.4f)
-            session = preparePackAuth(authRequirement, currentSession, refreshedInstance, sessionMintedForLaunch)
+            attempt.setStage(PrepareStage.AUTH, 0.4f)
+            session = preparePackAuth(attempt, authRequirement, currentSession, refreshedInstance, sessionMintedForLaunch)
                 ?: return Prepared.Bail
         }
 
@@ -700,7 +726,7 @@ class LauncherController(
         // legacy-Forge-1.12.2 -> 8), so the version-keyed heuristic stays out of
         // the controller. We only pass the user's explicit global setting; null
         // means "let the service provision."
-        setStage(PrepareStage.JVM, 0.7f)
+        attempt.setStage(PrepareStage.JVM, 0.7f)
         val javaOverride: Path? = settings.javaPath
             ?.takeIf { it.isNotEmpty() }
             ?.let { Path.of(it) }
@@ -846,12 +872,13 @@ class LauncherController(
      * proceed unverified. What changes is only whether it needed to.
      */
     private suspend fun catchUpWithPack(
+        attempt: Attempt,
         clientDir: Path,
         instance: PackInstance,
         firstLook: RosterVerdict,
     ): RosterVerdict {
         val version = instance.pinnedPackVersion ?: instance.packRef.version
-        setStage(PrepareStage.SYNC, 0.25f)
+        attempt.setStage(PrepareStage.SYNC, 0.25f)
         ActionRing.record(
             "Pack launch ${instance.displayName}: instance does not match the pack, fetching what is missing",
         )
@@ -865,7 +892,7 @@ class LauncherController(
             smrtSyncService.verifyAndRepair(clientDir, manifest, enabled) { current, total, path ->
                 // The SYNC stage's own sub-range, so the bar moves during what is
                 // otherwise a silent wait on a hundred-file walk.
-                setStage(PrepareStage.SYNC, 0.25f + 0.25f * (if (total > 0) current.toFloat() / total else 0f))
+                attempt.setStage(PrepareStage.SYNC, 0.25f + 0.25f * (if (total > 0) current.toFloat() / total else 0f))
             }
         }.onFailure {
             logger.warn("Pack launch {}: could not bring the instance in line: {}", instance.displayName, it.toString())
@@ -1025,6 +1052,7 @@ class LauncherController(
      * was earned for it. A newly registered provider activates its gate on its own.
      */
     private suspend fun preparePackAuth(
+        attempt: Attempt,
         requirement: PackAuthRequirement,
         currentSession: SessionData,
         instance: PackInstance,
@@ -1033,9 +1061,9 @@ class LauncherController(
         val scSatisfiable = authProviderRegistry.contains(PackAuthRequirement.SmartyCraft.PROVIDER_KEY)
         return when (requirement) {
             is PackAuthRequirement.SmartyCraft ->
-                if (scSatisfiable) prepareScAuth(requirement.serverId, currentSession, instance, sessionMintedForLaunch) else currentSession
+                if (scSatisfiable) prepareScAuth(attempt, requirement.serverId, currentSession, instance, sessionMintedForLaunch) else currentSession
             is PackAuthRequirement.Both ->
-                if (scSatisfiable) prepareScAuth(requirement.serverId, currentSession, instance, sessionMintedForLaunch) else currentSession
+                if (scSatisfiable) prepareScAuth(attempt, requirement.serverId, currentSession, instance, sessionMintedForLaunch) else currentSession
             PackAuthRequirement.Microsoft ->
                 if (!authProviderRegistry.contains(PackAuthRequirement.Microsoft.PROVIDER_KEY)) {
                     currentSession.toOffline()
@@ -1045,7 +1073,7 @@ class LauncherController(
                             ActionRing.record(
                                 "Pack launch ${instance.displayName}: Microsoft account required, none signed in",
                             )
-                            fail(LaunchError.MissingAuthProvider(PackAuthRequirement.Microsoft.PROVIDER_KEY))
+                            attempt.fail(LaunchError.MissingAuthProvider(PackAuthRequirement.Microsoft.PROVIDER_KEY))
                             null
                         }
                 }
@@ -1055,7 +1083,7 @@ class LauncherController(
     /**
      * SmartyCraft pre-spawn re-auth for an SC-bound pack. Returns the refreshed
      * [SessionData], a 2FA-fallback session with the cached manifest attached, or
-     * null after [fail] has already set the error state -- the caller bails on
+     * null after [Attempt.fail] has already reported the error -- the caller bails on
      * null.
      *
      * Precondition: missing player + password fails with
@@ -1064,6 +1092,7 @@ class LauncherController(
      * diagnosis is unambiguous.
      */
     private suspend fun prepareScAuth(
+        attempt: Attempt,
         serverId: String,
         currentSession: SessionData,
         instance: PackInstance,
@@ -1105,7 +1134,7 @@ class LauncherController(
             ActionRing.record(
                 "Pack launch ${instance.displayName}: missing SC credentials for '$serverId'",
             )
-            fail(LaunchError.MissingAuthProvider(PackAuthRequirement.SmartyCraft.PROVIDER_KEY))
+            attempt.fail(LaunchError.MissingAuthProvider(PackAuthRequirement.SmartyCraft.PROVIDER_KEY))
             return null
         }
         if (currentSession.twoFactor && !currentSession.mintedNow) {
@@ -1115,7 +1144,7 @@ class LauncherController(
             // and the player would find out only when the server refuses the join.
             // One code per launch buys a token that is known good at spawn time.
             // The UI answers this by prompting and relaunching with the fresh session.
-            fail(LaunchError.TwoFactorExpired)
+            attempt.fail(LaunchError.TwoFactorExpired)
             return null
         }
         return try {
@@ -1134,7 +1163,7 @@ class LauncherController(
             // path above.
             emit(LaunchLogEvent.TwoFactorDetected)
             ActionRing.record("Pack launch ${instance.displayName}: second factor required for '$serverId'")
-            fail(LaunchError.TwoFactorExpired)
+            attempt.fail(LaunchError.TwoFactorExpired)
             null
         } catch (e: CancellationException) {
             // The launch was stopped while it signed in. Caught below, the stop was
@@ -1258,8 +1287,4 @@ class LauncherController(
      */
     private inline fun <T> runCatchingUnlessStopped(block: () -> T): Result<T> =
         runCatching(block).onFailure { if (it is CancellationException) throw it }
-
-    private fun setStage(stage: PrepareStage, progress: Float) {
-        _state.value = LaunchState.Prepare(stage, progress)
-    }
 }
