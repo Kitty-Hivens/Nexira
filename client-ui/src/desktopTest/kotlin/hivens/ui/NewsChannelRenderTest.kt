@@ -62,8 +62,11 @@ class NewsChannelRenderTest {
             else NewsPage(items = items, page = 1, totalPages = 1)
     }
 
+    // On the event thread: the rail subscribes a snapshotFlow (see onEventThread).
+    private fun sheet(name: String, dark: Boolean, body: @Composable () -> Unit) = onEventThread { drawSheet(name, dark, body) }
+
     @OptIn(ExperimentalComposeUiApi::class)
-    private fun sheet(name: String, dark: Boolean, body: @Composable () -> Unit) {
+    private fun drawSheet(name: String, dark: Boolean, body: @Composable () -> Unit) {
         val d = 2f
         val scene = ImageComposeScene((320 * d).toInt(), (300 * d).toInt(), density = Density(d)) {
             LocaleProvider(AppLocale.RUSSIAN) {

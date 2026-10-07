@@ -43,17 +43,24 @@ class CompactNewsFeedChannelTest {
         val upstream = CountingFeed("upstream")
         val curated = CountingFeed("curated")
         val feed = mutableStateOf<INewsFeed>(upstream)
-        val scene = ImageComposeScene(320, 300, density = Density(1f)) {
-            NxTheme(dark = true) { CompactNewsFeed(maxItems = 4, feed = feed.value) }
+        // Built and drawn on the event thread: the rail subscribes a snapshotFlow.
+        val scene = onEventThread {
+            ImageComposeScene(320, 300, density = Density(1f)) {
+                NxTheme(dark = true) { CompactNewsFeed(maxItems = 4, feed = feed.value) }
+            }
         }
         var t = 0L
-        fun pump() = repeat(20) { scene.render(t).close(); t += FRAME_NANOS; Thread.sleep(5) }
+        fun pump() = repeat(20) {
+            onEventThread { scene.render(t).close() }
+            t += FRAME_NANOS
+            Thread.sleep(5)
+        }
 
         pump()
         assertTrue(upstream.firstPages.get() > 0, "the first channel never loaded")
-        feed.value = curated
+        onEventThread { feed.value = curated }
         pump()
-        scene.close()
+        onEventThread { scene.close() }
 
         assertTrue(curated.firstPages.get() > 0, "the old channel's rows stayed up under the new one")
     }
