@@ -12,12 +12,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalWindowInfo
 import hivens.ui.customization.LocalCustomization
 import hivens.ui.theme.LocalScheme
 import hivens.ui.theme.NxInk
+import kotlinx.coroutines.delay
 import kotlin.math.PI
 import kotlin.math.floor
 import kotlin.math.sin
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * What a field of particles is: a closed set of characters, like an arrival.
@@ -77,11 +80,21 @@ fun NxParticleField(
     // Held on its first frame when the person asked for less movement: the field
     // still decorates, it just stops drifting, and stops costing a frame a frame.
     val still = LocalCustomization.current.reduceMotion
+    // The two bounds the skin view puts on its own loop, for the same reasons.
+    // Asking for every frame keeps the compositor redrawing at the panel's rate,
+    // so the loop sleeps a floor first and asks for a frame second. And it stops
+    // while the window is not focused, which with the launcher behind a running
+    // game is the whole session: a field nobody is looking at is not drawn. It
+    // carries on from where it stood when focus comes back.
+    val windowFocused = LocalWindowInfo.current.isWindowFocused
     var nanos by remember { mutableLongStateOf(0L) }
-    LaunchedEffect(still) {
-        if (still) return@LaunchedEffect
+    LaunchedEffect(still, windowFocused) {
+        if (still || !windowFocused) return@LaunchedEffect
         val start = withFrameNanos { it } - nanos
-        while (true) withFrameNanos { nanos = it - start }
+        while (true) {
+            delay(MIN_ADVANCE_MS.milliseconds)
+            withFrameNanos { nanos = it - start }
+        }
     }
     Canvas(modifier.graphicsLayer()) {
         // Read here and only here, so a frame is a draw of this layer and not a
@@ -188,6 +201,9 @@ internal fun rand(i: Int, k: Int): Float {
 }
 
 private const val TAU = (2.0 * PI).toFloat()
+
+/** Floor on the interval between two advances of the field's clock, about thirty a second. */
+private const val MIN_ADVANCE_MS = 33L
 
 /** A ceiling on motes per field: a frame at this count is one cheap pass, a full window at Rich is under it. */
 internal const val MAX_MOTES = 700
