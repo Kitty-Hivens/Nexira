@@ -59,6 +59,11 @@ import hivens.ui.theme.NxColor
  * and in what order the entries are presented. [unavailable] replaces the empty
  * state and its retry for a channel that cannot work as configured -- a retry that
  * can never succeed is worse than a sentence saying what is missing.
+ *
+ * Everything loaded is the channel's, so a new [feed] starts over from nothing,
+ * the way the browse screen keys its state on the source it asks. The widget
+ * swaps channels in place, and kept, the old channel's rows stayed up under the
+ * new one's policy and its pages went on arriving at the end of the list.
  */
 @Composable
 fun CompactNewsFeed(
@@ -69,6 +74,21 @@ fun CompactNewsFeed(
     feed: INewsFeed = koinInject(),
     unavailable: String? = null,
     modifier: Modifier = Modifier,
+) {
+    key(feed) {
+        CompactNewsFeedOf(sslBypass, maxItems, showTitle, imageSource, feed, unavailable, modifier)
+    }
+}
+
+@Composable
+private fun CompactNewsFeedOf(
+    sslBypass: Boolean,
+    maxItems: Int,
+    showTitle: Boolean,
+    imageSource: NewsImageSource,
+    feed: INewsFeed,
+    unavailable: String?,
+    modifier: Modifier,
 ) {
     val protocolConfig: ServerProtocolConfig = koinInject()
     val s       = LocalStrings.current

@@ -90,6 +90,16 @@ internal fun AdvancedSection(
     // after a save matched them again and the clear was never written.
     var savedMimic    by remember { mutableStateOf(form.mimicVersionText) }
     var savedNewsFeed by remember { mutableStateOf(form.altNewsFeedUrl) }
+    // Leaving the category, or Settings, cancels those two effects with whatever
+    // they had not written yet, and coming back found nothing to save because the
+    // field already held the text. Written on the way out instead, as the pack
+    // settings sheet does with its own settling edit.
+    val currentSave by rememberUpdatedState(save)
+    DisposableEffect(Unit) {
+        onDispose {
+            if (form.mimicVersionText != savedMimic || form.altNewsFeedUrl != savedNewsFeed) currentSave()
+        }
+    }
 
     NxSection(s.settingsSectionUpdates) {
         NxToggle(s.settingsPreReleases, form.preReleasesEnabled, description = s.settingsPreReleasesDesc) {

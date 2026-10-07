@@ -34,6 +34,7 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -164,7 +165,8 @@ fun VideoPlayer(
     val togglePlayback = {
         when {
             isPlaying -> player.pause()
-            ended     -> player.seek(0L)
+            // The keyframe at zero is zero, so inexact lands in the same place.
+            ended     -> player.seek(0L, exact = false)
             else      -> player.resume()
         }
     }
@@ -237,8 +239,12 @@ fun VideoPlayer(
                     positionNanos = (frac * durationNanos).toLong()
                     if (durationNanos > 0) player.seek((frac * durationNanos).toLong(), exact = false)
                 },
+                // Inexact on release too. The player decodes on the GPU where it can,
+                // and an exact landing there ends it now and then, for the reason
+                // WallpaperSession.seek measures: a few dozen scrubs and the video
+                // was "video error" until the widget was mounted again.
                 onScrubEnd    = { frac ->
-                    if (durationNanos > 0) player.seek((frac * durationNanos).toLong(), exact = true)
+                    if (durationNanos > 0) player.seek((frac * durationNanos).toLong(), exact = false)
                     scrubbing = false
                 },
                 onToggleMute  = { muted = !muted },
@@ -450,8 +456,13 @@ private fun VideoControls(
 
 /**
  * Thin track + draggable handle reporting a 0..1 fraction. Drives both the
- * scrubber (with start/end so the player seeks inexact-while-dragging,
- * exact-on-release) and the volume bar (change only).
+ * scrubber (with start/end so the drag and its release are told apart) and the
+ * volume bar (change only).
+ *
+ * The callbacks are read through [rememberUpdatedState], as the shared playback
+ * scrubber does. The gesture never restarts, and the scrubber's close over the
+ * duration: one composed while the player was still opening kept a duration of
+ * zero, and dragging did nothing until the controls hid and came back.
  */
 @Composable
 private fun MediaSlider(
@@ -462,6 +473,9 @@ private fun MediaSlider(
     onEnd: (Float) -> Unit = {},
 ) {
     var widthPx by remember { mutableStateOf(1) }
+    val start by rememberUpdatedState(onStart)
+    val change by rememberUpdatedState(onChange)
+    val end by rememberUpdatedState(onEnd)
     Box(
         modifier = modifier
             .height(16.dp)
@@ -472,18 +486,18 @@ private fun MediaSlider(
                     // Consumed so the picture's play/pause click does not also
                     // fire: a tap on the scrubber is a seek, not a pause.
                     down.consume()
-                    onStart()
+                    start()
                     var frac = (down.position.x / widthPx).coerceIn(0f, 1f)
-                    onChange(frac)
-                    // finally: a cancelled drag must still release (commit the exact seek).
+                    change(frac)
+                    // finally: a cancelled drag must still release (commit the seek).
                     try {
-                        drag(down.id) { change ->
-                            frac = (change.position.x / widthPx).coerceIn(0f, 1f)
-                            onChange(frac)
-                            change.consume()
+                        drag(down.id) { moved ->
+                            frac = (moved.position.x / widthPx).coerceIn(0f, 1f)
+                            change(frac)
+                            moved.consume()
                         }
                     } finally {
-                        onEnd(frac)
+                        end(frac)
                     }
                 }
             },
