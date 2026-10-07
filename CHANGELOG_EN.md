@@ -18,11 +18,11 @@ verbatim and a hand-wrapped line becomes a staircase of breaks.
 
 ## [Unreleased]
 
-The music player is now ten different players, and you pick the one that suits the place you put it. A card led by the cover, one that takes on the colour of the record it is playing, a plain readout for a folder of loose files with no artwork in them, a tile that is nothing but the cover until you point at it, a disc, a token the size of a single cell, and several built around the shape of the track itself. The player you already had is replaced by the cover-led card and keeps its place on your screen.
+There are ten player widgets now instead of four, and you pick the one that suits the place you put it. Beside the card led by the cover, the one that takes on the colour of the record it is playing, the plain readout and the one that fills up as the track plays, there is a tile that is nothing but the cover until you point at it, a disc, a token the size of a single cell, and several built around the shape of the track itself. The music card Home had before is replaced by the cover-led card and keeps its place on your screen.
 
 Four of them draw the track. The launcher reads the file once and works out its shape, so what you see is the outline of that actual piece of music rather than a bar filling up, and the part already played is inked. It takes about a second per file, once, in the background, and a file it cannot measure simply stays flat instead of leaving a hole.
 
-You can load several files at a time and they become a queue. Skip forward and back, repeat one track or the whole queue, drop an entry you did not want. The queue and your place in it are still there after a restart, and nothing is opened until you press play.
+The queue and your place in it are still there after a restart, and nothing is opened until you press play.
 
 Your desktop now knows what is playing. Media keys work, the media widget shows the track, the artist and the cover, and its buttons drive the launcher. In the system volume panel the sound appears as Nexira with its own icon instead of an unnamed Java process, so you can turn it down on its own, send it to another output or point an effects rule at it.
 
@@ -70,7 +70,7 @@ Opening the launcher after using a newer version no longer rewrites your saved a
 
 Signing out of everything really signs you out: the next start no longer signs you back in offline under your old offline name. The profile no longer freezes while the system keyring is slow to answer.
 
-Crash reports and diagnostic bundles no longer include your account name, and a game's login is forgotten once the game has closed. A pack can no longer make the launcher download from an unencrypted address. A mod update that arrives damaged is downloaded again rather than failing.
+Crash reports and diagnostic bundles no longer include your account name, and the launcher lets go of the login it handed a game once that game has closed. A pack can no longer make the launcher download from an unencrypted address. A mod update that arrives damaged is downloaded again rather than failing.
 
 A run of small things that worked in one place and not in the next now work in both. A mod you install finishes with everything it needs even if you leave the page, and a skin you apply in the wardrobe still lands if you leave before it answers. Uploading a skin also works right after the launcher signs you in on its own. Loading a saved layout keeps the screens you made yourself, and it can be undone. A drag in the editor cut short with Esc no longer leaves the mouse pointer hidden, and a damaged layout file no longer sends the launcher into a restart loop. A layout file that cannot be read is kept as it is instead of being replaced by the default the first time you edit something, and the launcher tells you so.
 
