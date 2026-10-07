@@ -838,7 +838,7 @@ interface AppStrings {
     val contentVersionsLoadFailed: String
     val contentDetailAuthors: String
     val contentDetailSize: String
-    // ── The project page (#367) ──────────────────────────────────────────────
+    // ── The project page ─────────────────────────────────────────────────────
     // The page carries the header, the tabs and the body; the blocks below it
     // names live in the right rail's project-view family. A page drawn for a jar
     // the catalogue has never indexed keeps every one of these and answers the

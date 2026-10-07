@@ -253,7 +253,7 @@ sealed class Screen {
     data class CataloguePackDetail(val origin: PackOrigin, val packId: String) : Screen()
 
     /**
-     * The project page (#367), rendered natively rather than linked out.
+     * The project page, rendered natively rather than linked out.
      *
      * A SCREEN and not a panel, because its metadata blocks live in
      * `appshell.rightrail` -- a shell surface present on every screen -- and a
