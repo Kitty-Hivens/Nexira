@@ -78,6 +78,12 @@ A YouTube or Vimeo video no longer plays a fragment of itself in place of the wh
 
 The command-line launcher no longer prints your login token, and a crash report no longer puts your account name into the address of the page it opens. On macOS, a launcher update that fails while copying no longer leaves you without a launcher.
 
+Changing the theme, the language or the launcher's settings no longer holds the window still while the change is saved to disk.
+
+Stopping a launch while it is still getting ready no longer leaves an error on the Play button or lets a second game start beside the first.
+
+A pack you delete while the launcher is updating packs in the background stays deleted. Before, the update could write the whole pack back to disk, where it took up space without showing in the Library.
+
 ## [2.4.5] - 2026-09-15
 
 A pack that has fallen behind catches itself up when you press Play. Until now the launcher noticed that the files were not the pack's, said nothing on screen, quietly withheld your login and let the game start anyway, so the server turned you away with no explanation anywhere. This was easy to walk into: if a version of the launcher could not install some of a pack's mods and the next one could, the old files were still sitting there. Now the missing pieces are fetched first and the launch goes ahead properly. If the mirror cannot be reached, the launch still happens exactly as it did before.

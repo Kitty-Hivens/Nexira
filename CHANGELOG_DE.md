@@ -70,6 +70,12 @@ Ein Video von YouTube oder Vimeo spielt nicht mehr ein Bruchstück von sich stat
 
 Der Kommandozeilen-Launcher gibt dein Anmeldetoken nicht mehr aus, und ein Absturzbericht setzt deinen Kontonamen nicht mehr in die Adresse der Seite, die er öffnet. Unter macOS lässt dich ein Launcher-Update, das beim Kopieren scheitert, nicht mehr ohne Launcher zurück.
 
+Wenn du das Design, die Sprache oder die Einstellungen des Launchers änderst, steht das Fenster nicht mehr still, während die Änderung gespeichert wird.
+
+Stoppst du einen Start, während das Spiel noch vorbereitet wird, bleibt kein Fehler mehr auf dem Knopf „Spielen“ stehen, und ein zweites Spiel kann nicht neben dem ersten starten.
+
+Ein Pack, das du löschst, während der Launcher im Hintergrund Packs aktualisiert, bleibt gelöscht. Vorher konnte das Update das ganze Pack wieder auf die Festplatte schreiben, wo es Platz belegte, ohne in der Bibliothek aufzutauchen.
+
 ## [2.4.5] - 2026-09-15
 
 Ein Pack, das zurückgefallen ist, holt sich beim Klick auf Spielen selbst wieder ein. Bisher bemerkte der Launcher, dass die Dateien nicht die des Packs sind, sagte auf dem Bildschirm nichts, hielt die Anmeldung still zurück und startete das Spiel trotzdem, sodass der Server einen ohne jede Erklärung abwies. Hineinzugeraten war leicht: Konnte eine Launcher-Version einige Mods eines Packs nicht installieren und die nächste konnte es, lagen die alten Dateien weiterhin da. Jetzt wird das Fehlende zuerst geladen. Ist der Spiegel nicht erreichbar, läuft der Start genau so ab wie zuvor.
