@@ -1,6 +1,5 @@
 package hivens.ui.screens.mod
 
-import org.koin.compose.koinInject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CoroutineScope
 import androidx.compose.foundation.background
@@ -102,9 +101,7 @@ internal fun VersionsPane(
 ) {
     val s = LocalStrings.current
     val scope = rememberCoroutineScope()
-    // Installs run on the app's scope: one fetches the clicked jar and then its
-    // dependencies, and leaving the screen between the two left a mod without them.
-    val installScope: CoroutineScope = koinInject()
+    val installScope = state.installScope
     // Keyed on the project too. The page resolves it asynchronously, and a tab
     // opened before it lands used to ask with nothing to ask about, give up
     // silently, and leave a spinner running for the rest of the visit.

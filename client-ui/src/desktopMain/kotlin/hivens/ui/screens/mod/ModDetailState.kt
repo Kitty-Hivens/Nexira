@@ -20,6 +20,7 @@ import hivens.launcher.instance.folderName
 import hivens.launcher.instance.loadersFor
 import hivens.launcher.modrinth.ModrinthClient
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
@@ -52,6 +53,14 @@ class ModDetailState(
      * what it is handed, so whoever hands it has to speak.
      */
     private val strings: AppStrings,
+    /**
+     * Where an install from this page runs: the app's scope on a screen. One fetches
+     * the clicked jar and then what it requires, and on the composition's scope
+     * leaving the screen between the two left a mod without its dependencies.
+     * Carried here rather than looked up by the composables that use it, so the
+     * page still renders with no application behind it.
+     */
+    val installScope: CoroutineScope,
     // Composed from the two the state already holds, so a caller that has those
     // has this. Koin binds the same pair.
     private val installer: ModInstaller = ModInstaller(modrinth, scanner),

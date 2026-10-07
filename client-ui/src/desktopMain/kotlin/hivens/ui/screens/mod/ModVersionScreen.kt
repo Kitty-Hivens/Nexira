@@ -94,12 +94,13 @@ fun ModVersionScreen(
     val scanner: InstanceContentScanner = koinInject()
     val openProject: OpenProjectState = koinInject()
     val dataDir: Path = koinInject()
+    val appScope: CoroutineScope = koinInject()
     val families = LocalSurfaceFamilies.current
     val s = LocalStrings.current
 
     // The project, for the rail and for where an install would go.
     val project = remember(target) {
-        ModDetailState(target, modrinth, repo, dataDir, scanner, openProject, strings = s)
+        ModDetailState(target, modrinth, repo, dataDir, scanner, openProject, strings = s, installScope = appScope)
     }
     val build = remember(target, versionId) { ModVersionState(modrinth) }
     var reloadTick by remember(build) { mutableIntStateOf(0) }
@@ -146,9 +147,7 @@ internal fun ModVersionBody(
     modifier: Modifier = Modifier,
 ) {
     val s = LocalStrings.current
-    // Installs run on the app's scope: one fetches the clicked jar and then its
-    // dependencies, and leaving the screen between the two left a mod without them.
-    val installScope: CoroutineScope = koinInject()
+    val installScope = project.installScope
     NxSurface(SurfaceKind.Panel, modifier = modifier) {
         val v = build.version
         when {

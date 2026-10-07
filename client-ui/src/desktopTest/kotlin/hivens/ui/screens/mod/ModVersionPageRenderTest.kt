@@ -1,5 +1,7 @@
 package hivens.ui.screens.mod
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineScope
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -77,6 +79,8 @@ class ModVersionPageRenderTest {
             scanner = InstanceContentScanner(),
             open = OpenProjectState(),
             strings = RussianStrings,
+            // A sheet installs nothing; the scope is there because the page holds one.
+            installScope = CoroutineScope(Dispatchers.Unconfined),
         )
         s.project = p
         s.loading = false

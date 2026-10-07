@@ -106,11 +106,12 @@ fun ModDetailScreen(
     val scanner: InstanceContentScanner = koinInject()
     val openProject: OpenProjectState = koinInject()
     val dataDir: Path = koinInject()
+    val appScope: CoroutineScope = koinInject()
     val families = LocalSurfaceFamilies.current
     val s = LocalStrings.current
 
     val state = remember(target) {
-        ModDetailState(target, modrinth, repo, dataDir, scanner, openProject, strings = s)
+        ModDetailState(target, modrinth, repo, dataDir, scanner, openProject, strings = s, installScope = appScope)
     }
     var reloadTick by remember(state) { mutableStateOf(0) }
     // Saveable, not remembered. The only way to a build's page is the Versions
@@ -257,9 +258,7 @@ private fun Unknown(text: String) = Text(
 @Composable
 internal fun Header(state: ModDetailState) {
     val scope = rememberCoroutineScope()
-    // Installs run on the app's scope: one fetches the clicked jar and then its
-    // dependencies, and leaving the screen between the two left a mod without them.
-    val installScope: CoroutineScope = koinInject()
+    val installScope = state.installScope
     val s = LocalStrings.current
     val uriHandler = LocalUriHandler.current
     val clipboard = LocalClipboard.current
