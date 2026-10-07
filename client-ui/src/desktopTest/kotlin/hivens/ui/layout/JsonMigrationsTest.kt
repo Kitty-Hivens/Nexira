@@ -611,6 +611,25 @@ class JsonMigrationsTest {
         assertEquals(oldWeights, newWeights, "a weight was lost, gained or moved to another widget")
     }
 
+    /**
+     * One field of one widget must not take a file down. A placement anchor, a
+     * padding side and a widget kind each read as an object here, which a bare
+     * jsonPrimitive threw on, and the repository then served the bundled default.
+     */
+    @Test
+    fun `a prop of the wrong shape is read as absent rather than thrown on`() {
+        val graph = """{"surfaces":{
+            "home.new":{"families":{"general":{"slots":{"main":{"flow":null,"widgets":[
+                {"kind":{},"instance_id":"a","placement":{"anchor":{},"padding":{"start":{}},"x":1.0}}
+            ]}}}}},
+            "s":{"families":{"general":{"slots":{"main":{"widgets":[{"kind":["x"],"instance_id":"b"}]}}}}}
+        }}"""
+
+        val migrated = migrate(graph, from = 12)
+
+        assertNotNull(migrated["surfaces"])
+    }
+
     private companion object {
         /** Surfaces the bundle gained after the fixture was captured, each one on purpose. */
         val SURFACES_ADDED_SINCE_FIXTURE = setOf(

@@ -22,6 +22,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
@@ -43,6 +44,13 @@ class MadeScreensTest {
         assertEquals(listOf("mine"), links(linked))
         assertEquals(ScreenLinks.KIND, linked.traverse(rail)!!.widgets.last().kind, "at the end of the rail's list")
         assertSame(linked, ScreenLinks.ensureLink(linked, spec), "and a second pass adds nothing")
+    }
+
+    @Test
+    fun `a link whose screen prop is not a value is no link rather than a throw`() {
+        val odd = WidgetInstance(ScreenLinks.KIND, "odd", buildJsonObject { put("screen", buildJsonObject {}) })
+
+        assertNull(ScreenLinks.target(odd))
     }
 
     @Test
