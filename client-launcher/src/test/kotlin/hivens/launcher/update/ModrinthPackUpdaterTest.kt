@@ -32,6 +32,7 @@ import kotlin.io.path.readText
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -217,6 +218,21 @@ class ModrinthPackUpdaterTest {
         assertFalse(Files.exists(dir.resolve("mods/lib-2.0.jar")), "what only the new version shipped is removed")
         assertEquals(recordBefore, dir.resolve(PackFileRecord.FILE_NAME).readText())
         assertEquals(V1, h.repo.get(instance.id)?.pinnedPackVersion)
+    }
+
+    /** The mirror path's case, through the archive path: a delete that held the lock first is final. */
+    @Test
+    fun `an update that finds its instance deleted writes nothing`() = runTest {
+        val h = Harness()
+        val instance = h.installV1()
+        val dir = h.clientDirOf(instance)
+        dir.toFile().deleteRecursively()
+        h.repo.delete(instance.id)
+
+        assertFailsWith<InstanceRemovedException> { h.updater.applyUpdate(instance, null, null) }
+
+        assertFalse(Files.exists(dir), "the deleted directory stays deleted")
+        assertTrue(h.journal.listPending().isEmpty())
     }
 
     private companion object {

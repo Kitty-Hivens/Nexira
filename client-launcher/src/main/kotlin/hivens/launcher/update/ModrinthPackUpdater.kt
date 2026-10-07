@@ -124,7 +124,7 @@ class ModrinthPackUpdater(
 
         return InstanceMutationLock.withLock(clientDir) {
             withContext(Dispatchers.IO) {
-                val current = repository.get(instance.id) ?: instance
+                val current = repository.get(instance.id) ?: throw InstanceRemovedException(instance)
                 // A directory, so the archive path does not exist yet: downloadTo
                 // skips a target that is already on disk, and createTempFile
                 // creates one, so handing it a temp FILE downloaded nothing and
@@ -200,7 +200,7 @@ class ModrinthPackUpdater(
         val clientDir = clientDirOf(instance)
         return InstanceMutationLock.withLock(clientDir) {
             withContext(Dispatchers.IO) {
-                val current = repository.get(instance.id) ?: instance
+                val current = repository.get(instance.id) ?: throw InstanceRemovedException(instance)
                 // The record goes with the files. A snapshot that holds it puts back
                 // the one describing the restored build, and one taken before records
                 // were captured drops the current one, which describes the build being

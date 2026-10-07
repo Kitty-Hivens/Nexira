@@ -111,7 +111,8 @@ class PackUpdateService(
      * specific version switches/rolls back to that build. Re-reads the instance
      * and re-scans under [InstanceMutationLock] so the applied plan is
      * self-consistent, then commits the new baseline, version, cached snapshot,
-     * and carried-over optional-toggle set.
+     * and carried-over optional-toggle set. Throws [InstanceRemovedException] when
+     * the instance was deleted while this waited for the lock.
      */
     override suspend fun applyUpdate(
         instance: PackInstance,
@@ -130,7 +131,7 @@ class PackUpdateService(
         val clientDir = clientDirOf(instance)
         return InstanceMutationLock.withLock(clientDir) {
             withContext(Dispatchers.IO) {
-                val fresh = repository.get(instance.id) ?: instance
+                val fresh = repository.get(instance.id) ?: throw InstanceRemovedException(instance)
                 val targetManifest = target.toBaselineManifest()
                 val paths = fresh.installedManifest?.flatten()?.keys.orEmpty() + targetManifest.flatten().keys
                 val plan = computePlan(fresh, target, targetManifest, scanInstanceState(clientDir, paths))
@@ -372,7 +373,7 @@ class PackUpdateService(
         val clientDir = clientDirOf(instance)
         return InstanceMutationLock.withLock(clientDir) {
             withContext(Dispatchers.IO) {
-                val current = repository.get(instance.id) ?: instance
+                val current = repository.get(instance.id) ?: throw InstanceRemovedException(instance)
                 val managed = managedRealPaths(null, current.installedManifest ?: FileManifest())
                 val restored = snapshotService.restore(clientDir, current.instanceDirName, snapshotId, managed)
                 // A rollback is a deliberate pin: stop following latest so the update we

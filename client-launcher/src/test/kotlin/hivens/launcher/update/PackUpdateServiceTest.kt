@@ -37,6 +37,7 @@ import java.security.MessageDigest
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -497,6 +498,41 @@ class PackUpdateServiceTest {
         val instance = h.installV1()
         assertTrue(h.service.applyUpdate(instance, V2, null) is UpdateOutcome.Applied)
         assertEquals(false, h.repo.get("i1")!!.followLatest)
+    }
+
+    /**
+     * A delete can take the instance's lock while an update waits for it. The update
+     * then carried on from the record it had read before the wait and wrote the whole
+     * build back into the directory the delete had removed.
+     */
+    @Test
+    fun `an update that finds its instance deleted writes nothing`() = runTest {
+        val h = Harness()
+        val instance = h.installV1()
+        h.serveV2()
+        h.clientDir.toFile().deleteRecursively()
+        h.repo.delete(instance.id)
+
+        assertFailsWith<InstanceRemovedException> { h.service.applyUpdate(instance, null, null) }
+
+        assertFalse(Files.exists(h.clientDir), "the deleted directory stays deleted")
+        assertTrue(h.journal.listPending().isEmpty())
+    }
+
+    @Test
+    fun `a rollback that finds its instance deleted writes nothing`() = runTest {
+        val h = Harness()
+        val instance = h.installV1()
+        h.serveAmberV2()
+        h.service.applyUpdate(instance, null, null)
+        val snapshot = h.service.listSnapshots(instance).single()
+        h.clientDir.toFile().deleteRecursively()
+        h.repo.delete(instance.id)
+
+        assertFailsWith<InstanceRemovedException> { h.service.rollback(instance, snapshot.id) }
+
+        assertFalse(Files.exists(h.clientDir))
+        assertEquals(null, h.repo.get(instance.id))
     }
 
     private companion object {

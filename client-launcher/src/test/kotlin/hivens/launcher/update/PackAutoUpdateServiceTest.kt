@@ -168,6 +168,24 @@ class PackAutoUpdateServiceTest {
         assertEquals(null, work.workOn("green"))
     }
 
+    /** Deleted between the check and the apply: nothing failed, and there is no card left to badge. */
+    @Test
+    fun `a pack deleted during the pass is not reported as failed`() = runTest {
+        val repo = FakeRepo(listOf(instance("gone")))
+        val updater = object : PackUpdater by FakeUpdater(mapOf("gone" to available(CompatChange.Same))) {
+            override suspend fun applyUpdate(
+                instance: PackInstance,
+                targetVersion: String?,
+                progress: ((Int, Int, String) -> Unit)?,
+            ): UpdateOutcome = throw InstanceRemovedException(instance)
+        }
+        val service = PackAutoUpdateService(repo, updater, { settings() }, InstanceWorkRegistry(), { null })
+
+        service.runOnce()
+
+        assertEquals(null, service.statuses.value["gone"])
+    }
+
     @Test
     fun `amber applies under snapshot-then-apply`() = runTest {
         val repo = FakeRepo(listOf(instance("amber")))

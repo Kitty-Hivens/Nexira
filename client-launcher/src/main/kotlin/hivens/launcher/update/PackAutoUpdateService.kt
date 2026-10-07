@@ -75,6 +75,11 @@ class PackAutoUpdateService(
                 // turned into a screen of red packs and a round of network work
                 // nobody asked for.
                 throw e
+            } catch (_: InstanceRemovedException) {
+                // Deleted while the pass was on it. Nothing failed, and there is no
+                // card left to badge.
+                log.info("auto-update: {} was removed during the pass", instance.id)
+                state.update { it - instance.id }
             } catch (e: Exception) {
                 log.warn("auto-update: failed for {}", instance.id, e)
                 setStatus(instance.id, PackUpdateStatus.Failed(e.message ?: e.toString()))
