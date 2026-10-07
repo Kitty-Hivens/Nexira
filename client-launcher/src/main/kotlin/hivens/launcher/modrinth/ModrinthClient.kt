@@ -15,7 +15,7 @@ import hivens.core.api.dto.modrinth.ModrinthHashQuery
 import hivens.core.api.dto.modrinth.ModrinthUpdateQuery
 import hivens.core.api.dto.modrinth.ModrinthVersion
 import hivens.launcher.cache.ModrinthCaches
-import io.ktor.client.plugins.timeout
+import hivens.core.net.metadataTimeout
 import io.ktor.client.request.get
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
@@ -263,7 +263,7 @@ class ModrinthClient(
             // shared with the mirror's, whose content negotiation is configured
             // elsewhere, and the body's shape is part of the request contract.
             setBody(json.encodeToString(body))
-            timeout { requestTimeoutMillis = METADATA_TIMEOUT_MS }
+            metadataTimeout()
         }
         if (!resp.status.isSuccess()) {
             val text = runCatching { resp.bodyAsText() }.getOrDefault("")
@@ -294,7 +294,7 @@ class ModrinthClient(
     private suspend fun requestJson(url: String): HttpResponse = httpProvider.current.get(url) {
         headers.append("User-Agent", USER_AGENT)
         headers.append("Accept", "application/json")
-        timeout { requestTimeoutMillis = METADATA_TIMEOUT_MS }
+        metadataTimeout()
     }
 
     private suspend fun failUnlessSuccess(resp: HttpResponse, url: String) {
@@ -304,17 +304,6 @@ class ModrinthClient(
     }
 
     companion object {
-    /**
-     * Metadata reads are bounded far tighter than the shared client's own timeout.
-     *
-     * That one is sized for a download -- ten minutes, correctly, for a runtime or a
-     * pack archive. A catalogue listing is what a person is looking at while it runs,
-     * so the same ceiling turns a stall into a spinner that outlasts anyone's
-     * patience with no error, no log line and nothing to retry. Past this a stall is
-     * an ordinary failure: it throws, it is written down, and the screen offers the
-     * retry it already has.
-     */
-    private const val METADATA_TIMEOUT_MS = 20_000L
         const val API_BASE = "https://api.modrinth.com"
         private const val USER_AGENT = "Nexira-modrinth-client"
 

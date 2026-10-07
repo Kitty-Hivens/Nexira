@@ -8,6 +8,7 @@ import hivens.core.cache.read
 import hivens.core.data.NewsChannelPolicy
 import hivens.core.data.NewsOrder
 import hivens.core.data.NewsPage
+import hivens.core.net.metadataTimeout
 import io.ktor.client.request.prepareGet
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.http.isSuccess
@@ -103,7 +104,7 @@ class SyndicationNewsFeed(
      * truncated document simply parses to the entries that made it in.
      */
     private suspend fun fetch(address: String): String =
-        clientProvider.current.prepareGet(address).execute { response ->
+        clientProvider.current.prepareGet(address) { metadataTimeout() }.execute { response ->
             if (!response.status.isSuccess()) {
                 error("GET $address -> HTTP ${response.status}")
             }

@@ -2,6 +2,7 @@ package hivens.launcher.runtime.loader
 
 import hivens.core.api.HttpClientProvider
 import hivens.launcher.runtime.MavenCoord
+import hivens.core.net.metadataTimeout
 import io.ktor.client.request.prepareGet
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpStatusCode
@@ -178,7 +179,7 @@ class LiteLoaderResolver(
 
     /** The body at [url], or null when it is not there. Any other failure throws. */
     private suspend fun fetchTextOrNull(url: String): String? =
-        clientProvider.current.prepareGet(url).execute { resp ->
+        clientProvider.current.prepareGet(url) { metadataTimeout() }.execute { resp ->
             if (resp.status == HttpStatusCode.NotFound) return@execute null
             if (!resp.status.isSuccess()) throw IOException("GET $url -> HTTP ${resp.status}")
             resp.bodyAsText()

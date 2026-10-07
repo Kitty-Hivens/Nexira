@@ -16,6 +16,7 @@ import hivens.core.data.UpdateChannelMeta
 import hivens.core.platform.Arch
 import hivens.core.platform.OS
 import hivens.core.platform.Platform
+import hivens.core.net.metadataTimeout
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import kotlinx.coroutines.Dispatchers
@@ -278,6 +279,7 @@ class UpdateService(
     internal suspend fun fetchLatestRelease(): GitHubRelease? {
         val response = httpClient.get(GITHUB_API_LATEST) {
             header("Accept", "application/vnd.github.v3+json")
+            metadataTimeout()
         }
         if (response.status.value != 200) {
             logger.warn("GitHub /releases/latest returned {}", response.status)
@@ -296,6 +298,7 @@ class UpdateService(
         val response = httpClient.get(GITHUB_API_RELEASES) {
             header("Accept", "application/vnd.github.v3+json")
             parameter("per_page", PRERELEASE_PAGE_SIZE)
+            metadataTimeout()
         }
         if (response.status.value != 200) {
             logger.warn("GitHub /releases returned {}", response.status)
@@ -317,6 +320,7 @@ class UpdateService(
     internal suspend fun tryFetchChannelMeta(): UpdateChannelMeta? = try {
         val response = httpClient.get(UPDATE_CHANNEL_META_URL) {
             header("Accept", "application/json")
+            metadataTimeout()
         }
         if (response.status.value != 200) {
             logger.debug("update-channel.json fetch returned {}", response.status)
@@ -592,6 +596,7 @@ class UpdateService(
         return try {
             val response = httpClient.get(asset.browserDownloadUrl) {
                 header("Accept", "application/json")
+                metadataTimeout()
             }
             if (response.status.value != 200) {
                 logger.warn("release-manifest.json fetch returned {}", response.status)
@@ -624,7 +629,7 @@ class UpdateService(
         if (lang.isEmpty()) return null
         val url = "$RAW_BASE/$LOCALIZED_CHANGELOG_REF/CHANGELOG_${lang.uppercase()}.md"
         return try {
-            val response = httpClient.get(url) { header("Accept", "text/plain") }
+            val response = httpClient.get(url) { header("Accept", "text/plain"); metadataTimeout() }
             if (response.status.value != 200) {
                 logger.debug("No {} changelog at {}: {}", lang, tag, response.status)
                 null

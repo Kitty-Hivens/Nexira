@@ -16,6 +16,7 @@ import hivens.launcher.runtime.loader.ResolvedLibrary
 import hivens.launcher.runtime.loader.ResolvedRuntime
 import hivens.launcher.runtime.loader.mergeLibraries
 import hivens.launcher.util.sha1Of
+import hivens.core.net.metadataTimeout
 import io.ktor.client.request.prepareGet
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.client.statement.bodyAsText
@@ -525,8 +526,9 @@ class RuntimeProvisioner(
         return json.decodeFromString(MojangAssetIndex.serializer(), bytes.decodeToString())
     }
 
+    /** The version manifest and a version json, both read while a person waits on a picker or a launch. */
     private suspend fun fetchText(url: String): String =
-        httpClient.prepareGet(url).execute { resp ->
+        httpClient.prepareGet(url) { metadataTimeout() }.execute { resp ->
             if (!resp.status.isSuccess()) throw IOException("GET $url -> HTTP ${resp.status}")
             resp.bodyAsText()
         }

@@ -1,6 +1,7 @@
 package hivens.launcher.runtime.loader
 
 import hivens.core.api.HttpClientProvider
+import hivens.core.net.metadataTimeout
 import io.ktor.client.request.prepareGet
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.isSuccess
@@ -27,7 +28,7 @@ internal suspend fun githubReleaseVersions(
     apiUrl: String,
     asset: (tag: String) -> String,
 ): List<LoaderVersionOption> {
-    val text = clientProvider.current.prepareGet(apiUrl).execute { resp ->
+    val text = clientProvider.current.prepareGet(apiUrl) { metadataTimeout() }.execute { resp ->
         if (!resp.status.isSuccess()) throw IOException("GET $apiUrl -> HTTP ${resp.status}")
         resp.bodyAsText()
     }

@@ -7,6 +7,7 @@ import hivens.core.net.TransferEngine
 import hivens.launcher.runtime.MavenCoord
 import hivens.launcher.runtime.MojangArguments
 import hivens.launcher.runtime.MojangLibrary
+import hivens.core.net.metadataTimeout
 import io.ktor.client.request.prepareGet
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.client.statement.bodyAsText
@@ -179,7 +180,7 @@ class ForgeLegacyResolver(
     }
 
     private suspend fun fetchText(url: String): String =
-        clientProvider.current.prepareGet(url).execute { resp ->
+        clientProvider.current.prepareGet(url) { metadataTimeout() }.execute { resp ->
             if (!resp.status.isSuccess()) throw IOException("GET $url -> HTTP ${resp.status}")
             resp.bodyAsText()
         }

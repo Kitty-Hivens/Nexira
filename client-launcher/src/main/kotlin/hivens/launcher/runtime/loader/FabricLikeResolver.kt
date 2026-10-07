@@ -2,6 +2,7 @@ package hivens.launcher.runtime.loader
 
 import hivens.core.api.HttpClientProvider
 import hivens.launcher.runtime.MavenCoord
+import hivens.core.net.metadataTimeout
 import io.ktor.client.request.prepareGet
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.isSuccess
@@ -120,7 +121,7 @@ class FabricLikeResolver(
     }
 
     private suspend fun fetchText(url: String): String =
-        clientProvider.current.prepareGet(url).execute { resp ->
+        clientProvider.current.prepareGet(url) { metadataTimeout() }.execute { resp ->
             if (!resp.status.isSuccess()) throw IOException("GET $url -> HTTP ${resp.status}")
             resp.bodyAsText()
         }

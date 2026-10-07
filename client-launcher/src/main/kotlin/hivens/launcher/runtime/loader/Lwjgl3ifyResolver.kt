@@ -5,6 +5,7 @@ import hivens.core.platform.Platform
 import hivens.launcher.runtime.MavenCoord
 import hivens.launcher.runtime.MojangLibrary
 import hivens.launcher.runtime.flattenArguments
+import hivens.core.net.metadataTimeout
 import io.ktor.client.request.prepareGet
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.isSuccess
@@ -77,7 +78,7 @@ class Lwjgl3ifyResolver(
                 ?: run {
                     val url = "${releaseBase.trimEnd('/')}/$loaderVersion/version.json"
                     log.info("lwjgl3ify: fetching profile {}", url)
-                    val text = clientProvider.current.prepareGet(url).execute { resp ->
+                    val text = clientProvider.current.prepareGet(url) { metadataTimeout() }.execute { resp ->
                         if (!resp.status.isSuccess()) {
                             throw IOException("lwjgl3ify $loaderVersion: GET $url -> HTTP ${resp.status}")
                         }

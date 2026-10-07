@@ -8,6 +8,7 @@ import hivens.core.cache.read
 import hivens.core.data.NewsItem
 import hivens.core.data.NewsPage
 import hivens.launcher.network.ServerProtocolConfig
+import hivens.core.net.metadataTimeout
 import io.ktor.client.call.body
 import io.ktor.client.request.get
 import kotlinx.coroutines.CancellationException
@@ -73,7 +74,7 @@ class SmartyCraftNewsFeed(
     private suspend fun load(index: Int): NewsPage = withContext(Dispatchers.IO) {
         val url = "${config.baseUrl.trimEnd('/')}/index_page$index"
         runCatching {
-            val html: String = clientProvider.current.get(url).body()
+            val html: String = clientProvider.current.get(url) { metadataTimeout() }.body()
             SmartyNewsParser.parse(html, config.baseUrl, index).also {
                 if (it.items.isEmpty()) {
                     log.warn("News page {} parsed to nothing -- upstream markup may have moved", index)
