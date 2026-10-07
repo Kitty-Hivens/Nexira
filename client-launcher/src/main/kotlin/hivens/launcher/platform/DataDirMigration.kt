@@ -28,7 +28,17 @@ import java.time.Instant
  * - the marker file is already present (already migrated);
  * - the legacy directory contains nothing beyond housekeeping markers;
  * - the target directory exists and is non-empty (defensive -- never
- *   overwrite, write marker on legacy to stop revisiting).
+ *   overwrite, write marker on legacy to stop revisiting), unless what is
+ *   there is this migration's own unfinished copy.
+ *
+ * The two guards [DataDirMover] keeps for the same kind of copy hold here too.
+ * The target carries [IN_PROGRESS_MARKER] while the copy runs, so a copy cut
+ * short is taken up again on the next start. Without it the half-filled target
+ * read as populated, the legacy directory was marked done, and the half copy
+ * became the data for good. And the running process's own files at the top of
+ * the legacy directory are not copied: the legacy `.lock` copied over the live
+ * one replaced the file this process holds its lock on, and a second launcher
+ * then took the lock on the new file and ran beside this one.
  */
 object DataDirMigration {
     private val log = LoggerFactory.getLogger(DataDirMigration::class.java)
@@ -43,6 +53,9 @@ object DataDirMigration {
      * lost.
      */
     private val HOUSEKEEPING = setOf(".lock", ".lock.pid", ".show", MARKER)
+
+    /** Written into the target before the copy and removed once it finished. */
+    internal const val IN_PROGRESS_MARKER = ".nexira-migration-in-progress"
 
     /**
      * Pending migration source returned by [detect]. [totalBytes] and
@@ -67,7 +80,8 @@ object DataDirMigration {
             if (!Files.isDirectory(legacy)) continue
             if (Files.exists(marker)) continue
             if (!legacy.hasUserData()) continue
-            if (Files.isDirectory(target) && target.hasUserData()) {
+            val unfinished = Files.isRegularFile(target.resolve(IN_PROGRESS_MARKER))
+            if (Files.isDirectory(target) && target.hasUserData() && !unfinished) {
                 log.info("Target {} already populated; marking legacy {} as migrated", target, legacy)
                 writeMarker(marker, target)
                 continue
@@ -93,12 +107,14 @@ object DataDirMigration {
         onProgress: (bytesDone: Long, currentFile: Path) -> Unit = { _, _ -> },
     ): Result<Unit> = runCatching {
         Files.createDirectories(target)
+        Files.writeString(target.resolve(IN_PROGRESS_MARKER), source.path.toString())
         var done = 0L
         Files.walk(source.path).use { stream ->
             stream.forEach { src ->
                 if (src == source.path) return@forEach
-                if (src.fileName?.toString() == MARKER) return@forEach
-                val rel = source.path.relativize(src).toString()
+                val relPath = source.path.relativize(src)
+                if (relPath.nameCount == 1 && relPath.fileName.toString() in HOUSEKEEPING) return@forEach
+                val rel = relPath.toString()
                 val dst = target.resolve(rel)
                 if (Files.isDirectory(src)) {
                     runCatching { Files.createDirectories(dst) }
@@ -117,6 +133,7 @@ object DataDirMigration {
                 }
             }
         }
+        Files.delete(target.resolve(IN_PROGRESS_MARKER))
         writeMarker(source.path.resolve(MARKER), target)
         log.info("Migration completed: {} -> {} ({} files)", source.path, target, source.fileCount)
     }

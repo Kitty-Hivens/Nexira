@@ -128,6 +128,40 @@ class DataDirMigrationTest {
     }
 
     @Test
+    fun `a copy cut short is taken up again rather than kept as the data`() {
+        Files.createDirectories(auraEraLegacy)
+        Files.writeString(auraEraLegacy.resolve("a.json"), "a")
+        Files.writeString(auraEraLegacy.resolve("b.json"), "b")
+        // What an earlier start left: one file of two, and the marker that says so.
+        Files.createDirectories(paths.dataDir)
+        Files.writeString(paths.dataDir.resolve("a.json"), "a")
+        Files.writeString(paths.dataDir.resolve(DataDirMigration.IN_PROGRESS_MARKER), auraEraLegacy.toString())
+
+        DataDirMigration.run(paths)
+
+        assertEquals("b", Files.readString(paths.dataDir.resolve("b.json")), "the half copy became the data")
+        assertFalse(Files.exists(paths.dataDir.resolve(DataDirMigration.IN_PROGRESS_MARKER)))
+        assertTrue(Files.exists(auraEraLegacy.resolve(".migrated")))
+    }
+
+    @Test
+    fun `the legacy directory's lock files are not copied over the live ones`() {
+        Files.createDirectories(auraEraLegacy)
+        Files.writeString(auraEraLegacy.resolve("settings.json"), "{}")
+        Files.writeString(auraEraLegacy.resolve(".lock"), "old")
+        Files.writeString(auraEraLegacy.resolve(".lock.pid"), "1")
+        Files.createDirectories(paths.dataDir)
+        Files.writeString(paths.dataDir.resolve(".lock"), "live")
+        Files.writeString(paths.dataDir.resolve(".lock.pid"), "12345")
+
+        DataDirMigration.run(paths)
+
+        assertEquals("live", Files.readString(paths.dataDir.resolve(".lock")))
+        assertEquals("12345", Files.readString(paths.dataDir.resolve(".lock.pid")))
+        assertEquals("{}", Files.readString(paths.dataDir.resolve("settings.json")))
+    }
+
+    @Test
     fun `preserves directory tree depth`() {
         val deep = auraEraLegacy.resolve("clients/Industrial/assets/textures/blocks")
         Files.createDirectories(deep)
