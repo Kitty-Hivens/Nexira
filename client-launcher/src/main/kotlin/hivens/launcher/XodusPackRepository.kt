@@ -15,6 +15,7 @@ import jetbrains.exodus.env.Store
 import jetbrains.exodus.env.StoreConfig
 import jetbrains.exodus.env.Transaction
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -145,8 +146,11 @@ class XodusPackRepository(
             else current + instance
         }
         // Keep memory and disk in lockstep: if the durable write fails, revert the
-        // in-memory state so the UI never claims an install the DB never got.
-        val written = withContext(Dispatchers.IO) { writeInstance(instance) }
+        // in-memory state so the UI never claims an install the DB never got. Past the
+        // memory change the write is not cancellable: a cancellation landing on the
+        // dispatch threw before the write and before the revert, and left an edit that
+        // was on screen and gone at the next start.
+        val written = withContext(NonCancellable + Dispatchers.IO) { writeInstance(instance) }
         if (!written) state.value = previous
         return written
     }
@@ -155,7 +159,7 @@ class XodusPackRepository(
         mutex.withLock {
             val previous = state.value
             state.update { it.filterNot { i -> i.id == id } }
-            if (!withContext(Dispatchers.IO) { deleteInstance(id) }) state.value = previous
+            if (!withContext(NonCancellable + Dispatchers.IO) { deleteInstance(id) }) state.value = previous
         }
     }
 

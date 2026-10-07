@@ -4,9 +4,11 @@ import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
 import hivens.core.data.PackReference
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
@@ -196,6 +198,29 @@ class XodusPackRepositoryTest {
         }
 
         assertEquals(64, r.get("a")!!.playtimeSeconds)
+    }
+
+    /**
+     * The pack settings save from an effect that the next edit cancels. A cancellation
+     * that reached the update between the memory change and the disk write left the
+     * edit on screen and absent after a restart.
+     */
+    @Test
+    fun `an update cancelled after it changed memory still reaches the disk`() = runTest {
+        val d = tempData()
+        val r = repo(d)
+        r.put(instance("a"))
+
+        lateinit var job: Job
+        job = launch {
+            r.update("a") { job.cancel(); it.copy(notes = "edited") }
+        }
+        job.join()
+        r.close()
+
+        val reopened = XodusPackRepository(d.resolve("db"), d.resolve("packs.json"), json).also { repos.add(it) }
+        assertEquals(r.get("a")?.notes, reopened.get("a")?.notes, "memory and disk agree")
+        assertEquals("edited", reopened.get("a")?.notes)
     }
 
     @Test
