@@ -103,6 +103,7 @@ import hivens.ui.theme.Status
 import hivens.ui.theme.decorativeColor
 import hivens.ui.utils.humanSize
 import hivens.ui.utils.shortNameList
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.withContext
@@ -663,8 +664,12 @@ private fun DiffSection(
         else -> {
             val diff by produceState<Result<Pair<PackVersionDiff, SmrtBuildDiff?>>?>(null, build.versionNumber, baseVersion) {
                 value = null
-                value = runCatching {
-                    withContext(Dispatchers.IO) {
+                // A cancellation is passed on rather than shown. Picking another build
+                // while this one loads cancels the producer, and the state outlives the
+                // key change, so a caught cancellation came back as a red "failed:
+                // cancelled" over the next build until its own diff arrived.
+                value = try {
+                    Result.success(withContext(Dispatchers.IO) {
                         val fromManifest = mirror.fetchManifestVersion(pack.packRef.id, baseVersion)
                         val toManifest = mirror.fetchManifestVersion(pack.packRef.id, build.versionNumber)
                         val computed = PackVersionDiff.compute(fromManifest, toManifest)
@@ -675,7 +680,11 @@ private fun DiffSection(
                             mirror.fetchDiff(pack.packRef.id, baseVersion, build.versionNumber)
                         }.getOrNull()
                         computed to enriched
-                    }
+                    })
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Result.failure(e)
                 }
             }
             when (val result = diff) {

@@ -106,12 +106,15 @@ internal fun DiagnosticsSection(
     // is enough to freeze Settings for a beat); while busy the button is disabled so a
     // double click doesn't fire two parallel writes. The GitHub-Issue button enables
     // only after a bundle exists this session.
-    var lastBundlePath by remember { mutableStateOf<Path?>(null) }
-    var bundleBusy     by remember { mutableStateOf(false) }
+    //
+    // The three below live as long as the write does, on the process rather than on
+    // this section (see [BundleState]).
+    var lastBundlePath by BundleState.lastPath
+    var bundleBusy     by BundleState.busy
     // Why the bundle could not be made. Swallowing it left a button that visibly
     // did nothing: it re-enabled, no file opened, and the reason -- a full disk,
     // a read-only data dir -- was known and thrown away.
-    var bundleError    by remember { mutableStateOf<String?>(null) }
+    var bundleError    by BundleState.error
     // The app's scope, not the composition's. Writing the archive does not stop
     // because the reader switched category, and on the composition's scope that
     // switch cancelled it mid-ZIP and left a partial file with the flag raised.
@@ -254,6 +257,19 @@ internal fun DiagnosticsSection(
         subtitle = "v${Branding.VERSION.removePrefix("v")} — GPLv3",
         onClick  = onOpenAbout,
     )
+}
+
+/**
+ * What the bundle button knows, held for the process. The write runs on the app
+ * scope so that switching category does not cancel it, and this section's own
+ * remembered state was gone by the time it finished: coming back found the button
+ * enabled with a write still running, so a second ZIP started beside the first,
+ * and the finished one's path landed nowhere, leaving "Report on GitHub" off.
+ */
+private object BundleState {
+    val busy = mutableStateOf(false)
+    val lastPath = mutableStateOf<Path?>(null)
+    val error = mutableStateOf<String?>(null)
 }
 
 /**

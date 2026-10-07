@@ -1,9 +1,6 @@
 package hivens.ui.widgets.players
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -26,7 +23,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -174,22 +170,22 @@ internal fun TimelinePlayerCard(
             // on the plane itself falls through to here. With nothing loaded the
             // same surface opens the picker, since there is no artwork to click and
             // a card that says "pick a track" has to answer somewhere.
+            //
+            // The seek is the shared one the other players use: the gesture is tracked
+            // and the track seeks once, where it is let go. Seeking on the press and
+            // on every frame of the drag repositioned the decoder dozens of times in
+            // one scrub, which is what that helper was written to stop.
+            val seekFraction: ((Float) -> Unit)? =
+                if (!idle && loaded && duration > 0L) {
+                    { at -> onSeek((at * duration).toLong()) }
+                } else {
+                    null
+                }
             Box(
                 Modifier
                     .fillMaxSize()
                     .openWhenEmpty(idle, s.audioPickTrack, onPick)
-                    .pointerInput(idle, loaded, duration) {
-                        if (idle || !loaded || duration <= 0L) return@pointerInput
-                        awaitEachGesture {
-                            val down = awaitFirstDown(requireUnconsumed = false)
-                            val width = size.width.coerceAtLeast(1).toFloat()
-                            onSeek(((down.position.x / width).coerceIn(0f, 1f) * duration).toLong())
-                            drag(down.id) { change ->
-                                onSeek(((change.position.x / width).coerceIn(0f, 1f) * duration).toLong())
-                                change.consume()
-                            }
-                        }
-                    },
+                    .seekAlong(vertical = false, onSeekFraction = seekFraction),
             )
 
             Row(

@@ -13,6 +13,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -20,6 +21,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import hivens.ui.theme.Spacing
@@ -44,6 +46,11 @@ internal fun parseHexOrNull(hex: String): Color? {
  * "what is a colour" rule so no screen re-implements hex vs 16-bit guessing (D13).
  * [hex] null/blank shows the swatch as outline-only (the default); [onValueChange]
  * emits the raw text (null when blank); [onClear] + [clearLabel] reset to default.
+ *
+ * [hex] is taken into the text only while the field is not being typed in, as the
+ * prop panel's number and text rows already do. A caller that writes the value
+ * back through a debounced record hands an older one back between keystrokes, and
+ * taken while typing it replaced what was half typed and moved the caret.
  */
 @Composable
 fun NxColorField(
@@ -54,7 +61,9 @@ fun NxColorField(
     clearLabel: String? = null,
     placeholder: String = "#RRGGBB",
 ) {
-    var text by remember(hex) { mutableStateOf(hex.orEmpty()) }
+    var focused by remember { mutableStateOf(false) }
+    var text by remember { mutableStateOf(hex.orEmpty()) }
+    LaunchedEffect(hex, focused) { if (!focused) text = hex.orEmpty() }
     val parsed = text.takeIf { it.isNotBlank() }?.let(::parseHexOrNull)
     Row(
         // Fills what it is given and lets the field take the rest, rather than
@@ -77,7 +86,9 @@ fun NxColorField(
             value         = text,
             onValueChange = { v -> text = v; onValueChange(v.ifBlank { null }) },
             placeholder   = placeholder,
-            modifier      = Modifier.weight(1f),
+            // On the field's plane, which holds the text field: hasFocus answers for
+            // the field inside it.
+            modifier      = Modifier.weight(1f).onFocusChanged { focused = it.hasFocus },
         )
         if (onClear != null && clearLabel != null) {
             Text(

@@ -133,14 +133,18 @@ fun rememberSkinUploader(session: SessionData, onSkinChanged: () -> Unit): SkinU
     var status by remember { mutableStateOf<UploadStatus>(UploadStatus.None) }
     val dialogSettings = rememberFileDialogSettings(s.profileUploadSkin)
 
-    val pick: () -> Unit = {
+    val pick: () -> Unit = pick@{
+        // One upload at a time, as the diagnostic bundle's button holds one write:
+        // a second file picked while the first was still uploading raced it, and the
+        // skin that stayed was whichever POST landed last.
+        if (status == UploadStatus.Loading) return@pick
         scope.launch {
             val picked = pickFile(
                 type     = FileKitType.File(extensions = listOf("png")),
                 settings = dialogSettings,
             )
             val file = picked?.path?.let { File(it) }
-            if (file != null) {
+            if (file != null && status != UploadStatus.Loading) {
                 status = UploadStatus.Loading
                 uploadScope.launch {
                     status = try {

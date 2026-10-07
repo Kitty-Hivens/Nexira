@@ -171,8 +171,12 @@ fun LibraryScreen(
                 settings = importDialogSettings,
             )
             val file = Path.of(picked?.path ?: return@launch)
+            // Keyed on the whole path, for the reason a create gets its own key: keyed
+            // on the name, a second `pack.mrpack` from another folder, picked while the
+            // first was still unpacking, was dropped without a word. The same file
+            // picked twice is still one import.
             importKey = installService.run(
-                key   = "import:${file.fileName}",
+                key   = "import:${file.toAbsolutePath().normalize()}",
                 title = file.fileName.toString(),
             ) { reserve, progress -> importService.import(file, reserve, progress) }
         }

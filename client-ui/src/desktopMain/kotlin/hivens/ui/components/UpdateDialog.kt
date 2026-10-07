@@ -97,9 +97,14 @@ fun UpdateDialog(
     // delegates from the enclosing composable so each call site shrinks to
     // a one-liner.
     fun launchDownload() {
+        // At once and checked, as the install below does: set inside the coroutine,
+        // two quick clicks (or the automation hook beside a click) both got in before
+        // it ran and started two transfers to the same staging file.
+        // The state itself, read now, not the busy flag of the last composition.
+        if (downloadState is DownloadState.Downloading || downloadState is DownloadState.Installing) return
+        downloadState = DownloadState.Downloading(0L, 0L, 0.0)
+        errorMessage  = null
         scope.launch {
-            downloadState = DownloadState.Downloading(0L, 0L, 0.0)
-            errorMessage  = null
             try {
                 val path = updateService.downloadUpdate(update) { dl, total, speed ->
                     downloadState = DownloadState.Downloading(dl, total, speed)

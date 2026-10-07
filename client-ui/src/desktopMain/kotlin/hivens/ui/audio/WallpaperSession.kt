@@ -71,6 +71,23 @@ class WallpaperSession(
     private var pollJob: Job? = null
 
     /**
+     * Held by a hand-over and by every write a poll makes, and a poll writes only
+     * while its player is still the attached one.
+     *
+     * The music player joins its poll before it replaces the player, so no late
+     * iteration writes afterwards. A hand-over here is not a suspend call, so it
+     * cannot wait, and the poll runs on the app scope's threads: a cancelled one
+     * still finished the tag read it was in and wrote the old file's name and cover
+     * after the new file had cleared them. Nothing reads them again once set, so
+     * the previous wallpaper's title stayed for the whole life of the next.
+     */
+    private val lock = Any()
+
+    private inline fun ifStillAttached(p: VideoPlayer, write: () -> Unit) {
+        synchronized(lock) { if (player === p) write() }
+    }
+
+    /**
      * Where a level the transport set goes, so it survives the session.
      *
      * Handed over with the player rather than taken at construction, because the
@@ -96,7 +113,7 @@ class WallpaperSession(
         volume: Float,
         repeat: RepeatMode,
         persistVolume: (Float) -> Unit,
-    ) {
+    ) = synchronized(lock) {
         pollJob?.cancel()
         this.player = player
         this.persistVolume = persistVolume
@@ -113,7 +130,7 @@ class WallpaperSession(
     }
 
     /** Gives the player back. The flows keep their last values, which is what a paused wall looks like. */
-    fun detach() {
+    fun detach() = synchronized(lock) {
         pollJob?.cancel()
         pollJob = null
         player = null
@@ -146,7 +163,7 @@ class WallpaperSession(
         // the delay.
         while (coroutineContext.isActive) {
             val st = player.state
-            _state.value = mapPlaybackState(
+            val mapped = mapPlaybackState(
                 file    = file,
                 st      = st,
                 // A wallpaper is playing from the moment it opens: nobody presses
@@ -156,6 +173,7 @@ class WallpaperSession(
                 posMs   = player.positionNanos() / 1_000_000L,
                 durMs   = (player.durationNanos ?: 0L) / 1_000_000L,
             )
+            ifStillAttached(player) { _state.value = mapped }
             if (_track.value == null && st != VideoPlayer.State.Opening) readMetadata(player, file)
             if (st is VideoPlayer.State.Failed) {
                 log.warn("Wallpaper playback failed for {}", file, st.cause)
@@ -168,7 +186,8 @@ class WallpaperSession(
     /** Once per file, as soon as the player is past Opening, for the reason the music player gives. */
     private fun readMetadata(player: VideoPlayer, file: Path) {
         val artwork = player.coverArt?.let { runCatching { decodeArtwork(it) }.getOrNull() }
-        _track.value = trackInfoFrom(player.tags, file, artwork)
+        val info = trackInfoFrom(player.tags, file, artwork)
+        ifStillAttached(player) { _track.value = info }
     }
 
     // ── Transport ────────────────────────────────────────────────────────

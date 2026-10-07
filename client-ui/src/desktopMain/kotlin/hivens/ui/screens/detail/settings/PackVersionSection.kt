@@ -119,9 +119,17 @@ internal fun PackVersionSection(
             onNotice(null)
             // Explicit action: go past the cache. Answering "check now" out of a
             // four-minute-old entry is what made this button feel like a coin flip.
-            check = runCatching { updater.checkForUpdate(pack, forceRefresh = true) }
-                .onFailure { onNotice(s.packVersionsFailed(it.message ?: s.packVersionCheckFailed)) }
-                .getOrNull()
+            // A cancellation is passed on, as bestEffort below does: switching the
+            // sheet's tab mid-check cancels this scope, and caught here it wrote a
+            // red "failed: cancelled" into the footer, which outlives the section.
+            check = try {
+                updater.checkForUpdate(pack, forceRefresh = true)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                onNotice(s.packVersionsFailed(e.message ?: s.packVersionCheckFailed))
+                null
+            }
             // Feed the shared hub so the ambient badges (card, hero) reflect what
             // this manual check just learned.
             when (val c = check) {
