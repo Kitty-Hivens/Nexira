@@ -41,6 +41,7 @@ import hivens.ui.puppet.PuppetField
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.puppet.PuppetToggle
 import hivens.ui.platform.SystemActions
+import hivens.ui.utils.PreferenceWriter
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -62,6 +63,7 @@ fun LoginPanel(
     val certificateGate: CertificateTrustGate  = koinInject()
     val offlineProvider: OfflineAuthProvider   = koinInject()
     val settingsService: ISettingsService      = koinInject()
+    val preferences: PreferenceWriter          = koinInject()
     val s            = LocalStrings.current
     val scope        = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
@@ -81,7 +83,7 @@ fun LoginPanel(
     // box off stops future saves and nothing else.
     val setRememberMe: (Boolean) -> Unit = { value ->
         rememberMe = value
-        settingsService.updateSettings { it.copy(saveCredentials = value) }
+        preferences.write("remember me") { settingsService.updateSettings { it.copy(saveCredentials = value) } }
     }
 
     // 2FA flow state. Which path a TWOAUTH demand takes is decided by the

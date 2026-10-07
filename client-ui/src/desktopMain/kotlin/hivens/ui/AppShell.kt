@@ -123,6 +123,7 @@ import hivens.ui.theme.rememberThemeReveal
 import hivens.ui.theme.ThemeManager
 import hivens.ui.system.SystemNotifier
 import hivens.ui.utils.GameConsoleService
+import hivens.ui.utils.PreferenceWriter
 import hivens.ui.layout.LayoutGraphRepository
 import hivens.ui.legacy.RetiredClientsGate
 import hivens.ui.logic.PostLaunchGate
@@ -367,6 +368,7 @@ fun FrameWindowScope.AppShellContent(
     // by AppCoroutineScopeHook on JVM shutdown). Same instance backs
     // LauncherController.appScope and any other fire-and-forget work.
     val applicationScope: CoroutineScope        = koinInject()
+    val preferences: PreferenceWriter           = koinInject()
 
     val settings = remember { settingsService.getSettings() }
 
@@ -458,10 +460,10 @@ fun FrameWindowScope.AppShellContent(
     // start opens on what was last observed instead of flashing the old scheme.
     // darkThemeFor returns null when nothing should change, which keeps a
     // wallpaper crossfade from writing the settings file on every tick.
-    val applyAutomaticDark: suspend (Boolean?) -> Unit = { wanted ->
+    val applyAutomaticDark: (Boolean?) -> Unit = { wanted ->
         if (wanted != null) {
             isDarkTheme = wanted
-            settingsService.updateSettings { it.copy(isDarkTheme = wanted) }
+            preferences.write("the colour scheme") { settingsService.updateSettings { it.copy(isDarkTheme = wanted) } }
         }
     }
 
@@ -1132,8 +1134,9 @@ fun FrameWindowScope.AppShellContent(
                             // Stored with the selection, so the wallpaper theme opens in
                             // itself next time. Written only when the picture changed.
                             if (colours != themeLibrary.wallpaper) {
-                                themeLibrary = themeLibrary.copy(wallpaper = colours)
-                                themeManager.save(themeLibrary)
+                                val library = themeLibrary.copy(wallpaper = colours)
+                                themeLibrary = library
+                                preferences.write("the wallpaper colours") { themeManager.save(library) }
                             }
                         },
                         onRealExit   = quit,
@@ -1146,37 +1149,42 @@ fun FrameWindowScope.AppShellContent(
                             isDarkTheme = !isDarkTheme
                             themeMode = ThemeMode.Manual
                             val dark = isDarkTheme
-                            settingsService.updateSettings { it.copy(
-                                isDarkTheme = dark,
-                                themeMode = ThemeMode.Manual,
-                                themeFromWallpaper = false,
-                            ) }
+                            preferences.write("the colour scheme") {
+                                settingsService.updateSettings { it.copy(
+                                    isDarkTheme = dark,
+                                    themeMode = ThemeMode.Manual,
+                                    themeFromWallpaper = false,
+                                ) }
+                            }
                         },
                         themeMode = themeMode,
                         onThemeModeChanged = { mode ->
                             themeMode = mode
                             // themeFromWallpaper mirrors the mode so a downgrade to a
                             // pre-mode build keeps the wallpaper opt-in coherent.
-                            settingsService.updateSettings { it.copy(
-                                themeMode = mode,
-                                themeFromWallpaper = mode == ThemeMode.Wallpaper,
-                            ) }
+                            preferences.write("the theme mode") {
+                                settingsService.updateSettings { it.copy(
+                                    themeMode = mode,
+                                    themeFromWallpaper = mode == ThemeMode.Wallpaper,
+                                ) }
+                            }
                         },
                         systemThemeAvailable = systemThemeAvailable,
                         themeLibrary         = themeLibrary,
                         onThemeSelected      = { id ->
-                            themeLibrary = themeLibrary.copy(selected = id)
-                            themeManager.save(themeLibrary)
+                            val library = themeLibrary.copy(selected = id)
+                            themeLibrary = library
+                            preferences.write("the theme") { themeManager.save(library) }
                         },
                         currentLocale   = currentLocale,
                         onLocaleChanged = { newLocale ->
                             currentLocale = newLocale
-                            settingsService.updateSettings { it.copy(locale = newLocale.tag) }
+                            preferences.write("the language") { settingsService.updateSettings { it.copy(locale = newLocale.tag) } }
                         },
                         customization              = customization,
                         onCustomizationChanged     = { newCustomization ->
                             customization = newCustomization
-                            customizationManager.save(newCustomization)
+                            preferences.write("the customization") { customizationManager.save(newCustomization) }
                         },
                     )
                     UpdateManager()

@@ -175,9 +175,9 @@ internal fun AdvancedSection(
         PuppetToggle("settings.mimicVersion", form.mimicOverrideEnabled) { form.mimicOverrideEnabled = it; save() }
 
         // The revealed field is debounced (400 ms after the last keystroke) because
-        // save() does a synchronous file write and applies the value to live protocol
-        // traffic; per-keystroke saves would stutter and push partial values. The
-        // toggle flip persists immediately via its own callback.
+        // save() writes the file and applies the value to live protocol traffic, and
+        // per-keystroke saves would write the disk once per key and push partial
+        // values. The toggle flip persists immediately via its own callback.
         if (form.mimicOverrideEnabled) {
             // Filter at every keystroke: the value flows into a User-Agent header, a
             // JVM system property, and the spawned game's -Dminecraft.launcher.version
@@ -212,8 +212,8 @@ internal fun AdvancedSection(
 
     // The news widget's second channel. There is no toggle beside it because the
     // field IS the switch: blank means the channel is not configured and nothing is
-    // fetched for it. Debounced like the mimic field, and for the same reason --
-    // save() is a synchronous file write.
+    // fetched for it. Debounced like the mimic field, so the file is not written
+    // once per keystroke.
     NxSection(s.settingsSectionNews) {
         Text(s.settingsAltNewsFeed, color = NxInk.main, fontWeight = FontWeight.Medium)
         Text(

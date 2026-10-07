@@ -67,6 +67,7 @@ import hivens.ui.layout.LayoutGraphRepository
 import hivens.ui.utils.ConsoleSettingsStore
 import hivens.ui.utils.GameConsoleService
 import hivens.ui.utils.LogRetention
+import hivens.ui.utils.PreferenceWriter
 import hivens.widget.model.DefaultLayout
 import java.nio.file.Path
 import javax.swing.SwingUtilities
@@ -99,6 +100,7 @@ import org.jetbrains.compose.resources.ExperimentalResourceApi
 import org.koin.core.context.GlobalContext
 import org.koin.core.context.stopKoin
 import kotlin.concurrent.thread
+import kotlin.time.Duration.Companion.seconds
 import kotlin.system.exitProcess
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
@@ -143,6 +145,14 @@ val uiModule = module {
     }
 
     single { GameConsoleService(get()) }
+    // The one writer for what the interface saves on a click. createdAtStart, so
+    // the drain on exit is armed before the first choice is made.
+    single(createdAtStart = true) {
+        PreferenceWriter().also { writer ->
+            val drainFor = 3.seconds
+            Runtime.getRuntime().addShutdownHook(Thread({ writer.drain(drainFor) }, "nexira-preferences-drain"))
+        }
+    }
     // Holds the per-session game output files to an age and a total size. Once per
     // start, off the boot path; see its KDoc for what it leaves alone.
     single(createdAtStart = true) {
@@ -412,13 +422,14 @@ val uiModule = module {
     }
     single {
         val settings: ISettingsService = get()
+        val preferences: PreferenceWriter = get()
         NotificationCenter(
             archive             = get<NotificationArchiveStore>()::record,
             // Seed the popup-mute from the persisted preference and write the
             // flip back, so "do not disturb" survives a restart.
             initialDoNotDisturb = settings.getSettings().doNotDisturb,
             persistDoNotDisturb = { value ->
-                settings.updateSettings { it.copy(doNotDisturb = value) }
+                preferences.write("do not disturb") { settings.updateSettings { it.copy(doNotDisturb = value) } }
             },
         )
     }

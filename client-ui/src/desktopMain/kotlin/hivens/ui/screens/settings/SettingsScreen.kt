@@ -8,6 +8,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import hivens.config.ExperimentalProtocolOverride
@@ -18,6 +19,7 @@ import hivens.ui.surface.NxCard
 import hivens.ui.i18n.AppLocale
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetScreen
+import hivens.ui.utils.PreferenceWriter
 import org.koin.compose.koinInject
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
@@ -44,6 +46,7 @@ fun SettingsScreen(
     PuppetScreen("Settings")
 
     val settingsService: ISettingsService = koinInject()
+    val preferences: PreferenceWriter     = koinInject()
     val paths: PlatformPaths              = koinInject()
     val s = LocalStrings.current
 
@@ -58,13 +61,22 @@ fun SettingsScreen(
     val sectionRetention = rememberSaveableStateHolder()
 
     fun save() {
-        val toPersist = settingsService.updateSettings { form.mergeInto(it) }
-        // Apply the mimic-version override immediately so the next protocol
-        // handshake picks it up. Without this the user would have to restart
-        // for the change to take effect, even though the system property
-        // mechanism Protocol.MIMIC_LAUNCHER_VERSION reads is live.
-        @OptIn(ExperimentalProtocolOverride::class)
-        Protocol.setMimicLauncherVersion(toPersist.mimicVersionOverride)
+        // The form as it stands at the click. The write lands later on the writer's
+        // thread, by which time the form may have moved on.
+        val asClicked = Snapshot.takeSnapshot()
+        preferences.write("the settings") {
+            val toPersist = try {
+                asClicked.enter { settingsService.updateSettings { form.mergeInto(it) } }
+            } finally {
+                asClicked.dispose()
+            }
+            // Apply the mimic-version override immediately so the next protocol
+            // handshake picks it up. Without this the user would have to restart
+            // for the change to take effect, even though the system property
+            // mechanism Protocol.MIMIC_LAUNCHER_VERSION reads is live.
+            @OptIn(ExperimentalProtocolOverride::class)
+            Protocol.setMimicLauncherVersion(toPersist.mimicVersionOverride)
+        }
     }
 
     Column(Modifier.fillMaxSize().padding(16.dp)) {
