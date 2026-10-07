@@ -1685,6 +1685,9 @@ object GermanStrings : AppStrings {
     override fun readOnlyDataBodyOldFormat(stores: String) =
         "In einer Form geschrieben, die dieser Build nicht getreu lesen kann: $stores. Unverändert belassen " +
             "und schreibgeschützt geöffnet, Änderungen gehen beim Beenden verloren. Ein älterer Build liest sie noch."
+    override fun readOnlyDataBodyDamaged(stores: String) =
+        "Konnte diesmal nicht gelesen werden: $stores. Unverändert belassen und schreibgeschützt geöffnet, " +
+            "Änderungen gehen beim Beenden verloren. Der nächste Start liest sie erneut, und wenn das nicht gelingt, lässt sie sich im Wiederherstellungsmodus zurücksetzen."
     override val readOnlyDataLibrary  = "die Pack-Sammlung"
     override val readOnlyDataLayout   = "das Layout"
     override val readOnlyDataTheme    = "das Design"

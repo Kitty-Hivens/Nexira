@@ -310,13 +310,27 @@ class LayoutGraphRepository(
                             "Falling back to the bundled default to protect instanceId-keyed traversals.",
                         file, result.id, result.stage, envelope.schemaVersion, LayoutReconcile.CURRENT_SCHEMA,
                     )
+                    closeOverDamage()
                     defaultGraph()
                 }
             }
         } catch (e: Exception) {
             log.error("Failed to load layout graph at {} -- falling back to bundled default", file, e)
+            closeOverDamage()
             defaultGraph()
         }
+    }
+
+    /**
+     * The file is somebody's arrangement that could not be read this time, and the
+     * default stands in for it. Read-only, for the reason the old-format branch
+     * above gives: open for writing, the first edit of the session put the default
+     * over a file that a transient read error, one duplicated id or a stray brace
+     * had kept from loading, and the arrangement was gone for good.
+     */
+    private fun closeOverDamage() {
+        readOnly = true
+        NewerBuildData.record(ReadOnlyStore.Layout, ReadOnlyReason.Damaged)
     }
 
     /**

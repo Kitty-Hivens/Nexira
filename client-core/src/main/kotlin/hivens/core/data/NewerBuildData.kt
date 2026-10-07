@@ -19,6 +19,14 @@ enum class ReadOnlyReason {
      * the file is left exactly as it is.
      */
     UnreadableFormat,
+
+    /**
+     * Could not be read this time: a file that does not parse, a read that failed,
+     * or a tree that breaks its own rules. Neither updating nor going back is the
+     * answer, so the file is left as it is for the next start to read again, and
+     * for a hand or a reset to repair.
+     */
+    Damaged,
 }
 
 /**

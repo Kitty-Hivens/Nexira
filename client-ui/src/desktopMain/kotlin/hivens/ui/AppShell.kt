@@ -739,6 +739,7 @@ fun FrameWindowScope.AppShellContent(
                     body      = when (reason) {
                         ReadOnlyReason.NewerBuild       -> s.readOnlyDataBody(named)
                         ReadOnlyReason.UnreadableFormat -> s.readOnlyDataBodyOldFormat(named)
+                        ReadOnlyReason.Damaged          -> s.readOnlyDataBodyDamaged(named)
                     },
                 )
             }

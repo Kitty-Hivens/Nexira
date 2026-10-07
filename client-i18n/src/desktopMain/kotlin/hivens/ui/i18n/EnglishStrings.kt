@@ -1684,6 +1684,9 @@ object EnglishStrings : AppStrings {
     override fun readOnlyDataBodyOldFormat(stores: String) =
         "Written in a form this build cannot read faithfully: $stores. Left exactly as it is and open " +
             "read-only, so anything you change now is lost when the launcher closes. An older build still reads it."
+    override fun readOnlyDataBodyDamaged(stores: String) =
+        "Could not be read this time: $stores. Left exactly as it is and open read-only, so anything you change " +
+            "now is lost when the launcher closes. The next start reads it again, and if it still cannot, it can be reset in recovery mode."
     override val readOnlyDataLibrary  = "the pack library"
     override val readOnlyDataLayout   = "the layout"
     override val readOnlyDataTheme    = "the theme"

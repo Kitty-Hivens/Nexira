@@ -1780,6 +1780,8 @@ interface AppStrings {
     fun readOnlyDataBody(stores: String): String
     /** The other direction: too old to read faithfully, so going back helps and updating does not. */
     fun readOnlyDataBodyOldFormat(stores: String): String
+    /** A file that could not be read at all this time: the next start tries again, and recovery can reset it. */
+    fun readOnlyDataBodyDamaged(stores: String): String
     val readOnlyDataLibrary: String
     val readOnlyDataLayout: String
     val readOnlyDataTheme: String

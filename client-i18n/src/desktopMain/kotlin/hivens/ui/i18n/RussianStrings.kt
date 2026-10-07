@@ -1698,6 +1698,9 @@ object RussianStrings : AppStrings {
     override fun readOnlyDataBodyOldFormat(stores: String) =
         "Записано в форме, которую эта сборка не умеет прочитать точно: $stores. Файл оставлен как есть " +
             "и открыт только для чтения, поэтому всё изменённое пропадёт при выходе. Старая сборка его ещё читает."
+    override fun readOnlyDataBodyDamaged(stores: String) =
+        "Не удалось прочитать в этот раз: $stores. Файл оставлен как есть и открыт только для чтения, поэтому " +
+            "всё изменённое пропадёт при выходе. Следующий запуск прочитает его снова, а если не выйдет, его можно сбросить в режиме восстановления."
     override val readOnlyDataLibrary  = "библиотека сборок"
     override val readOnlyDataLayout   = "раскладка"
     override val readOnlyDataTheme    = "тема"

@@ -1691,6 +1691,9 @@ object JapaneseStrings : AppStrings {
     override fun readOnlyDataBodyOldFormat(stores: String) =
         "このビルドが正確に読めない形式で保存されています: $stores。ファイルはそのまま残し、読み取り専用で開いています。" +
             "今の変更は終了時に失われます。古いビルドなら読み込めます。"
+    override fun readOnlyDataBodyDamaged(stores: String) =
+        "今回は読み込めませんでした: $stores。ファイルはそのまま残し、読み取り専用で開いています。今の変更は終了時に失われます。" +
+            "次の起動でもう一度読み込みます。それでも読めない場合は、リカバリーモードでリセットできます。"
     override val readOnlyDataLibrary = "パックのライブラリ"
     override val readOnlyDataLayout = "レイアウト"
     override val readOnlyDataTheme    = "テーマ"

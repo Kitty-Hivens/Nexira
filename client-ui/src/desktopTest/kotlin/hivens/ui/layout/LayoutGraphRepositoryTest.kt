@@ -33,6 +33,9 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonPrimitive
 import hivens.ui.bootstrap.RecoveryIo
+import hivens.core.data.ReadOnlyStore
+import hivens.core.data.ReadOnlyReason
+import hivens.core.data.NewerBuildData
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.AfterTest
@@ -132,6 +135,26 @@ class LayoutGraphRepositoryTest {
         Files.writeString(file, "{this is not valid json")
         val repo = repo()
         assertEquals(sampleDefault, repo.value())
+    }
+
+    /**
+     * The default stands in for a file that did not load, and the file is still
+     * somebody's arrangement. Writable, the first edit of the session put the
+     * default over it for good.
+     */
+    @Test
+    fun `a file that does not load is left as it is and said so`() = runBlocking {
+        NewerBuildData.reset()
+        val damaged = "{this is not valid json"
+        Files.writeString(file, damaged)
+
+        val repo = repo()
+        repo.update { LayoutGraph.EMPTY }
+        repo.flush()
+
+        assertEquals(damaged, Files.readString(file), "the first edit wrote the default over the file")
+        assertEquals(mapOf(ReadOnlyStore.Layout to ReadOnlyReason.Damaged), NewerBuildData.affectedWithReason())
+        NewerBuildData.reset()
     }
 
     @Test
