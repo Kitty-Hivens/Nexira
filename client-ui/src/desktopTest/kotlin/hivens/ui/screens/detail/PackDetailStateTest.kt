@@ -5,6 +5,7 @@ import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
 import hivens.core.data.PackReference
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -30,6 +31,7 @@ import kotlin.test.assertTrue
  * update on the app scope, the playtime a finished session writes back -- does so
  * through the same registry, and the screen has to show what it says.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 class PackDetailStateTest {
 
     private fun pack(id: String = "inst-1", name: String = "Industrial") = PackInstance(

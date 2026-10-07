@@ -6,6 +6,7 @@ import hivens.core.data.PackOrigin
 import hivens.core.data.PackReference
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -23,6 +24,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class ApplyGuardTest {
     private val json = Json { ignoreUnknownKeys = true }
     private val temps = mutableListOf<Path>()

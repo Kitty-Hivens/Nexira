@@ -144,7 +144,7 @@ class CachedSmrtPackClientTest {
 
         client.listPacks()
         assertEquals(1, counter.get())
-        (smrtCaches.listing as Cache<SmrtPackListing>).invalidate("$mirror/v1/packs")
+        smrtCaches.listing.invalidate("$mirror/v1/packs")
         client.listPacks()
         assertEquals(2, counter.get(), "post-invalidate listPacks reloads")
     }

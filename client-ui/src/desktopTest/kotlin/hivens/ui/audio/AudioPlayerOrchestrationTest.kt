@@ -3,6 +3,7 @@ package hivens.ui.audio
 import dev.hivens.skinema.audio.PcmFormat
 import dev.hivens.skinema.audio.PcmSink
 import dev.hivens.skinema.player.VideoPlayer
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
@@ -31,6 +32,7 @@ import kotlin.test.assertTrue
  * property borrowed from the real thing is the one the orchestration turns on,
  * that closing is what releases a file.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 class AudioPlayerOrchestrationTest {
 
     // -- the stand-in ----------------------------------------------------------

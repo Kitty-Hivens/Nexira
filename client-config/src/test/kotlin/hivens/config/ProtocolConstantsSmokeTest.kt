@@ -69,6 +69,7 @@ class ProtocolConstantsSmokeTest {
     }
 
     @Test
+    @OptIn(ExperimentalProtocolOverride::class)
     fun `runtime override switches MIMIC_LAUNCHER_VERSION`() {
         val original = System.getProperty(Protocol.SYSTEM_PROP_MIMIC_VERSION)
         try {

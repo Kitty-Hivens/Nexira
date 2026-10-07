@@ -28,7 +28,7 @@ class SystemNotifierLifecycleTest {
         override val capabilities = NotifierCapabilities(false, 0, false, false, false, false, false)
         override fun notify(notification: Notification): NotificationHandle? = null
         override fun cancel(handle: NotificationHandle): Boolean = false
-        override fun onEvent(listener: (NotificationEvent) -> Unit): () -> Unit = {}
+        override fun onEvent(handler: (NotificationEvent) -> Unit): () -> Unit = {}
         override fun close() { closed = true }
     }
 

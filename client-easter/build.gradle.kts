@@ -57,11 +57,5 @@ kotlin {
 tasks.withType<KotlinJvmCompile>().configureEach {
     compilerOptions {
         jvmTarget.set(JvmTarget.JVM_27)
-
-        // Language: AprilFoolsEngine nests a typealias for the floating-button
-        // event signature. The flag travelled here with the file; Kotlin 2.4
-        // accepts the nesting without it, but the declaration outlives any one
-        // compiler version and the module should not depend on that default.
-        freeCompilerArgs.add("-XXLanguage:+NestedTypeAliases")
     }
 }

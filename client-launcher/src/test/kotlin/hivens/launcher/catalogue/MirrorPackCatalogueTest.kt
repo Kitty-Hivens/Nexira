@@ -30,6 +30,8 @@ import kotlin.test.assertFalse
 
 class MirrorPackCatalogueTest {
 
+    private val lenientJson = Json { ignoreUnknownKeys = true }
+
     private fun pack(id: String) =
         """{"pack_id":"$id","display_name":"$id","tagline":"","minecraft_version":"1.21.1","latest_pack_version":"1"}"""
 
@@ -121,7 +123,7 @@ class MirrorPackCatalogueTest {
 
     @Test
     fun `a refresh that fails behind the stored list still leaves the poll running`() = runBlocking {
-        val stored = Json { ignoreUnknownKeys = true }.decodeFromString(SmrtPackListing.serializer(), listing("a"))
+        val stored = lenientJson.decodeFromString(SmrtPackListing.serializer(), listing("a"))
         val caches = SmrtPackCaches(FailingRefreshCache(stored), PassthroughCache(), PassthroughCache(), PassthroughCache())
         val (client, _) = mirror(listing("a", "b"), caches = caches)
         val answers = withTimeout(5_000) {

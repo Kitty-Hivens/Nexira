@@ -8,6 +8,7 @@ import hivens.core.io.InstanceMutationLock
 import hivens.core.launch.InstanceWorkRegistry
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -22,6 +23,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class ApplyRecoveryTest {
     private val json = Json { ignoreUnknownKeys = true }
 

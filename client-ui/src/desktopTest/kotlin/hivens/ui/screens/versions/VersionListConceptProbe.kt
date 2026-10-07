@@ -78,6 +78,8 @@ import hivens.ui.surface.SurfaceKind
  */
 class VersionListConceptProbe {
 
+    private val json = Json { ignoreUnknownKeys = true }
+
     @Serializable
     data class Fixture(
         val id: String,
@@ -94,7 +96,7 @@ class VersionListConceptProbe {
     private val versions: List<Fixture> by lazy {
         val raw = checkNotNull(javaClass.classLoader.getResourceAsStream("catalogue/iris.versions.json"))
             .bufferedReader().use { it.readText() }
-        Json { ignoreUnknownKeys = true }.decodeFromString<List<Fixture>>(raw)
+        json.decodeFromString<List<Fixture>>(raw)
     }
 
     /**

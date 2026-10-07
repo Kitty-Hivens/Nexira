@@ -264,7 +264,7 @@ private fun Plate(
         }
         if (showFigures) {
             Text(
-                text       = "${(progress!!.coerceIn(0f, 1f) * 100).toInt()}%",
+                text       = "${(progress.coerceIn(0f, 1f) * 100).toInt()}%",
                 // Beside the words it is the lesser half; alone in the plate it is the
                 // whole message and takes the verb's weight.
                 color      = if (words) content.copy(alpha = 0.62f) else inks.onPlate,

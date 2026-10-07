@@ -17,6 +17,7 @@ import hivens.core.update.UpdateCheck
 import hivens.core.update.UpdateDirection
 import hivens.core.update.UpdateOutcome
 import hivens.core.update.UpdatePlan
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -30,6 +31,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class PackAutoUpdateServiceTest {
 
     private class FakeRepo(initial: List<PackInstance>) : IPackRepository {

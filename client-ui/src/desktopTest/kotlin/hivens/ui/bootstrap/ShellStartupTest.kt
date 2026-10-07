@@ -1,6 +1,7 @@
 package hivens.ui.bootstrap
 
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -17,6 +18,7 @@ import kotlin.test.assertTrue
  * got there first the recovery afterwards restored an older snapshot over the
  * update that had just landed.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 class ShellStartupTest {
 
     private fun TestScope.startup(

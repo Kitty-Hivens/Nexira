@@ -21,6 +21,8 @@ import kotlin.test.assertTrue
 
 class UpdateEngineTest {
 
+    private val markerJson = Json { encodeDefaults = true }
+
     private fun write(root: Path, rel: String, content: String): Path {
         val p = root.resolve(rel); p.createParentDirectories(); Files.writeString(p, content); return p
     }
@@ -141,7 +143,7 @@ class UpdateEngineTest {
             val staged = UpdateStager(layout, source).stage(plan, remote)
             val marker = layout.applyMarker
             val commit = ApplyCommit("2.0.0", staged.staged.keys.toList(), staged.deletes)
-            AtomicFiles.writeString(marker, Json { encodeDefaults = true }.encodeToString(ApplyCommit.serializer(), commit))
+            AtomicFiles.writeString(marker, markerJson.encodeToString(ApplyCommit.serializer(), commit))
 
             // Fresh applier (new process) recovers.
             LayoutApplier(layout).recover { v -> if (v == "2.0.0") remote else null }
@@ -203,7 +205,7 @@ class UpdateEngineTest {
         val staged = UpdateStager(layout, FakeSource(server, emptyMap()))
             .stage(LauncherUpdatePlanner.plan(local, remote), remote)
         val commit = ApplyCommit("2.0.0", staged.staged.keys.toList(), staged.deletes)
-        AtomicFiles.writeString(layout.applyMarker, Json { encodeDefaults = true }.encodeToString(ApplyCommit.serializer(), commit))
+        AtomicFiles.writeString(layout.applyMarker, markerJson.encodeToString(ApplyCommit.serializer(), commit))
         return commit
     }
 

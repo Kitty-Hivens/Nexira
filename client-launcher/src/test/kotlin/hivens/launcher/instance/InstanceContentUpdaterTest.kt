@@ -14,7 +14,8 @@ import io.ktor.client.engine.mock.respond
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import io.ktor.utils.io.ByteReadChannel
-import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.builtins.ListSerializer
@@ -187,7 +188,7 @@ class InstanceContentUpdaterTest {
                     respond(ByteReadChannel(body.toByteArray()), HttpStatusCode.OK, headersOf("Content-Type", "application/json"))
                 })
             }
-            updater = InstanceContentUpdater(ModrinthClient(provider, testTransferEngine(provider), json), InstanceContentManager(), GlobalScope, InstanceWorkRegistry())
+            updater = InstanceContentUpdater(ModrinthClient(provider, testTransferEngine(provider), json), InstanceContentManager(), CoroutineScope(SupervisorJob()), InstanceWorkRegistry())
         }
 
         suspend fun check(ownLib: Boolean = true): InstanceContentUpdater.CheckOutcome {

@@ -1,6 +1,7 @@
 package hivens.ui.utils
 
 import hivens.ui.bootstrap.RecoveryIo
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -24,6 +25,7 @@ import kotlin.test.assertTrue
  * What these pin is the store being the single owner: one value, published, and
  * every write starting from what is current.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 class ConsoleSettingsStoreTest {
 
     private val dir: Path = Files.createTempDirectory("console-settings")

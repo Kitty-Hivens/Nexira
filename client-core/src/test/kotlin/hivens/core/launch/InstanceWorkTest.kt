@@ -1,6 +1,7 @@
 package hivens.core.launch
 
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -9,6 +10,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class InstanceWorkTest {
 
     @Test

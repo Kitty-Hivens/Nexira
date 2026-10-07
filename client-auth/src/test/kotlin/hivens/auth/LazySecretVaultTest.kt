@@ -15,7 +15,7 @@ class LazySecretVaultTest {
         private val bag = mutableMapOf<String, ByteArray>()
         override val tier = VaultTier.Memory
         override val backend = "fake"
-        override fun store(key: String, value: ByteArray): Boolean { bag[key] = value; return true }
+        override fun store(key: String, secret: ByteArray): Boolean { bag[key] = secret; return true }
         override fun retrieve(key: String): ByteArray? = bag[key]
         override fun delete(key: String): Boolean = bag.remove(key) != null
         override fun contains(key: String): Boolean = bag.containsKey(key)

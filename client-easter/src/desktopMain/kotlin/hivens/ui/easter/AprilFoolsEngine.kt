@@ -147,15 +147,14 @@ object AprilFoolsEngine {
 
     // ─── Event pool ───────────────────────────────────────────────────────────
 
-    // Uniform event signature -- every `eventX` below conforms to the
-    // [Event] typealias so [pickEvent] can return any of them
-    // interchangeably. Some events use only a subset of the args
-    // (e.g. [eventDrunkWobble] is button-only, [eventEarthquake]
-    // shakes the global screen state without per-button positioning).
-    // Affected functions carry @Suppress("UNUSED_PARAMETER") at the
-    // declaration; do not "fix" them by dropping the param, the
-    // typealias contract is what keeps the dispatch loop generic.
-    private typealias Event = suspend (FloatingButton, () -> Offset, () -> IntSize) -> Unit
+    // Uniform event signature: every `eventX` below conforms to the [Event]
+    // typealias at the bottom of this file, so [pickEvent] can return any of them
+    // interchangeably. Some events use only a subset of the args (e.g.
+    // [eventDrunkWobble] is button-only, [eventEarthquake] shakes the global
+    // screen state without per-button positioning). Affected functions carry
+    // @Suppress("UNUSED_PARAMETER") at the declaration; do not "fix" them by
+    // dropping the param, the typealias contract is what keeps the dispatch loop
+    // generic.
 
     private fun pickEvent(): Event {
         val t = AprilFools.intensity()
@@ -580,3 +579,10 @@ object AprilFoolsEngine {
         btn: FloatingButton, cursor: () -> Offset, ws: () -> IntSize,
     ) = eventMassEscape(btn, cursor, ws)
 }
+
+/**
+ * The signature every escape event shares, see the event pool above. File-level
+ * rather than nested in the engine: a nested typealias needed an internal compiler
+ * flag, and the compiler reports that flag as a warning on every build.
+ */
+private typealias Event = suspend (FloatingButton, () -> Offset, () -> IntSize) -> Unit
