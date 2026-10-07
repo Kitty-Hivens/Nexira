@@ -46,6 +46,27 @@ class TerminateEscalationTest {
     }
 
     @Test
+    fun `what the game started does not outlive a stop the game took politely`() {
+        if (!unix) return
+        // A shell that waits on a child it started dies to SIGTERM and leaves the child,
+        // which is the shape of a wrapper script that does not exec the game.
+        val process = ProcessBuilder("sh", "-c", "sleep 300 & wait").start()
+        try {
+            val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
+            while (process.descendants().count() == 0L && System.nanoTime() < deadline) Thread.sleep(20)
+            val child = process.descendants().findFirst().orElseThrow()
+
+            terminate(process)
+
+            assertTrue(child.onExit().get(10, TimeUnit.SECONDS) != null, "the child outlived the stop")
+            assertFalse(child.isAlive)
+        } finally {
+            process.descendants().forEach { it.destroyForcibly() }
+            process.destroyForcibly()
+        }
+    }
+
+    @Test
     fun `terminate does not block the caller on a process that will not die`() {
         if (!unix) return
         // abort() runs on the Compose thread from a click handler, so the escalation

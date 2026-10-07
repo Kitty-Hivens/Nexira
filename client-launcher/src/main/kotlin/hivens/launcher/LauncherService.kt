@@ -539,17 +539,28 @@ internal class ProcessLaunchHandle(
      * click handler -- blocking there would freeze the window on exactly the
      * process that is refusing to die.
      *
-     * Descendants are taken first: killing the parent orphans them, and on Windows
-     * `destroyForcibly` does not reach them at all.
+     * Descendants are listed first, before any signal: killing the parent orphans
+     * them, an orphan is no longer among its descendants, and on Windows
+     * `destroyForcibly` does not reach them at all. They were listed only on the
+     * escalation, after the parent was gone, so a game that took the polite signal
+     * left whatever it had started running, and a launch through a wrapper script
+     * that does not exec left the game itself. What outlives the parent is given
+     * the same polite signal and the same grace, then the forced one.
      */
     override fun terminate() {
+        val children = runCatching { process.descendants().toList() }.getOrDefault(emptyList())
         runCatching { process.destroy() }
         Thread {
             val exited = runCatching { process.waitFor(TERMINATE_GRACE_SECONDS, TimeUnit.SECONDS) }
                 .getOrDefault(false)
-            if (!exited) {
-                runCatching { process.descendants().forEach { child -> child.destroyForcibly() } }
-                runCatching { process.destroyForcibly() }
+            if (!exited) runCatching { process.destroyForcibly() }
+            val left = children.filter { it.isAlive }
+            left.forEach { runCatching { it.destroy() } }
+            val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(TERMINATE_GRACE_SECONDS)
+            left.forEach { child ->
+                val remaining = (deadline - System.nanoTime()).coerceAtLeast(0L)
+                val gone = runCatching { child.onExit().get(remaining, TimeUnit.NANOSECONDS); true }.getOrDefault(false)
+                if (!gone) runCatching { child.destroyForcibly() }
             }
         }.apply {
             isDaemon = true
