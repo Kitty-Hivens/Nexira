@@ -30,6 +30,13 @@ repositories {
     mavenCentral()
 }
 
+// Kotlin compiles this to JVM 26, the newest target it knows, while the Java side
+// follows the daemon's JDK 27. There are no Java sources here, so the Java target
+// is held to Kotlin's, which is what the plugin checks the two against.
+java {
+    targetCompatibility = JavaVersion.VERSION_26
+}
+
 // Convention plugins declared here become consumable from project
 // build.gradle.kts files via `plugins { id("nexira.packaging") }`. The
 // `kotlin-dsl` plugin pulls in the `java-gradle-plugin` capability that

@@ -118,9 +118,16 @@ subprojects {
         // LinkageError waiting to happen, invisible until a 9+-only API
         // gets touched. Force-set on every Kotlin/JVM compile task so the
         // bytecode floor always matches the Java target above.
+        //
+        // Warnings are errors, test sources included. A warning nobody has to act
+        // on is one nobody reads: the build had grown eighty-odd of them, and a new
+        // one that mattered would have scrolled past with the rest. A warning that
+        // is right to keep is answered where it stands, with an opt-in or a
+        // suppression that says why, rather than left for the next reader.
         tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile>().configureEach {
             compilerOptions {
                 jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_27)
+                allWarningsAsErrors.set(true)
             }
         }
     }
