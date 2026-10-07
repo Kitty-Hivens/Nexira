@@ -14,7 +14,6 @@ import hivens.widget.model.walkInstances
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonPrimitive
 
 /**
  * The links that open a made screen: one widget kind, found by the id in its props.
@@ -29,9 +28,13 @@ internal object ScreenLinks {
     /** Where a new screen's link goes: the bottom of the rail's main list. */
     private val RAIL = SlotPath(SurfaceId("appshell.leftrail"), SlotId("top"))
 
-    /** The id a link widget points at, or null when [widget] is not a link. */
+    /**
+     * The id a link widget points at, or null when [widget] is not a link. A prop of
+     * the wrong shape is no link either, rather than a throw inside a reset or a
+     * screen delete: the layout file is somebody's to edit.
+     */
     fun target(widget: WidgetInstance): String? =
-        if (widget.kind != KIND) null else widget.props["screen"]?.jsonPrimitive?.contentOrNull
+        if (widget.kind != KIND) null else (widget.props["screen"] as? JsonPrimitive)?.contentOrNull
 
     /**
      * Puts a link to [spec] at the end of the rail, unless one already exists

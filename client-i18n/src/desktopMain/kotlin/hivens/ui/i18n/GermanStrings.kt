@@ -1548,6 +1548,7 @@ object GermanStrings : AppStrings {
     override val editorPresetNamePlaceholder = "Preset-Name..."
     override fun editorPresetsSaved(count: Int) = "Gespeichert ($count)"
     override val editorPresetsEmpty          = "Leer. Speichere das aktuelle Layout als erstes Preset."
+    override val editorPresetWriteFailed     = "Der Preset-Ordner konnte nicht beschrieben werden. Prüfe, ob auf dem Datenträger Platz ist und der Ordner beschreibbar ist."
     override val editorPresetsBuiltIn          = "Vorlagen"
     override fun bundledPresetName(id: String) = when (id) {
         "home-type" -> "Startseite: Typografie"

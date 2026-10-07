@@ -1554,6 +1554,7 @@ object JapaneseStrings : AppStrings {
     override val editorPresetNamePlaceholder = "プリセットの名前..."
     override fun editorPresetsSaved(count: Int) = "保存済み ($count)"
     override val editorPresetsEmpty = "空です。いまのレイアウトを最初のプリセットとして保存してください。"
+    override val editorPresetWriteFailed = "プリセットのフォルダーに書き込めませんでした。ディスクの空き容量と、フォルダーに書き込めるかを確認してください。"
     override val editorPresetsBuiltIn = "既成"
     override fun bundledPresetName(id: String) = when (id) {
         "home-type" -> "ホーム: タイポグラフィ"

@@ -87,7 +87,6 @@ import hivens.ui.theme.NxTheme
 import hivens.ui.surface.defaultOpacity
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.model.walkInstances
-import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.intOrNull
 
 
@@ -270,8 +269,11 @@ fun ShellCenterRegion(instance: WidgetInstance) {
     // the rail's named opacity is read off the layout rather than assumed.
     val graph = LocalLayoutGraph.current
     val railOpacity = remember(graph) {
-        graph.walkInstances().firstOrNull { it.kind.value == "appshell.region.left" }
-            ?.props?.get("opacityPct")?.jsonPrimitive?.intOrNull?.regionOpacity()
+        // Read as the region's own props class reads it: a value of the wrong shape
+        // in a hand-edited file is no opacity rather than a throw in the region that
+        // is always on screen, which restarted the shell on every start.
+        (graph.walkInstances().firstOrNull { it.kind.value == "appshell.region.left" }
+            ?.props?.get("opacityPct") as? JsonPrimitive)?.intOrNull?.regionOpacity()
     }
     val chrome = NxTheme.colours.step(1).copy(alpha = railOpacity ?: SurfaceKind.Chrome.defaultOpacity())
     val cornerDp = 12.dp
@@ -385,6 +387,17 @@ fun ShellRightRegion(instance: WidgetInstance) {
     // Ctrl+N (window-level, see AppShell) toggles the rail. rememberUpdatedState
     // keeps the flip reading the latest collapsed value across recompositions.
     val currentToggle by rememberUpdatedState(toggleCollapse)
+    // Where a swipe left the rail, written as that value rather than as a flip. The
+    // gesture outlives recomposition, and a flip decided against the props it was
+    // created with skipped the write after Ctrl+N had changed them: the rail shut on
+    // screen and stayed open in the file, so the next Ctrl+N did nothing visible.
+    val setCollapsed: (Boolean) -> Unit = { collapse ->
+        controller.updatePropsFrom(path, instance.instanceId, historyKey = "collapsed") { stored ->
+            JsonObject(stored + ("collapsed" to JsonPrimitive(collapse)))
+        }
+    }
+    val currentSetCollapsed by rememberUpdatedState(setCollapsed)
+    val currentlyCollapsed by rememberUpdatedState(props.collapsed)
     LaunchedEffect(Unit) {
         var seen = controller.rightRailToggleSignal.value
         snapshotFlow { controller.rightRailToggleSignal.value }.collect { tick ->
@@ -461,7 +474,12 @@ fun ShellRightRegion(instance: WidgetInstance) {
                 onDragEnd = {
                     val collapse = widthAnim.value < (collapsedPx + expandedPx) / 2f
                     scope.launch { widthAnim.animateTo(if (collapse) collapsedPx else expandedPx) }
-                    if (collapse != props.collapsed) toggleCollapse()
+                    currentSetCollapsed(collapse)
+                },
+                // A swipe cut short goes back where the rail stands rather than
+                // staying at whatever partial width the pointer left it.
+                onDragCancel = {
+                    scope.launch { widthAnim.animateTo(if (currentlyCollapsed) collapsedPx else expandedPx) }
                 },
             )
         }

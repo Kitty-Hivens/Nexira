@@ -46,12 +46,16 @@ import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.LocalMonoFamily
 import java.text.DateFormat
 import java.util.Date
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.Status
+import org.slf4j.LoggerFactory
+
+private val log = LoggerFactory.getLogger("PresetManagerPanel")
 
 // Modal preset manager. Reached via the "Presets" chip on the
 // edit-mode pill. Lists existing presets with Load / Delete / Export
@@ -75,9 +79,27 @@ fun PresetManagerPanel(
     val scope = rememberCoroutineScope()
     var presets by remember(visible) { mutableStateOf(emptyList<PresetMeta>()) }
     var newName by remember(visible) { mutableStateOf("") }
+    var writeFailed by remember(visible) { mutableStateOf(false) }
+    // A save, a delete or the listing, with a failure said in the dialog. They run
+    // on this composition's scope, where an exception nothing catches restarts the
+    // shell, as the file pickers' own guard explains: a full disk or a read-only
+    // profile took the edit session down with it.
+    fun guarded(action: suspend () -> Unit) {
+        scope.launch {
+            try {
+                action()
+                writeFailed = false
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                log.error("Preset storage failed", e)
+                writeFailed = true
+            }
+        }
+    }
     // Init empty + load off the UI thread: listProvider() is a directory scan and
     // ran twice before (once here during composition, once in the effect).
-    LaunchedEffect(Unit) { presets = withContext(Dispatchers.IO) { listProvider() } }
+    LaunchedEffect(Unit) { guarded { presets = withContext(Dispatchers.IO) { listProvider() } } }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -165,7 +187,7 @@ fun PresetManagerPanel(
                             onClick = {
                                 val n = newName.trim()
                                 if (n.isNotEmpty()) {
-                                    scope.launch {
+                                    guarded {
                                         onSaveCurrent(n)
                                         newName = ""
                                         // Reload AFTER the write lands (and off the UI
@@ -181,6 +203,15 @@ fun PresetManagerPanel(
                             compact = true,
                         )
                     }
+                }
+
+                if (writeFailed) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text  = s.editorPresetWriteFailed,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = NxColor.status(Status.Error, text = true),
+                    )
                 }
 
                 Spacer(Modifier.height(16.dp))
@@ -225,7 +256,7 @@ fun PresetManagerPanel(
                                 meta     = meta,
                                 onLoad   = { onLoad(meta) },
                                 onDelete = {
-                                    scope.launch {
+                                    guarded {
                                         onDelete(meta)
                                         presets = withContext(Dispatchers.IO) { listProvider() }
                                     }

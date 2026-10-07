@@ -476,23 +476,32 @@ fun EditableWidgetChrome(
                                         acc += moved
                                         latticeDrag = acc
                                     }
-                                    drag(down.id) { change ->
-                                        acc += change.positionChange()
-                                        pointer += change.positionChange()
-                                        autoScroll.move(pointer)
-                                        latticeDrag = acc
-                                        change.consume()
+                                    // finally, in this branch and the three below: a gesture
+                                    // cut off mid-drag, the chrome leaving the composition on
+                                    // Esc or Ctrl+E, ran nothing after its drag, and the ghost,
+                                    // the hidden cursor and the overlap warning stayed up with
+                                    // the editor closed. A cut-off gesture commits nothing.
+                                    try {
+                                        drag(down.id) { change ->
+                                            acc += change.positionChange()
+                                            pointer += change.positionChange()
+                                            autoScroll.move(pointer)
+                                            latticeDrag = acc
+                                            change.consume()
+                                        }
+                                        autoScroll.stop()
+                                        gridGeo.value?.let { geo ->
+                                            val (col, row) = gridDragCell(
+                                                start.x.toInt(), start.y.toInt(),
+                                                acc.x * signX, acc.y * signY, density,
+                                                geo.cellDp, geo.gutterDp, geo.columns, geo.transposed,
+                                            )
+                                            editController.moveWidgetInGrid(path, instance.instanceId, col, row, geo.columns)
+                                        }
+                                    } finally {
+                                        autoScroll.stop()
+                                        latticeDrag = Offset.Zero
                                     }
-                                    autoScroll.stop()
-                                    gridGeo.value?.let { geo ->
-                                        val (col, row) = gridDragCell(
-                                            start.x.toInt(), start.y.toInt(),
-                                            acc.x * signX, acc.y * signY, density,
-                                            geo.cellDp, geo.gutterDp, geo.columns, geo.transposed,
-                                        )
-                                        editController.moveWidgetInGrid(path, instance.instanceId, col, row, geo.columns)
-                                    }
-                                    latticeDrag = Offset.Zero
                                 }
                                 isPlaced -> {
                                     val a = anchorOf(livePlacement.value)
@@ -526,36 +535,39 @@ fun EditableWidgetChrome(
                                         curY += moved.y / density * signY
                                         editController.setWidgetOffset(path, instance.instanceId, curX, curY)
                                     }
-                                    drag(down.id) { change ->
-                                        pointer += change.positionChange()
-                                        autoScroll.move(pointer)
-                                        val slot = liveSlotSize.value
-                                        val wb = widgetWindowBounds
-                                        val (nx, ny) = placementDragOffset(
-                                            curX, curY,
-                                            change.positionChange().x * signX, change.positionChange().y * signY,
-                                            density,
-                                            slotWDp   = clampSlot(true, hBias, slot.width),
-                                            slotHDp   = clampSlot(false, vBias, slot.height),
-                                            widgetWDp = widgetLayoutSize.width / density,
-                                            widgetHDp = widgetLayoutSize.height / density,
-                                            hBias     = anchorHorizontalBias(a),
-                                            vBias     = anchorVerticalBias(a),
-                                        )
-                                        curX = nx
-                                        curY = ny
-                                        editController.setWidgetOffset(path, instance.instanceId, nx, ny)
-                                        // Who this is currently on top of, said while the
-                                        // gesture is live. The bounds are a frame behind the
-                                        // write, which for a warning colour is close enough
-                                        // and costs no extra measurement.
-                                        registry.publishOverlap(
-                                            wb?.let { registry.overlapping(path, it, instance.instanceId) }.orEmpty(),
-                                        )
-                                        change.consume()
+                                    try {
+                                        drag(down.id) { change ->
+                                            pointer += change.positionChange()
+                                            autoScroll.move(pointer)
+                                            val slot = liveSlotSize.value
+                                            val wb = widgetWindowBounds
+                                            val (nx, ny) = placementDragOffset(
+                                                curX, curY,
+                                                change.positionChange().x * signX, change.positionChange().y * signY,
+                                                density,
+                                                slotWDp   = clampSlot(true, hBias, slot.width),
+                                                slotHDp   = clampSlot(false, vBias, slot.height),
+                                                widgetWDp = widgetLayoutSize.width / density,
+                                                widgetHDp = widgetLayoutSize.height / density,
+                                                hBias     = anchorHorizontalBias(a),
+                                                vBias     = anchorVerticalBias(a),
+                                            )
+                                            curX = nx
+                                            curY = ny
+                                            editController.setWidgetOffset(path, instance.instanceId, nx, ny)
+                                            // Who this is currently on top of, said while the
+                                            // gesture is live. The bounds are a frame behind the
+                                            // write, which for a warning colour is close enough
+                                            // and costs no extra measurement.
+                                            registry.publishOverlap(
+                                                wb?.let { registry.overlapping(path, it, instance.instanceId) }.orEmpty(),
+                                            )
+                                            change.consume()
+                                        }
+                                    } finally {
+                                        autoScroll.stop()
+                                        registry.publishOverlap(emptySet())
                                     }
-                                    autoScroll.stop()
-                                    registry.publishOverlap(emptySet())
                                 }
                                 else -> {
                                     // Flow reorder: drive the existing DnD controller
@@ -583,15 +595,19 @@ fun EditableWidgetChrome(
                                     // screen, and the drop is read off where the slots are,
                                     // which moves with the page by itself.
                                     autoScroll.start(last) { }
-                                    drag(slop.id) { change ->
-                                        last += change.positionChange()
-                                        autoScroll.move(last)
-                                        controller.update(last)
-                                        change.consume()
+                                    try {
+                                        drag(slop.id) { change ->
+                                            last += change.positionChange()
+                                            autoScroll.move(last)
+                                            controller.update(last)
+                                            change.consume()
+                                        }
+                                        autoScroll.stop()
+                                        liveCommitDrop.value(last)
+                                    } finally {
+                                        autoScroll.stop()
+                                        controller.end()
                                     }
-                                    autoScroll.stop()
-                                    liveCommitDrop.value(last)
-                                    controller.end()
                                 }
                             }
                         }
@@ -730,17 +746,20 @@ fun EditableWidgetChrome(
                                         accY += moved.y
                                         apply()
                                     }
-                                    drag(down.id) { change ->
-                                        accX += change.positionChange().x
-                                        accY += change.positionChange().y
-                                        pointer += change.positionChange()
-                                        autoScroll.move(pointer)
-                                        apply()
-                                        change.consume()
+                                    try {
+                                        drag(down.id) { change ->
+                                            accX += change.positionChange().x
+                                            accY += change.positionChange().y
+                                            pointer += change.positionChange()
+                                            autoScroll.move(pointer)
+                                            apply()
+                                            change.consume()
+                                        }
+                                    } finally {
+                                        autoScroll.stop()
+                                        resizing = false
+                                        registry.publishOverlap(emptySet())
                                     }
-                                    autoScroll.stop()
-                                    resizing = false
-                                    registry.publishOverlap(emptySet())
                                 }
                             },
                     ) {

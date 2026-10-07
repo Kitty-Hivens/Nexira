@@ -1547,6 +1547,7 @@ object EnglishStrings : AppStrings {
     override val editorPresetNamePlaceholder = "Preset name..."
     override fun editorPresetsSaved(count: Int) = "Saved ($count)"
     override val editorPresetsEmpty          = "Empty. Save the current layout as your first preset."
+    override val editorPresetWriteFailed     = "Could not write to the presets folder. Check that the disk has room and the folder can be written to."
     override val editorPresetsBuiltIn          = "Ready-made"
     override fun bundledPresetName(id: String) = when (id) {
         "home-type" -> "Home: type"

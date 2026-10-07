@@ -12,7 +12,6 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.floatOrNull
 import kotlinx.serialization.json.intOrNull
-import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
 /**
@@ -156,7 +155,7 @@ internal object JsonMigrations {
     private fun compensatePlacedWidget(widget: JsonElement): JsonElement {
         val obj = widget.asObjectOrNull() ?: return widget
         val placement = obj["placement"]?.asObjectOrNull() ?: return widget
-        val anchor = placement["anchor"]?.jsonPrimitive?.contentOrNull ?: "topStart"
+        val anchor = (placement["anchor"] as? JsonPrimitive)?.contentOrNull ?: "topStart"
         val hBias = anchorHorizontalBias(anchor)
         val vBias = anchorVerticalBias(anchor)
         // The side the offset counts from is the side the removed padding sat on. A
@@ -170,8 +169,8 @@ internal object JsonMigrations {
         if (addStart == 0f && addEnd == 0f && addTop == 0f && addBottom == 0f) return widget
         val existing = placement["padding"]?.asObjectOrNull()
         fun eff(side: String): Float =
-            existing?.get(side)?.jsonPrimitive?.floatOrNull
-                ?: existing?.get("all")?.jsonPrimitive?.floatOrNull ?: 0f
+            (existing?.get(side) as? JsonPrimitive)?.floatOrNull
+                ?: (existing?.get("all") as? JsonPrimitive)?.floatOrNull ?: 0f
         val start = eff("start") + addStart
         val end = eff("end") + addEnd
         val top = eff("top") + addTop
@@ -249,7 +248,7 @@ internal object JsonMigrations {
         val obj = slot.asObjectOrNull() ?: return slot
         val widgets = obj["widgets"]?.jsonArrayOrNull() ?: return slot
         val kept = widgets
-            .filter { it.asObjectOrNull()?.get("kind")?.jsonPrimitive?.contentOrNull !in RETIRED_KINDS }
+            .filter { (it.asObjectOrNull()?.get("kind") as? JsonPrimitive)?.contentOrNull !in RETIRED_KINDS }
             .map { filterWidget(it) }
         return buildJsonObject {
             obj.forEach { (key, value) -> if (key != "widgets") put(key, value) }

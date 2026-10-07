@@ -1561,6 +1561,7 @@ object RussianStrings : AppStrings {
     override val editorPresetNamePlaceholder = "Имя пресета..."
     override fun editorPresetsSaved(count: Int) = "Сохранённые ($count)"
     override val editorPresetsEmpty          = "Пусто. Сохрани текущий layout как первый пресет."
+    override val editorPresetWriteFailed     = "Не удалось записать в папку пресетов. Проверь, что на диске есть место и папка доступна для записи."
     override val editorPresetsBuiltIn          = "Готовые"
     override fun bundledPresetName(id: String) = when (id) {
         "home-type" -> "Главная: типографика"

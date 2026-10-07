@@ -32,6 +32,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -67,6 +68,7 @@ import hivens.widget.model.WidgetInstance
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
@@ -339,6 +341,12 @@ private fun NotificationDrawer(
 
 // Swipe a row to the right to dismiss it: the offset tracks the drag, snaps back
 // if released early, or slides off and removes the group once past the threshold.
+//
+// The dismissal is read through rememberUpdatedState, as the live toast card reads
+// its own. The gesture never restarts, and the callback closes over the groups the
+// drawer had when the row appeared: swiping every group away left the drawer open
+// on its empty box, because the last swipe still counted the ones already gone.
+// A swipe cut short goes back to rest rather than staying half off the row.
 @Composable
 private fun SwipeableHistoryRow(
     entry: PersistedNotification,
@@ -350,6 +358,7 @@ private fun SwipeableHistoryRow(
     val scope = rememberCoroutineScope()
     val offsetX = remember { Animatable(0f) }
     var widthPx by remember { mutableStateOf(1f) }
+    val dismiss by rememberUpdatedState(onDismiss)
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -363,11 +372,12 @@ private fun SwipeableHistoryRow(
                     },
                     onDragEnd = {
                         if (offsetX.value > widthPx * 0.4f) {
-                            scope.launch { offsetX.animateTo(widthPx); onDismiss() }
+                            scope.launch { offsetX.animateTo(widthPx); dismiss() }
                         } else {
                             scope.launch { offsetX.animateTo(0f) }
                         }
                     },
+                    onDragCancel = { scope.launch { offsetX.animateTo(0f) } },
                 )
             }
             .offset { IntOffset(offsetX.value.roundToInt(), 0) }
@@ -472,7 +482,11 @@ private fun TimeStamp(epoch: Long, ampm: Boolean, vertical: Boolean, color: Colo
     val hh = "%02d".format(hour)
     val mm = "%02d".format(ldt.minute)
     val ss = "%02d".format(ldt.second)
-    val meridiem = if (ldt.hour < 12) "am" else "pm"
+    // The marker in the launcher's language, as the clock widget writes it, rather
+    // than an English am/pm in a Russian or Japanese interface.
+    val locale = LocalStrings.current.locale
+    val meridiemFormat = remember(locale) { DateTimeFormatter.ofPattern("a", locale) }
+    val meridiem = meridiemFormat.format(ldt)
     val style = MaterialTheme.typography.labelSmall
     if (vertical) {
         Column(horizontalAlignment = Alignment.End) {

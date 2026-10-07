@@ -340,13 +340,19 @@ fun Modifier.dragSource(
         // source's bounds move while the drag is in flight, and a pointer measured
         // against them reports the source's movement as the user's.
         var lastPointer = bounds.topLeft + drag.position
-        drag(drag.id) { change: PointerInputChange ->
-            lastPointer += change.positionChange()
-            controller.update(lastPointer)
-            change.consume()
+        // finally: a drag cut off with the palette closing under it, Esc or Ctrl+E
+        // mid-gesture, ran nothing after this, and the ghost and the hidden cursor
+        // it draws stayed up over the whole window. A cut-off drag drops nothing.
+        try {
+            drag(drag.id) { change: PointerInputChange ->
+                lastPointer += change.positionChange()
+                controller.update(lastPointer)
+                change.consume()
+            }
+            onDragEnd(lastPointer)
+        } finally {
+            controller.end()
         }
-        onDragEnd(lastPointer)
-        controller.end()
     }
 }
 
