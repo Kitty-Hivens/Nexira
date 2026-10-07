@@ -211,8 +211,9 @@ jobs:
           :client-cli:test :client-media:test :client-tray:test
           :client-ui:desktopTest :client-i18n:desktopTest :client-render3d:desktopTest
           :client-easter:desktopTest :nx-ui:desktopTest
-          :widget-api:test :widget-model:test :widget-processor:test
+          :widget-api:test :widget-model:test :widget-processor:test :widget-loader:test
           :authlib-agent:test :profiler-agent:test
+          :experimental:client-boot:test :examples:widget-pixelplayer:test
           --continue
 
       # Gradle's daemon keeps the .lock files under ~/.gradle/caches open for as
