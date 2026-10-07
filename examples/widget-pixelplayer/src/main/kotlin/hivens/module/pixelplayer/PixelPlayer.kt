@@ -150,12 +150,17 @@ internal class PixelPlayer private constructor() {
 
     /** Seek to a fraction of the track. The bar is discrete, so this arrives snapped. */
     fun seekTo(fraction: Float) {
+        // Under the gate like every other compound operation: a step suspended in
+        // its close would otherwise have this seek the player it is about to drop
+        // and write a position onto the track that replaces it.
         scope.launch(engine) {
-            val duration = _state.value.durationMs
-            if (duration <= 0L) return@launch
-            val target = (fraction.coerceIn(0f, 1f) * duration).toLong()
-            player?.seek(target * 1_000_000L, exact = true)
-            _state.value = _state.value.copy(positionMs = target)
+            gate.withLock {
+                val duration = _state.value.durationMs
+                if (duration <= 0L) return@withLock
+                val target = (fraction.coerceIn(0f, 1f) * duration).toLong()
+                player?.seek(target * 1_000_000L, exact = true)
+                _state.value = _state.value.copy(positionMs = target)
+            }
         }
     }
 
@@ -180,7 +185,13 @@ internal class PixelPlayer private constructor() {
         if (views.decrementAndGet() > 0) return
         scope.launch {
             delay(NO_VIEW_GRACE_MS.milliseconds)
-            if (views.get() == 0) withContext(engine) { close() }
+            // The count is read inside the gate, on the engine, and the close runs
+            // there too. Read outside, a view remounting right at the end of the
+            // grace could open a track between the check and the close, and the
+            // close then shut the player that had just been opened for it.
+            withContext(engine) {
+                gate.withLock { if (views.get() == 0) close() }
+            }
         }
     }
 
