@@ -1,36 +1,23 @@
 package hivens.launcher.launch
 
 import hivens.core.data.PackAuthRequirement
-import hivens.core.data.PackInstance
-import hivens.core.data.PackOrigin
 
 /**
  * Resolves the auth requirement for a pack launch. An explicit manifest
- * requirement always wins; otherwise it derives from the pack origin:
+ * requirement always wins, and nothing else is treated as a server binding.
  *
- * - Smartycraft: the packRef id IS the SC server id by construction, so the
- *   binding derives directly from it.
- * - Mirror: Microsoft. An SC-bound mirror pack declares itself through the
- *   manifest's `auth` block (`kind: smartycraft`); the name table that used to
- *   bridge the gap is gone now that the mirror authors the block, so a mirror
- *   manifest WITHOUT one launches as a plain licensed pack and an SC server
- *   will kick it -- the block is the single source of the binding.
- * - Modrinth / Local (incl. CurseForge imports) / Unknown: Microsoft (licensed
- *   play). Advisory until the Microsoft provider is registered.
+ * Without one the answer is Microsoft for every origin, which records the intent
+ * (licensed play) and nothing more. A pack's origin never implies a server: the
+ * binding is the manifest's `auth` block, and a launch that the manifest did not
+ * bind gets no session token unless a licensed provider is registered and signed
+ * in. See `LauncherController.preparePackLaunch` for where that is decided.
  *
- * Microsoft requirements are non-blocking in this phase (the launch gate only
- * enforces a satisfiable provider), so deriving Microsoft instead of null does
- * not change current behavior -- it records intent for when the provider lands.
+ * [PackOrigin.Smartycraft][hivens.core.data.PackOrigin.Smartycraft] used to derive
+ * an SC binding from its pack id. Nothing creates that origin any more, and the
+ * derived binding handed a live session to a launch the manifest had never bound,
+ * so none of the guards a bound launch runs under were armed for it.
  */
 object PackAuthRouter {
-    fun requirementFor(instance: PackInstance, explicit: PackAuthRequirement?): PackAuthRequirement? {
-        if (explicit != null) return explicit
-        return when (instance.packRef.origin) {
-            PackOrigin.Smartycraft -> PackAuthRequirement.SmartyCraft(instance.packRef.id)
-            PackOrigin.Mirror,
-            PackOrigin.Modrinth,
-            PackOrigin.Local,
-            PackOrigin.Unknown -> PackAuthRequirement.Microsoft
-        }
-    }
+    fun requirementFor(explicit: PackAuthRequirement?): PackAuthRequirement =
+        explicit ?: PackAuthRequirement.Microsoft
 }

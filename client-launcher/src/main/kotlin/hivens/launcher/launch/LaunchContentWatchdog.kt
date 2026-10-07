@@ -8,7 +8,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
-import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration.Companion.milliseconds
@@ -68,8 +67,13 @@ internal class LaunchContentWatchdog(
      * this promptly instead of holding a thread for the full settle.
      */
     suspend fun run(): List<String> = withContext(Dispatchers.IO) {
+        // Watched whether or not it exists yet. An instance whose `mods/` was gone at
+        // the check passes it (nothing foreign, and a missing file is not a
+        // substitution), and returning here left the watch off for exactly that
+        // session: the directory could be created after the spawn, with a jar in it,
+        // before the loader scans. A missing directory lists as empty, so its
+        // appearance is a change like any other.
         val modsDir = clientDir.resolve("mods")
-        if (!Files.isDirectory(modsDir)) return@withContext emptyList()
 
         val deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(settleMillis)
         var seen = DirectorySnapshot.of(modsDir)

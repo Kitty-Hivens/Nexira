@@ -10,6 +10,7 @@ import io.ktor.utils.io.ByteReadChannel
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import java.io.ByteArrayOutputStream
+import java.nio.file.Files
 import java.security.MessageDigest
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
@@ -79,6 +80,39 @@ class ForgeLegacyResolverTest {
         assertNull(asm.bundled, "url-based lib must not carry bundled bytes")
     }
 
+    /**
+     * Every launch of a 1.12.2 pack read the maven's metadata and downloaded the
+     * installer into a temp file it then deleted, so none could start offline.
+     */
+    @Test
+    fun `a named build relaunches from the kept installer with the network gone`() = runTest {
+        val forgePath = "net/minecraftforge/forge/1.12.2-14.23.5.2860/forge-1.12.2-14.23.5.2860.jar"
+        val forgeBytes = "FORGE-UNIVERSAL".toByteArray()
+        val versionJson = """{"mainClass":"net.minecraft.launchwrapper.Launch","libraries":[
+            {"name":"net.minecraftforge:forge:1.12.2-14.23.5.2860","downloads":{"artifact":{"path":"$forgePath","url":"","sha1":"${sha1(forgeBytes)}","size":${forgeBytes.size}}}}]}"""
+        val zipBytes = installerZip(versionJson, forgePath, forgeBytes)
+        var online = true
+        val engine = MockEngine { req ->
+            when {
+                !online -> respond("offline", HttpStatusCode.ServiceUnavailable)
+                req.url.toString() == META_URL -> respond("<metadata><versioning><versions><version>1.12.2-14.23.5.2860</version></versions></versioning></metadata>", HttpStatusCode.OK)
+                req.url.toString() == INSTALLER_URL -> respond(ByteReadChannel(zipBytes), HttpStatusCode.OK)
+                else -> respond("missing", HttpStatusCode.NotFound)
+            }
+        }
+        val cacheDir = Files.createTempDirectory("forge-cache")
+        val provider = HttpClientProvider { HttpClient(engine) }
+        val resolver = ForgeLegacyResolver(provider, testTransferEngine(provider), json, forgeMavenBase = MAVEN_BASE, cacheDir = cacheDir)
+        resolver.resolve("1.12.2", "14.23.5.2860")
+
+        online = false
+        val again = resolver.resolve("1.12.2", "14.23.5.2860")
+
+        assertEquals("net.minecraft.launchwrapper.Launch", again.mainClass)
+        assertEquals("FORGE-UNIVERSAL", again.libraries.single().bundled?.decodeToString())
+        cacheDir.toFile().deleteRecursively()
+    }
+
     @Test
     fun `extractTweakArgs falls back to the canonical FML tweaker when absent`() {
         val resolver = ForgeLegacyResolver(HttpClientProvider { HttpClient(MockEngine { respond("", HttpStatusCode.OK) }) }, testTransferEngine(HttpClientProvider { HttpClient(MockEngine { respond("", HttpStatusCode.OK) }) }), json)
@@ -90,6 +124,13 @@ class ForgeLegacyResolverTest {
     fun `resolveForgeBuild keeps a published build`() = runTest {
         val r = ForgeLegacyResolver(HttpClientProvider { HttpClient(metadataEngine()) }, testTransferEngine(HttpClientProvider { HttpClient(metadataEngine()) }), json, forgeMavenBase = MAVEN_BASE)
         assertEquals("14.23.5.2864", r.resolveForgeBuild("1.12.2", "14.23.5.2864"))
+    }
+
+    /** Written the way other launchers write it, with the Minecraft version in front. */
+    @Test
+    fun `resolveForgeBuild keeps a published build named with its Minecraft prefix`() = runTest {
+        val r = ForgeLegacyResolver(HttpClientProvider { HttpClient(metadataEngine()) }, testTransferEngine(HttpClientProvider { HttpClient(metadataEngine()) }), json, forgeMavenBase = MAVEN_BASE)
+        assertEquals("14.23.5.2860", r.resolveForgeBuild("1.12.2", "1.12.2-14.23.5.2860"))
     }
 
     @Test

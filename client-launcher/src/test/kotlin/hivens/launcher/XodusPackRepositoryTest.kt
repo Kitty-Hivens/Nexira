@@ -3,7 +3,13 @@ package hivens.launcher
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
 import hivens.core.data.PackReference
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import java.nio.file.Files
@@ -130,6 +136,33 @@ class XodusPackRepositoryTest {
         assertEquals(listOf("legacy"), repos.first().list().map { it.id })
     }
 
+    /**
+     * Xodus locks the directory for one process, and the registry used to take that
+     * lock when it was built and keep it. One that holds it per operation leaves the
+     * database free between them, which is what lets the launcher start while a
+     * command-line launch is running.
+     */
+    @Test
+    fun `a registry that holds the database per operation leaves it free between them`() = runTest {
+        val d = tempData()
+        val transient = XodusPackRepository(d.resolve("db"), d.resolve("packs.json"), json, holdOpen = false).also { repos.add(it) }
+        transient.put(instance("a"))
+
+        val other = repo(d)
+
+        assertEquals(listOf("a"), other.list().map { it.id })
+    }
+
+    /** Built is not opened: a registry nobody has read takes no lock. */
+    @Test
+    fun `building a registry does not open its database`() = runTest {
+        val d = tempData()
+        repo(d)
+        val reader = repo(d)
+
+        assertEquals(emptyList(), reader.list())
+    }
+
     @Test
     fun `a failed write rolls back the in-memory state`() = runTest {
         val r = repo(tempData())
@@ -138,5 +171,82 @@ class XodusPackRepositoryTest {
         r.put(instance("b"))
         assertNull(r.get("b"))
         assertEquals(listOf("a"), r.list().map { it.id })
+    }
+
+    @Test
+    fun `an update lands on the record as it is, not as the caller last read it`() = runTest {
+        val r = repo(tempData())
+        r.put(instance("a"))
+        val staleRead = r.get("a")!!
+        // Another writer records playtime after the settings window read the record.
+        r.put(staleRead.copy(playtimeSeconds = 600))
+
+        r.update("a") { it.copy(notes = "edited") }
+
+        val stored = r.get("a")!!
+        assertEquals("edited", stored.notes)
+        assertEquals(600, stored.playtimeSeconds, "the edit carried back the playtime of an older read")
+    }
+
+    @Test
+    fun `concurrent updates each see the one before`() = runTest {
+        val r = repo(tempData())
+        r.put(instance("a"))
+
+        withContext(Dispatchers.Default) {
+            (1..64).map { async { r.update("a") { it.copy(playtimeSeconds = it.playtimeSeconds + 1) } } }.awaitAll()
+        }
+
+        assertEquals(64, r.get("a")!!.playtimeSeconds)
+    }
+
+    /**
+     * The pack settings save from an effect that the next edit cancels. A cancellation
+     * that reached the update between the memory change and the disk write left the
+     * edit on screen and absent after a restart.
+     */
+    @Test
+    fun `an update cancelled after it changed memory still reaches the disk`() = runTest {
+        val d = tempData()
+        val r = repo(d)
+        r.put(instance("a"))
+
+        lateinit var job: Job
+        job = launch {
+            r.update("a") { job.cancel(); it.copy(notes = "edited") }
+        }
+        job.join()
+        r.close()
+
+        val reopened = XodusPackRepository(d.resolve("db"), d.resolve("packs.json"), json).also { repos.add(it) }
+        assertEquals(r.get("a")?.notes, reopened.get("a")?.notes, "memory and disk agree")
+        assertEquals("edited", reopened.get("a")?.notes)
+    }
+
+    @Test
+    fun `an update of an instance that is not installed writes nothing`() = runTest {
+        val r = repo(tempData())
+        assertNull(r.update("ghost") { it.copy(notes = "x") })
+        assertTrue(r.list().isEmpty())
+    }
+
+    // A database made before a schema bump, opened by the build after it, then by the
+    // build before it again. The stamp has to move, or the older build never learns
+    // it is looking at newer data and writes its own shape over it.
+    @Test
+    fun `a schema bump is stamped on an existing database and an older build reads it read-only`() = runTest {
+        val d = tempData()
+        fun at(version: Int) =
+            XodusPackRepository(d.resolve("db"), d.resolve("packs.json"), json, schemaVersion = version).also { repos.add(it) }
+
+        at(1).apply { put(instance("a")); close() }
+        at(2).apply { list(); close() }
+
+        val older = at(1)
+        older.put(instance("b"))
+        older.close()
+
+        val ids = at(2).list().map { it.id }
+        assertEquals(listOf("a"), ids, "the older build did not write over the newer database")
     }
 }

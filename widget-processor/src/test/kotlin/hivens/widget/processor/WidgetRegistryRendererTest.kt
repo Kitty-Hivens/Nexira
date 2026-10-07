@@ -4,6 +4,8 @@ import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -43,12 +45,12 @@ class WidgetRegistryRendererTest {
 
     @Test
     fun `a declared plane is emitted, decoded on first read`() {
-        val src = renderRegistry(listOf(widget("home.card", surfaceJson = """{"fill":"base","opacity":0.45}""")))
+        val src = renderRegistry(listOf(widget("home.card", surfaceJson = """{"fill":"panel","opacity":0.45}""")))
         assertContains(src, "import hivens.widget.model.SurfaceSpec")
         assertContains(src, "override val defaultSurface: SurfaceSpec? by lazy {")
         // Escaped into a Kotlin literal, not pasted raw: an unescaped quote here
         // would not compile, and the failure would be in generated code.
-        assertContains(src, """decodeFromString(SurfaceSpec.serializer(), "{\"fill\":\"base\",\"opacity\":0.45}")""")
+        assertContains(src, """decodeFromString(SurfaceSpec.serializer(), "{\"fill\":\"panel\",\"opacity\":0.45}")""")
     }
 
     @Test
@@ -258,5 +260,126 @@ class WidgetRegistryRendererTest {
         val src = renderRegistry(listOf(widget("home.new.clock")))
         assertContains(src, "package hivens.widget.generated")
         assertContains(src, "object GeneratedWidgetRegistry : WidgetRegistry {")
+    }
+
+    // ── Declared size ────────────────────────────────────────────────
+
+    @Test
+    fun `a widget that says nothing about its size emits nothing about it`() {
+        val out = renderRegistry(listOf(widget("a.b")))
+        assertFalse(out.contains("WidgetSizing"), "six zeroes is what the interface already defaults to")
+        assertFalse(out.contains("import hivens.widget.model.WidgetSizing"))
+    }
+
+    @Test
+    fun `a declared size is emitted, naming only the axes that were named`() {
+        val out = renderRegistry(
+            listOf(widget("a.b").copy(sizing = SizingArgs(prefWidth = 200, prefHeight = 230))),
+        )
+        assertTrue(out.contains("import hivens.widget.model.WidgetSizing"))
+        assertTrue(
+            out.contains("override val sizing: WidgetSizing = WidgetSizing(prefWidth = 200, prefHeight = 230)"),
+            out,
+        )
+    }
+
+    @Test
+    fun `one axis declared leaves the other silent rather than zeroed`() {
+        val out = renderRegistry(listOf(widget("a.b").copy(sizing = SizingArgs(minWidth = 96, maxWidth = 420))))
+        assertTrue(out.contains("WidgetSizing(minWidth = 96, maxWidth = 420)"), out)
+    }
+
+    @Test
+    fun `the import appears once for a build where only some widgets declare`() {
+        val out = renderRegistry(
+            listOf(widget("a.b"), widget("c.d").copy(sizing = SizingArgs(prefWidth = 10))),
+        )
+        assertEquals(1, out.lines().count { it == "import hivens.widget.model.WidgetSizing" })
+    }
+
+    // ── What the processor refuses ───────────────────────────────────
+
+    @Test
+    fun `a size in order passes`() {
+        assertNull(WidgetValidator.sizingFault(SizingArgs()))
+        assertNull(
+            WidgetValidator.sizingFault(
+                SizingArgs(
+                    minWidth = 80, prefWidth = 200, maxWidth = 800,
+                    minHeight = 92, prefHeight = 230, maxHeight = 920,
+                ),
+            ),
+        )
+        assertNull(
+            WidgetValidator.sizingFault(SizingArgs(minHeight = 92, maxHeight = 920)),
+            "bounds on one axis alone are in order, because a bound is per axis",
+        )
+    }
+
+    @Test
+    fun `a size out of order is named, because the author is right here`() {
+        assertNotNull(WidgetValidator.sizingFault(SizingArgs(minWidth = 400, maxWidth = 100)))
+        assertNotNull(WidgetValidator.sizingFault(SizingArgs(minWidth = 200, prefWidth = 100)))
+        assertNotNull(WidgetValidator.sizingFault(SizingArgs(prefWidth = 900, maxWidth = 800)))
+        assertNotNull(WidgetValidator.sizingFault(SizingArgs(minHeight = -1)))
+    }
+
+    @Test
+    fun `a bound with nothing on the other side is not a contradiction`() {
+        // Declaring only a floor, or only a ceiling, is the common case.
+        assertNull(WidgetValidator.sizingFault(SizingArgs(minWidth = 400)))
+        assertNull(WidgetValidator.sizingFault(SizingArgs(maxWidth = 400)))
+    }
+
+    @Test
+    fun `a preferred size is a shape, so half of one is refused`() {
+        // Three readers ask for both axes before they will use it, and on an
+        // AdaptiveWidget half of one is worse than none: the widget falls through
+        // to filling whatever slot it lands in.
+        assertNotNull(WidgetValidator.sizingFault(SizingArgs(prefWidth = 400)))
+        assertNotNull(WidgetValidator.sizingFault(SizingArgs(prefHeight = 400)))
+        assertNull(WidgetValidator.sizingFault(SizingArgs(prefWidth = 400, prefHeight = 300)))
+    }
+}
+
+/** A declared arrival reaches the descriptor, and a mistyped one never builds. */
+class WidgetEntranceDeclarationTest {
+
+    private fun widget(id: String, enter: String?) = WidgetModel(
+        id = id,
+        displayName = "Display",
+        removable = true,
+        drawsOwnSurface = false,
+        slots = emptyList(),
+        propsClassFqn = null,
+        functionFqn = "hivens.ui.widgets.Sample",
+        enter = enter,
+    )
+
+    @Test
+    fun `a declared arrival is emitted as the constant it names`() {
+        val src = renderRegistry(listOf(widget("home.card", enter = "Rise")))
+        assertContains(src, "import hivens.widget.model.Entrance")
+        assertContains(src, "override val defaultEntrance: Entrance? = Entrance.Rise")
+    }
+
+    @Test
+    fun `a widget that declares none emits neither the import nor the field`() {
+        val src = renderRegistry(listOf(widget("home.card", enter = null)))
+        assertFalse("Entrance" in src, src)
+    }
+
+    @Test
+    fun `an unknown character is a build error that lists the known ones`() {
+        assertNull(WidgetValidator.entranceFault(""))
+        assertNull(WidgetValidator.entranceFault("settle"))
+        val fault = assertNotNull(WidgetValidator.entranceFault("spiral"))
+        assertContains(fault, "spiral")
+        assertContains(fault, "none, fade, rise, settle")
+    }
+
+    @Test
+    fun `an annotation value with a dollar or a line break stays inside its literal`() {
+        assertEquals("a\\${'$'}b\\nc\\\"d\\\\e", "a${'$'}b\nc\"d\\e".kotlinEscape())
     }
 }

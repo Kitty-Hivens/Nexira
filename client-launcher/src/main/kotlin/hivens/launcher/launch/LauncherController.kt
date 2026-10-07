@@ -6,7 +6,6 @@ import hivens.core.api.AuthException
 import hivens.core.api.TwoFactorRequiredException
 import hivens.core.data.AuthStatus
 import hivens.core.api.interfaces.*
-import hivens.core.api.model.ServerProfile
 import hivens.core.api.dto.smrt.SmrtPackManifest
 import hivens.core.api.dto.smrt.toDomain
 import hivens.core.data.CachedManifestSnapshot
@@ -21,6 +20,7 @@ import hivens.core.data.flatten
 import hivens.core.diag.ActionRing
 import hivens.core.io.InstanceMutationLock
 import hivens.core.launch.AuthRefreshFailure
+import hivens.core.launch.InstanceWorkRegistry
 import hivens.core.launch.LaunchError
 import hivens.core.launch.LaunchHandle
 import hivens.core.launch.LaunchLogEvent
@@ -28,10 +28,6 @@ import hivens.core.launch.LaunchState
 import hivens.core.launch.PrepareStage
 import hivens.core.launch.SpawnResult
 import hivens.launcher.di.AppCoroutineScopeHook
-import hivens.launcher.platform.ServerNameValidator
-import hivens.launcher.smrt.ClientSyncCoordinator
-import hivens.launcher.smrt.OpenSmrtHelperResolver
-import hivens.launcher.smrt.SmartyModPlanner
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -59,29 +55,23 @@ import kotlinx.coroutines.slf4j.MDCContext
  * graph automatically; production wiring stays a one-liner.
  *
  * Note: [appScope] is the shared `single<CoroutineScope>(createdAtStart)`
- * registered alongside [AppCoroutineScopeHook] -- the
- * JVM shutdown hook cancels every in-flight launch on process exit. The
- * prior dedicated `CoroutineScope(SupervisorJob() + IO)` here was
- * unreachable from any shutdown hook, so a SIGTERM mid-launch could
- * leave the spawned game process and its sockets hanging.
+ * registered alongside [AppCoroutineScopeHook], whose JVM shutdown hook cancels
+ * the launcher's own work in flight. A running game is not part of that work and
+ * survives it; see the hook for why, and [settleSessionForQuit] for how its
+ * session is still recorded when the launcher quits around it.
  */
 class LauncherController(
     private val authService: AuthProvider,
     private val authProviderRegistry: AuthProviderRegistry,
     private val credentialsManager: ICredentialStore,
     private val settingsService: ISettingsService,
-    private val downloadService: IFileDownloadService,
-    private val javaManagerService: IJavaManager,
     private val launcherService: ILauncherService,
-    private val manifestProcessor: IManifestProcessorService,
-    private val manifestCache: IManifestStore,
-    private val profileManager: IInstanceProfileStore,
     private val packRepository: IPackRepository,
     private val smrtPackClient: IMirrorPackClient,
     private val smrtSyncService: IPackSyncService,
-    private val smartyPlanner: SmartyModPlanner,
     private val dataDirectory: Path,
     private val appScope: CoroutineScope,
+    private val work: InstanceWorkRegistry,
 ) : RunningPackSource {
 
     private val logger = LoggerFactory.getLogger(LauncherController::class.java)
@@ -97,15 +87,14 @@ class LauncherController(
         manifest: SmrtPackManifest,
         toggles: List<ContentToggle>,
     ): PackInstance {
-        // Re-read, then change the one field this owns. The record the caller holds
-        // was captured when the tab rendered, and an apply committing in between
-        // moves the pinned version, the installed manifest and the cached one. Writing
-        // the captured copy back whole restores all three to the build the update had
-        // just left, so a checkbox would silently undo an update. The two other
-        // writers in this file already re-read for the same reason.
-        val current = packRepository.get(instance.id) ?: instance
-        val updated = current.copy(optionalContent = toggles)
-        packRepository.put(updated)
+        // The one field this owns, set on the record as it stands. The record the
+        // caller holds was captured when the tab rendered, and an apply committing in
+        // between moves the pinned version, the installed manifest and the cached one.
+        // Writing the captured copy back whole restores all three to the build the
+        // update had just left, so a checkbox would silently undo an update. The other
+        // writers in this file do the same for the same reason.
+        val updated = packRepository.update(instance.id) { it.copy(optionalContent = toggles) }
+            ?: instance.copy(optionalContent = toggles)
         val clientDir = dataDirectory.resolve("instances").resolve(updated.instanceDirName)
         val deferred = withContext(Dispatchers.IO) {
             InstanceMutationLock.withLock(clientDir) {
@@ -190,6 +179,21 @@ class LauncherController(
     private val _state = MutableStateFlow<LaunchState>(LaunchState.Idle)
     val state: StateFlow<LaunchState> = _state.asStateFlow()
 
+    private val _runningPackInstanceId = MutableStateFlow<String?>(null)
+
+    /**
+     * [LaunchState] deliberately carries no target identity -- it is the shared
+     * Compose-free contract and a frontend renders it without caring what was
+     * launched. This is the separate question "whose files are in use right now",
+     * which the settings surfaces need in order to warn about rewriting them and
+     * the auto-updater needs in order to leave them alone.
+     *
+     * Set when a launch is accepted, not when its game spawns: preparing a launch
+     * already reads the instance, and an update that started under it would swap
+     * files between the check and the game reading them.
+     */
+    override val runningPackInstanceId: StateFlow<String?> = _runningPackInstanceId.asStateFlow()
+
     /**
      * Push-side log channel. UI subscribes (`LaunchLogCollector` in
      * `Main.kt`'s application block) and routes each event to the
@@ -202,16 +206,6 @@ class LauncherController(
      * itself capped at 2000 lines, so lossy-under-pressure semantics
      * stay consistent across the two layers.
      */
-    private val _runningPackInstanceId = MutableStateFlow<String?>(null)
-
-    /**
-     * [LaunchState] deliberately carries no target identity -- it is the shared
-     * Compose-free contract and a frontend renders it without caring what was
-     * launched. This is the separate question "whose files are in use right now",
-     * which the settings surfaces need in order to warn about rewriting them.
-     */
-    override val runningPackInstanceId: StateFlow<String?> = _runningPackInstanceId.asStateFlow()
-
     private val _events = MutableSharedFlow<LaunchLogEvent>(
         extraBufferCapacity = 256,
         onBufferOverflow = BufferOverflow.DROP_OLDEST,
@@ -227,6 +221,7 @@ class LauncherController(
         emit(LaunchLogEvent.Error(reason))
     }
 
+    /** Read and written under [launchLock] only. */
     private var launchJob: Job? = null
     /**
      * Tracked separately from [launchJob] so [abort] can terminate the live
@@ -239,19 +234,14 @@ class LauncherController(
     private val launchLock = Any()
 
     /**
-     * Per-launch abort token. Each launch installs a fresh
-     * AtomicBoolean here and captures it in its coroutine; [abort] flips
-     * whatever token is current. The launch coroutine -- parked in the
-     * blocking `process.waitFor()`, which resumes with SIGTERM code 143
-     * once the process is destroyed -- checks ITS OWN captured token to
-     * tell a user stop from a crash.
+     * Per-launch abort token. Each launch installs a fresh AtomicBoolean here and
+     * captures it in its coroutine; [abort] flips whatever token is current. The
+     * launch coroutine, parked in the process wait, checks ITS OWN captured token
+     * to tell a user stop from a crash.
      *
-     * A single shared flag would race: aborting game A then immediately
-     * launching B (allowed, because abort sets state Idle synchronously
-     * while A's coroutine is still blocked in waitFor) would let B reset
-     * the flag before A's exit handler reads it, so A would falsely
-     * report a crash and clobber B's state. A per-launch token each
-     * coroutine reads in isolation removes the race.
+     * Per launch rather than one shared flag, because a launch that was stopped
+     * during its preparation unwinds after [abort] has already reopened the gate,
+     * and a shared flag would be reset under it by the launch that followed.
      */
     @Volatile private var currentAbortToken: AtomicBoolean? = null
 
@@ -259,42 +249,70 @@ class LauncherController(
      * Identity of the launch that currently owns the controller's shared state --
      * [runningHandle], [_runningPackInstanceId] and [_state].
      *
-     * Aborting A and immediately launching B is allowed: abort sets Idle
-     * synchronously while A's coroutine is still parked in a blocking `awaitExit`
-     * that cancellation cannot interrupt. A then wakes up, potentially long after B
-     * spawned, and everything its tail clears would be B's. Each launch checks that
-     * it is still the current one before touching anything shared, and otherwise
-     * unwinds silently.
+     * A launch stopped while it was still preparing is cancelled, and [abort] opens
+     * the gate at once, since there is no game to wait for; its coroutine unwinds
+     * afterwards, possibly after the next launch has started. Each launch checks
+     * that it is still the current one before touching anything shared, and
+     * otherwise unwinds silently. A launch with a game running is not reopened
+     * until that game exits, so this is no longer the case for a stopped game.
      */
     @Volatile private var currentLaunchTag: Any? = null
 
     private fun ownsController(tag: Any): Boolean = currentLaunchTag === tag
 
     /**
-     * SC server-list launch. Delegates the gate/token/MDC/spawn/wait/exit
-     * machinery to [launchInternal]; [prepareServerLaunch] supplies the
-     * SC-specific auth + sync + java steps and the spawn binding.
+     * One accepted launch's hold on [_state], for what it writes while it prepares
+     * and spawns.
      *
-     * @return false when a launch was already under way and this one was refused.
+     * A stop during preparation cancels the launch and reopens the gate at once, but
+     * the cancellation lands only at the launch's next suspension point, and it runs
+     * on until then. A stage or an error written in that stretch went over Idle, or
+     * over the launch that had started since. An error there reads as Play, so
+     * another launch could be accepted while that one went on to spawn a game nothing
+     * would track. These writes land only while this launch is the current one and
+     * nobody has stopped it.
      */
-    fun launch(
-        currentSession: SessionData,
-        server: ServerProfile,
-        onSessionRefreshed: ((SessionData) -> Unit)? = null,
-    ) = launchInternal(
-        label = server.name,
-        onStart = {
-            emit(LaunchLogEvent.SessionStarted(server.assetDir, server.name))
-            emit(LaunchLogEvent.AppBanner)
-            emit(LaunchLogEvent.TargetServer(server.name, settingsService.getSettings().isOfflineMode))
-        },
-        prepare = { prepareServerLaunch(currentSession, server, onSessionRefreshed) },
-    )
+    private inner class Attempt(private val tag: Any, private val abortToken: AtomicBoolean) {
+        private fun holds(): Boolean = ownsController(tag) && !abortToken.get()
+
+        fun fail(reason: LaunchError, cause: Throwable? = null) {
+            synchronized(launchLock) { if (holds()) this@LauncherController.fail(reason, cause) }
+        }
+
+        fun setStage(stage: PrepareStage, progress: Float) {
+            synchronized(launchLock) { if (holds()) _state.value = LaunchState.Prepare(stage, progress) }
+        }
+    }
+
+    /**
+     * The session of the game that is up: which launch it belongs to, where its
+     * playtime has been counted up to, and what records it.
+     *
+     * Kept outside the launch coroutine because a session has two ways to end. The
+     * usual one is the process exiting, when the coroutine's own tail records it.
+     * The other is the launcher quitting with the game left running, where the tail
+     * never runs and [settleSessionForQuit] records what has been played so far.
+     * Counting from [countedFrom] rather than from a fixed start keeps the two from
+     * adding the same minutes twice.
+     */
+    private class LiveSession(
+        val tag: Any,
+        val countedFrom: AtomicLong,
+        val record: (suspend (sessionSeconds: Long) -> Unit)?,
+    ) {
+        /** The seconds since the last count, moving the mark to now. */
+        fun take(): Long {
+            val now = Instant.now().epochSecond
+            return (now - countedFrom.getAndSet(now)).coerceAtLeast(0)
+        }
+    }
+
+    @Volatile private var liveSession: LiveSession? = null
 
     /**
      * Outcome of a prepare phase. [Ready] carries the path-specific spawn (and
-     * an optional post-spawn hook); [Bail] means prepare already called [fail]
-     * and the flow must stop WITHOUT overwriting that error state.
+     * an optional post-spawn hook); [Bail] means prepare already reported its
+     * failure through [Attempt.fail] and the flow must stop WITHOUT overwriting it.
      */
     private sealed interface Prepared {
         class Ready(
@@ -318,13 +336,19 @@ class LauncherController(
              * construction: it lives on the value the launch coroutine holds.
              */
             val contentFailed: AtomicBoolean = AtomicBoolean(false),
+            /**
+             * Raised when the session guard could not be armed, or died while it
+             * watched, and the game was stopped for it. Read after [contentFailed]
+             * for the same reason, and per launch the same way.
+             */
+            val guardFailed: AtomicBoolean = AtomicBoolean(false),
         ) : Prepared
 
         data object Bail : Prepared
     }
 
     /**
-     * Owns the launch state machine shared by both entry points: the atomic
+     * Owns the launch state machine: the atomic
      * re-entry gate, the per-launch abort token + MDC tag, the spawn, the
      * blocking wait, the exit-code verdict, and the cancellation-vs-crash catch
      * tail. [prepare] runs the path-specific steps and returns a
@@ -333,107 +357,182 @@ class LauncherController(
     private fun launchInternal(
         label: String,
         onStart: () -> Unit,
-        prepare: suspend CoroutineScope.() -> Prepared,
+        /** Runs under the gate, once this launch is accepted, before anything else can observe it. */
+        onAccepted: () -> Unit = {},
+        prepare: suspend CoroutineScope.(Attempt) -> Prepared,
     ): Boolean {
-        // Re-entry guard must be atomic with the launchJob assignment. Without
-        // the lock two parallel callers (UI double-click, tray-launch racing
-        // dashboard-launch) could both observe Idle, both pass the gate, both
-        // assign launchJob, and produce two in-flight game spawns -- of which
-        // only the second is tracked for abort(). Claim the state slot under
-        // the lock; the coroutine runs outside it so the gate isn't held
-        // during the long flow.
+        // Tag every log line for this attempt with a stable launchId so a user
+        // dump can be sliced per-play-click (`grep launchId=abcd1234 *.log`).
+        // MDCContext (from kotlinx-coroutines-slf4j) propagates it across every
+        // dispatcher hop the flow takes, including LauncherService.
+        val launchId = UUID.randomUUID().toString().take(8)
+        val abortToken = AtomicBoolean(false)
+        val launchTag = Any()
+        val job: Job
+
+        // The gate, the fields that identify this launch, and its job are claimed in
+        // one step under the lock that [abort] also takes. Two parallel callers (a UI
+        // double-click, a tray launch racing one from the Library) must not both pass
+        // the gate. And the identity must not be written after the lock is released:
+        // an abort in that window flipped the previous launch's token and cancelled
+        // the previous job, and this launch then ran on to a game the person believed
+        // they had stopped. The job is created lazily inside the lock and started
+        // outside it, so the long flow never runs under the gate.
         synchronized(launchLock) {
             if (_state.value !is LaunchState.Idle &&
                 _state.value !is LaunchState.Error) return false
             _state.value = LaunchState.Prepare(PrepareStage.INIT, 0.0f)
+            onAccepted()
+            currentAbortToken = abortToken
+            currentLaunchTag = launchTag
+            job = appScope.launch(MDCContext(mapOf("launchId" to launchId)), start = CoroutineStart.LAZY) {
+                runLaunch(label, launchId, launchTag, abortToken, onStart, prepare)
+            }
+            launchJob = job
         }
+        job.start()
+        return true
+    }
 
-        // Tag every log line for this attempt with a stable launchId so a user
-        // dump can be sliced per-play-click (`grep launchId=abcd1234 *.log`).
-        // MDCContext (from kotlinx-coroutines-slf4j) propagates it across every
-        // dispatcher hop the flow takes, including FileDownloadService and
-        // LauncherService.
-        val launchId = UUID.randomUUID().toString().take(8)
-        val abortToken = AtomicBoolean(false)
-        currentAbortToken = abortToken
-        val launchTag = Any()
-        currentLaunchTag = launchTag
+    /** The body of one accepted launch; see [launchInternal]. */
+    private suspend fun CoroutineScope.runLaunch(
+        label: String,
+        launchId: String,
+        launchTag: Any,
+        abortToken: AtomicBoolean,
+        onStart: () -> Unit,
+        prepare: suspend CoroutineScope.(Attempt) -> Prepared,
+    ) {
+        val attempt = Attempt(launchTag, abortToken)
+        // Local, not a field: a field would let an aborted launch's tail cancel
+        // the guard of the launch that started after it -- the same shape of
+        // race currentAbortToken's KDoc describes.
+        var sessionGuard: Job? = null
+        // The game this launch started, so a stop that interrupts the launch
+        // before the wait is armed can still end it.
+        var spawned: LaunchHandle? = null
+        try {
+            attempt.setStage(PrepareStage.INIT, 0.0f)
+            onStart()
+            ActionRing.record("Launching: $label (launchId=$launchId)")
 
-        launchJob = appScope.launch(MDCContext(mapOf("launchId" to launchId))) {
-            // Local, not a field: a field would let an aborted launch's tail cancel
-            // the guard of the launch that started after it -- the same shape of
-            // race currentAbortToken's KDoc describes.
-            var sessionGuard: Job? = null
-            try {
-                _state.value = LaunchState.Prepare(PrepareStage.INIT, 0.0f)
-                onStart()
-                ActionRing.record("Launching: $label (launchId=$launchId)")
-
-                val prepared = when (val r = prepare()) {
-                    // prepare() already called fail(); stop without touching _state.
-                    is Prepared.Bail -> return@launch
-                    is Prepared.Ready -> r
+            val prepared = when (val r = prepare(attempt)) {
+                // prepare() already reported its failure; stop without touching _state.
+                is Prepared.Bail -> {
+                    if (ownsController(launchTag)) _runningPackInstanceId.value = null
+                    return
                 }
+                is Prepared.Ready -> r
+            }
 
-                setStage(PrepareStage.LAUNCH, 0.95f)
-                ActionRing.record("Game running: $label")
-                emit(LaunchLogEvent.Launching)
+            attempt.setStage(PrepareStage.LAUNCH, 0.95f)
+            ActionRing.record("Game running: $label")
+            emit(LaunchLogEvent.Launching)
 
-                when (val result = prepared.spawn { text, type -> emit(LaunchLogEvent.ProcessOutput(text, type)) }) {
-                    // The service maps its own failures (provisioning, spawn IO,
-                    // SC-binding block) to a semantic LaunchError; surface it.
-                    is SpawnResult.Failed -> fail(result.error)
-                    is SpawnResult.Started -> {
-                        val handle = result.handle
-                        runningHandle = handle
-                        _state.value = LaunchState.GameRunning(handle)
-                        // Post-spawn hook guarded centrally: a throwing hook must
-                        // not flip the running game into an Error state.
-                        prepared.onSpawned?.let { hook ->
-                            runCatching { sessionGuard = hook(handle) }
-                                .onFailure { logger.warn("Post-spawn hook failed for {}", label, it) }
+            when (val result = prepared.spawn { text, type -> emit(LaunchLogEvent.ProcessOutput(text, type)) }) {
+                // The service maps its own failures (provisioning, spawn IO,
+                // SC-binding block) to a semantic LaunchError; surface it.
+                is SpawnResult.Failed -> {
+                    if (ownsController(launchTag)) _runningPackInstanceId.value = null
+                    attempt.fail(result.error)
+                }
+                is SpawnResult.Started -> {
+                    val handle = result.handle
+                    spawned = handle
+                    val live = LiveSession(launchTag, AtomicLong(Instant.now().epochSecond), prepared.onExit)
+                    synchronized(launchLock) {
+                        if (ownsController(launchTag)) {
+                            runningHandle = handle
+                            liveSession = live
+                            // A stop that arrived while the process was being
+                            // started found no game to end. It is ended now,
+                            // and the launch waits for it like any other stop.
+                            if (abortToken.get()) {
+                                _state.value = LaunchState.Stopping(handle)
+                                runCatching { handle.terminate() }
+                            } else {
+                                _state.value = LaunchState.GameRunning(handle)
+                            }
                         }
-                        val sessionStart = Instant.now().epochSecond
+                    }
+                    // What the hook still throws is the session guard failing to arm,
+                    // since its own bookkeeping is guarded inside it. A game that may
+                    // be holding a token and that nothing is watching is not one to
+                    // leave running, so it is stopped, and the stop is reported as the
+                    // failure it is once the process has gone. A cancellation passes.
+                    prepared.onSpawned?.let { hook ->
+                        try {
+                            sessionGuard = hook(handle)
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            logger.error("The session guard could not be armed for {}, stopping the game", label, e)
+                            prepared.guardFailed.set(true)
+                            runCatching { handle.terminate() }
+                        }
+                    }
 
-                        // Reads its OWN captured abortToken, never the
-                        // currentAbortToken field -- see that field's KDoc for the
-                        // abort-A-then-launch-B race a shared flag would reopen.
-                        val exitCode = handle.awaitExit()
-                        // Whatever the post-spawn guard was still watching for, the
-                        // process is gone and there is nothing left to watch it on.
-                        // Unconditional: this one is this launch's own.
-                        sessionGuard?.cancel()
+                    // Reads its OWN captured abortToken, never the
+                    // currentAbortToken field -- see that field's KDoc.
+                    val exitCode = handle.awaitExit()
+                    // Whatever the post-spawn guard was still watching for, the
+                    // process is gone and there is nothing left to watch it on.
+                    // Unconditional: this one is this launch's own.
+                    sessionGuard?.cancel()
+                    ActionRing.record("Game exited: $label (code $exitCode)")
+                    // Recorded before the state settles, and before anything
+                    // could reopen the gate: a stop is a normal end of a session
+                    // and its playtime counts. It used to be skipped whole,
+                    // because the stop cancelled the coroutine and the wait
+                    // threw past this tail.
+                    live.record?.let { hook ->
+                        runCatching { hook(live.take()) }.onFailure { logger.warn("Post-exit hook failed for {}", label, it) }
+                    }
+
+                    synchronized(launchLock) {
                         if (ownsController(launchTag)) {
                             runningHandle = null
+                            liveSession = null
                             // Cleared here rather than in the pack path's own exit
                             // hook: that hook is guarded and may be skipped, and "no
                             // files are in use" has to be true the moment the
                             // process is gone.
                             _runningPackInstanceId.value = null
+                            when {
+                                // The watchdog ended this session. Reported now that
+                                // the process is gone rather than when it was told to
+                                // go: Error reads as Play, and a second game started
+                                // inside the grace would share the instance with this
+                                // one. Read before the exit code, which is the
+                                // watchdog's own doing.
+                                prepared.contentFailed.get() -> fail(LaunchError.ContentChangedDuringLaunch)
+                                prepared.guardFailed.get() -> fail(LaunchError.Internal("session-guard"))
+                                exitCode != 0 && !abortToken.get() -> fail(LaunchError.ExitCode(exitCode))
+                                else -> _state.value = LaunchState.Idle
+                            }
                         }
-                        ActionRing.record("Game exited: $label (code $exitCode)")
-                        prepared.onExit?.let { hook ->
-                            val secs = (Instant.now().epochSecond - sessionStart).coerceAtLeast(0)
-                            runCatching { hook(secs) }.onFailure { logger.warn("Post-exit hook failed for {}", label, it) }
-                        }
-
-                        when {
-                            // A newer launch owns the state now: this one exited
-                            // into a world that has moved on and says nothing.
-                            !ownsController(launchTag) -> Unit
-                            // Read before the exit code: that code IS the guard's
-                            // doing, and judging it would overwrite the reason.
-                            prepared.contentFailed.get() -> Unit
-                            exitCode != 0 && !abortToken.get() -> fail(LaunchError.ExitCode(exitCode))
-                            else -> _state.value = LaunchState.Idle
-                        }
+                        // A newer launch owns the state otherwise: this one exited
+                        // into a world that has moved on and says nothing.
                     }
                 }
-            } catch (e: Exception) {
-                sessionGuard?.cancel()
+            }
+        } catch (e: Throwable) {
+            // Throwable, so an Error is wound down like an exception: caught as
+            // Exception only, it skipped this and left the state on Prepare or
+            // GameRunning with no launch behind it. It is still thrown on below.
+            sessionGuard?.cancel()
+            // A game the person asked to stop is ended whatever interrupted the
+            // wait, and so is one this launch is about to lose track of through a
+            // failure: the handle is forgotten below, after which no stop could
+            // reach it. Not on a plain cancellation: when the launcher itself is
+            // shutting down the scope is cancelled with no stop requested, and a
+            // game the person chose to leave running on quit has to stay running.
+            if (abortToken.get() || e !is CancellationException) spawned?.let { runCatching { it.terminate() } }
+            synchronized(launchLock) {
                 val mine = ownsController(launchTag)
                 if (mine) {
                     runningHandle = null
+                    liveSession = null
                     _runningPackInstanceId.value = null
                 }
                 if (e !is CancellationException) {
@@ -443,221 +542,29 @@ class LauncherController(
                     _state.value = LaunchState.Idle
                 }
             }
+            if (e is Error) throw e
         }
-        return true
     }
 
     /**
-     * SC server-list prepare phase: auth (skipped offline), ignored-file
-     * calculation, sync (or offline manifest recovery), and Java resolution.
-     * Bails -- with the semantic [LaunchError] already set on [fail] -- for the
-     * 2FA-no-manifest, offline-no-client/manifest, and helper-unavailable cases.
+     * The launch path: a [PackInstance] from the local Library. Re-entry guard,
+     * MDC tagging, and abort semantics come from [launchInternal];
+     * [preparePackLaunch] supplies the manifest resolve + pack auth + spawn
+     * binding.
      *
-     * A [CoroutineScope] extension so `isActive` inside the sync callbacks reads
-     * the launch coroutine's cancellation, matching the pre-extraction body.
-     *
-     * The file probes here block, deliberately: a launch runs on the app scope,
-     * whose dispatcher is [Dispatchers.IO]. Moving them to their own IO context
-     * would only add a hop -- and take the launch off the caller's dispatcher,
-     * which is what the tests drive it on.
-     */
-    @Suppress("BlockingMethodInNonBlockingContext")
-    private suspend fun CoroutineScope.prepareServerLaunch(
-        currentSession: SessionData,
-        server: ServerProfile,
-        onSessionRefreshed: ((SessionData) -> Unit)?,
-    ): Prepared {
-        // Named rather than implicit: `isActive` inside the sync callbacks below is
-        // the LAUNCH coroutine's, not that of whatever suspends around it, and an
-        // implicit receiver leaves the reader (and the linter) guessing which.
-        val launchScope = this
-        val settings = settingsService.getSettings()
-        val isOffline = settings.isOfflineMode
-
-        // 1. Auth -- skip in offline mode
-        setStage(PrepareStage.AUTH, 0.1f)
-        var session = currentSession
-        val targetServerId = server.assetDir
-
-        if (isOffline) {
-            emit(LaunchLogEvent.OfflineSkipAuth)
-            // Offline: no SC auth, so the bound server cannot be joined -- the
-            // client still launches for singleplayer/LAN. Mint a proper offline
-            // identity (vanilla OfflinePlayer UUID, blank token -> "0" in argv +
-            // userType legacy) rather than carrying a stale/garbage session.
-            ActionRing.record(
-                "Offline launch of '$targetServerId': singleplayer only, the server cannot be joined without auth",
-            )
-            session = session.copy(
-                uuid = if (session.offline) session.uuid else OfflineIdentity.dashlessUuidFor(session.playerName),
-                accessToken = "",
-                offline = true,
-            )
-        } else {
-            try {
-                val pass = credentialsManager.accountFor(PackAuthRequirement.SmartyCraft.PROVIDER_KEY)?.cachedPassword
-                    ?: session.cachedPassword
-                if (session.twoFactor && !session.mintedNow) {
-                    // Same as the pack path: mint the session for this launch rather
-                    // than trust a stored one nothing can vouch for.
-                    fail(LaunchError.TwoFactorExpired)
-                    return Prepared.Bail
-                } else if (!pass.isNullOrEmpty()) {
-                    session = authService.login(session.playerName, pass, targetServerId)
-                    onSessionRefreshed?.invoke(session)
-                    emit(LaunchLogEvent.AuthSucceeded(session.uuid))
-                } else {
-                    emit(LaunchLogEvent.NoPassword)
-                }
-            } catch (_: TwoFactorRequiredException) {
-                // The demand itself says the account is two-factor; the UI persists
-                // that so later launches stop logging in behind the user's back.
-                //
-                // And it stops here rather than continuing on the stored session: a
-                // cached manifest would let the sync run, but the game would still be
-                // handed a token nothing minted for this launch, which is exactly what
-                // the code prompt exists to prevent.
-                emit(LaunchLogEvent.TwoFactorDetected)
-                ActionRing.record("Launch: second factor required for $targetServerId")
-                fail(LaunchError.TwoFactorExpired)
-                return Prepared.Bail
-            } catch (e: Exception) {
-                // No fresh session, so no session at all: same rule as the pack
-                // path. Carrying the previous token forward is what produced the
-                // launch that looks fine until the server answers "Failed to verify
-                // username" with nothing pointing back here.
-                emit(LaunchLogEvent.AuthFailed(e.message, classifyAuthFailure(e)))
-                emit(LaunchLogEvent.OfflineSkipAuth)
-                session = session.toOffline()
-            }
-        }
-
-        // 2. Ignored files
-        val ignoredFiles = calculateIgnoredFiles(server)
-
-        // 3. Download -- skip in offline mode if client exists
-        setStage(PrepareStage.SYNC, 0.2f)
-        val clientDir = dataDirectory.resolve("clients").resolve(ServerNameValidator.require(targetServerId))
-        if (!Files.exists(clientDir)) Files.createDirectories(clientDir)
-
-        if (isOffline) {
-            // In offline mode, skip file sync but verify client exists.
-            // .use{} closes the directory stream; without it the OS file handle
-            // leaks until GC eventually collects the stream.
-            val hasClient = Files.exists(clientDir) &&
-                Files.list(clientDir).use { it.count() > 0 }
-            if (!hasClient) {
-                fail(LaunchError.OfflineNoClient)
-                return Prepared.Bail
-            }
-            // Recover the file manifest from the last successful online sync.
-            // Without it, ClasspathProvider has nothing to walk and builds an
-            // empty -cp argument -- the JVM then dies with "Could not find or
-            // load main class net.minecraft.launchwrapper.Launch" because the
-            // class IS on disk but classpath is "". TTL is intentionally ignored
-            // here: a stale-but-present manifest is strictly better than
-            // launching with no classpath. If the user has never logged in
-            // online, the cache is empty, and we bail with an actionable error
-            // rather than a cryptic JVM message.
-            if (session.fileManifest == null) {
-                val cached = manifestCache.loadManifest(targetServerId)
-                if (cached != null) {
-                    session = session.copy(fileManifest = cached)
-                } else {
-                    fail(LaunchError.OfflineNoManifest)
-                    return Prepared.Bail
-                }
-            }
-            emit(LaunchLogEvent.OfflineSkipSync)
-        } else {
-            // Smarty swap / strict plan -- computed here (not in the offline
-            // branch) so an offline launch never makes the resolver's doomed
-            // network fetch.
-            val smartyPlan = smartyPlanner.plan(server, session.fileManifest, settings)
-
-            // Block rather than strip Smarty with no replacement: if the swap is
-            // on and the manifest ships Smarty but no helper is available for
-            // this MC version (unsupported version / descriptor down / nothing
-            // cached), launching would either join with no network mod (kick)
-            // or, if we kept Smarty, run the surveillance mod.
-            if (settings.useOpenSmrtHelper && smartyPlan.ignoredAddon.isNotEmpty() &&
-                !helperPresent(clientDir, server.version, smartyPlan)) {
-                fail(LaunchError.HelperUnavailable(server.version))
-                return Prepared.Bail
-            }
-
-            ClientSyncCoordinator.withClientLock(clientDir) {
-                downloadService.processSession(
-                    session = session,
-                    serverId = targetServerId,
-                    targetDir = clientDir,
-                    extraCheckSum = server.extraCheckSum,
-                    ignoredFiles = ignoredFiles + smartyPlan.ignoredAddon,
-                    messageUI = { /* log */ },
-                    progressUI = { progress ->
-                        if (!launchScope.isActive) return@processSession
-                        _state.value = LaunchState.Downloading(
-                            currentFileIdx   = progress.currentFileIdx,
-                            totalFiles       = progress.totalFiles,
-                            downloadedBytes  = progress.downloadedBytes,
-                            totalBytes       = progress.totalBytes,
-                            speedBytesPerSec = progress.bytesPerSec,
-                        )
-                    },
-                    // Map integrity-walk progress onto the SYNC stage's 0.2..0.7
-                    // sub-range. The actual download progress takes over from
-                    // 0.7 upward via the Downloading state above. Without this,
-                    // the progress bar froze at 20% during the MD5 walk on
-                    // 1000-file modpacks -- 5-30s of perceived hang.
-                    verifyUI = { verified, total ->
-                        if (!launchScope.isActive) return@processSession
-                        val fraction = if (total > 0) verified.toFloat() / total else 0f
-                        setStage(PrepareStage.SYNC, 0.2f + 0.5f * fraction)
-                    },
-                    injectModJar = smartyPlan.injectJar,
-                    strictModCheck = smartyPlan.strict,
-                    helperKeepGlobs = smartyPlan.helperKeepGlobs,
-                )
-            }
-        }
-
-        // 4. Java
-        setStage(PrepareStage.JVM, 0.9f)
-        val javaPath = if (!settings.javaPath.isNullOrEmpty()) {
-            Path.of(settings.javaPath!!)
-        } else {
-            javaManagerService.getJavaPath(server.version)
-        }
-
-        // 5. Spawn binding handed back to launchInternal.
-        return Prepared.Ready(
-            spawn = { onLog ->
-                launcherService.launchClientWithLogs(
-                    sessionData = session,
-                    serverProfile = server,
-                    clientRootPath = clientDir,
-                    javaExecutablePath = javaPath,
-                    adaptiveEnabled = settings.adaptiveMemoryEnabled,
-                    onLog = onLog,
-                )
-            },
-        )
-    }
-
-    /**
-     * Pack-centric launch path for the Hivens mirror world: a [PackInstance]
-     * from the local Library. Re-entry guard, MDC tagging, and abort semantics
-     * come from [launchInternal]; [preparePackLaunch] supplies the manifest
-     * resolve + pack auth + spawn binding, so the existing UI surfaces
-     * (LaunchControlPanel, GameConsoleService) plug in unchanged.
+     * [sessionMintedForLaunch] says [currentSession] was made for this very launch,
+     * as the answer to the second-factor demand the previous attempt stopped on. The
+     * launch carries it as it is instead of signing in again: see [prepareScAuth].
      *
      * @return false when a launch was already under way and this one was refused.
      */
     fun launchPackInstance(
         currentSession: SessionData,
         packInstance: PackInstance,
+        sessionMintedForLaunch: Boolean = false,
     ) = launchInternal(
         label = packInstance.displayName,
+        onAccepted = { _runningPackInstanceId.value = packInstance.id },
         onStart = {
             emit(LaunchLogEvent.SessionStarted(packInstance.id, packInstance.displayName))
             emit(LaunchLogEvent.AppBanner)
@@ -666,15 +573,15 @@ class LauncherController(
             // all when cachedManifest is populated.
             emit(LaunchLogEvent.TargetServer(packInstance.displayName, offline = false))
         },
-        prepare = { preparePackLaunch(currentSession, packInstance) },
+        prepare = { attempt -> preparePackLaunch(attempt, currentSession, packInstance, sessionMintedForLaunch) },
     )
 
     /**
-     * Pack-centric prepare phase. Skips SC auth + per-launch asset re-sync
-     * (mirror packs are static + already on disk after install):
+     * Prepare phase. Skips a per-launch asset re-sync -- mirror packs are static
+     * and already on disk after install:
      * - Resolves the [CachedManifestSnapshot]; when [PackInstance.cachedManifest]
      *   is null (instance predates the field) a one-time mirror fetch fills it
-     *   and writes it back via [IPackRepository.put].
+     *   and writes it back via [IPackRepository.update].
      * - Refreshes the SC session right before spawn for SC-bound packs so a cold
      *   mod-load (server-side SC tokens age out in ~minutes) does not invalidate
      *   the join. Packs that declare no requirement pass through untouched.
@@ -685,15 +592,26 @@ class LauncherController(
      * recently-played sort).
      */
     private suspend fun preparePackLaunch(
+        attempt: Attempt,
         currentSession: SessionData,
         packInstance: PackInstance,
+        sessionMintedForLaunch: Boolean,
     ): Prepared {
+        // Before anything reads the instance. The launch controls already say this and
+        // do not offer Play, so this is the refusal for a launch that arrives some other
+        // way: a notification's relaunch, the second-factor retry, a tray entry.
+        work.workOn(packInstance.id)?.let { busy ->
+            ActionRing.record("Pack launch ${packInstance.displayName}: refused, the instance is busy (${busy.name})")
+            attempt.fail(LaunchError.InstanceBusy(busy))
+            return Prepared.Bail
+        }
+
         val settings = settingsService.getSettings()
 
         // 1. Resolve the manifest snapshot. Stored on the instance after
         // install; one-shot fetch + write-back covers instances that predate
         // the field.
-        setStage(PrepareStage.SYNC, 0.2f)
+        attempt.setStage(PrepareStage.SYNC, 0.2f)
         val (manifestSnapshot, refreshedInstance) = resolveOrFetchManifest(packInstance)
 
         // 2. Local sanity: instance directory must exist before we run a network
@@ -703,12 +621,22 @@ class LauncherController(
             .resolve("instances")
             .resolve(refreshedInstance.instanceDirName)
         if (!Files.exists(clientDir)) {
-            fail(LaunchError.OfflineNoClient)
+            attempt.fail(LaunchError.OfflineNoClient)
             return Prepared.Bail
         }
 
-        // 3. Auth requirement: refresh the session right before spawn. Mirrors
-        // the SC server path's pre-spawn re-auth.
+        // What an earlier switch or update could not do to a mod's files because the
+        // game had them open. That game has exited, and nothing but a launch comes
+        // round again: left alone, a mod the player switched off went on loading.
+        // Before the roster check, which reads the result.
+        val owed = runCatchingUnlessStopped { smrtSyncService.settlePending(clientDir) }
+            .onFailure { logger.warn("Pack launch {}: pending content changes not applied", refreshedInstance.displayName, it) }
+            .getOrDefault(emptyList())
+        if (owed.isNotEmpty()) {
+            ActionRing.record("Pack launch ${refreshedInstance.displayName}: ${owed.size} content change(s) still held open (${owed.joinToString()})")
+        }
+
+        // 3. Auth requirement: refresh the session right before spawn.
         //
         // Three ways a launch ends up without a token, and they share one rule:
         // the game process only gets a session that was earned for THIS launch.
@@ -719,14 +647,16 @@ class LauncherController(
         // - Unverified instance: no roster means nothing vouched for what is in
         //   mods/, and a token is exactly what an unvouched-for jar would want.
         // - A refresh that did not go through: covered in preparePackAuth.
-        val authRequirement = PackAuthRouter.requirementFor(refreshedInstance, manifestSnapshot.authRequirement)
+        // - No server binding: the manifest names no server, so no session was earned
+        //   for one. Covered below, where the token is decided.
+        val authRequirement = PackAuthRouter.requirementFor(manifestSnapshot.authRequirement)
 
         // 2b. Hold the instance to the pack -- but only where a token is at stake.
         // A server-bound pack is the case that matters: we are about to hand the
         // game a session that logs into someone's server, and a jar the pack never
         // named is what that session would be lent to. A pack with no binding has no
-        // server and gets no token, so what its owner puts in mods/ is their game and
-        // none of our business.
+        // server and gets no token of ours, so what its owner puts in mods/ is their
+        // game and none of our business.
         //
         // Held against the roster written to the instance at sync time, so it answers
         // with no network and an offline launch is covered too.
@@ -745,7 +675,7 @@ class LauncherController(
         // and the launch would go on with no token and no word about why, over files
         // the launcher can simply fetch. So it fetches them and asks again.
         val verdict = if (serverBound && !firstLook.verified && !settings.isOfflineMode) {
-            catchUpWithPack(clientDir, refreshedInstance, firstLook)
+            catchUpWithPack(attempt, clientDir, refreshedInstance, firstLook)
         } else {
             firstLook
         }
@@ -775,35 +705,45 @@ class LauncherController(
                 emit(LaunchLogEvent.InstanceUnverified)
             }
             session = session.toOffline()
-        } else if (authRequirement != null) {
-            setStage(PrepareStage.AUTH, 0.4f)
-            session = preparePackAuth(authRequirement, currentSession, refreshedInstance)
+        } else if (!serverBound) {
+            // The guards above are armed by the binding, so the token has to follow the
+            // same answer. Handing the session in hand to an unbound launch put a live
+            // SmartyCraft token on the command line of a game whose mods/ nobody had
+            // checked, and that token is not scoped to one server.
+            session = licensedSession() ?: run {
+                emit(LaunchLogEvent.UnboundOffline)
+                currentSession.toOffline()
+            }
+        } else {
+            attempt.setStage(PrepareStage.AUTH, 0.4f)
+            session = preparePackAuth(attempt, authRequirement, currentSession, refreshedInstance, sessionMintedForLaunch)
                 ?: return Prepared.Bail
         }
 
-        // 4. Java override. The pack launch path picks the LOADER-declared Java
-        // itself (resolved.javaMajor) from the resolved runtime -- same MC +
-        // different loader can need different Java (Cleanroom-1.12.2 -> 25 vs
-        // legacy-Forge-1.12.2 -> 8), so the version-keyed heuristic moves out of
+        // 4. Java override. The launch picks the LOADER-declared Java itself
+        // (resolved.javaMajor) from the resolved runtime -- same MC + different
+        // loader can need different Java (Cleanroom-1.12.2 -> 25 vs
+        // legacy-Forge-1.12.2 -> 8), so the version-keyed heuristic stays out of
         // the controller. We only pass the user's explicit global setting; null
         // means "let the service provision."
-        setStage(PrepareStage.JVM, 0.7f)
+        attempt.setStage(PrepareStage.JVM, 0.7f)
         val javaOverride: Path? = settings.javaPath
             ?.takeIf { it.isNotEmpty() }
             ?.let { Path.of(it) }
 
         // 5. Spawn binding handed back to launchInternal.
         val contentFailed = AtomicBoolean(false)
+        val guardFailed = AtomicBoolean(false)
         return Prepared.Ready(
             contentFailed = contentFailed,
+            guardFailed = guardFailed,
             spawn = { onLog ->
-                launcherService.launchPackClient(
+                pinLoaderVersion(refreshedInstance.id, manifestSnapshot, launcherService.launchPackClient(
                     sessionData          = session,
-                    // Carry the EFFECTIVE requirement (manifest value or the
-                    // router's origin-derived one) so the service's SC-binding step
-                    // sees it; the raw snapshot's authRequirement is null for packs
-                    // whose mirror manifest has no auth block yet (e.g. Industrial).
-                    manifest             = manifestSnapshot.copy(authRequirement = authRequirement),
+                    // The manifest's own declaration, the same one serverBound reads,
+                    // so the service's SC binding and the guards below cannot answer
+                    // the binding question two ways.
+                    manifest             = manifestSnapshot,
                     runtime              = refreshedInstance.runtime,
                     clientRootPath       = clientDir,
                     javaPathOverride     = javaOverride,
@@ -815,7 +755,7 @@ class LauncherController(
                     // resolved it to Microsoft -- the launch would hand a
                     // Microsoft token to the SC host. Same test the service uses
                     // for its SC binding, so the two cannot disagree.
-                    redirectAuthHost     = authRequirement?.scServerId != null,
+                    redirectAuthHost     = manifestSnapshot.authRequirement?.scServerId != null,
                     // Same partition the roster sweep uses, and for the same
                     // reason: a bound launch is handed a token, so the loader
                     // hooks it inherits are a way to run code beside it. Taken
@@ -846,32 +786,73 @@ class LauncherController(
                     useSmartycraftAuthLib = settings.useSmartycraftAuthLib,
                     displayName          = refreshedInstance.displayName,
                     onLog                = onLog,
-                )
+                ))
             },
             onSpawned = { handle ->
-                _runningPackInstanceId.value = refreshedInstance.id
-                packRepository.put(
-                    refreshedInstance.copy(lastPlayedEpochOrZero = Instant.now().epochSecond),
-                )
-                // Armed for exactly the launches the seal covers. A launch that got
-                // no token has nothing to lend to a jar that arrives late, and its
-                // owner's `mods/` is their own business.
-                if (serverBound && verdict.verified) {
-                    watchSessionContent(handle, clientDir, refreshedInstance, contentFailed)
+                // Armed first, for exactly the launches the seal covers. A launch that
+                // got no token has nothing to lend to a jar that arrives late, and its
+                // owner's `mods/` is their own business. First, because the record
+                // write below used to come before it, and a write that threw left a
+                // bound game running with nothing watching it.
+                val guard = if (serverBound && verdict.verified) {
+                    watchSessionContent(handle, clientDir, refreshedInstance, contentFailed, guardFailed)
                 } else {
                     null
                 }
+                // The one field this owns, set on the record as it stands. The record in
+                // hand was captured before the click, and preparing a launch takes long
+                // enough (a sign-in, a catch-up repair) for an update or a settings edit
+                // to commit meanwhile. Writing the captured copy back whole put all of
+                // that back to how it was. Nothing is written when the instance is gone.
+                runCatchingUnlessStopped {
+                    packRepository.update(refreshedInstance.id) { it.copy(lastPlayedEpochOrZero = Instant.now().epochSecond) }
+                }.onFailure { logger.warn("Could not record when {} was last played", refreshedInstance.displayName, it) }
+                guard
             },
             onExit = { secs ->
-                // Re-read the persisted instance (onSpawned wrote lastPlayed; the
-                // user may have edited it mid-session) and add the session onto
-                // THAT, so neither write clobbers the other. Skip when it's gone --
-                // never resurrect an instance deleted while it ran.
-                packRepository.get(refreshedInstance.id)?.let { current ->
-                    packRepository.put(current.copy(playtimeSeconds = current.playtimeSeconds + secs))
-                }
+                // Added onto the record as it stands (onSpawned wrote lastPlayed, the
+                // user may have edited it mid-session), so neither write clobbers the
+                // other. Nothing is written when it is gone: an instance deleted while
+                // it ran is not resurrected.
+                packRepository.update(refreshedInstance.id) { it.copy(playtimeSeconds = it.playtimeSeconds + secs) }
             },
         )
+    }
+
+    /**
+     * Records the loader version a launch resolved onto a pack that named none, and
+     * hands [result] on unchanged.
+     *
+     * A blank version meant "the latest", asked again on every launch: the loader
+     * moved under the pack with no notice, a new Forge promotion ran its installer
+     * again at the next Play, and the lookup needed the network, so the pack could
+     * not start offline. The first launch now settles it, and the next ones ask
+     * for that version by name. A version the pack does name is left as it is,
+     * including a legacy Forge build the resolver had to substitute.
+     */
+    private fun pinLoaderVersion(
+        instanceId: String,
+        manifest: CachedManifestSnapshot,
+        result: SpawnResult,
+    ): SpawnResult {
+        val resolved = (result as? SpawnResult.Started)?.resolvedLoaderVersion?.takeIf { it.isNotBlank() }
+        if (resolved != null && manifest.loaderVersion.isBlank()) {
+            // Written behind the launch, not in it. The process exists by now and is not
+            // yet the launch's to stop: a suspension here was a window in which a stop
+            // found no game to end, cancelled the launch, and left the game running with
+            // nothing holding it.
+            appScope.launch {
+                runCatching { packRepository.update(instanceId) { current ->
+                    val cached = current.cachedManifest ?: return@update current
+                    // Only onto the loader it was resolved for: the loader can be changed
+                    // in the pack's settings while a first launch is still preparing.
+                    val sameLoader = cached.loaderName.equals(manifest.loaderName, ignoreCase = true)
+                    if (cached.loaderVersion.isNotBlank() || !sameLoader) current
+                    else current.copy(cachedManifest = cached.copy(loaderVersion = resolved))
+                } }.onFailure { logger.warn("Could not record the loader version {} for {}", resolved, instanceId, it) }
+            }
+        }
+        return result
     }
 
     /**
@@ -891,16 +872,17 @@ class LauncherController(
      * proceed unverified. What changes is only whether it needed to.
      */
     private suspend fun catchUpWithPack(
+        attempt: Attempt,
         clientDir: Path,
         instance: PackInstance,
         firstLook: RosterVerdict,
     ): RosterVerdict {
         val version = instance.pinnedPackVersion ?: instance.packRef.version
-        setStage(PrepareStage.SYNC, 0.25f)
+        attempt.setStage(PrepareStage.SYNC, 0.25f)
         ActionRing.record(
             "Pack launch ${instance.displayName}: instance does not match the pack, fetching what is missing",
         )
-        val repaired = runCatching {
+        val repaired = runCatchingUnlessStopped {
             val manifest = if (version != null) {
                 smrtPackClient.fetchManifestVersion(instance.packRef.id, version)
             } else {
@@ -910,7 +892,7 @@ class LauncherController(
             smrtSyncService.verifyAndRepair(clientDir, manifest, enabled) { current, total, path ->
                 // The SYNC stage's own sub-range, so the bar moves during what is
                 // otherwise a silent wait on a hundred-file walk.
-                setStage(PrepareStage.SYNC, 0.25f + 0.25f * (if (total > 0) current.toFloat() / total else 0f))
+                attempt.setStage(PrepareStage.SYNC, 0.25f + 0.25f * (if (total > 0) current.toFloat() / total else 0f))
             }
         }.onFailure {
             logger.warn("Pack launch {}: could not bring the instance in line: {}", instance.displayName, it.toString())
@@ -944,18 +926,36 @@ class LauncherController(
      * running JVM by then, so removing it neither stops the code nor leaves a
      * working install -- what is left to do is take the session away. The instance
      * is reported as it stands, and the repair path is what puts it right.
+     *
+     * A watch that fails is treated like one that could not be armed: the game is
+     * stopped and [guardFailed] says why. Left to the scope's handler it was a log
+     * line, and the bound game ran on with nothing watching it.
      */
     private fun watchSessionContent(
         handle: LaunchHandle,
         clientDir: Path,
         instance: PackInstance,
         contentFailed: AtomicBoolean,
+        guardFailed: AtomicBoolean,
     ): Job = appScope.launch {
-        val findings = LaunchContentWatchdog(
-            sync = smrtSyncService,
-            clientDir = clientDir,
-            expected = modBaseline(instance),
-        ).run()
+        val findings = try {
+            LaunchContentWatchdog(
+                sync = smrtSyncService,
+                clientDir = clientDir,
+                expected = modBaseline(instance),
+            ).run()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            logger.error("The session guard for {} failed while watching, stopping the game", instance.displayName, e)
+            synchronized(launchLock) {
+                if (runningHandle !== handle) return@launch
+                guardFailed.set(true)
+                _state.value = LaunchState.Stopping(handle)
+            }
+            runCatching { handle.terminate() }
+            return@launch
+        }
         if (findings.isEmpty()) return@launch
         // The process this was armed for must still be the controller's live one.
         // An aborted launch stays parked in its blocking wait, so its guard can
@@ -967,16 +967,20 @@ class LauncherController(
         }
 
         // Raised BEFORE the process is ended, so the exit verdict already sees it
-        // when the wait returns and does not overwrite the reason with an exit code.
+        // when the wait returns and reports this reason instead of an exit code.
         contentFailed.set(true)
         logger.warn("Content changed after the spawn for {}: {}", instance.displayName, findings)
         ActionRing.record(
             "Pack launch ${instance.displayName}: content changed after the spawn, ending the session (${findings.size})",
         )
-        // No ForeignContentRemoved here: nothing was removed, and the console line
-        // for that event says otherwise. fail() emits the error the UI already
-        // renders for this reason.
-        fail(LaunchError.ContentChangedDuringLaunch)
+        // Stopping, not failed, until the process is gone. Failed reads as Play, and
+        // the process has up to the termination grace left: a second launch inside
+        // it put two games on one instance, one world and one log. The error is
+        // raised by the launch's own tail once the game has exited, which is also
+        // what emits the line the UI renders for this reason.
+        synchronized(launchLock) {
+            if (runningHandle === handle) _state.value = LaunchState.Stopping(handle)
+        }
         runCatching { handle.terminate() }
     }
 
@@ -1017,41 +1021,59 @@ class LauncherController(
             authRequirement  = manifest.auth?.toDomain(),
         )
         val refreshed = instance.copy(cachedManifest = snapshot)
-        runCatching { packRepository.put(refreshed) }
-            .onFailure { logger.warn("Failed to persist cachedManifest for ${instance.id}", it) }
+        // Onto the record as it stands, for the same reason onSpawned re-reads: the
+        // fetch is a network round trip, and the copy in hand may be older than it.
+        runCatchingUnlessStopped {
+            packRepository.update(instance.id) { it.copy(cachedManifest = snapshot) }
+        }.onFailure { logger.warn("Failed to persist cachedManifest for ${instance.id}", it) }
         return snapshot to refreshed
     }
 
     /**
-     * Pack-side pre-spawn auth, dispatched by the pack's [PackAuthRequirement].
-     * A requirement is enforced only for a provider the [authProviderRegistry] can
-     * satisfy: SC-bound requirements ([PackAuthRequirement.SmartyCraft], and the SC
-     * half of [PackAuthRequirement.Both]) re-auth via [prepareScAuth] when SC is
-     * registered; [PackAuthRequirement.Microsoft] -- and any SC requirement whose
-     * provider is somehow absent -- is advisory, so the pack launches with the
-     * current session. A newly registered provider activates its gate on its own.
+     * The signed-in Microsoft session, when the provider is registered and has one.
+     *
+     * The only token an unbound launch may carry: it is the player's own licence,
+     * valid wherever they take it, rather than a session minted for somebody's
+     * server. Null means the launch goes offline.
+     */
+    private fun licensedSession(): SessionData? {
+        if (!authProviderRegistry.contains(PackAuthRequirement.Microsoft.PROVIDER_KEY)) return null
+        return credentialsManager.accountFor(PackAuthRequirement.Microsoft.PROVIDER_KEY)
+    }
+
+    /**
+     * Pack-side pre-spawn auth for a server-bound pack, dispatched by its
+     * [PackAuthRequirement]. A requirement is enforced only for a provider the
+     * [authProviderRegistry] can satisfy: SC-bound requirements
+     * ([PackAuthRequirement.SmartyCraft], and the SC half of
+     * [PackAuthRequirement.Both]) re-auth via [prepareScAuth] when SC is registered.
+     * A declared [PackAuthRequirement.Microsoft] whose provider is not registered is
+     * advisory: the pack launches, offline, since nothing here holds a session that
+     * was earned for it. A newly registered provider activates its gate on its own.
      */
     private suspend fun preparePackAuth(
+        attempt: Attempt,
         requirement: PackAuthRequirement,
         currentSession: SessionData,
         instance: PackInstance,
+        sessionMintedForLaunch: Boolean,
     ): SessionData? {
         val scSatisfiable = authProviderRegistry.contains(PackAuthRequirement.SmartyCraft.PROVIDER_KEY)
         return when (requirement) {
             is PackAuthRequirement.SmartyCraft ->
-                if (scSatisfiable) prepareScAuth(requirement.serverId, currentSession, instance) else currentSession
+                if (scSatisfiable) prepareScAuth(attempt, requirement.serverId, currentSession, instance, sessionMintedForLaunch) else currentSession
             is PackAuthRequirement.Both ->
-                if (scSatisfiable) prepareScAuth(requirement.serverId, currentSession, instance) else currentSession
+                if (scSatisfiable) prepareScAuth(attempt, requirement.serverId, currentSession, instance, sessionMintedForLaunch) else currentSession
             PackAuthRequirement.Microsoft ->
                 if (!authProviderRegistry.contains(PackAuthRequirement.Microsoft.PROVIDER_KEY)) {
-                    currentSession // no Microsoft provider configured -> advisory (Phase A behavior)
+                    currentSession.toOffline()
                 } else {
                     credentialsManager.accountFor(PackAuthRequirement.Microsoft.PROVIDER_KEY)
                         ?: run {
                             ActionRing.record(
                                 "Pack launch ${instance.displayName}: Microsoft account required, none signed in",
                             )
-                            fail(LaunchError.MissingAuthProvider(PackAuthRequirement.Microsoft.PROVIDER_KEY))
+                            attempt.fail(LaunchError.MissingAuthProvider(PackAuthRequirement.Microsoft.PROVIDER_KEY))
                             null
                         }
                 }
@@ -1059,11 +1081,10 @@ class LauncherController(
     }
 
     /**
-     * SmartyCraft pre-spawn re-auth for an SC-bound pack, mirroring the SC
-     * server-list path's pre-spawn re-auth (see [launch], around the AUTH stage).
-     * Returns the refreshed [SessionData], a 2FA-fallback session with the cached
-     * manifest attached, or null after [fail] has already set the error state -- the
-     * caller bails on null.
+     * SmartyCraft pre-spawn re-auth for an SC-bound pack. Returns the refreshed
+     * [SessionData], a 2FA-fallback session with the cached manifest attached, or
+     * null after [Attempt.fail] has already reported the error -- the caller bails on
+     * null.
      *
      * Precondition: missing player + password fails with
      * [LaunchError.MissingAuthProvider] rather than spawning the game and waiting
@@ -1071,12 +1092,41 @@ class LauncherController(
      * diagnosis is unambiguous.
      */
     private suspend fun prepareScAuth(
+        attempt: Attempt,
         serverId: String,
         currentSession: SessionData,
         instance: PackInstance,
+        sessionMintedForLaunch: Boolean,
     ): SessionData? {
         // Multi-active: an SC-bound pack always uses the SmartyCraft account,
         // regardless of which account is the chrome "primary".
+        // Experimental: go with the token already in hand rather than minting a
+        // fresh one. The saved session lasts at least a day, so re-authenticating
+        // per launch is what makes a two-factor account ask for a code every time.
+        // With this on it asks once, at sign-in, and a stale token surfaces as a
+        // join refusal the player can act on -- not a code prompt before a game
+        // that would have run. The server, not a timer, decides when it is spent.
+        if (settingsService.getSettings().experimentalReuseSession && currentSession.reusableForSc()) {
+            emit(LaunchLogEvent.AuthSucceeded(currentSession.uuid))
+            ActionRing.record("Pack launch ${instance.displayName}: reusing the session in hand (experimental)")
+            return if (currentSession.serverId == serverId) currentSession
+            else currentSession.copy(serverId = serverId)
+        }
+
+        // The relaunch that answers a second-factor demand already holds the session
+        // the code unlocked, minted for exactly this launch. Signing in again here
+        // only worked while the provider's short session cache answered for the
+        // network: a launch that spent longer than that preparing (a roster sweep
+        // over a large mods/, a catch-up fetch) sent a real login, which on
+        // SmartyCraft mints a new uid and kills the session the code had just
+        // unlocked, and the gate asked for the code again.
+        if (sessionMintedForLaunch && currentSession.reusableForSc()) {
+            emit(LaunchLogEvent.AuthSucceeded(currentSession.uuid))
+            ActionRing.record("Pack launch ${instance.displayName}: carrying the session the second factor just unlocked")
+            return if (currentSession.serverId == serverId) currentSession
+            else currentSession.copy(serverId = serverId)
+        }
+
         val saved = credentialsManager.accountFor(PackAuthRequirement.SmartyCraft.PROVIDER_KEY)
         val pass = saved?.cachedPassword ?: currentSession.cachedPassword
         val playerName = currentSession.playerName.ifBlank { saved?.playerName ?: "" }
@@ -1084,7 +1134,7 @@ class LauncherController(
             ActionRing.record(
                 "Pack launch ${instance.displayName}: missing SC credentials for '$serverId'",
             )
-            fail(LaunchError.MissingAuthProvider(PackAuthRequirement.SmartyCraft.PROVIDER_KEY))
+            attempt.fail(LaunchError.MissingAuthProvider(PackAuthRequirement.SmartyCraft.PROVIDER_KEY))
             return null
         }
         if (currentSession.twoFactor && !currentSession.mintedNow) {
@@ -1094,12 +1144,16 @@ class LauncherController(
             // and the player would find out only when the server refuses the join.
             // One code per launch buys a token that is known good at spawn time.
             // The UI answers this by prompting and relaunching with the fresh session.
-            fail(LaunchError.TwoFactorExpired)
+            attempt.fail(LaunchError.TwoFactorExpired)
             return null
         }
         return try {
             val fresh = authService.login(playerName, pass, serverId)
             emit(LaunchLogEvent.AuthSucceeded(fresh.uuid))
+            // The login retired the uid the store holds. Whatever is signed later
+            // from the stored account, a skin upload among them, needs this one.
+            runCatching { credentialsManager.refreshStored(PackAuthRequirement.SmartyCraft.PROVIDER_KEY, fresh) }
+                .onFailure { logger.warn("Pack launch {}: could not record the refreshed session", instance.displayName, it) }
             fresh
         } catch (_: TwoFactorRequiredException) {
             // First contact with the gate, before the account is flagged. Carrying the
@@ -1109,8 +1163,13 @@ class LauncherController(
             // path above.
             emit(LaunchLogEvent.TwoFactorDetected)
             ActionRing.record("Pack launch ${instance.displayName}: second factor required for '$serverId'")
-            fail(LaunchError.TwoFactorExpired)
+            attempt.fail(LaunchError.TwoFactorExpired)
             null
+        } catch (e: CancellationException) {
+            // The launch was stopped while it signed in. Caught below, the stop was
+            // narrated as a session that could not be refreshed and the launch went
+            // on offline to its next suspension point.
+            throw e
         } catch (e: Exception) {
             // A refresh that did not go through means this launch has no session it
             // earned, so it gets none: the pack starts offline with the token
@@ -1123,6 +1182,21 @@ class LauncherController(
             currentSession.toOffline()
         }
     }
+
+    /**
+     * Whether this session can be carried into an SC-bound launch as-is: a
+     * SmartyCraft session with a token, not an offline one and not Microsoft.
+     *
+     * Deliberately NOT keyed on `status == OK`. A session restored from the store
+     * after a restart carries `status = null` (see CredentialsManager.loadSession),
+     * so requiring OK let the reuse work in the same run yet fail the very next
+     * launch, which is when it matters most: the account is signed in without a
+     * code, then a pack launch demands one anyway. A non-blank token is the real
+     * signal there is something to reuse; `refreshToken == null` keeps a Microsoft
+     * session (its only carrier of a refresh token) out of the SC path.
+     */
+    private fun SessionData.reusableForSc(): Boolean =
+        !offline && refreshToken == null && accessToken.isNotBlank() && playerName.isNotBlank()
 
     /**
      * The same session with nothing on it that could join a server: vanilla offline
@@ -1157,36 +1231,60 @@ class LauncherController(
     }
 
     /**
-     * Stops the in-flight launch. If the game process has already spawned,
-     * terminates it via [LaunchHandle.terminate] before resetting state --
-     * canceling the coroutine alone would orphan the spawned process and the
-     * next [launch] click would happily spawn a second game.
+     * Stops the in-flight launch.
+     *
+     * With a game up, it asks the game to end and leaves the rest to the launch:
+     * the state reads [LaunchState.Stopping] until the process has actually gone,
+     * and the launch's own tail then records the session and settles to Idle. It
+     * used to set Idle at once and cancel the launch, which reopened Play while the
+     * old game had up to the termination grace left, and skipped the tail that is
+     * the only writer of playtime.
+     *
+     * Still preparing, there is no game to wait for: the launch is cancelled and
+     * the gate reopens now.
      */
     fun abort() {
-        currentAbortToken?.set(true)
-        val handle = runningHandle
-        runningHandle = null
-        runCatching { handle?.terminate() }
-        launchJob?.cancel()
-        _state.value = LaunchState.Idle
-    }
-
-    private fun setStage(stage: PrepareStage, progress: Float) {
-        _state.value = LaunchState.Prepare(stage, progress)
-    }
-
-    private fun calculateIgnoredFiles(server: ServerProfile): Set<String> {
-        val userState = profileManager.getProfile(server.assetDir).optionalModsState
-        return manifestProcessor.calculateIgnoredFiles(server, userState)
+        synchronized(launchLock) {
+            currentAbortToken?.set(true)
+            val handle = runningHandle
+            if (handle != null) {
+                _state.value = LaunchState.Stopping(handle)
+                runCatching { handle.terminate() }
+            } else {
+                launchJob?.cancel()
+                _state.value = LaunchState.Idle
+            }
+        }
     }
 
     /**
-     * A helper is usable for [mcVersion] when one was resolved this launch
-     * ([SmartyModPlanner.Plan.injectJar]) or a previously-injected one of the
-     * exact expected name is still on disk.
+     * Stops the launch of [instanceId], and nothing else.
+     *
+     * What a pack's own control calls. A control left showing Stop after its
+     * launch ended would otherwise end whichever game is running now, which is not
+     * the one it names.
      */
-    private fun helperPresent(clientDir: Path, mcVersion: String, plan: SmartyModPlanner.Plan): Boolean =
-        plan.injectJar != null ||
-            Files.isRegularFile(clientDir.resolve("mods").resolve(OpenSmrtHelperResolver.helperFileName(mcVersion)))
+    fun abort(instanceId: String) {
+        if (_runningPackInstanceId.value == instanceId) abort()
+    }
 
+    /**
+     * Records the running game's session up to now, for a launcher that is about to
+     * quit and leave the game running. Its launch never reaches its own tail in that
+     * case, so this is the only record the session gets. Minutes counted here are
+     * not counted again if the game does exit first.
+     */
+    suspend fun settleSessionForQuit() {
+        val live = liveSession ?: return
+        val record = live.record ?: return
+        runCatching { record(live.take()) }.onFailure { logger.warn("Recording the session before quit failed", it) }
+    }
+
+    /**
+     * [runCatching] that lets a stopped launch stop. A plain one catches the
+     * cancellation with everything else, and a launch stopped during that call was
+     * narrated as the call failing and carried on to its next suspension point.
+     */
+    private inline fun <T> runCatchingUnlessStopped(block: () -> T): Result<T> =
+        runCatching(block).onFailure { if (it is CancellationException) throw it }
 }

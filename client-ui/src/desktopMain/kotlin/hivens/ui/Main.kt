@@ -7,6 +7,7 @@ import androidx.compose.ui.window.LocalWindowExceptionHandlerFactory
 import androidx.compose.ui.window.WindowExceptionHandler
 import androidx.compose.ui.window.WindowExceptionHandlerFactory
 import androidx.compose.ui.window.application
+import hivens.core.api.interfaces.IPackRepository
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.io.IconProcessor
 import hivens.ui.bootstrap.GuiBootstrap
@@ -25,12 +26,14 @@ import hivens.ui.identity.SkinLibrary
 import hivens.ui.identity.ClanRoleProvider
 import hivens.ui.identity.SkinManager
 import hivens.ui.navigation.NavRequests
+import hivens.ui.components.LauncherUpdateState
 import hivens.core.activity.ActivityRegistry
 import hivens.launcher.PackInstallService
 import hivens.core.update.PackUpdateStatusHub
 import hivens.ui.activity.ActivityCommands
 import hivens.ui.activity.ActivityDriver
 import hivens.ui.activity.SelectionRegistry
+import hivens.ui.screens.library.content.ContentIconStore
 import hivens.ui.notifications.IndicationCenter
 import hivens.ui.notifications.NotificationArchiveStore
 import hivens.ui.notifications.NotificationCenter
@@ -42,6 +45,11 @@ import hivens.ui.platform.ImageIoIconProcessor
 import hivens.ui.puppet.PuppetServerLoader
 import hivens.config.Storage
 import hivens.ui.audio.AudioPlayer
+import hivens.ui.audio.PlaybackRouter
+import hivens.ui.audio.WallpaperSession
+import hivens.ui.audio.MediaSessionBridge
+import hivens.ui.audio.AudioOutput
+import hivens.ui.audio.SystemAudioOutput
 import hivens.ui.background.BackgroundOptimizer
 import hivens.ui.editor.EditModeController
 import hivens.ui.editor.presets.PresetRepository
@@ -49,25 +57,35 @@ import hivens.media.VideoCacheService
 import hivens.media.YtDlpService
 import hivens.tray.LibTrayController
 import hivens.tray.TrayController
+import hivens.ui.background.BackgroundManager
 import hivens.ui.layout.LayoutGraphFlushHook
+import hivens.launcher.legacy.RetiredDataSweeper
+import hivens.ui.legacy.RetiredClientsGate
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import hivens.ui.layout.LayoutGraphRepository
 import hivens.ui.utils.ConsoleSettingsStore
 import hivens.ui.utils.GameConsoleService
+import hivens.ui.utils.LogRetention
+import hivens.ui.utils.PreferenceWriter
 import hivens.widget.model.DefaultLayout
 import java.nio.file.Path
 import javax.swing.SwingUtilities
 import org.slf4j.LoggerFactory
-import hivens.launcher.AutoSyncService
+import hivens.launcher.instance.InstanceContentUpdater
 import hivens.update.UpdateService
 import hivens.ui.widgets.Commands
 import hivens.ui.widgets.Sources
 import hivens.ui.widgets.state.WidgetStateFlushHook
+import hivens.ui.widgets.services.MusicPlayerService
+import hivens.ui.widgets.services.MusicPlayerServiceImpl
 import hivens.ui.widgets.state.WidgetStateGc
 import hivens.ui.widgets.state.WidgetStateStore
 import hivens.widget.api.WidgetCommandRegistry
 import hivens.widget.api.WidgetDataRegistry
-import hivens.widget.api.CompositeWidgetRegistry
-import hivens.widget.loader.WidgetModuleLoader
+import hivens.ui.screens.mod.OpenProjectState
+import hivens.widget.api.SurfaceFamilies
+import hivens.ui.widgets.modules.WidgetModules
 import hivens.widget.api.WidgetRegistry
 import hivens.widget.api.WidgetServiceRegistry
 import hivens.widget.api.command
@@ -79,8 +97,10 @@ import hivens.widget.generated.GeneratedWidgetRegistry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.jetbrains.compose.resources.ExperimentalResourceApi
+import org.koin.core.context.GlobalContext
 import org.koin.core.context.stopKoin
 import kotlin.concurrent.thread
+import kotlin.time.Duration.Companion.seconds
 import kotlin.system.exitProcess
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
@@ -97,8 +117,47 @@ val uiModule = module {
     single { SkinManager(get(), get()) }
     single { ClanRoleProvider(get()) }
     single { SkinLibrary(get<Path>().resolve("skins"), get()) }
-    single { DefaultSkinProvider(get<PlatformPaths>().clientsDir, get<PlatformPaths>().skinCacheDir.resolve("defaults")) }
+    single {
+        val paths: PlatformPaths = get()
+        DefaultSkinProvider(
+            librariesDir     = paths.librariesDir,
+            cacheDir         = paths.skinCacheDir.resolve("defaults"),
+            legacyClientsDir = paths.clientsDir,
+        )
+    }
+
+    // The leftover-clients chore. The gate is what the reminder's action opens;
+    // the sweeper is registered here rather than beside the scanner because its
+    // one hook belongs to a client-ui type: the default skins are read out of a
+    // client jar, and on an upgraded install the retired tree is the only place
+    // one lives until a pack is installed. Listing them extracts and caches the
+    // PNGs for good -- nine off a modern client, the Steve and Alex pair off a
+    // 1.12.2 one -- so the sweep does it once before the first deletion.
+    // Otherwise somebody who cleared the folders first would find the wardrobe's
+    // defaults gone for a reason they could not act on.
+    single { RetiredClientsGate() }
+    single {
+        val skins: DefaultSkinProvider = get()
+        RetiredDataSweeper(
+            dataDir = get<Path>(),
+            beforeFirstDelete = { withContext(Dispatchers.IO) { skins.list() } },
+        )
+    }
+
     single { GameConsoleService(get()) }
+    // The one writer for what the interface saves on a click. createdAtStart, so
+    // the drain on exit is armed before the first choice is made.
+    single(createdAtStart = true) {
+        PreferenceWriter().also { writer ->
+            val drainFor = 3.seconds
+            Runtime.getRuntime().addShutdownHook(Thread({ writer.drain(drainFor) }, "nexira-preferences-drain"))
+        }
+    }
+    // Holds the per-session game output files to an age and a total size. Once per
+    // start, off the boot path; see its KDoc for what it leaves alone.
+    single(createdAtStart = true) {
+        LogRetention(get<PlatformPaths>().logsDir).also { it.start(get()) }
+    }
     // One owner of console.json for the three surfaces that read it: the shell's
     // window, Settings > Console and the pack's Logs tab.
     single { ConsoleSettingsStore(get<Path>(), get(), get()) }
@@ -128,31 +187,23 @@ val uiModule = module {
     // the shell regions and the sign-in panel are non-removable because a layout
     // without them has no navigation and no way to sign in, and shadowing them
     // by id would be that removal through a side door.
-    single<WidgetRegistry> {
-        val contributed = WidgetModuleLoader(get<Path>().resolve(Storage.WIDGETS_DIR)).scan()
-        val sources = listOf(GeneratedWidgetRegistry) + contributed.loaded.map { it.registry }
-        // Parallel to sources, so a diagnostic can name a module rather than an
-        // index into a list the reader cannot see.
-        val labels = listOf("built-in") + contributed.loaded.map { it.id }
-        val registry = CompositeWidgetRegistry(sources)
-
-        val log = LoggerFactory.getLogger("Widgets")
-        log.info(
-            "Widget registry: {} kinds from {} source(s) [{}]",
-            registry.all().size, sources.size, labels.joinToString(", "),
+    //
+    // The modules can change while the launcher runs: switched off, switched on,
+    // the folder read again. The composition reads their state and hears the change;
+    // everything outside it asks the registry below, which answers with whatever is
+    // current.
+    single {
+        val dataDir: Path = get()
+        WidgetModules(
+            directory = dataDir.resolve(Storage.WIDGETS_DIR),
+            shadowDir = dataDir.resolve("cache").resolve("widget-modules"),
+            stateFile = dataDir.resolve("widget-modules.json"),
+            json      = get(),
+            builtIn   = GeneratedWidgetRegistry,
+            scope     = get(),
         )
-        // A contribution that loses its id loses it silently otherwise: the
-        // widget simply never appears, and nothing anywhere says why. The
-        // composite deliberately has no logger of its own, so the diagnostic
-        // gets read out here, where one exists.
-        registry.shadowed.forEach {
-            log.warn(
-                "Widget '{}' from '{}' is shadowed by '{}' and will not be used",
-                it.kind.value, labels[it.bySource], labels[it.heldBy],
-            )
-        }
-        registry
     }
+    single<WidgetRegistry> { get<WidgetModules>().registry }
 
     // Cross-widget service registry (Phase D). One global instance per
     // launcher process. Provider widgets register via provideService
@@ -167,9 +218,10 @@ val uiModule = module {
     // the registry is complete before the first widget composes.
     single {
         WidgetDataRegistry().apply {
-            register(Sources.AutoSync, flowSource(get<AutoSyncService>().snapshot))
+            register(Sources.Activity, flowSource(get<ActivityRegistry>().activities))
             register(Sources.Notifications, flowSource(get<NotificationArchiveStore>().log))
             register(Sources.DoNotDisturb, flowSource(get<NotificationCenter>().doNotDisturb))
+            register(Sources.OpenProject, flowSource(get<OpenProjectState>().open))
         }
     }
 
@@ -217,8 +269,26 @@ val uiModule = module {
     // graph; the flush hook lands the debounced write on quit. GC + flush hook are
     // createdAtStart so they wire up before any stateful widget composes / before exit.
     single { WidgetStateStore(get<Path>().resolve("widget-state.json"), get(), get()) }
-    single(createdAtStart = true) { WidgetStateGc(repo = get(), store = get(), scope = get()) }
+    single(createdAtStart = true) {
+        val presets: PresetRepository = get()
+        WidgetStateGc(repo = get(), store = get(), scope = get(), alsoReferenced = presets::referencedInstanceIds)
+    }
     single(createdAtStart = true) { WidgetStateFlushHook(get()) }
+
+    // The wallpaper settings, one per process because the manager carries the
+    // shutdown flush for its debounced writes.
+    single { BackgroundManager(get<Path>(), get()) }
+
+    // What the mod page is looking at, which the right rail's project-view family
+    // reads. A singleton because the page that writes it and the rail that reads
+    // it are different surfaces with no composition in common.
+    single { OpenProjectState() }
+
+    // Which family each surface is showing. A singleton rather than shell state
+    // because switching one is something the app DOES -- a navigation, a pack
+    // opening, a future plugin -- and not all of that runs inside a composition.
+    // Deliberately not persisted: it describes the moment, not the arrangement.
+    single { SurfaceFamilies() }
 
     // Editor mutation facade. Holds no state itself; fires LayoutGraph
     // updates into the shared CoroutineScope so callers stay
@@ -232,13 +302,73 @@ val uiModule = module {
     // used to be reset to full on every launch.
     single {
         val settings: ISettingsService = get()
+        val saved = settings.getSettings()
         AudioPlayer(
             scope         = get(),
-            initialVolume = settings.getSettings().audioVolume,
+            initialVolume = saved.audioVolume,
             persistVolume = { level ->
-                settings.saveSettings(settings.getSettings().copy(audioVolume = level))
+                settings.updateSettings { it.copy(audioVolume = level) }
+            },
+            initialQueue  = saved.audioQueue.mapNotNull { runCatching { Path.of(it) }.getOrNull() },
+            initialIndex  = saved.audioQueueIndex,
+            // Optional, and read as optional. The doc on this parameter says losing
+            // the named output must never cost the sound itself, and a get() that
+            // throws is exactly that cost, paid by everything else in the process
+            // as well.
+            output        = getOrNull(),
+            persistQueue  = { files, index ->
+                settings.updateSettings { it.copy(
+                        audioQueue      = files.map { it.toString() },
+                        audioQueueIndex = index,
+                    ) }
             },
         )
+    }
+
+    // What a widget asks about playback, and the one place the answer comes from.
+    //
+    // It used to be provided by every player widget into the widget service
+    // registry and read by one consumer, which had a fallback to this same engine
+    // for when none was mounted. Every path already ended at one object, so the
+    // round trip decided which wrapper was asked and nothing else: ten
+    // registrations, one reader, and a churn the drag ghost could steal from,
+    // since a ghost and its source share an instance id and the ghost's dispose
+    // unregistered what the source had provided.
+    //
+    // App-static instead, like the data sources and the commands beside it. The
+    // widgets read the contract rather than the engine, which is what lets the
+    // thing behind it change without any of them knowing.
+    single { WallpaperSession(get()) }
+    single { PlaybackRouter(get(), MusicPlayerServiceImpl(get()), get()) }
+    // Bound to the same instance rather than built twice: the background asks for
+    // the router by its own type to say who owns the session, and everything else
+    // asks for the contract. Two instances would mean the switch and the readers
+    // disagreeing about who is playing.
+    single<MusicPlayerService> { get<PlaybackRouter>() }
+
+    // Where the sound leaves. One connection to the sound server for the process,
+    // opened on the first track rather than at startup, and a stream per track on
+    // top of it. A machine it cannot reach falls back to the line skinema opens
+    // for itself, so this is an improvement to how the sound is labelled and never
+    // a condition on it playing.
+    // Bound by the interface the player asks for, not by the class that implements
+    // it. Registered under the concrete type, the lookup for AudioOutput found
+    // nothing and took the whole launcher down before its first frame.
+    single<AudioOutput>(createdAtStart = false) { SystemAudioOutput() }
+
+    // What the desktop sees of the player: MPRIS on Linux, the platform's own
+    // elsewhere. createdAtStart because nothing composes it -- a media session is
+    // not a widget, and a launcher whose keys only work once somebody has opened
+    // the right screen is a launcher whose keys do not work.
+    //
+    // It claims no device, so it neither competes with the engine nor depends on
+    // one being open, and a desktop with no session bus simply gets nothing.
+    single(createdAtStart = true) {
+        MediaSessionBridge(
+            player = get(),
+            scope  = get(),
+            artDir = get<Path>().resolve("media-session"),
+        ).also { it.start() }
     }
 
     // Media resolvers feeding the local-only Skinema player (client-media).
@@ -292,13 +422,14 @@ val uiModule = module {
     }
     single {
         val settings: ISettingsService = get()
+        val preferences: PreferenceWriter = get()
         NotificationCenter(
             archive             = get<NotificationArchiveStore>()::record,
             // Seed the popup-mute from the persisted preference and write the
             // flip back, so "do not disturb" survives a restart.
             initialDoNotDisturb = settings.getSettings().doNotDisturb,
             persistDoNotDisturb = { value ->
-                settings.saveSettings(settings.getSettings().copy(doNotDisturb = value))
+                preferences.write("do not disturb") { settings.updateSettings { it.copy(doNotDisturb = value) } }
             },
         )
     }
@@ -314,6 +445,7 @@ val uiModule = module {
     // What the current view has selected. App-scoped so the surface can read it
     // without knowing which screen published it; the view clears it on the way out.
     single { SelectionRegistry() }
+    single { ContentIconStore() }
     single { SessionRegistry(appScope = get()) }
     // One-slot handoff: the launch driver parks "needs a code", the shell answers.
     single { hivens.ui.notifications.TwoFactorLaunchGate() }
@@ -346,7 +478,7 @@ val uiModule = module {
             stringsProvider = { stringsFor(AppLocale.fromTag(settingsService.getSettings().locale)) },
         ).also { it.start() }
     }
-    // Feeds the self-identifying services (installs, updates, sync) into the
+    // Feeds the self-identifying services (installs, updates, content) into the
     // activity registry. Launch and game entries come from LaunchDriver, which
     // is the only place that knows which pack a LaunchState belongs to.
     // createdAtStart for the same reason as InstallDriver: the collector must
@@ -356,7 +488,7 @@ val uiModule = module {
             registry   = get(),
             installs   = get<PackInstallService>().installs,
             updates    = get<PackUpdateStatusHub>().statuses,
-            sync       = get<AutoSyncService>().snapshot,
+            contentUpdates = get<InstanceContentUpdater>().runs,
             repository = get(),
             appScope   = get(),
         ).also { it.start() }
@@ -364,6 +496,7 @@ val uiModule = module {
     // Navigation requests from outside the composition (notification actions,
     // drivers). AppRoot collects and feeds them into the back stack.
     single { NavRequests() }
+    single { LauncherUpdateState() }
     // Surfaces pack-update outcomes (background auto-updater + manual flows via
     // the status hub) into the notification center. Same lifecycle rationale as
     // InstallDriver.
@@ -433,6 +566,11 @@ fun main(args: Array<String>) {
             // already listening when the first shell Composable registers itself
             // (the threshold overlay registers nothing).
             PuppetServerLoader.instance.startIfRequested()
+            // The pack registry opens its database on first use, so it is used here,
+            // on this thread: the first screen to read it would otherwise open it on
+            // the UI thread. Whatever goes wrong is the registry's to report, and it
+            // is no reason to stop the boot.
+            runCatching { GlobalContext.get().get<IPackRepository>().observe() }
             result
         }.onSuccess { result ->
             bootStage.value   = BootStage.Done
@@ -559,6 +697,17 @@ private fun runShellWithRecovery(
             if (safe) "Safe-mode window crashed -- giving up" else "Shell composition crashed -- attempting recovery",
             crash,
         )
+
+        // A crash that ran through a widget module's code is the module's. Switching
+        // it off before the restart is what makes the restart work, where retrying
+        // the same crash would only count down to safe mode. The crash still counts:
+        // if the module was not the whole story, safe mode is still the floor.
+        if (!safe) {
+            runCatching {
+                val modules = GlobalContext.getOrNull()?.getOrNull<WidgetModules>()
+                modules?.culpritOf(crash)?.let { modules.switchOffAfterCrash(it, crash) }
+            }.onFailure { log.warn("Could not trace the crash to a widget module", it) }
+        }
 
         val saved = runCatching {
             val reporter = pre.crashReporter.get()

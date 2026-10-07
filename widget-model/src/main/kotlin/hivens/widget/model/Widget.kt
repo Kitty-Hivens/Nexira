@@ -67,4 +67,28 @@ annotation class Widget(
     // plane is constant should declare it in [surface] and let the kernel draw it,
     // which is what puts it under the editor's control.
     val drawsOwnSurface: Boolean = false,
+    // What this widget needs, wants and can use, per axis, in dp. Zero on any of
+    // the six means undeclared, which is what every widget said before there was
+    // anywhere to say it, and every reader falls back to the behaviour it had.
+    //
+    // Six ints rather than one string, unlike [surface]: a plane is an object with
+    // a grammar of its own and worth one parser, a size is six numbers and a parser
+    // for them would be six ways to get a build error instead of a typed field.
+    //
+    // See [WidgetSizing] for what each one answers and who asks. The processor
+    // checks they are non-negative and in order, because min above max is a widget
+    // nothing can draw and the author is right here when it is written.
+    val minWidth: Int = 0,
+    val minHeight: Int = 0,
+    val prefWidth: Int = 0,
+    val prefHeight: Int = 0,
+    val maxWidth: Int = 0,
+    val maxHeight: Int = 0,
+    // How the widget arrives when its surface opens, as an [Entrance] id: "none",
+    // "fade", "rise" or "settle". Blank (the default) is [Entrance.DEFAULT]. A name
+    // rather than a duration, because the timing belongs to the motion scale and a
+    // widget only says what kind of arrival it makes. The processor rejects an id
+    // it does not know, so a typo is a build error rather than a widget that
+    // quietly fades.
+    val enter: String = "",
 )

@@ -53,12 +53,18 @@ class CliArgsTest {
 
     @Test
     fun `launch parses all options`() {
-        val cmd = parseArgs(arrayOf("launch", "pack-1", "--provider", "smartycraft", "--user", "Bob", "--dry-run"))
+        val cmd = parseArgs(arrayOf("launch", "pack-1", "--provider", "offline", "--user", "Bob", "--dry-run"))
         assertIs<CliCommand.Launch>(cmd)
         assertEquals("pack-1", cmd.packId)
-        assertEquals("smartycraft", cmd.provider)
+        assertEquals("offline", cmd.provider)
         assertEquals("Bob", cmd.user)
         assertTrue(cmd.dryRun)
+    }
+
+    /** A rename would put another name beside the real account's uuid and token. */
+    @Test
+    fun `a stored account cannot be given another name`() {
+        assertIs<CliCommand.Invalid>(parseArgs(arrayOf("launch", "pack-1", "--provider", "smartycraft", "--user", "Bob")))
     }
 
     @Test

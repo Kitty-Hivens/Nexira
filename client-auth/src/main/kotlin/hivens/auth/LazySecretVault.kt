@@ -22,7 +22,7 @@ class LazySecretVault(opener: () -> SecretVault) : SecretVault {
     override val tier: VaultTier get() = vault.tier
     override val backend: String get() = vault.backend
 
-    override fun store(key: String, value: ByteArray): Boolean = vault.store(key, value)
+    override fun store(key: String, secret: ByteArray): Boolean = vault.store(key, secret)
     override fun retrieve(key: String): ByteArray? = vault.retrieve(key)
     override fun delete(key: String): Boolean = vault.delete(key)
     override fun contains(key: String): Boolean = vault.contains(key)

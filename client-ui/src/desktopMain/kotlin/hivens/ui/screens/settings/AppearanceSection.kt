@@ -26,13 +26,11 @@ import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import hivens.core.data.HomeView
 import hivens.ui.chrome.IS_TILING_WM
 import hivens.ui.i18n.AppLocale
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.nx.NxChoiceChip
 import hivens.ui.nx.NxContextMenu
 import hivens.ui.nx.NxMenuItem
 import hivens.ui.nx.NxMenuMark
@@ -42,16 +40,19 @@ import hivens.ui.nx.NxSwitch
 import hivens.ui.nx.NxToggle
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetToggle
+import hivens.ui.customization.LocalCustomization
 import hivens.ui.theme.LocalThemeReveal
 import hivens.ui.theme.Motion
-import hivens.ui.theme.NxTheme
 import hivens.ui.theme.familyForText
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.Status
 
 /**
  * Interface + Behavior block. Drives anything user-facing about how the
  * launcher looks and how it behaves around launches: language, theme
- * preset shortcut, background shortcut, dark/light toggle, home-view
- * variant, UI style variant, close-after-launch, offline mode.
+ * preset shortcut, background shortcut, dark/light toggle, window chrome,
+ * close-after-launch, offline mode.
  *
  * Two [NxSection] planes (Interface, Behavior) per the island model;
  * expressiveness stays as a row state (day/night sun/moon + reveal,
@@ -70,8 +71,6 @@ internal fun AppearanceSection(
     onOpenBackgroundSettings: () -> Unit,
     currentLocale: AppLocale,
     onLocaleChanged: (AppLocale) -> Unit,
-    homeView: HomeView,
-    onHomeViewChanged: (HomeView) -> Unit,
 ) {
     val s = LocalStrings.current
     var langExpanded by remember { mutableStateOf(false) }
@@ -84,7 +83,7 @@ internal fun AppearanceSection(
         NxRow(
             title    = s.settingsLanguage,
             icon     = NxIcon.Language,
-            iconTint = NxTheme.colors.primary,
+            iconTint = NxColor.lead(),
             onClick  = { langExpanded = true },
             trailing = {
                 Box {
@@ -93,11 +92,11 @@ internal fun AppearanceSection(
                         // script the UI face has no glyphs for even while the interface is Latin.
                         Text(
                             currentLocale.displayName,
-                            color = NxTheme.colors.primary,
+                            color = NxColor.lead(),
                             fontWeight = FontWeight.Bold,
                             fontFamily = familyForText(currentLocale.displayName),
                         )
-                        Symbol(NxIcon.ArrowDropDown, null, tint = NxTheme.colors.primary)
+                        Symbol(NxIcon.ArrowDropDown, null, tint = NxColor.lead())
                     }
                     NxContextMenu(
                         expanded         = langExpanded,
@@ -128,9 +127,9 @@ internal fun AppearanceSection(
             title    = s.settingsThemePicker,
             subtitle = s.settingsThemePickerSub,
             icon     = NxIcon.Star,
-            iconTint = NxTheme.colors.primary,
+            iconTint = NxColor.lead(),
             onClick  = onOpenThemePicker,
-            trailing = { Symbol(NxIcon.ArrowDropDown, null, tint = NxTheme.colors.primary) },
+            trailing = { Symbol(NxIcon.ArrowDropDown, null, tint = NxColor.lead()) },
         )
 
         // Custom background shortcut.
@@ -139,9 +138,9 @@ internal fun AppearanceSection(
             title    = s.settingsBackground,
             subtitle = s.settingsBackgroundSub,
             icon     = NxIcon.Wallpaper,
-            iconTint = NxTheme.colors.primary,
+            iconTint = NxColor.lead(),
             onClick  = onOpenBackgroundSettings,
-            trailing = { Symbol(NxIcon.ChevronRight, null, tint = NxTheme.colors.primary) },
+            trailing = { Symbol(NxIcon.ChevronRight, null, tint = NxColor.lead()) },
         )
 
         // Dark theme: day/night identity (sun warm, moon cool) + GNOME-style reveal.
@@ -153,16 +152,6 @@ internal fun AppearanceSection(
         PuppetToggle("settings.darkTheme", themeSwitchState) { isChecked ->
             themeSwitchState = isChecked; onToggleTheme()
         }
-
-        // Home view variant. The modern widget-composed home is the default and
-        // leads; the legacy Dashboard follows. The parent updates routing on
-        // change.
-        PickerBlock(s.settingsHomeViewTitle, s.settingsHomeViewSub) {
-            NxChoiceChip(s.settingsHomeViewNew,     homeView == HomeView.New)          { onHomeViewChanged(HomeView.New) }
-            NxChoiceChip(s.settingsHomeViewClassic, homeView == HomeView.Classic)      { onHomeViewChanged(HomeView.Classic) }
-        }
-        PuppetClick("settings.homeView.new")          { onHomeViewChanged(HomeView.New) }
-        PuppetClick("settings.homeView.classic")      { onHomeViewChanged(HomeView.Classic) }
 
         // Window chrome. `undecorated` is fixed when the window is created, so the flip
         // lands at the next launch and the row says so rather than looking inert. On a
@@ -180,7 +169,7 @@ internal fun AppearanceSection(
             Text(
                 text  = s.settingsCustomChromeTiling,
                 style = MaterialTheme.typography.bodySmall,
-                color = NxTheme.colors.textSecondary,
+                color = NxInk.quiet,
             )
         }
         PuppetToggle("settings.useCustomChrome", form.useCustomChrome, enabled = !IS_TILING_WM) {
@@ -196,7 +185,7 @@ internal fun AppearanceSection(
         }
         PuppetToggle("settings.closeAfterStart", form.closeAfterStart) { form.closeAfterStart = it; save() }
 
-        NxToggle(s.settingsOfflineMode, form.isOfflineMode, description = s.settingsOfflineModeDesc, icon = NxIcon.WifiOff, accent = NxTheme.colors.error) {
+        NxToggle(s.settingsOfflineMode, form.isOfflineMode, description = s.settingsOfflineModeDesc, icon = NxIcon.WifiOff, accent = NxColor.status(Status.Error)) {
             form.isOfflineMode = it; save()
         }
         PuppetToggle("settings.offlineMode", form.isOfflineMode) { form.isOfflineMode = it; save() }
@@ -211,7 +200,7 @@ private val MoonBlue  = Color(0xFF8AB4F8)
 /**
  * Dark-theme toggle as an in-plane row with a day/night identity: sun (warm) when
  * light, moon (cool) when dark. Icon and switch track take that FIXED colour, not
- * the palette accent. The flip runs through the GNOME-style reveal (a circle growing
+ * the theme's lead colour. The flip runs through the GNOME-style reveal (a circle growing
  * out of the switch) when a host is present; no host (or motion off) is a plain flip.
  */
 @Composable
@@ -224,7 +213,10 @@ internal fun DayNightRow(
     val tint = if (checked) MoonBlue else SunOrange
     val reveal = LocalThemeReveal.current
     // The theme wipe's own pace -- a set piece rather than an interface response.
-    val durationMs = Motion.ownRhythm(THEME_REVEAL_MS).durationMs
+    // With motion reduced it is no wipe at all: the reveal reads a non-positive
+    // duration as a plain flip.
+    val still = LocalCustomization.current.reduceMotion
+    val durationMs = if (still) 0 else Motion.ownRhythm(THEME_REVEAL_MS).durationMs
     var switchOrigin by remember { mutableStateOf(Offset.Zero) }
     val onToggle: (Boolean) -> Unit = { newValue ->
         if (reveal != null) reveal.reveal(switchOrigin, durationMs) { onCheckedChange(newValue) }
@@ -239,8 +231,8 @@ internal fun DayNightRow(
             Symbol(if (checked) NxIcon.DarkMode else NxIcon.LightMode, null, tint = tint, size = 22.dp)
             Spacer(Modifier.width(12.dp))
             Column {
-                Text(title, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.Medium)
-                Text(description, style = MaterialTheme.typography.bodySmall, color = NxTheme.colors.textSecondary)
+                Text(title, color = NxInk.main, fontWeight = FontWeight.Medium)
+                Text(description, style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
             }
         }
         Spacer(Modifier.width(12.dp))
@@ -266,8 +258,8 @@ internal fun PickerBlock(
     chips: @Composable FlowRowScope.() -> Unit,
 ) {
     Column(Modifier.fillMaxWidth()) {
-        Text(title, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.Medium)
-        Text(sub, style = MaterialTheme.typography.bodySmall, color = NxTheme.colors.textSecondary)
+        Text(title, color = NxInk.main, fontWeight = FontWeight.Medium)
+        Text(sub, style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
         Spacer(Modifier.height(8.dp))
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),

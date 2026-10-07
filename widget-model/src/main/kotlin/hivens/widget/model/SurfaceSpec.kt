@@ -23,7 +23,7 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 data class SurfaceSpec(
-    /** See [FillSource]: blank, a named theme rung, or a literal colour. */
+    /** See [FillSource]: blank, a surface word, or a literal colour. */
     val fill: String = "",
     val opacity: Float? = null,
     val blurDp: Float? = null,
@@ -38,23 +38,38 @@ data class SurfaceSpec(
  *
  * One field carries both a value and a name, so there is no second control to keep in
  * step with the first and a hand-edited config reads plainly. A literal cannot follow
- * a palette, which is why the theme rungs stay reachable by name and are the default:
- * a surface that names nothing tracks whatever palette is active.
+ * a theme, which is why the surface words stay reachable by name and are the default:
+ * a surface that names nothing tracks whatever theme is active.
  */
 sealed interface FillSource {
-    /** Take the rung the call site would have picked anyway. */
+    /** Take the surface the call site would have picked anyway. */
     object Inherit : FillSource
 
-    /** A rung of the theme's tonal ladder, named. The names are mirrored rather than
-     *  shared because the design system is a leaf module and stays one. */
-    data class Rung(val name: String) : FillSource
+    /**
+     * A surface word: what the plane is (a panel, a card, a field), from which the
+     * design system works out its colour relative to what holds it. The words are
+     * mirrored rather than shared because the design system is a leaf module and
+     * stays one.
+     */
+    data class Named(val name: String) : FillSource
 
     /** An explicit colour, alpha included. */
     data class Literal(val argb: Int) : FillSource
 }
 
-/** The rung names [FillSource.Rung] accepts, shallowest first. */
-val SURFACE_RUNGS: List<String> = listOf("sunken", "base", "raised", "floating")
+/** The surface words [FillSource.Named] accepts, from the page outward, glass last. */
+val SURFACE_WORDS: List<String> = listOf("field", "panel", "card", "popup", "chrome")
+
+/**
+ * What the words used to be: absolute rungs of one ladder. A file written with them is
+ * read as the word that plays the same part, so a layout never needs wiping for this.
+ */
+private val LEGACY_WORDS: Map<String, String> = mapOf(
+    "sunken" to "field",
+    "base" to "panel",
+    "raised" to "card",
+    "floating" to "popup",
+)
 
 /**
  * Reads a [SurfaceSpec.fill] value. Anything unrecognised is [FillSource.Inherit]:
@@ -66,7 +81,8 @@ fun parseFill(value: String): FillSource {
     if (v.isEmpty()) return FillSource.Inherit
     if (v.startsWith("#")) return parseHexFill(v) ?: FillSource.Inherit
     val lower = v.lowercase()
-    return if (lower in SURFACE_RUNGS) FillSource.Rung(lower) else FillSource.Inherit
+    val word = if (lower in SURFACE_WORDS) lower else LEGACY_WORDS[lower]
+    return word?.let(FillSource::Named) ?: FillSource.Inherit
 }
 
 private fun parseHexFill(v: String): FillSource.Literal? {

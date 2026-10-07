@@ -159,6 +159,11 @@ check_asset "aarch64\.dmg$"      "macOS DMG (Apple Silicon)"
 # so it is frequently absent when this runs. Filename ends -x86_64-community.dmg.
 check_asset_optional "x86_64-community\.dmg$" "macOS DMG (Intel, community)"
 check_asset "SHA256SUMS"         "SHA256 checksums file"
+# Only a release embeds update information (see build-appimage.sh), so only a
+# release publishes the .zsync that information points at.
+if [[ "$VER_NUM" != *-* ]]; then
+    check_asset "\.AppImage\.zsync$" "AppImage zsync (update information)"
+fi
 
 echo ""
 
@@ -189,11 +194,22 @@ else
     fail "macOS  → no .dmg found"
 fi
 
-LIN_ASSET=$(echo "$RELEASE_JSON" | jq -r '[.assets[] | select(.name | test("\\.AppImage$"))] | first | .name // "NONE"')
+# UpdateService.linuxAssetName: the channel's name, never the version. A release
+# from before those names is served its single AppImage instead.
+LIN_EXPECTED="Nexira-x86_64.AppImage"
+if [[ "$VER_NUM" == *-* && "${VER_NUM#*-}" == nightly* ]]; then
+    LIN_EXPECTED="Nexira-nightly-x86_64.AppImage"
+fi
+LIN_ASSET=$(echo "$RELEASE_JSON" | jq -r --arg n "$LIN_EXPECTED" '[.assets[] | select(.name == $n)] | first | .name // "NONE"')
 if [[ "$LIN_ASSET" != "NONE" ]]; then
     ok "Linux  → $LIN_ASSET"
 else
-    fail "Linux  → no .AppImage found"
+    LIN_ASSET=$(echo "$RELEASE_JSON" | jq -r '[.assets[] | select(.name | test("\\.AppImage$"))] | if length == 1 then .[0].name else "NONE" end')
+    if [[ "$LIN_ASSET" != "NONE" ]]; then
+        warn "Linux  → $LIN_ASSET (named before the channel names, expected $LIN_EXPECTED)"
+    else
+        fail "Linux  → no $LIN_EXPECTED, and no single .AppImage to fall back on"
+    fi
 fi
 
 echo ""

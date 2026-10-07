@@ -4,7 +4,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import hivens.widget.model.NestedSegment
 import hivens.widget.model.SlotId
-import hivens.widget.model.SlotOrientation
+import hivens.widget.model.FlowSpec
 import hivens.widget.model.SlotPath
 import hivens.widget.model.SurfaceId
 import kotlin.test.Test
@@ -23,6 +23,36 @@ class DropTargetRegistryTest {
     private fun rect(top: Float, height: Float = 50f, left: Float = 0f, width: Float = 300f): Rect =
         Rect(left = left, top = top, right = left + width, bottom = top + height)
 
+    /**
+     * A placeholder from a screen that has gone is smaller than the live pane under
+     * it, and the smallest rectangle wins, so kept it took the drop.
+     */
+    @Test
+    fun `a withdrawn placeholder no longer takes a drop meant for the live slot beneath`() {
+        val r = DropTargetRegistry()
+        r.registerSlot(otherSlot, rect(top = 0f, height = 400f))
+        r.registerPlaceholder(slot, rect(top = 100f, height = 80f))
+        assertEquals(slot, r.slotForPoint(Offset(50f, 120f)))
+
+        r.withdrawPlaceholder(slot)
+
+        assertEquals(otherSlot, r.slotForPoint(Offset(50f, 120f)))
+    }
+
+    /** The placeholder goes when the first widget arrives, and the slot it sat in stays. */
+    @Test
+    fun `withdrawing a placeholder leaves the bounds its slot reported`() {
+        val r = DropTargetRegistry()
+        r.registerSlot(slot, rect(top = 0f, height = 300f))
+        r.registerPlaceholder(slot, rect(top = 10f, height = 80f))
+
+        r.withdrawPlaceholder(slot)
+
+        assertEquals(rect(top = 0f, height = 300f), r.slotRect(slot))
+        r.withdrawSlot(slot)
+        assertNull(r.slotRect(slot))
+    }
+
     @Test
     fun `insertionIndexInSlot picks the widget whose midpoint the pointer is above`() {
         val r = DropTargetRegistry()
@@ -31,11 +61,11 @@ class DropTargetRegistryTest {
         r.registerWidget(slot, "c", index = 2, rect = rect(top = 120f))   // [120, 170]
 
         // Above midpoint of widget 0 -> index 0
-        assertEquals(0, r.insertionIndexInSlot(slot, Offset(50f, 10f)))
+        assertEquals(0, r.insertionIndexInSlot(slot, Offset(50f, 10f), FlowSpec.Column))
         // Below midpoint of widget 0, above midpoint of widget 1 -> 1
-        assertEquals(1, r.insertionIndexInSlot(slot, Offset(50f, 70f)))
+        assertEquals(1, r.insertionIndexInSlot(slot, Offset(50f, 70f), FlowSpec.Column))
         // Below all -> append at 3
-        assertEquals(3, r.insertionIndexInSlot(slot, Offset(50f, 200f)))
+        assertEquals(3, r.insertionIndexInSlot(slot, Offset(50f, 200f), FlowSpec.Column))
     }
 
     @Test
@@ -46,7 +76,7 @@ class DropTargetRegistryTest {
         r.registerWidget(slot, "b", index = 1, rect = rect(top = 0f, height = 80f, left = 110f, width = 100f)) // x [110,210], mid 160
         r.registerWidget(slot, "c", index = 2, rect = rect(top = 0f, height = 80f, left = 220f, width = 100f)) // x [220,320]
 
-        val row = SlotOrientation.Row
+        val row = FlowSpec.Row
         assertEquals(0, r.insertionIndexInSlot(slot, Offset(10f, 40f), row))   // left of a's mid
         assertEquals(1, r.insertionIndexInSlot(slot, Offset(120f, 40f), row))  // past a's mid, before b's mid
         assertEquals(3, r.insertionIndexInSlot(slot, Offset(400f, 40f), row))  // past all -> append
@@ -62,7 +92,7 @@ class DropTargetRegistryTest {
         r.registerWidget(slot, "c", index = 2, rect = rect(top = 100f, height = 80f, left = 0f,   width = 100f)) // r1c0
         r.registerWidget(slot, "d", index = 3, rect = rect(top = 100f, height = 80f, left = 110f, width = 100f)) // r1c1
 
-        val grid = SlotOrientation.Grid
+        val grid = FlowSpec.grid(2)
         assertEquals(0, r.insertionIndexInSlot(slot, Offset(50f, -10f), grid)) // above everything
         assertEquals(0, r.insertionIndexInSlot(slot, Offset(10f, 40f), grid))  // row 0, left of a's center
         assertEquals(1, r.insertionIndexInSlot(slot, Offset(120f, 40f), grid)) // row 0, between a and b centers
@@ -73,7 +103,7 @@ class DropTargetRegistryTest {
     @Test
     fun `insertionIndexInSlot returns zero for unknown slot`() {
         val r = DropTargetRegistry()
-        assertEquals(0, r.insertionIndexInSlot(slot, Offset(0f, 0f)))
+        assertEquals(0, r.insertionIndexInSlot(slot, Offset(0f, 0f), FlowSpec.Column))
     }
 
     @Test

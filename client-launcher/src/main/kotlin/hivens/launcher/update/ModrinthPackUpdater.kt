@@ -24,8 +24,6 @@ import org.slf4j.LoggerFactory
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
-import java.time.Instant
-import java.util.UUID
 
 /**
  * Moves a Modrinth-installed instance between versions of its pack.
@@ -39,17 +37,21 @@ import java.util.UUID
  *
  * Applying goes through [MrpackInstaller.update], which reconciles against the
  * record written at install: the pack's own files move, and whatever the player
- * added stays where they put it.
+ * added stays where they put it. It runs inside the same [ApplyGuard] as the
+ * mirror path, so a failed or interrupted update is rolled back rather than left
+ * half-converted.
  */
 class ModrinthPackUpdater(
     private val client: ModrinthClient,
     private val installer: MrpackInstaller,
     private val repository: IPackRepository,
     private val snapshotService: PackSnapshotService,
+    journal: ApplyJournal,
     private val dataDir: Path,
 ) : PackUpdater {
 
     private val log = LoggerFactory.getLogger(ModrinthPackUpdater::class.java)
+    private val guard = ApplyGuard(snapshotService, journal, repository)
 
     private fun clientDirOf(instance: PackInstance): Path =
         dataDir.resolve("instances").resolve(instance.instanceDirName)
@@ -122,15 +124,7 @@ class ModrinthPackUpdater(
 
         return InstanceMutationLock.withLock(clientDir) {
             withContext(Dispatchers.IO) {
-                val current = repository.get(instance.id) ?: instance
-                // A structural change is the one that strands a world and the mods
-                // the player added on top, so it gets a snapshot it can be undone
-                // from. A safe re-sync does not pay for one.
-                if (!compat.isSafe) {
-                    val managed = PackFileRecord.read(clientDir).keys
-                    snapshotService.capture(clientDir, current, managed, UUID.randomUUID().toString(), Instant.now().epochSecond)
-                }
-
+                val current = repository.get(instance.id) ?: throw InstanceRemovedException(instance)
                 // A directory, so the archive path does not exist yet: downloadTo
                 // skips a target that is already on disk, and createTempFile
                 // creates one, so handing it a temp FILE downloaded nothing and
@@ -138,13 +132,14 @@ class ModrinthPackUpdater(
                 val scratch = Files.createTempDirectory("mrpack-update-")
                 val archive = scratch.resolve("pack.mrpack")
                 try {
+                    val record = PackFileRecord.read(clientDir)
                     // An instance from before records existed has no baseline, and
                     // without one an update cannot retire what the old version
                     // shipped: every pack renames its jars per version, so the
                     // instance ends up carrying two of each mod and the game will
                     // not start. The old version's own archive is the baseline, and
                     // fetching it happens once -- the update writes a record.
-                    val installedArchive = if (PackFileRecord.read(clientDir).isEmpty()) {
+                    val installedArchive = if (record.isEmpty()) {
                         val installed = currentVersionOf(current)
                         val previous = ordered.firstOrNull { it.versionNumber == installed }
                             ?: throw IOException(
@@ -152,11 +147,13 @@ class ModrinthPackUpdater(
                                     "installed, and version '$installed' is no longer listed to read one from. " +
                                     "Reinstall the pack to update it.",
                             )
-                        scratch.resolve("installed.mrpack").also { client.downloadTo(previous.primaryFile().url, it) }
+                        scratch.resolve("installed.mrpack").also { previous.primaryFile().let { f -> client.downloadTo(f.url, it, f.hashes.sha1) } }
                     } else {
                         null
                     }
-                    client.downloadTo(target.primaryFile().url, archive)
+                    // Held to the published digest: the index inside is what pins
+                    // every other file the update fetches.
+                    target.primaryFile().let { f -> client.downloadTo(f.url, archive, f.hashes.sha1) }
                     // Say what went wrong here rather than let a zero-byte file
                     // reach the zip reader, which reports only "zip file is empty"
                     // and names neither the pack nor where the bytes should have
@@ -168,13 +165,22 @@ class ModrinthPackUpdater(
                                 "from ${target.primaryFile().url}",
                         )
                     }
-                    installer.update(
-                        instance = current,
-                        mrpack = archive,
-                        source = MrpackSource(current.packRef.origin, current.packRef.id, target.versionNumber, buildKey = target.id),
-                        installedArchive = installedArchive,
-                        progress = progress ?: { _, _, _ -> },
-                    )
+                    // Everything the update can create, replace or retire, known before
+                    // it touches anything: what the old version placed, what the new
+                    // one places, and the record that describes which is which.
+                    val managed = record.keys +
+                        installedArchive?.let { runCatching { installer.archivePaths(it) }.getOrDefault(emptySet()) }.orEmpty() +
+                        installer.archivePaths(archive) +
+                        PackFileRecord.FILE_NAME
+                    guard.apply(clientDir, current, managed, currentVersionOf(current), target.versionNumber) {
+                        installer.update(
+                            instance = current,
+                            mrpack = archive,
+                            source = MrpackSource(current.packRef.origin, current.packRef.id, target.versionNumber, buildKey = target.id),
+                            installedArchive = installedArchive,
+                            progress = progress ?: { _, _, _ -> },
+                        )
+                    }
                 } finally {
                     runCatching {
                         Files.list(scratch).use { s -> s.forEach { Files.deleteIfExists(it) } }
@@ -194,14 +200,18 @@ class ModrinthPackUpdater(
         val clientDir = clientDirOf(instance)
         return InstanceMutationLock.withLock(clientDir) {
             withContext(Dispatchers.IO) {
-                val current = repository.get(instance.id) ?: instance
-                val managed = PackFileRecord.read(clientDir).keys
+                val current = repository.get(instance.id) ?: throw InstanceRemovedException(instance)
+                // The record goes with the files. A snapshot that holds it puts back
+                // the one describing the restored build, and one taken before records
+                // were captured drops the current one, which describes the build being
+                // undone: no record is read as "retire nothing", a wrong one as
+                // "retire the wrong things".
+                val managed = PackFileRecord.read(clientDir).keys + PackFileRecord.FILE_NAME
                 val restored = snapshotService.restore(clientDir, current.instanceDirName, snapshotId, managed)
                 // A rollback is a deliberate pin: stop following latest, or the
                 // update just undone comes back on the next pass.
-                val pinned = restored.copy(followLatest = false)
-                repository.put(pinned)
-                pinned
+                repository.update(current.id) { it.withBuildOf(restored).copy(followLatest = false) }
+                    ?: current.withBuildOf(restored).copy(followLatest = false)
             }
         }
     }

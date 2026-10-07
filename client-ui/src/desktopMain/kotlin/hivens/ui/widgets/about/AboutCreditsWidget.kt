@@ -27,12 +27,13 @@ import hivens.ui.BuildConfig
 import hivens.ui.easter.GibberishMode
 import hivens.ui.easter.LocalAprilFools
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.theme.NxTheme
 import hivens.widget.api.rememberProps
 import hivens.widget.model.PropLabel
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 import kotlinx.serialization.Serializable
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
 
 // Credits + technology list + license. Self-scrolls because the
 // content is long; the surface does not impose a verticalScroll on
@@ -46,11 +47,18 @@ data class AboutCreditsProps(
     @PropLabel("widget.about.credits.title") val title: String = "",
 )
 
+// The ceiling is load-bearing rather than cosmetic: this widget scrolls its own
+// content, and Compose refuses to measure a scrolling component against an
+// unbounded height. The editor can put it in a slot that has none, and the
+// renderer fills that silence from here.
 @Widget(
     id = "about.credits",
     displayName = "widget.about.credits",
     propsClass = AboutCreditsProps::class,
-    surface = """{"fill":"raised","opacity":0.92,"border":{"widthDp":1.0}}""",
+    surface = """{"fill":"card","border":{"widthDp":1.0}}""",
+    minWidth = 260, minHeight = 180,
+    prefWidth = 320, prefHeight = 428,
+    maxWidth = 720, maxHeight = 1200,
 )
 @Composable
 fun AboutCreditsWidget(instance: WidgetInstance) {
@@ -79,7 +87,7 @@ fun AboutCreditsWidget(instance: WidgetInstance) {
                 Text(
                     text       = "Haru (Hivens)",
                     fontWeight = FontWeight.Bold,
-                    color      = NxTheme.colors.textPrimary,
+                    color      = NxInk.main,
                 )
                 Text(
                     text  = af.maybeGibberish(
@@ -88,7 +96,7 @@ fun AboutCreditsWidget(instance: WidgetInstance) {
                         mode        = GibberishMode.SCRAMBLED,
                     ),
                     style = MaterialTheme.typography.bodySmall,
-                    color = NxTheme.colors.primary,
+                    color = NxColor.lead(),
                 )
             }
         }
@@ -108,18 +116,18 @@ fun AboutCreditsWidget(instance: WidgetInstance) {
 
         techs.forEach { (name, desc) ->
             Row(Modifier.padding(vertical = 3.dp)) {
-                Text("•", color = NxTheme.colors.primary, fontWeight = FontWeight.Bold)
+                Text("•", color = NxColor.lead(), fontWeight = FontWeight.Bold)
                 Spacer(Modifier.width(8.dp))
                 Text(
                     text       = af.maybeGibberish(name, probability = 0.20f, mode = GibberishMode.ZALGO),
                     fontWeight = FontWeight.Medium,
-                    color      = NxTheme.colors.textPrimary,
+                    color      = NxInk.main,
                     fontSize   = 13.sp,
                 )
                 Spacer(Modifier.width(6.dp))
                 Text(
                     text     = "— ${af.maybeGibberish(desc, probability = 0.40f, mode = GibberishMode.JARGON)}",
-                    color    = NxTheme.colors.textSecondary,
+                    color    = NxInk.quiet,
                     fontSize = 13.sp,
                 )
             }
@@ -136,7 +144,7 @@ fun AboutCreditsWidget(instance: WidgetInstance) {
                 mode        = GibberishMode.LOREM,
             ),
             style = MaterialTheme.typography.bodySmall,
-            color = NxTheme.colors.textSecondary,
+            color = NxInk.quiet,
         )
     }
 }

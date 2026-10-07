@@ -15,7 +15,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -32,15 +31,19 @@ import hivens.ui.components.DestructiveConfirmDialog
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.platform.SystemActions
 import hivens.ui.screens.library.PackCard
-import hivens.ui.theme.NxTheme
+import hivens.ui.surface.NxSurface
+import hivens.ui.surface.SurfaceKind
+import androidx.compose.foundation.layout.padding
 import hivens.widget.api.rememberProps
 import hivens.widget.model.PropLabel
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 import java.nio.file.Path
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import org.koin.compose.koinInject
+import hivens.ui.theme.NxInk
 
 @Serializable
 data class LibraryBodyProps(
@@ -53,7 +56,16 @@ data class LibraryBodyProps(
 // branching would force the layout graph to know about appState, which
 // belongs to navigation, not layout. Self-gating keeps the slot stable
 // across the empty -> populated transition.
-@Widget(id = "library.body", displayName = "widget.library.body", propsClass = LibraryBodyProps::class)
+// The ceiling is load-bearing: this lists lazily, and a lazy list cannot be
+// measured against an unbounded axis. Generous, because this is the library's
+// whole content pane and a bound under it would cut the list short.
+@Widget(
+    id = "library.body",
+    displayName = "widget.library.body",
+    propsClass = LibraryBodyProps::class,
+    minWidth = 320, minHeight = 200,
+    maxWidth = 2400, maxHeight = 1600,
+)
 @Composable
 fun LibraryBody(instance: WidgetInstance) {
     val p = instance.rememberProps<LibraryBodyProps>()
@@ -62,7 +74,9 @@ fun LibraryBody(instance: WidgetInstance) {
     val repo: IPackRepository = koinInject()
     val paths: PlatformPaths = koinInject()
     val packInstanceService: PackInstanceService = koinInject()
-    val scope = rememberCoroutineScope()
+    // The app's scope, not this composition's: leaving the Library mid-delete
+    // cancelled it halfway through the tree.
+    val scope: CoroutineScope = koinInject()
     var pendingDelete by remember { mutableStateOf<PackInstance?>(null) }
     val instances by remember { repo.observe() }.collectAsState()
 
@@ -126,24 +140,29 @@ private fun LibraryList(
 private fun LibraryEmpty(title: String, body: String, onBrowse: () -> Unit) {
     val s = LocalStrings.current
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            Text(
-                text       = title,
-                style      = MaterialTheme.typography.titleLarge,
-                color      = NxTheme.colors.textPrimary,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Text(
-                text      = body,
-                style     = MaterialTheme.typography.bodyMedium,
-                color     = NxTheme.colors.textSecondary,
-                textAlign = TextAlign.Center,
-                modifier  = Modifier.widthIn(max = 360.dp),
-            )
-            NxButton(label = s.browseOpen, onClick = onBrowse)
+        // A panel the size of what it says. The words are the whole screen here, and
+        // on the bare page they lay over whatever the wallpaper had in the middle.
+        NxSurface(SurfaceKind.Panel, shape = MaterialTheme.shapes.large) {
+            Column(
+                modifier            = Modifier.padding(horizontal = 32.dp, vertical = 28.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                Text(
+                    text       = title,
+                    style      = MaterialTheme.typography.titleLarge,
+                    color      = NxInk.main,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text      = body,
+                    style     = MaterialTheme.typography.bodyMedium,
+                    color     = NxInk.quiet,
+                    textAlign = TextAlign.Center,
+                    modifier  = Modifier.widthIn(max = 360.dp),
+                )
+                NxButton(label = s.browseOpen, onClick = onBrowse)
+            }
         }
     }
 }

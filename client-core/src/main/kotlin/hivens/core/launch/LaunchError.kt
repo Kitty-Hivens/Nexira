@@ -27,23 +27,11 @@ sealed class LaunchError {
     /** Offline mode launched without an installed client directory. */
     data object OfflineNoClient : LaunchError()
 
-    /** Offline mode launched without a cached manifest from a prior online run. */
-    data object OfflineNoManifest : LaunchError()
-
     /**
      * 2FA account with an expired (or absent) cached manifest --
      * re-login through the form is required.
      */
     data object TwoFactorExpired : LaunchError()
-
-    /**
-     * The open-smrt helper swap is enabled and the server ships the
-     * proprietary Smarty jar, but no helper is available for [mcVersion]
-     * (unsupported version / descriptor down / nothing cached). The launch
-     * is blocked rather than stripping Smarty with no replacement (broken
-     * join) or silently keeping the surveillance mod.
-     */
-    data class HelperUnavailable(val mcVersion: String) : LaunchError()
 
     /**
      * An SC-bound pack needs SmartyCraft's patched authlib (the vanilla one
@@ -61,4 +49,12 @@ sealed class LaunchError {
      * [providerKey] is a stable identifier the UI maps to a localized name.
      */
     data class MissingAuthProvider(val providerKey: String) : LaunchError()
+
+    /**
+     * The instance is in the middle of [work] that rewrites its files. A game started
+     * now would load a mix of two builds, or files that are about to be replaced.
+     * The launch controls say this before anyone presses them; this is the refusal
+     * for a launch that arrives some other way, from a notification or a relaunch.
+     */
+    data class InstanceBusy(val work: InstanceWork) : LaunchError()
 }

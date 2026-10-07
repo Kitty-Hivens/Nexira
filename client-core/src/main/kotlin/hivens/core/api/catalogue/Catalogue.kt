@@ -88,6 +88,13 @@ data class CataloguePackVersion(
      * files from the manifest by (packId, version).
      */
     val downloadUrl: String? = null,
+    /**
+     * The sha1 the source publishes for [downloadUrl], and its size. The archive
+     * carries the index that pins every other file, so it is the one download
+     * nothing else can vouch for.
+     */
+    val downloadSha1: String? = null,
+    val downloadSize: Long = -1L,
     /** Release channel; both sources spell it `version_type` on the wire. */
     val channel: VersionChannel = VersionChannel.Release,
     /** ISO-8601 publish instant, or null when the source does not date a version. */

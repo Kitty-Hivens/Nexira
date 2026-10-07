@@ -1,6 +1,9 @@
 package hivens.ui.i18n
 
 import hivens.core.data.PackAuthRequirement
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 object RussianStrings : AppStrings {
@@ -31,34 +34,21 @@ object RussianStrings : AppStrings {
     override val navForward  = "Вперёд"
 
     // Dashboard
-    override fun dashboardWelcome(name: String) = "ДОБРО ПОЖАЛОВАТЬ, $name"
-    override val dashboardServers              = "Доступные серверы"
-    override val dashboardServersEmpty         = "Серверы не найдены"
-    override val dashboardLoginRequiredTitle   = "Войдите, чтобы увидеть серверы"
-    override val dashboardLoginRequiredHint    = "Список серверов SmartyCraft скрыт за авторизацией. Войти можно в разделе Профиль."
+    override fun homeWelcomeGreeting(name: String) = "С возвращением, $name"
+    override val homeWelcomeSubtitle = "Продолжайте с того места, где остановились."
 
     // Launch Control
-    override val launchReady       = "Готов к игре"
-    override val launchButton      = "Играть"
-    override val launchAbort       = "Отмена"
     override val launchRunning     = "Игра запущена"
-    override val launchStop        = "Остановить"
     override val launchDownloading = "Загрузка:"
     override val launchPreparing   = "Подготовка"
     override val launchFailed      = "Ошибка запуска"
 
     // Launcher States
-    override val stateInit        = "Инициализация..."
-    override val stateAuth        = "Авторизация..."
     override val stateAuthFail    = "Ошибка авторизации (оффлайн?)"
     override val stateNoPassword  = "Пароль не найден, используем текущую сессию."
-    override val stateSync        = "Синхронизация файлов..."
-    override val stateJvm         = "Подготовка JVM..."
     override val stateLaunching   = "Запуск процесса..."
     override fun stateExitCode(code: Int)  = "Игра закрылась с кодом $code"
     override fun stateError(msg: String)   = "Ошибка: $msg"
-    override fun stateHelperUnavailable(mcVersion: String) =
-        "Нет open-smrt хелпера для Minecraft $mcVersion. Запуск заблокирован, чтобы не запускать проприетарный мод Smarty; отключи подмену хелпера в настройках, чтобы играть с ним."
     override fun stateAuthlibUnavailable(mcVersion: String) =
         "Не удалось получить authlib SmartyCraft для Minecraft $mcVersion. Запуск заблокирован: сервер отклонит вход. Проверь соединение и вход в SmartyCraft и попробуй снова."
     override fun stateMissingAuthProvider(providerKey: String) = when (providerKey) {
@@ -96,10 +86,10 @@ object RussianStrings : AppStrings {
     override val settingsThemeModeSystem            = "Система"
     override val settingsThemeModeWallpaper         = "Обои"
     override val settingsThemeModeSystemUnavailable = "Системная схема недоступна в этой среде"
-    override val settingsPaletteFromWallpaper       = "Цвета из обоев"
-    override val settingsPaletteFromWallpaperDesc   = "Выключено: тема сохраняет свои цвета"
     override val settingsSurfaceBlur                = "Размытие за панелями"
     override val settingsSurfaceBlurDesc            = "Стоит немного на каждом кадре; без него панели сохраняют форму и непрозрачность"
+    override val settingsReduceMotion               = "Меньше движения"
+    override val settingsReduceMotionDesc           = "Виджеты сразу на месте при открытии экрана, частицы замирают"
     override val settingsCustomChrome               = "Своя строка заголовка"
     override val settingsCustomChromeDesc           = "Заменяет заголовок окна собственной верхней панелью. Применится при следующем запуске."
     override val settingsCustomChromeTiling         = "Твой оконный менеджер не рисует заголовок, так что здесь это ничего не меняет."
@@ -113,13 +103,8 @@ object RussianStrings : AppStrings {
     override val themePickerApply           = "Применить"
     override val themePickerPreview         = "Предпросмотр"
     override val themePickerSelected        = "Выбрана"
-    override val themePickerColorPrimary    = "Основной"
-    override val themePickerColorSecondary  = "Дополнительный"
-    override val themePickerColorBackground = "Фон"
-    override val themePickerColorSurface    = "Поверхность"
-    override val themePickerColorAccent     = "Акцент"
-    override val themePickerColorSuccess    = "Успех"
-    override val themePickerColorError      = "Ошибка"
+    override val themePickerDarkOnly        = "Только тёмная"
+    override val themeFromWallpaper         = "Из обоев"
     override val themePickerBtnSample       = "Пример кнопки"
     override val themePickerBtnOutlined     = "Кнопка с рамкой"
 
@@ -145,33 +130,14 @@ object RussianStrings : AppStrings {
     override val paginationNext         = "Следующая страница"
 
     // Server Detail
-    override val serverDetailTitle         = "Информация о сервере"
-    override val serverDetailNoImage       = "Нет изображения"
-    override val serverDetailNoImageHint   = "banner.png"
-    override val serverDetailMissingTitle  = "Информация отсутствует"
-    override fun serverDetailMissingPath(file: String) = "Создайте файл $file в папке:"
 
     // Server Settings
-    override val serverSettingsSubtitle        = "Настройки запуска"
-    override val serverSettingsSectionSystem   = "Система"
-    override val serverSettingsSectionMods     = "Модификации"
-    override val serverSettingsRam             = "ОЗУ"
-    override fun serverSettingsRamValue(mb: Int) = "ОЗУ: $mb МБ"
-    override val serverSettingsJava            = "Версия Java"
-    override fun serverSettingsJavaAuto(version: String) = "Автоматически ($version)"
-    override val serverSettingsJavaHint        = "Оставьте пустым для использования встроенной Java"
     override val serverSettingsOpenFolder      = "Открыть папку"
-    override val serverSettingsReset           = "Сбросить клиент"
 
-    override val serverSettingsResetConfirmTitle = "Сбросить клиент?"
-    override val serverSettingsResetConfirmBody  = "Все скачанные файлы клиента этого сервера будут удалены без возможности восстановления."
     override val backgroundResetConfirmTitle     = "Сбросить фон?"
     override val backgroundResetConfirmBody      = "Вся конфигурация пользовательского фона вернётся к значениям по умолчанию."
     override val logoutConfirmTitle              = "Выйти из аккаунта?"
     override val logoutConfirmBody               = "Сохранённый вход будет удалён с этого устройства. Для повторного входа понадобится снова ввести данные."
-
-    override val serverSettingsNoMods          = "Нет опциональных модов"
-    override val serverSettingsPickJava        = "Выберите Java"
 
     // Update
     override val updateTitle           = "Доступно обновление"
@@ -259,33 +225,32 @@ object RussianStrings : AppStrings {
 
     // --- Launcher States: Offline ---
     override val stateOfflineSkipAuth      = "Оффлайн-режим — авторизация пропущена"
+    override val stateUnboundOffline       = "Сборка не привязана к серверу, поэтому запускается офлайн и не получает токен сессии"
     override val stateOfflineSkipSync      = "Оффлайн-режим — синхронизация пропущена, используем локальные файлы"
     override fun stateForeignContentRemoved(count: Int, names: String) =
         "Удалено файлов, которых нет в сборке: $count ($names)"
     override val stateContentChanged       = "Сборка была изменена, запуск остановлен. Просим не модифицировать файлы сборки."
     override val stateOfflineNoClient      = "Файлы клиента не найдены. Сначала скачайте их онлайн."
-    override val stateOfflineNoManifest    = "Нет кеша манифеста для этого сервера. Войдите онлайн хотя бы раз перед запуском оффлайн."
 
     // --- Server Settings: Extended ---
-    override val serverSettingsJvmArgs     = "Аргументы JVM"
-    override val serverSettingsJvmArgsHint = "-XX:+UseZGC -Dfoo=bar"
-    override val serverSettingsJvmBuildArgs = "Собрать"
-    override val serverSettingsResolution  = "Размер окна"
-    override val serverSettingsWidth       = "Ширина"
-    override val serverSettingsHeight      = "Высота"
-    override val serverSettingsFullscreen  = "Полный экран"
-    override val serverSettingsAutoConnect = "Автоподключение к серверу"
 
     // --- Server Settings: Icon Upload ---
-    override val serverSettingsPickIcon    = "Выбрать иконку сервера"
 
     // =========================================================================
     // RAM Selector
     // =========================================================================
-    override val ramCustomInputLabel = "Своё значение:"
     override fun ramSystemHint(systemRam: String, recommended: String) =
         "Система: $systemRam • Рекомендуется не более $recommended"
-    override fun ramAutoLabel(resolved: String) = "Авто · ~$resolved"
+    override val ramModeTitle = "Объём памяти"
+    override val ramModeAuto = "Авто"
+    override val ramModeOwn = "Своё"
+    override fun ramAutoDetail(resolved: String) = "Подбирается под систему и под эту сборку. Сейчас это $resolved."
+    override val ramOwnDetail = "Столько игра получит при каждом запуске."
+    override val ramAllocated = "Выделено"
+    override val ramUnitGb = "ГБ"
+    override val ramUnitMb = "МБ"
+    override fun ramOutOfRange(min: String, max: String) = "Можно от $min до $max"
+    override fun ramAboveRecommended(recommended: String) = "Больше $recommended: системе и самой игре вне кучи может не хватить памяти"
 
     // =========================================================================
     // Mod cards
@@ -296,7 +261,6 @@ object RussianStrings : AppStrings {
     // =========================================================================
     // Server grid
     // =========================================================================
-    override val serversFavorites = "★ ИЗБРАННЫЕ"
 
     // =========================================================================
     // Custom Background
@@ -374,12 +338,6 @@ object RussianStrings : AppStrings {
     override val techSkiaDesc    = "Графический рендер"
     override val techCoilDesc    = "Загрузка изображений"
 
-    // --- Spawn Reset ---
-    override val spawnResetButton  = "Вернуться на спавн"
-    override val spawnResetLoading = "Сбрасываем..."
-    override val spawnResetSuccess = "Готово! Перезайди"
-    override val spawnResetError   = "Ошибка сервера"
-
     // --- Tray ---
     override val trayStatusIdle    = "Ожидание"
     override val trayStatusRunning = "Игра запущена"
@@ -388,7 +346,6 @@ object RussianStrings : AppStrings {
     override val trayHintBody      = "Окно свёрнуто в системный трей. Нажмите на значок в трее, чтобы вернуть его."
     override val trayHintShow      = "Показать окно"
 
-
     // --- Settings: Advanced (обновления, запуск, каталог данных) ---
     override val settingsSectionUpdates      = "Обновления"
     override val settingsSectionLaunch       = "Запуск"
@@ -396,8 +353,6 @@ object RussianStrings : AppStrings {
     override val settingsPreReleasesDesc     = "Получать бета-сборки до перевода в стабильные."
     override val settingsMandatoryUpdates       = "Обязательные обновления"
     override val settingsMandatoryUpdatesDesc   = "Блокировать запуск до установки критических обновлений, когда ломается совместимость с протоколом. По умолчанию выключено: порог может заблокировать и твой собственный запуск, поэтому его соблюдение — осознанный выбор."
-    override val settingsAutoSyncAllPacks       = "Автосинхронизация клиентов SmartyCraft при запуске"
-    override val settingsAutoSyncAllPacksDesc   = "Пересинхронизировать в фоне при старте лаунчера все уже установленные клиенты SmartyCraft. С двухфакторным входом вход не выполняется вообще — он отозвал бы сессию, которую ты подтвердил кодом, — поэтому синхронизация идёт только по манифесту, сохранённому при прошлом ручном входе, а сервер без такого манифеста пропускается. Путь серверов SmartyCraft уходит в 2.5.0, его дефекты не чинятся; поддерживаемый путь — сборка с зеркала. Тратит фоновый трафик."
     override val settingsAutoUpdatePacks        = "Автообновление установленных инстансов"
     override val settingsAutoUpdatePacksDesc    = "Держать установленные инстансы зеркала на последней версии. Безопасные обновления ставятся в фоне; смена версии Minecraft или загрузчика идёт по правилу ниже. Выключи, чтобы обновлять вручную."
     override val settingsAmberPolicy            = "Когда сборка меняет Minecraft или загрузчик"
@@ -412,9 +367,6 @@ object RussianStrings : AppStrings {
     override val settingsMimicVersion           = "Подмена версии лаунчера"
     override val settingsMimicVersionDesc       = "Зафиксировать строку версии, которая отправляется в рукопожатии и User-Agent. Оставь пустым для стандартного значения — заполни только если апстрим успел поднять свою версию быстрее цикла релизов Nexira. Применяется на следующем запросе к протоколу после сохранения, перезапуск не требуется."
     override fun settingsMimicVersionPlaceholder(default: String) = "По умолчанию: $default"
-    override fun dashboardAutoSyncProgress(serverName: String, current: Int, total: Int) =
-        "Синхронизация $serverName ($current/$total)"
-    override fun dashboardAutoSyncBytes(readMB: Long, totalMB: Long) = "$readMB / $totalMB МБ"
     override val widgetProgressTitle = "Фоновая активность"
     override val widgetProgressIdle = "Сейчас ничего не качается."
     override fun widgetTabDefaultLabel(index: Int) = "Вкладка $index"
@@ -472,16 +424,13 @@ object RussianStrings : AppStrings {
     override val sslBypassRevoke        = "Отозвать"
     override fun sslBypassExpiresAt(formatted: String) = "Истекает: $formatted"
 
-
     override val settingsSectionSmarty           = "Серверы Smarty"
-    override val settingsOpenSmrtHelperTitle      = "Использовать альтернативный хелпер для сети smrt"
-    override val settingsStrictModCheckTitle      = "Точная проверка модификаций"
-    override val settingsOpenSmrtHelperDesc       = "Подменяет родной мод Smarty нашим открытым хелпером на серверах Smarty. Те же сетевые функции, но без слежки. Если для версии игры замены нет, запуск блокируется, а не запускает родной мод."
-    override val settingsStrictModCheckDesc       = "После синхронизации удаляет из папки mods всё, чего сервер не запрашивал. Держит сборку чистой, но заодно сносит и моды, которые ты добавил вручную."
     override val settingsNetworkAgentTitle        = "Использовать агента для поддержки работы сети"
     override val settingsNetworkAgentDesc         = "Направляет авторизацию игры на SmartyCraft прямо при запуске: вход на сервер и проверку скинов. Вход проходит через SmartyCraft, скины грузятся, и при этом не нужно подставлять пропатченную библиотеку авторизации от SmartyCraft. Нужно для входа на серверы SmartyCraft."
     override val settingsSmartyAuthLibTitle       = "Использовать библиотеку авторизации с SmartyCraft"
     override val settingsSmartyAuthLibDesc        = "Старый способ: берёт пропатченную библиотеку авторизации из клиента SmartyCraft и кладёт её в сборку вместо родной. Заменён агентом выше, оставлен как запасной вариант. Если файл не удаётся получить, запуск блокируется. По умолчанию выключено."
+    override val settingsReuseSessionTitle        = "Держать одну сессию (эксперимент)"
+    override val settingsReuseSessionDesc         = "Не входит заново перед каждым запуском. Одного входа хватает надолго, поэтому код двухфакторной защиты спрашивается один раз, а не при каждом запуске. Если сервер прервёт сессию, следующий запуск попросит войти снова. По умолчанию выключено."
 
     override val settingsSectionDataDir       = "Каталог данных"
     override val settingsDataDirCurrent       = "Текущий путь:"
@@ -603,12 +552,6 @@ object RussianStrings : AppStrings {
     override val navLibrary = "Библиотека"
     override val navBrowse  = "Каталог"
 
-    override val settingsHomeViewTitle   = "Главный экран"
-    override val settingsHomeViewSub     = "Современный экран включён по умолчанию. Классический Dashboard доступен в любой момент."
-    override val settingsHomeViewClassic = "Классический"
-    override val settingsHomeViewNew     = "Современный"
-
-
     // --- Выделение в левой панели ---
     override val navSelectionTitle        = "Выделение пункта меню"
     override val navSelectionSub          = "Как подсвечивается активный пункт в левой панели"
@@ -686,11 +629,17 @@ object RussianStrings : AppStrings {
     override val backgroundLoopForever   = "Бесконечно"
     override val backgroundLoopOnce      = "Один раз"
 
+    override val backgroundAudio         = "Звук"
+    override val backgroundAudioDesc     = "Проигрывать звуковую дорожку самих обоев. Скорость анимации меняет и её темп."
+    override val backgroundAudioVolume   = "Громкость"
+    override val backgroundAudioStill   = "У неподвижных обоев нет ни звука, ни позиции."
+    override val backgroundLink   = "Управлять из плееров"
+    override val backgroundLinkDesc   = "Виджеты плеера и медиаклавиши обращаются к обоям. Пауза останавливает и картинку."
+
     override val customizationAccentClear     = "Сбросить акцент"
     override val customizationSectionVisual   = "Визуал"
     override val customizationSectionColors   = "Переопределение цветов"
     override val customizationHexInvalid      = "Неверный hex"
-    override val themePickerAccentOverride    = "Свой акцент (применяется сразу)"
 
     override val browseTitle             = "Каталог"
     override val browseSearchPlaceholder = "Поиск сборок"
@@ -701,7 +650,11 @@ object RussianStrings : AppStrings {
     override val createPackName          = "Название"
     override val createPackMc            = "Версия Minecraft"
     override val createPackLoader        = "Загрузчик"
-    override val createPackLoaderVersion = "Версия загрузчика (необязательно)"
+    override val createPackLoaderVersion = "Версия загрузчика"
+    override val createPackLoaderVersionLatest = "Пусто: последняя"
+    override val createPackLoaderVersionRequired = "Для этого загрузчика обязательна"
+    override val createPackLoaderRecommended = "рекомендуемая"
+    override val createPackLoaderPreRelease = "предварительная"
     override val createPackConfirm       = "Создать"
     override val createPackCancel        = "Отмена"
     override val createPackShowSnapshots = "Показать снапшоты"
@@ -780,9 +733,109 @@ object RussianStrings : AppStrings {
     override val selectionClear                 = "Снять"
     override fun selectionBlockedByPack(count: Int) = "Из выбранного паку принадлежит: $count. Отсоедините сборку, чтобы ими управлять."
     override val contentActionDetails           = "Детали"
+    override val contentLockedTitle             = "Мод сборки"
+    override val contentLockedBody              = "Его ставит и обновляет сборка, поэтому выключить, удалить или сменить его версию здесь нельзя: следующее обновление вернуло бы всё как было. Чтобы распоряжаться им самому, сборку можно отвязать в настройках, но обновлений у неё больше не будет."
+    override val contentLockedOptionalBody      = "Это необязательный мод сборки: его можно выключить, а удалить или сменить версию нельзя, пока сборка обновляет его сама."
+    override val contentLockedOpenSettings      = "Настройки сборки"
     override val contentActionOpenPage          = "Открыть страницу"
+    override val contentUpdateCheck             = "Проверить обновления"
+    override fun contentUpdateAll(count: Int)   = "Обновить всё: $count"
+    override fun contentUpdateRunning(done: Int, total: Int) = "Обновление: $done из $total"
+    override val contentUpdateUpToDate          = "Всё обновлено"
+    override val contentUpdateCheckFailed       = "Не удалось проверить"
+    override val contentUpdateConfirmTitle      = "Обновить проекты?"
+    override fun contentUpdateConfirmBody(count: Int) =
+        "Файлы будут заменены новыми версиями с Modrinth. Проектов: $count."
+    override val contentUpdateConfirmAction     = "Обновить"
+    override fun contentUpdateTo(version: String) = "Обновить до $version"
+    override val contentActionVersions          = "Версии"
+    override val contentVersionsTitle           = "Выбор версии"
+    override val contentVersionsUnknown         = "Modrinth не знает этот файл"
+    override val contentVersionsLoadFailed      = "Не удалось получить список версий"
     override val contentDetailAuthors           = "Авторы"
     override val contentDetailSize              = "Размер"
+    override val modPageTabDescription = "Описание"
+    override val modPageTabVersions = "Версии"
+    override val modPageTabChangelog = "Изменения"
+    override val modPageTabGallery = "Галерея"
+    override val modPageBodyEmpty = "Автор ничего не написал об этом проекте."
+    override val modPageBodyUnknown = "Описание живёт на странице проекта, а этот файл Modrinth не знает."
+    override val modPageStatDownloads = "скачиваний"
+    override val modPageStatFollowers = "подписчиков"
+    override val modPageLocalFile = "Локальный файл"
+    override val modPageFindInCatalogue = "Найти на Modrinth"
+    override val modPageHomepage = "Сайт проекта"
+    override val modPageOpenInCatalogue = "Открыть на Modrinth"
+    override val modPageCopyLink = "Скопировать ссылку"
+    override fun modPageInstallInto(pack: String) = "Установить в $pack"
+    override fun modPageInstalledIn(pack: String) = "Уже в $pack"
+    override val modPageInstalling = "Устанавливается"
+    override val modPageInstallFailed = "Установить не вышло"
+    override val modPageInstallRetry = "Повторить"
+    override fun modPageInstallMissing(count: Int) = "Не хватает зависимостей: $count"
+    override val modPageInstallShort = "Установить"
+    override fun modPageNoBuildFor(target: String) = "Нет сборки под $target"
+    override val modPageNoBuildAny = "Подходящей сборки нет"
+    override val versionsIncompatibleHint = "Эта сборка под другой лоадер или версию игры"
+    override val versionsColumnVersion = "Версия"
+    override val versionsColumnGameVersion = "Игровая версия"
+    override val versionsColumnPlatform = "Платформа"
+    override val versionsColumnPublished = "Опубликован"
+    override val versionsColumnDownloads = "Загрузки"
+    override val modPageVersionsFailed = "Не удалось получить список сборок"
+    override val modPageVersionsFailedBody = "Каталог не ответил. Проверь соединение и попробуй ещё раз."
+    override val modPageVersionsNoEntry = "Modrinth не знает этот файл, поэтому списка сборок нет"
+    override val versionsFilterChannel = "Канал"
+    override val versionsFilterGameVersion = "Игровая версия"
+    override val versionsFilterPlatform = "Платформа"
+    override val versionsFilterReset = "Сбросить"
+    override fun versionsFilterShown(shown: Int, total: Int) = "Показано $shown из $total"
+    override val versionsFilterNoMatch = "Под эти фильтры не подходит ни одна сборка"
+    override fun modPageInstalledVersion(version: String) = "Установлено: $version"
+
+    override val modVersionRequires = "Требует"
+    override val modVersionOptional = "Работает с"
+    override val modVersionIncompatible = "Не работает с"
+    override val modVersionFiles = "Файлы"
+    override val modVersionPinnedBuild = "конкретная сборка"
+    override val modVersionPrimaryFile = "основной файл"
+    override val modVersionFailed = "Сборка не загрузилась"
+    override val modRailCompatibility = "Совместимость"
+    override val modRailGame = "Minecraft"
+    override val modRailPlatforms = "Платформы"
+    override val modRailEnvironment = "Среда"
+    override val modRailLinks = "Ссылки"
+    override val modRailTags = "Теги"
+    override val modRailCreators = "Авторы"
+    override val modRailDetails = "Сведения"
+    override val modRailUnknownValue = "?"
+    override val modEnvClientOnly = "Только клиент"
+    override val modEnvServerOnly = "Только сервер"
+    override val modEnvBoth = "Клиент и сервер"
+    override val modEnvEither = "Клиент или сервер"
+    override val modLinkIssues = "Сообщить о проблеме"
+    override val modLinkSource = "Исходный код"
+    override val modLinkWiki = "Вики"
+    override val modLinkDiscord = "Discord"
+    override val modLinkDonate = "Поддержать автора"
+    override val modLicenseUnknown = "Лицензия не указана"
+    override val modLicenseAllRights = "Все права защищены"
+    override fun modPublishedOn(date: String) = "Опубликован $date"
+    override fun modUpdatedOn(date: String) = "Обновлён $date"
+    override val modPublishedUnknown = "Дата публикации неизвестна"
+    override val modUpdatedUnknown = "Дата обновления неизвестна"
+    override val modDisclosureTelemetryOptIn = "Телеметрия, включается вручную"
+    override val modDisclosureTelemetryOptOut = "Телеметрия, отключается вручную"
+    override val modDisclosureTelemetryAlways = "Телеметрия, отключить нельзя"
+    override val modDisclosureTelemetry = "Телеметрия"
+    override val modDisclosureAds = "Содержит рекламу"
+    override val modDisclosurePaid = "Содержит платные функции"
+    override val modDisclosureAiContent = "Содержит материал, созданный ИИ"
+    override val modDisclosureAiFunctionality = "Обращается к генеративной модели"
+    override val modDisclosureSystem = "Взаимодействует с системой вне игры"
+    override val modDisclosureEpilepsy = "Предупреждение о вспышках света"
+    override fun compactMillions(value: String) = "$value млн"
+    override fun compactThousands(value: String) = "$value тыс."
     override val contentTabFetchErrorTitle      = "Не удалось загрузить содержимое сборки"
     override val contentTabFetchErrorGeneric    = "Манифест с зеркала не загрузился."
     override val contentTabRetry                = "Повторить"
@@ -816,7 +869,6 @@ object RussianStrings : AppStrings {
         else "$count ${russianPlural(count, "альтернатива", "альтернативы", "альтернатив")}"
     override val contentTabRoleAlternativesHeader = "Альтернативы в этой сборке"
     override val contentTabModNoDescription     = "Описания пока нет в манифесте."
-    override fun contentTabModLicensePrefix(license: String) = "Лицензия: $license"
     override val contentTabModUrlLabel          = "Страница мода"
     override fun contentTabModSizeLabel(kb: Long) = "$kb KB"
     override fun contentTabModDependencies(count: Int) = "Зависимости ($count)"
@@ -881,6 +933,9 @@ object RussianStrings : AppStrings {
     override fun versionPickerCount(n: Int)     = "$n ${russianPlural(n, "версия", "версии", "версий")}"
     override val versionPickerEmpty             = "Версия не выбрана"
     override val versionPickerNoChangelog       = "У этой версии нет описания изменений"
+    override val versionPickerIncompatible      = "Не подходит этой сборке"
+    override fun versionPickerShowIncompatible(count: Int) = "Показать неподходящие ($count)"
+    override val versionPickerHideIncompatible  = "Скрыть неподходящие"
     override val versionPickerWarning           = "Смена версии перезапишет файлы сборки. Перед применением снимается точка восстановления."
     override fun versionPickerInstall(version: String)  = "Установить $version"
     override fun versionPickerUpgrade(version: String)  = "Обновить до $version"
@@ -923,6 +978,25 @@ object RussianStrings : AppStrings {
 
     override val packSettingsTitle              = "Настройки сборки"
     override val packSettingsClose              = "Закрыть"
+    override val packSettingsExpand             = "Развернуть"
+    override val packSettingsCollapse           = "Свернуть"
+    override fun packSettingsRuntimeLine(loader: String, mc: String) = "$loader на $mc"
+    override fun packSettingsRuntimeVanilla(mc: String) = "Minecraft $mc"
+    override val packSettingsLoader             = "Загрузчик"
+    override val packSettingsJavaPickOwn        = "Указать свою"
+    override val packSettingsOptionalCoToggle   = "Мод включает то, что ему нужно, и выключает то, с чем несовместим."
+    override val packLoaderInstalled = "Сейчас"
+    override val packLoaderNextLaunch = "Применится при следующем запуске, он и установит загрузчик."
+    override val packLoaderModsStay = "Моды останутся в папке как есть. Моды для другого загрузчика не загрузятся."
+    override val packLoaderApply = "Применить"
+    override val packLoaderRevert = "Отменить"
+    override fun optionalConflictsWith(name: String) = "Несовместим с $name"
+    override fun optionalNeedsOff(name: String) = "Нужен $name, а он выключен"
+    override fun optionalNeededBy(name: String) = "Выключен, а он нужен $name"
+    override fun contentBehindPin(neededBy: String, version: String) = "$neededBy нужна версия $version или новее"
+    override fun contentDependencyMissing(id: String) = "Нужен $id, а его нет или он выключен"
+    override fun contentDependencyVersion(name: String, wanted: String, installed: String) = "Нужен $name $wanted, а стоит $installed"
+    override val packVersionCheckTitle          = "Обновления"
     override val packSettingsCategoryGeneral    = "Основное"
     override val packSettingsCategoryRuntime    = "Запуск"
     override val packSettingsCategoryVersion    = "Версия"
@@ -937,9 +1011,10 @@ object RussianStrings : AppStrings {
     override fun packSettingsForkedFrom(name: String) = "Ответвление от $name"
     override val packSettingsPackId             = "ID пака"
     override val packSettingsMemory             = "Память"
+    override fun packSettingsMemoryFromArgs(flags: String) = "Задана в JVM-аргументах ($flags), эта настройка не применяется"
     override val packSettingsEnvironment        = "Среда"
     override val packSettingsJava               = "Java"
-    override fun packSettingsJavaManaged(major: Int) = "Управляемая — Java $major"
+    override fun packSettingsJavaManaged(major: Int) = "Управляется лаунчером: Java $major"
     override val packSettingsJavaCustom         = "Свой путь к Java"
     override val packSettingsJavaPathPlaceholder = "/путь/к/bin/java"
     override val packSettingsJavaReset          = "На управляемую"
@@ -952,6 +1027,10 @@ object RussianStrings : AppStrings {
     override val packSettingsWidth              = "Ширина"
     override val packSettingsHeight             = "Высота"
     override val packSettingsFullscreen         = "Полноэкранный режим"
+    override val packSettingsEarlyScreen        = "Экран загрузки модов"
+    override val packSettingsEarlyScreenDesc    = "Окно с прогрессом загрузки модов, пока игра не открыла своё"
+    override val packSettingsEarlyScreenWayland = "Выключен на Wayland: если уйти на другой рабочий стол, пока грузятся моды, запуск сорвётся"
+    override val packSettingsEarlyScreenReset   = "Как по умолчанию"
     override val packSettingsOptional           = "Опциональное содержимое"
     override val packSettingsOptionalNone       = "У этой сборки нет опций"
     override val packContentPresenceClient      = "Только клиент"
@@ -968,7 +1047,7 @@ object RussianStrings : AppStrings {
     override val packSettingsOpenFolder         = "Открыть"
     override val packSettingsSizeComputing      = "подсчёт размера"
     override val packSettingsDetach             = "Отсоединить в локальную"
-    override val packSettingsDetachDesc         = "Стать своей копией; провенанс сохранится"
+    override val packSettingsDetachDesc         = "Станет вашей копией. Обновлений и входа на сервер сборки больше не будет, происхождение сохранится"
     override val packSettingsDetachAction       = "Отсоединить"
     override val packSettingsRepair             = "Проверить и восстановить файлы"
     override val packSettingsRepairDesc         = "Проверить все файлы и восстановить только повреждённые"
@@ -985,6 +1064,7 @@ object RussianStrings : AppStrings {
     override val packSettingsDangerZone         = "Опасная зона"
     override val packSettingsDelete             = "Удалить сборку"
     override val packSettingsDeleteDesc         = "Файлы инстанса будут стёрты безвозвратно"
+    override val packDeleteBlockedRunning       = "Удалить можно после выхода из игры"
     override val packVersionSnapshots           = "Точки восстановления"
     override val packVersionRestore             = "Восстановить"
     override val packVersionSnapshotsHint       = "Снимок сохраняет ваши правки; создаётся перед структурным обновлением"
@@ -995,6 +1075,19 @@ object RussianStrings : AppStrings {
     override fun packDetailInstanceDirHint(dirName: String) = "Папка экземпляра: instances/$dirName"
     override val packDetailPlay                 = "Играть"
     override val packDetailPlayLoginRequired    = "Войдите, чтобы играть"
+    override val launchBlockUpdating            = "Обновляется…"
+    override val launchBlockRepairing           = "Проверка файлов…"
+    override val launchBlockRecovering          = "Восстановление…"
+    override val launchBlockDeleting            = "Удаление…"
+    override val launchBlockUpdatingContent     = "Обновляются моды…"
+    override val launchBlockMissing             = "Файлы не найдены"
+    override val launchBlockOtherRunning        = "Запущена другая игра"
+    override val launchStopping                 = "Останавливается…"
+    override val quitGameTitle                  = "Игра запущена"
+    override fun quitGameBody(packName: String) = "Сборка «$packName» ещё запущена. Её можно оставить работать или остановить перед выходом. Время игры запишется в обоих случаях."
+    override val quitLeaveGame                  = "Оставить игру и выйти"
+    override val quitStopGame                   = "Остановить игру и выйти"
+    override val notifReasonInstanceBusy        = "Сборка сейчас обновляется или проверяется, поэтому не запущена. Запустите её, когда это закончится."
     override val packPlayWait                   = "Подождите"
     override val packPlayExit                   = "Выход"
     override val packDetailNotFoundTitle        = "Экземпляр не найден"
@@ -1021,11 +1114,7 @@ object RussianStrings : AppStrings {
         return "$count $word"
     }
     override fun notificationShowMore(count: Int)               = "ещё $count"
-    override fun notificationAbsoluteTime(instant: java.time.Instant): String =
-        java.time.format.DateTimeFormatter
-            .ofPattern("d MMMM yyyy, HH:mm:ss", java.util.Locale.of("ru", "RU"))
-            .withZone(java.time.ZoneId.systemDefault())
-            .format(instant)
+    override fun notificationAbsoluteTime(instant: Instant): String = russianNotificationTime.format(instant)
 
     override fun notifPackPreparing(packName: String)   = "Подготовка $packName"
     override fun notifPackStage(stage: String)          = "Этап: $stage"
@@ -1047,6 +1136,8 @@ object RussianStrings : AppStrings {
     override fun notifInstallCancelled(packName: String) = "Установка $packName отменена"
     override val editorSurfOverlay                      = "Плавающий слой"
     override val editorSurfShortOverlay                 = "Плавающий"
+    override val editorSurfBackdrop                     = "Слой под содержимым"
+    override val editorSurfShortBackdrop                = "Под содержимым"
 
     override val activityPillExpand                     = "Показать все"
     override fun activityPillMore(count: Int)           = "+$count"
@@ -1066,7 +1157,6 @@ object RussianStrings : AppStrings {
     override val notifReasonAuthFail                    = "Не удалось войти"
     override fun notifReasonAuthFailDetail(detail: String) = detail
     override val notifReasonOfflineNoClient             = "Файлы сборки отсутствуют на диске"
-    override val notifReasonOfflineNoManifest           = "Нет кэша манифеста; выйди в сеть один раз для синхронизации"
     override val notifReasonTwoFactorExpired            = "Войди ещё раз, чтобы обновить учётные данные"
     override val notifSessionStaleTitle                 = "Сессия не обновилась"
     override val notifSessionStaleRejected              = "Сервер авторизации отклонил вход. Игра запустится со старой сессией, но зайти на сервер, скорее всего, не выйдет: войди в аккаунт заново."
@@ -1086,18 +1176,34 @@ object RussianStrings : AppStrings {
     override fun notifTimeMinutes(minutes: Long)        = "$minutes мин"
     override fun notifTimeHours(hours: Long)            = "$hours ч"
     override fun notifTimeDays(days: Long)              = "$days дн"
+    override val notBuiltYetTitle = "Привет! Ты нашёл нереализованную функцию"
+    override val notBuiltYetBody = "Поздравляем. А теперь придётся подождать."
+    override val ageJustNow = "только что"
+    override fun ageMinutes(minutes: Long) = "$minutes мин назад"
+    override fun ageHours(hours: Long) = "$hours ч назад"
+    override fun ageDays(days: Long) = "$days дн назад"
+    override fun ageMonths(months: Long) = "$months мес назад"
+    override fun ageYears(years: Long) = "$years г назад"
 
     // --- Home (new) + launch tiles ---
     override val homeRecentTitle    = "Твои сборки"
     override val homeNoPacksTitle   = "Сборок пока нет"
+    override val homeWhatsNewTitle = "Что нового"
+    override fun homeWhatsNewLauncher(app: String, version: String) = "Вышел $app $version"
+    override val homeWhatsNewLauncherHint = "Посмотреть, что изменилось, и установить"
+    override fun homeWhatsNewPackReady(version: String) = "Ждёт сборка $version"
+    override fun homeWhatsNewPackRollback(version: String) = "Источник вернулся к $version"
+    override fun homeWhatsNewPackUpdated(version: String) = "Обновлена до $version"
     override val homeNoPacksBody    = "Установи что-нибудь через Browse — твои сборки появятся здесь."
     override val browseOpen         = "Открыть Browse"
     override val homeQuickContinue  = "Продолжить"
     override val homeQuickStart     = "Запустить"
     override val homeQuickButton    = "Играть"
     override fun homeHeroPlaytime(hours: Long) = "В игре $hours ч"
+    override fun homeFactHours(hours: Long) = "$hours ч"
+    override val homeFactPlaytime = "в игре"
+    override val homeFactLastSession = "последний запуск"
     override val launchTileReady    = "Запустить"
-    override val launchTileBlocked  = "Играть нельзя"
 
     // --- Library widgets ---
     override val libraryEmptyTitle     = "Пока пусто"
@@ -1110,6 +1216,36 @@ object RussianStrings : AppStrings {
     // --- Layout editor: common actions ---
     override val editorClose   = "Закрыть"
     override val editorEnterLayout          = "Редактировать компоновку"
+    override val retiredTitle = "Файлы от старого пути к серверам"
+    override fun retiredNoticeBody(count: Int) = "От списка серверов SmartyCraft осталось папок: $count. Их больше никто не читает."
+    override val retiredNoticeAction = "Разобрать"
+    override val retiredIntro = "Список серверов SmartyCraft убран, а эти папки от него остались. Они твои: миры, конфиги и моды, которые ты ставил. Папку можно оставить как локальную сборку или удалить и вернуть себе место."
+    override fun retiredFound(count: Int, size: String) = "Папок: $count, $size"
+    override val retiredColumnClient = "Папка"
+    override val retiredColumnSize = "Размер"
+    override val retiredColumnRuntime = "Minecraft и загрузчик"
+    override val retiredColumnChoice = "Что делать"
+    override fun retiredMods(count: Int) = "модов: $count"
+    override val retiredChoiceKeep = "Не трогать"
+    override val retiredChoiceAdopt = "Оставить сборкой"
+    override val retiredChoiceDelete = "Удалить"
+    override val retiredNoVersion = "версия Minecraft не определена"
+    override val retiredDetected = "Прочитано из папки. Поправь, если неверно."
+    override val retiredLoaderVanilla = "нет"
+    override val retiredApply = "Выполнить"
+    override val retiredClose = "Закрыть"
+    override val retiredBusy = "Работаю..."
+    override val retiredWarning = "Удаление необратимо. Копии этих папок у лаунчера нет."
+    override val retiredAdopted = "Оставлено сборкой"
+    override val retiredAdoptedSourceKept = "Оставлено сборкой, старая папка на месте: часть файлов не перенеслась"
+    override val retiredDeleted = "Удалено"
+    override val retiredFailed = "Не получилось"
+    override val retiredRemoveFailed = "Не удалось удалить: файлы кто-то держит"
+    override fun retiredDone(reclaimed: String) = "Готово. Освобождено $reclaimed."
+    override val retiredDoneNothing = "Готово."
+    override val retiredNeedsVersion = "Укажи версию Minecraft, на которой работала папка, и она станет паком."
+    override fun retiredBlockedBy(folders: String) = "Нужна версия Minecraft: $folders"
+    override val retiredPartlyDeleted = "Удалено частично: часть файлов осталась"
     override val editorCancel  = "Отмена"
     override val editorDelete  = "Удалить"
     override val editorReset   = "Сбросить"
@@ -1140,6 +1276,7 @@ object RussianStrings : AppStrings {
         "widget.appshell.region.top" to "Шапка окна",
         "widget.appshell.region.body" to "Основная область",
         "widget.appshell.topbar.breadcrumb" to "Хлебные крошки",
+        "widget.appshell.topbar.sessions" to "Запущенные игры",
         "widget.appshell.topbar.heightDp" to "Высота",
         "widget.appshell.topbar.cornerStyle" to "Углы",
         "widget.appshell.topbar.groupStyle" to "Группировка",
@@ -1148,12 +1285,18 @@ object RussianStrings : AppStrings {
         "widget.appshell.topbar.controls" to "Кнопки окна",
         "widget.appshell.region.right" to "Правая панель",
         "widget.appshell.region.showDivider" to "Разделитель",
-        "widget.appshell.region.widthDp" to "Ширина (0 — гибкая)",
+        "widget.appshell.region.widthDp" to "Ширина (0 — автоматически)",
+        "widget.mod.tags" to "Теги проекта",
+        "widget.mod.creators" to "Авторы проекта",
+        "widget.mod.compatibility" to "Совместимость проекта",
+        "widget.mod.links" to "Ссылки проекта",
+        "widget.mod.details" to "Сведения о проекте",
         "widget.appshell.rightrail.compactnews" to "Лента новостей",
         "widget.appshell.rightrail.compactnews.maxItems" to "Макс. элементов (0 = все)",
         "widget.appshell.rightrail.compactnews.showTitle" to "Показывать заголовок",
         "widget.appshell.rightrail.compactnews.imageSource" to "Источник картинки",
         "widget.appshell.rightrail.compactnews.channel" to "Канал",
+        "widget.bg.audio" to "Звук обоев",
         "widget.bg.enable.toggle" to "Фон вкл/выкл",
         "widget.bg.fx.animspeed" to "Скорость анимации",
         "widget.bg.fx.blur" to "Размытие",
@@ -1181,7 +1324,6 @@ object RussianStrings : AppStrings {
         "widget.container.tabs.label2" to "Вкладка 2",
         "widget.container.tabs.label3" to "Вкладка 3",
         "widget.container.tabs.tabCount" to "Вкладок",
-        "widget.home.classic.content" to "Классический дашборд",
         "widget.home.new.clock" to "Часы",
         "widget.home.new.clock.accent" to "Цвет акцента",
         "widget.home.new.clock.faceSize" to "Размер циферблата",
@@ -1192,10 +1334,9 @@ object RussianStrings : AppStrings {
         "widget.home.new.hero" to "Hero-карта пака",
         "widget.home.new.hero.height" to "Высота",
         "widget.home.new.hero.showMeta" to "Метаданные",
+        "widget.home.new.hero.playLayout" to "Вид кнопки",
         "widget.home.new.launchbutton" to "Кнопка запуска",
         "widget.home.new.launchbutton.label" to "Надпись",
-        "widget.home.new.music" to "Музыкальный плеер",
-        "widget.home.new.music.title" to "Заголовок",
         "widget.home.new.playback.mini" to "Мини-плеер",
         "widget.home.new.player.timeline" to "Плеер: карточка как шкала",
         "widget.home.new.player.timeline.fill" to "Заливка проигранного",
@@ -1206,13 +1347,47 @@ object RussianStrings : AppStrings {
         "widget.home.new.player.seeded.tint" to "Подмес обложки",
         "widget.home.new.player.cover" to "Плеер с обложкой",
         "widget.home.new.player.cover.showAlbum" to "Показывать альбом",
+        "widget.home.new.player.wave" to "Плеер: звук вместо картинки",
+        "widget.home.new.player.wave.showTimes" to "Показывать время",
+        "widget.home.new.player.ground" to "Плеер: обложка как фон",
+        "widget.home.new.player.ground.dim" to "Затемнение",
+        "widget.home.new.player.record" to "Плеер: пластинка",
+        "widget.home.new.player.record.showCaption" to "Подпись под диском",
+        "widget.home.new.player.record.size" to "Наибольшая ширина",
+        "widget.home.new.player.column" to "Плеер: колонка",
+        "widget.home.new.player.column.showCover" to "Показывать обложку",
+        "widget.home.new.player.column.size" to "Наибольшая ширина",
+        "widget.home.new.player.tile" to "Плеер: плитка обложки",
+        "widget.home.new.player.tile.showCaption" to "Название в покое",
+        "widget.home.new.player.tile.size" to "Наибольшая ширина",
+        "widget.home.new.player.token" to "Плеер: жетон",
+        "widget.home.new.player.token.showCover" to "Обложка в середине",
+        "widget.home.new.player.token.size" to "Наибольшая ширина",
         "widget.home.new.progress" to "Фоновая активность",
         "widget.home.new.progress.idleText" to "Текст простоя",
         "widget.home.new.progress.title" to "Заголовок",
         "widget.home.new.quicklaunch" to "Быстрый запуск",
         "widget.home.new.quicklaunch.buttonLabel" to "Надпись кнопки",
+        "widget.home.new.quicklaunch.playLayout" to "Вид кнопки",
         "widget.home.new.recent" to "Плитки сборок",
-        "widget.home.new.recent.maxTiles" to "Сколько плиток",
+        "widget.home.new.whatsnew" to "Что нового",
+        "widget.decor.particles" to "Частицы",
+        "widget.decor.particles.field" to "Характер",
+        "widget.decor.particles.density" to "Плотность",
+        "widget.home.new.continue" to "Продолжить крупно",
+        "widget.home.new.continue.showFacts" to "Факты",
+        "widget.home.new.packlist" to "Список сборок",
+        "widget.home.new.spines" to "Корешки сборок",
+        "widget.home.new.time" to "Время крупно",
+        "widget.home.new.time.showDate" to "Дата",
+        "widget.home.new.hero.fillHeight" to "Заполнять высоту",
+        "widget.home.new.packlist.title" to "Заголовок",
+        "widget.home.new.packlist.maxRows" to "Строк (0: все)",
+        "widget.home.new.packlist.skipContinued" to "Без продолжаемой сборки",
+        "widget.home.new.hero.followWidth" to "Расти вместе с шириной",
+        "widget.home.new.recent.rows" to "Ряды",
+        "widget.home.new.recent.tileWidth" to "Минимальная ширина плитки",
+        "widget.home.new.recent.maxTiles" to "Предел плиток (0: сколько влезет)",
         "widget.home.new.recent.title" to "Заголовок",
         "widget.home.new.spacer" to "Отступ",
         "widget.home.new.spacer.height" to "Высота",
@@ -1229,6 +1404,7 @@ object RussianStrings : AppStrings {
         "widget.library.header.title" to "Заголовок",
         "widget.library.header.show" to "Показывать шапку",
         "widget.nav.entry" to "Пункт навигации",
+        "widget.nav.screen" to "Ссылка на экран",
         "widget.notes.scratch" to "Заметки",
         "widget.notes.scratch.placeholder" to "Напишите что-нибудь...",
         "widget.notes.scratch.title" to "Заголовок",
@@ -1246,11 +1422,6 @@ object RussianStrings : AppStrings {
         "widget.profile.nav" to "Навигация профиля",
         "widget.profile.skin.section" to "Скин",
         "widget.profile.skin.section.previewHeight" to "Высота превью",
-        "widget.server.details.banner" to "Баннер сервера",
-        "widget.server.details.banner.cornerRadius" to "Скругление углов",
-        "widget.server.details.description" to "Описание сервера",
-        "widget.server.details.tagbar" to "Теги сервера",
-        "widget.server.details.title" to "Заголовок сервера",
         "widget.theme.picker.grid" to "Сетка тем",
         "widget.theme.picker.preview" to "Превью темы",
     )
@@ -1286,6 +1457,11 @@ object RussianStrings : AppStrings {
     override val thresholdErrorTitle     = "запуск не удался"
     override val thresholdOpenLogs       = "папка логов"
     override val thresholdQuit           = "выйти"
+    override val widgetStateTooLong = "Слишком длинно для сохранения"
+    override val editorPropUnreadable = "Сохранённое значение не читается, используется значение по умолчанию"
+    override val thresholdRecovery = "перезапуск в восстановление"
+    override val thresholdRecoveryArmed = "восстановление откроется при следующем запуске"
+    override val thresholdRecoveryHint = "восстановление также открывается при запуске с --recovery или NEXIRA_RECOVERY=1"
     override val recoveryReloadedNotice = "Интерфейс перезапущен после ошибки"
     override val editorSave    = "Сохранить"
     override val editorApply   = "Применить"
@@ -1297,7 +1473,39 @@ object RussianStrings : AppStrings {
     override val editorSlotRow    = "Ряд"
     override val editorSlotGrid   = "Сетка"
     override val editorSlotCanvas = "Холст"
-    override val editorSlotCubeGrid = "Кубы"
+    override val editorSlotViewportTitle = "Прокрутка"
+    override val editorViewportStatic = "Нет"
+    override val editorViewportDown = "Вниз"
+    override val editorViewportRight = "Вправо"
+    override val editorViewportScrollbar = "Полоса прокрутки"
+    override val editorViewportMap = "Карта"
+    override val editorViewportPaged = "Постранично"
+    override val editorPin = "Закрепить"
+    override val editorUnpin = "Открепить"
+    override val modulesTitle = "Модули виджетов"
+    override val modulesChip = "Модули"
+    override val modulesEmpty = "Модулей нет. Положите .jar в папку и перечитайте её."
+    override val modulesReload = "Перечитать папку"
+    override val modulesOpenFolder = "Открыть папку"
+    override fun moduleWidgets(n: Int) = "Виджетов: $n"
+    override val moduleOff = "Выключен"
+    override fun moduleOffAfterCrash(failure: String) = "Выключен после сбоя: $failure"
+    override fun moduleRefused(reason: String) = "Не загружен: $reason"
+    override val moduleGone = "Файла больше нет. Его виджеты сохраняются, пока вы его не забудете."
+    override val moduleForget = "Забыть"
+    override fun moduleCrashedTitle(name: String) = "Модуль виджетов «$name» упал"
+    override fun moduleCrashedBody(failure: String) = "Он выключен, чтобы лаунчер мог работать дальше ($failure). Включить снова можно в редакторе, в разделе «Модули»."
+    override val mapGoHome = "К содержимому"
+    override val editorAnchorTitle = "Якорь"
+    override val editorAnchorTopStart = "Сверху слева"
+    override val editorAnchorTopCenter = "Сверху"
+    override val editorAnchorTopEnd = "Сверху справа"
+    override val editorAnchorCenterStart = "Слева"
+    override val editorAnchorCenter = "По центру"
+    override val editorAnchorCenterEnd = "Справа"
+    override val editorAnchorBottomStart = "Снизу слева"
+    override val editorAnchorBottomCenter = "Снизу"
+    override val editorAnchorBottomEnd = "Снизу справа"
     override val editorSlotLayoutMenuTitle     = "Раскладка"
     override val editorSlotGridColumns         = "Столбцы"
     override val editorSlotGridColumnsDecrease = "Меньше столбцов"
@@ -1307,6 +1515,14 @@ object RussianStrings : AppStrings {
     // --- Layout editor: prop panel ---
     override val editorResetToDefault = "Сбросить к умолчанию"
     override val editorBackingTitle   = "Подложка"
+    override val editorPaddingTitle   = "Отступы"
+    override val editorMotionTitle = "Появление"
+    override val editorMotionEnter = "Как появляется"
+    override val editorMotionDelay = "Задержка, мс"
+    override val entranceNone = "Без появления"
+    override val entranceFade = "Проявление"
+    override val entranceRise = "Подъём"
+    override val entranceSettle = "Оседание"
     override val editorSurfaceNone    = "У этого виджета нет подложки. Если добавить, за ним появится поверхность, которую можно настроить."
     override val editorSurfaceAdd     = "Добавить подложку"
     override val editorSurfaceOwn     = "Этот виджет рисует подложку сам, поэтому настраивать здесь нечего. Её форма меняется вместе с тем, что он делает, а запись такое описать не может."
@@ -1324,7 +1540,7 @@ object RussianStrings : AppStrings {
     override val editorSurfaceBlur    = "Размытие"
     override val editorSurfaceBorder  = "Обводка"
     override val editorSurfaceShadow  = "Тень"
-    override val editorSurfaceFillHint = "Пусто -- по теме; имя ступени (base, raised, floating, sunken) следует за палитрой; #RRGGBB или #AARRGGBB -- нет."
+    override val editorSurfaceFillHint = "Пусто: по теме. Слово поверхности (panel, card, field, popup, chrome) тоже следует за темой, относительно того, что держит виджет. #RRGGBB или #AARRGGBB не следуют."
     override val editorSurfaceShapeKind        = "Форма"
     override val editorSurfaceSmoothing        = "Сглаживание"
     override val editorSurfaceCornerTopStart   = "Угол, сверху слева"
@@ -1345,6 +1561,24 @@ object RussianStrings : AppStrings {
     override val editorPresetNamePlaceholder = "Имя пресета..."
     override fun editorPresetsSaved(count: Int) = "Сохранённые ($count)"
     override val editorPresetsEmpty          = "Пусто. Сохрани текущий layout как первый пресет."
+    override val editorPresetWriteFailed     = "Не удалось записать в папку пресетов. Проверь, что на диске есть место и папка доступна для записи."
+    override val editorPresetsBuiltIn          = "Готовые"
+    override fun bundledPresetName(id: String) = when (id) {
+        "home-type" -> "Главная: типографика"
+        "home-column" -> "Главная: колонна"
+        "home-spines" -> "Главная: корешки"
+        "home-dock" -> "Главная: причал"
+        "home-bento" -> "Главная: бенто"
+        else -> id
+    }
+    override fun bundledPresetDescription(id: String) = when (id) {
+        "home-type" -> "Продолжаемая сборка крупным шрифтом, библиотека списком"
+        "home-column" -> "Высокая карточка слева, сборки сеткой рядом"
+        "home-spines" -> "Каждая сборка полосой на полке, одна раскрыта"
+        "home-dock" -> "Время сверху, сборки в ряд внизу"
+        "home-bento" -> "Ячейки по важности, продолжаемая сборка крупнее всех"
+        else -> ""
+    }
 
     // --- Layout editor: palette ---
     override val editorPaletteHide  = "Скрыть палитру"
@@ -1366,9 +1600,27 @@ object RussianStrings : AppStrings {
     override val editorResetSurfaceTitle = "Сбросить поверхность к умолчанию?"
     override fun editorResetSurfaceBody(name: String) =
         "\"$name\" вернётся к расстановке виджетов из встроенного default-layout. Все локальные изменения на этой поверхности (добавленные виджеты, перестановки, удаления) пропадут. Другие поверхности не тронем."
+    override val editorResetAllTitle = "Сбросить все поверхности к умолчанию?"
+    override val editorResetAllBody = "Каждая поверхность вернётся к расстановке из встроенного default-layout, и все локальные изменения на всех поверхностях пропадут. Созданные вами экраны останутся."
     override val editorPreview           = "Просмотр"
     override val editorPreviewHidden     = "Скрыто"
     override val editorPaletteToggleHide = "Скрыть"
+    override val editorRegionProps       = "Сама область"
+    override fun editorSurfaceFolded(name: String) = "$name, свёрнута"
+    override val editorNewScreen = "Новый экран"
+    override val editorMountRefused = "Эта поверхность уже открыта выше, второй раз она здесь не откроется"
+    override val screenMissing = "Этого экрана больше нет"
+    override val screenUntitled = "Без названия"
+    override fun screenDefaultTitle(n: Int) = "Экран $n"
+    override val screenSettingsTitle = "Экран"
+    override val screenTitleLabel = "Название"
+    override val screenIconLabel = "Значок"
+    override val screenDelete = "Удалить экран"
+    override fun screenDeleteBody(title: String) = "«$title» и всё, что на нём, будут удалены вместе с кнопкой на панели."
+    override fun screenDeletedTitle(title: String) = "Экран «$title» удалён"
+    override val screenRestore = "Вернуть"
+    override val editorUndo              = "Отменить"
+    override val editorRedo              = "Вернуть"
     override val editorEscHint           = "Esc — выйти"
     override val editorFabEdit           = "Редактировать раскладку"
     override val editorFabDone           = "Готово"
@@ -1381,14 +1633,12 @@ object RussianStrings : AppStrings {
     override val editorSurfShortAbout     = "О приложении"
     override val editorSurfShortBg        = "Фон"
     override val editorSurfShortProfile   = "Профиль"
-    override val editorSurfShortServer    = "Сервер"
     override val editorSurfShortTheme     = "Темы"
     override val editorSurfShortShell     = "Оболочка"
     override val editorSurfShortTopBar    = "Верх"
     override val editorSurfShortBody      = "Область"
 
     // --- Layout editor: surface long names ---
-    override val editorSurfHomeClassic = "Главная (классика)"
     override val editorSurfHomeNew     = "Главная (новая)"
     override val editorSurfLibrary     = "Библиотека"
     override val editorSurfLeftRail    = "Боковая панель"
@@ -1396,7 +1646,6 @@ object RussianStrings : AppStrings {
     override val editorSurfAbout       = "О приложении"
     override val editorSurfBg          = "Настройки фона"
     override val editorSurfProfile     = "Профиль"
-    override val editorSurfServer      = "Детали сервера"
     override val editorSurfTheme       = "Выбор темы"
     override val editorSurfShell        = "Оболочка приложения"
     override val editorSurfTopBar       = "Верхняя панель"
@@ -1416,6 +1665,7 @@ object RussianStrings : AppStrings {
     override val audioRepeatQueue      = "Вся очередь"
     override val audioPlaybackOptions  = "Воспроизведение"
     override val audioSkipNext         = "Следующий трек"
+    override val audioQueue = "Очередь"
     override val audioSkipPrevious     = "Предыдущий трек"
     override val audioNoFile           = "Без файла"
     override val audioStatusReady      = "Готов"
@@ -1445,8 +1695,16 @@ object RussianStrings : AppStrings {
     override fun readOnlyDataBody(stores: String) =
         "Записано более новой сборкой лаунчера: $stores. Открыто только для чтения — эта сессия не может записать " +
             "данные обратно, и всё изменённое пропадёт при выходе. Обновитесь, чтобы снова редактировать."
+    override fun readOnlyDataBodyOldFormat(stores: String) =
+        "Записано в форме, которую эта сборка не умеет прочитать точно: $stores. Файл оставлен как есть " +
+            "и открыт только для чтения, поэтому всё изменённое пропадёт при выходе. Старая сборка его ещё читает."
+    override fun readOnlyDataBodyDamaged(stores: String) =
+        "Не удалось прочитать в этот раз: $stores. Файл оставлен как есть и открыт только для чтения, поэтому " +
+            "всё изменённое пропадёт при выходе. Следующий запуск прочитает его снова, а если не выйдет, его можно сбросить в режиме восстановления."
     override val readOnlyDataLibrary  = "библиотека сборок"
     override val readOnlyDataLayout   = "раскладка"
+    override val readOnlyDataTheme    = "тема"
+    override val readOnlyDataAccounts = "сохранённые аккаунты"
     override val videoFetchingTool    = "Скачиваем загрузчик"
     override val videoResolvingPage   = "Читаем страницу"
     override val videoDownloading     = "Скачивание"
@@ -1471,3 +1729,7 @@ object RussianStrings : AppStrings {
     override val sessionsActiveTitle = "Активные сессии"
     override val aboutLogoDesc       = "Логотип приложения"
 }
+
+/** Built once, as the other catalogues do, rather than on every notification's tooltip. */
+private val russianNotificationTime: DateTimeFormatter =
+    DateTimeFormatter.ofPattern("d MMMM yyyy, HH:mm:ss", Locale.of("ru", "RU")).withZone(ZoneId.systemDefault())

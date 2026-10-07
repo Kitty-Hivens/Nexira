@@ -26,7 +26,7 @@ fun BgScaleModeWidget() {
             NxChoiceChip(
                 label    = label,
                 selected = settings.scaleMode == mode,
-                onToggle = { ctx.update { copy(scaleMode = mode) } },
+                onToggle = { ctx.update { withScaleMode(mode) } },
             )
         }
     }

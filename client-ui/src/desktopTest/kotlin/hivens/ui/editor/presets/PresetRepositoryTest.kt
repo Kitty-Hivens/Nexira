@@ -1,8 +1,16 @@
 package hivens.ui.editor.presets
 
 import hivens.ui.customization.CustomizationSettings
+import hivens.ui.layout.LayoutReconcile
 import hivens.widget.model.LayoutGraph
+import hivens.widget.model.SlotContent
+import hivens.widget.model.SlotId
+import hivens.widget.model.SurfaceId
+import hivens.widget.model.SurfaceLayout
+import hivens.widget.model.WidgetInstance
+import hivens.widget.model.WidgetKind
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.exists
@@ -35,12 +43,16 @@ class PresetRepositoryTest {
 
     private fun newRepo() = PresetRepository(tmp.resolve("presets"), json)
 
-    private fun envelope(name: String) = PresetEnvelope(
+    /** A file written by hand, for the paths that have to start from bytes on disk. */
+    private fun envelope(name: String, schema: Int = LayoutReconcile.CURRENT_SCHEMA) = PresetEnvelope(
+        schemaVersion = schema,
         name          = name,
         createdAt     = 1_700_000_000L,
-        graph         = LayoutGraph.EMPTY,
+        graph         = JsonObject(emptyMap()),
         customization = CustomizationSettings(),
     )
+
+    private fun PresetRepository.save(name: String) = save(name, LayoutGraph.EMPTY, CustomizationSettings())
 
     @Test
     fun `a preset written before the digest suffix is still readable`() {
@@ -63,8 +75,8 @@ class PresetRepositoryTest {
         // Every character outside [A-Za-z0-9_-] maps to an underscore, so any two
         // Cyrillic names of equal length used to collapse to one file and the
         // second save destroyed the first.
-        repo.save(envelope("Ночь"))
-        repo.save(envelope("День"))
+        repo.save("Ночь")
+        repo.save("День")
 
         val names = repo.list().map { it.name }.toSet()
         assertEquals(setOf("Ночь", "День"), names, "one preset overwrote the other")
@@ -75,15 +87,15 @@ class PresetRepositoryTest {
     @Test
     fun `the typed name survives a round trip through the file`() {
         val repo = newRepo()
-        repo.save(envelope("Тёмная тема"))
+        repo.save("Тёмная тема")
         assertEquals(listOf("Тёмная тема"), repo.list().map { it.name })
     }
 
     @Test
     fun `deleting one of two look-alike names leaves the other`() {
         val repo = newRepo()
-        repo.save(envelope("Ночь"))
-        repo.save(envelope("День"))
+        repo.save("Ночь")
+        repo.save("День")
 
         assertTrue(repo.delete("Ночь"))
 
@@ -92,10 +104,32 @@ class PresetRepositoryTest {
         assertNotNull(repo.load("День"))
     }
 
+    /**
+     * The state collector keeps what these ids own, so a widget a preset brings
+     * back returns with its note or checklist rather than empty.
+     */
+    @Test
+    fun `every instance id a saved preset names is reported, nested ones included`() {
+        val repo = newRepo()
+        val inner = WidgetInstance(WidgetKind("notes"), "notes-1")
+        val group = WidgetInstance(
+            kind       = WidgetKind("container.group"),
+            instanceId = "group-1",
+            children   = mapOf(SlotId("body") to SlotContent(listOf(inner))),
+        )
+        fun homeWith(widget: WidgetInstance) = LayoutGraph(
+            surfaces = mapOf(SurfaceId("home.new") to SurfaceLayout(slots = mapOf(SlotId("main") to SlotContent(listOf(widget))))),
+        )
+        repo.save("A", homeWith(group), CustomizationSettings())
+        repo.save("B", homeWith(WidgetInstance(WidgetKind("checklist"), "check-1")), CustomizationSettings())
+
+        assertEquals(setOf("group-1", "notes-1", "check-1"), repo.referencedInstanceIds())
+    }
+
     @Test
     fun `save round-trips through load`() {
         val repo = newRepo()
-        repo.save(envelope("Music mode"))
+        repo.save("Music mode")
         val back = repo.load("Music mode")
         assertNotNull(back)
         assertEquals("Music mode", back.name)
@@ -104,9 +138,9 @@ class PresetRepositoryTest {
     @Test
     fun `list returns presets newest-first`() {
         val repo = newRepo()
-        repo.save(envelope("Alpha"))
+        repo.save("Alpha")
         Thread.sleep(15)
-        repo.save(envelope("Beta"))
+        repo.save("Beta")
         val list = repo.list()
         assertEquals(listOf("Beta", "Alpha"), list.map { it.name })
     }
@@ -114,7 +148,7 @@ class PresetRepositoryTest {
     @Test
     fun `delete removes the file`() {
         val repo = newRepo()
-        repo.save(envelope("Doomed"))
+        repo.save("Doomed")
         assertEquals(listOf("Doomed"), repo.list().map { it.name })
         assertTrue(repo.delete("Doomed"))
         assertEquals(emptyList(), repo.list())
@@ -130,7 +164,7 @@ class PresetRepositoryTest {
     @Test
     fun `sanitization replaces unsafe chars and prevents traversal`() {
         val repo = newRepo()
-        repo.save(envelope("../../etc/passwd"))
+        repo.save("../../etc/passwd")
         // Sanitized to underscores; original path traversal does not
         // escape the presets dir.
         val files = Files.list(tmp.resolve("presets")).use { it.toList() }
@@ -143,7 +177,7 @@ class PresetRepositoryTest {
     @Test
     fun `export copies the file to destination`() {
         val repo = newRepo()
-        repo.save(envelope("Backup"))
+        repo.save("Backup")
         val dest = tmp.resolve("out/Backup.json")
         Files.createDirectories(dest.parent)
         assertTrue(repo.export("Backup", dest))
@@ -156,9 +190,25 @@ class PresetRepositoryTest {
         val external = tmp.resolve("incoming.json")
         Files.writeString(external, json.encodeToString(envelope("Imported")))
         val imported = repo.import(external)
-        assertNotNull(imported)
-        assertEquals("Imported", imported.name)
+        assertEquals("Imported", imported)
         assertNotNull(repo.load("Imported"))
+    }
+
+    @Test
+    fun `a preset from before the surface schema is refused rather than half-read`() {
+        // It used to be applied: the floor lived in the repository that owns the
+        // layout file, and a preset went straight to the merge. Files from before
+        // that schema are in people's preset directories now, and applying one
+        // dropped every widget's plane on decode without a word, then persisted
+        // the result as current.
+        val repo = newRepo()
+        Files.createDirectories(tmp.resolve("presets"))
+        Files.writeString(
+            tmp.resolve("presets/Ancient.json"),
+            json.encodeToString(PresetEnvelope.serializer(), envelope("Ancient", schema = 7)),
+        )
+        assertNull(repo.load("Ancient"))
+        assertEquals(listOf("Ancient"), repo.list().map { it.name }, "the file is left where it is")
     }
 
     @Test

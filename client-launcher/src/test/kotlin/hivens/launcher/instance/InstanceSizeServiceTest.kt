@@ -10,6 +10,21 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.Executors
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.CyclicBarrier
+import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
+import kotlin.coroutines.CoroutineContext
+import java.lang.Runnable
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.ExperimentalPathApi
@@ -153,4 +168,42 @@ class InstanceSizeServiceTest {
             clock = clock,
             ioDispatcher = StandardTestDispatcher(testScheduler),
         )
+
+    // Callers on different threads at once, which the shared app scope allows. Each
+    // round all of them ask for a forced measure while the first walk is held open;
+    // one walk is what the round should cost.
+    @Test
+    fun `callers at once share one walk`() {
+        write("mods/a.jar", 10)
+        val walks = AtomicInteger()
+        val pool = Executors.newFixedThreadPool(CALLERS)
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        try {
+            repeat(ROUNDS) {
+                val held = CountDownLatch(1)
+                val counting = object : CoroutineDispatcher() {
+                    override fun dispatch(context: CoroutineContext, block: Runnable) {
+                        walks.incrementAndGet()
+                        Dispatchers.IO.dispatch(context) { held.await(); block.run() }
+                    }
+                }
+                val service = InstanceSizeService(dataDir, scope, ioDispatcher = counting)
+                walks.set(0)
+                val start = CyclicBarrier(CALLERS)
+                val calls = (1..CALLERS).map { pool.submit { start.await(); service.measure(instance, force = true) } }
+                calls.forEach { it.get(5, TimeUnit.SECONDS) }
+                held.countDown()
+                runBlocking { withTimeout(5_000) { while (service.sizes.value[instance.id] == null) delay(1) } }
+                assertEquals(1, walks.get(), "walks started for one round of callers")
+            }
+        } finally {
+            scope.cancel()
+            pool.shutdownNow()
+        }
+    }
+
+    private companion object {
+        const val CALLERS = 16
+        const val ROUNDS = 100
+    }
 }

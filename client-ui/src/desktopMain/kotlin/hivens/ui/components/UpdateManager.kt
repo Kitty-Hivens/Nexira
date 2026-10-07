@@ -3,6 +3,7 @@ package hivens.ui.components
 import androidx.compose.runtime.*
 import hivens.config.Branding
 import hivens.core.data.LauncherUpdate
+import hivens.update.DesktopIntegration
 import hivens.update.UpdateService
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.notifications.Kind
@@ -12,6 +13,8 @@ import hivens.ui.notifications.NotificationCenter
 import hivens.ui.notifications.Severity
 import hivens.ui.puppet.PuppetClick
 import kotlin.time.Duration.Companion.milliseconds
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 
 // Stable source key so a re-check coalesces onto the same card instead of
@@ -21,7 +24,9 @@ private const val UPDATE_SOURCE_KEY = "launcher.update"
 @Composable
 fun UpdateManager() {
     val updateService = koinInject<UpdateService>()
+    val desktopIntegration = koinInject<DesktopIntegration>()
     val center        = koinInject<NotificationCenter>()
+    val updateState   = koinInject<LauncherUpdateState>()
     val s             = LocalStrings.current
 
     var availableUpdate by remember { mutableStateOf<LauncherUpdate?>(null) }
@@ -54,6 +59,8 @@ fun UpdateManager() {
         // Drop stale installers before probing -- a partially-downloaded artefact
         // from a previous session could otherwise shadow the new one.
         updateService.cleanupOldUpdates()
+        // A menu entry left naming an AppImage that was reinstalled or moved.
+        withContext(Dispatchers.IO) { desktopIntegration.healEntry() }
 
         val update = updateService.checkForUpdate()
         if (update != null) {
@@ -80,6 +87,18 @@ fun UpdateManager() {
             if (mandatory != null) {
                 availableUpdate = mandatory
                 // Retire any pending non-critical card; the modal supersedes it.
+                center.dismiss(UPDATE_SOURCE_KEY)
+                showDialog = true
+            }
+        }
+    }
+
+    // What the check found, for the screens that mention it beside the card, and
+    // their way back to this dialog.
+    LaunchedEffect(availableUpdate) { updateState.publish(availableUpdate) }
+    LaunchedEffect(updateState) {
+        updateState.detailsRequests.collect {
+            if (availableUpdate != null) {
                 center.dismiss(UPDATE_SOURCE_KEY)
                 showDialog = true
             }

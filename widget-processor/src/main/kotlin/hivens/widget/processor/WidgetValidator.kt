@@ -5,6 +5,7 @@ import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.devtools.ksp.symbol.KSType
 import com.google.devtools.ksp.symbol.Modifier
+import hivens.widget.model.Entrance
 
 // Shared rule-set for what a @Widget composable must look like. The KSP
 // processor validates Kotlin sources at compile time; Phase E's plugin
@@ -48,6 +49,10 @@ internal object WidgetValidator {
         val injects: List<String>,
         /** The default plane as JSON, already checked to parse. Null for none. */
         val surfaceJson: String?,
+        /** What the widget needs, wants and can use, already checked to be in order. */
+        val sizing: SizingArgs,
+        /** The declared arrival as an [hivens.widget.model.Entrance] constant name, or null for none. */
+        val enter: String? = null,
     )
 
     // KSP entry point. Returns the extracted annotation args, or null
@@ -142,6 +147,16 @@ internal object WidgetValidator {
             }
             sanitized.add(raw)
         }
+        // A container reaches its child slots through its own instance id, so slots
+        // on a declaration that takes no instance are places nothing can render.
+        if (sanitized.isNotEmpty() && !takesInstance) {
+            env.logger.error(
+                "@Widget '$id' declares slots but takes no instance " +
+                    "-- add `instance: WidgetInstance` to render them",
+                symbol,
+            )
+            return null
+        }
 
         // propsClass: a KClass<*> annotation arg arrives as a KSType.
         // Unit::class (the default) means "no props". Anything else must
@@ -186,7 +201,6 @@ internal object WidgetValidator {
             }
         }
 
-        // Until now nothing in the processor referenced the two service
         // A malformed default plane is a build error rather than a widget that
         // quietly draws none: it is a literal in source, so the author is right here
         // and the cost of telling them is one line.
@@ -204,7 +218,36 @@ internal object WidgetValidator {
             }
             rawSurface
         }
+        // drawsOwnSurface says nothing should paint a plane for this widget, so a
+        // declared plane beside it is one of the two claims that cannot hold.
+        if (surface != null && drawsOwnSurface) {
+            env.logger.error(
+                "@Widget '$id' declares a surface and drawsOwnSurface together -- keep one",
+                symbol,
+            )
+            return null
+        }
 
+        val sizing = SizingArgs(
+            minWidth = args.int("minWidth"),
+            minHeight = args.int("minHeight"),
+            prefWidth = args.int("prefWidth"),
+            prefHeight = args.int("prefHeight"),
+            maxWidth = args.int("maxWidth"),
+            maxHeight = args.int("maxHeight"),
+        )
+        sizingFault(sizing)?.let {
+            env.logger.error("@Widget '$id' $it", symbol)
+            return null
+        }
+
+        val rawEnter = (args["enter"] as? String).orEmpty()
+        entranceFault(rawEnter)?.let {
+            env.logger.error("@Widget '$id' $it", symbol)
+            return null
+        }
+
+        // Until now nothing in the processor referenced the two service
         // annotations, so a widget could claim a contract it never registers,
         // or read one no widget provides, and the build stayed quiet either
         // way. Carrying them through is what lets the mismatch be seen.
@@ -219,7 +262,56 @@ internal object WidgetValidator {
             provides = symbol.serviceContracts(PROVIDES_SERVICE_FQN, "classes"),
             injects = symbol.serviceContracts(INJECT_SERVICE_FQN, "services"),
             surfaceJson = surface,
+            sizing = sizing,
+            enter = Entrance.parse(rawEnter)?.name,
         )
+    }
+
+    /**
+     * What is wrong with a declared arrival, or null when nothing is. Blank is
+     * fine and means the default. Anything else has to name a character the
+     * renderer knows, because an unknown one would otherwise fall back in silence
+     * and read as a widget that ignores what it was told.
+     */
+    internal fun entranceFault(raw: String): String? {
+        if (raw.isBlank()) return null
+        if (Entrance.parse(raw) != null) return null
+        val known = Entrance.entries.joinToString { it.id }
+        return "declares enter '$raw', which is not one of: $known"
+    }
+
+    private fun Map<String?, Any?>.int(name: String): Int = (this[name] as? Int) ?: 0
+
+    /**
+     * What is wrong with a size declaration, or null when nothing is.
+     *
+     * Separate and pure because it is the whole of the rule and every case is one
+     * assertion. A declaration out of order describes a widget nothing can draw,
+     * and it is a literal in source, so the author is right here and the cost of
+     * telling them is one line.
+     */
+    internal fun sizingFault(s: SizingArgs): String? {
+        fun axis(name: String, min: Int, pref: Int, max: Int): String? = when {
+            min < 0 || pref < 0 || max < 0 -> "declares a negative $name"
+            min > 0 && max > 0 && min > max -> "declares min$name $min above max$name $max"
+            pref > 0 && min > 0 && pref < min -> "declares pref$name $pref below min$name $min"
+            pref > 0 && max > 0 && pref > max -> "declares pref$name $pref above max$name $max"
+            else -> null
+        }
+        // A preferred size is a footprint, and three of its readers ask for both
+        // axes before they will use it: the palette tile, the drag ghost and
+        // AdaptiveWidget. Half of one is therefore not half an answer, it is no
+        // answer, and on an adaptive widget it is worse than none -- the widget
+        // falls through to filling whatever slot it lands in. Named at build time
+        // rather than discovered as a widget that swallowed a surface.
+        val halfPreferred = when {
+            s.prefWidth > 0 && s.prefHeight == 0 -> "declares prefWidth with no prefHeight"
+            s.prefHeight > 0 && s.prefWidth == 0 -> "declares prefHeight with no prefWidth"
+            else -> null
+        }
+        return axis("Width", s.minWidth, s.prefWidth, s.maxWidth)
+            ?: axis("Height", s.minHeight, s.prefHeight, s.maxHeight)
+            ?: halfPreferred
     }
 
     /**

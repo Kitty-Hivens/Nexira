@@ -1,0 +1,220 @@
+package hivens.ui.audio
+
+import dev.hivens.libsound.AudioBackend
+import dev.hivens.libsound.AudioFormat
+import dev.hivens.libsound.AudioSink
+import dev.hivens.libsound.LatencyProfile
+import dev.hivens.libsound.MediaRole
+import dev.hivens.libsound.PcmEncoding
+import dev.hivens.libsound.SinkConfig
+import dev.hivens.libsound.audio.AudioBackends
+import dev.hivens.skinema.audio.PcmFormat
+import dev.hivens.skinema.audio.PcmSink
+import dev.hivens.skinema.audio.PcmEncoding as SkinemaEncoding
+import org.slf4j.LoggerFactory
+
+/**
+ * Where a track's sound leaves.
+ *
+ * One member, because one is all the player asks for. An interface rather than the
+ * class below it for the reason the engine is one: the player closes a stream that
+ * an engine refused to take, and that is a path worth being able to drive without
+ * a sound server on the machine.
+ */
+public fun interface AudioOutput {
+    /**
+     * A stream for one track at the given buffer depth, or null to let the decoder
+     * open its own line.
+     *
+     * [latency] is what the sink asks the server for. A standalone music track has
+     * no picture to sync to and every reason never to underrun, so it asks for
+     * [LatencyProfile.RELAXED]. The no-argument overload takes the video default, a
+     * short path that keeps audio in step with the picture.
+     *
+     * The single abstract method here is what lets a test supply the output as a
+     * lambda. A default value on it is a compile error on a functional interface, so
+     * the video convenience is the concrete overload below rather than a default.
+     */
+    public fun sink(latency: LatencyProfile): PcmSink?
+
+    /** A stream at the default (video) buffer depth, for callers that do not choose one. */
+    public fun sink(): PcmSink? = sink(LatencyProfile.BALANCED)
+}
+
+/**
+ * Where the launcher's sound leaves, when the system will have it by name.
+ *
+ * Without this skinema opens a line for itself through JavaSound, and what the
+ * desktop's mixer shows is an anonymous row labelled with the JVM's process
+ * name: no icon, no media role, and a volume slider that belongs to the whole
+ * virtual machine rather than to the music. Through libsound it is a stream
+ * called Nexira that a person can find, turn down, move to another device, or
+ * point an EasyEffects rule at, and on Linux it speaks PipeWire natively rather
+ * than through its PulseAudio server.
+ *
+ * One backend for the process and a sink per track, which is the shape both
+ * libraries expect: a backend is a connection to the sound server, and a sink is
+ * one stream on it. The player hands each sink to skinema and skinema closes it,
+ * so nothing here tracks them.
+ *
+ * Null is an ordinary answer at every step. A machine with no device at all, a
+ * backend that will not load its system library, a sink the server refuses: each
+ * of those simply means skinema opens its own line as it always did. Sound is the
+ * feature, identity in the mixer is the improvement, and losing the second must
+ * never cost the first.
+ */
+class SystemAudioOutput : AudioOutput, AutoCloseable {
+
+    private val log = LoggerFactory.getLogger(SystemAudioOutput::class.java)
+
+    private var backend: AudioBackend? = null
+    private var attempted = false
+    private val lock = Any()
+
+    /**
+     * A sink for one track, or null to let skinema open its own line.
+     *
+     * The backend is opened on the first call rather than at construction: it is
+     * a connection to the sound server, and a launcher that never plays anything
+     * has no business holding one.
+     */
+    override fun sink(latency: LatencyProfile): PcmSink? {
+        val open = backendOrNull() ?: return null
+        return try {
+            SkinemaAdapter(
+                open.createSink(
+                    SinkConfig(
+                        applicationName = APPLICATION,
+                        applicationId = APPLICATION_ID,
+                        iconName = ICON,
+                        mediaRole = MediaRole.MUSIC,
+                        latency = latency,
+                    ),
+                ),
+            )
+        } catch (e: Exception) {
+            log.warn("Could not create a system audio stream; falling back to the player's own line", e)
+            null
+        }
+    }
+
+    private fun backendOrNull(): AudioBackend? = synchronized(lock) {
+        if (attempted) return backend
+        attempted = true
+        backend = try {
+            AudioBackends.open(APPLICATION)
+        } catch (e: Exception) {
+            log.warn("No system audio backend; falling back to the player's own line", e)
+            null
+        } catch (e: LinkageError) {
+            // The same narrow catch the player makes around skinema, for the same
+            // reason: a Panama binding whose system library will not load fails as
+            // an Error, and a launcher that cannot reach libpulse should play
+            // through the fallback rather than refuse to start.
+            log.warn("No system audio backend; falling back to the player's own line", e)
+            null
+        }
+        backend?.let {
+            log.info("System audio output ready: {}", it.javaClass.simpleName)
+            releaseOnShutdown()
+        }
+        backend
+    }
+
+    /**
+     * Gives the connection back when the process goes, which nothing else does.
+     *
+     * Registered at the moment a backend exists rather than at construction, which
+     * is the whole reason it is here and not in a hook class of its own: this is
+     * opened on the first track, so a launcher nobody played anything in should
+     * install nothing.
+     *
+     * Closing the backend releases every sink made from it, so a write parked
+     * against a device that has stopped answering is freed rather than left for
+     * the process to take down with it.
+     *
+     * The lambdas are built now and not at shutdown, the same reason the layout
+     * flush gives: a lambda's class loads when its first instance is made, and a
+     * hook that first reaches for its own generated classes while the process is
+     * exiting cannot run at all if the image behind it has been replaced.
+     */
+    private fun releaseOnShutdown() {
+        val body: () -> Unit = { close() }
+        val task = Runnable { runCatching(body) }
+        runCatching { Runtime.getRuntime().addShutdownHook(Thread(task, "nexira-audio-output")) }
+    }
+
+    override fun close() {
+        synchronized(lock) {
+            runCatching { backend?.close() }
+            backend = null
+        }
+    }
+
+    private companion object {
+        const val APPLICATION = "Nexira"
+        const val APPLICATION_ID = "dev.hivens.nexira"
+
+        /**
+         * The icon a mixer row draws beside the name, by the name the desktop
+         * knows it under: the same one the desktop entry names and the one the
+         * packaging installs into hicolor. A generic freedesktop name was what
+         * made the row a note glyph like any other player's.
+         */
+        const val ICON = "nexira"
+    }
+}
+
+/**
+ * skinema's seam on one side, libsound's sink on the other.
+ *
+ * The two contracts line up method for method, which is not luck: both were
+ * written around the same question, how many frames the device has actually
+ * played, because that number is the clock a player's whole timeline rides on.
+ * So this carries no state and corrects nothing.
+ *
+ * The shape is no longer assumed. skinema used to hand over a sample rate and
+ * nothing else, so this built S16LE interleaved stereo from documentation and
+ * hoped; 0.8.2 passes the whole format, and the two encodings name the same five
+ * members, so the mapping is total and the guess is gone.
+ */
+private class SkinemaAdapter(private val sink: AudioSink) : PcmSink {
+
+    override fun open(format: PcmFormat) {
+        sink.open(AudioFormat(format.sampleRate, format.channels, encodingOf(format.encoding)))
+    }
+
+    override fun write(data: ByteArray, offset: Int, length: Int) = sink.write(data, offset, length)
+
+    override fun stop() = sink.stop()
+
+    override fun start() = sink.start()
+
+    override fun flush() = sink.flush()
+
+    /**
+     * The two enums are the same five members under two package names, so this
+     * is exhaustive on purpose: a new encoding on either side should stop the
+     * compiler rather than fall through to a silent default that plays noise.
+     */
+    private fun encodingOf(encoding: SkinemaEncoding): PcmEncoding = when (encoding) {
+        SkinemaEncoding.U8    -> PcmEncoding.U8
+        SkinemaEncoding.S16LE -> PcmEncoding.S16LE
+        SkinemaEncoding.S32LE -> PcmEncoding.S32LE
+        SkinemaEncoding.F32LE -> PcmEncoding.F32LE
+        SkinemaEncoding.F64LE -> PcmEncoding.F64LE
+    }
+
+    override fun framePosition(): Long = sink.framePosition()
+
+    override fun setVolume(volume: Float) = sink.setVolume(volume)
+
+    // Idempotent on both sides: skinema's watchdog closes a sink to break a write
+    // that nothing will finish, and the audio thread closes it again on its way
+    // out.
+    override fun close() = sink.close()
+
+    private companion object {
+        const val CHANNELS = 2
+    }
+}

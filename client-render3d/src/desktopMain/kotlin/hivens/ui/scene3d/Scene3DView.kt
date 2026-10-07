@@ -163,6 +163,12 @@ private class RenderRequest(
 private class SceneRenderer {
     private var sw = -1
     private var sh = -1
+    // The output size and the factor too, not only their product: half the canvas at
+    // twice the supersampling keeps the supersampled size and changes the resolve
+    // buffer and the image, which a check on the product alone kept stale.
+    private var ow = -1
+    private var oh = -1
+    private var oss = -1
     private var color = IntArray(0)
     private var depth = FloatArray(0)
     private var resolved = IntArray(0)
@@ -171,8 +177,9 @@ private class SceneRenderer {
     fun render(req: RenderRequest): ImageBitmap {
         val rw = req.w * req.ss
         val rh = req.h * req.ss
-        if (rw != sw || rh != sh) {
+        if (rw != sw || rh != sh || req.w != ow || req.h != oh || req.ss != oss) {
             sw = rw; sh = rh
+            ow = req.w; oh = req.h; oss = req.ss
             color = IntArray(rw * rh)
             depth = FloatArray(rw * rh)
             resolved = if (req.ss == 1) IntArray(0) else IntArray(req.w * req.h)

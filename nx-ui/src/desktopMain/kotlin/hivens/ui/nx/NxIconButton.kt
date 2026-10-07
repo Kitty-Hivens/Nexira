@@ -15,8 +15,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.Symbol
-import hivens.ui.theme.NxTheme
 import hivens.ui.theme.Spacing
+import hivens.ui.theme.NxInk
 
 /**
  * Icon-only clickable with a shape-correct CIRCULAR state layer: the hover/press
@@ -40,7 +40,7 @@ fun NxIconButton(
     contentDescription: String?,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    tint: Color = NxTheme.colors.textSecondary,
+    tint: Color = NxInk.quiet,
     enabled: Boolean = true,
     iconSize: Dp = 18.dp,
     tooltip: Boolean = true,
@@ -58,6 +58,7 @@ fun NxIconButton(
     val interaction = remember { MutableInteractionSource() }
     val shownTint = if (enabled) tint else tint.copy(alpha = 0.4f)
     NxTooltip(
+        behaviour = NxTooltipBehaviour.LabelCentred,
         text     = contentDescription.orEmpty(),
         enabled  = tooltip && !contentDescription.isNullOrBlank(),
         modifier = modifier,

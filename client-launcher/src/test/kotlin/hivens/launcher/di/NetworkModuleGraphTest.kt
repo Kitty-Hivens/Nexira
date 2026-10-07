@@ -5,6 +5,7 @@ import hivens.core.api.interfaces.IServerProtocol
 import hivens.core.security.SslBypassStore
 import hivens.launcher.network.ServerProtocolConfig
 import hivens.launcher.protocol.LauncherHashCache
+import io.ktor.client.engine.okhttp.OkHttpEngine
 import okhttp3.Call
 import okhttp3.OkHttpClient
 import org.koin.core.context.startKoin
@@ -17,6 +18,8 @@ import java.time.Instant
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertNotSame
 import kotlin.test.assertSame
 
@@ -52,11 +55,9 @@ class NetworkModuleGraphTest {
         koin.get<OkHttpClient>(named("insecure"))
         koin.get<HttpClientProvider>()
         koin.get<HttpClientProvider>(named("direct"))
-        koin.get<HttpClientProvider>(named("insecure"))
         koin.get<Call.Factory>()
         koin.get<LauncherHashCache>()
         koin.get<IServerProtocol>()
-        koin.get<IServerProtocol>(named("insecure"))
         koin.get<SslBypassStore>()
     }
 
@@ -70,6 +71,20 @@ class NetworkModuleGraphTest {
             koin.get<OkHttpClient>(named("direct")),
             koin.get<OkHttpClient>(named("insecure")),
         )
+    }
+
+    /**
+     * OkHttp follows a redirect from https to plaintext http unless told not to,
+     * and the Ktor client on top refuses that downgrade only when the redirect
+     * reaches it. The direct channel fetches what a pack manifest names.
+     */
+    @Test
+    fun `the direct channel leaves redirects to the client that refuses a downgrade`() {
+        val koin = org.koin.core.context.GlobalContext.get()
+        val engine = koin.get<HttpClientProvider>(named("direct")).current.engine as OkHttpEngine
+        val okHttp = assertNotNull(engine.config.preconfigured)
+        assertFalse(okHttp.followRedirects)
+        assertFalse(okHttp.followSslRedirects)
     }
 
     @Test

@@ -165,7 +165,7 @@ internal class WindowsCredentialManagerKeyringStorage : IKeyringStorage {
     }
 
     override fun store(service: String, account: String, secret: String): Boolean {
-        require(service.isNotBlank() && account.isNotBlank()) { "service and account must be non-blank" }
+        requireKeyringIds(service, account)
         val handle = credWriteHandle ?: return false
         return Arena.ofConfined().use { call ->
             try {
@@ -204,7 +204,7 @@ internal class WindowsCredentialManagerKeyringStorage : IKeyringStorage {
     }
 
     override fun retrieve(service: String, account: String): String? {
-        require(service.isNotBlank() && account.isNotBlank()) { "service and account must be non-blank" }
+        requireKeyringIds(service, account)
         val handle = credReadHandle ?: return null
         val freeHandle = credFreeHandle ?: return null
         return Arena.ofConfined().use { call ->
@@ -247,7 +247,7 @@ internal class WindowsCredentialManagerKeyringStorage : IKeyringStorage {
     }
 
     override fun clear(service: String, account: String): Boolean {
-        require(service.isNotBlank() && account.isNotBlank()) { "service and account must be non-blank" }
+        requireKeyringIds(service, account)
         val handle = credDeleteHandle ?: return false
         return Arena.ofConfined().use { call ->
             try {

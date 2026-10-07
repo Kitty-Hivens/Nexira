@@ -10,8 +10,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Constraints
 import hivens.ui.screens.ConsolePalette
 import hivens.ui.screens.spanStyleFor
-import hivens.ui.theme.CustomTheme
 import hivens.ui.utils.LogEntry
+import hivens.ui.widgets.toWidgetColorOrNull
 
 // The colour + geometry a line lays out under. A change to ANY field means the
 // cached layouts are stale, so the canvas bumps the cache generation (invalidate)
@@ -84,9 +84,10 @@ internal class LineLayoutCache(
             val start = sp.start.coerceIn(0, len)
             val end = sp.end.coerceIn(start, len)
             if (start == end) continue
+            val ruleColour = sp.colorHex?.toWidgetColorOrNull()
             val style = when {
-                sp.colorHex != null -> SpanStyle(
-                    color = CustomTheme.parseHexColor(sp.colorHex),
+                ruleColour != null -> SpanStyle(
+                    color = ruleColour,
                     fontWeight = if (sp.bold) FontWeight.Bold else null,
                 )
                 // A bold-only run (ANSI `1` with no colour) keeps the role colour.

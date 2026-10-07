@@ -28,10 +28,16 @@ import java.util.Base64
  * the ones whose files were deleted.
  */
 class ContentScanCache(
-    private val env: Environment,
+    // Asked for at each operation, null when it could not be opened: a miss, and
+    // a write dropped, rather than a failure. See XodusDiskStore.
+    private val environment: () -> Environment?,
     private val storeName: String,
     private val json: Json,
 ) {
+    constructor(env: Environment, storeName: String, json: Json) : this({ env }, storeName, json)
+
+    private val env: Environment get() = environment() ?: throw IllegalStateException("cache database unavailable")
+
     private val log = LoggerFactory.getLogger(ContentScanCache::class.java)
 
     /**
@@ -70,6 +76,7 @@ class ContentScanCache(
             val slim = CachedMeta(
                 meta.name, meta.version, meta.description, null,
                 meta.homepageUrl, meta.license, meta.authors, meta.dependencies,
+                meta.loaders, meta.gameVersions, meta.provides, meta.requires,
             )
             bytes = json.encodeToString(CachedScan.serializer(), CachedScan(size, mtime, slim, FORMAT)).encodeToByteArray()
         }
@@ -118,7 +125,10 @@ class ContentScanCache(
         // fixes, metadata priority) so unchanged files re-parse; entries written
         // before the field existed default to 1 and read as misses.
         // 2: quote-aware TOML values, TOML-over-stub priority, jarVersion resolve.
-        const val FORMAT = 2
+        // 3: every loader the archive declares, and every game version it names.
+        // 4: the ids an archive provides, nested jars included, and its requirements.
+        // 5: requirements per manifest, a template [[mods]] header, nested-only jars.
+        const val FORMAT = 5
     }
 }
 
@@ -156,4 +166,8 @@ class CachedMeta(
     val license: String? = null,
     val authors: List<String> = emptyList(),
     val dependencies: List<String> = emptyList(),
+    val loaders: List<String> = emptyList(),
+    val gameVersions: List<String> = emptyList(),
+    val provides: List<ProvidedMod> = emptyList(),
+    val requires: List<ModRequirement> = emptyList(),
 )

@@ -1,0 +1,68 @@
+{
+  "schema_version": 15,
+  "id": "home-dock",
+  "graph": {
+    "surfaces": {
+      "home.new": {
+        "families": {
+          "general": {
+            "slots": {
+              "main": {
+                "widgets": [
+                  {
+                    "kind": "home.new.time",
+                    "instance_id": "preset-dock-time",
+                    "placement": {
+                      "padding": {
+                        "start": 24.0,
+                        "top": 20.0
+                      }
+                    }
+                  },
+                  {
+                    "kind": "home.new.whatsnew",
+                    "instance_id": "preset-dock-whatsnew",
+                    "placement": {
+                      "padding": {
+                        "start": 24.0,
+                        "end": 24.0
+                      }
+                    }
+                  },
+                  {
+                    "kind": "home.new.spacer",
+                    "instance_id": "preset-dock-spacer",
+                    "placement": {
+                      "weight": 1.0
+                    }
+                  },
+                  {
+                    "kind": "home.new.recent",
+                    "instance_id": "preset-dock-packs",
+                    "props": {
+                      "rows": 1,
+                      "tileWidth": 280
+                    },
+                    "placement": {
+                      "padding": {
+                        "start": 24.0,
+                        "end": 24.0,
+                        "bottom": 20.0
+                      }
+                    }
+                  }
+                ],
+                "flow": {
+                  "direction": "vertical",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

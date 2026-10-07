@@ -46,4 +46,12 @@ data class InstanceRuntime(
      * stale 925x530.
      */
     val windowSizeOverride: Boolean = false,
+    /**
+     * Whether Forge's and NeoForge's own loading screen opens while mods load.
+     * Null leaves it to the launcher, which turns it off on a Wayland session and
+     * otherwise leaves the pack's `config/fml.toml` as the pack shipped it. Null
+     * rather than a flag so a record persisted before the field, and one nobody
+     * has touched, takes the launcher's answer instead of a stored guess.
+     */
+    val earlyLoadingScreen: Boolean? = null,
 ) : RuntimePrefs

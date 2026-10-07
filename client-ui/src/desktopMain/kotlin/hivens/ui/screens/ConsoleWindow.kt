@@ -33,6 +33,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -60,7 +61,9 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
@@ -75,10 +78,8 @@ import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -90,6 +91,7 @@ import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
+import hivens.ui.nx.NxSteadyText
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetField
 import hivens.ui.puppet.PuppetScreen
@@ -108,18 +110,20 @@ import hivens.ui.screens.console.LogCanvas
 import hivens.ui.screens.console.LogSelection
 import hivens.ui.screens.console.buildLineModels
 import hivens.ui.screens.console.rememberLogCanvasState
+import hivens.ui.surface.NxSurface
+import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.Motion
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.CustomTheme
+import hivens.ui.theme.Status
+import hivens.ui.theme.Theme
 import hivens.ui.theme.LocalMonoFamily
 import hivens.ui.theme.nexiraBrailleFamily
 import hivens.ui.utils.ConsoleSettings
 import hivens.ui.utils.ConsoleSettingsStore
-import hivens.ui.utils.FilterRule
 import hivens.ui.utils.GameConsoleService
-import hivens.ui.utils.HighlightRule
 import hivens.ui.utils.LogEntry
 import hivens.ui.utils.LogType
+import hivens.ui.widgets.toWidgetColorOrNull
 import java.awt.datatransfer.StringSelection
 import kotlin.time.Duration.Companion.milliseconds
 import androidx.compose.runtime.snapshotFlow
@@ -130,6 +134,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
 
 // Severity-only highlight + the exception markers that survive Slice A.
 // Class-name / number / null highlights were noisy and lied when log
@@ -139,18 +145,16 @@ private val FONT_SIZES = listOf(11, 12, 14)
 
 // Upper bound on search-highlight spans / match offsets kept per render. A broad
 // query ("e") over a 50k-line buffer would otherwise allocate tens of thousands of
-// DocSpans + IntRanges + AnnotatedString entries -- a memory spike out of all
-// proportion to a highlight aid. Past this, scanning stops: F3 navigates the first
+// spans and matches, a memory spike out of all proportion to a highlight aid. Past this, scanning stops: F3 navigates the first
 // MAX_SEARCH_MATCHES hits, which is far more than anyone steps through by hand.
 internal const val MAX_SEARCH_MATCHES = 5000
 
 // ── Palette ──────────────────────────────────────────────────────────────────
-// Theme-derived colors flow through NxTheme.colors at every composable
-// call site; this small record carries the subset that pure helpers (the
-// AnnotatedString builder) consume off the composition. Only console-only
-// tokens (the yellow search highlight, the orange pause accent) live as
-// constants -- everything else maps to a NxColors role and follows
-// the user's theme + customization overrides.
+// Theme colours are asked for (NxInk, NxColor) at every composable call site.
+// This small record carries the subset that pure helpers (the per-line layout
+// cache) consume off the composition. Only console-only tokens (the yellow
+// search highlight, the orange pause accent) live as constants. Everything
+// else is a request and follows the user's theme.
 internal data class ConsolePalette(
     val textPrimary:    Color,
     val textSecondary:  Color,
@@ -162,78 +166,18 @@ internal data class ConsolePalette(
     val searchMatchBg:  Color,
 )
 
-// Console-only accents that have no NxColors counterpart. Yellow
+// Console-only accents that have no theme counterpart. Yellow
 // search-match background is universally legible on either light or dark
 // surfaces; pause-accent uses warm orange to read as "intentional halt"
-// rather than failure (criticalAccent would conflate with ERROR severity).
+// rather than failure (the error status would conflate with ERROR severity).
 private val CONSOLE_SEARCH_MATCH_BG = Color(0xFFFFEB3B)
 private val CONSOLE_SEARCH_MATCH_FG = Color(0xFF212121)
 private val CONSOLE_PAUSE_ACCENT   = Color(0xFFFFA726)
 
-// ── Match index for F3/n navigation ─────────────────────────────────────────
-// `ranges` carries each match's [start, endExclusive) so regex hits with
-// per-match variable length highlight the actual matched text instead of a
-// zero-width caret. `lineSeverities` is the parallel per-entry record the
-// severity gutter strip needs -- one entry per LogEntry, carrying the char
-// range it occupies in `annotated` so the painter can ask layoutResult for
-// the y-extent of each visual line that range spans.
-// The full off-thread render result: the annotated document, F3/n match ranges,
-// the per-entry severity spans for the gutter, plus the scalar counts the
-// toolbar / footer show. Everything the UI needs is computed once on
-// Dispatchers.Default and swapped in together, so composition stays O(1).
-internal data class ConsoleRender(
-    val annotated:      AnnotatedString,
-    val ranges:         List<IntRange>,
-    val lineSeverities: List<LineSeverity>,
-    val filteredCount:  Int,
-    val totalCount:     Int,
-    val warnCount:      Int,
-    val errorCount:     Int,
-    /** true when search matches hit MAX_SEARCH_MATCHES and scanning stopped early. */
-    val searchCapped:   Boolean = false,
-)
-
-
-internal data class LineSeverity(
-    val startOffset: Int,
-    val endOffset:   Int,
-    val type:        LogType,
-)
-
-// Colour role of one span, resolved to an actual SpanStyle only in the styling
-// pass. Keeping the structural pass palette-free is what lets a theme change
-// skip the expensive filter/regex/annotate rebuild -- see [buildConsoleDoc].
+// Colour role of one span, resolved to an actual SpanStyle only when a line is
+// laid out. Keeping the line models palette-free is what lets a theme change skip
+// the filter/regex pass -- see buildLineModels.
 internal enum class SpanRole { Divider, Info, Warn, Error, Marker, Search }
-
-// [colorHex] != null is a user highlight rule: an explicit colour (and [bold])
-// that overrides the role->palette mapping for this span. Emitted right after the
-// base line span so it wins over severity colour, but before marker / search
-// overlays so those stay visible on their sub-ranges.
-internal class DocSpan(
-    val start: Int,
-    val end: Int,
-    val role: SpanRole,
-    val colorHex: String? = null,
-    val bold: Boolean = false,
-)
-
-// Palette-independent render document: the plain text, the span layout (roles
-// not colours), the F3/n match ranges, the gutter severities, and the scalar
-// counts. Built once per content / filter / search change; [styleDoc] colours
-// it per palette.
-internal data class ConsoleDoc(
-    val text:           String,
-    val spans:          List<DocSpan>,
-    val ranges:         List<IntRange>,
-    val lineSeverities: List<LineSeverity>,
-    val filteredCount:  Int,
-    val totalCount:     Int,
-    val warnCount:      Int,
-    val errorCount:     Int,
-    /** true when search matches hit MAX_SEARCH_MATCHES and scanning stopped early. */
-    val searchCapped:   Boolean = false,
-)
-
 
 /**
  * Where [ConsoleContent] reads its entries from.
@@ -259,7 +203,7 @@ internal sealed interface ConsoleSource {
 fun ConsoleWindow(
     isDarkTheme: Boolean,
     onClose: () -> Unit,
-    customTheme: CustomTheme? = null,
+    theme: Theme,
 ) {
     val title = LocalStrings.current.consoleTitle
     // Collected here rather than by the shell that hosts this window: the store
@@ -276,17 +220,11 @@ fun ConsoleWindow(
         alwaysOnTop    = false,
         undecorated    = false,
     ) {
-        // NxTheme handles both the Material colorScheme + the
-        // launcher's NxColors composition local; child composables
-        // read NxTheme.colors directly. Accent / role overrides
-        // from LocalCustomization propagate in if the caller wrapped the
-        // ConsoleWindow site in a CustomizationProvider; otherwise the
-        // default settings yield the same palette as the main shell.
-        NxTheme(
-            useDarkTheme = isDarkTheme,
-            customTheme  = customTheme,
-        ) {
-            Surface(modifier = Modifier.fillMaxSize(), color = NxTheme.colors.background) {
+        // NxTheme provides the scheme and the Material colorScheme cut from
+        // it, and child composables ask it for colours. The caller hands in
+        // the active theme, so this separate window matches the main shell.
+        NxTheme(theme = theme, dark = isDarkTheme) {
+            NxSurface(SurfaceKind.Page, Modifier.fillMaxSize(), shape = RectangleShape) {
                 ConsoleContent(settings = settings, onSettingsChange = settingsStore::update)
             }
         }
@@ -306,20 +244,24 @@ internal fun ConsoleContent(
     val focusManager = LocalFocusManager.current
     val scope = rememberCoroutineScope()
     val gameConsole: GameConsoleService = koinInject()
-    val themeColors = NxTheme.colors
+    val inkMain = NxInk.main
+    val inkQuiet = NxInk.quiet
+    val inkLine = NxInk.line
+    val warnText = NxColor.status(Status.Warning, text = true)
+    val errorText = NxColor.status(Status.Error, text = true)
 
-    // Pure-function helpers (the AnnotatedString builder) consume a value-
-    // type palette off the composition; build it once per theme change so
-    // the builder stays @Composable-free.
-    val palette = remember(themeColors, settings.infoColor, settings.warnColor, settings.errorColor) {
+    // Pure-function helpers (the per-line layout cache) consume a value-type
+    // palette off the composition; build it once per theme change so they stay
+    // @Composable-free.
+    val palette = remember(inkMain, inkQuiet, inkLine, warnText, errorText, settings.infoColor, settings.warnColor, settings.errorColor) {
         ConsolePalette(
-            textPrimary    = themeColors.textPrimary,
-            textSecondary  = themeColors.textSecondary,
-            // Settings > Console severity overrides win; null falls back to theme.
-            severityInfo   = settings.infoColor?.let { CustomTheme.parseHexColor(it) } ?: themeColors.textPrimary,
-            severityWarn   = settings.warnColor?.let { CustomTheme.parseHexColor(it) } ?: themeColors.warnAccent,
-            severityError  = settings.errorColor?.let { CustomTheme.parseHexColor(it) } ?: themeColors.criticalAccent,
-            divider        = themeColors.outline,
+            textPrimary    = inkMain,
+            textSecondary  = inkQuiet,
+            // Settings > Console severity overrides win. Null or malformed falls back to the theme.
+            severityInfo   = settings.infoColor?.toWidgetColorOrNull() ?: inkMain,
+            severityWarn   = settings.warnColor?.toWidgetColorOrNull() ?: warnText,
+            severityError  = settings.errorColor?.toWidgetColorOrNull() ?: errorText,
+            divider        = inkLine,
             searchMatch    = CONSOLE_SEARCH_MATCH_FG,
             searchMatchBg  = CONSOLE_SEARCH_MATCH_BG,
         )
@@ -396,7 +338,7 @@ internal fun ConsoleContent(
 
     // ── Render: filter + counts + annotate, all OFF the UI thread ──────────
     // The whole O(n) pass -- severity/query filtering, warn/error counts, and
-    // the AnnotatedString build -- runs on Dispatchers.Default and swaps in once
+    // the line models -- runs on Dispatchers.Default and swaps in once
     // via produceState. Nothing O(n) touches composition, so a 5000-line buffer
     // (or a live flood) never blocks Main. In-flight builds cancel when any key
     // changes, so rapid filter/search edits collapse to one final rebuild.
@@ -693,7 +635,7 @@ internal fun ConsoleContent(
             canClear      = isLive,
         )
 
-        HorizontalDivider(thickness = 1.dp, color = themeColors.outline.copy(alpha = 0.4f))
+        HorizontalDivider(thickness = 1.dp, color = NxColor.wash(NxInk.line, 0.4f))
 
         // ── Log area ────────────────────────────────────────────────────────
         Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -703,19 +645,22 @@ internal fun ConsoleContent(
             val baseStyle = TextStyle(
                 fontFamily = LocalMonoFamily.current,
                 fontSize   = fontSize.sp,
-                color      = themeColors.textPrimary,
+                color      = inkMain,
             )
             val startPadPx    = with(density) { 10.dp.toPx() }
             val topPadPx      = with(density) { 4.dp.toPx() }
             val gutterWidthPx = with(density) { 3.dp.toPx() }
             var hostWidthPx by remember { mutableIntStateOf(0) }
 
-            // Themed right-click popup (Compose-drawn, not the dated Swing default).
-            val menuRepresentation = remember(themeColors) {
+            // Themed right-click popup (Compose-drawn, not the dated Swing default),
+            // cut from the top step the way a popup is.
+            val colours = NxTheme.colours
+            val menuRepresentation = remember(colours) {
+                val top = colours.step(colours.topStep)
                 DefaultContextMenuRepresentation(
-                    backgroundColor = themeColors.surface,
-                    textColor       = themeColors.textPrimary,
-                    itemHoverColor  = themeColors.primary.copy(alpha = 0.14f),
+                    backgroundColor = top,
+                    textColor       = colours.inkMain(top),
+                    itemHoverColor  = lerp(top, colours.lead, 0.14f),
                 )
             }
             CompositionLocalProvider(LocalContextMenuRepresentation provides menuRepresentation) {
@@ -736,9 +681,9 @@ internal fun ConsoleContent(
                         baseStyle       = baseStyle,
                         wrap            = wrapText,
                         showGutter      = showGutter,
-                        warnColor       = themeColors.warnAccent,
-                        errorColor      = themeColors.criticalAccent,
-                        selectionColor  = themeColors.primary.copy(alpha = 0.30f),
+                        warnColor       = NxColor.status(Status.Warning),
+                        errorColor      = NxColor.status(Status.Error),
+                        selectionColor  = NxColor.wash(NxColor.lead(), 0.30f),
                         startPadPx      = startPadPx,
                         topPadPx        = topPadPx,
                         gutterWidthPx   = gutterWidthPx,
@@ -764,8 +709,8 @@ internal fun ConsoleContent(
                 thickness           = 8.dp,
                 shape               = RoundedCornerShape(4.dp),
                 hoverDurationMillis = 250,
-                unhoverColor        = themeColors.textSecondary.copy(alpha = 0.40f),
-                hoverColor          = themeColors.textSecondary.copy(alpha = 0.75f),
+                unhoverColor        = NxColor.wash(inkQuiet, 0.40f),
+                hoverColor          = NxColor.wash(inkQuiet, 0.75f),
             )
             VerticalScrollbar(
                 adapter  = canvasState.scroll.scrollbarAdapter(),
@@ -794,15 +739,13 @@ internal fun ConsoleContent(
                     .padding(top = 12.dp),
             ) { showing ->
                 if (showing) {
-                    Surface(color = themeColors.success.copy(alpha = 0.9f)) {
+                    val toastFill = NxColor.status(Status.Success)
+                    Surface(color = toastFill) {
                         Text(
                             text     = s.consoleCopied,
-                            // White text reads against both light- and dark-
-                            // success surfaces in NxColors as currently
-                            // defined; revisit in customization slice if a
-                            // contrast pairing becomes necessary under
-                            // user-supplied overrides.
-                            color    = Color.White,
+                            // The ink is chosen against the success fill, so it
+                            // reads on a light one and on a dark one alike.
+                            color    = NxColor.on(toastFill),
                             fontSize = 11.sp,
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                         )
@@ -814,7 +757,7 @@ internal fun ConsoleContent(
         }
 
         // ── Footer: search prompt + status ─────────────────────────────────
-        HorizontalDivider(thickness = 1.dp, color = themeColors.outline.copy(alpha = 0.4f))
+        HorizontalDivider(thickness = 1.dp, color = NxColor.wash(NxInk.line, 0.4f))
 
         if (searchOpen) {
             SearchPrompt(
@@ -944,7 +887,6 @@ private fun Toolbar(
     /** A file-backed view has no buffer to wipe, and the control says so. */
     canClear: Boolean,
 ) {
-    val colors = NxTheme.colors
     Row(
         Modifier
             .fillMaxWidth()
@@ -954,7 +896,7 @@ private fun Toolbar(
     ) {
         Text(
             text       = strings.consoleHeaderCount(filtered, total),
-            color      = colors.textPrimary,
+            color      = NxInk.main,
             fontWeight = FontWeight.Bold,
             fontFamily = LocalMonoFamily.current,
             fontSize   = 11.sp,
@@ -962,16 +904,16 @@ private fun Toolbar(
         )
 
         Row(verticalAlignment = Alignment.CenterVertically) {
-            SeverityToggle("INFO",  filterInfo,  colors.textPrimary,    null,       onFilterInfo)
+            SeverityToggle("INFO",  filterInfo,  NxInk.main,                                  null,       onFilterInfo)
             Spacer(Modifier.width(4.dp))
-            SeverityToggle("WARN",  filterWarn,  colors.warnAccent,     warnCount,  onFilterWarn)
+            SeverityToggle("WARN",  filterWarn,  NxColor.status(Status.Warning, text = true), warnCount,  onFilterWarn)
             Spacer(Modifier.width(4.dp))
-            SeverityToggle("ERROR", filterError, colors.criticalAccent, errorCount, onFilterError)
+            SeverityToggle("ERROR", filterError, NxColor.status(Status.Error, text = true),   errorCount, onFilterError)
 
             Spacer(Modifier.width(8.dp))
             VerticalDivider(
                 modifier = Modifier.height(20.dp).width(1.dp),
-                color    = colors.textSecondary.copy(alpha = 0.3f),
+                color    = NxColor.wash(NxInk.quiet, 0.3f),
             )
             Spacer(Modifier.width(4.dp))
 
@@ -1006,7 +948,7 @@ private fun Toolbar(
             ) {
                 Text(
                     text       = "${fontSize}px",
-                    color      = colors.textSecondary,
+                    color      = NxInk.quiet,
                     fontSize   = 11.sp,
                     lineHeight = 13.sp,
                     fontFamily = LocalMonoFamily.current,
@@ -1016,20 +958,20 @@ private fun Toolbar(
             IconButton(onClick = onToggleWrap, modifier = Modifier.size(32.dp)) {
                 Symbol(NxIcon.WrapText,
                     contentDescription = strings.consoleWrap,
-                    tint = if (wrapText) colors.success else colors.textSecondary,
+                    tint = if (wrapText) NxColor.status(Status.Success) else NxInk.quiet,
                 )
             }
             IconButton(onClick = onSave, modifier = Modifier.size(32.dp)) {
-                Symbol(NxIcon.Save, strings.consoleSaveToFile, tint = colors.textSecondary)
+                Symbol(NxIcon.Save, strings.consoleSaveToFile, tint = NxInk.quiet)
             }
             IconButton(onClick = onCopyAll, modifier = Modifier.size(32.dp)) {
-                Symbol(NxIcon.ContentCopy, strings.consoleCopyAll, tint = colors.textSecondary)
+                Symbol(NxIcon.ContentCopy, strings.consoleCopyAll, tint = NxInk.quiet)
             }
             IconButton(onClick = onClear, enabled = canClear, modifier = Modifier.size(32.dp)) {
                 Symbol(
                     NxIcon.Delete,
                     strings.consoleClear,
-                    tint = colors.textSecondary.copy(alpha = if (canClear) 1f else 0.38f),
+                    tint = if (canClear) NxInk.quiet else NxInk.off,
                 )
             }
 
@@ -1039,7 +981,7 @@ private fun Toolbar(
             var gearOpen by remember { mutableStateOf(false) }
             Box {
                 IconButton(onClick = { gearOpen = true }, modifier = Modifier.size(32.dp)) {
-                    Symbol(NxIcon.Settings, strings.consoleSettingsLabel, tint = colors.textSecondary)
+                    Symbol(NxIcon.Settings, strings.consoleSettingsLabel, tint = NxInk.quiet)
                 }
                 DropdownMenu(
                     expanded         = gearOpen,
@@ -1077,7 +1019,7 @@ private fun Toolbar(
 // raw Box + clickable bypasses that pipeline and gives us full control
 // over both the chip background tint (active state) and the text color.
 // Active chip carries a 14% accent wash so the toggle reads ON without
-// needing a border; inactive label drops to 45% alpha for clear hierarchy.
+// needing a border. The inactive label drops to a 45% wash for clear hierarchy.
 @Composable
 private fun SeverityToggle(
     label: String,
@@ -1087,7 +1029,7 @@ private fun SeverityToggle(
     onToggle: (Boolean) -> Unit,
 ) {
     val text = if (count != null && count > 0) "$label $count" else label
-    val bg   = if (active) accent.copy(alpha = 0.14f) else Color.Transparent
+    val bg   = if (active) NxColor.wash(accent, 0.14f) else Color.Transparent
     // Wrap-content height + symmetric padding centers the text optically.
     // The prior fixed 24 dp height pushed all-caps mono labels visually
     // below the chip center because font ascent reserves space above the
@@ -1101,13 +1043,18 @@ private fun SeverityToggle(
             .padding(horizontal = 8.dp, vertical = 3.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            text       = text,
-            color      = if (active) accent else accent.copy(alpha = 0.45f),
-            fontSize   = 11.sp,
-            lineHeight = 13.sp,
-            fontFamily = LocalMonoFamily.current,
-            fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
+        // Measured bold, drawn at its current weight. Toggling a level bolded its
+        // chip, and even in a mono face the bold is wider, so the rest of the row
+        // stepped sideways every time one was switched.
+        NxSteadyText(
+            text   = text,
+            color  = if (active) accent else NxColor.wash(accent, 0.45f),
+            style  = LocalTextStyle.current.copy(
+                fontSize   = 11.sp,
+                lineHeight = 13.sp,
+                fontFamily = LocalMonoFamily.current,
+            ),
+            weight = if (active) FontWeight.Bold else FontWeight.Normal,
         )
     }
 }
@@ -1130,7 +1077,6 @@ private fun SearchPrompt(
     onNext: () -> Unit,
     onPrev: () -> Unit,
 ) {
-    val colors = NxTheme.colors
     Row(
         Modifier
             .fillMaxWidth()
@@ -1139,7 +1085,7 @@ private fun SearchPrompt(
     ) {
         Text(
             text       = "/",
-            color      = colors.textSecondary,
+            color      = NxInk.quiet,
             fontFamily = LocalMonoFamily.current,
             fontWeight = FontWeight.Bold,
             fontSize   = 12.sp,
@@ -1150,11 +1096,11 @@ private fun SearchPrompt(
             onValueChange = onQueryChange,
             singleLine    = true,
             textStyle     = TextStyle(
-                color      = colors.textPrimary,
+                color      = NxInk.main,
                 fontSize   = 12.sp,
                 fontFamily = LocalMonoFamily.current,
             ),
-            cursorBrush   = SolidColor(colors.textPrimary),
+            cursorBrush   = SolidColor(NxInk.main),
             modifier      = Modifier
                 .weight(1f)
                 .focusRequester(focusRequester)
@@ -1163,7 +1109,7 @@ private fun SearchPrompt(
                 if (query.isEmpty()) {
                     Text(
                         text       = strings.consoleSearchPlaceholder,
-                        color      = colors.textSecondary.copy(alpha = 0.5f),
+                        color      = NxColor.wash(NxInk.quiet, 0.5f),
                         fontSize   = 12.sp,
                         fontFamily = LocalMonoFamily.current,
                     )
@@ -1172,9 +1118,9 @@ private fun SearchPrompt(
             },
         )
         val regexTint = when {
-            !regexMode  -> colors.textSecondary.copy(alpha = 0.4f)
-            !regexValid -> colors.criticalAccent
-            else        -> colors.success
+            !regexMode  -> NxColor.wash(NxInk.quiet, 0.4f)
+            !regexValid -> NxColor.status(Status.Error, text = true)
+            else        -> NxColor.status(Status.Success, text = true)
         }
         PromptButton(onClick = onToggleRegex) {
             Text(
@@ -1194,7 +1140,7 @@ private fun SearchPrompt(
         PromptButton(onClick = onToggleFilter) {
             Text(
                 text       = "f|",
-                color      = if (filterMode) colors.success else colors.textSecondary.copy(alpha = 0.4f),
+                color      = if (filterMode) NxColor.status(Status.Success, text = true) else NxColor.wash(NxInk.quiet, 0.4f),
                 fontSize   = 12.sp,
                 lineHeight = 14.sp,
                 fontFamily = LocalMonoFamily.current,
@@ -1204,7 +1150,7 @@ private fun SearchPrompt(
         PromptButton(onClick = onPrev) {
             Text(
                 text       = "<",
-                color      = colors.textSecondary,
+                color      = NxInk.quiet,
                 fontSize   = 12.sp,
                 lineHeight = 14.sp,
                 fontFamily = LocalMonoFamily.current,
@@ -1213,7 +1159,7 @@ private fun SearchPrompt(
         PromptButton(onClick = onNext) {
             Text(
                 text       = ">",
-                color      = colors.textSecondary,
+                color      = NxInk.quiet,
                 fontSize   = 12.sp,
                 lineHeight = 14.sp,
                 fontFamily = LocalMonoFamily.current,
@@ -1222,7 +1168,7 @@ private fun SearchPrompt(
         PromptButton(onClick = onClose) {
             Symbol(icon = NxIcon.Close,
                 contentDescription = null,
-                tint               = colors.textSecondary,
+                tint               = NxInk.quiet,
                 modifier           = Modifier.size(14.dp),
             )
         }
@@ -1264,7 +1210,6 @@ private fun CommandInputRow(
     onFocusChanged: (Boolean) -> Unit,
     strings: AppStrings,
 ) {
-    val colors = NxTheme.colors
     Row(
         Modifier
             .fillMaxWidth()
@@ -1276,7 +1221,7 @@ private fun CommandInputRow(
         // so the two footer rows look like a family.
         Text(
             text       = ">",
-            color      = colors.success,
+            color      = NxColor.status(Status.Success, text = true),
             fontFamily = LocalMonoFamily.current,
             fontWeight = FontWeight.Bold,
             fontSize   = 12.sp,
@@ -1287,11 +1232,11 @@ private fun CommandInputRow(
             onValueChange = onValueChange,
             singleLine    = true,
             textStyle     = TextStyle(
-                color      = colors.textPrimary,
+                color      = NxInk.main,
                 fontSize   = 12.sp,
                 fontFamily = LocalMonoFamily.current,
             ),
-            cursorBrush   = SolidColor(colors.textPrimary),
+            cursorBrush   = SolidColor(NxInk.main),
             modifier      = Modifier
                 .weight(1f)
                 .onFocusChanged { onFocusChanged(it.isFocused) }
@@ -1309,7 +1254,7 @@ private fun CommandInputRow(
                 if (value.isEmpty()) {
                     Text(
                         text       = strings.consoleCommandPlaceholder,
-                        color      = colors.textSecondary.copy(alpha = 0.45f),
+                        color      = NxColor.wash(NxInk.quiet, 0.45f),
                         fontSize   = 12.sp,
                         fontFamily = LocalMonoFamily.current,
                     )
@@ -1337,7 +1282,6 @@ private fun StatusFooter(
     searchCapped: Boolean = false,
     onResumeFollow: () -> Unit,
 ) {
-    val colors = NxTheme.colors
     Row(
         Modifier
             .fillMaxWidth()
@@ -1354,14 +1298,14 @@ private fun StatusFooter(
         }
         Text(
             text       = linesText,
-            color      = colors.textSecondary,
+            color      = NxInk.quiet,
             fontFamily = LocalMonoFamily.current,
             fontSize   = 10.sp,
         )
         Spacer(Modifier.width(12.dp))
         Text(
             text       = strings.consoleStatusFiltered(warnCount, errorCount),
-            color      = colors.textSecondary,
+            color      = NxInk.quiet,
             fontFamily = LocalMonoFamily.current,
             fontSize   = 10.sp,
         )
@@ -1373,7 +1317,7 @@ private fun StatusFooter(
             // were not highlighted -- F3 still steps through the first cap-worth.
             Text(
                 text       = strings.consoleStatusMatch(matchCurrent, matchTotal) + if (searchCapped) "+" else "",
-                color      = colors.textSecondary,
+                color      = NxInk.quiet,
                 fontFamily = LocalMonoFamily.current,
                 fontSize   = 10.sp,
             )
@@ -1383,9 +1327,9 @@ private fun StatusFooter(
         // Follow / paused chip: clickable when paused to resume tailing.
         // success doubles as "everything is on track"; pause uses warm
         // orange so the chip reads as a deliberate halt rather than an
-        // error -- criticalAccent would conflate with ERROR severity.
+        // error, which the error status would conflate with ERROR severity.
         val followText  = if (following) strings.consoleStatusFollow else strings.consoleStatusPaused
-        val followColor = if (following) colors.success else CONSOLE_PAUSE_ACCENT
+        val followColor = if (following) NxColor.status(Status.Success, text = true) else CONSOLE_PAUSE_ACCENT
         TextButton(onClick = onResumeFollow, modifier = Modifier.height(20.dp)) {
             Text(
                 text       = followText,
@@ -1477,14 +1421,6 @@ private fun handleKey(
     }
 }
 
-// ── Render document builder + styling ────────────────────────────────────────
-// buildConsoleDoc is the structural pass: one walk over the entries emitting the
-// plain text, a palette-free span layout (severity base, ERROR_MARKERS overlay,
-// search overlay), the F3/n match ranges, the gutter severities, and the counts.
-// styleDoc then colours those spans for a given palette. Splitting the two keeps
-// a theme change off the expensive filter/regex/annotate path -- only styleDoc
-// re-runs. DIVIDERs render inline as their own dimmed line.
-
 /**
  * Idle filler for a console with no log lines yet (`totalCount == 0`) -- a friendly
  * stand-in instead of a blank panel, plus a hint to launch something. ASCII + mono
@@ -1515,14 +1451,14 @@ private fun ConsoleEmptyState(extraArts: List<String>) {
             // DejaVu Sans (not the mono UI font) -- it carries Braille at a uniform
             // cell; lineHeight == fontSize so the dot rows stack without gaps.
             style     = TextStyle(fontFamily = nexiraBrailleFamily(), fontSize = 16.sp, lineHeight = 16.sp),
-            color     = NxTheme.colors.textSecondary.copy(alpha = 0.5f),
+            color     = NxColor.wash(NxInk.quiet, 0.5f),
             textAlign = TextAlign.Start,
         )
         Spacer(Modifier.height(16.dp))
         Text(
             text      = s.consoleEmptyHint,
             style     = MaterialTheme.typography.bodySmall,
-            color     = NxTheme.colors.textSecondary.copy(alpha = 0.7f),
+            color     = NxColor.wash(NxInk.quiet, 0.7f),
             textAlign = TextAlign.Center,
         )
     }
@@ -1675,170 +1611,6 @@ private val CONSOLE_EMPTY_ARTS: List<String> = listOf(
     brailleArt(ART_CRESCENT),
     brailleArt(ART_STAR),
 )
-
-internal fun buildConsoleDoc(
-    all: List<LogEntry>,
-    filterInfo: Boolean,
-    filterWarn: Boolean,
-    filterError: Boolean,
-    searchAsFilter: Boolean,
-    rawQuery: String,
-    regexMode: Boolean,
-    regexCompiled: Regex?,
-    showTimestamps: Boolean,
-    highlightRules: List<HighlightRule> = emptyList(),
-    filterRules: List<FilterRule> = emptyList(),
-): ConsoleDoc {
-    // Pre-compile the user rules once (regex rules with a bad pattern compile to
-    // null and are skipped). A line is muted if it matches any enabled filter
-    // rule; it takes the colour of the first enabled highlight rule it matches.
-    val activeFilters = filterRules.asSequence()
-        .filter { it.enabled && it.pattern.isNotBlank() }
-        .map { it to (if (it.regex) runCatching { Regex(it.pattern) }.getOrNull() else null) }
-        .toList()
-    val activeHighlights = highlightRules.asSequence()
-        .filter { it.enabled && it.pattern.isNotBlank() }
-        .map { it to (if (it.regex) runCatching { Regex(it.pattern) }.getOrNull() else null) }
-        .toList()
-    fun matchesFilter(text: String) = activeFilters.any { (r, rx) ->
-        if (rx != null) rx.containsMatchIn(text) else text.contains(r.pattern, ignoreCase = true)
-    }
-    fun highlightFor(text: String): HighlightRule? = activeHighlights.firstOrNull { (r, rx) ->
-        if (rx != null) rx.containsMatchIn(text) else text.contains(r.pattern, ignoreCase = true)
-    }?.first
-    // One pass for counts (over ALL entries) + the severity/query filter that
-    // produces the displayed list. Severity gates first; query-narrowing only
-    // when search-as-filter is on. Dividers always pass so session boundaries
-    // stay visible.
-    var warnCount = 0
-    var errorCount = 0
-    val entries = ArrayList<LogEntry>(all.size)
-    for (e in all) {
-        when (e.type) {
-            LogType.WARN  -> warnCount++
-            LogType.ERROR -> errorCount++
-            else          -> {}
-        }
-        val severityOk = when (e.type) {
-            LogType.INFO    -> filterInfo
-            LogType.WARN    -> filterWarn
-            LogType.ERROR   -> filterError
-            LogType.DIVIDER -> true
-        }
-        if (!severityOk) continue
-        val queryOk = if (!searchAsFilter || rawQuery.isBlank() || e.type == LogType.DIVIDER) {
-            true
-        } else if (regexMode) {
-            regexCompiled?.containsMatchIn(e.text) ?: false
-        } else {
-            e.text.contains(rawQuery, ignoreCase = true)
-        }
-        if (!queryOk) continue
-        // User mute rules hide matching lines entirely; dividers always survive so
-        // session boundaries stay visible.
-        if (e.type != LogType.DIVIDER && matchesFilter(e.text)) continue
-        entries.add(e)
-    }
-
-    val sb = StringBuilder()
-    val spans = ArrayList<DocSpan>()
-    val matches = mutableListOf<IntRange>()
-    val severities = mutableListOf<LineSeverity>()
-    var searchCapped = false
-
-    for ((idx, e) in entries.withIndex()) {
-        val lineStart = sb.length
-        val lineText: String
-
-        if (e.type == LogType.DIVIDER) {
-            lineText = e.text
-            sb.append(lineText)
-            spans.add(DocSpan(lineStart, sb.length, SpanRole.Divider))
-        } else {
-            val role = when (e.type) {
-                LogType.WARN  -> SpanRole.Warn
-                LogType.ERROR -> SpanRole.Error
-                // DIVIDER is handled in the if-branch above; INFO is the
-                // remaining reachable case.
-                else          -> SpanRole.Info
-            }
-            lineText = if (showTimestamps) "[${e.timestamp}] ${e.text}" else e.text
-            sb.append(lineText)
-            spans.add(DocSpan(lineStart, sb.length, role))
-            // User highlight rule wins over severity colour for the whole line;
-            // marker / search overlays added below still paint over their sub-ranges.
-            highlightFor(lineText)?.let { spans.add(DocSpan(lineStart, sb.length, role, it.colorHex, it.bold)) }
-            if (e.type == LogType.ERROR || e.type == LogType.WARN) {
-                ERROR_MARKERS.findAll(lineText).forEach { m ->
-                    spans.add(DocSpan(lineStart + m.range.first, lineStart + m.range.last + 1, SpanRole.Marker))
-                }
-            }
-        }
-        severities.add(LineSeverity(lineStart, sb.length, e.type))
-
-        // Search highlight + match-offset collection, scanning the just-appended
-        // line text directly. Bounded by MAX_SEARCH_MATCHES so a broad query over a
-        // huge buffer can't blow up memory; once the cap is hit the scan stops.
-        if (rawQuery.isNotBlank() && matches.size < MAX_SEARCH_MATCHES) {
-            val matchRanges = if (regexMode) {
-                regexCompiled?.findAll(lineText)?.map { it.range }?.toList().orEmpty()
-            } else {
-                findAllSubstring(lineText, rawQuery)
-            }
-            for (range in matchRanges) {
-                if (range.isEmpty()) continue
-                val absStart = lineStart + range.first
-                val absEnd   = lineStart + range.last + 1
-                spans.add(DocSpan(absStart, absEnd, SpanRole.Search))
-                // Inclusive end so the IntRange size mirrors the match span.
-                matches.add(absStart until absEnd)
-                if (matches.size >= MAX_SEARCH_MATCHES) { searchCapped = true; break }
-            }
-        }
-
-        if (idx != entries.lastIndex) sb.append('\n')
-    }
-
-    return ConsoleDoc(
-        text           = sb.toString(),
-        spans          = spans,
-        ranges         = matches,
-        lineSeverities = severities,
-        filteredCount  = entries.size,
-        totalCount     = all.size,
-        warnCount      = warnCount,
-        errorCount     = errorCount,
-        searchCapped   = searchCapped,
-    )
-}
-
-// Colour the palette-free [doc] for the active [palette]. Base-line spans are
-// added before their marker / search overlays (preserved by [buildConsoleDoc]'s
-// emission order) so the overlay colour + weight win on the sub-range they
-// cover -- a later addStyle merges over an earlier one.
-internal fun styleDoc(doc: ConsoleDoc, palette: ConsolePalette): ConsoleRender {
-    val annotated = buildAnnotatedString {
-        append(doc.text)
-        for (sp in doc.spans) {
-            val style = if (sp.colorHex != null) {
-                SpanStyle(color = CustomTheme.parseHexColor(sp.colorHex), fontWeight = if (sp.bold) FontWeight.Bold else null)
-            } else {
-                spanStyleFor(sp.role, palette)
-            }
-            addStyle(style, sp.start, sp.end)
-        }
-    }
-    return ConsoleRender(
-        annotated      = annotated,
-        ranges         = doc.ranges,
-        lineSeverities = doc.lineSeverities,
-        filteredCount  = doc.filteredCount,
-        totalCount     = doc.totalCount,
-        warnCount      = doc.warnCount,
-        errorCount     = doc.errorCount,
-        searchCapped   = doc.searchCapped,
-    )
-}
 
 internal fun spanStyleFor(role: SpanRole, p: ConsolePalette): SpanStyle = when (role) {
     SpanRole.Divider -> SpanStyle(color = p.divider, fontWeight = FontWeight.Light)

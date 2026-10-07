@@ -44,4 +44,27 @@ class WidgetPropsTest {
         val p = inst(buildJsonObject { put("count", "not-a-number") }).decodeProps<SampleProps>()
         assertEquals(SampleProps(), p)
     }
+
+    @Test
+    fun `one unreadable field leaves the others as they were set`() {
+        val p = inst(
+            buildJsonObject {
+                put("flag", false)
+                put("count", "not-a-number")
+                put("label", "kept")
+            },
+        ).decodeProps<SampleProps>()
+        assertEquals(SampleProps(flag = false, label = "kept"), p)
+    }
+
+    @Test
+    fun `the readable props are the stored ones without the field that failed`() {
+        val stored = buildJsonObject {
+            put("flag", false)
+            put("count", "not-a-number")
+        }
+        assertEquals(buildJsonObject { put("flag", false) }, readableProps(SampleProps.serializer(), stored))
+        val clean = buildJsonObject { put("count", 3) }
+        assertEquals(clean, readableProps(SampleProps.serializer(), clean))
+    }
 }

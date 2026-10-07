@@ -21,9 +21,17 @@ import java.nio.file.Path
 object RecoveryIo {
 
     // Customization leaf files, each of which its owner re-seeds when absent
-    // (ThemeManager, BackgroundManager, ConsoleSettings). Kept as literals
-    // mirroring those owners -- they are not Storage constants there.
-    private val CUSTOMIZATION_FILES = listOf("themes.json", "background.json", "console.json")
+    // (ThemeManager, BackgroundManager, ConsoleSettings, CustomizationManager).
+    // Kept as literals mirroring those owners -- they are not Storage constants
+    // there.
+    //
+    // customization.json belongs here and was missing: it holds the accent that
+    // re-seeds the entire generated palette, and the rail settings that can leave
+    // the navigation with no visible selection at all. Both are set from a panel
+    // reachable only by a keyboard chord, so this surface was the one way back
+    // from them and did not take it.
+    private val CUSTOMIZATION_FILES =
+        listOf("themes.json", "background.json", "console.json", "customization.json")
 
     // Not one of the above, and not a reset the appearance button is allowed to
     // make: this file is what the user typed into their widgets, and nothing else

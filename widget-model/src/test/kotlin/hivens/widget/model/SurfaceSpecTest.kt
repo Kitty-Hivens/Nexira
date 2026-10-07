@@ -60,9 +60,10 @@ class SurfaceSpecTest {
 
     @Test
     fun `nothing on the wire is an enum`() {
-        // An enum constant renamed upstream breaks every file that named it; a string
-        // is a parser change. LenientEnumSerializer exists in this module because that
-        // lesson was already paid for once.
+        // An enum constant renamed upstream breaks every file that named it, while a
+        // string is a parser change. The module used to keep a lenient enum codec
+        // beside this claim, for the one field that broke the rule; the field is
+        // gone and so is the codec, and the claim is now the whole of it.
         val encoded = json.encodeToString(SurfaceSpec(shape = SurfaceShape(kind = "pill")))
         assertTrue(""""kind":"pill"""" in encoded, encoded)
     }
@@ -76,15 +77,25 @@ class SurfaceSpecTest {
     }
 
     @Test
-    fun `a rung is recognised by name, in any case`() {
-        assertEquals(FillSource.Rung("raised"), parseFill("raised"))
-        assertEquals(FillSource.Rung("floating"), parseFill("Floating"))
-        assertEquals(FillSource.Rung("sunken"), parseFill("  SUNKEN "))
+    fun `a surface word is recognised by name, in any case`() {
+        assertEquals(FillSource.Named("card"), parseFill("card"))
+        assertEquals(FillSource.Named("popup"), parseFill("Popup"))
+        assertEquals(FillSource.Named("field"), parseFill("  FIELD "))
     }
 
     @Test
-    fun `every declared rung parses`() {
-        for (rung in SURFACE_RUNGS) assertEquals(FillSource.Rung(rung), parseFill(rung))
+    fun `every declared word parses`() {
+        for (word in SURFACE_WORDS) assertEquals(FillSource.Named(word), parseFill(word))
+    }
+
+    @Test
+    fun `a file written with the old rungs reads as the word that plays their part`() {
+        // The layout is wiped once and never again, so an old name is translated
+        // rather than refused.
+        assertEquals(FillSource.Named("field"), parseFill("sunken"))
+        assertEquals(FillSource.Named("panel"), parseFill("base"))
+        assertEquals(FillSource.Named("card"), parseFill("Raised"))
+        assertEquals(FillSource.Named("popup"), parseFill("floating"))
     }
 
     @Test

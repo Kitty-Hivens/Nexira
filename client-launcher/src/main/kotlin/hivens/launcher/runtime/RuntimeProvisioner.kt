@@ -11,10 +11,12 @@ import hivens.core.platform.Platform
 import hivens.launcher.runtime.loader.DownloadProgress
 import hivens.launcher.runtime.loader.LibrarySpec
 import hivens.launcher.runtime.loader.LoaderRegistry
+import hivens.launcher.runtime.loader.LoaderVersionOption
 import hivens.launcher.runtime.loader.ResolvedLibrary
 import hivens.launcher.runtime.loader.ResolvedRuntime
 import hivens.launcher.runtime.loader.mergeLibraries
 import hivens.launcher.util.sha1Of
+import hivens.core.net.metadataTimeout
 import io.ktor.client.request.prepareGet
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.client.statement.bodyAsText
@@ -89,6 +91,13 @@ class RuntimeProvisioner(
         }
     }
 
+    /** This OS's native classifiers without an architecture, see [ensureRuntime]'s override natives. */
+    private val hostOsClassifiers: Set<String> = when (mojangOs) {
+        "windows" -> setOf("natives-windows")
+        "osx" -> setOf("natives-macos", "natives-osx")
+        else -> setOf("natives-linux")
+    }
+
     /** Resolved vanilla layout: the client jar, the asset index id, the
      *  vanilla library set (with coords, for merging a loader overlay), and
      *  the modern jvm/game arg tokens (empty on legacy versions) that a
@@ -115,6 +124,8 @@ class RuntimeProvisioner(
         val dest: Path,
         val sha1: String,
         val size: Long,
+        /** Held to when there is no [sha1], for a source that publishes only an md5. */
+        val md5: String = "",
     )
 
     /**
@@ -122,17 +133,36 @@ class RuntimeProvisioner(
      * in the shared roots: the vanilla base, plus -- when [loaderName] names a
      * known loader -- that loader's overlay merged on top (loader libraries win
      * on a group:artifact collision). Idempotent; returns the merged,
-     * launch-ready runtime.
+     * launch-ready runtime. [seed] offers files from another launcher's tree,
+     * taken only where they match; see [RuntimeSeed].
      */
     suspend fun ensureRuntime(
         mcVersion: String,
         loaderName: String?,
         loaderVersion: String,
         progress: DownloadProgress = { _, _, _ -> },
+        seed: RuntimeSeed? = null,
     ): ResolvedRuntime = withContext(Dispatchers.IO) {
-        val vanilla = ensureVanilla(mcVersion, progress)
+        // Before anything is downloaded. A loader nothing here serves used to read as
+        // no loader at all, so the pack started as plain vanilla with every mod
+        // ignored and nothing said: a typo in a free-text field, a manifest naming
+        // LiteLoader, a loader a newer build knows.
+        if (loaderRegistry.resolverFor(loaderName) == null && !LoaderRegistry.isVanilla(loaderName)) {
+            throw IOException("The loader '${loaderName!!.trim()}' is not one this launcher can install")
+        }
+        // The two answers that can refuse a pack come before the download that takes
+        // minutes: whether Mojang knows this Minecraft version, and whether the loader
+        // has a build for it. Asked after, Fabric on 1.12.2 or a version typo failed
+        // only once the whole vanilla runtime was on disk.
+        loadOrFetchVersion(mcVersion)
         val resolver = loaderRegistry.resolverFor(loaderName)
-            ?: return@withContext ResolvedRuntime(
+        val profile = resolver?.let {
+            log.info("resolving loader overlay: {} {}", it.loaderId, loaderVersion)
+            it.resolve(mcVersion, loaderVersion)
+        }
+        val vanilla = ensureVanilla(mcVersion, progress, seed)
+        if (profile == null) {
+            return@withContext ResolvedRuntime(
                 libraries = vanilla.libraries,
                 clientJar = vanilla.clientJar,
                 mainClass = VANILLA_MAIN_CLASS,
@@ -140,23 +170,28 @@ class RuntimeProvisioner(
                 natives = vanilla.natives.map { it.path },
                 javaMajor = vanilla.javaMajor,
             )
+        }
 
-        log.info("resolving loader overlay: {} {}", resolver.loaderId, loaderVersion)
-        val profile = resolver.resolve(mcVersion, loaderVersion)
-        val overlay = profile.libraries.map { ResolvedLibrary(it.coord, provision(it)) }
+        val overlay = profile.libraries.map { ResolvedLibrary(it.coord, provision(it, seed)) }
         // Host natives the loader adds on top of vanilla's -- a LWJGL swap
         // (Cleanroom / lwjgl3ify) contributes its own LWJGL3 .so/.dll here. The
         // loader lists all platforms (as the MMC instance does); the same host
         // filter as the vanilla natives keeps only this machine's set, so the
         // resolver stays platform-agnostic.
         val overrideNatives = profile.nativesOverride
-            ?.filterNot { isForeignNative(it.coord) }
-            ?.map { provision(it) }
+            ?.let { natives ->
+                // An arm64 host with no `-arm64` classifier on offer takes the plain
+                // one for its OS: Legacy Fabric publishes only those, each carrying
+                // every architecture, and dropping them left the game no LWJGL at all.
+                natives.filterNot { isForeignNative(it.coord) }
+                    .ifEmpty { natives.filter { it.coord.nativeClassifier in hostOsClassifiers } }
+            }
+            ?.map { provision(it, seed) }
             .orEmpty()
         // Processor outputs FML resolves by path under libraryDirectory (the
         // patched/SRG client, neoforge universal) -- on disk, never on -cp.
         profile.placeOnlyFiles.forEach { pf ->
-            placeLocal(librariesDir.resolve(pf.relPath), pf.source, null)
+            placeLocal(inLibraries(pf.relPath), pf.source, null)
         }
         // The installer's resources-only client output (client-<neoform>-extra.jar:
         // version.json + assets, no classes). Placed above like every other output;
@@ -164,7 +199,7 @@ class RuntimeProvisioner(
         // version.json (see [ResolvedRuntime.clientResourcesJar]).
         val clientResources = profile.placeOnlyFiles
             .firstOrNull { it.relPath.startsWith("net/minecraft/client/") && it.relPath.endsWith("-extra.jar") }
-            ?.let { librariesDir.resolve(it.relPath) }
+            ?.let { inLibraries(it.relPath) }
         // A self-contained loader (Cleanroom) supplies the whole classpath, so
         // the vanilla libraries are dropped -- keeping them leaks cross-coord
         // twins the merge cannot dedup (old oshi/icu/netty shadowing the new).
@@ -201,6 +236,7 @@ class RuntimeProvisioner(
             natives = baseNatives + overrideNatives,
             // Loader override (Cleanroom -> 25) wins; else inherit vanilla's declared.
             javaMajor = profile.javaMajor ?: vanilla.javaMajor,
+            loaderVersion = profile.version,
         )
     }
 
@@ -210,14 +246,19 @@ class RuntimeProvisioner(
      * precedence. Shared by the loader overlay and the loader's native-override
      * set so both go through the same verify/skip path.
      */
-    private suspend fun provision(spec: LibrarySpec): Path {
-        val dest = librariesDir.resolve(spec.coord.relativePath)
+    private suspend fun provision(spec: LibrarySpec, seed: RuntimeSeed? = null): Path {
+        // The coordinate comes from a loader profile or an installer's version
+        // json, third-party documents both, and `MavenCoord.parse` validates no
+        // segment, so a `..` in one of them would place the file outside the root.
+        val dest = inLibraries(spec.coord.relativePath, spec.coord.groupArtifact)
         when {
             spec.localFile != null -> placeLocal(dest, spec.localFile, spec.sha1)
             spec.bundled != null -> placeBundled(dest, spec.bundled, spec.sha1)
             else -> {
                 val url = spec.url ?: throw IOException("library ${spec.coord.groupArtifact} has neither url, bundled bytes, nor a local file")
-                fetchIfNeeded(DownloadTask(url, dest, spec.sha1.orEmpty(), spec.size))
+                val task = DownloadTask(url, dest, spec.sha1.orEmpty(), spec.size, spec.md5.orEmpty())
+                seed?.let { adoptFromSeed(task, it) }
+                fetchIfNeeded(task)
             }
         }
         return dest
@@ -231,6 +272,7 @@ class RuntimeProvisioner(
     suspend fun ensureVanilla(
         mcVersion: String,
         progress: DownloadProgress = { _, _, _ -> },
+        seed: RuntimeSeed? = null,
     ): VanillaRuntime = withContext(Dispatchers.IO) {
         // Offline-friendly resolve. A Mojang version json is immutable per MC
         // version, so cache it and reuse the on-disk copy -- a relaunch then skips
@@ -244,6 +286,14 @@ class RuntimeProvisioner(
         val assetIndex = ensureAssetIndex(assetIndexId, version.assetIndex.url, version.assetIndex.sha1)
 
         val tasks = planVanillaDownloads(mcVersion, version, assetIndex)
+        if (seed != null) {
+            var adopted = 0
+            tasks.forEachIndexed { i, task ->
+                if (adoptFromSeed(task, seed)) adopted++
+                if (i % SEED_PROGRESS_EVERY == 0) progress(i, tasks.size, "checking files offered by the import")
+            }
+            log.info("vanilla runtime {}: took {} of {} files from the offered tree", mcVersion, adopted, tasks.size)
+        }
         log.info("vanilla runtime {}: {} files to verify/fetch (assetIndex={})", mcVersion, tasks.size, assetIndexId)
         // One request at a time over a few thousand asset objects was the slowest
         // part of a first launch, and a single reset anywhere in it failed the whole
@@ -253,7 +303,7 @@ class RuntimeProvisioner(
         }
 
         VanillaRuntime(
-            clientJar = librariesDir.resolve(clientJarRelPath(mcVersion)),
+            clientJar = inLibraries(clientJarRelPath(mcVersion), mcVersion),
             assetIndexId = assetIndexId,
             libraries = vanillaLibraries(version),
             jvmArgs = version.arguments?.let { flattenArguments(it.jvm, mojangOs) } ?: emptyList(),
@@ -262,6 +312,14 @@ class RuntimeProvisioner(
             javaMajor = version.javaVersion?.majorVersion,
         )
     }
+
+    /**
+     * The versions [loaderName] publishes for [mcVersion], newest first, for the
+     * create dialog's picker. Empty for vanilla, for a loader nothing here serves,
+     * and for one with no listing.
+     */
+    suspend fun availableLoaderVersions(loaderName: String?, mcVersion: String): List<LoaderVersionOption> =
+        loaderRegistry.resolverFor(loaderName)?.availableVersions(mcVersion).orEmpty()
 
     /**
      * Every Minecraft version id from Mojang's manifest, newest-first -- the
@@ -373,7 +431,7 @@ class RuntimeProvisioner(
         version.downloads.client.let { client ->
             out += DownloadTask(
                 url = client.url,
-                dest = librariesDir.resolve(clientJarRelPath(mcVersion)),
+                dest = inLibraries(clientJarRelPath(mcVersion), mcVersion),
                 sha1 = client.sha1,
                 size = client.size,
             )
@@ -411,6 +469,13 @@ class RuntimeProvisioner(
 
     internal fun assetObjectRelPath(hash: String): String = "objects/${hash.take(2)}/$hash"
 
+    /**
+     * [rel] under the shared libraries root, refused when it leaves it. Every
+     * path here is built from something a document named: a maven coordinate, a
+     * Minecraft version from a pack manifest, an installer's output.
+     */
+    private fun inLibraries(rel: String, label: String = rel): Path = resolveWithinRoot(librariesDir, rel, label)
+
     internal fun assetObjectUrl(hash: String): String =
         "${resourcesBaseUrl.trimEnd('/')}/${hash.take(2)}/$hash"
 
@@ -429,7 +494,7 @@ class RuntimeProvisioner(
      * A corrupt/partial cache (rare; writes are atomic) falls back to a refetch.
      */
     private suspend fun loadOrFetchVersion(mcVersion: String): MojangVersion {
-        val cachePath = librariesDir.resolve(versionJsonRelPath(mcVersion))
+        val cachePath = inLibraries(versionJsonRelPath(mcVersion), mcVersion)
         if (Files.isRegularFile(cachePath)) {
             runCatching { json.decodeFromString(MojangVersion.serializer(), Files.readString(cachePath)) }
                 .onSuccess { return it }
@@ -448,7 +513,7 @@ class RuntimeProvisioner(
      * fetching + verifying + persisting it.
      */
     private suspend fun ensureAssetIndex(id: String, url: String, sha1: String): MojangAssetIndex {
-        val indexPath = assetsDir.resolve(assetIndexRelPath(id))
+        val indexPath = resolveWithinRoot(assetsDir, assetIndexRelPath(id), id)
         val onDisk = if (Files.isRegularFile(indexPath)) runCatching { Files.readAllBytes(indexPath) }.getOrNull() else null
         val bytes = if (onDisk != null && sha1Of(onDisk).equals(sha1, ignoreCase = true)) {
             onDisk
@@ -461,8 +526,9 @@ class RuntimeProvisioner(
         return json.decodeFromString(MojangAssetIndex.serializer(), bytes.decodeToString())
     }
 
+    /** The version manifest and a version json, both read while a person waits on a picker or a launch. */
     private suspend fun fetchText(url: String): String =
-        httpClient.prepareGet(url).execute { resp ->
+        httpClient.prepareGet(url) { metadataTimeout() }.execute { resp ->
             if (!resp.status.isSuccess()) throw IOException("GET $url -> HTTP ${resp.status}")
             resp.bodyAsText()
         }
@@ -474,6 +540,50 @@ class RuntimeProvisioner(
             resp.bodyAsChannel().copyTo(buf)
             buf.toByteArray()
         }
+
+    /**
+     * Places the [seed]'s file for [task] when the shared root has none yet and
+     * the file's sha1 is the one [task] expects. True when it was placed. A task
+     * that names no sha1 has nothing to hold the file to, and is left to download.
+     */
+    private fun adoptFromSeed(task: DownloadTask, seed: RuntimeSeed): Boolean {
+        if (task.sha1.isBlank() || Files.exists(task.dest)) return false
+        val candidate = seedCandidate(task.dest, seed)?.takeIf { Files.isRegularFile(it) && !Files.isSymbolicLink(it) }
+            ?: return false
+        val matches = runCatching { sha1Of(candidate).equals(task.sha1, ignoreCase = true) }.getOrDefault(false)
+        if (!matches) {
+            log.info("not taking {} from the offered tree: its contents are not the expected build", candidate)
+            return false
+        }
+        return runCatching {
+            Files.createDirectories(task.dest.parent)
+            try {
+                // A hard link costs no space and the bytes were just checked.
+                Files.createLink(task.dest, candidate)
+            } catch (_: Exception) {
+                val tmp = Files.createTempFile(task.dest.parent, "${task.dest.fileName}.", ".tmp")
+                try {
+                    Files.copy(candidate, tmp, StandardCopyOption.REPLACE_EXISTING)
+                    moveAtomic(tmp, task.dest)
+                } finally {
+                    runCatching { Files.deleteIfExists(tmp) }
+                }
+            }
+            true
+        }.onFailure { log.warn("could not place {} from the offered tree", task.dest, it) }.getOrDefault(false)
+    }
+
+    /** Where [seed] would keep the file the shared roots keep at [dest]. */
+    private fun seedCandidate(dest: Path, seed: RuntimeSeed): Path? {
+        if (dest.fileName.toString().startsWith("minecraft-") && dest.startsWith(librariesDir.resolve("net/minecraft/minecraft"))) {
+            seed.clientJar?.let { return it }
+        }
+        return when {
+            dest.startsWith(assetsDir) -> seed.assetsDir?.resolve(assetsDir.relativize(dest).toString())
+            dest.startsWith(librariesDir) -> seed.librariesDir?.resolve(librariesDir.relativize(dest).toString())
+            else -> null
+        }
+    }
 
     private suspend fun fetchIfNeeded(task: DownloadTask) {
         transfers.fetch(task.toTransfer())
@@ -494,7 +604,8 @@ class RuntimeProvisioner(
     private fun DownloadTask.toTransfer(): Transfer = Transfer(
         url = url,
         dest = dest,
-        expect = sha1.takeIf { it.isNotBlank() }?.let { Digest(DigestAlgorithm.SHA1, it) },
+        expect = sha1.takeIf { it.isNotBlank() }?.let { Digest(DigestAlgorithm.SHA1, it) }
+            ?: md5.takeIf { it.isNotBlank() }?.let { Digest(DigestAlgorithm.MD5, it) },
         size = size,
         skip = if (size > 0L) SkipIfPresent.BySize else SkipIfPresent.Presence,
     )
@@ -559,6 +670,9 @@ class RuntimeProvisioner(
     companion object {
         const val VERSION_MANIFEST_URL = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json"
         const val RESOURCES_BASE = "https://resources.download.minecraft.net"
+
+        /** How often the check of an offered tree reports progress, in files. */
+        private const val SEED_PROGRESS_EVERY = 200
 
         /** Pure-vanilla launch entry point (no loader overlay). */
         const val VANILLA_MAIN_CLASS = "net.minecraft.client.main.Main"

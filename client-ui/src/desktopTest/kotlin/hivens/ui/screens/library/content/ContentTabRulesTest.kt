@@ -2,6 +2,7 @@ package hivens.ui.screens.library.content
 
 import hivens.core.api.dto.smrt.SmrtModEntry
 import hivens.core.api.dto.smrt.SmrtSource
+import hivens.core.data.OptionalContentRules
 import hivens.launcher.instance.ContentKind
 import hivens.launcher.instance.InstalledContent
 import kotlin.test.Test
@@ -110,6 +111,32 @@ class ContentTabRulesTest {
         assertFalse(rules.canDelete)
     }
 
+    @Test
+    fun `a pack mod the rules have something to say about carries it and keeps its switch`() {
+        val core = entry("core.jar", required = true)
+        val rules = contentRowRules(
+            content("alt.jar"),
+            manifestEntry   = entry("alt.jar", required = false),
+            userOwned       = false,
+            optionalEnabled = true,
+            problems        = listOf(OptionalContentRules.Problem.ConflictsWith(core)),
+        )
+        assertTrue(rules.showToggle, "the player may still turn it either way")
+        assertEquals(OptionalContentRules.Problem.ConflictsWith(core), rules.problem)
+    }
+
+    @Test
+    fun `a row the pack does not curate carries no problem`() {
+        val rules = contentRowRules(
+            content("stray.jar"),
+            manifestEntry   = null,
+            userOwned       = true,
+            optionalEnabled = null,
+            problems        = listOf(OptionalContentRules.Problem.NeedsDisabled(entry("lib.jar", required = false))),
+        )
+        assertNull(rules.problem)
+    }
+
     // -- the list -------------------------------------------------------------
 
     private val items = listOf(
@@ -131,7 +158,10 @@ class ContentTabRulesTest {
     fun `search matches the shown name and the file name, either case`() {
         assertEquals(listOf("sodium.jar"), filterContent(items, "SODIUM", ContentFilter.All).map { it.fileName })
         assertEquals(listOf("faithful.zip"), filterContent(items, "faith", ContentFilter.All).map { it.fileName })
-        assertEquals(listOf("iris.jar"), filterContent(items, ".jar", ContentFilter.Mods).map { it.fileName }.filter { it == "iris.jar" })
+        // The whole result, not one entry picked out of it: a search that stopped
+        // narrowing would still contain the one it was asked about.
+        assertEquals(listOf("sodium.jar", "iris.jar"), filterContent(items, ".jar", ContentFilter.All).map { it.fileName })
+        assertEquals(emptyList(), filterContent(items, "nothing-like-this", ContentFilter.All))
     }
 
     @Test

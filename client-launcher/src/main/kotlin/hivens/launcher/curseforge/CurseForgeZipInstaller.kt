@@ -1,5 +1,6 @@
 package hivens.launcher.curseforge
 
+import hivens.launcher.instance.instanceDirName
 import hivens.core.api.dto.curseforge.CfManifest
 import hivens.core.io.UnpackBudget
 import hivens.core.io.UnpackLimits
@@ -61,10 +62,12 @@ class CurseForgeZipInstaller(
             val displayName = manifest.name.ifBlank { "Imported pack" }
 
             val instanceId = UUID.randomUUID().toString()
-            val instanceDirName = sanitize("$displayName-$instanceId")
+            val instanceDirName = instanceDirName(displayName, instanceId)
             val clientDir = dataDir.resolve("instances").resolve(instanceDirName)
-            Files.createDirectories(clientDir)
+            // Reserved before it exists, as the other installers do: a directory that
+            // already existed when reserved is not one a cancel or a failure removes.
             onReserveDir(clientDir)
+            Files.createDirectories(clientDir)
 
             // Only the overrides tree installs (configs + any bundled jars); the
             // project/file-id mods need the CF API we deliberately don't use.

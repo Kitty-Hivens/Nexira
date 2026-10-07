@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import hivens.core.logging.Redactor
 import hivens.launcher.platform.PlatformPaths
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -137,13 +138,35 @@ class GameConsoleService(
      */
     private suspend fun drainLoop() {
         for (first in channel) {
-            apply(first)
+            applySafely(first)
             while (true) {
                 val next = channel.tryReceive().getOrNull() ?: break
-                apply(next)
+                applySafely(next)
             }
             flushWriter()
             publish()
+        }
+    }
+
+    /**
+     * [apply], with a failure confined to the one message. The loop is the only
+     * consumer of an unbounded channel, so a throw that ended it ended the console
+     * for the life of the process: producers went on enqueueing, the window went on
+     * showing the last snapshot, and a scroll-up waited for an answer nobody would
+     * send. A message someone is waiting on is answered anyway.
+     */
+    private fun applySafely(msg: Msg) {
+        try {
+            apply(msg)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            log.warn("Console message {} failed, the console carries on", msg::class.simpleName, e)
+            when (msg) {
+                is Msg.LoadHistory -> msg.result.complete(emptyList())
+                is Msg.Close -> msg.done.complete(Unit)
+                else -> Unit
+            }
         }
     }
 
@@ -179,7 +202,11 @@ class GameConsoleService(
                 // so it sits at or near the end. Scanning from the front cost a
                 // walk of the whole window per tick, and a provisioning run is
                 // thousands of ticks.
-                val idx = if (prev != null) buffer.lastIndexOf(prev) else -1
+                //
+                // By identity, as forgetSlot below matches: an entry is a data class,
+                // and an equal line elsewhere in the window, an ordinary line that
+                // reads the same, would be the one replaced.
+                val idx = if (prev != null) lastIndexOfSame(prev) else -1
                 if (idx >= 0) {
                     buffer[idx] = entry
                 } else {
@@ -212,6 +239,15 @@ class GameConsoleService(
             // into the file than the window actually begins.
             if (!forgetSlot(aged)) historyOffset += 1
         }
+    }
+
+    /** The last position holding [entry] itself, not an equal one; -1 when none does. */
+    private fun lastIndexOfSame(entry: LogEntry): Int {
+        val it = buffer.listIterator(buffer.size)
+        while (it.hasPrevious()) {
+            if (it.previous() === entry) return it.nextIndex()
+        }
+        return -1
     }
 
     /**
@@ -270,8 +306,10 @@ class GameConsoleService(
     suspend fun loadHistoryBefore(count: Int): List<LogEntry> {
         if (count <= 0) return emptyList()
         val result = CompletableDeferred<List<LogEntry>>()
-        channel.trySend(Msg.LoadHistory(count, result))
-        return result.await()
+        if (!channel.trySend(Msg.LoadHistory(count, result)).isSuccess) return emptyList()
+        // Bounded like [close], and for the same reason: with nothing draining, an
+        // unbounded wait suspended the scroll that asked for ever.
+        return withTimeoutOrNull(HISTORY_ACK_TIMEOUT_MS.milliseconds) { result.await() } ?: emptyList()
     }
 
     /**
@@ -533,6 +571,9 @@ class GameConsoleService(
 
         /** How long [close] waits for the drainer to hand the writer back. */
         private const val CLOSE_ACK_TIMEOUT_MS = 5_000L
+
+        /** How long a page of history is waited for before the scroll gives up on it. */
+        private const val HISTORY_ACK_TIMEOUT_MS = 5_000L
 
         /** Filesystem-safe form of a pack/server id for log file names. */
         private fun sanitizeId(id: String): String =

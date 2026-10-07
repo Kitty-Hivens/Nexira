@@ -21,7 +21,7 @@ import hivens.widget.model.WidgetInstance
     id          = "container.group",
     displayName = "widget.container.group",
     slots       = ["body"],
-    surface     = """{"fill":"base","opacity":0.0}""",
+    surface     = """{"fill":"panel","opacity":0.0}""",
 )
 @Composable
 fun GroupContainerWidget(instance: WidgetInstance) {

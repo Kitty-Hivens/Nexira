@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
+import java.io.ByteArrayOutputStream
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.zip.ZipEntry
@@ -163,5 +164,134 @@ class InstanceContentScannerTest {
         assertEquals("Dropped", item.displayName)
         assertEquals("2.0", item.version)
         assertNull(item.iconBytes)
+    }
+
+    private fun jarBytes(entries: Map<String, ByteArray>): ByteArray {
+        val out = ByteArrayOutputStream()
+        ZipOutputStream(out).use { zos ->
+            entries.forEach { (name, bytes) ->
+                zos.putNextEntry(ZipEntry(name))
+                zos.write(bytes)
+                zos.closeEntry()
+            }
+        }
+        return out.toByteArray()
+    }
+
+    @Test
+    fun `a mods toml gives its ids and its hard dependencies with their ranges`() = runBlocking {
+        val toml = listOf(
+            "modLoader=\"javafml\"",
+            "[[mods]]",
+            "modId=\"reeses_sodium_options\"",
+            "version=\"\${file.jarVersion}\"",
+            "description='''",
+            "[[dependencies.fake]]",
+            "modId=\"not_a_real_dependency\"",
+            "'''",
+            "[[dependencies.reeses_sodium_options]]",
+            "modId=\"sodium\"",
+            "type=\"required\"",
+            "versionRange=\"[0.8.12,)\"",
+            "side=\"CLIENT\"",
+            "[[dependencies.reeses_sodium_options]]",
+            "modId=\"iris\"",
+            "type=\"optional\"",
+            "versionRange=\"[1.0,)\"",
+            "[[dependencies.reeses_sodium_options]]",
+            "modId = 'serverthing'",
+            "mandatory = true",
+            "side = \"SERVER\"",
+            "[[dependencies.reeses_sodium_options]]",
+            "modId=\"old_forge_optional\"",
+            "mandatory=false",
+            "# [[dependencies.reeses_sodium_options]]",
+            "# modId=\"commented_out\"",
+        ).joinToString("\n")
+        zip(dir.resolve("mods/reeses.jar"), mapOf(
+            "META-INF/neoforge.mods.toml" to toml.toByteArray(),
+            "META-INF/MANIFEST.MF" to "Manifest-Version: 1.0\nImplementation-Version: 1.8.3\n".toByteArray(),
+        ))
+
+        val item = InstanceContentScanner().scan(dir).single()
+
+        assertEquals(listOf(ProvidedMod("reeses_sodium_options", "1.8.3")), item.provides)
+        assertEquals(listOf(ModRequirement("sodium", listOf("[0.8.12,)"), RangeScheme.Maven, "neoforge")), item.requires)
+    }
+
+    @Test
+    fun `a fabric mod provides its nested jars and requires what it depends on`() = runBlocking {
+        val nested = jarBytes(mapOf("fabric.mod.json" to """{"id":"fabric-api-base","version":"0.4.42"}""".toByteArray()))
+        zip(dir.resolve("mods/fabric-api.jar"), mapOf(
+            "fabric.mod.json" to """{"id":"fabric-api","version":"0.100.0","provides":["fabric"],"depends":{"fabricloader":">=0.15","minecraft":["1.21","1.21.1"]}}""".toByteArray(),
+            "META-INF/jars/fabric-api-base.jar" to nested,
+        ))
+
+        val item = InstanceContentScanner().scan(dir).single()
+
+        assertEquals(
+            setOf(ProvidedMod("fabric-api", "0.100.0"), ProvidedMod("fabric", "0.100.0"), ProvidedMod("fabric-api-base", "0.4.42")),
+            item.provides.toSet(),
+        )
+        assertEquals(
+            listOf(
+                ModRequirement("fabricloader", listOf(">=0.15"), RangeScheme.Fabric, "fabric"),
+                ModRequirement("minecraft", listOf("1.21", "1.21.1"), RangeScheme.Fabric, "fabric"),
+            ),
+            item.requires,
+        )
+    }
+
+    @Test
+    fun `a template header with a comment after it is still a table`() = runBlocking {
+        val toml = listOf(
+            "﻿modLoader=\"javafml\" #mandatory",
+            "[[mods]] #mandatory",
+            "modId=\"examplemod\" #mandatory",
+            "version=\"1.0.0\"",
+            "[[dependencies.examplemod]] #optional",
+            "modId=\"examplelib\" #mandatory",
+            "mandatory=true",
+            "versionRange=\"[2.0,)\"",
+        ).joinToString("\r\n")
+        zip(dir.resolve("mods/example.jar"), mapOf("META-INF/mods.toml" to toml.toByteArray()))
+
+        val item = InstanceContentScanner().scan(dir).single()
+
+        assertEquals(listOf(ProvidedMod("examplemod", "1.0.0")), item.provides)
+        assertEquals(listOf(ModRequirement("examplelib", listOf("[2.0,)"), RangeScheme.Maven, "forge")), item.requires)
+    }
+
+    @Test
+    fun `a jar whose mod is only nested inside it provides that mod`() = runBlocking {
+        val inner = jarBytes(mapOf(
+            "META-INF/mods.toml" to "[[mods]]\nmodId=\"kotlinforforge\"\nversion=\"4.11.0\"\n".toByteArray(),
+        ))
+        zip(dir.resolve("mods/kotlinforforge-all.jar"), mapOf("META-INF/jarjar/kffmod.jar" to inner))
+
+        val item = InstanceContentScanner().scan(dir).single()
+
+        assertEquals(listOf(ProvidedMod("kotlinforforge", "4.11.0")), item.provides)
+    }
+
+    @Test
+    fun `a multi-loader jar provides every name and keeps each loader's requirements apart`() = runBlocking {
+        zip(dir.resolve("mods/both.jar"), mapOf(
+            "META-INF/neoforge.mods.toml" to "[[mods]]\nmodId=\"both_mod\"\nversion=\"1.0\"\n[[dependencies.both_mod]]\nmodId=\"kotlinforforge\"\ntype=\"required\"\n".toByteArray(),
+            "fabric.mod.json" to """{"id":"both-mod","version":"1.0","depends":{"fabric-language-kotlin":"*"}}""".toByteArray(),
+        ))
+
+        val item = InstanceContentScanner().scan(dir).single()
+
+        assertEquals(setOf("both_mod", "both-mod"), item.provides.map { it.id }.toSet())
+        assertEquals(setOf("neoforge", "fabric"), item.requires.map { it.loader }.toSet())
+    }
+
+    @Test
+    fun `a server-side fabric mod requires nothing of a client`() = runBlocking {
+        zip(dir.resolve("mods/server.jar"), mapOf(
+            "fabric.mod.json" to """{"id":"serverthing","version":"1","environment":"server","depends":{"lib":"*"}}""".toByteArray(),
+        ))
+        assertTrue(InstanceContentScanner().scan(dir).single().requires.isEmpty())
     }
 }

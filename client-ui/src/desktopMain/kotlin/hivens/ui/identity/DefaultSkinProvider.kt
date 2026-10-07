@@ -20,9 +20,20 @@ import kotlin.io.path.listDirectoryEntries
  * and fall back to the legacy pair. Extraction happens once into [cacheDir]; later
  * calls read the cache.
  *
- * [clientsDir] is `<dataDir>/clients`, holding `<pack>/bin/<loader>-<version>.jar`.
+ * [librariesDir] is the shared `<dataDir>/libraries` root the runtime provisioner
+ * fills, where the vanilla client sits at
+ * `net/minecraft/minecraft/<version>/minecraft-<version>.jar`.
+ *
+ * [legacyClientsDir] is `<dataDir>/clients`, holding `<pack>/bin/<jar>`, which the retired
+ * server path wrote. Nothing fills it any more, and it is read second rather than
+ * dropped: somebody upgrading has the old tree and may have no pack installed in
+ * the new one yet, and an empty skin row is not the news they should get for it.
  */
-class DefaultSkinProvider(private val clientsDir: Path, private val cacheDir: Path) {
+class DefaultSkinProvider(
+    private val librariesDir: Path,
+    private val cacheDir: Path,
+    private val legacyClientsDir: Path? = null,
+) {
     private val log = LoggerFactory.getLogger(DefaultSkinProvider::class.java)
 
     data class DefaultSkin(val name: String, val slim: Boolean, val file: Path)
@@ -63,8 +74,24 @@ class DefaultSkinProvider(private val clientsDir: Path, private val cacheDir: Pa
                 )
             }
         }
-        return emptyList()
+        return cachedLegacy()
     }
+
+    /**
+     * The pair already extracted from a client that is no longer on disk.
+     *
+     * Read last, so a modern jar appearing later still upgrades the row to nine.
+     * Read at all because a pre-1.19.4 client only ever carries two, and the
+     * reason the leftover-clients sweep extracts before it deletes is that the
+     * jar stops existing. A cache that only counted as a hit at nine threw that
+     * rescue away on exactly the installs it was written for: the two PNGs sat
+     * there and nothing ever read them again.
+     */
+    private fun cachedLegacy(): List<DefaultSkin> =
+        listOf("Steve" to false, "Alex" to true).mapNotNull { (name, slim) ->
+            val f = cacheDir.resolve("${name.lowercase()}.png")
+            if (f.exists()) DefaultSkin(name, slim, f) else null
+        }
 
     private fun cachedModern(): List<DefaultSkin>? {
         val hit = modern.mapNotNull { (name, slim) ->
@@ -97,9 +124,32 @@ class DefaultSkinProvider(private val clientsDir: Path, private val cacheDir: Pa
         return DefaultSkin(name, slim, out)
     }
 
-    private fun findClientJar(carries: (Path) -> Boolean): Path? {
-        if (!clientsDir.isDirectory()) return null
-        for (pack in clientsDir.listDirectoryEntries()) {
+    /**
+     * A client jar that carries the textures: the newest one the provisioner has
+     * written, else whatever the retired server path left behind.
+     *
+     * Newest by directory name rather than by parsing the version. A lexical walk
+     * is not release order ("1.9" sorts above "1.21.1"), and it does not need to
+     * be: the texture predicate has already ruled out every client that lacks the
+     * modern set, and within the families that have it the two orders agree.
+     */
+    private fun findClientJar(carries: (Path) -> Boolean): Path? =
+        provisionedJar(carries) ?: legacyJar(carries)
+
+    private fun provisionedJar(carries: (Path) -> Boolean): Path? {
+        val versions = librariesDir.resolve("net/minecraft/minecraft")
+        if (!versions.isDirectory()) return null
+        return versions.listDirectoryEntries()
+            .filter { it.isDirectory() }
+            .sortedByDescending { it.fileName.toString() }
+            .firstNotNullOfOrNull { dir ->
+                dir.listDirectoryEntries("*.jar").firstOrNull { carries(it) }
+            }
+    }
+
+    private fun legacyJar(carries: (Path) -> Boolean): Path? {
+        val root = legacyClientsDir?.takeIf { it.isDirectory() } ?: return null
+        for (pack in root.listDirectoryEntries()) {
             val bin = pack.resolve("bin")
             if (!bin.isDirectory()) continue
             for (jar in bin.listDirectoryEntries("*.jar")) if (carries(jar)) return jar

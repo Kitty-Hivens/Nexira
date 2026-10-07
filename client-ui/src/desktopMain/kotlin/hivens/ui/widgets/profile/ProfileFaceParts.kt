@@ -13,6 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -23,8 +24,13 @@ import hivens.core.api.interfaces.ISettingsService
 import hivens.core.data.SessionData
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetClick
-import hivens.ui.theme.NxTheme
+import hivens.ui.utils.rememberReadOffMain
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
 
 /**
  * The face the shell should wear right now: the user's choice first, licence
@@ -59,6 +65,7 @@ internal fun FacePicker(modifier: Modifier = Modifier) {
     val credentials: AccountStore = koinInject()
     val settingsService: ISettingsService = koinInject()
     val s = LocalStrings.current
+    val scope = rememberCoroutineScope()
 
     // Keyed on the surface's account revision as well as the session: the picker's
     // whole job is to name one of the accounts that exist now, and signing out of
@@ -66,7 +73,7 @@ internal fun FacePicker(modifier: Modifier = Modifier) {
     // identical -- so on that alone the picker went on offering a provider that
     // had just been removed, and choosing it wrote the preference for it.
     val revision = ctx.accountsRevision.value
-    val accounts = remember(revision, ctx.session) { credentials.listAccounts() }
+    val accounts = rememberReadOffMain(revision, ctx.session) { credentials.listAccounts() }?.value ?: return
     if (accounts.size < 2) return
 
     var preferred by remember(revision, ctx.session) {
@@ -74,14 +81,17 @@ internal fun FacePicker(modifier: Modifier = Modifier) {
     }
 
     fun choose(providerKey: String?) {
-        settingsService.saveSettings(
-            settingsService.getSettings().copy(preferredFaceProvider = providerKey),
-        )
         preferred = providerKey
-        // Re-resolve through the store rather than loading the named account
-        // directly: naming a provider whose account has since gone must land on
-        // the same fallback the shell uses at startup.
-        credentials.faceSession(settingsService)?.let { ctx.onLogin(it) }
+        scope.launch {
+            // Re-resolve through the store rather than loading the named account
+            // directly: naming a provider whose account has since gone must land on
+            // the same fallback the shell uses at startup.
+            val face = withContext(Dispatchers.IO) {
+                settingsService.updateSettings { it.copy(preferredFaceProvider = providerKey) }
+                credentials.faceSession(settingsService)
+            }
+            face?.let { ctx.onLogin(it) }
+        }
     }
 
     // Auto first: it is the default and the state a user returns to, so it reads
@@ -97,7 +107,7 @@ internal fun FacePicker(modifier: Modifier = Modifier) {
         Text(
             text     = s.accountFaceLabel,
             style    = MaterialTheme.typography.labelSmall,
-            color    = NxTheme.colors.textSecondary,
+            color    = NxInk.quiet,
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
         )
         options.forEach { (key, label) ->
@@ -112,14 +122,14 @@ private fun FaceOption(label: String, selected: Boolean, onClick: () -> Unit) {
     Text(
         text       = label,
         style      = MaterialTheme.typography.bodySmall,
-        color      = if (selected) NxTheme.colors.primary else NxTheme.colors.textSecondary,
+        color      = if (selected) NxColor.lead() else NxInk.quiet,
         fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
         modifier   = Modifier
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.medium)
             .background(
-                if (selected) NxTheme.colors.primary.copy(alpha = 0.12f)
-                else NxTheme.colors.background.copy(alpha = 0f),
+                if (selected) NxColor.lead().copy(alpha = 0.12f)
+                else NxColor.page.copy(alpha = 0f),
             )
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 7.dp),

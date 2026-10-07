@@ -87,4 +87,18 @@ class SingleInstanceTest {
             "released lock must be reacquire in the same process"
         )
     }
+
+    /** What the command line asks before it boots: answered without taking the lock and without a raise signal. */
+    @Test
+    fun `heldElsewhere sees a held lock, leaves a free one free and signals nobody`() {
+        assertFalse(SingleInstance.heldElsewhere(dataDir), "no lock file is no launcher")
+
+        assertTrue(SingleInstance.acquire(dataDir))
+        assertTrue(SingleInstance.heldElsewhere(dataDir))
+        assertFalse(Files.exists(dataDir.resolve(".show")), "asking must not raise anybody's window")
+
+        SingleInstance.release()
+        assertFalse(SingleInstance.heldElsewhere(dataDir))
+        assertTrue(SingleInstance.acquire(dataDir), "asking must not have kept the lock")
+    }
 }

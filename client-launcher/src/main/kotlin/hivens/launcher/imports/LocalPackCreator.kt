@@ -1,5 +1,6 @@
 package hivens.launcher.imports
 
+import hivens.launcher.instance.instanceDirName
 import hivens.core.api.interfaces.IJavaManager
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.CachedManifestSnapshot
@@ -25,10 +26,10 @@ import java.util.UUID
  * [ForeignInstanceImporter], which all start from existing content.
  *
  * [loader] is the LoaderRegistry id (`forge` / `neoforge` / `fabric` / `quilt`)
- * or null for vanilla. A blank [loaderVersion] asks the resolver for its default
- * / latest where it supports that (Fabric does; Forge-legacy best-effort) --
- * ensureRuntime surfaces an unresolvable loader as an error rather than a broken
- * instance.
+ * or null for vanilla. A blank [loaderVersion] asks the resolver for its latest,
+ * and the version it resolved is what the pack records. Cleanroom and lwjgl3ify
+ * have no latest to offer and need one named. ensureRuntime surfaces an
+ * unresolvable loader as an error rather than a broken instance.
  */
 class LocalPackCreator(
     private val runtimeProvisioner: RuntimeProvisioner,
@@ -51,7 +52,7 @@ class LocalPackCreator(
         val displayName = name.trim().ifEmpty { "New pack" }
         val loaderId = loader?.trim()?.lowercase()?.takeIf { it.isNotEmpty() && it != "vanilla" }
         val instanceId = UUID.randomUUID().toString()
-        val instanceDirName = sanitize("$displayName-$instanceId")
+        val instanceDirName = instanceDirName(displayName, instanceId)
         val clientDir = dataDir.resolve("instances").resolve(instanceDirName)
         onReserveDir(clientDir)
         // Seed the folders the Content-tab browser writes into, so adding the
@@ -60,7 +61,9 @@ class LocalPackCreator(
         Files.createDirectories(clientDir.resolve("config"))
         log.info("create: '{}' ({} {} on {}) -> {}", displayName, loaderId ?: "vanilla", loaderVersion, mc, clientDir)
 
-        runtimeProvisioner.ensureRuntime(mc, loaderId, loaderVersion, progress)
+        // What the loader resolved to, recorded instead of a blank: a blank version
+        // was "the latest" again on every launch.
+        val resolved = runtimeProvisioner.ensureRuntime(mc, loaderId, loaderVersion, progress)
 
         val instance = PackInstance(
             id = instanceId,
@@ -69,11 +72,15 @@ class LocalPackCreator(
             instanceDirName = instanceDirName,
             createdAtEpoch = Instant.now().epochSecond,
             runtime = InstanceRuntime(),
-            notes = "Created locally.",
+            // No note. A note is for something the player has to know and cannot
+            // see -- an import that left files unresolved. That this pack was
+            // built here is already on the page as the Local badge, and saying it
+            // again in a banner is a permanent notice carrying no information.
+            notes = "",
             cachedManifest = CachedManifestSnapshot(
                 minecraftVersion = mc,
                 loaderName = loaderId ?: "vanilla",
-                loaderVersion = loaderVersion,
+                loaderVersion = resolved.loaderVersion ?: "",
                 javaMajor = javaManager.detectJavaVersion(mc),
             ),
         )

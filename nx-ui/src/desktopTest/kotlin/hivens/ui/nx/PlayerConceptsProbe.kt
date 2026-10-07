@@ -41,7 +41,7 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.surface.NxSurface
-import hivens.ui.surface.NxSurfaceLevel
+import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.Spacing
 import org.jetbrains.skia.Bitmap
@@ -53,6 +53,8 @@ import org.jetbrains.skia.Paint as SkPaint
 import org.jetbrains.skia.Rect as SkRect
 import java.io.File
 import kotlin.test.Test
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
 
 /**
  * Four concepts for a small player, one per sheet.
@@ -85,9 +87,9 @@ class PlayerConceptsProbe {
     private fun sheet(name: String, wDp: Int, hDp: Int, body: @Composable () -> Unit) {
         val d = 3f
         val scene = ImageComposeScene((wDp * d).toInt(), (hDp * d).toInt(), density = Density(d)) {
-            NxTheme(useDarkTheme = true) {
+            NxTheme(dark = true) {
                 Box(
-                    Modifier.fillMaxSize().background(NxTheme.colors.background).padding(Spacing.s16),
+                    Modifier.fillMaxSize().background(NxColor.page).padding(Spacing.s16),
                     contentAlignment = Alignment.Center,
                 ) { body() }
             }
@@ -102,7 +104,7 @@ class PlayerConceptsProbe {
     private fun Glyph(icon: hivens.ui.icons.IconKey, size: Int, alpha: Float = 1f) =
         Symbol(
             icon, null,
-            tint = NxTheme.colors.textPrimary.copy(alpha = alpha),
+            tint = NxInk.main.copy(alpha = alpha),
             fill = 1f, weight = 500,
             modifier = Modifier.size(size.dp),
         )
@@ -114,12 +116,12 @@ class PlayerConceptsProbe {
     // a bar competing with a volume slider of the same shape.
     @Composable
     private fun ConceptTimeline(name: String) {
-        val c = NxTheme.colors
-        NxSurface(NxSurfaceLevel.Floating, Modifier.width(320.dp), shape = MaterialTheme.shapes.medium) {
+        val c = probeInks()
+        NxSurface(SurfaceKind.Card, Modifier.width(320.dp), shape = MaterialTheme.shapes.medium) {
             Box(Modifier.fillMaxWidth().height(76.dp)) {
                 Box(
                     Modifier.fillMaxWidth(fraction).fillMaxHeight()
-                        .background(lerp(c.surfaceContainer, c.primary, 0.22f)),
+                        .background(lerp(c.raised, c.lead, 0.22f)),
                 )
                 Row(
                     Modifier.fillMaxSize().padding(horizontal = Spacing.s14),
@@ -127,13 +129,13 @@ class PlayerConceptsProbe {
                 ) {
                     Column(Modifier.weight(1f)) {
                         Text(
-                            name, style = MaterialTheme.typography.bodyLarge, color = c.textPrimary,
+                            name, style = MaterialTheme.typography.bodyLarge, color = c.main,
                             fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis,
                         )
                         Spacer(Modifier.height(Spacing.s2))
                         Text(
                             "$artist  ·  $elapsed / $total",
-                            style = MaterialTheme.typography.bodySmall, color = c.textSecondary, maxLines = 1,
+                            style = MaterialTheme.typography.bodySmall, color = c.quiet, maxLines = 1,
                         )
                     }
                     Spacer(Modifier.width(Spacing.s12))
@@ -153,7 +155,7 @@ class PlayerConceptsProbe {
     // faked with a note glyph, so the empty case is a colour, not a placeholder.
     @Composable
     private fun ConceptCoverTile(art: ImageBitmap?, chrome: Boolean) {
-        val c = NxTheme.colors
+        val c = probeInks()
         Box(Modifier.size(196.dp).clip(MaterialTheme.shapes.medium)) {
             if (art != null) {
                 Image(art, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
@@ -162,8 +164,8 @@ class PlayerConceptsProbe {
                     Modifier.fillMaxSize().background(
                         Brush.linearGradient(
                             listOf(
-                                lerp(c.surfaceContainer, c.primary, 0.30f),
-                                lerp(c.surfaceContainer, c.tertiary, 0.16f),
+                                lerp(c.raised, c.lead, 0.30f),
+                                lerp(c.raised, c.third, 0.16f),
                             ),
                         ),
                     ),
@@ -199,7 +201,7 @@ class PlayerConceptsProbe {
             }
             // Inset by the shape's own corner so neither end is eaten by the curve.
             Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(horizontal = 12.dp)) {
-                Box(Modifier.fillMaxWidth(fraction).height(3.dp).clip(CircleShape).background(c.primary))
+                Box(Modifier.fillMaxWidth(fraction).height(3.dp).clip(CircleShape).background(c.lead))
             }
         }
     }
@@ -210,19 +212,19 @@ class PlayerConceptsProbe {
     // look empty, because nothing here was ever going to be a picture.
     @Composable
     private fun ConceptReadout() {
-        val c = NxTheme.colors
-        NxSurface(NxSurfaceLevel.Floating, Modifier.width(320.dp), shape = MaterialTheme.shapes.medium) {
+        val c = probeInks()
+        NxSurface(SurfaceKind.Card, Modifier.width(320.dp), shape = MaterialTheme.shapes.medium) {
             Column(Modifier.fillMaxWidth().padding(Spacing.s14)) {
                 Text(
-                    title, style = MaterialTheme.typography.bodyMedium, color = c.textSecondary,
+                    title, style = MaterialTheme.typography.bodyMedium, color = c.quiet,
                     maxLines = 1, overflow = TextOverflow.Ellipsis,
                 )
                 Spacer(Modifier.height(Spacing.s6))
                 Row(verticalAlignment = Alignment.Bottom) {
-                    Text(elapsed, style = MaterialTheme.typography.headlineMedium, color = c.textPrimary, fontWeight = FontWeight.Medium)
+                    Text(elapsed, style = MaterialTheme.typography.headlineMedium, color = c.main, fontWeight = FontWeight.Medium)
                     Spacer(Modifier.width(Spacing.s6))
                     Text(
-                        "/ $total", style = MaterialTheme.typography.bodyMedium, color = c.textSecondary,
+                        "/ $total", style = MaterialTheme.typography.bodyMedium, color = c.quiet,
                         modifier = Modifier.padding(bottom = 3.dp),
                     )
                     Spacer(Modifier.weight(1f))
@@ -234,8 +236,8 @@ class PlayerConceptsProbe {
                 }
                 Spacer(Modifier.height(Spacing.s10))
                 Box(Modifier.fillMaxWidth().height(2.dp)) {
-                    Box(Modifier.fillMaxSize().background(c.textSecondary.copy(alpha = 0.20f)))
-                    Box(Modifier.fillMaxWidth(fraction).fillMaxHeight().background(c.primary))
+                    Box(Modifier.fillMaxSize().background(c.quiet.copy(alpha = 0.20f)))
+                    Box(Modifier.fillMaxWidth(fraction).fillMaxHeight().background(c.lead))
                 }
             }
         }
@@ -247,21 +249,21 @@ class PlayerConceptsProbe {
     // now anchors under the control instead of chasing the pointer.
     @Composable
     private fun ConceptToken() {
-        val c = NxTheme.colors
-        NxSurface(NxSurfaceLevel.Floating, Modifier.size(96.dp), shape = CircleShape) {
+        val c = probeInks()
+        NxSurface(SurfaceKind.Card, Modifier.size(96.dp), shape = CircleShape) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Canvas(Modifier.size(74.dp)) {
                     val stroke = 5.dp.toPx()
                     val inset = stroke / 2f
                     val arc = GeomSize(size.width - stroke, size.height - stroke)
                     drawArc(
-                        color = c.textSecondary.copy(alpha = 0.22f),
+                        color = c.quiet.copy(alpha = 0.22f),
                         startAngle = -90f, sweepAngle = 360f, useCenter = false,
                         topLeft = Offset(inset, inset), size = arc,
                         style = Stroke(width = stroke, cap = StrokeCap.Round),
                     )
                     drawArc(
-                        color = c.primary,
+                        color = c.lead,
                         startAngle = -90f, sweepAngle = 360f * fraction, useCenter = false,
                         topLeft = Offset(inset, inset), size = arc,
                         style = Stroke(width = stroke, cap = StrokeCap.Round),

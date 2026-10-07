@@ -23,8 +23,10 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.Symbol
-import hivens.ui.theme.NxTheme
 import hivens.ui.theme.Spacing
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.Status
 
 /**
  * The one button. Four emphasis roles -- a call site picks a role, not colours. The per-widget freedom the old de-facto base button
@@ -52,31 +54,29 @@ fun NxButton(
     compact: Boolean = false,
     minHeight: Dp? = null,
 ) {
-    val palette = NxTheme.colors
     val shape = MaterialTheme.shapes.small
 
     val container: Color = when (style) {
-        NxButtonStyle.Primary     -> palette.primary
-        NxButtonStyle.Destructive -> palette.error
+        NxButtonStyle.Primary     -> NxColor.lead()
+        NxButtonStyle.Destructive -> NxColor.status(Status.Error)
         NxButtonStyle.Secondary   -> Color.Transparent
         NxButtonStyle.Tertiary    -> Color.Transparent
     }
     // Alpha alone does not read as off on a filled style: a destructive button at
     // forty-five percent is still a saturated slab, so a blocked delete looked
     // armed. Disabled drops the fill entirely, which is what "disabled" already
-    // looks like on the quiet styles -- one appearance for one state.
+    // looks like on the quiet styles: one appearance for one state.
     //
-    // Which means the ink has to move with it. White was chosen to sit on a filled
-    // primary or error; with the fill gone it lands on the page instead, and white
-    // at forty-five percent over a light surface is about 1.1:1 -- the label simply
-    // is not there. A disabled control has to be readable, that is the whole point
-    // of showing it rather than hiding it.
+    // Which means the ink has to move with it. On a fill the label is whichever ink
+    // reads on that fill. With the fill gone it is the plane's own ink, since a
+    // disabled control has to be readable, that is the whole point of showing it.
     val content: Color = when {
-        !enabled -> palette.textPrimary
-        style == NxButtonStyle.Primary || style == NxButtonStyle.Destructive -> Color.White
-        style == NxButtonStyle.Secondary -> palette.textPrimary
-        else -> palette.primary
+        !enabled -> NxInk.main
+        style == NxButtonStyle.Primary || style == NxButtonStyle.Destructive -> NxColor.on(container)
+        style == NxButtonStyle.Secondary -> NxInk.main
+        else -> NxColor.lead(text = true)
     }
+    val outline = NxInk.line
     val bordered = style == NxButtonStyle.Secondary
     val dim = if (enabled) 1f else 0.45f
     val pad = if (compact) PaddingValues(horizontal = Spacing.s12, vertical = Spacing.s6)
@@ -95,7 +95,7 @@ fun NxButton(
                     if (enabled) container
                     else Color.Transparent,
                 )
-                .let { if (bordered) it.border(1.dp, palette.outline.copy(alpha = dim), shape) else it }
+                .let { if (bordered) it.border(1.dp, outline.copy(alpha = dim), shape) else it }
                 .clickable(enabled = enabled, onClick = onClick)
                 .padding(pad),
             verticalAlignment     = Alignment.CenterVertically,

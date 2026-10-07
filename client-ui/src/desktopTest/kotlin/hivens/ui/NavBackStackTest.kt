@@ -73,7 +73,7 @@ class NavBackStackTest {
     @Test
     fun switchingTabsResetsHistory() {
         val nav = NavBackStack(Screen.Home)
-        nav.navigate(Screen.ServerSettings("industrial"))
+        nav.navigate(Screen.PackDetail("inst-1"))
         assertTrue(nav.canGoBack)
         nav.switchTo(Screen.Library)
         assertEquals(Screen.Library, nav.current)
@@ -234,5 +234,25 @@ class NavBackStackTest {
         assertEquals(Screen.About, nav.current)
         assertEquals(listOf(Screen.About), nav.trail)
         assertFalse(nav.canGoBack)
+    }
+
+    @Test
+    fun aDeletedScreenLeavesTheHistoryBothWays() {
+        val nav = NavBackStack(Screen.Home)
+        nav.navigate(Screen.Custom("gone"))
+        nav.navigate(Screen.Library)
+        nav.navigate(Screen.Custom("kept"))
+        nav.back()
+        nav.retainWhere(Screen.Home) { it != Screen.Custom("gone") }
+        assertEquals(listOf(Screen.Home, Screen.Library), nav.trail, "the deleted screen is gone from the way back")
+        nav.forward()
+        assertEquals(Screen.Custom("kept"), nav.current, "and the screens that still exist are untouched")
+    }
+
+    @Test
+    fun aHistoryOfNothingButDeletedScreensStartsOverAtTheFallback() {
+        val nav = NavBackStack(Screen.Custom("gone"))
+        nav.retainWhere(Screen.Home) { it !is Screen.Custom }
+        assertEquals(listOf(Screen.Home), nav.trail)
     }
 }

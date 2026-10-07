@@ -1,17 +1,24 @@
 package hivens.ui.layout
 
-import hivens.widget.model.CanvasPlacement
+import hivens.widget.model.FamilyId
 import hivens.widget.model.LayoutGraph
+import hivens.widget.model.Placement
 import hivens.widget.model.SlotContent
 import hivens.widget.model.SlotId
 import hivens.widget.model.SlotPath
+import hivens.widget.model.SurfaceCorners
 import hivens.widget.model.SurfaceId
 import hivens.widget.model.SurfaceLayout
-import hivens.widget.model.SurfaceCorners
 import hivens.widget.model.SurfaceShape
 import hivens.widget.model.SurfaceSpec
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
+import hivens.widget.model.SCREEN_MAIN_SLOT
+import hivens.widget.model.ScreenSpec
+import hivens.widget.model.addScreen
+import hivens.widget.model.insertWidget
+import hivens.widget.model.screen
+import hivens.widget.model.traverse
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -20,11 +27,15 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonPrimitive
 import hivens.ui.bootstrap.RecoveryIo
+import hivens.core.data.ReadOnlyStore
+import hivens.core.data.ReadOnlyReason
+import hivens.core.data.NewerBuildData
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.AfterTest
@@ -88,11 +99,13 @@ class LayoutGraphRepositoryTest {
         repo.update { graph ->
             graph.copy(
                 surfaces = graph.surfaces.mapValues { (_, layout) ->
-                    layout.copy(
-                        slots = layout.slots.mapValues { (_, content) ->
-                            content.copy(widgets = content.widgets + widget)
-                        }
-                    )
+                    layout.mapFamilies { family ->
+                        family.copy(
+                            slots = family.slots.mapValues { (_, content) ->
+                                content.copy(widgets = content.widgets + widget)
+                            }
+                        )
+                    }
                 }
             )
         }
@@ -102,7 +115,7 @@ class LayoutGraphRepositoryTest {
         val reloaded = LayoutGraphRepository(file, json, scope) { sampleDefault }
         val widgets = reloaded.value()
             .surfaces[SurfaceId("home.classic")]!!
-            .slots[SlotId("main")]!!
+            .slotsOf(FamilyId.GENERAL)[SlotId("main")]!!
             .widgets
         assertEquals(listOf(widget), widgets)
     }
@@ -111,12 +124,10 @@ class LayoutGraphRepositoryTest {
     fun `update with identity transform does not rewrite file`() = runBlocking {
         val repo = repo()
         repo.flush()  // ensure seeded write completed
-        val beforeMtime = Files.getLastModifiedTime(file)
-        Thread.sleep(50)
+        val before = repo.writesLanded
         repo.update { it }
         repo.flush()
-        val afterMtime = Files.getLastModifiedTime(file)
-        assertEquals(beforeMtime, afterMtime, "no-op update must not touch the file")
+        assertEquals(before, repo.writesLanded, "no-op update must not touch the file")
     }
 
     @Test
@@ -124,6 +135,26 @@ class LayoutGraphRepositoryTest {
         Files.writeString(file, "{this is not valid json")
         val repo = repo()
         assertEquals(sampleDefault, repo.value())
+    }
+
+    /**
+     * The default stands in for a file that did not load, and the file is still
+     * somebody's arrangement. Writable, the first edit of the session put the
+     * default over it for good.
+     */
+    @Test
+    fun `a file that does not load is left as it is and said so`() = runBlocking {
+        NewerBuildData.reset()
+        val damaged = "{this is not valid json"
+        Files.writeString(file, damaged)
+
+        val repo = repo()
+        repo.update { LayoutGraph.EMPTY }
+        repo.flush()
+
+        assertEquals(damaged, Files.readString(file), "the first edit wrote the default over the file")
+        assertEquals(mapOf(ReadOnlyStore.Layout to ReadOnlyReason.Damaged), NewerBuildData.affectedWithReason())
+        NewerBuildData.reset()
     }
 
     @Test
@@ -184,14 +215,14 @@ class LayoutGraphRepositoryTest {
     // ── Debounce + flush ──────────────────────────────────────────────
 
     @Test
-    fun `drag-thrash collapses to roughly one write per debounce window`() = runBlocking {
+    fun `drag-thrash collapses to one write`() = runBlocking {
         val repo = repo()
         repo.flush()  // settle the seed write
-        val beforeMtime = Files.getLastModifiedTime(file)
+        val before = repo.writesLanded
 
-        // Fire 30 updates rapidly. Without debounce this would produce
-        // 30 file writes; with 200ms debounce we expect 0 (still pending)
-        // until we flush or wait out the window.
+        // Fire 30 updates rapidly. Without debounce this would produce 30 file
+        // writes; each update restarts the window, so the flush that follows lands
+        // them as one.
         repeat(30) { i ->
             repo.update { graph ->
                 graph.copy(
@@ -199,16 +230,10 @@ class LayoutGraphRepositoryTest {
                 )
             }
         }
-
-        // Immediately after, the file must NOT yet reflect the writes
-        // (within 200ms debounce window, give or take scheduling slop).
-        val midMtime = Files.getLastModifiedTime(file)
-        assertEquals(beforeMtime, midMtime, "writes must not have landed within debounce window")
-
-        // Flush completes the single coalesced write.
         repo.flush()
-        val afterMtime = Files.getLastModifiedTime(file)
-        assertTrue(afterMtime > beforeMtime, "flush must land the coalesced write on disk")
+
+        assertEquals(before + 1, repo.writesLanded, "thirty updates and a flush are one write")
+        assertTrue("scratch-29" in Files.readString(file), "and it is the last state that landed")
     }
 
     @Test
@@ -233,29 +258,25 @@ class LayoutGraphRepositoryTest {
     fun `flush() with no pending write is a no-op and does not touch the file`() = runBlocking {
         val repo = repo()
         repo.flush()  // settle seed
-        val beforeMtime = Files.getLastModifiedTime(file)
-        Thread.sleep(50)
+        val before = repo.writesLanded
         repo.flush()  // no pending write
-        val afterMtime = Files.getLastModifiedTime(file)
-        assertEquals(beforeMtime, afterMtime)
+        assertEquals(before, repo.writesLanded)
     }
 
     @Test
     fun `debounce window eventually persists without explicit flush`() = runBlocking {
         val repo = repo()
         repo.flush()  // settle seed
-        val beforeMtime = Files.getLastModifiedTime(file)
-        Thread.sleep(50)
+        val before = repo.writesLanded
 
         repo.update {
             it.copy(surfaces = it.surfaces + (SurfaceId("debounce-test") to SurfaceLayout()))
         }
 
-        // Wait past the debounce window plus dispatch slop.
-        delay(400)
-
-        val afterMtime = Files.getLastModifiedTime(file)
-        assertTrue(afterMtime > beforeMtime, "debounce coroutine must have written on its own")
+        // Waited for rather than slept past: the window is a lower bound, and how
+        // long the write takes after it is the scheduler's business.
+        withTimeout(5_000) { while (repo.writesLanded == before) delay(10) }
+        assertTrue("debounce-test" in Files.readString(file), "debounce coroutine must have written on its own")
     }
 
     // ── Tree-wide uniqueness ──────────────────────────────────────────
@@ -344,7 +365,7 @@ class LayoutGraphRepositoryTest {
         repo.flush()
 
         val reloaded = LayoutGraphRepository(file, json, scope) { sampleDefault }
-        val w = reloaded.value().surfaces[SurfaceId("cx")]!!.slots[SlotId("o")]!!.widgets.first()
+        val w = reloaded.value().surfaces[SurfaceId("cx")]!!.slotsOf(FamilyId.GENERAL)[SlotId("o")]!!.widgets.first()
         assertEquals(SurfaceSpec(opacity = 0.45f, shape = SurfaceShape(corners = SurfaceCorners(all = 10f))), w.surface)
     }
 
@@ -369,7 +390,7 @@ class LayoutGraphRepositoryTest {
         val reloaded = LayoutGraphRepository(file, json, scope) { sampleDefault }
         val containerLoaded = reloaded.value()
             .surfaces[SurfaceId("with-container")]!!
-            .slots[SlotId("main")]!!
+            .slotsOf(FamilyId.GENERAL)[SlotId("main")]!!
             .widgets.first()
         val childLoaded = containerLoaded.children[SlotId("body")]!!.widgets.first()
         assertEquals("c1", childLoaded.instanceId)
@@ -408,7 +429,7 @@ class LayoutGraphRepositoryTest {
             )),
         ))
         val loaded = loadFrom(LayoutReconcile.SURFACE_SCHEMA, theirs, default = theirs)
-        val w = loaded.surfaces[SurfaceId("home.new")]!!.slots[SlotId("main")]!!.widgets.single()
+        val w = loaded.surfaces[SurfaceId("home.new")]!!.slotsOf(FamilyId.GENERAL)[SlotId("main")]!!.widgets.single()
         assertEquals("theirs", w.instanceId)
         assertEquals(0.4f, w.surface?.opacity)
     }
@@ -430,10 +451,14 @@ class LayoutGraphRepositoryTest {
         ))
 
     private fun navKind(kind: String, id: String, surface: SurfaceSpec? = null, weight: Float = 0f) =
-        WidgetInstance(WidgetKind(kind), id, JsonObject(emptyMap()), surface = surface, weight = weight)
+        WidgetInstance(
+            WidgetKind(kind), id, JsonObject(emptyMap()),
+            surface   = surface,
+            placement = Placement(weight = weight).takeUnless { it == Placement() },
+        )
 
     private fun LayoutGraph.leftrailSlot(slot: String) =
-        surfaces[SurfaceId("appshell.leftrail")]!!.slots[SlotId(slot)]!!.widgets
+        surfaces[SurfaceId("appshell.leftrail")]!!.slotsOf(FamilyId.GENERAL)[SlotId(slot)]!!.widgets
 
     private fun WidgetInstance.target() = props["target"]?.jsonPrimitive?.content
 
@@ -462,11 +487,13 @@ class LayoutGraphRepositoryTest {
                 surfaces = graph.surfaces
                     .mapValues { (sid, layout) ->
                         if (sid == SurfaceId("home.classic")) {
-                            layout.copy(
-                                slots = layout.slots.mapValues { (_, content) ->
-                                    content.copy(widgets = content.widgets + extra)
-                                }
-                            )
+                            layout.mapFamilies { family ->
+                                family.copy(
+                                    slots = family.slots.mapValues { (_, content) ->
+                                        content.copy(widgets = content.widgets + extra)
+                                    }
+                                )
+                            }
                         } else layout
                     } + (SurfaceId("scratch") to SurfaceLayout()),
             )
@@ -566,7 +593,7 @@ class LayoutGraphRepositoryTest {
         val nextDefault = LayoutGraph(
             surfaces = mapOf(
                 SurfaceId("profile") to SurfaceLayout(
-                    slots = priorDefault.surfaces[SurfaceId("profile")]!!.slots +
+                    slots = priorDefault.surfaces[SurfaceId("profile")]!!.slotsOf(FamilyId.GENERAL) +
                         (SlotId("signin") to SlotContent(listOf(signin))),
                 ),
             ),
@@ -574,15 +601,15 @@ class LayoutGraphRepositoryTest {
         val loaded = LayoutGraphRepository(file, json, scope) { nextDefault }.value()
         val profile = loaded.surfaces[SurfaceId("profile")]!!
 
-        assertTrue(SlotId("signin") in profile.slots, "new bundled-default slot must auto-seed into the existing surface")
+        assertTrue(SlotId("signin") in profile.slotsOf(FamilyId.GENERAL), "new bundled-default slot must auto-seed into the existing surface")
         assertEquals(
             listOf(signin),
-            profile.slots[SlotId("signin")]!!.widgets,
+            profile.slotsOf(FamilyId.GENERAL)[SlotId("signin")]!!.widgets,
             "seeded slot must match the bundled default",
         )
         // The user's pre-existing slots in the same surface are untouched.
-        assertEquals("nav-1",  profile.slots[SlotId("nav")]!!.widgets.single().instanceId)
-        assertEquals("acct-1", profile.slots[SlotId("account")]!!.widgets.single().instanceId)
+        assertEquals("nav-1",  profile.slotsOf(FamilyId.GENERAL)[SlotId("nav")]!!.widgets.single().instanceId)
+        assertEquals("acct-1", profile.slotsOf(FamilyId.GENERAL)[SlotId("account")]!!.widgets.single().instanceId)
     }
 
     @Test
@@ -607,7 +634,7 @@ class LayoutGraphRepositoryTest {
         val loaded = LayoutGraphRepository(file, json, scope) { nextDefault }.value()
         assertEquals(
             "user-edited-nav",
-            loaded.surfaces[SurfaceId("profile")]!!.slots[SlotId("nav")]!!.widgets.single().instanceId,
+            loaded.surfaces[SurfaceId("profile")]!!.slotsOf(FamilyId.GENERAL)[SlotId("nav")]!!.widgets.single().instanceId,
             "an existing slot keeps the user's content; only MISSING slots seed",
         )
     }
@@ -647,10 +674,39 @@ class LayoutGraphRepositoryTest {
         repo.update { it.copy(surfaces = it.surfaces + (SurfaceId("scratch") to SurfaceLayout())) }
         repo.flush()
 
-        val stamp = Files.getLastModifiedTime(file)
+        val written = repo.writesLanded
         Files.delete(file)
         repo.flush()
         assertFalse(Files.exists(file), "flush wrote again with nothing owed")
-        assertTrue(stamp.toMillis() > 0)
+        assertEquals(written, repo.writesLanded)
+    }
+
+    @Test
+    fun `a full reset keeps the screens somebody made, content and all`() = runBlocking {
+        val repo = repo()
+        val made = ScreenSpec("mine", "Mine", surface = SurfaceId("screen.mine"))
+        repo.update { it.addScreen(made) }
+        repo.update {
+            it.insertWidget(SlotPath(made.surface, SCREEN_MAIN_SLOT), WidgetInstance(WidgetKind("k"), "w"), 0)
+        }
+        repo.resetAll()
+        val g = repo.value()
+        assertEquals("Mine", g.screen("mine")?.title)
+        assertEquals(listOf("w"), g.traverse(SlotPath(made.surface, SCREEN_MAIN_SLOT))!!.widgets.map { it.instanceId })
+        assertTrue(SurfaceId("home.classic") in g.surfaces, "and the launcher's own surfaces are the default again")
+    }
+
+    @Test
+    fun `resetting a made screen leaves it blank rather than gone`() = runBlocking {
+        val repo = repo()
+        val made = ScreenSpec("mine", "Mine", surface = SurfaceId("screen.mine"))
+        repo.update { it.addScreen(made) }
+        repo.update {
+            it.insertWidget(SlotPath(made.surface, SCREEN_MAIN_SLOT), WidgetInstance(WidgetKind("k"), "w"), 0)
+        }
+        repo.resetSurface(made.surface)
+        val g = repo.value()
+        assertTrue(made.surface in g.surfaces, "the screen still has a page to open")
+        assertTrue(g.traverse(SlotPath(made.surface, SCREEN_MAIN_SLOT))!!.widgets.isEmpty())
     }
 }

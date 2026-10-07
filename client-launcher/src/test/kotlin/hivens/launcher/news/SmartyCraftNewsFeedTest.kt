@@ -1,7 +1,5 @@
 package hivens.launcher.news
 
-import hivens.core.api.interfaces.IServerListService
-import hivens.core.data.DashboardData
 import hivens.core.data.NewsItem
 import hivens.launcher.network.ServerProtocolConfig
 import hivens.test.MockResponse
@@ -9,7 +7,6 @@ import hivens.test.buildMockClient
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import kotlinx.coroutines.test.runTest
-import java.util.concurrent.CompletableFuture
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -18,16 +15,15 @@ class SmartyCraftNewsFeedTest {
 
     private val config = ServerProtocolConfig(baseUrl = "https://www.example.invalid")
 
-    private class FakeDashboard(private val news: List<NewsItem>) : IServerListService {
+    /** Stands in for the dashboard payload's news, and counts how often it is asked. */
+    private class FakeDashboard(private val news: List<NewsItem>) {
         var reads = 0
             private set
 
-        override fun fetchDashboardData(): CompletableFuture<DashboardData> {
+        suspend fun read(): List<NewsItem> {
             reads++
-            return CompletableFuture.completedFuture(DashboardData(emptyList(), news))
+            return news
         }
-
-        override fun refresh(): CompletableFuture<DashboardData> = fetchDashboardData()
     }
 
     private fun html(vararg ids: Int, totalPages: Int = 45): String {
@@ -46,11 +42,11 @@ class SmartyCraftNewsFeedTest {
 
     private fun feed(
         vararg responses: MockResponse,
-        dashboard: IServerListService = FakeDashboard(emptyList()),
+        dashboard: FakeDashboard = FakeDashboard(emptyList()),
     ) = SmartyCraftNewsFeed(
         clientProvider = buildMockClient(*responses),
         config = config,
-        dashboard = dashboard,
+        dashboardNews = { dashboard.read() },
     )
 
     @Test

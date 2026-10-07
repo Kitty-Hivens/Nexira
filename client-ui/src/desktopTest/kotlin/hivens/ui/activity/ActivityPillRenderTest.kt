@@ -28,6 +28,8 @@ import java.io.File
 import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertTrue
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.Status
 
 /**
  * The scene has to be big enough for what it composes. An undersized one clamps
@@ -102,13 +104,13 @@ class ActivityPillRenderTest {
         ) {
             // The real theme entry point rather than a hand-provided palette: what
             // the sheet shows is then what the app resolves, tonal ladder included.
-            NxTheme(useDarkTheme = dark) {
+            NxTheme(dark = dark) {
                 CompositionLocalProvider(
                     LocalStrings provides EnglishStrings,
                 ) {
-                    accent = NxTheme.colors.progressAccent
+                    accent = NxColor.status(Status.Info)
                     Column(
-                        modifier = Modifier.fillMaxSize().background(NxTheme.colors.background).padding(16.dp),
+                        modifier = Modifier.fillMaxSize().background(NxColor.page).padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) { content() }
                 }

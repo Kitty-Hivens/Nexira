@@ -97,7 +97,7 @@ class MrpackInstallerTest {
     private val modBytes = "COOL-MOD".toByteArray()
     private val clientBytes = "VANILLA-CLIENT".toByteArray()
 
-    private fun buildMrpack(): Path {
+    private fun buildMrpack(planted: Boolean = false): Path {
         val file = Files.createTempFile("test", ".mrpack").also { tempDirs.add(it) }
         val index = """
             {"formatVersion":1,"game":"minecraft","versionId":"1.0.0","name":"Test Pack",
@@ -112,6 +112,9 @@ class MrpackInstallerTest {
             zos.putNextEntry(ZipEntry("overrides/config/foo.txt")); zos.write("FOO".toByteArray()); zos.closeEntry()
             zos.putNextEntry(ZipEntry("client-overrides/options.txt")); zos.write("OPT".toByteArray()); zos.closeEntry()
             zos.putNextEntry(ZipEntry("server-overrides/server.properties")); zos.write("SRV".toByteArray()); zos.closeEntry()
+            if (planted) {
+                zos.putNextEntry(ZipEntry("overrides/mods/planted.jar")); zos.write("PLANTED".toByteArray()); zos.closeEntry()
+            }
         }
         return file
     }
@@ -260,13 +263,13 @@ class MrpackInstallerTest {
     }
 
     /** Builds a pack whose contents differ between versions, so an update has work to do. */
-    private fun buildVersionedPack(second: Boolean): Path {
+    private fun buildVersionedPack(second: Boolean, minecraft: String = "1.20.1"): Path {
         val file = Files.createTempFile("test-v", ".mrpack").also { tempDirs.add(it) }
         val cool = if (second) modV2Bytes to MOD_V2_URL else modBytes to MOD_URL
         val lib = if (second) Triple("mods/lib-2.0.jar", libV2Bytes, LIB_V2_URL) else Triple("mods/lib-1.0.jar", libV1Bytes, LIB_V1_URL)
         val index = """
             {"formatVersion":1,"game":"minecraft","versionId":"${if (second) "2.0.0" else "1.0.0"}","name":"Test Pack",
-             "dependencies":{"minecraft":"1.20.1"},
+             "dependencies":{"minecraft":"$minecraft"},
              "files":[
                {"path":"mods/cool.jar","hashes":{"sha1":"${sha1(cool.first)}"},"downloads":["${cool.second}"],"fileSize":${cool.first.size}},
                {"path":"mods/stable.jar","hashes":{"sha1":"${sha1(stableBytes)}"},"downloads":["$STABLE_URL"],"fileSize":${stableBytes.size}},
@@ -433,6 +436,122 @@ class MrpackInstallerTest {
         assertTrue(Files.exists(clientDir.resolve("mods/lib-1.0.jar")), "nothing knew this file was the pack's")
     }
 
+    /**
+     * A pre-update snapshot holds each file by a hardlink, which only keeps the old
+     * bytes while a changed file arrives as a new inode. Overrides were written into
+     * the existing one, so a Modrinth rollback restored the content it was undoing.
+     */
+    @Test
+    fun `a changed override arrives as a new file, leaving a hardlink to the old one intact`() = runTest {
+        val dataDir = tempDir("data")
+        val installer = updatableInstaller(dataDir)
+        val instance = installer.install(buildVersionedPack(second = false))
+        val clientDir = dataDir.resolve("instances").resolve(instance.instanceDirName)
+        val held = tempDir("held").resolve("foo.txt")
+        Files.createLink(held, clientDir.resolve("config/foo.txt"))
+
+        installer.update(instance, buildVersionedPack(second = true))
+
+        assertEquals("FOO-V2", clientDir.resolve("config/foo.txt").readText())
+        assertEquals("FOO", held.readText(), "the old inode is untouched, so a snapshot of it still holds the old bytes")
+        assertFalse(
+            Files.list(clientDir.resolve("config")).use { s -> s.anyMatch { it.fileName.toString().endsWith(".nexira-staged") } },
+            "no staging file is left behind",
+        )
+    }
+
+    /**
+     * The runtime used to be provisioned after the overrides were written and the
+     * retired files dropped. A failure there left the directory on the new version
+     * under a registry entry still naming the old Minecraft and loader.
+     */
+    @Test
+    fun `an update whose runtime cannot be provisioned leaves the instance as it was`() = runTest {
+        val dataDir = tempDir("data")
+        val installer = updatableInstaller(dataDir)
+        val instance = installer.install(buildVersionedPack(second = false))
+        val clientDir = dataDir.resolve("instances").resolve(instance.instanceDirName)
+        val recordBefore = clientDir.resolve(PackFileRecord.FILE_NAME).readText()
+
+        // The version manifest lists 1.20.1 only, so provisioning 1.20.2 fails.
+        runCatching { installer.update(instance, buildVersionedPack(second = true, minecraft = "1.20.2")) }
+            .onSuccess { error("provisioning an unknown version must fail") }
+
+        assertEquals("COOL-MOD", clientDir.resolve("mods/cool.jar").readText())
+        assertEquals("FOO", clientDir.resolve("config/foo.txt").readText())
+        assertTrue(Files.exists(clientDir.resolve("config/gone.txt")))
+        assertTrue(Files.exists(clientDir.resolve("mods/lib-1.0.jar")))
+        assertEquals(recordBefore, clientDir.resolve(PackFileRecord.FILE_NAME).readText())
+    }
+
+    /** An installer whose engine serves [archive] at [ARCHIVE_URL], beside the vanilla runtime. */
+    private fun urlInstaller(archive: ByteArray, repo: FakeRepository, dataDir: Path): MrpackInstaller {
+        val base = engine()
+        val provider = HttpClientProvider {
+            HttpClient(MockEngine { req ->
+                if (req.url.toString() == ARCHIVE_URL) respond(ByteReadChannel(archive), HttpStatusCode.OK)
+                else base.config.requestHandlers.first()(this, req)
+            })
+        }
+        val provisioner = RuntimeProvisioner(
+            librariesDir = tempDir("libs"), assetsDir = tempDir("assets"), clientProvider = provider,
+            transfers = testTransferEngine(provider), json = json,
+            loaderRegistry = LoaderRegistry(emptyList()), osName = "Linux",
+            versionManifestUrl = MANIFEST_URL, resourcesBaseUrl = RES_BASE,
+        )
+        return MrpackInstaller(testTransferEngine(provider), json, fakeJava, provisioner, repo, dataDir)
+    }
+
+    /**
+     * The index that pins every file's hash travels inside the archive, so an
+     * archive taken on trust lets whoever served it pick the files and the hashes
+     * they are checked against together.
+     */
+    @Test
+    fun `an archive that does not match its published digest installs nothing`() = runTest {
+        val published = Files.readAllBytes(buildMrpack())
+        // Installable on its own, so only the digest can stop it.
+        val served = Files.readAllBytes(buildMrpack(planted = true))
+        val repo = FakeRepository()
+        val dataDir = tempDir("data")
+
+        runCatching {
+            urlInstaller(served, repo, dataDir).installFromUrl(
+                url = ARCHIVE_URL,
+                sha1 = sha1(published),
+                source = MrpackSource(PackOrigin.Modrinth, id = "AABBCCDD", version = "1.0.0"),
+            )
+        }.onSuccess { error("an archive with the wrong bytes must not install") }
+
+        assertTrue(repo.stored.isEmpty(), "nothing registered")
+        assertFalse(Files.exists(dataDir.resolve("instances")), "no instance directory was made")
+    }
+
+    @Test
+    fun `an archive that matches its published digest installs`() = runTest {
+        val bytes = Files.readAllBytes(buildMrpack())
+        val repo = FakeRepository()
+
+        val instance = urlInstaller(bytes, repo, tempDir("data")).installFromUrl(
+            url = ARCHIVE_URL,
+            sha1 = sha1(bytes),
+            size = bytes.size.toLong(),
+            source = MrpackSource(PackOrigin.Modrinth, id = "AABBCCDD", version = "1.0.0"),
+        )
+
+        assertEquals("Test Pack", instance.displayName)
+        assertTrue(repo.stored.any { it.id == instance.id })
+    }
+
+    @Test
+    fun `archivePaths names what a version places, and not what it skips`() {
+        assertEquals(
+            setOf("mods/cool.jar", "config/foo.txt", "options.txt"),
+            bareInstaller().archivePaths(buildMrpack()),
+            "not the client-unsupported file and not the server override",
+        )
+    }
+
     private companion object {
         const val MANIFEST_URL = "https://piston-meta.test/manifest.json"
         const val VERSION_URL = "https://piston-meta.test/1.20.1.json"
@@ -445,5 +564,6 @@ class MrpackInstallerTest {
         const val STABLE_URL = "https://cdn.test/stable.jar"
         const val LIB_V1_URL = "https://cdn.test/lib-1.0.jar"
         const val LIB_V2_URL = "https://cdn.test/lib-2.0.jar"
+        const val ARCHIVE_URL = "https://cdn.test/pack.mrpack"
     }
 }

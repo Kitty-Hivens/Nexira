@@ -4,9 +4,6 @@
       "type": "hivens.core.data.PackOrigin[]"
     },
     {
-      "type": "hivens.widget.model.SlotOrientation[]"
-    },
-    {
       "type": "java.lang.Boolean",
       "jniAccessible": true,
       "methods": [

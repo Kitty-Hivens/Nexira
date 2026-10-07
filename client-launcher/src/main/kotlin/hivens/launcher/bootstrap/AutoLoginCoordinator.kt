@@ -20,6 +20,9 @@ import org.slf4j.LoggerFactory
  * - **Offline mode is on.** Synthesize an offline-identity session (vanilla
  *   offline UUID, blank token) from the chosen offline name, else the last
  *   signed-in name; null when neither exists. No network call.
+ * - **No saved account, but an offline name was chosen.** The same offline
+ *   identity. It is never stored as an account, having no secret, so without
+ *   this a player who signed in offline was signed out by every restart.
  * - **Microsoft account active.** The session carries a refresh token (SC
  *   sessions never do). Silent-refresh it for a fresh Minecraft token; on any
  *   failure (or no configured client id) trust the cached token -- the MC
@@ -35,7 +38,7 @@ import org.slf4j.LoggerFactory
  *   [AuthException] with `isSslError`, stop at [Resolution.CertificateUntrusted]
  *   and leave the decision to the user.
  *   On any other failure, return null and let the user re-enter manually.
- * - **No cached password.** Return [Resolution.NoCredentials].
+ * - **No cached password, or nothing saved at all.** Return [Resolution.NoCredentials].
  *
  * Returns a [Resolution]: [Resolution.Success] carries the session;
  * [Resolution.NetworkDown] means nothing reached the server (the caller may
@@ -54,7 +57,12 @@ object AutoLoginCoordinator {
     private val log = LoggerFactory.getLogger(AutoLoginCoordinator::class.java)
 
     sealed interface Resolution {
-        data class Success(val session: SessionData) : Resolution
+        /**
+         * [signedIn] says the session came from a sign-in made here rather than from
+         * the store. A SmartyCraft login retires the uid the store holds, so the
+         * caller writes the fresh one back, the same as a launch that signs in.
+         */
+        data class Success(val session: SessionData, val signedIn: Boolean = false) : Resolution
 
         /** No saved account, password, or offline name -- nothing to attempt. */
         data object NoCredentials : Resolution
@@ -78,7 +86,6 @@ object AutoLoginCoordinator {
     suspend fun resolveSession(
         settings: SettingsData,
         saved: SessionData?,
-        lastServerId: String?,
         authService: AuthProvider,
         msaProvider: RefreshableAuthProvider? = null,
     ): Resolution {
@@ -89,19 +96,29 @@ object AutoLoginCoordinator {
             val name = settings.offlinePlayerName?.takeIf { it.isNotBlank() }
                 ?: saved?.playerName?.takeIf { it.isNotBlank() }
                 ?: return Resolution.NoCredentials
-            return Resolution.Success(
-                SessionData(
-                    status      = AuthStatus.OK,
-                    playerName  = name,
-                    uuid        = OfflineIdentity.dashlessUuidFor(name),
-                    accessToken = "",
-                    offline     = true,
-                    serverId    = lastServerId,
-                ),
-            )
+            return Resolution.Success(offlineSession(name))
         }
 
-        if (saved == null) return Resolution.NoCredentials
+        if (saved == null) {
+            val name = settings.offlinePlayerName?.takeIf { it.isNotBlank() } ?: return Resolution.NoCredentials
+            return Resolution.Success(offlineSession(name))
+        }
+
+        // Experimental single-session: trust the saved SmartyCraft token and make no
+        // request. The re-login below is destructive on SmartyCraft -- it mints a new
+        // uid and invalidates the token in hand -- so for a 2FA account whose flag is
+        // not set yet it signs in only to kill the session it was about to open on,
+        // then returns that now-dead session as a success. With reuse on, the token
+        // is used until the server actually refuses it. Microsoft (a refresh token)
+        // keeps its own silent-refresh path; this is for the SC shape only.
+        if (settings.experimentalReuseSession &&
+            saved.refreshToken == null &&
+            !saved.offline &&
+            saved.accessToken.isNotBlank()
+        ) {
+            ActionRing.record("Auto-login: reusing the saved session, no sign-in (experimental)")
+            return Resolution.Success(saved)
+        }
 
         // Microsoft account: silent-refresh the stored token, falling back to the
         // cached Minecraft token on any failure (or no configured client id).
@@ -112,7 +129,7 @@ object AutoLoginCoordinator {
                     log.warn("MSA silent refresh failed -- trusting the cached Microsoft token", it)
                     null
                 }
-            return Resolution.Success((refreshed ?: saved).copy(serverId = lastServerId))
+            return Resolution.Success(refreshed ?: saved)
         }
 
         // A known two-factor account is never signed in from here. The damage is
@@ -120,21 +137,20 @@ object AutoLoginCoordinator {
         // invalidates the previous one, so this call revokes the session the
         // player unlocked with a code, and a game already running is dropped with
         // a username verification error moments after the launcher window opens.
-        // Nothing on screen connects the two. AutoSyncService gates the same call
-        // for the same reason.
+        // Nothing on screen connects the two.
         //
         // Ahead of the cached-password read, because the token is what this branch
         // goes with and an account that never saved a password still has one.
         if (saved.twoFactor) {
             ActionRing.record("Auto-login: two-factor account, going with the session in hand")
-            return Resolution.Success(saved.copy(serverId = lastServerId))
+            return Resolution.Success(saved)
         }
 
         val cachedPass = saved.cachedPassword ?: return Resolution.NoCredentials
-        val server = lastServerId ?: Protocol.DEFAULT_SERVER_ID
+        val server = Protocol.DEFAULT_SERVER_ID
 
         return try {
-            Resolution.Success(authService.login(saved.playerName, cachedPass, server))
+            Resolution.Success(authService.login(saved.playerName, cachedPass, server), signedIn = true)
         } catch (e: TwoFactorRequiredException) {
             // First contact with the gate: the flag is set by whoever meets it, and
             // an account restored from a build that predates the flag meets it here.
@@ -149,7 +165,7 @@ object AutoLoginCoordinator {
             ActionRing.record(
                 "Auto-login: 2FA account, trusting cached accessToken (uid=${e.uid?.take(8) ?: "<missing>"})"
             )
-            Resolution.Success(saved.copy(serverId = lastServerId, twoFactor = true))
+            Resolution.Success(saved.copy(twoFactor = true))
         } catch (e: AuthException) {
             when {
                 e.isSslError -> {
@@ -178,6 +194,14 @@ object AutoLoginCoordinator {
             }
         }
     }
+
+    private fun offlineSession(name: String) = SessionData(
+        status      = AuthStatus.OK,
+        playerName  = name,
+        uuid        = OfflineIdentity.dashlessUuidFor(name),
+        accessToken = "",
+        offline     = true,
+    )
 
     /**
      * Backoff ladder for [Resolution.NetworkDown] retries: quick first

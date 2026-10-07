@@ -43,8 +43,8 @@ class WidgetSurfaceRenderTest {
 
     @Test
     fun `a rung fill follows the palette rather than a literal`() {
-        val raised = pixel(SurfaceSpec(fill = "raised", opacity = 1f), X + W / 2, Y + H / 2)
-        val floating = pixel(SurfaceSpec(fill = "floating", opacity = 1f), X + W / 2, Y + H / 2)
+        val raised = pixel(SurfaceSpec(fill = "card", opacity = 1f), X + W / 2, Y + H / 2)
+        val floating = pixel(SurfaceSpec(fill = "popup", opacity = 1f), X + W / 2, Y + H / 2)
         assertTrue(raised != floating, "two rungs resolved to one colour: $raised")
         assertTrue(raised.isGrey && floating.isGrey, "a rung produced a colour off the ladder: $raised / $floating")
     }
@@ -166,12 +166,10 @@ class WidgetSurfaceRenderTest {
         assertTrue(!pixel(spec, X + W / 2, Y + H / 2).isPage, "an unknown kind drew nothing at all")
     }
 
-    @Test
-    fun `padding insets the plane from the widget's box`() {
-        val spec = SurfaceSpec(fill = "#FF000000", opacity = 1f, padding = hivens.widget.model.SurfaceInsets(all = 12f))
-        val inset = pixel(spec, X + 4, Y + H / 2)
-        assertTrue(inset.isPage, "padding did not inset the plane: $inset")
-    }
+    // Padding no longer lives on the plane: it moved to Placement and is applied by
+    // the slot wrapper as an outer inset, so WidgetSurface draws the plane full and
+    // the test that asserted it inset here is gone. The placement-level behaviour is
+    // covered where the slot wrapper is exercised, not here in the plane renderer.
 
     private data class Px(val r: Int, val g: Int, val b: Int) {
         val isPage: Boolean get() = r > 200 && g < 60 && b > 200
@@ -182,7 +180,7 @@ class WidgetSurfaceRenderTest {
     @OptIn(ExperimentalComposeUiApi::class)
     private fun pixel(spec: SurfaceSpec, px: Int, py: Int): Px {
         val scene = ImageComposeScene(width = SW, height = SH, density = Density(1f)) {
-            NxTheme(useDarkTheme = true) {
+            NxTheme(dark = true) {
                 Box(Modifier.fillMaxSize().background(PAGE)) {
                     Box(Modifier.offset(X.dp, Y.dp).size(W.dp, H.dp)) {
                         WidgetSurface(spec) { Box(Modifier.fillMaxSize()) }
@@ -207,7 +205,7 @@ class WidgetSurfaceRenderTest {
     @OptIn(ExperimentalComposeUiApi::class)
     private fun adaptive(spec: SurfaceSpec, w: Int, h: Int, px: Int, py: Int): Px {
         val scene = ImageComposeScene(width = w + 2 * M, height = h + 2 * M, density = Density(1f)) {
-            NxTheme(useDarkTheme = true) {
+            NxTheme(dark = true) {
                 Box(Modifier.fillMaxSize().background(PAGE)) {
                     Box(Modifier.offset(M.dp, M.dp).size(w.dp, h.dp)) {
                         WidgetSurface(spec) {
@@ -234,7 +232,7 @@ class WidgetSurfaceRenderTest {
     @OptIn(ExperimentalComposeUiApi::class)
     private fun cornerCut(spec: SurfaceSpec): Int {
         val scene = ImageComposeScene(width = SW, height = SH, density = Density(1f)) {
-            NxTheme(useDarkTheme = true) {
+            NxTheme(dark = true) {
                 Box(Modifier.fillMaxSize().background(PAGE)) {
                     Box(Modifier.offset(X.dp, Y.dp).size(W.dp, H.dp)) {
                         WidgetSurface(spec) { Box(Modifier.fillMaxSize()) }

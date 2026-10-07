@@ -1,5 +1,7 @@
 package hivens.ui.utils
 
+import hivens.ui.bootstrap.RecoveryIo
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -23,6 +25,7 @@ import kotlin.test.assertTrue
  * What these pin is the store being the single owner: one value, published, and
  * every write starting from what is current.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 class ConsoleSettingsStoreTest {
 
     private val dir: Path = Files.createTempDirectory("console-settings")
@@ -30,7 +33,10 @@ class ConsoleSettingsStoreTest {
 
     @OptIn(kotlin.io.path.ExperimentalPathApi::class)
     @AfterTest
-    fun cleanUp() = dir.deleteRecursively()
+    fun cleanUp() {
+        RecoveryIo.resetForTests()
+        dir.deleteRecursively()
+    }
 
     /** Writes land on the test's own scheduler, so a test says when they happen. */
     private val scheduler = StandardTestDispatcher()
@@ -94,6 +100,20 @@ class ConsoleSettingsStoreTest {
         store.flush()
 
         assertEquals(false, store().current.showTimestamps)
+    }
+
+    @Test
+    fun `a reset from the recovery surface is not written back over`() {
+        val store = store()
+        store.update(store.current.copy(fontSize = 18))
+        settle()
+        store.update(store.current.copy(fontSize = 20))
+
+        RecoveryIo.resetCustomization(dir)
+        store.flush()
+        settle()
+
+        assertFalse(Files.exists(dir.resolve("console.json")), "the reset deleted it and nothing put it back")
     }
 
     @Test

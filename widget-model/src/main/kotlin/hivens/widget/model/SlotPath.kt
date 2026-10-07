@@ -13,10 +13,19 @@ package hivens.widget.model
 // instance id), so the type carries `rootSlot` separately rather than
 // modelling it as the head of a uniform segment list with a nullable
 // parent.
+//
+// [family] is part of the address and not of the reader's state, because a
+// surface holds every family at once and two of them can declare the same slot
+// name for different content. A path that needed the live family to say what it
+// points at would not be an address; it would be half of one, and the other half
+// would be whatever the app happened to be showing when the transform ran. It
+// defaults to [FamilyId.GENERAL], which is where a caller that has never heard
+// of families means.
 data class SlotPath(
     val surface: SurfaceId,
     val rootSlot: SlotId,
     val nested: List<NestedSegment> = emptyList(),
+    val family: FamilyId = FamilyId.GENERAL,
 ) {
     val leafSlot: SlotId
         get() = nested.lastOrNull()?.slot ?: rootSlot
@@ -31,7 +40,7 @@ data class SlotPath(
         copy(nested = nested + NestedSegment(parentInstanceId, slot))
 
     override fun toString(): String = buildString {
-        append(surface.value).append(':').append(rootSlot.value)
+        append(surface.value).append('/').append(family.value).append(':').append(rootSlot.value)
         for (segment in nested) {
             append(" > ").append(segment.parentInstanceId).append(':').append(segment.slot.value)
         }

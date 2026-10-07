@@ -17,6 +17,13 @@ interface IPackCatalogueService {
     val origin: PackOrigin
 
     /**
+     * Whether [search] honours its page. False for a source that answers with its
+     * whole listing whatever page is asked, where one answer is the entire list and
+     * a later one replaces it outright rather than being merged into it.
+     */
+    val paged: Boolean get() = true
+
+    /**
      * Catalogue search. [page] is zero-based. Sources without a query endpoint
      * (the mirror) filter their full listing client-side; [query] blank lists
      * everything.

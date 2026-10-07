@@ -18,6 +18,84 @@ verbatim and a hand-wrapped line becomes a staircase of breaks.
 
 ## [Unreleased]
 
+## [2.4.6] - 2026-10-07
+
+### Music
+
+There are ten player widgets now instead of four, and you pick the one that suits the place you put it. Beside the card led by the cover, the one that takes on the colour of the record it is playing, the plain readout and the one that fills up as the track plays, there is a tile that is nothing but the cover until you point at it, a disc, a token the size of a single cell, and several built around the shape of the track itself. The music card Home had before is replaced by the cover-led card and keeps its place on your screen.
+
+Four of them draw the track. The launcher reads the file once and works out its shape, so what you see is the outline of that actual piece of music rather than a bar filling up, and the part already played is inked. It takes about a second per file, once, in the background, and a file it cannot measure simply stays flat instead of leaving a hole.
+
+The queue and your place in it are still there after a restart, and nothing is opened until you press play.
+
+Your desktop now knows what is playing. Media keys work, the media widget shows the track, the artist and the cover, and its buttons drive the launcher. In the system volume panel the sound appears as Nexira with its own icon instead of an unnamed Java process, so you can turn it down on its own, send it to another output or point an effects rule at it.
+
+Every measure answers a press and follows a drag, wherever it appears: a bar, the shape of the track, the same shape stood on end, the ring around a disc, or the whole body of a card.
+
+And a long list of smaller things. A click on a measure lands every time instead of roughly half the time. Dragging around the disc keeps following your hand instead of stopping when it strays past the edge. Changing tracks no longer leaves the scrubber working from the previous track's length, so a click halfway along a short track stops jumping to the end of it. The clock and the bar agree with each other. A track with no tags keeps one name instead of renaming itself while it loads. The play button on the cover card is legible on the dark theme. An empty player opens a file wherever you click it, including at widths where its artwork square is not drawn.
+
+### Packs and playing
+
+A pack that is not tied to a server now always starts offline. Before, it could receive the session of the account you were signed in with, and a mod in that pack could take it. Signing in offline from your profile now works and is still there after a restart.
+
+The Play button now says why you cannot play: the pack is updating, its files are being checked, another game is running, or you need to sign in. While an update runs, the button itself becomes the progress bar. In the "Pack hero card" and "Quick launch" widgets you can choose where the explanation goes: inside the button or beside it.
+
+Creating a pack from scratch is easier. The loader version is picked from a list of what that loader actually publishes for your Minecraft version, with the recommended build and the betas marked, and leaving it empty still means the latest. Cleanroom and lwjgl3ify are in the list of loaders now too. A loader that has nothing for the version you chose, or a Minecraft version that does not exist, says so straight away instead of after downloading the whole game.
+
+A pack now remembers the loader version it was installed with. Before, a pack created without one quietly moved to each new loader release, could reinstall Forge at the next Play, and needed the internet to start. Now it starts offline for every loader once it has been played once.
+
+NeoForge installs on Minecraft 1.20.1 and on the new 26.x releases, where it failed before.
+
+You cannot delete a pack while its game is running or while it is being updated. The delete button says why. Deleting a pack also clears the backups kept for rolling it back, which used to stay on disk for good.
+
+A pack you delete while the launcher is updating packs in the background stays deleted. Before, the update could write the whole pack back to disk, where it took up space without showing in the Library.
+
+Detaching a pack to local makes it fully yours: mods you add to it stay, where before the next Play removed them.
+
+The Content tab shows a mod once even if both its on and off copies are in the folder, turning a mod on no longer brings back an old copy of it, and a file whose copying was interrupted is not left half-written in your mods folder.
+
+Rolling back an update, or editing a pack's settings while something else changes it, no longer undoes your playtime, notes or other settings.
+
+A mod you turn off while the game is running is turned off the next time you play, where before it could keep loading.
+
+Quitting the launcher while a game is running now asks whether to leave the game running or stop it, and your playtime is recorded either way.
+
+Stopping a game from the launcher waits for it to actually close before Play comes back, so you cannot start a second copy on top of one still saving, and the time you played is counted.
+
+Stopping a launch while it is still getting ready no longer leaves an error on the Play button or lets a second game start beside the first.
+
+An update that is interrupted, whether you cancel it, the launcher closes or the power goes, puts the pack back exactly as it was instead of leaving it half updated.
+
+### Accounts and sign-in
+
+Accounts with two-factor sign-in ask for the code once. If getting a pack ready took longer than half a minute, the launcher signed in again after you had typed the code, which cancelled that code and asked for another. A slow connection also no longer sends you a second code, and no longer reports a correct code as wrong.
+
+Signing in by hand while the launcher is still trying your saved account keeps the account you chose. Saved accounts survive the launcher being closed in the middle of saving them. The key your SmartyCraft account signs things with is now kept in the system keyring with your password, not in a plain file. If you go back to an older version afterwards, sign in again before uploading a skin.
+
+Uploading a skin works after you have played. The wardrobe imports your own SmartyCraft skin, and no longer that of a SmartyCraft player who happens to share your Microsoft name.
+
+A SmartyCraft sign-in the launcher cannot finish now says so when you sign in. Before, the game started anyway and failed at the server with no explanation.
+
+Opening the launcher after using a newer version no longer rewrites your saved accounts in an older format. It tells you that changes to them will not be kept.
+
+Signing out of everything really signs you out: the next start no longer signs you back in offline under your old offline name. The profile no longer freezes while the system keyring is slow to answer.
+
+### Privacy
+
+Crash reports and diagnostic bundles no longer include your account name, and the launcher lets go of the login it handed a game once that game has closed. A pack can no longer make the launcher download from an unencrypted address. A mod update that arrives damaged is downloaded again rather than failing.
+
+The command-line launcher no longer prints your login token, and a crash report no longer puts your account name into the address of the page it opens. On macOS, a launcher update that fails while copying no longer leaves you without a launcher.
+
+### Everything else
+
+On Linux, a launcher update that crashes shortly after it starts is undone, and the previous version comes back on its own. Before, the old version was deleted two seconds after the new one started, so a build that opened its window and then died left nothing to go back to.
+
+A run of small things that worked in one place and not in the next now work in both. A mod you install finishes with everything it needs even if you leave the page, and a skin you apply in the wardrobe still lands if you leave before it answers. Uploading a skin also works right after the launcher signs you in on its own. Loading a saved layout keeps the screens you made yourself, and it can be undone. A drag in the editor cut short with Esc no longer leaves the mouse pointer hidden, and a damaged layout file no longer sends the launcher into a restart loop. A layout file that cannot be read is kept as it is instead of being replaced by the default the first time you edit something, and the launcher tells you so.
+
+A YouTube or Vimeo video no longer plays a fragment of itself in place of the whole thing, and scrubbing a video no longer ends it with an error. Lists of loader versions and news that stall now give up after twenty seconds instead of spinning for ten minutes. A module you switch off in recovery mode stays off, and stopping a game also stops anything it started.
+
+Changing the theme, the language or the launcher's settings no longer holds the window still while the change is saved to disk.
+
 ## [2.4.5] - 2026-09-15
 
 A pack that has fallen behind catches itself up when you press Play. Until now the launcher noticed that the files were not the pack's, said nothing on screen, quietly withheld your login and let the game start anyway, so the server turned you away with no explanation anywhere. This was easy to walk into: if a version of the launcher could not install some of a pack's mods and the next one could, the old files were still sitting there. Now the missing pieces are fetched first and the launch goes ahead properly. If the mirror cannot be reached, the launch still happens exactly as it did before.

@@ -7,10 +7,12 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -22,7 +24,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -56,15 +57,17 @@ import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.isSecondaryPressed
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import hivens.core.data.HomeView
 import hivens.ui.Screen
 import hivens.ui.customization.CustomizationSettings
 import hivens.ui.editor.decoration.EditableWidgetChrome
@@ -80,6 +83,8 @@ import hivens.ui.editor.presets.PresetEnvelope
 import hivens.ui.editor.presets.PresetManagerPanel
 import hivens.ui.editor.presets.PresetMeta
 import hivens.ui.editor.presets.PresetRepository
+import hivens.ui.editor.props.ScreenPropertiesPanel
+import hivens.ui.editor.props.WidgetModulesPanel
 import hivens.ui.editor.props.SurfacePropertiesPanel
 import hivens.ui.editor.props.WidgetPropPanel
 import hivens.ui.i18n.AppStrings
@@ -89,39 +94,62 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.layout.LayoutGraphRepository
 import hivens.ui.layout.LayoutReconcile
-import hivens.ui.nx.AdaptiveWidth
 import hivens.ui.nx.NxContextMenu
 import hivens.ui.nx.NxMenuItem
 import hivens.ui.nx.WidthClass
 import hivens.ui.theme.Motion
-import hivens.ui.theme.NxTheme
+import hivens.ui.surface.NxSurface
+import hivens.ui.surface.SurfaceKind
+import hivens.config.Branding
+import hivens.ui.notifications.Kind
+import hivens.ui.notifications.NotifAction
+import hivens.ui.notifications.NotificationCenter
+import hivens.ui.notifications.Severity
+import hivens.ui.theme.OnFill
+import hivens.ui.widgets.modules.WidgetModules
 import hivens.widget.api.EmptySlotDecorator
 import hivens.widget.api.LocalEmptySlotDecorator
+import hivens.widget.api.LocalFamilyOverrides
 import hivens.widget.api.LocalLayoutGraph
+import hivens.widget.api.LocalPlacementReflow
+import hivens.widget.api.LocalMapPanOnPrimary
+import hivens.widget.api.LocalRefusedMount
 import hivens.widget.api.LocalSlotBoundsReporter
+import hivens.widget.api.LocalSlotBoundsWithdrawal
 import hivens.widget.api.LocalSlotChromeModifier
 import hivens.widget.api.LocalSlotMotionMs
 import hivens.widget.api.LocalSlotPath
 import hivens.widget.api.LocalUnknownWidgetDecorator
 import hivens.widget.api.LocalWidgetDecorator
 import hivens.widget.api.LocalWidgetRegistry
+import hivens.widget.api.SlotBoundsReporter
 import hivens.widget.api.SlotChromeModifier
 import hivens.widget.api.UnknownWidgetDecorator
 import hivens.widget.api.WidgetDecorator
+import hivens.widget.model.BundledPresets
 import hivens.widget.model.DefaultLayout
-import hivens.widget.model.SlotOrientation
+import hivens.widget.model.withSurfacesFrom
+import hivens.widget.model.FlowSpec
+import hivens.widget.model.FamilyId
+import hivens.widget.model.LayoutGraph
+import hivens.widget.model.ScreenSpec
 import hivens.widget.model.SlotPath
 import hivens.widget.model.SurfaceId
+import hivens.widget.model.screen
+import hivens.widget.model.screenOn
 import hivens.widget.model.traverse
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineScope as KotlinCoroutineScope
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import org.slf4j.LoggerFactory
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.Status
 
 // EditorSurfaceHost is the single coordinator for everything edit-mode
 // related on the active surface. It:
-//   * resolves which SurfaceId the active Screen/HomeView maps to
+//   * resolves which SurfaceId the active Screen maps to
 //   * holds DragController + DropTargetRegistry per surface
 //   * provides LocalEditMode, LocalDragController, LocalDropTargetRegistry,
 //     and LocalWidgetDecorator (the decorator wraps each widget with
@@ -139,58 +167,117 @@ private val log = LoggerFactory.getLogger("EditorSurfaceHost")
 @Composable
 fun EditorSurfaceHost(
     currentScreen: Screen,
-    homeView: HomeView,
     customization: CustomizationSettings = CustomizationSettings(),
     onCustomizationChanged: (CustomizationSettings) -> Unit = {},
-    // The host now wraps the WHOLE shell Row (rails included) so the editor's
-    // decorators reach rail widgets. These insets keep the chrome overlays
-    // (pill / palette / prop panel / vignette) anchored over the center pane,
-    // past the left rail and right panel, matching their pre-hoist place.
-    centerStartInset: Dp = 0.dp,
-    centerEndInset: Dp = 0.dp,
+    /** Opens a screen, the way the rail does. The editor uses it to show a screen it just made. */
+    onOpenScreen: (Screen) -> Unit = {},
     content: @Composable () -> Unit,
 ) {
     val graphForSurfaces = LocalLayoutGraph.current
-    val availableSurfaces: List<SurfaceId> = remember(currentScreen, homeView, graphForSurfaces) {
-        EditorSurfaces.availableFor(currentScreen, homeView, graphForSurfaces)
+    // The host wraps the WHOLE shell Row (rails included) so its decorators reach
+    // rail widgets, and its overlays then have to be put back over the content
+    // pane. The regions report where they landed; see [ShellChromeBounds] for why
+    // the two constants this replaces could not be right.
+    val chromeBounds = remember { ShellChromeBounds() }
+    val hostRect = remember { mutableStateOf(Rect.Zero) }
+    val availableSurfaces: List<SurfaceId> = remember(currentScreen, graphForSurfaces) {
+        EditorSurfaces.availableFor(currentScreen, graphForSurfaces)
     }
+    // Which of those tabs point at something folded away. Separate from the tab
+    // set on purpose: the editor's whole state is keyed on that set, and folding a
+    // rail does not change what is editable. While the fold was part of it, a rail
+    // collapsed from its own panel re-keyed every remember in this function and
+    // dropped the reader out of edit mode mid-edit.
+    val foldedSurfaces: Set<SurfaceId> = remember(availableSurfaces, graphForSurfaces) {
+        availableSurfaces.filterTo(mutableSetOf()) { EditorSurfaces.foldedAway(it, graphForSurfaces) }
+    }
+    // The region this surface is the inside of, so its own settings are reachable
+    // from its own tab rather than from the frame that happens to hold it.
+    val ownerRegion = selectedSurfaceOwnerRegion(graphForSurfaces)
     val controller: EditModeController = koinInject()
     val layoutRepo: LayoutGraphRepository = koinInject()
     val presetRepo: PresetRepository      = koinInject()
+    val widgetModules: WidgetModules      = koinInject()
     val coroutineScope = rememberCoroutineScope()
     val s = LocalStrings.current
 
-    var editing       by remember(availableSurfaces) { mutableStateOf(false) }
-    var paletteOpen   by remember(availableSurfaces) { mutableStateOf(true) }
-    var previewing    by remember(availableSurfaces) { mutableStateOf(false) }
+    // An edit session belongs to the app, not to the screen it started on. Moving
+    // to another screen while arranging keeps the editor on: a rail or the top bar
+    // stays the selected tab, and a tab that belonged to the screen left behind
+    // gives way to the new screen's own (see the re-point below). It used to end
+    // with any move that changed the tab set, so arranging several screens meant
+    // leaving the editor and coming back for each, and deleting a screen threw the
+    // person out of the editor they were deleting it from.
+    var editing       by remember { mutableStateOf(false) }
+    var paletteOpen   by remember { mutableStateOf(true) }
+    var previewing    by remember { mutableStateOf(false) }
     // Where a right-click landed while NOT editing, which is the only thing that
     // opens the way in. Null closes the menu.
     var entryMenuAt   by remember { mutableStateOf<Offset?>(null) }
-    var presetPanelOpen by remember(availableSurfaces) { mutableStateOf(false) }
-    var resetSurfaceConfirm by remember(availableSurfaces) { mutableStateOf(false) }
-    var selectedSurface by remember(availableSurfaces) {
-        mutableStateOf(availableSurfaces.firstOrNull())
+    var presetPanelOpen by remember { mutableStateOf(false) }
+    var modulesPanelOpen by remember { mutableStateOf(false) }
+    var resetSurfaceConfirm by remember { mutableStateOf(false) }
+    var resetAllConfirm by remember { mutableStateOf(false) }
+    var selectedSurface by remember { mutableStateOf(availableSurfaces.firstOrNull()) }
+    // Whether the selection is the open screen's own page rather than a rail or the
+    // top bar. Set by what the person picks, and only by that: a re-point made
+    // while a screen is half gone must not decide it, or a deleted screen leaves
+    // the selection stuck on the top bar it fell back to for one frame.
+    var followsScreen by remember { mutableStateOf(true) }
+    // Which of the selected surface's families is being arranged. Null follows the
+    // app, which is what a surface with one family always does. A family the app
+    // only enters in some state -- a rail that only shows its project view while a
+    // project is open -- would otherwise be arrangeable only by first getting the
+    // app into that state, which makes the reader hunt for their own layout.
+    var selectedFamily by remember(selectedSurface) { mutableStateOf<FamilyId?>(null) }
+    val availableFamilies: List<FamilyId> = remember(selectedSurface, graphForSurfaces) {
+        selectedSurface?.let { graphForSurfaces.surfaces[it]?.families?.keys?.toList() }.orEmpty()
     }
-    // Prop editor target. Cleared on surface change (keyed remember), on
-    // dismiss, and on leaving edit mode; while set, the palette hides so
-    // the two right-edge panels do not overlap.
-    var propTarget by remember(availableSurfaces) { mutableStateOf<PropTarget?>(null) }
-    // Surface-level settings panel (currently the left rail's nav-selection
-    // settings). Mutually exclusive with the per-widget prop panel + palette.
-    var surfaceSettingsOpen by remember(availableSurfaces) { mutableStateOf(false) }
+
+    // Prop editor target. Cleared when the selected tab is re-pointed or the widget's
+    // surface leaves the tab set, on dismiss, and on leaving edit mode; while set,
+    // the palette hides so the two right-edge panels do not overlap.
+    var propTarget by remember { mutableStateOf<PropTarget?>(null) }
+    // Surface-level settings panel (a region's, or a made screen's). Mutually
+    // exclusive with the per-widget prop panel + palette.
+    var surfaceSettingsOpen by remember { mutableStateOf(false) }
     // Selected slot (Tier 2 slot layout chrome): the highlighted slot, its window
     // rect (for the handle anchor), the cursor anchor for a right-click menu, and
     // whether the handle's menu is open. selectedSlotState stays a State so the slot
     // chrome modifier can read it without the host capturing a stale value.
-    val selectedSlotState = remember(availableSurfaces) { mutableStateOf<SlotPath?>(null) }
-    var selectedSlotRect  by remember(availableSurfaces) { mutableStateOf<Rect?>(null) }
-    var slotMenuCursor    by remember(availableSurfaces) { mutableStateOf<Offset?>(null) }
-    var handleMenuOpen    by remember(availableSurfaces) { mutableStateOf(false) }
+    val selectedSlotState = remember { mutableStateOf<SlotPath?>(null) }
+    var selectedSlotRect  by remember { mutableStateOf<Rect?>(null) }
+    var slotMenuCursor    by remember { mutableStateOf<Offset?>(null) }
+    var handleMenuOpen    by remember { mutableStateOf(false) }
     fun clearSlotSelection() {
         selectedSlotState.value = null
         selectedSlotRect = null
         slotMenuCursor = null
         handleMenuOpen = false
+    }
+
+    // The tab set changes under a running editor: a move to another screen, a
+    // deleted screen, a preset load or a reset. A selected tab still in the set
+    // stays selected, which is a rail or the top bar on any move. One that left
+    // gives way to the first tab, which is the new screen's own, rather than hold
+    // an id nothing answers to, which renders as an editor over nothing.
+    LaunchedEffect(availableSurfaces) {
+        val page = availableSurfaces.firstOrNull { !EditorSurfaces.isShell(it) }
+        val gone = selectedSurface !in availableSurfaces
+        if (gone || (followsScreen && page != null && selectedSurface != page)) {
+            selectedSurface = page ?: availableSurfaces.firstOrNull()
+            propTarget = null
+            surfaceSettingsOpen = false
+            // The same clean-up every other route to a new surface does. Without
+            // it the handle and its menu stay anchored to a slot on a surface that
+            // is gone, and act on a path nothing answers to.
+            clearSlotSelection()
+        } else if (propTarget?.path?.surface?.let { it !in availableSurfaces } == true) {
+            propTarget = null
+        }
+        // Nothing left to arrange, which no screen has today, but the editor would
+        // otherwise stay on over nothing.
+        if (availableSurfaces.isEmpty()) editing = false
     }
 
     // One Escape backs out one step: an open slot menu first, then the slot
@@ -209,6 +296,62 @@ fun EditorSurfaceHost(
     // the last panel with the palette still hidden.
     LaunchedEffect(editing) { if (!editing) { propTarget = null; surfaceSettingsOpen = false; clearSlotSelection() } }
 
+    // A screen just made from the pill. Not keyed on the tab set, because opening it
+    // changes the tab set and that is exactly when this has to survive: the record
+    // lands a frame or two after the press, the screen is opened once it is there,
+    // and once its surface is a tab the editor stays on with the screen's own
+    // settings open, so the next thing the person does is name it. Declared after
+    // the exit clean-up above, which runs first on the same change and would
+    // otherwise close the panel this opens.
+    //
+    // A screen put back after a deletion takes the same road without the settings:
+    // it is not new, there is nothing to name.
+    var pendingScreen by remember { mutableStateOf<ScreenSpec?>(null) }
+    var pendingSettings by remember { mutableStateOf(true) }
+    LaunchedEffect(pendingScreen, graphForSurfaces) {
+        val made = pendingScreen ?: return@LaunchedEffect
+        if (graphForSurfaces.screen(made.id) != null && currentScreen != Screen.Custom(made.id)) {
+            onOpenScreen(Screen.Custom(made.id))
+        }
+    }
+    LaunchedEffect(availableSurfaces) {
+        val made = pendingScreen ?: return@LaunchedEffect
+        if (made.surface !in availableSurfaces) return@LaunchedEffect
+        editing = true
+        selectedSurface = made.surface
+        followsScreen = true
+        propTarget = null
+        surfaceSettingsOpen = pendingSettings
+        pendingScreen = null
+    }
+    // A screen deleted from its own settings: said in a notice with the way back,
+    // because the editor stays on and the page the person was arranging is gone.
+    val notifications: NotificationCenter = koinInject()
+    val deleteScreen: (ScreenSpec) -> Unit = { doomed ->
+        controller.deleteScreen(doomed.id) { gone ->
+            notifications.push(
+                sourceKey = "screen-deleted-${doomed.id}",
+                sender    = Branding.TITLE,
+                iconUrl   = null,
+                severity  = Severity.Info,
+                // Held until answered or closed: a one-shot notice is gone in five
+                // seconds, which is less time than it takes to read it and decide.
+                kind      = Kind.ActionRequired,
+                title     = s.screenDeletedTitle(doomed.title.ifBlank { s.screenUntitled }),
+                actions   = listOf(
+                    NotifAction(id = "screen-restore-${doomed.id}", label = s.screenRestore) {
+                        controller.restoreScreen(gone)
+                        pendingSettings = false
+                        pendingScreen = gone.spec
+                    },
+                ),
+            )
+        }
+    }
+    // The selected surface's made screen, when it is one: its settings are the
+    // screen's own panel rather than a region's.
+    val selectedScreen: ScreenSpec? = selectedSurface?.let { graphForSurfaces.screenOn(it) }
+
     // Commit the arrangement at the points where the user has finished a
     // thought: leaving edit mode, and moving to another surface. Writes are
     // debounced 200ms, and the only other flush is the shutdown hook, so until
@@ -221,8 +364,8 @@ fun EditorSurfaceHost(
     // nothing pending, which is what entering edit mode hits.
     LaunchedEffect(editing, selectedSurface) { layoutRepo.flush() }
     val currentGraph = LocalLayoutGraph.current
-    // Leaving a surface drops edit mode -- avoids a stale edit state
-    // pointed at the wrong surface after navigation.
+    // Rebuilt whenever the selected tab changes, so the chrome is always pointed at
+    // the surface being arranged and never at one a move left behind.
     val state: EditModeState = remember(editing, selectedSurface) {
         val sel = selectedSurface
         if (editing && sel != null) {
@@ -314,7 +457,12 @@ fun EditorSurfaceHost(
                 }
                 val path = LocalSlotPath.current
                 val graph = LocalLayoutGraph.current
-                val orientation = graph.traverse(path)?.orientation ?: SlotOrientation.Column
+                // A slot that is not there at all reads as a plain column, which is
+                // what an absent slot has always rendered as. A slot that IS there
+                // and carries no flow is a placement slot, and null is its answer,
+                // so the two nulls must not be collapsed with an elvis.
+                val slotContent = graph.traverse(path)
+                val flow = if (slotContent != null) slotContent.flow else FlowSpec.Column
                 EditableWidgetChrome(
                     path         = path,
                     index        = index,
@@ -323,7 +471,7 @@ fun EditorSurfaceHost(
                     controller   = dragController,
                     editController = controller,
                     registry     = registry,
-                    orientation  = orientation,
+                    flow         = flow,
                     onRemove     = {
                         // Clear the prop target if it points at this widget, else
                         // the palette stays gated off (propTarget != null) and the
@@ -346,9 +494,9 @@ fun EditorSurfaceHost(
                         // pointer is off any slot; treat as cancel.
                         val targetPath = registry.slotForPoint(committedPointer)
                             ?: return@EditableWidgetChrome
-                        val targetOrientation = graph.traverse(targetPath)?.orientation
-                            ?: SlotOrientation.Column
-                        val targetIdx = registry.insertionIndexInSlot(targetPath, committedPointer, targetOrientation)
+                        val targetContent = graph.traverse(targetPath)
+                        val targetFlow = if (targetContent != null) targetContent.flow else FlowSpec.Column
+                        val targetIdx = registry.insertionIndexInSlot(targetPath, committedPointer, targetFlow)
                         if (targetPath == path) {
                             // Same slot -- reorder. -1 when moving down
                             // because removing the source shifts indices.
@@ -369,6 +517,10 @@ fun EditorSurfaceHost(
                                 to         = targetPath,
                                 instanceId = instance.instanceId,
                                 toIndex    = targetIdx,
+                                // The kinds the shell cannot do without are the
+                                // ones that render its other surfaces, the regions,
+                                // and moved to another surface one can render itself.
+                                staysOnSurface = !descriptor.removable,
                             )
                         }
                     },
@@ -442,7 +594,47 @@ fun EditorSurfaceHost(
         }
     }
 
+    // Remembered, not built inline: the Local is a dynamic one, and a fresh map
+    // each recompose would invalidate every slot that reads it -- which is all of
+    // them -- for a value that changes only when the editor picks a family.
+    val familyOverrides: Map<SurfaceId, FamilyId> = remember(editing, selectedSurface, selectedFamily) {
+        val sid = selectedSurface
+        val fid = selectedFamily
+        if (editing && sid != null && fid != null) mapOf(sid to fid) else emptyMap()
+    }
+
+    /**
+     * Remembered, and that is not a micro-optimisation.
+     *
+     * [LocalSlotBoundsReporter] is a STATIC local, so a new value recomposes the
+     * whole subtree it is provided over rather than the places that read it. A
+     * lambda literal built inline here is a new value on any recomposition the
+     * compiler cannot prove away, and this function recomposes on every frame of
+     * a drag. That put a second whole-shell invalidation per pointer move next to
+     * the one the layout graph was already causing.
+     */
+    // Where a surface refused to open inside itself. Said only while arranging,
+    // which is the only time somebody can have caused it and can undo it.
+    val refusedMount: @Composable (SurfaceId) -> Unit = remember(state, previewing) {
+        if (state is EditModeState.On && !previewing) {
+            { _ -> RefusedMountPlaceholder() }
+        } else {
+            { _ -> }
+        }
+    }
+
+    val slotBoundsReporter: SlotBoundsReporter = remember(state, previewing, registry) {
+        if (state is EditModeState.On && !previewing) {
+            { path, visible, content -> registry.registerSlot(path, visible, content) }
+        } else {
+            { _, _, _ -> }
+        }
+    }
+
+    val slotBoundsWithdrawal: (SlotPath) -> Unit = remember(registry) { { path -> registry.withdrawSlot(path) } }
+
     CompositionLocalProvider(
+        LocalShellChromeBounds  provides chromeBounds,
         LocalEditMode           provides state,
         LocalDragController     provides dragController,
         LocalDropTargetRegistry provides registry,
@@ -450,18 +642,26 @@ fun EditorSurfaceHost(
         LocalEmptySlotDecorator provides emptyDecorator,
         LocalUnknownWidgetDecorator provides unknownDecorator,
         LocalSlotChromeModifier provides slotChromeFactory,
+        // Shows the family being arranged in place of the one the app would.
+        // Empty while not editing, so nothing the editor picked survives the exit.
+        LocalFamilyOverrides provides familyOverrides,
         // Edit-mode reflow duration: slot add / remove / resize animates while
         // editing, and nothing elsewhere.
         LocalSlotMotionMs provides if (state is EditModeState.On && !previewing) {
             Motion.panelSlide.durationMs
         } else 0,
-        // Canvas slots report their window bounds so palette drops land at the
+        // Reflow is a view-time fit, so it is off while editing: a widget capped to
+        // its slot cannot be resized past it. Preview turns it back on to check the
+        // fit, and it is always on outside the editor.
+        LocalPlacementReflow provides !(state is EditModeState.On && !previewing),
+        // Placement slots report their window bounds so palette drops land at the
         // release point (PaletteItem reads slotOrigin to convert the pointer).
-        LocalSlotBoundsReporter provides if (state is EditModeState.On && !previewing) {
-            { p, r -> registry.registerSlot(p, r) }
-        } else {
-            { _, _ -> }
-        },
+        LocalSlotBoundsReporter provides slotBoundsReporter,
+        LocalSlotBoundsWithdrawal provides slotBoundsWithdrawal,
+        LocalRefusedMount provides refusedMount,
+        // A press on empty map selects the slot while arranging; the middle button
+        // moves the map then.
+        LocalMapPanOnPrimary provides !(state is EditModeState.On && !previewing),
         // Stub surface contexts, spread from the registry. Surface composables
         // that mount under content() override with the real values; widgets
         // dropped on a foreign surface fall through to the stubs and render
@@ -474,6 +674,7 @@ fun EditorSurfaceHost(
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                .onGloballyPositioned { hostRect.value = it.boundsInWindow() }
                 // The way into edit mode for anyone who does not already know the
                 // chord. Right-clicking the background of the thing you want to
                 // rearrange is how every desktop offers this, so it is the gesture
@@ -508,9 +709,9 @@ fun EditorSurfaceHost(
                     } else false
                 },
         ) {
-            // Subtle surface vignette while in edit mode -- a soft inner
-            // primary tint at very low alpha to communicate "this whole
-            // pane is being edited", without obscuring content.
+            // While in edit mode the pane is framed in a thin line of the lead
+            // colour (EditModeVignette below) to communicate "this whole pane is
+            // being edited", without obscuring content.
             content()
 
             entryMenuAt?.let { at ->
@@ -530,14 +731,12 @@ fun EditorSurfaceHost(
                 }
             }
 
-            // Center-anchored chrome layer: inset past the left rail and right
-            // panel so the vignette + overlays stay over the center pane exactly
-            // as before the host was hoisted around the whole shell Row.
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(start = centerStartInset, end = centerEndInset),
-            ) {
+            // Center-anchored chrome layer: the vignette and the overlays belong
+            // over the content pane, so they take the rectangle the centre region
+            // reported rather than a guess at what the rails leave. Padding on an
+            // inner box, because a box that both measures and pads itself chases
+            // its own tail.
+            ContentPaneBox(chromeBounds, hostRect) {
             EditModeVignette(active = editing)
 
             if (availableSurfaces.isNotEmpty()) {
@@ -548,24 +747,44 @@ fun EditorSurfaceHost(
                         title            = { Text(s.editorResetSurfaceTitle) },
                         text             = {
                             Text(
-                                text = s.editorResetSurfaceBody(humanSurfaceName(surfaceForReset, s)),
+                                text = s.editorResetSurfaceBody(humanSurfaceName(surfaceForReset, s, graphForSurfaces)),
                                 style = MaterialTheme.typography.bodyMedium,
                             )
                         },
                         confirmButton = {
+                            TextButton(onClick = {
+                                controller.resetSurface(surfaceForReset)
+                                resetSurfaceConfirm = false
+                            }) { Text(s.editorReset, color = NxColor.status(Status.Error, text = true)) }
+                        },
+                        // Resetting everything is offered from here and asked about on
+                        // its own. It sat beside this surface's reset as a second red
+                        // button, under a body promising that the other surfaces are
+                        // left alone, which is true of one of the two.
+                        dismissButton = {
                             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                                 TextButton(onClick = {
-                                    controller.resetAll()
                                     resetSurfaceConfirm = false
-                                }) { Text(s.editorResetAll, color = NxTheme.colors.error) }
-                                TextButton(onClick = {
-                                    controller.resetSurface(surfaceForReset)
-                                    resetSurfaceConfirm = false
-                                }) { Text(s.editorReset, color = NxTheme.colors.error) }
+                                    resetAllConfirm = true
+                                }) { Text(s.editorResetAll) }
+                                TextButton(onClick = { resetSurfaceConfirm = false }) { Text(s.editorCancel) }
                             }
                         },
+                    )
+                }
+                if (resetAllConfirm) {
+                    AlertDialog(
+                        onDismissRequest = { resetAllConfirm = false },
+                        title            = { Text(s.editorResetAllTitle) },
+                        text             = { Text(s.editorResetAllBody, style = MaterialTheme.typography.bodyMedium) },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                controller.resetAll()
+                                resetAllConfirm = false
+                            }) { Text(s.editorResetAll, color = NxColor.status(Status.Error, text = true)) }
+                        },
                         dismissButton = {
-                            TextButton(onClick = { resetSurfaceConfirm = false }) { Text(s.editorCancel) }
+                            TextButton(onClick = { resetAllConfirm = false }) { Text(s.editorCancel) }
                         },
                     )
                 }
@@ -574,15 +793,8 @@ fun EditorSurfaceHost(
                     visible       = editing && presetPanelOpen,
                     onDismiss     = { presetPanelOpen = false },
                     onSaveCurrent = { name ->
-                        val envelope = PresetEnvelope(
-                            schemaVersion = LayoutReconcile.CURRENT_SCHEMA,
-                            name          = name,
-                            createdAt     = System.currentTimeMillis(),
-                            graph         = currentGraph,
-                            customization = customization,
-                        )
                         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                            presetRepo.save(envelope)
+                            presetRepo.save(name, currentGraph, customization)
                         }
                     },
                     onLoad = { meta ->
@@ -594,7 +806,9 @@ fun EditorSurfaceHost(
                             // uniqueness pipeline as a normal on-disk load, so a
                             // preset from an older schema (retired kinds) or app
                             // version (missing surfaces/slots) reconciles instead
-                            // of landing in live state verbatim.
+                            // of landing in live state verbatim. The structural
+                            // half already ran inside the repository, before the
+                            // graph was decoded; this is the half that reads one.
                             val result = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                                 runCatching {
                                     LayoutReconcile.reconcile(env.schemaVersion, env.graph, DefaultLayout.load())
@@ -624,7 +838,7 @@ fun EditorSurfaceHost(
                                             meta.name, seeded.seededSlots,
                                         )
                                     }
-                                    layoutRepo.update { seeded.graph }
+                                    controller.loadArrangement(seeded.graph)
                                     onCustomizationChanged(env.customization)
                                     presetPanelOpen = false
                                 }
@@ -655,11 +869,37 @@ fun EditorSurfaceHost(
                         }
                     },
                     listProvider = { presetRepo.list() },
+                    builtIns     = BundledPresets.IDS,
+                    onApplyBuiltIn = { id ->
+                        coroutineScope.launch {
+                            val preset = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                runCatching { BundledPresets.load(id) }
+                                    .onFailure { log.error("Bundled preset '{}' failed to load", id, it) }
+                                    .getOrNull()
+                            } ?: return@launch
+                            // Only the surfaces the preset is about change. The look and
+                            // every other surface stay as the person left them, which is
+                            // what separates a shipped arrangement from a saved snapshot.
+                            controller.rearrange { graph ->
+                                WidgetGraphReconciler.reconcile(
+                                    graph    = graph.withSurfacesFrom(preset),
+                                    registry = widgetRegistry,
+                                ).graph
+                            }
+                            presetPanelOpen = false
+                        }
+                    },
+                )
+
+                WidgetModulesPanel(
+                    visible   = editing && !previewing && modulesPanelOpen,
+                    modules   = widgetModules,
+                    onDismiss = { modulesPanelOpen = false },
+                    modifier  = Modifier.align(Alignment.TopStart).padding(start = 16.dp),
                 )
 
                 WidgetPalettePanel(
                     visible        = editing && paletteOpen && !previewing && propTarget == null && !surfaceSettingsOpen,
-                    dimmed         = dragController.active != null,
                     onDismiss      = { paletteOpen = false },
                     controller     = dragController,
                     registry       = registry,
@@ -680,12 +920,23 @@ fun EditorSurfaceHost(
                 // rail's selection style) -- shares the right edge with the
                 // widget prop panel; the two are mutually exclusive by flag.
                 SurfacePropertiesPanel(
-                    visible                = editing && !previewing && surfaceSettingsOpen && surfaceHasSettings(selectedSurface),
-                    title                  = selectedSurface?.let { humanSurfaceName(it, s) } ?: "",
+                    visible                = editing && !previewing && surfaceSettingsOpen &&
+                        selectedScreen == null && surfaceHasSettings(selectedSurface, graphForSurfaces),
+                    title                  = selectedSurface?.let { humanSurfaceName(it, s, graphForSurfaces) } ?: "",
                     customization          = customization,
                     onCustomizationChanged = onCustomizationChanged,
                     onDismiss              = { surfaceSettingsOpen = false },
                     modifier               = Modifier.align(Alignment.TopEnd),
+                )
+
+                // A made screen's own settings, on the same chip and in the same place.
+                ScreenPropertiesPanel(
+                    visible    = editing && !previewing && surfaceSettingsOpen && selectedScreen != null,
+                    spec       = selectedScreen,
+                    controller = controller,
+                    onDelete   = deleteScreen,
+                    onDismiss  = { surfaceSettingsOpen = false },
+                    modifier   = Modifier.align(Alignment.TopEnd),
                 )
 
                 // No edit-mode FAB: Ctrl+E (window-level, see AppShell) toggles
@@ -693,29 +944,64 @@ fun EditorSurfaceHost(
             }
             } // end center-anchored chrome layer
 
-            // Editor toolbar pill: centered over the WHOLE window, NOT the inset
-            // center pane. The inset is a fixed 65/265, but the rails collapse
-            // (Ctrl+N) and resize, so centering inside it drifted the pill across
-            // rail states. The full-window box keeps it put.
+            // Editor toolbar pill: centered over the WHOLE window, NOT the content
+            // pane. The rails collapse (Ctrl+N) and resize, so centring inside the
+            // pane drifts the pill across rail states. The full-window box keeps it
+            // put.
             if (availableSurfaces.isNotEmpty()) {
                 EditModePill(
                     active                = editing,
                     surfaces              = availableSurfaces,
                     selectedSurface       = selectedSurface,
-                    onSurfacePicked       = { selectedSurface = it; surfaceSettingsOpen = false; clearSlotSelection() },
-                    surfaceHasSettings    = surfaceHasSettings(selectedSurface),
+                    folded                = foldedSurfaces,
+                    onSurfacePicked       = { picked ->
+                        selectedSurface = picked
+                        followsScreen = !EditorSurfaces.isShell(picked)
+                        surfaceSettingsOpen = false
+                        clearSlotSelection()
+                        // Nothing can be arranged inside a folded rail, and the one
+                        // control that changes that is on its region. Opening it is
+                        // the answer to the press rather than a tab that shows a
+                        // hairline and explains nothing.
+                        // Null when the surface is nobody's inside, which leaves
+                        // the tab selected and nothing opened rather than opening
+                        // a panel about a region that does not exist.
+                        propTarget = (picked.takeIf { it in foldedSurfaces })
+                            ?.let { ownerRegion(it) }
+                            ?.let { (regionPath, id) -> PropTarget(regionPath, id) }
+                    },
+                    families              = availableFamilies,
+                    selectedFamily        = selectedFamily,
+                    onFamilyPicked        = { selectedFamily = it; clearSlotSelection() },
+                    surfaceHasSettings    = surfaceHasSettings(selectedSurface, graphForSurfaces),
                     onOpenSurfaceSettings = { surfaceSettingsOpen = !surfaceSettingsOpen; if (surfaceSettingsOpen) propTarget = null },
                     paletteOpen           = paletteOpen,
                     onTogglePalette       = { paletteOpen = !paletteOpen },
                     previewing            = previewing,
                     onTogglePreview       = { previewing = !previewing },
                     onOpenPresets         = { presetPanelOpen = true },
+                    onOpenModules         = { modulesPanelOpen = !modulesPanelOpen },
+                    onNewScreen           = {
+                        pendingSettings = true
+                        pendingScreen = controller.createScreen(s.screenDefaultTitle(graphForSurfaces.screens.size + 1))
+                    },
                     onRequestReset        = { if (selectedSurface != null) resetSurfaceConfirm = true },
+                    hasRegionProps        = ownerRegion(selectedSurface) != null,
+                    onOpenRegionProps     = {
+                        ownerRegion(selectedSurface)?.let { (regionPath, id) ->
+                            surfaceSettingsOpen = false
+                            propTarget = if (propTarget?.instanceId == id) null else PropTarget(regionPath, id)
+                        }
+                    },
+                    canUndo               = controller.canUndo,
+                    canRedo               = controller.canRedo,
+                    onUndo                = { controller.undo() },
+                    onRedo                = { controller.redo() },
                     modifier              = Modifier.align(Alignment.TopCenter).padding(top = 16.dp),
                 )
             }
 
-            // Selected-slot chrome (Tier 2): handle + orientation menu, full-window
+            // Selected-slot chrome (Tier 2): handle + layout menu, full-window
             // so it is never a layout child of the edited slot.
             if (editing && !previewing) {
                 SlotSelectionOverlay(
@@ -736,6 +1022,29 @@ fun EditorSurfaceHost(
     }
 }
 
+/**
+ * The overlays' own box, sitting over the content pane.
+ *
+ * A composable of its own purely for the size of its restart scope. Reading the
+ * two rectangles where they were used put them in the same scope as the whole
+ * shell, so dragging the window's edge or swiping the right rail re-ran the
+ * pill, the panels and all the editor's wiring on every frame of the gesture.
+ * Read here, only this box re-measures.
+ */
+@Composable
+private fun ContentPaneBox(
+    bounds: ShellChromeBounds,
+    host: State<Rect>,
+    content: @Composable BoxScope.() -> Unit,
+) {
+    val density = LocalDensity.current
+    val insets = paneInsets(bounds.center, host.value, density)
+    Box(
+        modifier = Modifier.fillMaxSize().padding(start = insets.start, end = insets.end),
+        content = content,
+    )
+}
+
 // ── Top pill ────────────────────────────────────────────────────────────────
 
 @Composable
@@ -743,15 +1052,28 @@ private fun EditModePill(
     active: Boolean,
     surfaces: List<SurfaceId>,
     selectedSurface: SurfaceId?,
+    /** Of [surfaces], the ones whose region is folded away right now. */
+    folded: Set<SurfaceId>,
     onSurfacePicked: (SurfaceId) -> Unit,
+    families: List<FamilyId>,
+    selectedFamily: FamilyId?,
+    onFamilyPicked: (FamilyId?) -> Unit,
     surfaceHasSettings: Boolean,
     onOpenSurfaceSettings: () -> Unit,
+    hasRegionProps: Boolean,
+    onOpenRegionProps: () -> Unit,
     paletteOpen: Boolean,
     onTogglePalette: () -> Unit,
     previewing: Boolean,
     onTogglePreview: () -> Unit,
     onOpenPresets: () -> Unit,
+    onOpenModules: () -> Unit,
+    onNewScreen: () -> Unit,
     onRequestReset: () -> Unit,
+    canUndo: Boolean,
+    canRedo: Boolean,
+    onUndo: () -> Unit,
+    onRedo: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val s = LocalStrings.current
@@ -762,17 +1084,15 @@ private fun EditModePill(
         exit     = fadeOut(tween(motionMs)) + slideOutVertically(tween(motionMs)) { -it },
         modifier = modifier,
     ) {
-        AdaptiveWidth { _, maxWidth ->
-            // The pill goes icon-only below this width: the full-label set (with
-            // the surface-settings gear added) overflows around the 960dp min
-            // window, where the "Esc -- exit" hint got squeezed into a vertical
-            // staircase. Threshold on the measured width, not the coarse
-            // WidthClass, so it tracks the real chip count.
-            val compact = maxWidth < 1100.dp
-            Surface(
-                color   = NxTheme.colors.surface.copy(alpha = 0.94f),
-                shape   = RoundedCornerShape(20.dp),
-                shadowElevation = 6.dp,
+        // The pill goes icon-only when the labelled one does not fit, measured rather
+        // than guessed. A width threshold was right for one set of chips and wrong
+        // the moment a chip or a surface tab was added: the labelled pill ran past
+        // the window and the "Esc -- exit" hint was squeezed into a vertical
+        // staircase that made the whole pill five rows tall.
+        FitOrCompact { compact ->
+            NxSurface(
+                kind  = SurfaceKind.Popup,
+                shape = RoundedCornerShape(20.dp),
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -780,21 +1100,42 @@ private fun EditModePill(
                 ) {
                     Symbol(icon = NxIcon.Tune,
                         contentDescription = null,
-                        tint               = NxTheme.colors.primary,
+                        tint               = NxColor.lead(),
                         modifier           = Modifier.size(16.dp),
                     )
                     Spacer(Modifier.width(8.dp))
 
                     // Surface picker chips. One chip per available surface;
-                    // the active surface has a primary tint.
+                    // the active surface has a wash of the lead colour.
                     surfaces.forEach { sid ->
                         SurfaceChip(
                             surface  = sid,
                             active   = sid == selectedSurface,
+                            folded   = sid in folded,
                             compact  = compact,
                             onClick  = { onSurfacePicked(sid) },
                         )
                         Spacer(Modifier.width(4.dp))
+                    }
+
+                    // Family picker. Only for a surface that has more than one:
+                    // a single-family surface has nothing to choose, and a chip
+                    // that cannot change anything is noise in a pill already
+                    // tight enough to go icon-only.
+                    if (families.size > 1) {
+                        Spacer(Modifier.width(2.dp))
+                        families.forEach { fid ->
+                            FamilyChip(
+                                family  = fid,
+                                active  = fid == selectedFamily,
+                                compact = compact,
+                                // Picking the pinned one again hands the surface back
+                                // to the app, so the editor is never left holding a
+                                // family the reader has stopped looking at.
+                                onClick = { onFamilyPicked(if (fid == selectedFamily) null else fid) },
+                            )
+                            Spacer(Modifier.width(4.dp))
+                        }
                     }
 
                     Spacer(Modifier.width(6.dp))
@@ -808,6 +1149,24 @@ private fun EditModePill(
                             label    = s.editorSurfaceSettings,
                             selected = false,
                             onClick  = onOpenSurfaceSettings,
+                            compact  = compact,
+                        )
+                        Spacer(Modifier.width(4.dp))
+                    }
+
+                    // The region this surface sits in, by its own settings.
+                    //
+                    // Its width, its plane and whether it is folded away are props on
+                    // a widget in the frame, and the frame is a surface of its own, so
+                    // reaching them meant knowing that the shell is a row, that the row
+                    // is editable, and which of the three widgets in it is the rail you
+                    // can see. They are one press from the rail's own tab now.
+                    if (hasRegionProps) {
+                        ToolChip(
+                            icon     = NxIcon.ViewSidebar,
+                            label    = s.editorRegionProps,
+                            selected = false,
+                            onClick  = onOpenRegionProps,
                             compact  = compact,
                         )
                         Spacer(Modifier.width(4.dp))
@@ -832,6 +1191,49 @@ private fun EditModePill(
                         label    = if (paletteOpen) s.editorPaletteToggleHide else s.editorWidgets,
                         selected = paletteOpen,
                         onClick  = onTogglePalette,
+                        compact  = compact,
+                    )
+                    Spacer(Modifier.width(4.dp))
+
+                    // Undo and redo. On the bar as well as on Ctrl+Z, because a
+                    // chord nobody is told about is a chord nobody has, and the
+                    // greyed pair is also the only place the editor says whether
+                    // there is anything to go back to.
+                    ToolChip(
+                        icon     = NxIcon.Undo,
+                        label    = s.editorUndo,
+                        selected = false,
+                        onClick  = onUndo,
+                        enabled  = canUndo,
+                        compact  = compact,
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    ToolChip(
+                        icon     = NxIcon.Redo,
+                        label    = s.editorRedo,
+                        selected = false,
+                        onClick  = onRedo,
+                        enabled  = canRedo,
+                        compact  = compact,
+                    )
+                    Spacer(Modifier.width(4.dp))
+
+                    // A new screen of one's own, opened and ready to be named.
+                    ToolChip(
+                        icon     = NxIcon.Add,
+                        label    = s.editorNewScreen,
+                        selected = false,
+                        onClick  = onNewScreen,
+                        compact  = compact,
+                    )
+                    Spacer(Modifier.width(4.dp))
+
+                    // The widget modules, switched on and off while the launcher runs.
+                    ToolChip(
+                        icon     = NxIcon.Folder,
+                        label    = s.modulesChip,
+                        selected = false,
+                        onClick  = onOpenModules,
                         compact  = compact,
                     )
                     Spacer(Modifier.width(4.dp))
@@ -867,7 +1269,7 @@ private fun EditModePill(
                         Text(
                             text  = s.editorEscHint,
                             style = MaterialTheme.typography.labelSmall,
-                            color = NxTheme.colors.textSecondary,
+                            color = NxInk.quiet,
                             modifier = Modifier.padding(end = 8.dp),
                         )
                     }
@@ -877,27 +1279,63 @@ private fun EditModePill(
     }
 }
 
+/**
+ * Lays out [content] with labels when that fits the width it is given, and in its
+ * compact form when it does not. The labelled form is measured with no limit to
+ * find out, and only composed a second time, compact, when it is too wide.
+ */
 @Composable
-private fun SurfaceChip(surface: SurfaceId, active: Boolean, compact: Boolean, onClick: () -> Unit) {
+private fun FitOrCompact(content: @Composable (compact: Boolean) -> Unit) {
+    SubcomposeLayout { constraints ->
+        val full = subcompose(false) { content(false) }.map { it.measure(Constraints()) }
+        val fits = (full.maxOfOrNull { it.width } ?: 0) <= constraints.maxWidth
+        val chosen = if (fits) full else subcompose(true) { content(true) }.map { it.measure(constraints.copy(minWidth = 0)) }
+        layout(chosen.maxOfOrNull { it.width } ?: 0, chosen.maxOfOrNull { it.height } ?: 0) {
+            chosen.forEach { it.place(0, 0) }
+        }
+    }
+}
+
+/**
+ * One surface's tab.
+ *
+ * [folded] says the surface is a rail that is currently rolled up. It stays in the
+ * row and stays pressable, because its region settings are the only place the fold
+ * can be undone from and they hang off this tab. It says so with the crossed-out
+ * eye and a dimmed label, so a tab that leads to settings rather than to a canvas
+ * looks different from one that does not.
+ */
+@Composable
+private fun SurfaceChip(
+    surface: SurfaceId,
+    active: Boolean,
+    folded: Boolean,
+    compact: Boolean,
+    onClick: () -> Unit,
+) {
     val s = LocalStrings.current
-    val bg = if (active) NxTheme.colors.primary.copy(alpha = 0.18f)
+    val graph = LocalLayoutGraph.current
+    val bg = if (active) NxColor.wash(NxColor.lead(), 0.18f)
              else Color.Transparent
-    val fg = if (active) NxTheme.colors.primary else NxTheme.colors.textSecondary
-    val name = humanSurfaceShortName(surface, s)
-    Surface(
-        color    = bg,
-        shape    = RoundedCornerShape(12.dp),
-        modifier = Modifier,
-    ) {
+    val name = humanSurfaceShortName(surface, s, graph)
+    val label = if (folded) s.editorSurfaceFolded(name) else name
+    OnFill(bg) {
+        val base = if (active) NxColor.lead(text = true) else NxInk.quiet
+        val fg = if (folded) NxColor.wash(base, 0.45f) else base
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
+                .clip(CHIP_SHAPE)
+                .background(bg)
                 .clickable { onClick() }
                 .padding(horizontal = if (compact) 7.dp else 10.dp, vertical = 5.dp),
         ) {
-            Symbol(icon = surfaceIcon(surface),
-                // Compact hides the label, so the icon carries the name for a11y.
-                contentDescription = if (compact) name else null,
+            Symbol(icon = if (folded) NxIcon.VisibilityOff else surfaceIcon(surface, graph),
+                // Named whenever the tab is folded, not only when the pill is too
+                // narrow for words: the wide pill writes the plain name and the
+                // only other cue is a dimmed tint, which a screen reader has no
+                // way to report.
+                contentDescription = if (compact || folded) label else null,
                 tint               = fg,
                 modifier           = Modifier.size(14.dp),
             )
@@ -914,6 +1352,28 @@ private fun SurfaceChip(surface: SurfaceId, active: Boolean, compact: Boolean, o
     }
 }
 
+// A family of the selected surface. Text only: a family is named by what it is
+// for, and there is no icon vocabulary for "the rail while a project is open"
+// that would not be a worse label than the word.
+@Composable
+private fun FamilyChip(family: FamilyId, active: Boolean, compact: Boolean, onClick: () -> Unit) {
+    val bg = if (active) NxColor.wash(NxColor.lead(), 0.18f) else Color.Transparent
+    OnFill(bg) {
+        val fg = if (active) NxColor.lead(text = true) else NxInk.quiet
+        Text(
+            text       = family.value,
+            style      = MaterialTheme.typography.labelSmall,
+            color      = fg,
+            fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
+            modifier   = Modifier
+                .clip(CHIP_SHAPE)
+                .background(bg)
+                .clickable { onClick() }
+                .padding(horizontal = if (compact) 7.dp else 10.dp, vertical = 6.dp),
+        )
+    }
+}
+
 @Composable
 private fun ToolChip(
     icon: IconKey,
@@ -925,21 +1385,23 @@ private fun ToolChip(
     compact: Boolean = false,
 ) {
     val bg = when {
-        !enabled    -> NxTheme.colors.surfaceVariant.copy(alpha = 0.3f)
-        destructive -> NxTheme.colors.error.copy(alpha = 0.12f)
-        selected    -> NxTheme.colors.primary.copy(alpha = 0.18f)
-        else        -> NxTheme.colors.surfaceVariant.copy(alpha = 0.6f)
+        !enabled    -> NxColor.wash(NxInk.quiet, 0.06f)
+        destructive -> NxColor.wash(NxColor.status(Status.Error), 0.12f)
+        selected    -> NxColor.wash(NxColor.lead(), 0.18f)
+        else        -> NxColor.wash(NxInk.quiet, 0.12f)
     }
-    val fg = when {
-        !enabled    -> NxTheme.colors.textSecondary.copy(alpha = 0.45f)
-        destructive -> NxTheme.colors.error
-        selected    -> NxTheme.colors.primary
-        else        -> NxTheme.colors.textPrimary
-    }
-    Surface(color = bg, shape = RoundedCornerShape(12.dp)) {
+    OnFill(bg) {
+        val fg = when {
+            !enabled    -> NxInk.off
+            destructive -> NxColor.status(Status.Error, text = true)
+            selected    -> NxColor.lead(text = true)
+            else        -> NxInk.main
+        }
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
+                .clip(CHIP_SHAPE)
+                .background(bg)
                 .clickable(enabled = enabled) { onClick() }
                 .padding(horizontal = if (compact) 7.dp else 10.dp, vertical = 5.dp),
         ) {
@@ -962,22 +1424,42 @@ private fun ToolChip(
     }
 }
 
-private fun surfaceIcon(surface: SurfaceId): IconKey =
-    EditorSurfaces.spec(surface)?.icon ?: NxIcon.Home
+private val CHIP_SHAPE = RoundedCornerShape(12.dp)
+
+private fun surfaceIcon(surface: SurfaceId, graph: LayoutGraph): IconKey =
+    EditorSurfaces.specIn(surface, graph)?.icon ?: NxIcon.Home
 
 // Falls back to the raw id for a surface with no spec: better a visible
 // `home.experiment` in the picker than a blank chip, and the registry test
 // catches the omission before a build ships it.
-private fun humanSurfaceShortName(surface: SurfaceId, s: AppStrings): String =
-    EditorSurfaces.spec(surface)?.shortName?.invoke(s) ?: surface.value
+private fun humanSurfaceShortName(surface: SurfaceId, s: AppStrings, graph: LayoutGraph): String =
+    EditorSurfaces.specIn(surface, graph)?.shortName?.invoke(s) ?: surface.value
 
-private fun humanSurfaceName(surface: SurfaceId, s: AppStrings): String =
-    EditorSurfaces.spec(surface)?.name?.invoke(s) ?: surface.value
+private fun humanSurfaceName(surface: SurfaceId, s: AppStrings, graph: LayoutGraph): String =
+    EditorSurfaces.specIn(surface, graph)?.name?.invoke(s) ?: surface.value
 
-// Surfaces that expose surface-level settings (a SurfacePropertiesPanel),
-// distinct from per-widget props.
-private fun surfaceHasSettings(surface: SurfaceId?): Boolean =
-    surface != null && EditorSurfaces.spec(surface)?.hasSettings == true
+// Surfaces that expose surface-level settings (a SurfacePropertiesPanel, or a made
+// screen's own), distinct from per-widget props.
+private fun surfaceHasSettings(surface: SurfaceId?, graph: LayoutGraph): Boolean =
+    surface != null && EditorSurfaces.specIn(surface, graph)?.hasSettings == true
+
+/**
+ * What a surface that refused to open inside itself draws while somebody is
+ * arranging: a dashed box saying so, where the surface would have been, so the
+ * widget that caused it can be found and moved.
+ */
+@Composable
+private fun RefusedMountPlaceholder() {
+    val s = LocalStrings.current
+    Box(
+        modifier = Modifier
+            .padding(8.dp)
+            .border(1.dp, NxColor.status(Status.Warning), RoundedCornerShape(8.dp))
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+    ) {
+        Text(s.editorMountRefused, style = MaterialTheme.typography.labelMedium, color = NxColor.status(Status.Warning, text = true))
+    }
+}
 
 // ── Vignette ────────────────────────────────────────────────────────────────
 
@@ -996,7 +1478,7 @@ private fun EditModeVignette(active: Boolean) {
             .alpha(alpha)
             .border(
                 width = 1.5.dp,
-                color = NxTheme.colors.primary.copy(alpha = 0.35f),
+                color = NxColor.wash(NxColor.lead(), 0.35f),
                 shape = RoundedCornerShape(0.dp),
             ),
     )
@@ -1047,9 +1529,73 @@ private fun DragGhostOverlay(dragController: DragController) {
     }
 }
 
+/** How far in from the host's own left and right edges the content pane starts. */
+internal data class PaneInsets(val start: Dp, val end: Dp)
+
+/**
+ * The pane's rectangle expressed as padding on the host's frame.
+ *
+ * Sideways only. The overlays' distance from the top is the editor's own
+ * composition and the top bar is behind them by design, so only the rails, which
+ * they must not cover, are measured.
+ *
+ * Coerced at zero on both sides: a pane wider than the frame it is measured
+ * against is a half-laid-out frame rather than a negative gap, and a negative
+ * padding is not a thing [androidx.compose.foundation.layout.padding] takes.
+ * Nothing reported yet means no inset, which is the full frame -- the same place
+ * the overlays sit on a build with no rails.
+ *
+ * The gaps are then given back, continuously, until what is left between them is
+ * at least [MIN_PANE]. A threshold that dropped both insets the moment the pane
+ * got narrow was worse than having none: it had no hysteresis, so a reader
+ * dragging a rail's width slider watched the panel they were holding teleport
+ * across the window and back on every pixel across the boundary. And in the band
+ * just under it, dropping the insets put the palette squarely over the right
+ * rail, which is itself an editable surface and quite possibly the one being
+ * arranged, where simply letting the panel be narrower cost nothing.
+ *
+ * The end gap gives way first, because the panels hang off that edge and the
+ * vignette is all the start gap buys.
+ */
+internal fun paneInsets(pane: Rect?, host: Rect, density: Density): PaneInsets {
+    if (pane == null || host.width <= 0f) return PaneInsets(0.dp, 0.dp)
+    fun gap(px: Float): Dp = with(density) { px.coerceAtLeast(0f).toDp() }
+    val room = (host.width - with(density) { MIN_PANE.toPx() }).coerceAtLeast(0f)
+    var start = (pane.left - host.left).coerceAtLeast(0f)
+    var end = (host.right - pane.right).coerceAtLeast(0f)
+    if (start + end > room) {
+        end = (room - start).coerceAtLeast(0f)
+        if (start > room) start = room
+    }
+    return PaneInsets(start = gap(start), end = gap(end))
+}
+
+/**
+ * How little room the overlays will leave themselves.
+ *
+ * The narrowest a floating panel goes under its own resize (DockSize.MIN), so the
+ * clamp stops exactly where the panel would stop anyway. It is not the widest
+ * panel: one pulled out to 560 has been pulled there deliberately, and holding
+ * the whole pane open for it would cover the rails on any ordinary window.
+ */
+private val MIN_PANE = 200.dp
+
 private fun transparentPointerIcon(): PointerIcon {
     val image = java.awt.image.BufferedImage(16, 16, java.awt.image.BufferedImage.TYPE_INT_ARGB)
     val cursor = java.awt.Toolkit.getDefaultToolkit()
         .createCustomCursor(image, java.awt.Point(0, 0), "drag-ghost")
     return PointerIcon(cursor)
 }
+
+/**
+ * Resolves a surface to the region widget that contains it, once per graph.
+ *
+ * A function returned rather than a value computed, because the caller asks
+ * about whichever surface is selected and that changes without the graph doing
+ * so.
+ */
+@Composable
+private fun selectedSurfaceOwnerRegion(graph: LayoutGraph): (SurfaceId?) -> Pair<SlotPath, String>? =
+    remember(graph) {
+        { surface -> surface?.let { EditorSurfaces.ownerRegionOf(it, graph) } }
+    }

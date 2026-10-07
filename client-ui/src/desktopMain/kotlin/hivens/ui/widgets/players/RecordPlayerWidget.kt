@@ -1,0 +1,380 @@
+package hivens.ui.widgets.players
+
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import hivens.ui.audio.PlaybackState
+import hivens.ui.audio.RepeatMode
+import hivens.ui.audio.TrackInfo
+import hivens.ui.audio.Waveform
+import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
+import hivens.ui.nx.NxButton
+import hivens.ui.nx.NxButtonStyle
+import hivens.ui.nx.NxCycleToggle
+import hivens.ui.nx.NxIconButton
+import hivens.ui.nx.NxPanelGroup
+import hivens.ui.nx.NxPopoverPanel
+import hivens.ui.nx.NxSlider
+import hivens.ui.nx.NxTooltip
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.OnFill
+import hivens.ui.theme.familyForText
+import hivens.ui.widgets.services.MusicPlayerService
+import hivens.widget.api.rememberProps
+import hivens.widget.model.PropLabel
+import hivens.widget.model.PropRange
+import hivens.widget.model.Widget
+import hivens.widget.model.WidgetInstance
+import kotlinx.serialization.Serializable
+import org.koin.compose.koinInject
+
+/**
+ * The record.
+ *
+ * One square cell and no words in it. The cover is a disc, the envelope radiates
+ * around it, and the played share is the lit arc, so every part of the object is
+ * doing one job and the whole thing reads at a glance from across the room. What
+ * is playing lives in the tooltip rather than in a caption, which is the trade
+ * this shape makes: a name is available on demand and never at the cost of the
+ * only square it has.
+ *
+ * The envelope is the ring rather than a bar because a disc has no left and no
+ * right to run a bar along, and an arc drawn plainly would say the same thing a
+ * progress ring says on everything else. Bent into the ring it says two things
+ * at once, the shape of the track and where in it we are.
+ *
+ * No skip controls on the face, for the same reason there is no caption: they
+ * would be the fourth and fifth things on an object whose whole argument is that
+ * it is one thing. The queue is steppable from the panel behind the overflow,
+ * which is where everything that does not fit on this face goes.
+ */
+@Serializable
+data class RecordPlayerProps(
+    /**
+     * Whether a caption sits under the disc after all. Off by default, which is
+     * the concept as drawn: the tooltip is where the name belongs. On, for a
+     * placement where nobody is going to hover.
+     */
+    @PropLabel("widget.home.new.player.record.showCaption") val showCaption: Boolean = false,
+    /** How wide the disc may be, in points. A ceiling, not a size. */
+    @PropRange(min = 72.0, max = 420.0)
+    @PropLabel("widget.home.new.player.record.size") val size: Int = 168,
+)
+
+@Widget(
+    id = "home.new.player.record",
+    // Height bounds stay off: the size prop is a ceiling on the WIDTH, and with
+    // the caption switched on the disc is that plus the line under it. Mirroring
+    // the width's range onto the height clipped the caption the switch turns on.
+    // The preferred height is the square it draws at rest, which is what the
+    // gallery shows.
+    minWidth = 72, prefWidth = 168, maxWidth = 420,
+    prefHeight = 168,
+    displayName = "widget.home.new.player.record",
+    propsClass = RecordPlayerProps::class,
+    drawsOwnSurface = true,
+)
+@Composable
+fun RecordPlayerWidget(instance: WidgetInstance) {
+    val p = instance.rememberProps<RecordPlayerProps>()
+    val player: MusicPlayerService = koinInject()
+    val state by player.state.collectAsState()
+    val volume by player.volume.collectAsState()
+    val repeat by player.repeat.collectAsState()
+    val queue by player.queue.collectAsState()
+    val track by player.track.collectAsState()
+    val scope = rememberCoroutineScope()
+
+    val openTracks = rememberAudioFilesPicker(scope) { player.open(it) }
+    val waveform = rememberWaveform(state.file)
+
+    val hover = remember { MutableInteractionSource() }
+    val hovered by hover.collectIsHoveredAsState()
+
+    RecordPlayerCard(
+        state       = state,
+        track       = track,
+        waveform    = waveform,
+        volume      = volume,
+        repeat      = repeat,
+        queueSize   = queue.size,
+        showCaption = p.showCaption,
+        maxSide     = p.size.coerceIn(72, 420).dp,
+        onPick      = openTracks,
+        onPlayPause = { if (state is PlaybackState.Playing) player.pause() else player.play() },
+        onStop      = { player.stop() },
+        onVolume    = { player.setVolume(it) },
+        onRepeat    = { player.setRepeat(it) },
+        onSkipNext  = { player.skipToNext() },
+        onSkipPrev  = { player.skipToPrevious() },
+        onSeek      = { player.seek(it) },
+        chrome      = hovered,
+        modifier    = Modifier.hoverable(hover),
+    )
+}
+
+/** The card over plain data, so it renders off-screen across palettes. */
+@Composable
+internal fun RecordPlayerCard(
+    state: PlaybackState,
+    track: TrackInfo?,
+    waveform: Waveform?,
+    volume: Float,
+    repeat: RepeatMode,
+    queueSize: Int,
+    showCaption: Boolean,
+    maxSide: Dp = 168.dp,
+    onPick: () -> Unit,
+    onPlayPause: () -> Unit,
+    onStop: () -> Unit,
+    onVolume: (Float) -> Unit,
+    onRepeat: (RepeatMode) -> Unit,
+    onSkipNext: () -> Unit,
+    onSkipPrev: () -> Unit,
+    onSeek: (Long) -> Unit = {},
+    chrome: Boolean = true,
+    modifier: Modifier = Modifier,
+) {
+    val s = LocalStrings.current
+    val idle = state is PlaybackState.Idle
+    val loaded = !idle && state !is PlaybackState.Error
+    var menuOpen by remember { mutableStateOf(false) }
+
+    // The disc is the object and the controls are what a pointer asks for. Left
+    // standing, the transport sits on the artwork the whole time and the shape
+    // stops being a record and becomes a button with a picture behind it. Held up
+    // while the menu is open so a click into the panel does not take it away on
+    // the way there, and always up with nothing loaded, where it is the only thing
+    // saying the widget does anything at all.
+    val reveal by animateFloatAsState(
+        targetValue = if (chrome || menuOpen || idle) 1f else 0f,
+        label = "record-chrome",
+    )
+
+    val name = playerTitle(state, track, s)
+    val artist = track?.artist
+    val caption = if (artist.isNullOrBlank()) name else "$name  ·  $artist"
+
+    Column(modifier.playerObject(maxSide), horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(Modifier.fillMaxWidth()) {
+            NxTooltip(text = caption, enabled = !showCaption) {
+                val duration = durationMsOf(state)
+                BoxWithConstraints(
+                    Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(1f)
+                        // The envelope round the label is the measure, so it takes the
+                        // scrub as well. The label itself belongs to the transport.
+                        .seekByAngle(LABEL_SHARE) { at ->
+                            if (loaded && duration > 0L) onSeek((at * duration).toLong())
+                        }
+                        // The disc is the only affordance this shape has, so with
+                        // nothing loaded it has to be the one that opens a file.
+                        .openWhenEmpty(idle, s.audioPickTrack, onPick),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    val side = minOf(maxWidth, maxHeight)
+                    val innerPx = with(LocalDensity.current) { (side * LABEL_SHARE / 2f).toPx() }
+                    WaveformRing(
+                        waveform = waveform,
+                        fraction = progressFraction(state),
+                        played = NxColor.lead(),
+                        remaining = NxColor.wash(NxInk.quiet, 0.30f),
+                        // The ring starts where the label ends, with a hair of air
+                        // between them so the bars do not appear to grow out of the
+                        // artwork itself.
+                        innerRadius = innerPx + with(LocalDensity.current) { 3.dp.toPx() },
+                        modifier = Modifier.fillMaxSize().padding(RING_INSET),
+                    )
+                    Label(track?.artwork, side * LABEL_SHARE)
+                    Box(
+                        Modifier
+                            .size(side * BUTTON_SHARE)
+                            .clip(CircleShape)
+                            .alpha(reveal)
+                            .background(Color.Black.copy(alpha = TRANSPORT_SCRIM)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        NxIconButton(
+                            icon               = if (state is PlaybackState.Playing) NxIcon.Pause else NxIcon.PlayArrow,
+                            contentDescription = if (state is PlaybackState.Playing) s.audioPause else s.audioPlay,
+                            onClick            = onPlayPause,
+                            tint               = Color.White,
+                            enabled            = loaded,
+                            iconSize           = side * BUTTON_SHARE / 2f,
+                            fill               = 1f,
+                            weight             = 500,
+                        )
+                    }
+                }
+            }
+
+            Box(Modifier.align(Alignment.TopEnd).alpha(reveal)) {
+                NxIconButton(
+                    icon               = NxIcon.MoreVert,
+                    contentDescription = s.packCardMore,
+                    onClick            = { menuOpen = true },
+                )
+                NxPopoverPanel(
+                    expanded         = menuOpen,
+                    onDismissRequest = { menuOpen = false },
+                    title            = s.audioPlaybackOptions,
+                    footer           = {
+                        NxButton(
+                            label   = s.audioOpenFile,
+                            onClick = { menuOpen = false; onPick() },
+                            style   = NxButtonStyle.Tertiary,
+                            icon    = NxIcon.FolderOpen,
+                            compact = true,
+                        )
+                        NxButton(
+                            label   = s.audioStop,
+                            onClick = { menuOpen = false; onStop() },
+                            style   = NxButtonStyle.Tertiary,
+                            icon    = NxIcon.Stop,
+                            enabled = loaded,
+                            compact = true,
+                        )
+                    },
+                ) {
+                    // The face carries no skips, so a queue would be unreachable
+                    // from a screen holding only this widget. They live here.
+                    if (queueSize > 1) {
+                        NxPanelGroup(label = s.audioQueue) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                NxIconButton(
+                                    icon               = NxIcon.SkipPrevious,
+                                    contentDescription = s.audioSkipPrevious,
+                                    onClick            = onSkipPrev,
+                                    enabled            = loaded,
+                                )
+                                NxIconButton(
+                                    icon               = NxIcon.SkipNext,
+                                    contentDescription = s.audioSkipNext,
+                                    onClick            = onSkipNext,
+                                    enabled            = loaded,
+                                )
+                            }
+                        }
+                    }
+                    NxSlider(
+                        label         = s.audioVolume,
+                        value         = volume,
+                        range         = 0f..1f,
+                        valueText     = "${(volume * 100).toInt()}%",
+                        onValueChange = onVolume,
+                        compact       = true,
+                    )
+                    NxPanelGroup(label = s.audioRepeat) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            NxCycleToggle(
+                                states  = repeatStates(s),
+                                index   = repeatIndex(repeat),
+                                onCycle = { onRepeat(REPEAT_ORDER[it]) },
+                            )
+                            Spacer(Modifier.width(10.dp))
+                            Text(
+                                text  = repeatAnswer(repeat, s),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = NxInk.main,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        if (showCaption) {
+            Text(
+                text       = name,
+                style      = MaterialTheme.typography.bodySmall,
+                color      = NxInk.main,
+                maxLines   = 1,
+                overflow   = TextOverflow.Ellipsis,
+                textAlign  = TextAlign.Center,
+                fontFamily = familyForText(name),
+                modifier   = Modifier.fillMaxWidth().padding(top = 6.dp),
+            )
+        }
+    }
+}
+
+/** The disc at the middle: the artwork, or a tonal stand-in where there is none. */
+@Composable
+private fun Label(artwork: ImageBitmap?, side: Dp) {
+    if (artwork != null) {
+        Image(
+            bitmap             = artwork,
+            contentDescription = null,
+            contentScale       = ContentScale.Crop,
+            modifier           = Modifier.size(side).clip(CircleShape),
+        )
+    } else {
+        val tone = NxColor.wash(NxColor.lead(), 0.18f)
+        Box(
+            Modifier.size(side).clip(CircleShape).background(tone),
+            contentAlignment = Alignment.Center,
+        ) {
+            OnFill(tone) {
+                Symbol(NxIcon.MusicNote, null, tint = NxColor.lead(), fill = 1f, weight = 500, modifier = Modifier.size(side / 3f))
+            }
+        }
+    }
+}
+
+/** The label's diameter as a share of the square. The rest is ring and air. */
+private const val LABEL_SHARE = 0.57f
+
+/** The transport disc over the label, sized so it covers a label and not the ring. */
+private const val BUTTON_SHARE = 0.26f
+
+/** Keeps the loudest bar off the edge of the cell. */
+private val RING_INSET = 4.dp
+
+/**
+ * What the transport disc puts between itself and the label under it.
+ *
+ * Heavier than the concept sheet's, which was drawn over a dark blue cover
+ * and read fine there. A label with a bright middle, which is most of them,
+ * left a white glyph on yellow with a wash that did nothing.
+ */
+private const val TRANSPORT_SCRIM = 0.58f

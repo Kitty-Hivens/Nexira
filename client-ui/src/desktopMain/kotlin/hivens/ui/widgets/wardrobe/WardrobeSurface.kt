@@ -1,8 +1,6 @@
 package hivens.ui.widgets.wardrobe
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -38,7 +36,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toComposeImageBitmap
@@ -59,8 +56,8 @@ import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxChoiceChip
 import hivens.ui.nx.NxSectionHeader
 import hivens.ui.nx.NxTooltip
-import hivens.ui.surface.NxCard
-import hivens.ui.surface.NxSurfaceLevel
+import hivens.ui.surface.NxSurface
+import hivens.ui.surface.SurfaceKind
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
@@ -80,12 +77,13 @@ import hivens.ui.skin3d.SkinView3D
 import hivens.ui.skin3d.asSource
 import hivens.ui.skin3d.layered
 import hivens.ui.skin3d.rememberSkinViewState
-import hivens.ui.theme.NxTheme
 import hivens.ui.utils.pickFile
 import hivens.ui.utils.rememberFileDialogSettings
+import hivens.ui.utils.rememberReadOffMain
 import hivens.ui.widgets.profile.SkinHero
 import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.path
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -93,6 +91,9 @@ import org.jetbrains.skia.Image
 import org.koin.compose.koinInject
 import java.io.File
 import java.nio.file.Files
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.Status
 
 private const val SC_KEY = PackAuthRequirement.SmartyCraft.PROVIDER_KEY
 
@@ -116,10 +117,10 @@ fun WardrobeSurface(session: SessionData?, onBack: () -> Unit) {
 
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         // Title lives in the top-bar breadcrumb now -- no in-screen duplicate.
-        NxCard(modifier = Modifier.weight(1f).fillMaxWidth(), level = NxSurfaceLevel.Raised) {
+        NxSurface(SurfaceKind.Panel, modifier = Modifier.weight(1f).fillMaxWidth()) {
             if (session == null) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(s.wardrobeSignedOut, style = MaterialTheme.typography.bodyMedium, color = NxTheme.colors.textSecondary)
+                    Text(s.wardrobeSignedOut, style = MaterialTheme.typography.bodyMedium, color = NxInk.quiet)
                 }
             } else {
                 Wardrobe(session)
@@ -180,6 +181,9 @@ private fun Wardrobe(session: SessionData) {
     val defaultSkinProvider: DefaultSkinProvider = koinInject()
     val clanRoles: ClanRoleProvider = koinInject()
     val scope = rememberCoroutineScope()
+    // The apply is a POST that does not stop because the reader left the screen,
+    // the same as the profile's own upload.
+    val applyScope: CoroutineScope = koinInject()
 
     var refreshKey by remember { mutableIntStateOf(0) }
     var selectedId by remember { mutableStateOf<String?>(null) }
@@ -259,7 +263,7 @@ private fun Wardrobe(session: SessionData) {
             onDismiss    = { pendingDelete = null },
         )
     }
-    val scSession = remember(refreshKey, session) { credentials.accountFor(SC_KEY) }
+    val scSession = rememberReadOffMain(refreshKey, session) { credentials.accountFor(SC_KEY) }?.value
 
     // Cape capability. Fast path: a fresh login already said "no clan", no
     // network needed. Otherwise the public player page decides -- it works
@@ -279,12 +283,17 @@ private fun Wardrobe(session: SessionData) {
     // local library -- auto-import it (deduped by pixel content) so it shows among the
     // saved skins and reads as the active one. Runs once per player: a genuine server-side
     // skin change surfaces as a new entry on the next open, an identical one dedups.
-    LaunchedEffect(session.playerName) {
-        val bytes = skinManager.getRawSkinBytes(session.playerName) ?: return@LaunchedEffect
+    //
+    // The SmartyCraft account's look, not the face's. The skin host is SmartyCraft's and
+    // is asked by nickname, so a Microsoft face whose name is also taken there imported a
+    // stranger's skin into the library and marked it applied.
+    LaunchedEffect(scSession?.playerName) {
+        val scName = scSession?.playerName ?: return@LaunchedEffect
+        val bytes = skinManager.getRawSkinBytes(scName) ?: return@LaunchedEffect
         val primed = withContext(Dispatchers.IO) {
             // No pixel hash -> no dedup, so skip rather than accumulate a copy per open.
             val sha = skinContentHash(bytes) ?: return@withContext null
-            val entry = library.addUnique(bytes, session.playerName, slim = false, now = System.currentTimeMillis(), sha = sha)
+            val entry = library.addUnique(bytes, scName, slim = false, now = System.currentTimeMillis(), sha = sha)
             library.markApplied(entry.id, System.currentTimeMillis())
             decodeSkin(bytes)?.let { entry.id to it }
         }
@@ -318,14 +327,17 @@ private fun Wardrobe(session: SessionData) {
         val sc = scSession ?: return
         busy = true
         error = null
-        scope.launch {
+        // Left mid-request on the composition, the request was cancelled whether or not
+        // the server had taken it: an apply that landed was never marked or shown, and
+        // the next visit's import marked the old skin applied again.
+        applyScope.launch(Dispatchers.Main) {
             val result = withContext(Dispatchers.IO) {
                 runCatching { skinRepository.uploadSkin(file, isCloak = isCloak, session = sc) }
                     .getOrElse { it.message ?: "error" }
             }
             busy = false
             if (result == "OK") {
-                markId?.let { library.markApplied(it, System.currentTimeMillis()) }
+                withContext(Dispatchers.IO) { markId?.let { library.markApplied(it, System.currentTimeMillis()) } }
                 skinManager.invalidate(sc.playerName)
                 refreshKey++
             } else {
@@ -355,7 +367,8 @@ private fun Wardrobe(session: SessionData) {
                 if (bmp != null) {
                     SkinView3D(bmp, Modifier.fillMaxSize(), interactive = true, autoSpin = false, cape = previewCape, state = previewState)
                 } else {
-                    SkinHero(session.playerName, refreshKey, Modifier.fillMaxSize(), interactive = true, autoSpin = false, cape = previewCape, state = previewState)
+                    // The look an apply here would change, which is the SmartyCraft account's.
+                    SkinHero(scSession?.playerName ?: session.playerName, refreshKey, Modifier.fillMaxSize(), interactive = true, autoSpin = false, cape = previewCape, state = previewState)
                 }
             }
             FlowRow(
@@ -419,7 +432,7 @@ private fun Wardrobe(session: SessionData) {
                     }
                     if (busy) {
                         CircularProgressIndicator(
-                            color = NxTheme.colors.primary,
+                            color = NxColor.lead(),
                             strokeWidth = 2.dp,
                             modifier = Modifier.size(18.dp),
                         )
@@ -428,7 +441,7 @@ private fun Wardrobe(session: SessionData) {
                         Text(
                             text = it,
                             style = MaterialTheme.typography.bodySmall,
-                            color = NxTheme.colors.error,
+                            color = NxColor.status(Status.Error, text = true),
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f, fill = false),
@@ -470,7 +483,7 @@ private fun Wardrobe(session: SessionData) {
                         Text(
                             s.wardrobeCapeClanHint,
                             style = MaterialTheme.typography.bodySmall,
-                            color = NxTheme.colors.textSecondary,
+                            color = NxInk.quiet,
                         )
                     }
                     item(key = "add-cape") { AddTile(onClick = { importInto(SkinLibrary.Kind.Cape) { selectedCapeId = it } }) }
@@ -518,41 +531,42 @@ private fun SkinCard(
     onDelete: (() -> Unit)?,
 ) {
     val s = LocalStrings.current
-    Column(
-        modifier = Modifier
-            // Before the clip, not after: a stroke is centred on the outline, so
-            // half of it falls outside the shape and drawing it inside the clip
-            // left a half-width ring the corner antialiasing then ate.
-            .then(
-                if (selected) Modifier.border(2.dp, NxTheme.colors.primary, MaterialTheme.shapes.medium)
-                else Modifier
-            )
-            .clip(MaterialTheme.shapes.medium)
-            .background(NxTheme.colors.background.copy(alpha = 0.4f))
-            .clickable(onClick = onClick)
-            .padding(6.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
+    NxSurface(
+        kind          = SurfaceKind.Card,
+        // The ring is the surface's own edge, which is stroked outside its clip: a
+        // stroke is centred on the outline, so drawing it inside the clip left a
+        // half-width ring the corner antialiasing then ate.
+        borderWidthDp = if (selected) 2f else null,
+        borderColor   = if (selected) NxColor.lead() else null,
     ) {
-        Box(Modifier.fillMaxWidth().aspectRatio(1f)) {
-            if (bitmap != null) {
-                SkinView3D(bitmap, Modifier.fillMaxSize(), interactive = false, autoSpin = false, framing = SkinFraming.Bust)
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick)
+                .padding(6.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Box(Modifier.fillMaxWidth().aspectRatio(1f)) {
+                if (bitmap != null) {
+                    SkinView3D(bitmap, Modifier.fillMaxSize(), interactive = false, autoSpin = false, framing = SkinFraming.Bust)
+                }
+                // Active marker -- the most-recently-applied skin (library = history).
+                if (isActive) {
+                    Symbol(
+                        NxIcon.CheckCircle, null,
+                        tint = NxColor.status(Status.Success),
+                        size = 16.dp,
+                        modifier = Modifier.align(Alignment.TopEnd).padding(2.dp),
+                    )
+                }
             }
-            // Active marker -- the most-recently-applied skin (library = history).
-            if (isActive) {
-                Symbol(
-                    NxIcon.CheckCircle, null,
-                    tint = NxTheme.colors.success,
-                    size = 16.dp,
-                    modifier = Modifier.align(Alignment.TopEnd).padding(2.dp),
-                )
-            }
-        }
-        Row(Modifier.height(CardCaptionHeight), verticalAlignment = Alignment.CenterVertically) {
-            CardCaption(name, Modifier.weight(1f, fill = false))
-            // Default skins are read-only (not library entries), so no delete.
-            onDelete?.let { del ->
-                IconButton(onClick = del, modifier = Modifier.size(24.dp)) {
-                    Symbol(NxIcon.Delete, s.accountRemove, tint = NxTheme.colors.textSecondary, size = 16.dp)
+            Row(Modifier.height(CardCaptionHeight), verticalAlignment = Alignment.CenterVertically) {
+                CardCaption(name, Modifier.weight(1f, fill = false))
+                // Default skins are read-only (not library entries), so no delete.
+                onDelete?.let { del ->
+                    IconButton(onClick = del, modifier = Modifier.size(24.dp)) {
+                        Symbol(NxIcon.Delete, s.accountRemove, tint = NxInk.quiet, size = 16.dp)
+                    }
                 }
             }
         }
@@ -568,7 +582,7 @@ private fun CardCaption(name: String, modifier: Modifier = Modifier) {
         Text(
             text = name,
             style = MaterialTheme.typography.labelSmall,
-            color = NxTheme.colors.textPrimary,
+            color = NxInk.main,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             onTextLayout = { truncated = it.hasVisualOverflow },
@@ -581,19 +595,20 @@ private fun CardCaption(name: String, modifier: Modifier = Modifier) {
 @Composable
 private fun AddTile(onClick: () -> Unit) {
     val s = LocalStrings.current
-    Column(
-        modifier = Modifier
-            .clip(MaterialTheme.shapes.medium)
-            .background(NxTheme.colors.surface.copy(alpha = 0.4f))
-            .clickable(onClick = onClick)
-            .padding(6.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Box(Modifier.fillMaxWidth().aspectRatio(1f), contentAlignment = Alignment.Center) {
-            Symbol(NxIcon.Add, s.wardrobeUpload, tint = NxTheme.colors.primary, size = 32.dp)
-        }
-        Box(Modifier.height(CardCaptionHeight), contentAlignment = Alignment.Center) {
-            Text(s.wardrobeUpload, style = MaterialTheme.typography.labelSmall, color = NxTheme.colors.textSecondary, maxLines = 1)
+    NxSurface(SurfaceKind.Card) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick)
+                .padding(6.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Box(Modifier.fillMaxWidth().aspectRatio(1f), contentAlignment = Alignment.Center) {
+                Symbol(NxIcon.Add, s.wardrobeUpload, tint = NxColor.lead(), size = 32.dp)
+            }
+            Box(Modifier.height(CardCaptionHeight), contentAlignment = Alignment.Center) {
+                Text(s.wardrobeUpload, style = MaterialTheme.typography.labelSmall, color = NxInk.quiet, maxLines = 1)
+            }
         }
     }
     PuppetClick("wardrobe.upload") { onClick() }
@@ -609,36 +624,37 @@ private fun CapeCard(
     onDelete: () -> Unit,
 ) {
     val s = LocalStrings.current
-    Column(
-        modifier = Modifier
-            // Before the clip, not after: a stroke is centred on the outline, so
-            // half of it falls outside the shape and drawing it inside the clip
-            // left a half-width ring the corner antialiasing then ate.
-            .then(
-                if (selected) Modifier.border(2.dp, NxTheme.colors.primary, MaterialTheme.shapes.medium)
-                else Modifier
-            )
-            .clip(MaterialTheme.shapes.medium)
-            .background(NxTheme.colors.background.copy(alpha = 0.4f))
-            .clickable(onClick = onClick)
-            .padding(6.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
+    NxSurface(
+        kind          = SurfaceKind.Card,
+        // The ring is the surface's own edge, which is stroked outside its clip: a
+        // stroke is centred on the outline, so drawing it inside the clip left a
+        // half-width ring the corner antialiasing then ate.
+        borderWidthDp = if (selected) 2f else null,
+        borderColor   = if (selected) NxColor.lead() else null,
     ) {
-        Box(Modifier.fillMaxWidth().aspectRatio(1f), contentAlignment = Alignment.Center) {
-            if (bitmap != null) CapeThumbnail(bitmap, Modifier.fillMaxHeight().aspectRatio(10f / 16f))
-            if (isActive) {
-                Symbol(
-                    NxIcon.CheckCircle, null,
-                    tint = NxTheme.colors.success,
-                    size = 16.dp,
-                    modifier = Modifier.align(Alignment.TopEnd).padding(2.dp),
-                )
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick)
+                .padding(6.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Box(Modifier.fillMaxWidth().aspectRatio(1f), contentAlignment = Alignment.Center) {
+                if (bitmap != null) CapeThumbnail(bitmap, Modifier.fillMaxHeight().aspectRatio(10f / 16f))
+                if (isActive) {
+                    Symbol(
+                        NxIcon.CheckCircle, null,
+                        tint = NxColor.status(Status.Success),
+                        size = 16.dp,
+                        modifier = Modifier.align(Alignment.TopEnd).padding(2.dp),
+                    )
+                }
             }
-        }
-        Row(Modifier.height(CardCaptionHeight), verticalAlignment = Alignment.CenterVertically) {
-            CardCaption(name, Modifier.weight(1f, fill = false))
-            IconButton(onClick = onDelete, modifier = Modifier.size(24.dp)) {
-                Symbol(NxIcon.Delete, s.accountRemove, tint = NxTheme.colors.textSecondary, size = 16.dp)
+            Row(Modifier.height(CardCaptionHeight), verticalAlignment = Alignment.CenterVertically) {
+                CardCaption(name, Modifier.weight(1f, fill = false))
+                IconButton(onClick = onDelete, modifier = Modifier.size(24.dp)) {
+                    Symbol(NxIcon.Delete, s.accountRemove, tint = NxInk.quiet, size = 16.dp)
+                }
             }
         }
     }

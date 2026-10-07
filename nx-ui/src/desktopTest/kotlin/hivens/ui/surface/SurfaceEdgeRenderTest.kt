@@ -6,21 +6,20 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
-import hivens.ui.theme.DarkColorPalette
-import hivens.ui.theme.LocalNxColors
 import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
 import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertTrue
+import hivens.ui.theme.NxTheme
+import hivens.ui.theme.Themes
 
 /**
  * The last two of the seven values have to reach pixels like the rest.
@@ -90,9 +89,7 @@ class SurfaceEdgeRenderTest {
     @OptIn(ExperimentalComposeUiApi::class)
     private fun render(name: String, content: @androidx.compose.runtime.Composable () -> Unit): IntArray {
         val scene = ImageComposeScene(width = SW, height = SH, density = Density(1f)) {
-            CompositionLocalProvider(
-                LocalNxColors provides DarkColorPalette,
-            ) {
+            NxTheme(Themes.Celestia, dark = true) {
                 Box(Modifier.fillMaxSize().background(PAGE)) { content() }
             }
         }
@@ -107,10 +104,9 @@ class SurfaceEdgeRenderTest {
     @androidx.compose.runtime.Composable
     private fun plate(shadowDp: Float, borderWidthDp: Float) {
         NxSurface(
-            level = NxSurfaceLevel.Floating,
+            kind = SurfaceKind.Panel,
             modifier = Modifier.offset(X.dp, Y.dp).size(W.dp, H.dp),
             shape = RoundedCornerShape(10.dp),
-            blurDp = 0f,
             borderWidthDp = borderWidthDp,
             shadowDp = shadowDp,
         ) {}

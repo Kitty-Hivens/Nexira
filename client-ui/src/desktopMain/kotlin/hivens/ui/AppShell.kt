@@ -1,5 +1,12 @@
 package hivens.ui
 
+import kotlinx.coroutines.launch
+import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
+import hivens.ui.components.QuitWithGameHost
+import hivens.ui.components.QuitGate
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
@@ -17,6 +24,8 @@ import androidx.compose.ui.window.FrameWindowScope
 import androidx.compose.ui.window.WindowState
 import coil3.ImageLoader
 import coil3.SingletonImageLoader
+import coil3.disk.DiskCache
+import coil3.disk.directory
 import hivens.ui.render.SvgImageDecoder
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import hivens.config.Branding
@@ -24,11 +33,10 @@ import hivens.auth.AuthProvider
 import hivens.auth.AuthProviderRegistry
 import hivens.auth.RefreshableAuthProvider
 import hivens.core.data.NewerBuildData
+import hivens.core.data.ReadOnlyReason
 import hivens.core.data.ReadOnlyStore
-import hivens.core.api.interfaces.IServerListService
 import hivens.core.api.interfaces.ISettingsService
-import hivens.core.api.model.ServerProfile
-import hivens.core.data.HomeView
+import hivens.core.api.interfaces.IUpdateApplicator
 import hivens.core.data.ModuleId
 import hivens.core.data.PackAuthRequirement
 import hivens.ui.screens.detail.settings.PackSettingsCategory
@@ -38,10 +46,9 @@ import hivens.core.data.SessionData
 import hivens.core.data.ThemeMode
 import hivens.core.data.darkThemeFor
 import hivens.core.data.resolveInitialThemeMode
-import hivens.launcher.AutoSyncService
+import hivens.launcher.legacy.RetiredClientScanner
 import hivens.launcher.update.ApplyRecovery
 import hivens.launcher.update.PackAutoUpdateService
-import hivens.launcher.ServerListCacheStore
 import hivens.core.diag.ActionRing
 import hivens.core.security.SslBypassStore
 import hivens.launcher.bootstrap.AutoLoginCoordinator
@@ -63,8 +70,11 @@ import hivens.auth.AccountStore
 import hivens.core.launch.LaunchState
 import hivens.launcher.launch.LauncherController
 import hivens.launcher.network.ServerProtocolConfig
+import hivens.ui.chrome.ExtraButton
+import hivens.ui.chrome.awtOnX11
 import hivens.ui.chrome.computeSafeWindowMinSize
-import hivens.launcher.ProfileManager
+import hivens.ui.chrome.extraButton
+import hivens.ui.chrome.resendAsSidewaysWheel
 import hivens.tray.TrayController
 import hivens.tray.TrayStrings
 import hivens.ui.background.BackgroundManager
@@ -72,6 +82,7 @@ import hivens.ui.background.CustomBackground
 import hivens.ui.theme.WallpaperTone
 import hivens.ui.chrome.LocalChromeClose
 import hivens.ui.chrome.LocalComposeWindow
+import hivens.ui.chrome.isFrom
 import hivens.ui.chrome.LocalWindowHide
 import hivens.ui.chrome.ShellChord
 import hivens.ui.chrome.resolveShellChord
@@ -105,19 +116,27 @@ import hivens.ui.screens.MigrationScreen
 import hivens.ui.theme.NxTheme
 import hivens.ui.text.needsCjkFace
 import hivens.ui.theme.nexiraCjkFamily
-import hivens.ui.theme.CustomTheme
+import hivens.ui.theme.ThemeLibrary
 import hivens.ui.theme.SystemTheme
 import hivens.ui.theme.ThemeRevealHost
 import hivens.ui.theme.rememberThemeReveal
 import hivens.ui.theme.ThemeManager
 import hivens.ui.system.SystemNotifier
 import hivens.ui.utils.GameConsoleService
+import hivens.ui.utils.PreferenceWriter
 import hivens.ui.layout.LayoutGraphRepository
+import hivens.ui.legacy.RetiredClientsGate
 import hivens.ui.logic.PostLaunchGate
 import hivens.ui.logic.PostLaunchMove
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.LocalWidgetRegistry
 import hivens.widget.api.LocalWidgetSurfaceRenderer
+import hivens.widget.api.LocalWidgetEntrance
+import hivens.widget.api.LocalMapControls
+import hivens.widget.api.LocalViewportScrollbar
+import hivens.ui.widgets.NxMapControls
+import hivens.ui.widgets.NxViewportScrollbar
+import hivens.ui.widgets.PlayedWidgetEntrance
 import hivens.widget.api.WidgetSurfaceRenderer
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.PaddingValues
@@ -125,18 +144,21 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import hivens.ui.widgets.WidgetSurface
+import hivens.ui.widgets.modules.WidgetModules
 import hivens.ui.widgets.state.WidgetStateStore
 import hivens.widget.api.LocalWidgetCommandRegistry
 import hivens.widget.api.LocalWidgetDataRegistry
 import hivens.widget.api.LocalWidgetServiceRegistry
+import hivens.ui.screens.mod.ModTarget
+import hivens.widget.api.LocalSurfaceFamilies
 import hivens.widget.api.LocalWidgetStateHost
+import hivens.widget.api.SurfaceFamilies
 import hivens.widget.api.WidgetCommandRegistry
 import hivens.widget.api.WidgetDataRegistry
 import hivens.widget.api.WidgetServiceRegistry
 import hivens.widget.api.WidgetRegistry
 import hivens.widget.model.DefaultLayout
 import hivens.widget.model.walkInstances
-import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -156,6 +178,7 @@ import java.awt.event.MouseEvent
 import javax.swing.SwingUtilities
 import kotlin.system.exitProcess
 import kotlin.time.Duration.Companion.milliseconds
+import hivens.ui.theme.NxColor
 
 // 2-column Library + sidebar starts collapsing visibly below this width;
 // 600dp of height keeps PackDetail hero + sidebar both reachable. Held
@@ -191,16 +214,6 @@ sealed class Screen {
     object ThemePicker        : Screen()
     object About              : Screen()
     object BackgroundSettings : Screen()
-    /**
-     * The two server-scoped screens carry the roster id, not the roster entry.
-     * A [ServerProfile] copied into the back stack aged with every fetch -- the
-     * screens went on showing, and launching, an address the roster had since
-     * changed -- and made two visits to the same server structurally different
-     * entries, which is what the dedupe and popTo compare. Same reasoning as
-     * [PackDetail], which has carried an id since it was written.
-     */
-    data class ServerSettings(val serverId: String) : Screen()
-    data class ServerDetails (val serverId: String) : Screen()
 
     /**
      * Library card click target. Carries the PackInstance UUID; the
@@ -240,6 +253,48 @@ sealed class Screen {
     data class CataloguePackDetail(val origin: PackOrigin, val packId: String) : Screen()
 
     /**
+     * The project page, rendered natively rather than linked out.
+     *
+     * A SCREEN and not a panel, because its metadata blocks live in
+     * `appshell.rightrail` -- a shell surface present on every screen -- and a
+     * page carrying its own right-hand column would stand a third column beside
+     * the news. Opening one therefore navigates; it cannot open in place, because
+     * in place the blocks have nowhere to appear.
+     *
+     * Carries a [ModTarget] rather than a project id so a jar the catalogue has
+     * never indexed gets the same page as one it has.
+     */
+    data class ModDetail(val target: ModTarget) : Screen()
+
+    /**
+     * One build of a project: what it runs on, what it needs, what changed and
+     * which files it ships.
+     *
+     * The versions table answers "which builds exist" and cannot also answer
+     * "what is this one", because the second question needs a column per
+     * dependency and a paragraph of notes. It carries the [target] as well as the
+     * build so the rail keeps describing the project the build belongs to, and so
+     * an install from here knows which pack it is installing into.
+     *
+     * [versionNumber] rides along because the caller always has it and the
+     * breadcrumb needs it on the first frame. Resolving it would label the crumb
+     * with a catalogue id for as long as the fetch took, which is the one name
+     * nobody clicked.
+     */
+    data class ModVersion(
+        val target: ModTarget,
+        val versionId: String,
+        val versionNumber: String,
+    ) : Screen()
+
+    /**
+     * A screen somebody made, by its id. Everything about it, what it is called and
+     * what it holds, is in the layout graph, so this carries the id and nothing else
+     * and a rename never leaves a stale title on the back stack.
+     */
+    data class Custom(val id: String) : Screen()
+
+    /**
      * Identity for state that outlives a visit, stable across the fields a screen
      * stamps onto its own back-stack entry.
      *
@@ -253,8 +308,9 @@ sealed class Screen {
         is PackDetail          -> "PackDetail:$instanceId"
         is PackVersions        -> "PackVersions:$instanceId"
         is CataloguePackDetail -> "CataloguePackDetail:$origin:$packId"
-        is ServerSettings      -> "ServerSettings:$serverId"
-        is ServerDetails       -> "ServerDetails:$serverId"
+        is ModDetail           -> "ModDetail:${target.key}"
+        is ModVersion          -> "ModVersion:${target.key}:$versionId"
+        is Custom              -> "Custom:$id"
         else                   -> this::class.simpleName.orEmpty()
     }
 }
@@ -296,14 +352,12 @@ fun FrameWindowScope.AppShellContent(
     }
 
     val settingsService: ISettingsService      = koinInject()
-    val serverListService: IServerListService  = koinInject()
-    val serverListCache: ServerListCacheStore  = koinInject()
     val controller: LauncherController         = koinInject()
-    val profileManager: ProfileManager         = koinInject()
     val gameConsole: GameConsoleService        = koinInject()
     val debugOverlay: DebugOverlayState        = koinInject()
     val layoutGraphRepo: LayoutGraphRepository = koinInject()
     val widgetRegistry: WidgetRegistry         = koinInject()
+    val widgetModules: WidgetModules           = koinInject()
     val widgetServiceRegistry: WidgetServiceRegistry = koinInject()
     val widgetDataRegistry: WidgetDataRegistry = koinInject()
     val widgetCommandRegistry: WidgetCommandRegistry = koinInject()
@@ -314,8 +368,21 @@ fun FrameWindowScope.AppShellContent(
     // by AppCoroutineScopeHook on JVM shutdown). Same instance backs
     // LauncherController.appScope and any other fire-and-forget work.
     val applicationScope: CoroutineScope        = koinInject()
+    val preferences: PreferenceWriter           = koinInject()
 
     val settings = remember { settingsService.getSettings() }
+
+    // Every way out of the launcher goes through here. With a game running it asks
+    // first (see QuitWithGameHost); otherwise it quits as it always has.
+    val quitGate = remember { QuitGate() }
+    val quit: () -> Unit = {
+        val state = controller.state.value
+        if (controller.runningPackInstanceId.value != null || state is LaunchState.GameRunning || state is LaunchState.Stopping) {
+            quitGate.request()
+        } else {
+            exitApp()
+        }
+    }
 
     // The console's own commands, declared in ConsoleCommands. Registered once;
     // the console service is a process singleton. The UI-debug toggle is among
@@ -379,13 +446,6 @@ fun FrameWindowScope.AppShellContent(
     }
 
     var isDarkTheme   by remember { mutableStateOf(settings.isDarkTheme) }
-    // Material You palette: the wallpaper seed (computed in AppRoot from the backdrop
-    // bitmap) lifts up to here so NxTheme -- which wraps AppRoot -- can derive
-    // the palette from it. Default-on; the seed is null until a bitmap is decoded.
-    // Switching seeding off is how a theme preset is seen in its own colours, so the
-    // flag is state here rather than a read of the startup snapshot.
-    var paletteFromWallpaper by remember { mutableStateOf(settings.paletteFromWallpaper) }
-    var wallpaperSeed by remember { mutableStateOf<Int?>(null) }
     // Which source drives dark/light: the manual toggle, the OS scheme, or the
     // wallpaper's brightness. Both automatic sources write through isDarkTheme (and
     // persist it), so everything downstream keeps reading one boolean.
@@ -400,10 +460,10 @@ fun FrameWindowScope.AppShellContent(
     // start opens on what was last observed instead of flashing the old scheme.
     // darkThemeFor returns null when nothing should change, which keeps a
     // wallpaper crossfade from writing the settings file on every tick.
-    val applyAutomaticDark: suspend (Boolean?) -> Unit = { wanted ->
+    val applyAutomaticDark: (Boolean?) -> Unit = { wanted ->
         if (wanted != null) {
             isDarkTheme = wanted
-            settingsService.saveSettings(settingsService.getSettings().copy(isDarkTheme = wanted))
+            preferences.write("the colour scheme") { settingsService.updateSettings { it.copy(isDarkTheme = wanted) } }
         }
     }
 
@@ -422,7 +482,6 @@ fun FrameWindowScope.AppShellContent(
     var currentLocale by remember {
         mutableStateOf(AppLocale.fromTag(settings.locale))
     }
-    var homeView      by remember { mutableStateOf(settings.homeView) }
 
     // The chaos engine is a plain singleton rather than a composable, so it is
     // told what the interface looks like rather than reading it. Both values were
@@ -441,7 +500,9 @@ fun FrameWindowScope.AppShellContent(
     // a healthy graph reconciles to itself and writes nothing.
     LaunchedEffect(Unit) {
         val before = layoutGraphRepo.value()
-        val defaultKinds = DefaultLayout.load().walkInstances().map { it.kind }.toSet()
+        // A module that is off, broken or gone still owns its kinds until somebody
+        // forgets it, so its widgets are not pruned as if they had been renamed away.
+        val defaultKinds = DefaultLayout.load().walkInstances().map { it.kind }.toSet() + widgetModules.knownKinds()
         val result = WidgetGraphReconciler.reconcile(
             graph        = before,
             registry     = widgetRegistry,
@@ -449,15 +510,12 @@ fun FrameWindowScope.AppShellContent(
             // Prune removed kinds only when a schema bump actually happened --
             // a deliberate app update is the safe moment to reap orphans.
             //
-            // TRAP, armed the moment the registry has a second source: a kind
-            // vanishes here either because it was renamed away, or because the
-            // source that carried it is not in this build. The reconciler cannot
-            // tell those apart, and for the second it deletes the user's widgets
-            // along with their props and placement, permanently, on a file with
-            // no undo. Today every source is compiled in, so completeness is a
-            // build-time fact and this cannot fire. Whoever adds a source that
-            // can be absent has to gate this on the registry being complete
-            // BEFORE doing so, not after.
+            // A kind vanishes here either because it was renamed away, or because
+            // the module that carried it is off, broken or gone. The reconciler
+            // cannot tell those apart, which is why every kind a remembered module
+            // ever brought is counted as known above: only a kind no module claims
+            // is reaped, and a module's kinds are let go only when somebody forgets
+            // the module.
             prune        = layoutGraphRepo.migratedFromSchema != null,
         )
         if (result.graph != before) {
@@ -470,7 +528,13 @@ fun FrameWindowScope.AppShellContent(
         }
     }
 
-    val launchState by controller.state.collectAsState()
+    // Collapsed to the changes this shell acts on. Preparing and downloading emit
+    // per chunk and per verified file, and the shell reads neither the stage nor the
+    // progress, so a thousand-file install recomposed the root a few thousand times
+    // and re-ran everything keyed on it.
+    val launchState by remember(controller) {
+        controller.state.distinctUntilChanged { old, new -> old.isPreparing() && new.isPreparing() }
+    }.collectAsState(initial = controller.state.value)
 
     // Drains the controller's event channel into the console pane with
     // localized text. Lives at this level (not Dashboard) so events fire
@@ -511,8 +575,11 @@ fun FrameWindowScope.AppShellContent(
         val showFile = boot.paths.dataDir.resolve(".show").toFile()
         while (true) {
             delay(500.milliseconds)
-            if (showFile.exists()) {
-                showFile.delete()
+            // The check and the delete off the UI thread: twice a second for the
+            // life of the process, and a stall per tick on a data directory that is
+            // network-mounted or asleep.
+            val signalled = withContext(Dispatchers.IO) { showFile.exists().also { if (it) showFile.delete() } }
+            if (signalled) {
                 revealWindow()
                 raiseTick++
             }
@@ -528,18 +595,15 @@ fun FrameWindowScope.AppShellContent(
         PostLaunchGate(runningAtMount = (controller.state.value as? LaunchState.GameRunning)?.handle)
     }
 
-    // What the tray tooltip names: the session that is actually running. It used to
-    // read the last SmartyCraft server id, which is not what a pack launch started
-    // and is not even what the last launch was -- a pack played after a server left
-    // the tooltip naming the server. The registration lands from the launch driver,
-    // so the effect keys on it too and the name settles a moment after the state.
+    // What the tray tooltip names: the session that is actually running. The
+    // registration lands from the launch driver, so the effect keys on it too and
+    // the name settles a moment after the state.
     val activeSessions by sessions.active.collectAsState()
 
     LaunchedEffect(launchState, activeSessions) {
         val runningName = activeSessions.values.firstOrNull()?.packDisplayName
-            ?: profileManager.lastServerId
         when (launchState) {
-            is LaunchState.GameRunning -> tray.setGameStatus(true, runningName)
+            is LaunchState.GameRunning, is LaunchState.Stopping -> tray.setGameStatus(true, runningName)
             is LaunchState.Error -> {
                 tray.setGameStatus(false)
                 if (!isWindowVisible) {
@@ -616,9 +680,19 @@ fun FrameWindowScope.AppShellContent(
         // still-opaque threshold, and a render-path crash happens after this
         // point by construction. Staying up is the evidence, so the crash guard
         // hears about it only once the session has lasted.
+        //
+        // The launcher's own updater waits on the same evidence. A build that has
+        // stayed up this long is kept, and its predecessor's backup goes; one that
+        // dies before it is put back. In this composition's own effect, so a crash
+        // reload in between cancels the confirmation with it.
+        val updateApplicator: IUpdateApplicator = koinInject()
         LaunchedEffect(Unit) {
             delay(UiRecoverySignal.HEALTHY_SESSION_MS.milliseconds)
             UiRecoverySignal.noteShellHealthy()
+            withContext(Dispatchers.IO) {
+                runCatching { updateApplicator.confirmStarted() }
+                    .onFailure { LoggerFactory.getLogger("AppShell").warn("Could not confirm the launcher update", it) }
+            }
         }
 
         val notificationCenter: NotificationCenter = koinInject()
@@ -642,37 +716,111 @@ fun FrameWindowScope.AppShellContent(
         // must not age out before the work is done. Keyed, so a shell reload after
         // a crash updates the same entry instead of stacking another.
         LaunchedEffect(Unit) {
-            val stores = NewerBuildData.affected()
-            if (stores.isEmpty()) return@LaunchedEffect
-            val named = stores.joinToString(", ") { store ->
-                when (store) {
-                    ReadOnlyStore.PackLibrary -> s.readOnlyDataLibrary
-                    ReadOnlyStore.Layout      -> s.readOnlyDataLayout
+            val affected = NewerBuildData.affectedWithReason()
+            if (affected.isEmpty()) return@LaunchedEffect
+            // One notice per reason, because the two say opposite things about
+            // what to do: a newer file is fixed by updating, and an older one is
+            // fixed by going back. A single sentence covering both would be wrong
+            // for whichever half the reader has.
+            affected.entries.groupBy({ it.value }, { it.key }).forEach { (reason, stores) ->
+                val named = stores.joinToString(", ") { store ->
+                    when (store) {
+                        ReadOnlyStore.PackLibrary -> s.readOnlyDataLibrary
+                        ReadOnlyStore.Layout      -> s.readOnlyDataLayout
+                        ReadOnlyStore.Theme       -> s.readOnlyDataTheme
+                        ReadOnlyStore.Accounts    -> s.readOnlyDataAccounts
+                    }
                 }
+                notificationCenter.push(
+                    sourceKey = "storage-read-only-${reason.name.lowercase()}",
+                    sender    = Branding.TITLE,
+                    iconUrl   = null,
+                    severity  = Severity.Warn,
+                    kind      = Kind.Sticky,
+                    title     = s.readOnlyDataTitle,
+                    body      = when (reason) {
+                        ReadOnlyReason.NewerBuild       -> s.readOnlyDataBody(named)
+                        ReadOnlyReason.UnreadableFormat -> s.readOnlyDataBodyOldFormat(named)
+                        ReadOnlyReason.Damaged          -> s.readOnlyDataBodyDamaged(named)
+                    },
+                )
             }
+        }
+
+        // A widget module crashed the interface and the recovery switched it off.
+        // Said once the shell is back, because the person has to know why the
+        // widgets went and where to switch the module back on.
+        val crashNotice by widgetModules.crashNotice.collectAsState()
+        LaunchedEffect(crashNotice) {
+            val notice = crashNotice ?: return@LaunchedEffect
             notificationCenter.push(
-                sourceKey = "storage-read-only",
+                sourceKey = "widget-module-crash",
                 sender    = Branding.TITLE,
                 iconUrl   = null,
                 severity  = Severity.Warn,
                 kind      = Kind.Sticky,
-                title     = s.readOnlyDataTitle,
-                body      = s.readOnlyDataBody(named),
+                title     = s.moduleCrashedTitle(notice.name),
+                body      = s.moduleCrashedBody(notice.failure),
             )
+            widgetModules.consumeCrashNotice()
         }
 
         val dataDirectory: java.nio.file.Path = koinInject()
-        val autoSyncService: AutoSyncService = koinInject()
+        // What the retired SmartyCraft server path left under clients/. Announced
+        // once per session and only while it is there: the files are the player's,
+        // so the launcher says what it found and offers to help, and touches
+        // nothing until asked. The check lists one directory and stops at the first
+        // entry -- measuring gigabytes is the surface's job, when it is opened.
+        val retiredClients: RetiredClientScanner = koinInject()
+        val retiredGate: RetiredClientsGate = koinInject()
+        LaunchedEffect(Unit) {
+            val count = withContext(Dispatchers.IO) {
+                if (retiredClients.anyLeftBehind()) retiredClients.count() else 0
+            }
+            if (count == 0) return@LaunchedEffect
+            notificationCenter.push(
+                sourceKey = "retired-clients",
+                sender    = Branding.TITLE,
+                iconUrl   = null,
+                severity  = Severity.Info,
+                kind      = Kind.Sticky,
+                title     = s.retiredTitle,
+                body      = s.retiredNoticeBody(count),
+                actions   = listOf(
+                    hivens.ui.notifications.NotifAction(
+                        id = "retired-clients-open",
+                        label = s.retiredNoticeAction,
+                        onClick = { retiredGate.show() },
+                    ),
+                ),
+            )
+        }
         val packAutoUpdateService: PackAutoUpdateService = koinInject()
         val applyRecovery: ApplyRecovery = koinInject()
         val themeManager  = remember { ThemeManager(dataDirectory, AtomicFiles::writeString) }
-        var customTheme   by remember { mutableStateOf(themeManager.loadTheme()) }
+        var themeLibrary  by remember {
+            val loaded = themeManager.load()
+            // The manager decides read-only on its own, in a module that cannot see
+            // the notice registry, so the fact is carried across here. This runs
+            // during composition and the notice above is a LaunchedEffect, which
+            // runs after it, so the ordering holds.
+            if (themeManager.readOnly) NewerBuildData.record(ReadOnlyStore.Theme)
+            mutableStateOf(loaded)
+        }
 
-        // Customization extension: persisted overrides for accent, density,
-        // whether surfaces blur, and the nav rail's selection. Provided via
+        // Customization extension: persisted choices for whether surfaces blur
+        // and how the nav rail draws its selection. Provided via
         // [LocalCustomization] so NxTheme and the surfaces can read them
         // without prop-drilling.
-        val customizationJson    = remember { Json { ignoreUnknownKeys = true; encodeDefaults = true } }
+        // coerceInputValues is the half that was missing, and it is the half that
+        // matters: every field of the record already has a default, so an unknown
+        // KEY was survivable, while an unknown VALUE was not. A release adding one
+        // variant to the rail's selection enum made an older build fail the whole
+        // record, fall back to defaults, and write those defaults back on the next
+        // toggle. Coercion turns that into one field taking its default.
+        val customizationJson    = remember {
+            Json { ignoreUnknownKeys = true; encodeDefaults = true; coerceInputValues = true }
+        }
         val customizationManager = remember { CustomizationManager(dataDirectory, customizationJson, AtomicFiles::writeString) }
         var customization        by remember { mutableStateOf(customizationManager.load()) }
 
@@ -688,7 +836,7 @@ fun FrameWindowScope.AppShellContent(
             exit          = s.trayExit,
         )
 
-        // ── Bring-up: tray, notifier, roster, background services (run once) ──
+        // ── Bring-up: tray, notifier, background services (run once) ──
         // The sequence itself lives in ShellStartup, outside composition and
         // over functions rather than the singletons, so its order -- which is
         // load-bearing -- can be verified. This site only wires the real ones in.
@@ -697,7 +845,6 @@ fun FrameWindowScope.AppShellContent(
                 policy = StartupPolicy(
                     trayEnabled         = ModuleId.Tray.id   !in settings.disabledModules,
                     notifierEnabled     = ModuleId.Notify.id !in settings.disabledModules,
-                    autoSyncAllPacks    = settings.autoSyncAllPacks,
                     autoUpdatePacks     = settings.autoUpdatePacks,
                 ),
                 bringUpTray     = { icon ->
@@ -715,11 +862,6 @@ fun FrameWindowScope.AppShellContent(
                 readIcon        = { path -> withContext(Dispatchers.IO) { Res.readBytes(path) } },
                 trayIsSupported = { tray.isSupported },
                 showWindow      = revealWindow,
-                cachedRoster    = { withContext(Dispatchers.IO) { serverListCache.load() } },
-                fetchRoster     = {
-                    runInterruptible(Dispatchers.IO) { serverListService.fetchDashboardData().get() }.servers
-                },
-                syncAll             = { servers -> autoSyncService.syncAll(servers) },
                 recoverInterrupted  = { applyRecovery.recoverInterrupted() },
                 autoUpdatePacks     = { packAutoUpdateService.runOnce() },
                 appScope            = applicationScope,
@@ -748,7 +890,7 @@ fun FrameWindowScope.AppShellContent(
                     // visibility flip is unconditional during chaos so the
                     // dialog isn't hidden behind a minimized window.
                     if (af.isActive()) isWindowVisible = true
-                    af.requestCloseDialog { exitApp() }
+                    af.requestCloseDialog { quit() }
                 }
             }
 
@@ -782,13 +924,13 @@ fun FrameWindowScope.AppShellContent(
                 )
             }
             if (posted) withContext(Dispatchers.IO) {
-                settingsService.saveSettings(settingsService.getSettings().copy(trayHintShown = true))
+                settingsService.updateSettings { it.copy(trayHintShown = true) }
             }
         }
 
         // Console window moved inside the CompositionLocalProvider /
-        // NxTheme block below so it inherits the active theme +
-        // customization (accent override, role overrides). The window
+        // NxTheme block below so it inherits the active theme and the
+        // customization. The window
         // itself is a separate OS surface, but Compose Desktop propagates
         // CompositionLocals down through the Window composable.
 
@@ -809,7 +951,7 @@ fun FrameWindowScope.AppShellContent(
                     // meant as "minimize".
                     isWindowVisible = false
                 } else {
-                    exitApp()
+                    quit()
                 }
             }
         }
@@ -831,6 +973,8 @@ fun FrameWindowScope.AppShellContent(
                 ShellChord.ToggleRightRail    -> editModeController.requestRightRailToggle()
                 ShellChord.ToggleDebugOverlay -> debugOverlay.toggle()
                 ShellChord.ExitEditor         -> editModeController.requestEditorEscape()
+                ShellChord.UndoEdit           -> editModeController.undo()
+                ShellChord.RedoEdit           -> editModeController.redo()
                 null                          -> Unit
             }
             resolved.consume
@@ -896,7 +1040,13 @@ fun FrameWindowScope.AppShellContent(
                 }
             }
 
-            val layoutGraph by layoutGraphRepo.observe().collectAsState()
+            // Remembered: observe() hands out a new flow per call, and collecting a new
+            // one cancels the collector and starts it again on every recomposition.
+            val layoutGraph by remember(layoutGraphRepo) { layoutGraphRepo.observe() }.collectAsState()
+            // The registry as it is now. A module switched on or off, or the folder
+            // read again, is a new value here and a whole-tree recomposition, which
+            // is what a change to the set of widgets that exist is.
+            val modules by widgetModules.state.collectAsState()
             // Production renderer for a widget's own surface, see
             // [hivens.ui.widgets.WidgetSurface]. Invoked by the kernel only when a
             // widget carries one, so a widget without a plane pays nothing.
@@ -905,14 +1055,18 @@ fun FrameWindowScope.AppShellContent(
             // fresh identity each recompose would invalidate the whole content
             // subtree rather than just the widgets that have a surface.
             val surfaceRenderer: WidgetSurfaceRenderer = remember { { spec, content -> WidgetSurface(spec, content) } }
+            // Which family each surface shows. From Koin, not remembered here, so a
+            // switch can come from outside the composition.
+            val surfaceFamilies: SurfaceFamilies = koinInject()
             CompositionLocalProvider(
                 LocalCustomization                       provides customization,
                 LocalLayoutGraph                         provides layoutGraph,
-                LocalWidgetRegistry                      provides widgetRegistry,
+                LocalWidgetRegistry                      provides modules.registry,
                 LocalWidgetServiceRegistry               provides widgetServiceRegistry,
                 LocalWidgetDataRegistry                  provides widgetDataRegistry,
                 LocalWidgetCommandRegistry               provides widgetCommandRegistry,
                 LocalWidgetStateHost                     provides widgetStateStore,
+                LocalSurfaceFamilies                     provides surfaceFamilies,
                 // Dev UI-debug seams: report-only bounds instrumentation, mounted
                 // ONLY while a non-release build has the overlay on AND a facet needs
                 // it -- else identity, so a dev build with the overlay off runs the
@@ -925,6 +1079,9 @@ fun FrameWindowScope.AppShellContent(
                     if (debugOverlay.available && debugOverlay.enabled && debugOverlay.needsDecorators)
                         debugOverlay.slotChrome else IdentitySlotChromeModifier,
                 LocalWidgetSurfaceRenderer               provides surfaceRenderer,
+                LocalWidgetEntrance                      provides PlayedWidgetEntrance,
+                LocalViewportScrollbar                   provides NxViewportScrollbar,
+                LocalMapControls                         provides NxMapControls,
                 LocalWindowState                         provides windowState,
                 LocalWindowMaximizer                     provides maximizer,
                 LocalComposeWindow                       provides window,
@@ -934,28 +1091,25 @@ fun FrameWindowScope.AppShellContent(
             ) {
 
             // Console runs as its own OS window but is composed from here so
-            // it inherits LocalCustomization + LocalNxColors via the
-            // Compose composition tree. The internal NxTheme wrap is
-            // what actually projects the palette into the window's surface;
-            // this site only ensures the composition locals are in scope.
+            // it inherits LocalCustomization via the composition tree. Its own
+            // NxTheme wrap is what projects the theme into the window's surface.
+            // This site only ensures the composition locals are in scope.
             if (gameConsole.shouldShowConsole) {
                 // Console preferences are the store's; the window collects them
                 // itself so a slider drag does not recompose the shell.
                 ConsoleWindow(
                     isDarkTheme    = isDarkTheme,
                     onClose        = { gameConsole.hide() },
-                    customTheme    = customTheme,
+                    theme          = themeLibrary.active,
                 )
             }
 
             Box(Modifier.fillMaxSize()) {
             val themeReveal = rememberThemeReveal()
             NxTheme(
-                useDarkTheme = isDarkTheme,
-                customTheme  = customTheme,
-                paletteSeed  = wallpaperSeed,
-                paletteFromWallpaper = paletteFromWallpaper,
-                uiFamily     = uiFamily,
+                theme    = themeLibrary.active,
+                dark     = isDarkTheme,
+                uiFamily = uiFamily,
             ) {
                 ThemeRevealHost(themeReveal) {
                 val migration = boot.pendingMigration
@@ -975,9 +1129,17 @@ fun FrameWindowScope.AppShellContent(
                     )
                 } else {
                     AppRoot(
-                        onWallpaperSeed = { wallpaperSeed = it },
                         onWallpaperLuminance = { wallpaperLuminance = it },
-                        onRealExit   = exitApp,
+                        onWallpaperColours   = { colours ->
+                            // Stored with the selection, so the wallpaper theme opens in
+                            // itself next time. Written only when the picture changed.
+                            if (colours != themeLibrary.wallpaper) {
+                                val library = themeLibrary.copy(wallpaper = colours)
+                                themeLibrary = library
+                                preferences.write("the wallpaper colours") { themeManager.save(library) }
+                            }
+                        },
+                        onRealExit   = quit,
                         onHideToTray = if (tray.canBeReady) {{ isWindowVisible = false }}
                         else null,
                         isDarkTheme          = isDarkTheme,
@@ -986,52 +1148,43 @@ fun FrameWindowScope.AppShellContent(
                             // drops back to Manual in the same save.
                             isDarkTheme = !isDarkTheme
                             themeMode = ThemeMode.Manual
-                            val current = settingsService.getSettings()
-                            settingsService.saveSettings(current.copy(
-                                isDarkTheme = isDarkTheme,
-                                themeMode = ThemeMode.Manual,
-                                themeFromWallpaper = false,
-                            ))
+                            val dark = isDarkTheme
+                            preferences.write("the colour scheme") {
+                                settingsService.updateSettings { it.copy(
+                                    isDarkTheme = dark,
+                                    themeMode = ThemeMode.Manual,
+                                    themeFromWallpaper = false,
+                                ) }
+                            }
                         },
                         themeMode = themeMode,
                         onThemeModeChanged = { mode ->
                             themeMode = mode
                             // themeFromWallpaper mirrors the mode so a downgrade to a
                             // pre-mode build keeps the wallpaper opt-in coherent.
-                            settingsService.saveSettings(settingsService.getSettings().copy(
-                                themeMode = mode,
-                                themeFromWallpaper = mode == ThemeMode.Wallpaper,
-                            ))
+                            preferences.write("the theme mode") {
+                                settingsService.updateSettings { it.copy(
+                                    themeMode = mode,
+                                    themeFromWallpaper = mode == ThemeMode.Wallpaper,
+                                ) }
+                            }
                         },
                         systemThemeAvailable = systemThemeAvailable,
-                        paletteFromWallpaper = paletteFromWallpaper,
-                        onPaletteFromWallpaperChanged = { seeded ->
-                            paletteFromWallpaper = seeded
-                            settingsService.saveSettings(
-                                settingsService.getSettings().copy(paletteFromWallpaper = seeded),
-                            )
-                        },
-                        customTheme          = customTheme,
-                        onCustomThemeChanged = { newTheme ->
-                            customTheme = newTheme
-                            themeManager.saveTheme(newTheme)
+                        themeLibrary         = themeLibrary,
+                        onThemeSelected      = { id ->
+                            val library = themeLibrary.copy(selected = id)
+                            themeLibrary = library
+                            preferences.write("the theme") { themeManager.save(library) }
                         },
                         currentLocale   = currentLocale,
                         onLocaleChanged = { newLocale ->
                             currentLocale = newLocale
-                            val current = settingsService.getSettings()
-                            settingsService.saveSettings(current.copy(locale = newLocale.tag))
-                        },
-                        homeView           = homeView,
-                        onHomeViewChanged = { newView ->
-                            homeView = newView
-                            val current = settingsService.getSettings()
-                            settingsService.saveSettings(current.copy(homeView = newView))
+                            preferences.write("the language") { settingsService.updateSettings { it.copy(locale = newLocale.tag) } }
                         },
                         customization              = customization,
                         onCustomizationChanged     = { newCustomization ->
                             customization = newCustomization
-                            customizationManager.save(newCustomization)
+                            preferences.write("the customization") { customizationManager.save(newCustomization) }
                         },
                     )
                     UpdateManager()
@@ -1039,23 +1192,47 @@ fun FrameWindowScope.AppShellContent(
                 } // end ThemeRevealHost
             }
             // Dev UI-debug overlay: top of the shell Box z-order (above AppRoot and
-            // NotificationStack), its own NxTheme wrap so the accent tracks the style.
+            // NotificationStack), its own NxTheme wrap so it draws in the active theme.
             // Inert unless a non-release build has the master toggle on.
             NxTheme(
-                useDarkTheme = isDarkTheme,
-                customTheme  = customTheme,
-                paletteSeed  = wallpaperSeed,
-                paletteFromWallpaper = paletteFromWallpaper,
-                uiFamily     = uiFamily,
+                theme    = themeLibrary.active,
+                dark     = isDarkTheme,
+                uiFamily = uiFamily,
             ) {
                 DebugOverlay(debugOverlay)
                 // Inside the theme on purpose: the prompts are Dialogs with their own
-                // composition, and one raised from outside finds no NxColors and takes
+                // composition, and one raised from outside finds no theme and takes
                 // the shell down.
                 hivens.ui.components.TwoFactorPromptHost()
-                // Whatever read the host -- the roster, the news, a login -- parks its
-                // refused certificate here for the user to answer once.
+                // Whatever read the host -- the news, a login -- parks its refused
+                // certificate here for the user to answer once.
                 hivens.ui.components.CertificatePromptHost()
+                // What the retired server path left on disk, when the player asks
+                // the reminder to show them.
+                hivens.ui.legacy.RetiredClientsHost()
+                // The question a quit asks when a game is running. Both answers record
+                // the session before the process goes; stopping waits for the game's
+                // own shutdown, bounded so a game that will not go cannot hold the
+                // launcher open.
+                QuitWithGameHost(
+                    gate = quitGate,
+                    packName = activeSessions.values.firstOrNull()?.packDisplayName,
+                    onLeaveRunning = {
+                        applicationScope.launch {
+                            controller.settleSessionForQuit()
+                            SwingUtilities.invokeLater { exitApp() }
+                        }
+                    },
+                    onStopGame = {
+                        applicationScope.launch {
+                            controller.abort()
+                            withTimeoutOrNull(QUIT_STOP_WAIT) {
+                                controller.state.first { it is LaunchState.Idle || it is LaunchState.Error }
+                            }
+                            SwingUtilities.invokeLater { exitApp() }
+                        }
+                    },
+                )
             }
             // Synthetic resize grips -- undecorated drops the native border. Only
             // with custom chrome (else the OS frame resizes); self-gates to
@@ -1078,8 +1255,8 @@ fun FrameWindowScope.AppShellContent(
 
 @Composable
 fun AppRoot(
-    onWallpaperSeed: (Int?) -> Unit,
     onWallpaperLuminance: (Float?) -> Unit,
+    onWallpaperColours: (List<Int>) -> Unit,
     isDarkTheme: Boolean,
     onRealExit: () -> Unit,
     onHideToTray: (() -> Unit)?,
@@ -1087,20 +1264,15 @@ fun AppRoot(
     themeMode: ThemeMode,
     onThemeModeChanged: (ThemeMode) -> Unit,
     systemThemeAvailable: Boolean,
-    paletteFromWallpaper: Boolean,
-    onPaletteFromWallpaperChanged: (Boolean) -> Unit,
-    customTheme: CustomTheme,
-    onCustomThemeChanged: (CustomTheme) -> Unit,
+    themeLibrary: ThemeLibrary,
+    onThemeSelected: (String) -> Unit,
     currentLocale: AppLocale,
     onLocaleChanged: (AppLocale) -> Unit,
-    homeView: HomeView,
-    onHomeViewChanged: (HomeView) -> Unit,
     customization: CustomizationSettings,
     onCustomizationChanged: (CustomizationSettings) -> Unit,
 ) {
     val credentialsManager: AccountStore = koinInject()
     val authService: AuthProvider              = koinInject()
-    val profileManager: ProfileManager         = koinInject()
     val settingsService: ISettingsService      = koinInject()
     val dataDirectory: java.nio.file.Path      = koinInject()
     val json: Json                             = koinInject()
@@ -1127,6 +1299,16 @@ fun AppRoot(
     remember(routingCallFactory) {
         SingletonImageLoader.setSafe { context ->
             ImageLoader.Builder(context)
+                // In the launcher's own data, not the default under the system temp
+                // dir: that one is a tmpfs on many Linux machines, emptied on every
+                // boot, so every icon and banner was downloaded again each day, and it
+                // is shared with any other program built on the same library.
+                .diskCache {
+                    DiskCache.Builder()
+                        .directory(dataDirectory.resolve("cache").resolve("images").toFile())
+                        .maxSizeBytes(IMAGE_CACHE_BYTES)
+                        .build()
+                }
                 .components {
                     add(OkHttpNetworkFetcherFactory(callFactory = { routingCallFactory }))
                     // Pack descriptions carry rows of shields.io badges, and
@@ -1147,10 +1329,26 @@ fun AppRoot(
     // that no longer has one, and nothing surfaces the setting again until two
     // accounts are back, so it would decide the face of a session the user set
     // up long after making it.
-    val doLogout = {
-        credentialsManager.clear()
-        settingsService.saveSettings(settingsService.getSettings().copy(preferredFaceProvider = null))
-        appState = AppState.Unauthenticated
+    //
+    // The offline name goes too, whichever identity was fronting the shell. It is
+    // the only record of the offline identity, and startup signs that identity
+    // back in from it when no account is stored, which after this is always: kept
+    // because the face happened to be an online account, it had the next start
+    // sign straight back in under a name the user had just signed out of. The
+    // offline mode switch stays as it is. It says how to play rather than who
+    // plays, and with no name and no account it has nobody to sign in.
+    //
+    // The store is cleared off the UI thread, since every secret it deletes is a
+    // keyring call, and the shell signs out once it has been.
+    val logoutScope = rememberCoroutineScope()
+    val doLogout: () -> Unit = {
+        logoutScope.launch {
+            withContext(Dispatchers.IO) {
+                credentialsManager.clear()
+                settingsService.updateSettings { it.copy(preferredFaceProvider = null, offlinePlayerName = null) }
+            }
+            appState = AppState.Unauthenticated
+        }
     }
 
     // Mouse side buttons (back/forward) -> history navigation. Compose's pointer
@@ -1158,20 +1356,37 @@ fun AppRoot(
     // the AWT level where the thumb buttons still arrive. The AWT event thread is
     // the Compose UI thread in Compose Desktop, so mutating the NavBackStack here is
     // on the right thread.
+    //
+    // Which number is which depends on the toolkit (see extraButton): on X11 the
+    // sideways wheel arrives here too, and goes back to the window as a wheel.
+    //
+    // A toolkit listener hears every window the process has, so history moves only
+    // for a press in this one. Unfiltered, a thumb press in the separate console
+    // window paged the main window's history behind it. The sideways wheel goes back
+    // to whichever window it came from.
+    val mainWindow by rememberUpdatedState(LocalComposeWindow.current)
     DisposableEffect(Unit) {
         val toolkit = Toolkit.getDefaultToolkit()
         val listener = AWTEventListener { ev ->
             if (ev is MouseEvent && ev.id == MouseEvent.MOUSE_PRESSED) {
-                // AWT numbers the thumb buttons inconsistently across mice / X11
-                // setups (4/5 on some, 6/7 on others); lower of each pair = Back.
-                when (ev.button) {
-                    4, 6 -> backStack.back()
-                    5, 7 -> backStack.forward()
+                when (extraButton(ev.button, awtOnX11)) {
+                    ExtraButton.Back        -> if (ev.isFrom(mainWindow)) backStack.back()
+                    ExtraButton.Forward     -> if (ev.isFrom(mainWindow)) backStack.forward()
+                    ExtraButton.ScrollLeft  -> resendAsSidewaysWheel(ev, toRight = false)
+                    ExtraButton.ScrollRight -> resendAsSidewaysWheel(ev, toRight = true)
+                    ExtraButton.None        -> Unit
                 }
             }
         }
         toolkit.addAWTEventListener(listener, AWTEvent.MOUSE_EVENT_MASK)
         onDispose { toolkit.removeAWTEventListener(listener) }
+    }
+
+    // A made screen deleted while it sits in the history leaves it, back and
+    // forward both, so neither arrow can open a page about nothing.
+    val screenIds = LocalLayoutGraph.current.screens.map { it.id }.toSet()
+    LaunchedEffect(screenIds) {
+        backStack.retainWhere(Screen.Home) { it !is Screen.Custom || it.id in screenIds }
     }
 
     // Out-of-composition navigation requests (notification actions, drivers)
@@ -1182,20 +1397,17 @@ fun AppRoot(
     }
 
     // ── Background settings ───────────────────────────────────────────────
-    val backgroundManager = remember { BackgroundManager(dataDirectory, json) }
-    var backgroundSettings by remember { mutableStateOf(backgroundManager.load()) }
+    val backgroundManager: BackgroundManager = koinInject()
+    val backgroundSettings by backgroundManager.settings.collectAsState()
     // Persist background settings debounced and OFF the UI thread: the fx
     // sliders fire per tick, and a synchronous write per tick both janks the
     // drag and multiplies disk writes. The effect restarts on every value
-    // change (keyed), so one write lands ~300ms after the drag settles; the
-    // in-memory state above is already live, so a killed tail loses at most
-    // the final slider position (same contract as the layout-graph debounce).
-    var persistedBackground by remember { mutableStateOf(backgroundSettings) }
+    // change (keyed), so one write lands ~300ms after the drag settles. The
+    // manager flushes whatever is still unwritten at shutdown, so a quit or a
+    // crash-restart inside the debounce keeps the last slider position.
     LaunchedEffect(backgroundSettings) {
-        if (backgroundSettings == persistedBackground) return@LaunchedEffect
         delay(300.milliseconds)
-        withContext(Dispatchers.IO) { backgroundManager.save(backgroundSettings) }
-        persistedBackground = backgroundSettings
+        withContext(Dispatchers.IO) { backgroundManager.flush() }
     }
 
     // ── Auto-login with offline mode support ──────────────────────────────
@@ -1206,7 +1418,8 @@ fun AppRoot(
     // credentials stop -- looping on those hammers the upstream for nothing.
     // A bypass policy flip restarts the effect for an immediate fresh attempt
     // with a reset ladder (the flip is a user action). A manual login racing
-    // the loop wins: the loop re-reads the state each pass.
+    // the loop wins: the loop re-reads the state each pass, and a pass whose
+    // sign-in was already in flight checks it again once the answer is back.
     val autoLoginBypasses by bypassStore.bypasses.collectAsState()
     LaunchedEffect(autoLoginBypasses) {
         var attempt = 0
@@ -1219,7 +1432,6 @@ fun AppRoot(
                 AutoLoginCoordinator.resolveSession(
                     settings     = settings,
                     saved        = saved,
-                    lastServerId = profileManager.lastServerId,
                     authService  = authService,
                     msaProvider  = msaProvider,
                 )
@@ -1229,21 +1441,46 @@ fun AppRoot(
                     val session = resolution.session
                     // A silent MSA refresh rotates the refresh token; persist it so
                     // the next start uses the fresh one instead of re-spending the
-                    // stored token.
+                    // stored token. A rotation is not a choice of account, so it never
+                    // takes the active slot: it used to, on every start, so "active"
+                    // came to mean whichever account the boot happened to refresh, and
+                    // a manual sign-in that won the race below lost the slot too.
                     if (session.refreshToken != null && session.refreshToken != saved?.refreshToken) {
                         withContext(Dispatchers.IO) {
-                            credentialsManager.saveAccount(session, PackAuthRequirement.Microsoft.PROVIDER_KEY)
+                            credentialsManager.saveAccount(
+                                session,
+                                PackAuthRequirement.Microsoft.PROVIDER_KEY,
+                                makeActive = false,
+                            )
                         }
                     }
                     // The sign-in that just ran met the 2FA gate, and it is the only
                     // thing that could have told us. Unpersisted, the coordinator would
                     // spend another login on the next start -- and each one invalidates
                     // whatever session the player has in hand.
+                    // The sign-in retired the uid the store holds, and whatever is
+                    // signed later from the stored account, a skin upload among them,
+                    // needs the one it minted.
+                    if (resolution.signedIn) {
+                        withContext(Dispatchers.IO) {
+                            runCatching {
+                                credentialsManager.refreshStored(PackAuthRequirement.SmartyCraft.PROVIDER_KEY, session)
+                            }.onFailure {
+                                LoggerFactory.getLogger("AppShell").warn("Auto-login could not record the refreshed session", it)
+                            }
+                        }
+                    }
                     if (session.twoFactor && saved?.twoFactor != true) {
                         withContext(Dispatchers.IO) {
                             credentialsManager.markTwoFactor(PackAuthRequirement.SmartyCraft.PROVIDER_KEY)
                         }
                         ActionRing.record("Auto-login met the second factor: the SmartyCraft account is marked")
+                    }
+                    // The form stays usable while a pass is in flight, so the user may
+                    // have signed in by hand while this one waited on the network.
+                    if (appState is AppState.Authenticated) {
+                        ActionRing.record("Auto-login answered after a manual sign-in; the manual one stays")
+                        return@LaunchedEffect
                     }
                     appState = AppState.Authenticated(session)
                     return@LaunchedEffect
@@ -1275,12 +1512,11 @@ fun AppRoot(
     val mousePos    = remember { mutableStateOf(Offset(0.5f, 0.5f)) }
     val mousePxPos  = remember { mutableStateOf(Offset.Zero) }
     var windowSize by remember { mutableStateOf(IntSize.Zero) }
-    // What the wallpaper tells the palette: its seed colour and its overall
-    // brightness. Nothing else about the image leaves CustomBackground now that a
-    // frosted surface blurs the canvas beneath it instead of reproducing the image.
-    var tone by remember { mutableStateOf(WallpaperTone(null, null)) }
+    // What the wallpaper tells the shell: its overall brightness, for the mode that
+    // follows the wallpaper between dark and light, and its colours, which the
+    // wallpaper theme is made of.
+    var tone by remember { mutableStateOf(WallpaperTone.NONE) }
 
-    LaunchedEffect(tone.seedArgb) { onWallpaperSeed(tone.seedArgb) }
     LaunchedEffect(tone.avgLuminance) { onWallpaperLuminance(tone.avgLuminance) }
 
     Box(
@@ -1290,7 +1526,7 @@ fun AppRoot(
             // first video frame arrives) CustomBackground paints nothing, and without
             // this the bare window default -- a flat grey -- shows through. The theme
             // surface is covered edge-to-edge once the image is ready.
-            .background(NxTheme.colors.background)
+            .background(NxColor.page)
             .onSizeChanged { windowSize = it }
             .pointerInput(Unit) {
                 awaitPointerEventScope {
@@ -1310,7 +1546,14 @@ fun AppRoot(
       CustomBackground(
           settings         = backgroundSettings,
           mousePosProvider = { mousePos.value },
-          onTone           = { tone = it },
+          // Colours are passed on as reported and not from the initial state, which
+          // would clear the stored ones on every start before the picture decoded.
+          onTone           = { tone = it; onWallpaperColours(it.colours) },
+          // The one setting a player widget can move while the wallpaper is what
+          // its transport is pointed at. Through the same state the appearance
+          // panel writes, so the two sliders are one value and the debounce above
+          // persists it once.
+          onAudioVolume    = { volume -> backgroundManager.update { it.copy(audioVolume = volume) } },
       )
 
       af.WrapContent(
@@ -1338,16 +1581,12 @@ fun AppRoot(
               themeMode = themeMode,
               onThemeModeChanged = onThemeModeChanged,
               systemThemeAvailable = systemThemeAvailable,
-              paletteFromWallpaper = paletteFromWallpaper,
-              onPaletteFromWallpaperChanged = onPaletteFromWallpaperChanged,
-              customTheme = customTheme,
-              onCustomThemeChanged = onCustomThemeChanged,
+              themeLibrary = themeLibrary,
+              onThemeSelected = onThemeSelected,
               currentLocale = currentLocale,
               onLocaleChanged = onLocaleChanged,
-              homeView = homeView,
-              onHomeViewChanged = onHomeViewChanged,
               backgroundSettings = backgroundSettings,
-              onBackgroundSettingsChanged = { backgroundSettings = it },
+              onBackgroundSettingsChanged = { change -> backgroundManager.update(change) },
               customization              = customization,
               onCustomizationChanged     = onCustomizationChanged,
           )
@@ -1369,3 +1608,15 @@ fun AppRoot(
       }
     }
 }
+
+/** Getting a launch ready: the two states that change with every chunk and every file. */
+private fun LaunchState.isPreparing(): Boolean = this is LaunchState.Prepare || this is LaunchState.Downloading
+
+/** The most the image cache keeps on disk before it evicts the least recently used. */
+private const val IMAGE_CACHE_BYTES = 256L * 1024 * 1024
+
+/**
+ * How long quitting waits for a game it was asked to stop. The game gets its own
+ * termination grace and then a forced kill; this only has to outlast both.
+ */
+private val QUIT_STOP_WAIT = 15.seconds

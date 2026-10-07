@@ -2,6 +2,7 @@ package hivens.ui.background
 
 import androidx.compose.runtime.Composable
 import hivens.ui.diag.SkinemaGate
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.RememberObserver
 import androidx.compose.runtime.getValue
@@ -15,15 +16,22 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.skiaCanvas
+import dev.hivens.skinema.audio.PcmSink
 import dev.hivens.skinema.compose.rememberPlayerState
 import dev.hivens.skinema.libav.HwAccel
 import dev.hivens.skinema.player.VideoPlayer
+import dev.hivens.skinema.player.WhenUnwatched
 import dev.hivens.skinema.skiko.VideoFrameImage
-import hivens.ui.theme.seedFromRgba
+import hivens.ui.audio.AudioOutput
+import hivens.ui.audio.PlaybackRouter
+import hivens.ui.audio.RepeatMode
+import hivens.ui.audio.WallpaperSession
+import hivens.ui.theme.coloursFromRgba
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.jetbrains.skia.Image
+import org.koin.compose.getKoin
 import org.koin.compose.koinInject
 import org.jetbrains.skia.Rect
 import org.jetbrains.skia.SamplingMode
@@ -86,10 +94,33 @@ internal class VideoFramePainter(
 }
 
 /**
- * A silent Skinema player over one wallpaper file, plus the Skia image its
- * frames land in. Both hold resources the JVM will not reclaim on its own -- a
- * decode thread and a pacer thread, native FFmpeg state, one raster image --
- * and both are released together in [release].
+ * Where the wallpaper had got to, carried across a re-open.
+ *
+ * Whether the picture sounds, how it loops and how it decodes are all constructor
+ * arguments, so changing any of them rebuilds the player. Without this the
+ * wallpaper went back to its first frame every time somebody flipped the sound,
+ * which for a switch a person is expected to try is the wrong answer even though
+ * re-opening is the right mechanism.
+ *
+ * The video widget already carries position, volume and play state across the
+ * swap it makes going fullscreen, for the same reason. A wallpaper has no volume
+ * to carry (the level is applied to the running player) and no play state (it
+ * plays), so one number is the whole of it.
+ *
+ * Held by the file rather than by the player, so a different wallpaper begins at
+ * its own beginning instead of at the last one's offset.
+ */
+private class BackgroundResume {
+    @Volatile
+    var positionNanos: Long = 0L
+}
+
+/**
+ * A Skinema player over one wallpaper file, plus the Skia image its frames land
+ * in. Both hold resources the JVM will not reclaim on its own -- a decode thread
+ * and a pacer thread, native FFmpeg state, one raster image, and a stream on the
+ * sound server when the wallpaper is one that sounds -- and all of them are
+ * released together in [release].
  *
  * A [RememberObserver] rather than a `DisposableEffect`, because the decode
  * thread starts inside the constructor, i.e. during composition: a composition
@@ -100,7 +131,10 @@ internal class VideoFramePainter(
 private class BackgroundVideo(
     file: File,
     loop: Boolean,
+    audio: Boolean,
+    output: AudioOutput?,
     hardware: HwAccel,
+    unwatched: WhenUnwatched,
     private val closeScope: CoroutineScope,
 ) : RememberObserver {
 
@@ -111,12 +145,7 @@ private class BackgroundVideo(
      * wallpaper down with the window. The caller draws nothing instead, which
      * is what it already does for a file that fails to decode.
      */
-    val player: VideoPlayer? = try {
-        VideoPlayer(path = file.toPath(), loop = loop, audio = false, hardware = hardware)
-    } catch (e: LinkageError) {
-        log.error("Background media natives unavailable for {}", file.absolutePath, e)
-        null
-    }
+    val player: VideoPlayer? = openBackgroundPlayer(file, loop, audio, output, hardware, unwatched)
 
     private val frames = VideoFrameImage()
 
@@ -165,10 +194,40 @@ private class BackgroundVideo(
 }
 
 /**
- * Opens [file] as a looping, silent Skinema player and pumps its frames on the
- * Compose frame clock, returning a [VideoFramePainter] once the first frame has
- * decoded (null before that, and on [VideoPlayer.State.Failed], so the caller
- * draws nothing -- the same gate the still path uses while it decodes).
+ * Opens a wallpaper's player, and owns its stream until skinema does.
+ *
+ * The sink is named rather than passed inline, for the reason the music player
+ * gives about its own: skinema closes the stream it was handed and can only do
+ * that once it has one, so a constructor that throws leaves the stream ours to
+ * close. A silent wallpaper asks for no stream at all, which is every wallpaper
+ * until somebody turns the sound on.
+ */
+private fun openBackgroundPlayer(
+    file: File,
+    loop: Boolean,
+    audio: Boolean,
+    output: AudioOutput?,
+    hardware: HwAccel,
+    unwatched: WhenUnwatched,
+): VideoPlayer? {
+    val sink: PcmSink? = if (audio) output?.sink() else null
+    return try {
+        VideoPlayer(path = file.toPath(), loop = loop, audio = audio, sink = sink, hardware = hardware, unwatched = unwatched)
+    } catch (e: LinkageError) {
+        runCatching { sink?.close() }
+        log.error("Background media natives unavailable for {}", file.absolutePath, e)
+        null
+    }
+}
+
+/**
+ * Opens [file] as a looping Skinema player and pumps its frames on the Compose
+ * frame clock, returning a [VideoFramePainter] once the first frame has decoded
+ * (null before that, and on [VideoPlayer.State.Failed], so the caller draws
+ * nothing -- the same gate the still path uses while it decodes).
+ *
+ * Silent unless [audio] says otherwise, which is the wallpaper's own setting and
+ * off by default.
  *
  * The player holds a decode thread and native memory; it is released when [file]
  * or a playback setting changes, and when the background leaves the composition.
@@ -179,24 +238,52 @@ internal fun rememberSkinemaFrame(
     speedMultiplier: Float,
     loopMode: BackgroundLoopMode,
     hardwareDecode: Boolean,
-    onSeed: (Int) -> Unit = {},
+    audio: Boolean,
+    audioVolume: Float,
+    link: Boolean,
+    onAudioVolume: (Float) -> Unit,
+    onColours: (List<Int>) -> Unit = {},
 ): VideoFramePainter? {
     // Skinema disabled by boot recovery -> no animated background (same draw-
     // nothing contract as the decode-failure gate below).
     if (!SkinemaGate.enabled) return null
-    // Keyed on the decode policy and the loop mode as well as the file: both are
-    // constructor arguments, so neither takes effect until the player re-opens,
-    // and keying only on the file left the loop setting inert until the wallpaper
-    // itself changed.
+    // Optional, and read as optional, the same way the music player reads it: what
+    // the named output buys is a mixer row that says Nexira rather than an
+    // anonymous JVM, and losing that must never cost the sound itself. Resolved in
+    // a remember rather than through koinInject so the absence is an answer here
+    // instead of a throw out of composition.
+    val koin = getKoin()
+    val output = remember(koin) { koin.getOrNull<AudioOutput>() }
+    // Outlives the player on purpose: it exists to survive the re-open that a
+    // constructor argument forces, so it is keyed on the file and on nothing else.
+    val resume = remember(file) { BackgroundResume() }
+    // Keyed on what the player cannot be told after it is built: the file, the
+    // decode policy and whether it carries sound. Those three reach the
+    // constructor and nowhere else, so changing one means a new player, and
+    // [BackgroundResume] is what keeps the picture where it was across that.
+    //
+    // The loop mode and the loudness are NOT keys, and for the same reason: both
+    // are settable on a running player. Keying on the loop is what this used to
+    // do, and skinema's own note on the property names the cost -- a consumer
+    // offering a repeat button had to choose between the button and the position.
     val closeScope = koinInject<CoroutineScope>()
-    val video = remember(file, hardwareDecode, loopMode) {
+    val video = remember(file, hardwareDecode, audio, link) {
         BackgroundVideo(
             file = file,
             // The background loops unless the user pinned it to a single pass.
             loop = loopMode != BackgroundLoopMode.PlayOnce,
+            audio = audio,
+            output = output,
             // 4K on the CPU is brutal; AUTO offloads to the GPU and falls back
             // to software per file when no device opens.
             hardware = if (hardwareDecode) HwAccel.AUTO else HwAccel.OFF,
+            // Freeze stops the clock while nobody takes the picture, which is
+            // right for decoration: a minimised window should cost nothing. It is
+            // wrong for a track, because minimising would then stop the music. It
+            // also removes an ambiguity the link creates, where a gap in the frame
+            // pump reads as Paused and is indistinguishable from the real thing now
+            // that a real pause freezes the picture too.
+            unwatched = if (link) WhenUnwatched.KeepTime else WhenUnwatched.Freeze,
             closeScope = closeScope,
         )
     }
@@ -211,10 +298,69 @@ internal fun rememberSkinemaFrame(
     // [0.5, 4]x internally.
     LaunchedEffect(player, speedMultiplier) { player.setRate(speedMultiplier) }
 
+    // The wall as something that plays, and whether it is what the players are
+    // pointed at. Attached whenever it sounds, so a linked wall has a session
+    // waiting the instant the link is flipped rather than one frame later;
+    // ownership is the narrower question and is asked separately.
+    val session = koinInject<WallpaperSession>()
+    val router = koinInject<PlaybackRouter>()
+    DisposableEffect(video, audio) {
+        if (audio) {
+            session.attach(
+                player = player,
+                file = file.toPath(),
+                volume = audioVolume,
+                repeat = repeatOf(loopMode),
+                persistVolume = onAudioVolume,
+            )
+        }
+        onDispose { if (audio) session.detach() }
+    }
+    // Ownership, and nothing else, so the session can be attached and silent at the
+    // same time. The wall only owns what it can be heard doing.
+    DisposableEffect(router, audio, link) {
+        router.setWallpaperOwns(audio && link)
+        onDispose { router.setWallpaperOwns(false) }
+    }
+    // The settings moved, not the transport, so these report rather than write
+    // back: the appearance panel already persists, and echoing it would write the
+    // same value a second time through a debounce that is still in flight.
+    LaunchedEffect(session, audioVolume) { session.reportVolume(audioVolume) }
+    LaunchedEffect(session, loopMode) { session.reportRepeat(repeatOf(loopMode)) }
+
+    // A property write rather than a new player, which is what the property exists
+    // for. Read on the decode thread at the end of a lap, so a change lands at the
+    // next end of stream and never inside one: turning the loop off part way
+    // through still finishes the lap, and turning it on still wraps at the end of
+    // the one playing.
+    LaunchedEffect(player, loopMode) {
+        player.loop = loopMode != BackgroundLoopMode.PlayOnce
+    }
+
+    // Settable on a running player, which is why it is an effect and not a
+    // constructor argument: turning the wallpaper down must not restart its
+    // picture. Applied only where there is a pipeline to apply it to.
+    LaunchedEffect(player, audio, audioVolume) {
+        if (audio) player.setVolume(audioVolume.coerceIn(0f, 1f))
+    }
+
     LaunchedEffect(video) {
-        var seedSent = false
+        var resumed = false
+        var coloursSent = false
         while (true) {
             withFrameNanos { }
+            // Put the picture back where the previous player left it, once there is
+            // a decoder to ask. Zero is a first open on this file, which starts
+            // where the file does and needs no seek.
+            //
+            // Inexact for the reason the transport's own seek carries in full: an
+            // exact landing on a GPU-decoded file intermittently fails to download
+            // its frame, and skinema ends the player on that. A wallpaper put back
+            // roughly where it was is the whole requirement here anyway.
+            if (!resumed && player.state != VideoPlayer.State.Opening) {
+                resumed = true
+                resume.positionNanos.takeIf { it > 0L }?.let { player.seek(it, exact = false) }
+            }
             player.acquireFrame()?.let { slot ->
                 video.update(slot)
                 if (displaySize == null) {
@@ -224,10 +370,18 @@ internal fun rememberSkinemaFrame(
                     else
                         Size(slot.height.toFloat(), slot.width.toFloat())
                 }
-                // Seed the Material-You palette from the first decoded frame (once).
-                if (!seedSent) seedFromRgba(slot.rgba, slot.width, slot.height)?.let { seedSent = true; onSeed(it) }
+                // The wallpaper's colours come from the first decoded frame, once.
+                if (!coloursSent) {
+                    coloursFromRgba(slot.rgba, slot.width, slot.height).takeIf { it.isNotEmpty() }
+                        ?.let { coloursSent = true; onColours(it) }
+                }
                 frameStamp++
             }
+            // Read from the pump rather than on the way out. The close is
+            // asynchronous and joins a decode thread, so asking a player being torn
+            // down where it had got to races the thread that owns the clock. A zero
+            // is a player without one yet and is not a position.
+            player.positionNanos().takeIf { it > 0L }?.let { resume.positionNanos = it }
         }
     }
 
@@ -247,3 +401,14 @@ internal fun rememberSkinemaFrame(
         )
     }
 }
+
+/**
+ * The wallpaper's loop, as the transport names it.
+ *
+ * A wallpaper turns the lap or it does not, which is one bit, while a repeat mode
+ * has three states because a music queue has an end to wrap. There is no queue
+ * here, so [RepeatMode.Queue] has nothing to go round and never appears: a lap that
+ * repeats IS the one-entry case that mode already collapses into.
+ */
+private fun repeatOf(mode: BackgroundLoopMode): RepeatMode =
+    if (mode == BackgroundLoopMode.PlayOnce) RepeatMode.Off else RepeatMode.One

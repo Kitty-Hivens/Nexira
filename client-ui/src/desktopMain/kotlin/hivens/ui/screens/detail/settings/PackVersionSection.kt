@@ -1,9 +1,7 @@
 package hivens.ui.screens.detail.settings
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -21,6 +19,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.core.api.interfaces.IMirrorPackClient
 import hivens.core.data.PackInstance
+import hivens.core.data.PackOrigin
 import hivens.core.update.PackUpdateStatus
 import hivens.core.update.PackUpdateStatusHub
 import hivens.core.update.PackUpdater
@@ -36,20 +35,23 @@ import hivens.ui.components.ChannelChip
 import hivens.ui.components.formatBuildTimestamp
 import hivens.ui.components.rememberRunningPackGuard
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.icons.NxIcon
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxCalloutBanner
 import hivens.ui.nx.NxCalloutTone
-import hivens.ui.nx.NxSection
-import hivens.ui.nx.NxToggle
+import hivens.ui.nx.NxReveal
+import hivens.ui.nx.NxSettingGroup
+import hivens.ui.nx.NxSettingRow
+import hivens.ui.nx.NxSwitch
 import hivens.ui.puppet.PuppetClick
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxInk
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
 /**
- * Compact version panel for a mirror instance: the installed build with its
+ * Compact version panel for a tracked instance (a local pack gets
+ * [PackLoaderSection] instead): the installed build with its
  * channel, the mirror's latest-build line, a manual check, follow-latest, and
  * the available-update banner. A green update applies right here (progress in
  * the window's footer strip, narrated from [operation]); an amber one routes to
@@ -61,12 +63,17 @@ import org.koin.compose.koinInject
 internal fun PackVersionSection(
     pack: PackInstance,
     operation: PackOperation?,
-    save: (PackInstance) -> Unit,
+    save: (PackEdit) -> Unit,
     onOpenVersions: () -> Unit = {},
     onNotice: (String?) -> Unit = {},
 ) {
+    // A pack the player owns has no builds to move between. What it does have is
+    // the loader it was made with, and this is the section where a version is set.
+    if (pack.packRef.origin == PackOrigin.Local) {
+        PackLoaderSection(pack, save)
+        return
+    }
     val s = LocalStrings.current
-    val colors = NxTheme.colors
     val updater: PackUpdater = koinInject()
     val mirror: IMirrorPackClient = koinInject()
     val hub: PackUpdateStatusHub = koinInject()
@@ -88,16 +95,21 @@ internal fun PackVersionSection(
     }
 
     // Both reads are best-effort: offline settings stay usable, the lines just
-    // do not render.
+    // do not render. Asked of the mirror only for a mirror pack: the section also
+    // serves a Modrinth instance, whose id the mirror has never heard of, and asking
+    // anyway spent two requests on a pair of 404s.
+    val isMirror = pack.packRef.origin == PackOrigin.Mirror
     val installedChannel by produceState<VersionChannel?>(null, pack.id, current) {
-        value = runCatching { mirror.fetchManifestVersion(pack.packRef.id, current).versionChannel }.getOrNull()
+        if (!isMirror) return@produceState
+        value = bestEffort { mirror.fetchManifestVersion(pack.packRef.id, current).versionChannel }
     }
     val latestLine by produceState<String?>(null, pack.id) {
-        value = runCatching {
+        if (!isMirror) return@produceState
+        value = bestEffort {
             val summary = mirror.fetchSummary(pack.packRef.id)
             val built = formatBuildTimestamp(summary.latestBuiltAt)
             if (built != null) s.packVersionLatestBuilt(summary.latestPackVersion, built) else null
-        }.getOrNull()
+        }
     }
 
     fun runCheck() {
@@ -107,9 +119,17 @@ internal fun PackVersionSection(
             onNotice(null)
             // Explicit action: go past the cache. Answering "check now" out of a
             // four-minute-old entry is what made this button feel like a coin flip.
-            check = runCatching { updater.checkForUpdate(pack, forceRefresh = true) }
-                .onFailure { onNotice(s.packVersionsFailed(it.message ?: s.packVersionCheckFailed)) }
-                .getOrNull()
+            // A cancellation is passed on, as bestEffort below does: switching the
+            // sheet's tab mid-check cancels this scope, and caught here it wrote a
+            // red "failed: cancelled" into the footer, which outlives the section.
+            check = try {
+                updater.checkForUpdate(pack, forceRefresh = true)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                onNotice(s.packVersionsFailed(e.message ?: s.packVersionCheckFailed))
+                null
+            }
             // Feed the shared hub so the ambient badges (card, hero) reflect what
             // this manual check just learned.
             when (val c = check) {
@@ -147,21 +167,20 @@ internal fun PackVersionSection(
         }
     }
 
-    NxSection(s.packVersionSection) {
-        Row(
-            modifier          = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
+    NxSettingGroup(s.packVersionSection) {
+        NxSettingRow(
+            title  = s.packVersionInstalled,
+            detail = latestLine,
         ) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(s.packVersionInstalled, style = MaterialTheme.typography.labelSmall, color = colors.textSecondary)
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(current, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = colors.textPrimary)
-                    installedChannel?.let { ChannelChip(it) }
-                }
-                latestLine?.let {
-                    Text(it, style = MaterialTheme.typography.labelSmall, color = colors.textSecondary)
-                }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(current, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = NxInk.main)
+                installedChannel?.let { ChannelChip(it) }
             }
+        }
+        NxSettingRow(
+            title  = s.packVersionCheckTitle,
+            detail = if (check == UpdateCheck.UpToDate) s.packVersionUpToDate else null,
+        ) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 PuppetClick("packSettings.version.check") { runCheck() }
                 NxButton(
@@ -180,52 +199,52 @@ internal fun PackVersionSection(
                 )
             }
         }
-        NxToggle(
-            s.packVersionFollowLatest,
-            pack.followLatest,
-            description = s.packVersionFollowLatestDesc,
-            icon = NxIcon.Sync,
-        ) { enabled -> save(pack.copy(followLatest = enabled)) }
-        // Up-to-date is a quiet one-liner inside the section, not a banner block.
-        if (check == UpdateCheck.UpToDate) {
-            Text(s.packVersionUpToDate, style = MaterialTheme.typography.bodySmall, color = colors.success)
+        NxSettingRow(s.packVersionFollowLatest, detail = s.packVersionFollowLatestDesc) {
+            NxSwitch(pack.followLatest, { enabled -> save { it.copy(followLatest = enabled) } })
         }
     }
 
     // Only an actual available update earns a prominent banner. Green applies in
     // place; amber (structural) opens the versions screen where the full diff,
     // the snapshot notice and the confirm flow live.
-    (check as? UpdateCheck.Available)?.let { c ->
-        val isRollback = c.direction == UpdateDirection.Older
-        NxCalloutBanner(
-            // A mirror-side rollback of latest arrives through the same check as
-            // a release; calling it "available build" would be true but reads as
-            // an update, and the target is older than what is installed.
-            title = if (isRollback) s.packVersionRolledBack(c.toVersion) else s.packVersionAvailable(c.toVersion),
-            body = if (c.compat.isSafe) s.packVersionSafe else s.packVersionNeedsCare,
-            tone = if (c.compat.isSafe && !isRollback) NxCalloutTone.Info else NxCalloutTone.Warning,
-        ) {
-            // No line at all when the plan is absent: the source could not say
-            // what would change without handing over the whole pack, and a
-            // count of zero would read as "nothing changes".
-            c.plan?.takeIf { !it.isEmpty }?.let { plan ->
-                Text(
-                    s.packVersionsPlanCounts(plan.toAdd.size, plan.toUpdate.size, plan.toDelete.size),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = colors.textSecondary,
-                )
-            }
-            Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (c.compat.isSafe) {
-                    PuppetClick("packSettings.version.updateNow") { runningGuard.run(::applyLatest) }
-                    NxButton(
-                        label   = if (isRollback) s.packVersionSwitchNow else s.packVersionUpdateNow,
-                        onClick = { runningGuard.run(::applyLatest) },
-                        enabled = !busy,
-                        compact = true,
+    // Held across the reveal so the banner can play its way out after the check
+    // that raised it is cleared by an applied update.
+    val available = check as? UpdateCheck.Available
+    var shownCheck by remember(pack.id) { mutableStateOf<UpdateCheck.Available?>(null) }
+    if (available != null) shownCheck = available
+    NxReveal(visible = available != null) {
+        shownCheck?.let { c ->
+            val isRollback = c.direction == UpdateDirection.Older
+            NxCalloutBanner(
+                // A mirror-side rollback of latest arrives through the same check as
+                // a release; calling it "available build" would be true but reads as
+                // an update, and the target is older than what is installed.
+                title = if (isRollback) s.packVersionRolledBack(c.toVersion) else s.packVersionAvailable(c.toVersion),
+                body = if (c.compat.isSafe) s.packVersionSafe else s.packVersionNeedsCare,
+                tone = if (c.compat.isSafe && !isRollback) NxCalloutTone.Info else NxCalloutTone.Warning,
+            ) {
+                // No line at all when the plan is absent: the source could not say
+                // what would change without handing over the whole pack, and a
+                // count of zero would read as "nothing changes".
+                c.plan?.takeIf { !it.isEmpty }?.let { plan ->
+                    Text(
+                        s.packVersionsPlanCounts(plan.toAdd.size, plan.toUpdate.size, plan.toDelete.size),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = NxInk.quiet,
                     )
-                } else {
-                    NxButton(s.packVersionsAllVersions, onClick = onOpenVersions, compact = true)
+                }
+                Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (c.compat.isSafe) {
+                        PuppetClick("packSettings.version.updateNow") { runningGuard.run(::applyLatest) }
+                        NxButton(
+                            label   = if (isRollback) s.packVersionSwitchNow else s.packVersionUpdateNow,
+                            onClick = { runningGuard.run(::applyLatest) },
+                            enabled = !busy,
+                            compact = true,
+                        )
+                    } else {
+                        NxButton(s.packVersionsAllVersions, onClick = onOpenVersions, compact = true)
+                    }
                 }
             }
         }
@@ -233,3 +252,16 @@ internal fun PackVersionSection(
 
     runningGuard.Dialog()
 }
+
+/**
+ * [read]'s answer, or null when it failed. A cancellation is not a failure: it is
+ * passed on, so a producer the screen has left does not go on to write its null.
+ */
+private suspend fun <T> bestEffort(read: suspend () -> T): T? =
+    try {
+        read()
+    } catch (e: CancellationException) {
+        throw e
+    } catch (_: Exception) {
+        null
+    }

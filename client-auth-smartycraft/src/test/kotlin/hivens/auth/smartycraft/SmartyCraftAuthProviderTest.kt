@@ -1,17 +1,24 @@
 package hivens.auth.smartycraft
 
+import hivens.config.Protocol
 import hivens.core.api.AuthException
 import hivens.core.api.TwoFactorRequiredException
 import hivens.core.api.protocol.LoginResponse
 import hivens.core.api.protocol.StatusOnlyResponse
 import hivens.core.data.AuthStatus
+import hivens.core.util.HashUtils
 import hivens.test.FakeServerProtocol
 import kotlinx.coroutines.test.runTest
+import java.net.ConnectException
+import java.net.SocketTimeoutException
+import java.nio.charset.StandardCharsets
+import java.util.Base64
+import javax.crypto.Cipher
+import javax.crypto.spec.SecretKeySpec
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
@@ -41,6 +48,18 @@ class SmartyCraftAuthProviderTest {
         session = session,
         money = money,
     )
+
+    /**
+     * A session as the server sends it: AES under the key derived from [uid], so the
+     * provider can derive a game token from it. A value that does not decrypt now
+     * fails the sign-in, which is what it should have done all along.
+     */
+    private fun sealedSession(uid: String, plain: String = "fake-session-bytes"): String {
+        val key = HashUtils.md5(uid + Protocol.AUTH_SALT).take(16)
+        val cipher = Cipher.getInstance("AES/ECB/PKCS5Padding")
+        cipher.init(Cipher.ENCRYPT_MODE, SecretKeySpec(key.toByteArray(StandardCharsets.UTF_8), "AES"))
+        return Base64.getEncoder().encodeToString(cipher.doFinal(plain.toByteArray(StandardCharsets.UTF_8)))
+    }
 
     private fun protocol(response: LoginResponse) = FakeServerProtocol().apply {
         loginResult = { response }
@@ -118,7 +137,7 @@ class SmartyCraftAuthProviderTest {
                     uid = "abc-uid-128",
                     uuid = "550e8400e29b41d4a716446655440000",
                     playername = "TestPlayer",
-                    session = "ZmFrZS1zZXNzaW9uLWJ5dGVz",
+                    session = sealedSession("abc-uid-128"),
                     money = 50,
                 )
             }
@@ -180,7 +199,7 @@ class SmartyCraftAuthProviderTest {
                     status = "TWOAUTH", uid = "abc-uid-128",
                     uuid = "550e8400e29b41d4a716446655440000",
                     playername = "TestPlayer",
-                    session = "ZmFrZS1zZXNzaW9uLWJ5dGVz",
+                    session = sealedSession("abc-uid-128"),
                 )
             }
             twoauthResult = { _, _, _ -> StatusOnlyResponse(status = "OK") }
@@ -198,29 +217,54 @@ class SmartyCraftAuthProviderTest {
         assertEquals(1, proto.loginCalls.size, "the unlocked session is used as-is")
     }
 
+    /**
+     * The launch gate signs in again to see whether the account still answers to a
+     * second factor, and a session coming back reads as "it does not". Inside the
+     * cache window that session is the one the code unlocked, so it has to say so.
+     */
     @Test
-    fun `pending TWOAUTH cache is cleared by a fresh login attempt for the same triple`() = runTest {
-        // Audit catch on the 22-commit batch: pendingTwoFactor used to grow
-        // unbounded if the user canceled the dialog and retried with a
-        // different password. The fresh-login invalidation guards that --
-        // verify by chaining a TWOAUTH-yielding login, a wrong-password
-        // attempt (clears the cache), then a TWOAUTH-yielding login again,
-        // and confirming the second TWOAUTH path goes through the cache-promotion
-        // fallback (which is only possible if the entry was
-        // re-inserted, not pre-existing from the first attempt).
+    fun `a login answered from the cache after a code still carries the second factor`() = runTest {
+        val proto = FakeServerProtocol().apply {
+            loginResult = {
+                LoginResponse(
+                    status = "TWOAUTH", uid = "abc-uid-128",
+                    uuid = "550e8400e29b41d4a716446655440000",
+                    playername = "TestPlayer",
+                    session = sealedSession("abc-uid-128"),
+                )
+            }
+            twoauthResult = { _, _, _ -> StatusOnlyResponse(status = "OK") }
+        }
+        val service = SmartyCraftAuthProvider(proto)
+        val ex = assertFailsWith<TwoFactorRequiredException> { service.login("user", "pass", "Industrial") }
+        service.completeTwoFactor(username = "user", password = "pass", serverId = "Industrial", uid = ex.uid!!, code = "123456")
+
+        val again = service.login("user", "pass", "Industrial")
+
+        assertTrue(again.twoFactor, "the cached session is the unlocked one, not evidence the account dropped its factor")
+        assertEquals(1, proto.loginCalls.size)
+    }
+
+    @Test
+    fun `a later TWOAUTH for the same credentials is the one a code unlocks`() = runTest {
+        // A TWOAUTH-yielding login, an attempt with another password, then a
+        // TWOAUTH-yielding login again: the code unlocks the session of the last
+        // demand, not the abandoned first one.
         val responses = mutableListOf(
+            // Named apart from the second, so promoting the stale entry and promoting
+            // the fresh one cannot come out the same.
             LoginResponse(
                 status = "TWOAUTH", uid = "first-uid",
                 uuid = "550e8400e29b41d4a716446655440000",
-                playername = "TestPlayer",
-                session = "ZmFrZS1zZXNzaW9uLWJ5dGVz",
+                playername = "StaleName",
+                session = sealedSession("first-uid"),
             ),
             LoginResponse(status = "PASSWORD"),
             LoginResponse(
                 status = "TWOAUTH", uid = "second-uid",
                 uuid = "550e8400e29b41d4a716446655440000",
-                playername = "TestPlayer",
-                session = "ZmFrZS1zZXNzaW9uLWJ5dGVz",
+                playername = "FreshName",
+                session = sealedSession("second-uid"),
             ),
         )
         val proto = FakeServerProtocol().apply {
@@ -254,7 +298,41 @@ class SmartyCraftAuthProviderTest {
             uid = second.uid!!, code = "111111",
         )
         // Promote-from-cache used the most recent response, not a stale one.
-        assertEquals("TestPlayer", session.playerName)
+        assertEquals("FreshName", session.playerName)
+        assertEquals("second-uid", session.uid)
+    }
+
+    @Test
+    fun `a fresh login with the same credentials drops the pending second factor`() = runTest {
+        // The dialog was abandoned and the same account signed in again, and this
+        // time the server answered with an error rather than a new demand. The
+        // held response belongs to a demand nobody is answering any more, so a code
+        // arriving now must not unlock it.
+        val responses = mutableListOf(
+            LoginResponse(
+                status = "TWOAUTH", uid = "first-uid",
+                uuid = "550e8400e29b41d4a716446655440000",
+                playername = "StaleName",
+                session = sealedSession("first-uid"),
+            ),
+            LoginResponse(status = "ERROR"),
+        )
+        val proto = FakeServerProtocol().apply {
+            loginResult = { responses.removeAt(0) }
+            twoauthResult = { _, _, _ -> StatusOnlyResponse(status = "OK") }
+        }
+        val service = SmartyCraftAuthProvider(proto)
+
+        val first = assertFailsWith<TwoFactorRequiredException> { service.login("user", "pass", "Industrial") }
+        assertFailsWith<AuthException> { service.login("user", "pass", "Industrial") }
+
+        val failure = assertFailsWith<AuthException> {
+            service.completeTwoFactor(
+                username = "user", password = "pass", serverId = "Industrial",
+                uid = first.uid!!, code = "111111",
+            )
+        }
+        assertEquals(AuthStatus.TWO_FACTOR_EXPIRED, failure.status)
     }
 
     @Test
@@ -395,12 +473,58 @@ class SmartyCraftAuthProviderTest {
         assertTrue(ex.isNetworkError)
     }
 
+    /**
+     * A login that timed out reading its answer may have been processed, and for a
+     * two-factor account that means a code was sent. Running it again sends a second
+     * code and the first one stops working.
+     */
     @Test
-    fun `login succeeds when AES token decryption fails (degrades to raw token)`() = runTest {
-        val session = SmartyCraftAuthProvider(protocol(ok(session = "THIS_IS_NOT_VALID_BASE64!!!###")))
-            .login("user", "pass", "Industrial")
+    fun `a login whose answer timed out is not sent again`() = runTest {
+        val proto = FakeServerProtocol().apply {
+            loginResult = { throw SocketTimeoutException("Read timed out") }
+        }
+        val ex = assertFailsWith<AuthException> {
+            SmartyCraftAuthProvider(proto).login("user", "pass", "Industrial")
+        }
+        assertTrue(ex.isNetworkError, "the caller still learns it was the network")
+        assertEquals(1, proto.loginCalls.size)
+    }
+
+    @Test
+    fun `a login that never connected is tried again`() = runTest {
+        var calls = 0
+        val proto = FakeServerProtocol().apply {
+            loginResult = { if (calls++ == 0) throw ConnectException("Connection refused") else ok() }
+        }
+        val session = SmartyCraftAuthProvider(proto).login("user", "pass", "Industrial")
+
         assertEquals("TestPlayer", session.playerName)
-        assertNotNull(session.accessToken)
+        assertEquals(2, proto.loginCalls.size)
+    }
+
+    @Test
+    fun `a code check whose answer timed out is not sent again`() = runTest {
+        val proto = FakeServerProtocol().apply {
+            twoauthResult = { _, _, _ -> throw SocketTimeoutException("Read timed out") }
+        }
+        assertFailsWith<AuthException> {
+            SmartyCraftAuthProvider(proto).completeTwoFactor("user", "pass", "Industrial", uid = "abc-uid-128", code = "123456")
+        }
+        assertEquals(1, proto.twoauthCalls.size, "a spent code checked again reads as a wrong one")
+    }
+
+    /**
+     * The encrypted value used to stand in for the token, silently, and the game
+     * then died at the auth host with nothing pointing back at the sign-in.
+     */
+    @Test
+    fun `a session that does not decrypt fails the sign-in instead of becoming the token`() = runTest {
+        val ex = assertFailsWith<AuthException> {
+            SmartyCraftAuthProvider(protocol(ok(session = "THIS_IS_NOT_VALID_BASE64!!!###")))
+                .login("user", "pass", "Industrial")
+        }
+        assertEquals(AuthStatus.INTERNAL_ERROR, ex.status)
+        assertFalse(ex.isNetworkError, "a broken token scheme is not something to retry")
     }
 
     @Test
@@ -452,5 +576,30 @@ class SmartyCraftAuthProviderTest {
         service.login("user", "pass1", "Industrial")
         service.login("user", "pass2", "Industrial")
         assertEquals(2, proto.loginCalls.size)
+    }
+
+    @Test
+    fun `a login for a second world reuses the first world's session`() = runTest {
+        // The token is not scoped to the server (live-probed 2026-09-19), so a
+        // sign-in for one world and a launch of a pack bound to another must not
+        // force a fresh login -- which on a 2FA account would demand another code
+        // and kill the session just confirmed. The cache key is the account, not
+        // the account-and-world.
+        val proto = protocol(ok())
+        val service = SmartyCraftAuthProvider(proto)
+        service.login("user", "pass", "Industrial")
+        service.login("user", "pass", "RPG")
+        assertEquals(1, proto.loginCalls.size, "the second world hits the cache, no second login")
+    }
+
+    @Test
+    fun `a cache hit for a second world carries that world on the session`() = runTest {
+        // The token is shared, but the returned session names the world asked for
+        // now, because the launch selects the SC authlib by it.
+        val proto = protocol(ok())
+        val service = SmartyCraftAuthProvider(proto)
+        service.login("user", "pass", "Industrial")
+        val second = service.login("user", "pass", "RPG")
+        assertEquals("RPG", second.serverId)
     }
 }

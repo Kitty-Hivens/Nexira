@@ -20,7 +20,8 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.Symbol
 import hivens.ui.theme.Motion
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.NxInk
 
 /**
  * One state of an [NxCycleToggle]: the glyph that stands for it and the name it
@@ -69,10 +70,10 @@ fun NxCycleToggle(
 
     val tint by animateColorAsState(
         targetValue = when {
-            !enabled -> NxTheme.colors.textSecondary.copy(alpha = 0.4f)
-            active   -> NxTheme.colors.primary
-            hovered  -> NxTheme.colors.textPrimary
-            else     -> NxTheme.colors.textSecondary
+            !enabled -> NxInk.off
+            active   -> NxColor.lead()
+            hovered  -> NxInk.main
+            else     -> NxInk.quiet
         },
         animationSpec = Motion.tap.of(),
         label         = "cycle-tint",
@@ -80,8 +81,8 @@ fun NxCycleToggle(
     val wash by animateColorAsState(
         targetValue = when {
             !enabled -> Color.Transparent
-            active   -> NxTheme.colors.primary.copy(alpha = if (hovered) 0.24f else 0.16f)
-            hovered  -> NxTheme.colors.textPrimary.copy(alpha = 0.08f)
+            active   -> NxColor.wash(NxColor.lead(), if (hovered) 0.24f else 0.16f)
+            hovered  -> NxColor.wash(NxInk.main, 0.08f)
             else     -> Color.Transparent
         },
         animationSpec = Motion.tap.of(),

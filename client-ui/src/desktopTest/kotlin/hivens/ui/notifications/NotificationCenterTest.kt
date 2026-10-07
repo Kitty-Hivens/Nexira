@@ -220,4 +220,23 @@ class NotificationCenterTest {
         fun now(): Instant = current
         fun advance(seconds: Long) { current = current.plusSeconds(seconds) }
     }
+
+    @Test
+    fun `a failure body is redacted before it is shown or archived`() = runTest {
+        val archived = mutableListOf<PersistedNotification>()
+        val center = NotificationCenter(clock = clock::now, archive = { archived += it })
+        center.push(
+            sourceKey = "pack:X",
+            sender    = "X",
+            iconUrl   = null,
+            severity  = Severity.Critical,
+            kind      = Kind.Sticky,
+            title     = "X failed",
+            body      = "GET https://example/auth?accessToken=AAAA1234SECRET returned 500",
+        )
+
+        val shown = center.groups.first().single().latest.body.orEmpty()
+        assertTrue("AAAA1234SECRET" !in shown, "the token reaches the toast")
+        assertTrue("AAAA1234SECRET" !in archived.single().body.orEmpty(), "the token reaches the history on disk")
+    }
 }

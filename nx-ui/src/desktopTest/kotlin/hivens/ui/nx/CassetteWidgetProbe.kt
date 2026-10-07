@@ -45,7 +45,7 @@ import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.surface.NxSurface
-import hivens.ui.surface.NxSurfaceLevel
+import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.Spacing
 import org.jetbrains.skia.EncodedImageFormat
@@ -54,6 +54,7 @@ import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.sqrt
 import kotlin.test.Test
+import hivens.ui.theme.NxColor
 
 /**
  * The cassette, assembled.
@@ -105,8 +106,8 @@ class CassetteWidgetProbe {
 
     @Composable
     private fun Shell(fraction: Float, seeking: Boolean) {
-        val c = NxTheme.colors
-        val shell = lerp(c.surfaceContainerHigh, Color.Black, 0.52f)
+        val c = probeInks()
+        val shell = lerp(c.top, Color.Black, 0.52f)
         Canvas(Modifier.fillMaxWidth().height(200.dp).clip(RoundedCornerShape(4.dp))) {
             val d = 2f
             val w = size.width
@@ -179,12 +180,12 @@ class CassetteWidgetProbe {
                 strokeWidth = if (seeking) 5f else 3f, cap = StrokeCap.Round,
             )
             drawLine(
-                color = if (seeking) c.primary else c.primary.copy(alpha = 0.55f),
+                color = if (seeking) c.lead else c.lead.copy(alpha = 0.55f),
                 start = Offset(gl, gy), end = Offset(gl + (gr - gl) * fraction, gy),
                 strokeWidth = if (seeking) 5f else 3f, cap = StrokeCap.Round,
             )
             if (seeking) {
-                drawCircle(c.primary, radius = 11f, center = Offset(gl + (gr - gl) * fraction, gy))
+                drawCircle(c.lead, radius = 11f, center = Offset(gl + (gr - gl) * fraction, gy))
                 drawCircle(hollow, radius = 4f, center = Offset(gl + (gr - gl) * fraction, gy))
             }
 
@@ -214,8 +215,8 @@ class CassetteWidgetProbe {
 
     @Composable
     private fun Widget(fraction: Float, seeking: Boolean, repeatOn: Boolean) {
-        val c = NxTheme.colors
-        NxSurface(NxSurfaceLevel.Floating, Modifier.width(340.dp), shape = MaterialTheme.shapes.medium) {
+        val c = probeInks()
+        NxSurface(SurfaceKind.Card, Modifier.width(340.dp), shape = MaterialTheme.shapes.medium) {
             Column(Modifier.fillMaxWidth().padding(Spacing.s12)) {
                 Box {
                     Shell(fraction, seeking)
@@ -259,21 +260,21 @@ class CassetteWidgetProbe {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Key(
                         NxIcon.Repeat,
-                        if (repeatOn) c.primary.copy(alpha = 0.22f) else plate,
-                        if (repeatOn) c.primary else c.textSecondary,
+                        if (repeatOn) c.lead.copy(alpha = 0.22f) else plate,
+                        if (repeatOn) c.lead else c.quiet,
                     )
                     Spacer(Modifier.width(Spacing.s8))
-                    Key(NxIcon.Shuffle, plate, c.textSecondary)
+                    Key(NxIcon.Shuffle, plate, c.quiet)
                     Spacer(Modifier.weight(1f))
-                    Key(NxIcon.SkipPrevious, plate, c.textSecondary)
+                    Key(NxIcon.SkipPrevious, plate, c.quiet)
                     Spacer(Modifier.width(Spacing.s6))
-                    Key(NxIcon.Pause, c.primary, c.onPrimary, width = 46, glyph = 20)
+                    Key(NxIcon.Pause, c.lead, c.onLead, width = 46, glyph = 20)
                     Spacer(Modifier.width(Spacing.s6))
-                    Key(NxIcon.SkipNext, plate, c.textSecondary)
+                    Key(NxIcon.SkipNext, plate, c.quiet)
                     Spacer(Modifier.weight(1f))
-                    Key(NxIcon.QueueMusic, plate, c.textSecondary)
+                    Key(NxIcon.QueueMusic, plate, c.quiet)
                     Spacer(Modifier.width(Spacing.s8))
-                    Key(NxIcon.MoreVert, plate, c.textSecondary)
+                    Key(NxIcon.MoreVert, plate, c.quiet)
                 }
             }
         }
@@ -283,9 +284,9 @@ class CassetteWidgetProbe {
     private fun sheet(name: String, body: @Composable () -> Unit) {
         val d = 2.4f
         val scene = ImageComposeScene((380 * d).toInt(), (320 * d).toInt(), density = Density(d)) {
-            NxTheme(useDarkTheme = true) {
+            NxTheme(dark = true) {
                 Box(
-                    Modifier.fillMaxSize().background(NxTheme.colors.background),
+                    Modifier.fillMaxSize().background(NxColor.page),
                     contentAlignment = Alignment.Center,
                 ) { body() }
             }

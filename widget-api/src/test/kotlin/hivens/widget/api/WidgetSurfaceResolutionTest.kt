@@ -18,7 +18,7 @@ import kotlin.test.assertNull
  */
 class WidgetSurfaceResolutionTest {
 
-    private val declared = SurfaceSpec(fill = "raised", opacity = 0.4f)
+    private val declared = SurfaceSpec(fill = "card", opacity = 0.4f)
 
     private fun descriptor(surface: SurfaceSpec?) = object : WidgetDescriptor {
         override val kind = WidgetKind("test")
@@ -60,7 +60,7 @@ class WidgetSurfaceResolutionTest {
 
     @Test
     fun `an instance can give a plane to a widget that declares none`() {
-        val own = SurfaceSpec(fill = "base")
+        val own = SurfaceSpec(fill = "panel")
         assertEquals(own, descriptor(null).resolveSurface(instance(own)))
     }
 }

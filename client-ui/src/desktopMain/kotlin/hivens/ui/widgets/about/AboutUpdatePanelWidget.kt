@@ -29,13 +29,15 @@ import hivens.ui.flexible.Flexible
 import hivens.ui.flexible.FlexibleKind
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
-import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalMonoFamily
 import hivens.widget.api.rememberProps
 import hivens.widget.model.PropLabel
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 import kotlinx.serialization.Serializable
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.Status
 
 @Serializable
 data class AboutUpdateProps(
@@ -50,7 +52,7 @@ data class AboutUpdateProps(
     id = "about.update.panel",
     displayName = "widget.about.update.panel",
     propsClass = AboutUpdateProps::class,
-    surface = """{"fill":"raised","opacity":0.92,"border":{"widthDp":1.0}}""",
+    surface = """{"fill":"card","border":{"widthDp":1.0}}""",
 )
 @Composable
 fun AboutUpdatePanelWidget(instance: WidgetInstance) {
@@ -69,7 +71,7 @@ fun AboutUpdatePanelWidget(instance: WidgetInstance) {
 
         // Current version.
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(s.aboutCurrentVersion, color = NxTheme.colors.textSecondary, fontSize = 13.sp)
+            Text(s.aboutCurrentVersion, color = NxInk.quiet, fontSize = 13.sp)
             Spacer(Modifier.width(12.dp))
             Text(
                 text       = versionText,
@@ -87,7 +89,7 @@ fun AboutUpdatePanelWidget(instance: WidgetInstance) {
         // Only an actual available update renders below; up-to-date stays silent.
         (state as? UpdateCheckState.Available)?.let { current ->
             val availChannel = ReleaseChannel.classify(current.update.version.removePrefix("v"))
-            val availAccent = if (current.update.isCritical) NxTheme.colors.error else channelColor(availChannel)
+            val availAccent = if (current.update.isCritical) NxColor.status(Status.Error) else channelColor(availChannel)
 
             Spacer(Modifier.height(16.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {

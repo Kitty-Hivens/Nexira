@@ -32,6 +32,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -52,8 +53,9 @@ import hivens.ui.notifications.NotificationArchiveStore
 import hivens.ui.notifications.PersistedNotification
 import hivens.ui.notifications.Severity
 import hivens.ui.notifications.render.NotificationAvatar
-import hivens.ui.theme.NxColors
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.OnFill
+import hivens.ui.theme.Status
 import hivens.ui.widgets.Commands
 import hivens.ui.widgets.Sources
 import hivens.widget.api.rememberAction
@@ -66,10 +68,12 @@ import hivens.widget.model.WidgetInstance
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import org.koin.compose.koinInject
+import hivens.ui.theme.NxInk
 
 @Serializable
 data class NotificationHistoryProps(
@@ -99,11 +103,16 @@ private val PILL_BUTTON_SIZE = 28.dp
  * the whole list out before wiping it. Consecutive identical entries fold into
  * one row with a count, mirroring the live stack's progress coalescing.
  */
+// The ceiling is load-bearing: this scrolls its own list, and a scrolling
+// component cannot be measured against an unbounded height. No preferred size
+// until one is measured rather than guessed.
 @Widget(
     id = "notifications.history",
     displayName = "widget.notifications.history",
     propsClass = NotificationHistoryProps::class,
-    surface = """{"fill":"base","opacity":0.5,"border":{"widthDp":1.0}}""",
+    surface = """{"fill":"panel","border":{"widthDp":1.0}}""",
+    minWidth = 260, minHeight = 160,
+    maxWidth = 720, maxHeight = 1200,
 )
 @Composable
 fun NotificationHistoryWidget(instance: WidgetInstance) {
@@ -118,10 +127,9 @@ fun NotificationHistoryWidget(instance: WidgetInstance) {
     val doNotDisturb by rememberSource(Sources.DoNotDisturb)
     val setDoNotDisturb = rememberCommand(Commands.SetDoNotDisturb)
     val store: NotificationArchiveStore = koinInject()
-    val palette = NxTheme.colors
     var expanded by remember { mutableStateOf(false) }
     val groups = remember(log) { groupHistory(log) }
-    val outline = palette.outline.copy(alpha = 0.4f)
+    val outline = NxInk.line
     val scope = rememberCoroutineScope()
 
     // Clear slides the whole list out to the right, wipes it, then collapses the
@@ -229,42 +237,48 @@ private fun PillButton(
     active: Boolean = false,
     onClick: () -> Unit,
 ) {
-    val palette = NxTheme.colors
     // Active = the toggle is engaged (mute on): tint + fill shift to the accent so
     // the state reads at a glance without a separate label.
+    val fill = if (active) NxColor.wash(NxColor.lead(), 0.18f) else NxColor.wash(NxInk.quiet, 0.12f)
+    val border = if (active) NxColor.wash(NxColor.lead(), 0.6f) else outline
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(50))
-            .background(if (active) palette.primary.copy(alpha = 0.18f) else palette.surface.copy(alpha = 0.45f))
-            .border(1.dp, if (active) palette.primary.copy(alpha = 0.6f) else outline, RoundedCornerShape(50))
+            .background(fill)
+            .border(1.dp, border, RoundedCornerShape(50))
             .clickable(onClick = onClick)
             .padding(6.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Symbol(icon = icon,
-            contentDescription = contentDescription,
-            tint               = if (active) palette.primary else palette.textSecondary,
-            modifier           = Modifier.size(16.dp),
-        )
+        OnFill(fill) {
+            Symbol(icon = icon,
+                contentDescription = contentDescription,
+                tint               = if (active) NxColor.lead() else NxInk.quiet,
+                modifier           = Modifier.size(16.dp),
+            )
+        }
     }
 }
 
 @Composable
 private fun CountPill(text: String, outline: Color, modifier: Modifier = Modifier) {
+    val fill = NxColor.wash(NxInk.quiet, 0.08f)
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(50))
-            .background(NxTheme.colors.surface.copy(alpha = 0.35f))
+            .background(fill)
             .border(1.dp, outline, RoundedCornerShape(50))
             .padding(horizontal = 12.dp, vertical = 5.dp),
     ) {
-        Text(
-            text       = text,
-            style      = MaterialTheme.typography.labelMedium,
-            color      = NxTheme.colors.textSecondary,
-            fontWeight = FontWeight.Medium,
-            maxLines   = 1,
-        )
+        OnFill(fill) {
+            Text(
+                text       = text,
+                style      = MaterialTheme.typography.labelMedium,
+                color      = NxInk.quiet,
+                fontWeight = FontWeight.Medium,
+                maxLines   = 1,
+            )
+        }
     }
 }
 
@@ -280,7 +294,6 @@ private fun NotificationDrawer(
     fromTop: Boolean,
 ) {
     val strings = LocalStrings.current
-    val palette = NxTheme.colors
     val edge = if (fromTop) Alignment.Top else Alignment.Bottom
     AnimatedVisibility(
         visible = expanded,
@@ -295,7 +308,7 @@ private fun NotificationDrawer(
                 Text(
                     text  = strings.notifHistoryEmpty,
                     style = MaterialTheme.typography.bodySmall,
-                    color = palette.textSecondary.copy(alpha = 0.7f),
+                    color = NxInk.quiet,
                 )
             }
         } else {
@@ -328,6 +341,12 @@ private fun NotificationDrawer(
 
 // Swipe a row to the right to dismiss it: the offset tracks the drag, snaps back
 // if released early, or slides off and removes the group once past the threshold.
+//
+// The dismissal is read through rememberUpdatedState, as the live toast card reads
+// its own. The gesture never restarts, and the callback closes over the groups the
+// drawer had when the row appeared: swiping every group away left the drawer open
+// on its empty box, because the last swipe still counted the ones already gone.
+// A swipe cut short goes back to rest rather than staying half off the row.
 @Composable
 private fun SwipeableHistoryRow(
     entry: PersistedNotification,
@@ -339,6 +358,7 @@ private fun SwipeableHistoryRow(
     val scope = rememberCoroutineScope()
     val offsetX = remember { Animatable(0f) }
     var widthPx by remember { mutableStateOf(1f) }
+    val dismiss by rememberUpdatedState(onDismiss)
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -352,11 +372,12 @@ private fun SwipeableHistoryRow(
                     },
                     onDragEnd = {
                         if (offsetX.value > widthPx * 0.4f) {
-                            scope.launch { offsetX.animateTo(widthPx); onDismiss() }
+                            scope.launch { offsetX.animateTo(widthPx); dismiss() }
                         } else {
                             scope.launch { offsetX.animateTo(0f) }
                         }
                     },
+                    onDragCancel = { scope.launch { offsetX.animateTo(0f) } },
                 )
             }
             .offset { IntOffset(offsetX.value.roundToInt(), 0) }
@@ -404,7 +425,6 @@ private fun groupHistory(log: List<PersistedNotification>): List<HistoryGroup> {
 @Composable
 private fun HistoryRow(entry: PersistedNotification, count: Int, ampm: Boolean, verticalTime: Boolean) {
     val strings = LocalStrings.current
-    val palette = NxTheme.colors
     Row(
         modifier          = Modifier.fillMaxWidth().padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -416,7 +436,7 @@ private fun HistoryRow(entry: PersistedNotification, count: Int, ampm: Boolean, 
                 Text(
                     text       = entry.title,
                     style      = MaterialTheme.typography.bodyMedium,
-                    color      = severityColor(entry.severity, palette),
+                    color      = severityColor(entry.severity),
                     fontWeight = FontWeight.SemiBold,
                     maxLines   = 1,
                     overflow   = TextOverflow.Ellipsis,
@@ -427,7 +447,7 @@ private fun HistoryRow(entry: PersistedNotification, count: Int, ampm: Boolean, 
                     Text(
                         text       = strings.notifGroupCount(count),
                         style      = MaterialTheme.typography.labelSmall,
-                        color      = palette.primary,
+                        color      = NxColor.lead(text = true),
                         fontWeight = FontWeight.Bold,
                     )
                 }
@@ -437,7 +457,7 @@ private fun HistoryRow(entry: PersistedNotification, count: Int, ampm: Boolean, 
                 Text(
                     text     = body,
                     style    = MaterialTheme.typography.bodySmall,
-                    color    = palette.textSecondary,
+                    color    = NxInk.quiet,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -448,7 +468,7 @@ private fun HistoryRow(entry: PersistedNotification, count: Int, ampm: Boolean, 
             epoch    = entry.createdAtEpoch,
             ampm     = ampm,
             vertical = verticalTime,
-            color    = palette.textSecondary.copy(alpha = 0.6f),
+            color    = NxInk.quiet,
         )
     }
 }
@@ -462,7 +482,11 @@ private fun TimeStamp(epoch: Long, ampm: Boolean, vertical: Boolean, color: Colo
     val hh = "%02d".format(hour)
     val mm = "%02d".format(ldt.minute)
     val ss = "%02d".format(ldt.second)
-    val meridiem = if (ldt.hour < 12) "am" else "pm"
+    // The marker in the launcher's language, as the clock widget writes it, rather
+    // than an English am/pm in a Russian or Japanese interface.
+    val locale = LocalStrings.current.locale
+    val meridiemFormat = remember(locale) { DateTimeFormatter.ofPattern("a", locale) }
+    val meridiem = meridiemFormat.format(ldt)
     val style = MaterialTheme.typography.labelSmall
     if (vertical) {
         Column(horizontalAlignment = Alignment.End) {
@@ -482,8 +506,9 @@ private fun TimeStamp(epoch: Long, ampm: Boolean, vertical: Boolean, color: Colo
 
 // Critical / Warn tint the title so failures stand out when scanning the log;
 // Info / Success read as normal primary text.
-private fun severityColor(severity: Severity, colors: NxColors): Color = when (severity) {
-    Severity.Critical -> colors.criticalAccent
-    Severity.Warn     -> colors.warnAccent
-    else              -> colors.textPrimary
+@Composable
+private fun severityColor(severity: Severity): Color = when (severity) {
+    Severity.Critical -> NxColor.status(Status.Error, text = true)
+    Severity.Warn     -> NxColor.status(Status.Warning, text = true)
+    else              -> NxInk.main
 }

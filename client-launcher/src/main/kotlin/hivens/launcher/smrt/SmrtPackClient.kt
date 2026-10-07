@@ -9,14 +9,16 @@ import hivens.core.api.dto.smrt.SmrtPackSummary
 import hivens.core.api.interfaces.IMirrorPackClient
 import hivens.core.cache.read
 import hivens.launcher.cache.SmrtPackCaches
-import io.ktor.client.plugins.timeout
+import hivens.core.net.metadataTimeout
 import io.ktor.client.request.get
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.encodeURLParameter
 import io.ktor.http.isSuccess
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import java.io.IOException
 
@@ -33,17 +35,6 @@ class SmrtPackClient(
     private val caches: SmrtPackCaches = SmrtPackCaches.passthrough(),
 ) : IMirrorPackClient {
     companion object {
-    /**
-     * Metadata reads are bounded far tighter than the shared client's own timeout.
-     *
-     * That one is sized for a download -- ten minutes, correctly, for a runtime or a
-     * pack archive. A catalogue listing is what a person is looking at while it runs,
-     * so the same ceiling turns a stall into a spinner that outlasts anyone's
-     * patience with no error, no log line and nothing to retry. Past this a stall is
-     * an ordinary failure: it throws, it is written down, and the screen offers the
-     * retry it already has.
-     */
-    private const val METADATA_TIMEOUT_MS = 20_000L
         const val DEFAULT_MIRROR_BASE = "https://smrt.hivens.dev"
         private const val USER_AGENT = "Nexira-smrt-mirror-client"
 
@@ -97,9 +88,20 @@ class SmrtPackClient(
         return caches.summary.read(url, forceRefresh) { getJson(url) }
     }
 
-    suspend fun listPacks(): SmrtPackListing {
+    /** Every pack the mirror lists. See [fetchManifest] for what [forceRefresh] costs. */
+    suspend fun listPacks(forceRefresh: Boolean = false): SmrtPackListing {
         val url = "$mirrorBase/v1/packs"
-        return caches.listing.get(url) { getJson(url) }
+        return caches.listing.read(url, forceRefresh) { getJson(url) }
+    }
+
+    /**
+     * Stale-then-fresh view of the pack listing, the way [buildsStream] is for the
+     * build listing: the stored one at once when it is merely stale, then the
+     * reloaded one.
+     */
+    fun packsStream(): Flow<SmrtPackListing> {
+        val url = "$mirrorBase/v1/packs"
+        return caches.listing.flow(url) { getJson(url) }.map { it.value }
     }
 
     /**
@@ -144,17 +146,20 @@ class SmrtPackClient(
         return getJson(url)
     }
 
-    private suspend inline fun <reified T> getJson(url: String): T {
+    // On IO, request and decode both, so a caller may ask from the UI thread. A
+    // settings pane or a crumb asking straight out of a composition decoded a whole
+    // manifest on the event thread, and a rule that each caller remember to switch
+    // first had already been missed in several.
+    private suspend inline fun <reified T> getJson(url: String): T = withContext(Dispatchers.IO) {
         val resp: HttpResponse = httpProvider.current.get(url) {
             headers.append("User-Agent", USER_AGENT)
             headers.append("Accept", "application/json")
-            timeout { requestTimeoutMillis = METADATA_TIMEOUT_MS }
+            metadataTimeout()
         }
         if (!resp.status.isSuccess()) {
             val body = runCatching { resp.bodyAsText() }.getOrDefault("")
             throw IOException("GET $url failed: ${resp.status} body=$body")
         }
-        val text = resp.bodyAsText()
-        return json.decodeFromString(text)
+        json.decodeFromString<T>(resp.bodyAsText())
     }
 }

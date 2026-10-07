@@ -193,7 +193,7 @@ internal class LinuxLibsecretKeyringStorage : IKeyringStorage {
     }
 
     override fun store(service: String, account: String, secret: String): Boolean {
-        require(service.isNotBlank() && account.isNotBlank()) { "service and account must be non-blank" }
+        requireKeyringIds(service, account)
         val handle = storeHandle ?: return false
         val schema = schemaPtr ?: return false
         return Arena.ofConfined().use { call ->
@@ -219,7 +219,7 @@ internal class LinuxLibsecretKeyringStorage : IKeyringStorage {
     }
 
     override fun retrieve(service: String, account: String): String? {
-        require(service.isNotBlank() && account.isNotBlank()) { "service and account must be non-blank" }
+        requireKeyringIds(service, account)
         val handle = lookupHandle ?: return null
         val free = freeHandle ?: return null
         val schema = schemaPtr ?: return null
@@ -255,7 +255,7 @@ internal class LinuxLibsecretKeyringStorage : IKeyringStorage {
     }
 
     override fun clear(service: String, account: String): Boolean {
-        require(service.isNotBlank() && account.isNotBlank()) { "service and account must be non-blank" }
+        requireKeyringIds(service, account)
         val handle = clearHandle ?: return false
         val schema = schemaPtr ?: return false
         return Arena.ofConfined().use { call ->

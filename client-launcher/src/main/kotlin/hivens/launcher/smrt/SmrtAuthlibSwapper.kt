@@ -26,9 +26,9 @@ import java.nio.file.Path
  * rejected (403) for an SC session token. SC's own client ships a patched authlib
  * (same Maven artifact, different bytes) that redirects the join to SC's
  * `auth_joinserver.php`. That patched jar is part of the SC client file set the
- * server distributes -- the exact source the server-list path already pulls into
- * the `clients/` cache. We fetch it for the bound serverId straight from that
- * distribution and cache it per server, so nothing of SC's is rehosted.
+ * server distributes, which the session's file manifest lists. We fetch it for the
+ * bound serverId straight from that distribution and cache it per server, so
+ * nothing of SC's is rehosted.
  *
  * The caller swaps the resolved classpath entry to the returned jar; the shared
  * `libraries` root is never touched (a patched jar there would hit every pack of

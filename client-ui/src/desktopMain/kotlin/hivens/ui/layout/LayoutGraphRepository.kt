@@ -4,7 +4,12 @@ import hivens.widget.model.LayoutGraph
 import hivens.widget.model.SlotId
 import hivens.widget.model.SurfaceId
 import hivens.widget.model.WidgetInstance
+import hivens.widget.model.WidgetKind
+import hivens.widget.model.flatMapInstances
+import hivens.widget.model.resetScreenSurface
 import hivens.widget.model.resetSurface
+import hivens.widget.model.screenOn
+import hivens.widget.model.withScreensFrom
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -19,10 +24,14 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.int
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
 import hivens.core.data.NewerBuildData
+import hivens.core.data.ReadOnlyReason
 import hivens.core.data.ReadOnlyStore
 import hivens.core.io.AtomicFiles
 import hivens.ui.bootstrap.RecoveryIo
@@ -81,6 +90,16 @@ class LayoutGraphRepository(
      */
     val migratedFromSchema: Int? get() = _migratedFromSchema
 
+    /**
+     * Which bundled widgets this graph has been offered. A sibling of the layout by
+     * definition, so it is derived from the path rather than injected: nothing can
+     * point the two at different directories.
+     *
+     * Declared above [state] on purpose. [load] reads it, and a property initialised
+     * after the one that uses it is null when it is used.
+     */
+    private val seeded = SeededWidgets(file.resolveSibling("layout-seeded.json"), json)
+
     private val state: MutableStateFlow<LayoutGraph> = MutableStateFlow(load())
 
     // Pending debounced persist. Replaced on each update; cancelled by
@@ -92,7 +111,23 @@ class LayoutGraphRepository(
     // flush, so a long-completed job left flush believing a write was still owed.
     @Volatile private var dirty = false
 
+    @Volatile private var _writesLanded = 0
+
+    /**
+     * How many writes have reached the file since this repository was made. What the
+     * debounce is for is a count of writes, and counting them is the one way to ask
+     * about it that neither a scheduler nor a filesystem's clock can blur.
+     */
+    internal val writesLanded: Int get() = _writesLanded
+
     fun observe(): StateFlow<LayoutGraph> = state.asStateFlow()
+
+    /**
+     * Whether this session leaves the file as it found it: one a newer build wrote,
+     * or one in a form this build cannot read. The graph in memory is then a stand-in
+     * for the file, and what it lacks says nothing about what the file holds.
+     */
+    val isReadOnly: Boolean get() = readOnly
 
     fun value(): LayoutGraph = state.value
 
@@ -159,16 +194,26 @@ class LayoutGraphRepository(
      */
     suspend fun resetSurface(surface: SurfaceId) {
         val def = defaultGraph()
-        update { it.resetSurface(surface, def.surfaces[surface]) }
+        update { graph ->
+            // A screen somebody made has no bundled default, and the general reset
+            // reads that as "remove the surface", which would leave the screen
+            // pointing at nothing. Its default is the blank page it started as.
+            if (graph.screenOn(surface) != null) graph.resetScreenSurface(surface)
+            else graph.resetSurface(surface, def.surfaces[surface])
+        }
     }
 
     /**
      * Full reset: restore the entire graph to the bundled default. The escape
      * hatch when per-surface resets are not enough -- e.g. undoing edits spread
      * across several surfaces in one action.
+     *
+     * The screens somebody made stay, content and all. A reset is about how the
+     * launcher's own surfaces are arranged, and a screen made and filled by hand is
+     * not an arrangement of anything the default knows.
      */
     suspend fun resetAll() {
-        update { defaultGraph() }
+        update { current -> defaultGraph().withScreensFrom(current) }
     }
 
     /**
@@ -207,7 +252,17 @@ class LayoutGraphRepository(
             return def
         }
         return try {
-            val envelope = json.decodeFromString<Envelope>(Files.readString(file))
+            // Parsed rather than decoded, because the structural half of the ladder
+            // runs on the raw object. A field this build no longer declares is
+            // dropped by ignoreUnknownKeys at decode, which is before a migration
+            // taking a LayoutGraph could ever see it -- so a shape change has to
+            // happen while the file is still a tree of keys.
+            val root = json.parseToJsonElement(Files.readString(file)).jsonObject
+            val envelope = LoadedEnvelope(
+                schemaVersion = root["schema_version"]?.jsonPrimitive?.int
+                    ?: error("layout envelope carries no schema_version"),
+                graph = root["graph"]?.jsonObject ?: JsonObject(emptyMap()),
+            )
             if (envelope.schemaVersion > SCHEMA_VERSION) {
                 readOnly = true
                 NewerBuildData.record(ReadOnlyStore.Layout)
@@ -218,9 +273,16 @@ class LayoutGraphRepository(
                 )
             }
             if (envelope.schemaVersion in 1 until LayoutReconcile.SURFACE_SCHEMA) {
-                // Deliberately not migrated: see LayoutReconcile.SURFACE_SCHEMA. The
-                // file is left on disk untouched and simply not read, so a build that
-                // still understands it can be gone back to.
+                // Deliberately not migrated: see LayoutReconcile.SURFACE_SCHEMA.
+                //
+                // "Left on disk untouched" was the intent and not the behaviour: the
+                // branch returned the bundled default without closing the store, so
+                // the first edit of the session persisted that default over the file
+                // it had just declined to read, and the notice never fired because
+                // nothing had been recorded. Read-only is what makes the sentence
+                // above true.
+                readOnly = true
+                NewerBuildData.record(ReadOnlyStore.Layout, ReadOnlyReason.UnreadableFormat)
                 log.warn(
                     "Layout graph at {} is schema_version {} and describes widget surfaces in a form " +
                         "with no faithful reading here; starting from the bundled default. " +
@@ -233,26 +295,68 @@ class LayoutGraphRepository(
                 _migratedFromSchema = envelope.schemaVersion
             }
             val def = defaultGraph()
+            val structural = JsonMigrations.apply(envelope.schemaVersion, envelope.graph)
+            val decoded = json.decodeFromJsonElement(LayoutGraph.serializer(), structural)
             // Migrate + seed missing default surfaces/slots + sweep instanceId
             // uniqueness via the shared reconciler. A migration or merge that
             // mints a colliding id would silently break every findByInstanceId
             // traversal; update() guards live edits, this is the load-time
             // backstop -- serve the bundled default over a corrupted tree.
-            when (val result = LayoutReconcile.reconcile(envelope.schemaVersion, envelope.graph, def)) {
-                is LayoutReconcile.Result.Ok -> result.graph
+            when (val result = LayoutReconcile.reconcile(envelope.schemaVersion, decoded, def)) {
+                is LayoutReconcile.Result.Ok -> seedNewBundledWidgets(result.graph, def)
                 is LayoutReconcile.Result.DuplicateId -> {
                     log.error(
                         "Layout graph at {} has a duplicate instanceId '{}' after {} (schema_version {} -> {}). " +
                             "Falling back to the bundled default to protect instanceId-keyed traversals.",
                         file, result.id, result.stage, envelope.schemaVersion, LayoutReconcile.CURRENT_SCHEMA,
                     )
+                    closeOverDamage()
                     defaultGraph()
                 }
             }
         } catch (e: Exception) {
             log.error("Failed to load layout graph at {} -- falling back to bundled default", file, e)
+            closeOverDamage()
             defaultGraph()
         }
+    }
+
+    /**
+     * The file is somebody's arrangement that could not be read this time, and the
+     * default stands in for it. Read-only, for the reason the old-format branch
+     * above gives: open for writing, the first edit of the session put the default
+     * over a file that a transient read error, one duplicated id or a stray brace
+     * had kept from loading, and the arrangement was gone for good.
+     */
+    private fun closeOverDamage() {
+        readOnly = true
+        NewerBuildData.record(ReadOnlyStore.Layout, ReadOnlyReason.Damaged)
+    }
+
+    /**
+     * Hands the graph the bundled widgets it has never been offered.
+     *
+     * Runs after the reconcile so every slot a widget belongs to exists, and only on
+     * the branch that produced a usable graph: a tree rejected for a duplicate id is
+     * replaced by the bundled default, which carries them already.
+     *
+     * A read-only file is left alone entirely. It belongs to a newer build or to a
+     * schema this one cannot represent, and putting widgets into a graph that will
+     * never be written back would show them once and lose them on the next launch,
+     * which reads as the launcher forgetting.
+     */
+    private fun seedNewBundledWidgets(graph: LayoutGraph, def: LayoutGraph): LayoutGraph {
+        if (readOnly) return graph
+        val result = LayoutSeeding.seed(graph, def, seeded.load())
+        LayoutReconcile.firstDuplicateInstanceId(result.graph)?.let { dup ->
+            log.error("Seeding bundled widgets produced a duplicate instanceId '{}'; leaving the graph as it was", dup)
+            return graph
+        }
+        if (result.added.isNotEmpty()) {
+            log.info("Layout graph: seeding {} bundled widget(s) added since this file was written: {}", result.added.size, result.added)
+        }
+        seeded.save(result.offered)
+        return result.graph
     }
 
     // Synchronous file ops. Caller MUST hold [mutex] when invoking.
@@ -271,10 +375,14 @@ class LayoutGraphRepository(
             val envelope = Envelope(schemaVersion = SCHEMA_VERSION, graph = state.value)
             AtomicFiles.writeString(file, json.encodeToString(envelope))
             dirty = false
+            _writesLanded++
         } catch (e: Exception) {
             log.error("Failed to persist layout graph at {}", file, e)
         }
     }
+
+    /** What a read pulled off disk before the structural ladder runs. */
+    private data class LoadedEnvelope(val schemaVersion: Int, val graph: JsonObject)
 
     @Serializable
     private data class Envelope(
@@ -295,11 +403,10 @@ class LayoutGraphRepository(
 /**
  * Schema migration ladder. Each step transforms a graph from version N-1 to version N.
  *
- * Empty at present, and that is not an oversight. Everything below
- * [LayoutReconcile.SURFACE_SCHEMA] is discarded at load rather than migrated, so the
- * steps that once carried a graph from v1 to v7 are unreachable and have been removed
- * with their tests. The mechanism stays because the next schema change will be an
- * ordinary one: the format this build writes is built to grow rather than break.
+ * Everything below [LayoutReconcile.SURFACE_SCHEMA] is discarded at load rather than
+ * migrated, so the steps that once carried a graph from v1 to v7 are unreachable and
+ * were removed with their tests. What is here is the ordinary kind of change the
+ * mechanism was kept for.
  */
 internal object Migrations {
     fun apply(fromVersion: Int, graph: LayoutGraph): LayoutGraph {
@@ -319,7 +426,38 @@ internal object Migrations {
 
     private const val CURRENT = LayoutReconcile.CURRENT_SCHEMA
 
-    private fun step(toVersion: Int): Step = Step.IDENTITY
+    private fun step(toVersion: Int): Step = when (toVersion) {
+        9 -> RetireTheOldMusicPlayer
+        else -> Step.IDENTITY
+    }
+
+    /**
+     * The music player that predates the concept sheet becomes the cover-led one.
+     *
+     * Its widget is gone, and a kind the registry does not know is a widget the
+     * renderer skips: a silent hole where somebody had put a player, with nothing
+     * on screen to say what happened or how to get it back. So the instance is
+     * kept and re-pointed at the nearest successor, which is the kind that also
+     * leads with the artwork and carries the transport in a row.
+     *
+     * The props go back to the successor's defaults rather than being carried
+     * across. The old kind's only setting was a heading, and the new one has no
+     * heading to put it in, so there is nothing to preserve and a stale key would
+     * decode to a default anyway.
+     */
+    private val RetireTheOldMusicPlayer = Step { graph ->
+        graph.flatMapInstances { widget ->
+            if (widget.kind.value != RETIRED_MUSIC_PLAYER) {
+                listOf(widget)
+            } else {
+                listOf(widget.copy(kind = WidgetKind(MUSIC_PLAYER_SUCCESSOR), props = JsonObject(emptyMap())))
+            }
+        }
+    }
+
+    private const val RETIRED_MUSIC_PLAYER = "home.new.music"
+
+    private const val MUSIC_PLAYER_SUCCESSOR = "home.new.player.cover"
 
     private fun interface Step {
         fun apply(graph: LayoutGraph): LayoutGraph

@@ -7,12 +7,13 @@ import hivens.core.activity.ActivityRegistry
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.update.PackUpdateStatus
 import hivens.core.update.PackUpdateStatusHub
-import hivens.launcher.AutoSyncService
 import hivens.launcher.InstallPhase
 import hivens.launcher.InstallSnapshot
+import hivens.launcher.instance.InstanceContentUpdater
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Bridges the services that already publish their own progress into the single
@@ -34,7 +35,8 @@ class ActivityDriver(
     // which is why the first test for this file tested the registry instead.
     private val installs: StateFlow<Map<String, InstallSnapshot>>,
     private val updates: StateFlow<Map<String, PackUpdateStatus>>,
-    private val sync: StateFlow<AutoSyncService.Snapshot>,
+    /** Per-file updates inside an instance's own folders, keyed by instance dir. */
+    private val contentUpdates: StateFlow<Map<String, InstanceContentUpdater.Run>>,
     private val repository: IPackRepository,
     private val appScope: CoroutineScope,
 ) {
@@ -49,13 +51,34 @@ class ActivityDriver(
      * failure the user dismissed came straight back on the next tick of an
      * unrelated job -- and a settled entry had its eviction timer restarted ten
      * times a second, which meant it never left at all.
+     *
+     * A key its source has let go of is forgotten here too, as the install
+     * notification driver forgets its own. Kept, an import dismissed after it
+     * failed and retried into the same failure matched the remembered phase and
+     * said nothing on the second try. Concurrent, because the three sources are
+     * collected on the app scope, whose threads are many.
      */
-    private val reported = HashMap<String, ActivityPhase>()
+    private val reported = ConcurrentHashMap<String, ActivityPhase>()
 
     fun start() {
-        appScope.launch { installs.collect { it.values.forEach(::onInstall) } }
+        appScope.launch {
+            installs.collect { snapshots ->
+                forgetGone(INSTALL, snapshots.values.mapTo(HashSet()) { it.key })
+                snapshots.values.forEach(::onInstall)
+            }
+        }
         appScope.launch { updates.collect(::onUpdates) }
-        appScope.launch { sync.collect(::onSync) }
+        appScope.launch {
+            contentUpdates.collect { runs ->
+                forgetGone(CONTENT, runs.keys)
+                runs.forEach { (key, run) -> onContentUpdate(key, run) }
+            }
+        }
+    }
+
+    /** Drops the remembered phase of every [prefix] key whose source no longer lists it. */
+    private fun forgetGone(prefix: String, live: Set<String>) {
+        reported.keys.removeIf { it.startsWith(prefix) && it.removePrefix(prefix) !in live }
     }
 
     /** Report only what changed. Returns false when the registry already has this. */
@@ -78,7 +101,7 @@ class ActivityDriver(
             is InstallPhase.Failed    -> ActivityPhase.Failed(p.message)
             InstallPhase.Cancelled    -> ActivityPhase.Cancelled
         }
-        val key = "install:${snapshot.key}"
+        val key = "$INSTALL${snapshot.key}"
         if (!changed(key, phase)) return
         registry.report(
             key     = key,
@@ -127,43 +150,36 @@ class ActivityDriver(
     }
 
     /**
-     * Per-server rather than per-pass. The aggregate only knows how many failed,
-     * not why, so an aggregate entry would have to invent a sentence outside the
-     * string table; a per-server entry names its own subject and needs no prose.
-     * Byte counts from the aggregate land on whichever server is current.
+     * A batch of per-file updates inside one instance.
+     *
+     * Reported here rather than drawn by the tab that started it: the batch
+     * outlives that tab, and a band across the content list is chrome in the
+     * middle of the thing being changed. The pill is where the launcher already
+     * says what it is doing, and it survives navigating away.
+     *
+     * The count IS the measure -- files done out of files planned -- so a run
+     * needs no separate progress model. A batch that lost some files reports
+     * Failed even though most of them landed, because "forty of fifty two" is
+     * not a success anyone should have to read twice.
      */
-    private fun onSync(snapshot: AutoSyncService.Snapshot) {
-        val current = snapshot.overall as? AutoSyncService.OverallState.InProgress
-        for ((serverId, state) in snapshot.perServer) {
-            val phase = when (state) {
-                AutoSyncService.ServerState.SYNCING ->
-                    if (current != null && current.currentServer == serverId) {
-                        ActivityPhase.Running(current.bytesRead, current.totalBytes)
-                    } else {
-                        ActivityPhase.Running(0, 0)
-                    }
-                AutoSyncService.ServerState.SYNCED -> ActivityPhase.Succeeded
-                AutoSyncService.ServerState.FAILED -> ActivityPhase.Failed()
-                // Queued and skipped are not work in flight and have no outcome
-                // worth a line of chrome. Dropping the entry rather than skipping
-                // the report is the point: a server that goes SYNCING -> SKIPPED
-                // (two-factor with no cached manifest, a missing helper) would
-                // otherwise leave its in-flight entry on a surface that never
-                // evicts one by age.
-                AutoSyncService.ServerState.QUEUED,
-                AutoSyncService.ServerState.SKIPPED -> {
-                    forget("sync:$serverId")
-                    continue
-                }
-            }
-            val key = "sync:$serverId"
-            if (!changed(key, phase)) continue
-            registry.report(
-                key   = key,
-                kind  = ActivityKind.Sync,
-                title = serverId,
-                phase = phase,
-            )
+    private fun onContentUpdate(key: String, run: InstanceContentUpdater.Run) {
+        val phase = when {
+            !run.finished        -> ActivityPhase.Running(run.done.toLong(), run.total.toLong(), run.current)
+            run.failed.isEmpty() -> ActivityPhase.Succeeded
+            else                 -> ActivityPhase.Failed(run.failed.joinToString(", "))
         }
+        val activityKey = "$CONTENT$key"
+        if (!changed(activityKey, phase)) return
+        registry.report(
+            key   = activityKey,
+            kind  = ActivityKind.Update,
+            title = run.title,
+            phase = phase,
+        )
+    }
+
+    private companion object {
+        const val INSTALL = "install:"
+        const val CONTENT = "content:"
     }
 }

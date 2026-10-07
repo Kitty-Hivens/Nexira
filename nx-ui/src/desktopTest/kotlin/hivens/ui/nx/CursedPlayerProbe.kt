@@ -169,7 +169,7 @@ class CursedPlayerProbe {
         // No background: the card is composited over the source footage, and the
         // codec then has to pay for both at 374 kbit.
         val scene = ImageComposeScene(362, 297, density = Density(1.55f)) {
-            NxTheme(useDarkTheme = true) {
+            NxTheme(dark = true) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Cursed() }
             }
         }

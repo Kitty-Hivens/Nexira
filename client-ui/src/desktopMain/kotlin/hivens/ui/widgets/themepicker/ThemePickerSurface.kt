@@ -17,88 +17,85 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import hivens.ui.i18n.LocalStrings
-import hivens.ui.puppet.PuppetClick
-import hivens.ui.puppet.PuppetScreen
 import hivens.ui.flexible.Flexible
 import hivens.ui.flexible.FlexibleKind
+import hivens.ui.i18n.LocalStrings
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
-import hivens.ui.theme.NxTheme
-import hivens.ui.theme.CustomTheme
-import hivens.ui.theme.ThemePresets
+import hivens.ui.puppet.PuppetClick
+import hivens.ui.puppet.PuppetScreen
+import hivens.ui.surface.NxSurface
+import hivens.ui.surface.SurfaceKind
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.ThemeLibrary
 import hivens.widget.api.SlotRenderer
 import hivens.widget.model.SlotId
 import hivens.widget.model.SurfaceId
 
 private const val SURFACE = "theme.picker"
 
-// theme.picker surface composable. AppLayout routes
-// Screen.ThemePicker here. Provides LocalThemePickerContext for
-// child widgets, lays out two side-by-side slots (grid + preview),
-// keeps header chrome (back button, title, Apply) on the surface
-// itself rather than as widgets -- those three controls are
-// per-screen invariants the user cannot meaningfully remove without
-// losing access to the screen's whole purpose.
+// theme.picker surface composable. AppLayout routes Screen.ThemePicker here. Provides
+// LocalThemePickerContext for the child widgets and lays out two slots side by side
+// (grid and preview). The title and Apply are surface chrome rather than widgets:
+// without them the screen loses its whole purpose.
 @Composable
 fun ThemePickerSurface(
-    currentTheme: CustomTheme,
-    onThemeSelected: (CustomTheme) -> Unit,
+    library: ThemeLibrary,
+    isDarkTheme: Boolean,
+    onThemeSelected: (String) -> Unit,
     onBack: () -> Unit,
 ) {
     val s = LocalStrings.current
-    val themes = remember { ThemePresets.getAll() }
-    // Keyless remember: the local pending selection survives an
-    // external currentTheme change (system theme sync, preset
-    // load mid-edit). The legacy screen had the same shape; only
-    // an explicit Apply commits the selection upstream.
-    val selectedTheme = remember { mutableStateOf(currentTheme) }
+    val themes = library.all
+    // Keyless remember: the pending selection survives an outside change of the
+    // active theme. Only Apply commits it.
+    val selected = remember { mutableStateOf(library.active) }
 
-    val ctx = remember(themes, selectedTheme, onBack) {
+    val ctx = remember(themes, selected, isDarkTheme, onBack) {
         ThemePickerContext(
-            themes        = themes,
-            selectedTheme = selectedTheme,
-            onBack        = onBack,
+            themes   = themes,
+            selected = selected,
+            isDark   = isDarkTheme,
+            onBack   = onBack,
         )
     }
 
     PuppetScreen("ThemePicker")
     PuppetClick("themePicker.back") { onBack() }
-    PuppetClick("themePicker.apply") { onThemeSelected(selectedTheme.value) }
+    PuppetClick("themePicker.apply") { onThemeSelected(selected.value.id) }
     themes.forEach { theme ->
-        PuppetClick("themePicker.select.${theme.name}") { selectedTheme.value = theme }
+        PuppetClick("themePicker.select.${theme.id}") { selected.value = theme }
     }
 
     CompositionLocalProvider(LocalThemePickerContext provides ctx) {
         Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
-            // Header chrome: back + title left, apply right.
-            Row(
-                modifier              = Modifier.fillMaxWidth().padding(bottom = 24.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment     = Alignment.CenterVertically,
-            ) {
-                // No back arrow of its own. The window frame already carries one,
-                // enabled by the same history this screen would pop; a second
-                // copy fifty pixels below it is left over from before the shell
-                // had navigation at all.
-                Text(
-                    text       = s.themePickerTitle,
-                    style      = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Black,
-                    color      = NxTheme.colors.textPrimary,
-                )
-                Flexible("theme_picker_apply_btn", FlexibleKind.Button) {
-                    NxButton(
-                        label = s.themePickerApply,
-                        onClick = { onThemeSelected(selectedTheme.value) },
-                        style = NxButtonStyle.Primary,
+            // On a panel of its own, like the grid and the preview under it: the title
+            // is text, and on the bare page it lay over whatever the wallpaper had there.
+            NxSurface(SurfaceKind.Panel, Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
+                Row(
+                    modifier              = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 14.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment     = Alignment.CenterVertically,
+                ) {
+                    // No back arrow of its own. The window frame already carries one,
+                    // enabled by the same history this screen would pop.
+                    Text(
+                        text       = s.themePickerTitle,
+                        style      = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Black,
+                        color      = NxInk.main,
                     )
+                    Flexible("theme_picker_apply_btn", FlexibleKind.Button) {
+                        NxButton(
+                            label = s.themePickerApply,
+                            onClick = { onThemeSelected(selected.value.id) },
+                            style = NxButtonStyle.Primary,
+                        )
+                    }
                 }
             }
-            // Body: two side-by-side slots. Grid is the editable
-            // panel; preview reads the same selectedTheme via the
-            // surface context so removing the preview widget hides
-            // the panel but does not break selection.
+            // Grid is the editable panel. The preview reads the same selection, so
+            // removing the preview widget hides it without breaking selection.
             Row(
                 modifier              = Modifier.fillMaxSize(),
                 horizontalArrangement = Arrangement.spacedBy(24.dp),

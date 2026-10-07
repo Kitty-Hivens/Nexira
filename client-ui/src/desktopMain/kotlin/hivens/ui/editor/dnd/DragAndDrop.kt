@@ -6,7 +6,9 @@ import androidx.compose.foundation.gestures.awaitTouchSlopOrCancellation
 import androidx.compose.foundation.gestures.drag
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ProvidableCompositionLocal
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.mutableStateMapOf
@@ -19,7 +21,7 @@ import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
-import hivens.widget.model.SlotOrientation
+import hivens.widget.model.FlowSpec
 import hivens.widget.model.SlotPath
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
@@ -96,9 +98,75 @@ class DropTargetRegistry {
     private val widgets: SnapshotStateMap<SlotPath, SnapshotStateMap<String, WidgetBounds>> =
         mutableStateMapOf()
     private val slotBounds: SnapshotStateMap<SlotPath, Rect> = mutableStateMapOf()
+    // The whole placement box where it is larger than what is on screen, which is
+    // a slot that scrolls. Absent means the two are the same rect.
+    private val slotContent: SnapshotStateMap<SlotPath, Rect> = mutableStateMapOf()
+    // An empty slot's placeholder, kept apart from what the slot itself reports.
+    // The two report the same path and leave the composition at different times:
+    // the placeholder goes when the first widget arrives and the slot stays, so one
+    // map would have the placeholder's withdrawal take the slot's bounds with it.
+    private val placeholderBounds: SnapshotStateMap<SlotPath, Rect> = mutableStateMapOf()
 
-    fun registerSlot(path: SlotPath, rect: Rect) {
+    /**
+     * Which widgets the one being moved is currently sitting on top of.
+     *
+     * Free placement has no collision rule and is not getting one: refusing a
+     * position mid-gesture would mean clearing a path before you could put
+     * anything anywhere, which on a full surface is half the screen moved by
+     * hand. What it gets instead is the answer to the question the editor could
+     * not answer at all, which is WHERE the overlap is. Published by whichever
+     * widget is being dragged or resized and read by everybody, so the ones being
+     * landed on say so while the gesture is still live and the drop is still the
+     * person's to make.
+     */
+    var overlapped: Set<String> by mutableStateOf(emptySet())
+        private set
+
+    fun publishOverlap(ids: Set<String>) {
+        if (overlapped != ids) overlapped = ids
+    }
+
+    /**
+     * Ids in [path] whose rect meets [rect], leaving out [movingId] itself.
+     *
+     * Touching edges do not count. A widget laid flush against its neighbour is
+     * the arrangement somebody wanted, and reporting it as a collision would
+     * leave the warning colour on half the surface.
+     */
+    fun overlapping(path: SlotPath, rect: Rect, movingId: String): Set<String> {
+        val byId = widgets[path] ?: return emptySet()
+        return byId.entries
+            .filter { (id, bounds) -> id != movingId && bounds.rect.overlapsStrictly(rect) }
+            .mapTo(mutableSetOf()) { it.key }
+    }
+
+    /**
+     * Where a slot is. [rect] is what is on screen and is what a pointer can be
+     * over. [content] is the whole box, for a slot that scrolls, and is what a
+     * point inside it converts against.
+     */
+    fun registerSlot(path: SlotPath, rect: Rect, content: Rect = rect) {
         slotBounds[path] = rect
+        if (content == rect) slotContent.remove(path) else slotContent[path] = content
+    }
+
+    /**
+     * The slot that reported [path] has left the composition. Kept, its rectangle
+     * went on answering the hit-test after its screen had gone, and since the
+     * smallest rectangle wins, a stale one beat the live pane beneath it.
+     */
+    fun withdrawSlot(path: SlotPath) {
+        slotBounds.remove(path)
+        slotContent.remove(path)
+    }
+
+    /** Where an empty slot's placeholder is, until [withdrawPlaceholder]. */
+    fun registerPlaceholder(path: SlotPath, rect: Rect) {
+        placeholderBounds[path] = rect
+    }
+
+    fun withdrawPlaceholder(path: SlotPath) {
+        placeholderBounds.remove(path)
     }
 
     fun registerWidget(path: SlotPath, instanceId: String, index: Int, rect: Rect) {
@@ -118,7 +186,17 @@ class DropTargetRegistry {
     // Window-coord top-left of a registered slot (Canvas slots report bounds via
     // LocalSlotBoundsReporter). Lets a palette drop land at the release point.
     // Null when the slot has not reported bounds.
-    fun slotOrigin(path: SlotPath): Offset? = slotBounds[path]?.topLeft
+    fun slotOrigin(path: SlotPath): Offset? = slotRect(path)?.topLeft
+
+    /** The part of a slot that is on screen. */
+    fun slotRect(path: SlotPath): Rect? = slotBounds[path] ?: placeholderBounds[path]
+
+    /**
+     * The whole of a slot, on screen or not, for a drop that converts the pointer
+     * into the slot's own coordinates. On a page scrolled down by a screen this
+     * starts a screen above the window, which is where the page's origin is.
+     */
+    fun slotContentRect(path: SlotPath): Rect? = slotContent[path] ?: slotRect(path)
 
     // Two passes:
     //   1) exact rect hit across all registered sources (widget rects +
@@ -159,6 +237,7 @@ class DropTargetRegistry {
             byId.values.forEach { wb -> consider(wb.rect, path) }
         }
         slotBounds.forEach { (path, rect) -> consider(rect, path) }
+        placeholderBounds.forEach { (path, rect) -> consider(rect, path) }
         if (best != null) return best
 
         // Pass 2: vertical-span fallback. Per-slot virtual bounding
@@ -180,26 +259,39 @@ class DropTargetRegistry {
     // Insertion index for a pointer inside a known slot. Index is in
     // [0, count] -- count means "append at end". Finds the widget whose
     // main-axis midpoint the pointer is before; inserts at that widget's
-    // position. Main axis = X for Row slots, Y for Column/Grid. If the
-    // pointer is past all widgets, append.
+    // position. Main axis = X for a horizontal flow, Y for a vertical one. If
+    // the pointer is past all widgets, append.
+    //
+    // A placement slot has no insertion point at all: order there is paint
+    // order, not position, so a drop appends and the placement decides where it
+    // lands. Answering anything else would move a widget the user did not touch.
+    // No default for [flow]: it decides between "insert here" and "append", and a
+    // forgotten argument would move a widget the user never touched.
     fun insertionIndexInSlot(
         path: SlotPath,
         pointInWindow: Offset,
-        orientation: SlotOrientation = SlotOrientation.Column,
+        flow: FlowSpec?,
     ): Int {
         val items = widgets[path]?.values?.sortedBy { it.index } ?: return 0
         if (items.isEmpty()) return 0
-        if (orientation == SlotOrientation.Grid) {
-            // Row-major: insert before the first cell the pointer sits above
-            // (an earlier row) or, within the same row band, left of center.
+        if (flow == null) return items.size
+        if (flow.wrap > 0) {
+            // Reading order along the flow's own axis: before the first cell that
+            // sits on a later line, or, within the same line, before its middle.
+            // A vertical wrap stacks its lines side by side, so the two axes swap.
+            val acrossLines = if (flow.horizontal) pointInWindow.y else pointInWindow.x
+            val alongLine = if (flow.horizontal) pointInWindow.x else pointInWindow.y
             items.forEach { wb ->
                 val r = wb.rect
-                if (pointInWindow.y < r.top) return wb.index
-                if (pointInWindow.y <= r.bottom && pointInWindow.x < r.left + r.width / 2f) return wb.index
+                val lineStart = if (flow.horizontal) r.top else r.left
+                val lineEnd = if (flow.horizontal) r.bottom else r.right
+                val middle = if (flow.horizontal) r.left + r.width / 2f else r.top + r.height / 2f
+                if (acrossLines < lineStart) return wb.index
+                if (acrossLines <= lineEnd && alongLine < middle) return wb.index
             }
             return items.size
         }
-        val horizontal = orientation == SlotOrientation.Row
+        val horizontal = flow.horizontal
         items.forEach { wb ->
             val mid = if (horizontal) wb.rect.left + wb.rect.width / 2f
                       else wb.rect.top + wb.rect.height / 2f
@@ -248,24 +340,23 @@ fun Modifier.dragSource(
         // source's bounds move while the drag is in flight, and a pointer measured
         // against them reports the source's movement as the user's.
         var lastPointer = bounds.topLeft + drag.position
-        drag(drag.id) { change: PointerInputChange ->
-            lastPointer += change.positionChange()
-            controller.update(lastPointer)
-            change.consume()
+        // finally: a drag cut off with the palette closing under it, Esc or Ctrl+E
+        // mid-gesture, ran nothing after this, and the ghost and the hidden cursor
+        // it draws stayed up over the whole window. A cut-off drag drops nothing.
+        try {
+            drag(drag.id) { change: PointerInputChange ->
+                lastPointer += change.positionChange()
+                controller.update(lastPointer)
+                change.consume()
+            }
+            onDragEnd(lastPointer)
+        } finally {
+            controller.end()
         }
-        onDragEnd(lastPointer)
-        controller.end()
     }
 }
 
 // ── Drop-target modifier ────────────────────────────────────────────────────
-
-fun Modifier.slotBounds(
-    registry: DropTargetRegistry,
-    path: SlotPath,
-): Modifier = this.onGloballyPositioned { coords: LayoutCoordinates ->
-    registry.registerSlot(path, coords.boundsInWindow())
-}
 
 fun Modifier.widgetBounds(
     registry: DropTargetRegistry,
@@ -275,3 +366,12 @@ fun Modifier.widgetBounds(
 ): Modifier = this.onGloballyPositioned { coords: LayoutCoordinates ->
     registry.registerWidget(path, instanceId, index, coords.boundsInWindow())
 }
+
+/**
+ * Overlap with a shared edge left out.
+ *
+ * `Rect.overlaps` counts a touch as an intersection, which for two widgets laid
+ * flush is the arrangement rather than a fault.
+ */
+private fun Rect.overlapsStrictly(other: Rect): Boolean =
+    left < other.right && other.left < right && top < other.bottom && other.top < bottom

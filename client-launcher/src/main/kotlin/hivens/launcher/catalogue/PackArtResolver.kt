@@ -4,6 +4,7 @@ import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
 import hivens.launcher.modrinth.ModrinthClient
 import hivens.launcher.smrt.SmrtPackClient
+import kotlinx.coroutines.CancellationException
 import org.slf4j.LoggerFactory
 import java.util.concurrent.ConcurrentHashMap
 
@@ -20,9 +21,13 @@ data class PackArt(val iconUrl: String?, val bannerUrl: String?) {
  * Instances created before that field existed carry neither, so the source is
  * asked once per `(origin, id)` -- a cached Modrinth project or mirror summary
  * lookup, NOT the full catalogue `details()` (which also lists versions) -- and
- * the result is memoised for the resolver's life. This is what swaps the pixel
+ * an answer is memoised for the resolver's life. This is what swaps the pixel
  * placeholder for a pack's real cover; a failed or source-less lookup returns
  * [PackArt.NONE] and the UI keeps the pixel art.
+ *
+ * Only an answer is memoised. A lookup that failed, or was cancelled because the
+ * card scrolled away, says nothing about the pack, and written down as NONE it
+ * kept the placeholder up until the next start.
  */
 class PackArtResolver(
     private val modrinth: ModrinthClient,
@@ -58,7 +63,7 @@ class PackArtResolver(
         val key = keyOf(instance)
         cache[key]?.let { return it }
 
-        val art = try {
+        return try {
             when (instance.packRef.origin) {
                 PackOrigin.Modrinth -> modrinth.resolveProject(instance.packRef.id).let { p ->
                     PackArt(
@@ -69,12 +74,12 @@ class PackArtResolver(
                 }
                 PackOrigin.Mirror -> mirror.fetchSummary(instance.packRef.id).let { PackArt(it.iconUrl, it.bannerUrl) }
                 else              -> PackArt.NONE
-            }
+            }.also { cache[key] = it }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             log.warn("Pack art lookup failed for {} ({}): {}", instance.packRef.id, instance.packRef.origin, e.message)
             PackArt.NONE
         }
-        cache[key] = art
-        return art
     }
 }

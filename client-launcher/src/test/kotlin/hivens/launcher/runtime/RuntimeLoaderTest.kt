@@ -121,6 +121,7 @@ class RuntimeLoaderTest {
     @Test
     fun `ensureRuntime merges a loader overlay onto vanilla`() = runTest {
         val fabricProfile = LoaderProfile(
+            version = "test",
             libraries = listOf(LibrarySpec(MavenCoord.parse("net.fabricmc:fabric-loader:0.16.0"), LOADER_LIB_URL, sha1(loaderBytes), loaderBytes.size.toLong())),
             mainClass = "net.fabricmc.loader.impl.launch.knot.KnotClient",
             gameArgs = listOf("--fabric"),
@@ -227,11 +228,11 @@ class RuntimeLoaderTest {
         }
     }
 
-    private fun swapProvisioner(registry: LoaderRegistry, requests: MutableList<String>) = RuntimeProvisioner(
+    private fun swapProvisioner(registry: LoaderRegistry, requests: MutableList<String>, osArch: String = "amd64") = RuntimeProvisioner(
         librariesDir = librariesDir, assetsDir = assetsDir,
         clientProvider = HttpClientProvider { HttpClient(swapEngine(requests)) },
         transfers = testTransferEngine(HttpClientProvider { HttpClient(swapEngine(requests)) }),
-        json = json, loaderRegistry = registry, osName = "Linux", osArch = "amd64",
+        json = json, loaderRegistry = registry, osName = "Linux", osArch = osArch,
         versionManifestUrl = MANIFEST_URL, resourcesBaseUrl = RES_BASE,
     )
 
@@ -243,6 +244,7 @@ class RuntimeLoaderTest {
     @Test
     fun `removeFromBase strips vanilla LWJGL2 across group while the overlay adds LWJGL3`() = runTest {
         val profile = LoaderProfile(
+            version = "test",
             libraries = listOf(LibrarySpec(MavenCoord.parse("org.lwjgl:lwjgl:3.3.3"), LWJGL3_URL, sha1(lwjgl3Bytes), lwjgl3Bytes.size.toLong())),
             mainClass = "cleanroom.Foundation",
             removeFromBase = { it.group == "org.lwjgl.lwjgl" },
@@ -260,6 +262,7 @@ class RuntimeLoaderTest {
     fun `nativesOverride becomes the runtime native set`() = runTest {
         val nativeSpec = LibrarySpec(MavenCoord.parse("org.lwjgl:lwjgl:3.3.3:natives-linux"), NATIVE_URL, sha1(nativeBytes), nativeBytes.size.toLong())
         val profile = LoaderProfile(
+            version = "test",
             libraries = emptyList(),
             mainClass = "cleanroom.Foundation",
             nativesOverride = listOf(nativeSpec),
@@ -276,11 +279,24 @@ class RuntimeLoaderTest {
     }
 
     @Test
+    fun `an arm64 host takes the plain OS natives when no arm64 build is on offer`() = runTest {
+        // Legacy Fabric publishes one natives jar per OS, each carrying every architecture.
+        val nativeSpec = LibrarySpec(MavenCoord.parse("org.lwjgl:lwjgl:3.3.3:natives-linux"), NATIVE_URL, sha1(nativeBytes), nativeBytes.size.toLong())
+        val profile = LoaderProfile(version = "test", libraries = emptyList(), mainClass = "m", nativesOverride = listOf(nativeSpec))
+        val p = swapProvisioner(LoaderRegistry(listOf(swapResolver(profile))), mutableListOf(), osArch = "aarch64")
+
+        val rt = p.ensureRuntime("1.12.2", "cleanroom", "0.3.0")
+
+        assertEquals(listOf(librariesDir.resolve("org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3-natives-linux.jar")), rt.natives)
+    }
+
+    @Test
     fun `default profile removes nothing and inherits vanilla natives`() = runTest {
         // The additive shape every existing loader uses: removeFromBase and
         // nativesOverride left at their defaults must change neither the merged
         // library set nor the native set.
         val profile = LoaderProfile(
+            version = "test",
             libraries = listOf(LibrarySpec(MavenCoord.parse("org.lwjgl:lwjgl:3.3.3"), LWJGL3_URL, sha1(lwjgl3Bytes), lwjgl3Bytes.size.toLong())),
             mainClass = "cleanroom.Foundation",
         )
@@ -332,6 +348,7 @@ class RuntimeLoaderTest {
         val resolver = object : LoaderResolver {
             override val loaderId = "swap"
             override suspend fun resolve(mcVersion: String, loaderVersion: String) = LoaderProfile(
+            version = "test",
                 libraries = emptyList(),
                 mainClass = "x.Main",
                 removeFromBase = { it.group == "org.lwjgl.lwjgl" },

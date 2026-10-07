@@ -14,6 +14,8 @@ class IndicationCenter {
         // progress: null = indeterminate
         data class Downloading(val progress: Float?) : LaunchIndication()
         data object Running : LaunchIndication()
+        /** Asked to end, and the process has not gone yet. */
+        data object Stopping : LaunchIndication()
         data object Failed : LaunchIndication()
     }
 
@@ -29,6 +31,7 @@ class IndicationCenter {
         fun LaunchIndication?.controlMode(): LaunchControlMode = when (this) {
             null, LaunchIndication.Failed -> LaunchControlMode.Play
             LaunchIndication.Preparing,
+            LaunchIndication.Stopping,
             is LaunchIndication.Downloading -> LaunchControlMode.Wait
             LaunchIndication.Running -> LaunchControlMode.Stop
         }

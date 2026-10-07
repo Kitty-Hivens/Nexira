@@ -41,4 +41,14 @@ interface IUpdateApplicator {
      * never collected.
      */
     fun stagedLeftovers(): List<Path> = emptyList()
+
+    /**
+     * Called once the launcher has come up far enough to count as working. An
+     * implementation that keeps the replaced version until the new one proves
+     * itself drops it here, and one that does not keep it has nothing to do.
+     *
+     * Must not throw: it runs on the way up, and a failure to tidy an update
+     * away is no reason to stop the launcher that just started.
+     */
+    fun confirmStarted() {}
 }

@@ -32,7 +32,7 @@ class WidgetServiceRegistry {
     // keyed by provider widget's instanceId. Reading either level
     // subscribes the Compose snapshot to changes, so a consumer that
     // calls first<MusicPlayerService>() automatically recomposes
-    // when the MusicPlayerWidget mounts / unmounts.
+    // when a player widget mounts / unmounts.
     private val byKind: SnapshotStateMap<KClass<*>, SnapshotStateMap<String, WidgetService>> =
         mutableStateMapOf()
 

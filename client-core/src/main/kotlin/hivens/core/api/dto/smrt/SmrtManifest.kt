@@ -333,12 +333,12 @@ object SmrtSourceLenientSerializer : KSerializer<SmrtSource> {
  * Advisory display metadata. All fields optional; a launcher renders
  * sensible defaults derived from filename / dest when absent.
  *
- * [iconUrl], [role], and [requires] enable richer browse/library UX:
- * per-item icons, role-grouped pickers ("Recipe viewer" with a JEI ⇄
- * REI ⇄ EMI dropdown), and a dependency DAG the launcher can render
- * as a tree under each mod row. All three additive -- a manifest
- * without them parses cleanly and the launcher falls back to its
- * current rendering.
+ * [role], [requires] and [incompatibleWith] are read by the optional-content
+ * rules (hivens.core.data.OptionalContentRules): enabling a mod turns on what
+ * it requires and turns off its role-mates and declared incompatibilities, and
+ * a selection that breaks them is shown on the mod's row. They are not drawn as
+ * a tree or as grouped pickers. All additive: a manifest without them parses
+ * cleanly.
  */
 @Serializable
 data class SmrtDisplay(
@@ -356,16 +356,17 @@ data class SmrtDisplay(
      */
     @SerialName("icon_url") val iconUrl: String? = null,
     /**
-     * Short tag for grouping interchangeable mods. Launcher renders all
-     * mods with the same role as a single dropdown ("Recipe viewer: JEI
-     * [v]" lets the user swap to REI / JER / EMI). Canonical values are
-     * mirror-curated; the launcher does not enumerate them.
+     * Short tag for grouping interchangeable mods, one of which runs at a time
+     * (a recipe viewer: JEI, REI or EMI). Enabling one turns the others with the
+     * same role off. Canonical values are mirror-curated; the launcher does not
+     * enumerate them.
      */
     val role: String? = null,
     /**
-     * DAG of same-manifest dependencies. Resolver validates every entry's
-     * `filename` references an actual mods[] entry; missing references
-     * surface as broken-manifest warnings at install time.
+     * Same-manifest dependencies. Each names another mods[] entry by its
+     * filename or its [SmrtModEntry.stableKey]; a reference to an entry this
+     * manifest does not carry is ignored. A hard one is turned on with the mod
+     * that needs it, and reported on that mod's row while it is off.
      */
     val requires: List<SmrtRequirement> = emptyList(),
     /**
@@ -395,12 +396,13 @@ enum class SmrtPresence(val wire: String) {
 }
 
 /**
- * Single edge in a mod's dependency DAG. [filename] points at another
- * entry in the same manifest's mods[] list. [versionRange] follows
- * Maven-style range syntax (`>=4.0`, `[1.0,2.0)`); null means "any
- * version present is acceptable". [optional] = true means the consumer
- * works without the dep but works better with it -- the launcher shows
- * it greyed-out in the dep tree.
+ * One dependency of a manifest entry. [filename] points at another entry in
+ * the same manifest's mods[] list, by filename or stable key. [versionRange]
+ * follows Maven-style range syntax (`>=4.0`, `[1.0,2.0)`) and is carried but
+ * not compared, since a manifest entry names a file rather than a mod version:
+ * the version check runs on the jars themselves (dependencyIssues). [optional]
+ * = true means the consumer works without the dep but works better with it,
+ * and such a dependency is neither turned on nor reported.
  */
 @Serializable
 data class SmrtRequirement(
@@ -434,6 +436,10 @@ data class SmrtPackSummary(
     @SerialName("gallery_urls") val galleryUrls: List<String> = emptyList(),
     /** Long-form CommonMark description for the BrowsePackDetail About section. HTML is not parsed. */
     @SerialName("description_md") val descriptionMd: String? = null,
+    /** [tagline] by language tag, for [inLanguage]. Absent from a mirror that predates it. */
+    @SerialName("tagline_i18n") val taglineI18n: Map<String, String>? = null,
+    /** [descriptionMd] by language tag, for [inLanguage]. Absent from a mirror that predates it. */
+    @SerialName("description_md_i18n") val descriptionMdI18n: Map<String, String>? = null,
     /** When the latest build was published (RFC 3339); read-time derived by the mirror. */
     @SerialName("latest_built_at") val latestBuiltAt: String? = null,
     /** Channel of the latest build (`release` / `beta` / `alpha`); derived by the mirror. */

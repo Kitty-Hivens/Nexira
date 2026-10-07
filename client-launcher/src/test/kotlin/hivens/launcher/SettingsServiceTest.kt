@@ -56,6 +56,23 @@ class SettingsServiceTest {
         assertEquals(SettingsData(), svc.getSettings())
     }
 
+    /**
+     * The settings are written from several places at once. Read, changed and saved
+     * back, the slower of two writers put back a field the other had just changed;
+     * every one of these increments survives only if each step is one.
+     */
+    @Test
+    fun `concurrent updates each keep what the others wrote`() = runBlocking {
+        val svc = SettingsService(json, workDir / "settings.json")
+        svc.saveSettings(SettingsData(audioQueueIndex = 0))
+        withContext(Dispatchers.Default) {
+            (1..4).map {
+                async { repeat(100) { svc.updateSettings { s -> s.copy(audioQueueIndex = s.audioQueueIndex + 1) } } }
+            }.awaitAll()
+        }
+        assertEquals(400, svc.getSettings().audioQueueIndex)
+    }
+
     @Test
     fun `saveSettings round-trips through the file`() {
         val file = workDir / "settings.json"
@@ -72,7 +89,7 @@ class SettingsServiceTest {
     @Test
     fun `unknown enum value coerces to default and preserves other fields`() {
         // Scenario: launcher A writes settings with a new enum variant
-        // (HomeView.Future, say); launcher B (older binary, no Future
+        // (ThemeMode.Seasonal, say); launcher B (older binary, no Seasonal
         // variant) reads the same file. Without coerceInputValues this
         // crashes reload(), which then silently resets EVERY OTHER
         // field to defaults -- the user loses java path, memory, locale,
@@ -84,7 +101,7 @@ class SettingsServiceTest {
             {
               "javaPath": "/opt/jdk/bin/java",
               "locale": "de",
-              "homeView": "Future"
+              "themeMode": "Seasonal"
             }
             """.trimIndent(),
         )
@@ -95,8 +112,8 @@ class SettingsServiceTest {
         assertEquals("/opt/jdk/bin/java", loaded.javaPath, "non-enum fields must survive the coercion")
         assertEquals("de", loaded.locale, "non-enum fields must survive the coercion")
         assertEquals(
-            SettingsData().homeView,
-            loaded.homeView,
+            SettingsData().themeMode,
+            loaded.themeMode,
             "unknown enum value must coerce to the field default",
         )
     }
@@ -132,6 +149,28 @@ class SettingsServiceTest {
         assertEquals(setOf("keyring", "future-module"), loaded.disabledModules)
         assertEquals(ModuleId.Keyring, ModuleId.fromId("keyring"))
         assertEquals(null, ModuleId.fromId("future-module"), "unknown id maps to no module")
+    }
+
+    /**
+     * The recovery surface switches a module off through the raw file while this
+     * process may still hold its copy. The next ordinary change, a track ending and
+     * the queue position saved, used to write that copy back and switch the module
+     * on again.
+     */
+    @Test
+    fun `a change made to the file by another writer is built on, not written over`() {
+        val file = workDir / "settings.json"
+        val svc = SettingsService(json, file)
+        svc.updateSettings { it.copy(audioQueueIndex = 1) }
+
+        val elsewhere = json.decodeFromString<SettingsData>(Files.readString(file)).copy(disabledModules = setOf(ModuleId.Tray.id))
+        Files.writeString(file, json.encodeToString(elsewhere))
+
+        svc.updateSettings { it.copy(audioQueueIndex = 2) }
+
+        val onDisk = json.decodeFromString<SettingsData>(Files.readString(file))
+        assertEquals(setOf("tray"), onDisk.disabledModules, "the module came back on")
+        assertEquals(2, onDisk.audioQueueIndex)
     }
 
     /**

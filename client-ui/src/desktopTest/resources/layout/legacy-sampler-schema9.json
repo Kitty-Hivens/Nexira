@@ -1,0 +1,74 @@
+{
+  "schema_version": 9,
+  "graph": {
+    "surfaces": {
+      "sampler": {
+        "slots": {
+          "implicit": {
+            "widgets": [
+              {"kind": "a", "instance_id": "weighted", "weight": 2.0},
+              {"kind": "b", "instance_id": "plain", "props": {"title": "kept"}}
+            ]
+          },
+          "row": {
+            "orientation": "Row",
+            "widgets": [
+              {"kind": "c", "instance_id": "bounded", "canvas": {"x": 9.0, "y": 9.0, "width": 300.0, "height": 0.0, "z": 2}}
+            ]
+          },
+          "grid": {
+            "orientation": "Grid",
+            "gridColumns": 3,
+            "widgets": [
+              {"kind": "d", "instance_id": "cellA"},
+              {"kind": "d", "instance_id": "cellB"}
+            ]
+          },
+          "gridZero": {
+            "orientation": "Grid",
+            "gridColumns": 0,
+            "widgets": [
+              {"kind": "d", "instance_id": "zeroGrid"}
+            ]
+          },
+          "canvas": {
+            "orientation": "Canvas",
+            "widgets": [
+              {"kind": "e", "instance_id": "free", "canvas": {"x": 120.0, "y": 40.0, "width": 200.0, "height": 150.0, "z": 4}}
+            ]
+          },
+          "cube": {
+            "orientation": "CubeGrid",
+            "gridColumns": 4,
+            "widgets": [
+              {"kind": "f", "instance_id": "celled", "cell": {"col": 2, "row": 1, "colSpan": 3, "rowSpan": 2, "z": 1}}
+            ]
+          },
+          "cubeZero": {
+            "orientation": "CubeGrid",
+            "gridColumns": 0,
+            "widgets": [
+              {"kind": "f", "instance_id": "zeroCube", "cell": {"col": 3, "row": 2}}
+            ]
+          },
+          "nested": {
+            "widgets": [
+              {
+                "kind": "container.group",
+                "instance_id": "outer",
+                "children": {
+                  "body": {
+                    "orientation": "Canvas",
+                    "widgets": [
+                      {"kind": "g", "instance_id": "inner", "canvas": {"x": 5.0, "y": 6.0, "width": 70.0, "height": 80.0, "z": 3}}
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}

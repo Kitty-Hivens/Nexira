@@ -7,6 +7,7 @@ import hivens.core.api.dto.smrt.SmrtSource
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class OptionalContentRulesTest {
@@ -65,7 +66,107 @@ class OptionalContentRulesTest {
         val state = OptionalContentRules.enabledState(mods, listOf(ContentToggle("foamfix.jar", true)))
         assertEquals(true, state["required.jar"], "required always on")
         assertEquals(true, state["foamfix.jar"], "user toggle wins over default")
-        assertEquals(true, state["mixinbooter.jar"], "untouched optional uses default_enabled")
+        assertEquals(true, state["mixinbooter.jar"], "untouched optional uses default_enabled, conflict or not")
+    }
+
+    @Test
+    fun `a saved conflicting pair is reported on both sides and left as it is`() {
+        val state = OptionalContentRules.enabledState(mods, listOf(ContentToggle("foamfix.jar", true)))
+        val problems = OptionalContentRules.problems(mods, state)
+        assertEquals(listOf("mixinbooter.jar"), problems["foamfix.jar"]?.map { it.other.filename })
+        assertEquals(listOf("foamfix.jar"), problems["mixinbooter.jar"]?.map { it.other.filename })
+        assertTrue(problems["foamfix.jar"]!!.single() is OptionalContentRules.Problem.ConflictsWith)
+        assertNull(problems["required.jar"])
+    }
+
+    @Test
+    fun `enabling an optional beside a required mod it conflicts with is allowed and reported`() {
+        val m = listOf(
+            mod("core.jar", role = "renderer"),
+            mod("alt.jar", required = false, defaultEnabled = false, role = "renderer"),
+        )
+        val after = OptionalContentRules.applyToggle(m, mapOf("core.jar" to true, "alt.jar" to false), "alt.jar", true)
+        assertEquals(true, after["alt.jar"], "the player asked for it")
+        assertEquals(true, after["core.jar"], "a required mod is never switched off")
+        assertTrue(OptionalContentRules.problems(m, after)["alt.jar"]!!.single() is OptionalContentRules.Problem.ConflictsWith)
+    }
+
+    @Test
+    fun `turning off a library something still needs is allowed and reported on the consumer`() {
+        val m = listOf(
+            mod("consumer.jar", required = false, defaultEnabled = true, requires = listOf("lib.jar")),
+            mod("lib.jar", required = false, defaultEnabled = true),
+        )
+        val after = OptionalContentRules.applyToggle(m, mapOf("consumer.jar" to true, "lib.jar" to true), "lib.jar", false)
+        assertEquals(false, after["lib.jar"])
+        assertEquals(true, after["consumer.jar"], "nothing is turned off behind the player")
+        val problem = OptionalContentRules.problems(m, after)["consumer.jar"]!!.single()
+        assertTrue(problem is OptionalContentRules.Problem.NeedsDisabled && problem.other.filename == "lib.jar")
+    }
+
+    @Test
+    fun `a required mod whose optional library is off is reported`() {
+        val m = listOf(
+            mod("core.jar", requires = listOf("lib.jar")),
+            mod("lib.jar", required = false, defaultEnabled = false),
+        )
+        val state = OptionalContentRules.enabledState(m, emptyList())
+        assertEquals(false, state["lib.jar"])
+        assertTrue(OptionalContentRules.problems(m, state)["core.jar"]!!.single() is OptionalContentRules.Problem.NeedsDisabled)
+    }
+
+    @Test
+    fun `the library that is off says who needs it`() {
+        val m = listOf(
+            mod("core.jar", requires = listOf("lib.jar")),
+            mod("lib.jar", required = false, defaultEnabled = false),
+        )
+        val problem = OptionalContentRules.problems(m, OptionalContentRules.enabledState(m, emptyList()))["lib.jar"]!!.single()
+        assertTrue(problem is OptionalContentRules.Problem.NeededBy && problem.other.filename == "core.jar")
+    }
+
+    @Test
+    fun `a key two entries share names both of them`() {
+        val m = listOf(
+            mod("viewer.jar", required = false, defaultEnabled = true, incompatibleWith = listOf("modrinth:SHARED")),
+            mod("a-1.jar", required = false, defaultEnabled = true, projectId = "SHARED"),
+            mod("b-1.jar", required = false, defaultEnabled = true, projectId = "SHARED"),
+        )
+        val problems = OptionalContentRules.problems(m, OptionalContentRules.enabledState(m, emptyList()))
+        assertEquals(setOf("a-1.jar", "b-1.jar"), problems["viewer.jar"]!!.map { it.other.filename }.toSet())
+    }
+
+    @Test
+    fun `enabling a mod never switches off what it is turning on`() {
+        // A contradictory manifest: the consumer requires a library it also declares incompatible.
+        val m = listOf(
+            mod("consumer.jar", required = false, defaultEnabled = false, requires = listOf("lib.jar"), incompatibleWith = listOf("lib.jar")),
+            mod("lib.jar", required = false, defaultEnabled = false),
+        )
+        val after = OptionalContentRules.applyToggle(m, mapOf("consumer.jar" to false, "lib.jar" to false), "consumer.jar", true)
+        assertEquals(true, after["consumer.jar"])
+        assertEquals(true, after["lib.jar"])
+        assertTrue(OptionalContentRules.problems(m, after)["consumer.jar"]!!.isNotEmpty(), "the contradiction is shown instead")
+    }
+
+    @Test
+    fun `a selection the rules can keep has no problems`() {
+        val m = listOf(
+            mod("consumer.jar", required = false, defaultEnabled = true, requires = listOf("lib.jar")),
+            mod("lib.jar", required = false, defaultEnabled = true),
+            mod("jei.jar", required = false, defaultEnabled = true, role = "recipe_viewer"),
+            mod("rei.jar", required = false, defaultEnabled = false, role = "recipe_viewer"),
+        )
+        assertTrue(OptionalContentRules.problems(m, OptionalContentRules.enabledState(m, emptyList())).isEmpty())
+    }
+
+    @Test
+    fun `incompatible_with written as a stable key survives the filename changing`() {
+        val m = listOf(
+            mod("foamfix-0.11.jar", required = false, defaultEnabled = true, incompatibleWith = listOf("modrinth:MIXB")),
+            mod("mixinbooter-9.4.jar", required = false, defaultEnabled = true, projectId = "MIXB"),
+        )
+        assertTrue(OptionalContentRules.conflicts(m, "foamfix-0.11.jar", "mixinbooter-9.4.jar"))
     }
 
     @Test

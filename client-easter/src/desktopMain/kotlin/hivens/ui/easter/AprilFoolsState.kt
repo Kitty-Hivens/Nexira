@@ -6,6 +6,7 @@ import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.IntSize
 import java.time.LocalDate
+import java.time.temporal.ChronoUnit
 
 // ─── Calendar logic ───────────────────────────────────────────────────────────
 
@@ -56,11 +57,20 @@ object AprilFools {
     /**
      * Normalized chaos intensity: 0.07 on day 1, 1.0 on day 14.
      * Used as a multiplier everywhere -- crank it to 1.0 for local testing.
+     *
+     * The day is counted from the window's first day, and a run forced on outside
+     * the window counts as its first day. Read off the day of the month instead, a
+     * forced run was at full strength on the twentieth of any month.
      */
     fun intensity(): Float {
         if (!isActive()) return 0f
         debugIntensity?.let { return it.coerceIn(0f, 1f) }
-        val day = (LocalDate.now().dayOfMonth - 1).coerceIn(0, 13)
+        return intensityOn(LocalDate.now())
+    }
+
+    internal fun intensityOn(date: LocalDate): Float {
+        val start = LocalDate.of(date.year, 4, 1)
+        val day = ChronoUnit.DAYS.between(start, date).takeIf { it in 0..13 } ?: 0L
         return (day + 1) / 14f
     }
 
@@ -113,9 +123,9 @@ enum class ChaosPhase {
     SPINNING,
 
     /**
-     * Runs away from cursor on hover.
-     * The original button is still visible but keeps fleeing --
-     * no overlay clone for this one, pure local offset.
+     * Runs away from the cursor whenever it comes close. Drawn in the overlay like
+     * every other escape: the engine moves it there in window coordinates and hides
+     * the original, so it has to be.
      */
     FLEEING,
 
@@ -163,7 +173,10 @@ class FloatingButton(
     var hasLegs  by mutableStateOf(false)
     var legCycle by mutableStateOf(0f)   // 0..1 walking cycle
 
-    fun isEscaped() = phase !in setOf(ChaosPhase.IDLE, ChaosPhase.FLEEING)
+    // Every phase but IDLE draws in the overlay. FLEEING was left out on the strength
+    // of a design where it stayed in the layout, while the engine hides the original
+    // for it like any other escape, so a fleeing button was simply gone.
+    fun isEscaped() = phase != ChaosPhase.IDLE
 
     /** Snap overlay transform to match current origin -- call before escaping. */
     suspend fun snapToOrigin() {
@@ -220,7 +233,17 @@ object ChaosState {
     fun activeCount(): Int =
         buttons.count { it.phase != ChaosPhase.IDLE }
 
+    /**
+     * Resets every piece of chaos state. A button out in the overlay is put back in
+     * its layout first: the trackers keep the button after it leaves this list, and
+     * one dropped while escaped would stay invisible where it belongs.
+     */
     fun clean() {
+        buttons.forEach {
+            it.originalVisible = true
+            it.phase = ChaosPhase.IDLE
+            it.hasLegs = false
+        }
         buttons.clear()
         ghosts.clear()
         shakeOffset = Offset.Zero

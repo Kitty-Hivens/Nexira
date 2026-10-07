@@ -15,6 +15,8 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import java.io.ByteArrayOutputStream
 import java.io.IOException
+import java.io.InputStream
+import java.nio.file.AccessDeniedException
 import java.nio.file.FileSystems
 import java.nio.file.Files
 import java.nio.file.Path
@@ -130,10 +132,13 @@ class SmrtSyncServiceTest {
         }
     )
 
-    private fun serviceWith(engine: MockEngine): SmrtSyncService {
+    private fun serviceWith(
+        engine: MockEngine,
+        openForDigest: (Path) -> InputStream = { Files.newInputStream(it) },
+    ): SmrtSyncService {
         val provider = HttpClientProvider { HttpClient(engine) }
         val modrinth = ModrinthClient(provider, testTransferEngine(provider), json)
-        return SmrtSyncService(modrinth, testTransferEngine(provider))
+        return SmrtSyncService(modrinth, testTransferEngine(provider), openForDigest)
     }
 
 
@@ -351,22 +356,17 @@ class SmrtSyncServiceTest {
         val genuine = sha1Hex("GENUINE".toByteArray())
         val baseline = mapOf("req.jar" to genuine, "opt.jar" to genuine)
 
-        // Same POSIX caveat as the blocked-delete test above: what varies by
-        // platform is only how one arranges for a read to fail.
-        if (!FileSystems.getDefault().supportedFileAttributeViews().contains("posix")) return@runTest
-        val perms = Files.getPosixFilePermissions(locked)
-        Files.setPosixFilePermissions(locked, emptySet())
-        // Root is not bound by the mode bits, so there would be nothing to observe.
-        if (Files.isReadable(locked)) return@runTest
-        try {
-            val verdict = syncService().enforceRoster(dir, baseline)
-
-            assertEquals(listOf("req.jar"), verdict.unreadable)
-            assertEquals(listOf("opt.jar"), verdict.mismatched, "only the one actually compared is accused")
-            assertFalse(verdict.verified, "unchecked is not cleared -- it still denies the token")
-        } finally {
-            Files.setPosixFilePermissions(locked, perms)
+        // The lock, as the reader meets it, whatever the host and whoever runs the
+        // tests. Mode bits would not bind root, so arranging it through them left
+        // this switched off in container CI.
+        val service = serviceWith(MockEngine { respond("", HttpStatusCode.NotFound) }) { file ->
+            if (file == locked) throw AccessDeniedException(file.toString()) else Files.newInputStream(file)
         }
+        val verdict = service.enforceRoster(dir, baseline)
+
+        assertEquals(listOf("req.jar"), verdict.unreadable)
+        assertEquals(listOf("opt.jar"), verdict.mismatched, "only the one actually compared is accused")
+        assertFalse(verdict.verified, "unchecked is not cleared -- it still denies the token")
     }
 
     /**
@@ -993,6 +993,33 @@ class SmrtSyncServiceTest {
     }
 
     /**
+     * The manifest names the address, so it can name a plaintext one, or a device on
+     * the player's own network. The bytes are pinned either way. What is refused is
+     * the request, which used to go out on the manifest's say-so.
+     */
+    @Test
+    fun `an entry the manifest puts at a plaintext address is never requested`() = runTest {
+        val dir = tempDir("plaintext")
+        val requested = mutableListOf<String>()
+        val service = serviceWith(
+            MockEngine { req ->
+                requested += req.url.toString()
+                when (req.url.toString()) {
+                    REQ_URL -> respond(ByteReadChannel(reqBytes), HttpStatusCode.OK)
+                    else -> respond(ByteReadChannel(optBytes), HttpStatusCode.OK)
+                }
+            }
+        )
+        val manifest = parsed(manifest().replace(OPT_URL, "http://192.168.0.1/opt.jar"))
+
+        service.sync(manifest, dir, enabledState = mapOf("opt.jar" to true))
+
+        assertEquals(listOf(REQ_URL), requested)
+        assertFalse(Files.exists(dir.resolve("mods/opt.jar")), "nothing is fetched from a plaintext address")
+        assertTrue(Files.exists(dir.resolve("mods/req.jar")), "the rest of the pack still lands")
+    }
+
+    /**
      * The repair used to report such a pack whole. `plan` answered "nothing to
      * fetch" for an entry it was already right about and for one it could never
      * obtain, the two arrived as the same null, and everything outside the suspect
@@ -1147,5 +1174,116 @@ class SmrtSyncServiceTest {
 
         assertTrue(verdict.verified)
         assertTrue(verdict.blocked.isEmpty())
+    }
+
+    // --- what a held file could not do waits for the next launch ---
+
+    /**
+     * Holds `mods/` the way a running game holds its jars on Windows: nothing in it
+     * can be renamed or removed. POSIX only, and not as root, which the mode bits
+     * do not bind.
+     */
+    private inline fun whileModsHeld(dir: Path, block: () -> Unit): Boolean {
+        if (!FileSystems.getDefault().supportedFileAttributeViews().contains("posix")) return false
+        val mods = dir.resolve("mods")
+        val perms = Files.getPosixFilePermissions(mods)
+        Files.setPosixFilePermissions(mods, setOf(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_EXECUTE))
+        try {
+            if (Files.isWritable(mods)) return false
+            block()
+        } finally {
+            Files.setPosixFilePermissions(mods, perms)
+        }
+        return true
+    }
+
+    private val optOnly get() = parsed().mods
+
+    /**
+     * A switch made while the game ran used to be promised for "the next launch's
+     * sync", and a launch runs no sync. The mod went on loading until something
+     * else happened to relabel it.
+     */
+    @Test
+    fun `a switch the game held is carried out at the next launch`() = runTest {
+        val dir = tempDir("pending-move")
+        val service = syncService()
+        service.sync(parsed(), dir, enabledState = mapOf("req.jar" to true, "opt.jar" to true))
+
+        var deferred = emptyList<String>()
+        val held = whileModsHeld(dir) {
+            deferred = service.relabel(dir, optOnly, mapOf("req.jar" to true, "opt.jar" to false))
+        }
+        if (!held) return@runTest
+        assertEquals(listOf("opt.jar"), deferred)
+        assertTrue(Files.exists(dir.resolve("mods/opt.jar")), "still loading while held")
+
+        val owed = service.settlePending(dir)
+
+        assertTrue(owed.isEmpty())
+        assertFalse(Files.exists(dir.resolve("mods/opt.jar")), "the mod the player switched off no longer loads")
+        assertTrue(Files.exists(dir.resolve("mods/opt.jar.disabled")))
+        assertFalse(Files.exists(dir.resolve(PendingVariants.FILE_NAME)), "nothing is left owed")
+    }
+
+    @Test
+    fun `a later switch that lands clears what an earlier one left pending`() = runTest {
+        val dir = tempDir("pending-cleared")
+        val service = syncService()
+        service.sync(parsed(), dir, enabledState = mapOf("req.jar" to true, "opt.jar" to true))
+        val held = whileModsHeld(dir) {
+            service.relabel(dir, optOnly, mapOf("req.jar" to true, "opt.jar" to false))
+        }
+        if (!held) return@runTest
+
+        // The player changes their mind once the game is closed.
+        service.relabel(dir, optOnly, mapOf("req.jar" to true, "opt.jar" to true))
+        service.settlePending(dir)
+
+        assertTrue(Files.exists(dir.resolve("mods/opt.jar")), "the older choice must not come back and switch it off")
+        assertFalse(Files.exists(dir.resolve(PendingVariants.FILE_NAME)))
+    }
+
+    /**
+     * The update case: the new copy of a switched-off mod arrived under the disabled
+     * name, and the old active jar could not be removed beside it.
+     */
+    @Test
+    fun `an update's leftover is dropped at the next launch while its replacement is there`() = runTest {
+        val dir = tempDir("pending-drop")
+        val mods = Files.createDirectories(dir.resolve("mods"))
+        Files.write(mods.resolve("opt.jar"), "OLD".toByteArray())
+        Files.write(mods.resolve("opt.jar.disabled"), optBytes)
+        PendingVariants.update(dir, set = listOf(PendingVariants.Op.Drop("opt.jar")))
+
+        syncService().settlePending(dir)
+
+        assertFalse(Files.exists(mods.resolve("opt.jar")), "the stale active jar is gone")
+        assertContentEquals(optBytes, Files.readAllBytes(mods.resolve("opt.jar.disabled")), "the new copy is untouched")
+    }
+
+    @Test
+    fun `a leftover with no replacement beside it is the only copy and stays`() = runTest {
+        val dir = tempDir("pending-drop-alone")
+        val mods = Files.createDirectories(dir.resolve("mods"))
+        Files.write(mods.resolve("opt.jar"), "OLD".toByteArray())
+        PendingVariants.update(dir, set = listOf(PendingVariants.Op.Drop("opt.jar")))
+
+        syncService().settlePending(dir)
+
+        assertTrue(Files.exists(mods.resolve("opt.jar")))
+        assertFalse(Files.exists(dir.resolve(PendingVariants.FILE_NAME)), "and the entry is done with")
+    }
+
+    @Test
+    fun `a pending entry cannot name anything but a mod's own two names`() = runTest {
+        val dir = tempDir("pending-bounds")
+        val mods = Files.createDirectories(dir.resolve("mods"))
+        Files.write(mods.resolve("req.jar"), reqBytes)
+        Files.writeString(dir.resolve(PendingVariants.FILE_NAME), "move\tmods/req.jar\tmods/other.jar\ndrop\tconfig/x.cfg")
+
+        syncService().settlePending(dir)
+
+        assertTrue(Files.exists(mods.resolve("req.jar")), "a move between unrelated names is not honoured")
     }
 }

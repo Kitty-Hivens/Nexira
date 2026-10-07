@@ -9,6 +9,7 @@ import androidx.compose.ui.unit.Density
 import hivens.ui.theme.NxTheme
 import kotlin.test.Test
 import kotlin.test.assertTrue
+import hivens.ui.theme.NxColor
 
 /**
  * Descriptions are written by third parties, so the renderer has to survive
@@ -24,15 +25,15 @@ class HtmlRenderHostileTest {
     private fun layOut(markdown: String): Long {
         val started = System.nanoTime()
         val scene = ImageComposeScene(600, 400, density = Density(1f)) {
-            NxTheme(useDarkTheme = true) {
-                Box(Modifier.fillMaxSize().background(NxTheme.colors.background)) {
+            NxTheme(dark = true) {
+                Box(Modifier.fillMaxSize().background(NxColor.page)) {
                     MarkdownHtml(markdown = markdown, onLink = {})
                 }
             }
         }
         try {
             var t = 0L
-            repeat(12) { scene.render(t); t += 16_000_000L; Thread.sleep(15) }
+            repeat(12) { scene.render(t).close(); t += 16_000_000L; Thread.sleep(15) }
         } finally {
             scene.close()
         }

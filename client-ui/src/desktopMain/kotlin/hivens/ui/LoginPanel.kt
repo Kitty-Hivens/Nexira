@@ -25,7 +25,6 @@ import hivens.auth.AuthProvider
 import hivens.auth.OfflineAuthProvider
 import hivens.core.data.SessionData
 import hivens.auth.AccountStore
-import hivens.launcher.ProfileManager
 import hivens.launcher.network.CertificateTrustGate
 import hivens.launcher.network.ServerProtocolConfig
 import hivens.ui.components.ConfirmCodeDialog
@@ -41,13 +40,16 @@ import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetField
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.puppet.PuppetToggle
-import hivens.ui.theme.NxTheme
 import hivens.ui.platform.SystemActions
+import hivens.ui.utils.PreferenceWriter
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
-import org.koin.core.qualifier.named
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.Status
 
 @Composable
 fun LoginPanel(
@@ -56,13 +58,12 @@ fun LoginPanel(
     showMicrosoft: Boolean = true,
 ) {
     val authService: AuthProvider              = koinInject()
-    val insecureAuthService: AuthProvider      = koinInject(named("insecure"))
     val credentialsManager: AccountStore       = koinInject()
-    val profileManager: ProfileManager         = koinInject()
     val protocolConfig: ServerProtocolConfig   = koinInject()
     val certificateGate: CertificateTrustGate  = koinInject()
     val offlineProvider: OfflineAuthProvider   = koinInject()
     val settingsService: ISettingsService      = koinInject()
+    val preferences: PreferenceWriter          = koinInject()
     val s            = LocalStrings.current
     val scope        = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
@@ -82,7 +83,7 @@ fun LoginPanel(
     // box off stops future saves and nothing else.
     val setRememberMe: (Boolean) -> Unit = { value ->
         rememberMe = value
-        settingsService.saveSettings(settingsService.getSettings().copy(saveCredentials = value))
+        preferences.write("remember me") { settingsService.updateSettings { it.copy(saveCredentials = value) } }
     }
 
     // 2FA flow state. Which path a TWOAUTH demand takes is decided by the
@@ -90,59 +91,60 @@ fun LoginPanel(
     // [twoFactorPending] / completeTwoFactor / ConfirmCodeDialog path, which is
     // now what SmartyCraft takes. The [twoFactorUnsupported] banner remains for a
     // provider that raises the demand without being able to answer it.
-    //
-    // [service] is the provider that raised the demand. The SSL-bypass retry
-    // logs in through insecureAuthService, whose pendingTwoFactor cache is a
-    // different instance from the secure provider's -- completing the code
-    // against the wrong one would miss the cached login and re-dial the very
-    // TLS channel the user just bypassed.
-    data class TwoFactorPending(val uid: String, val username: String, val password: String, val serverId: String, val service: AuthProvider)
+    data class TwoFactorPending(val uid: String, val username: String, val password: String, val serverId: String)
     var twoFactorPending      by remember { mutableStateOf<TwoFactorPending?>(null) }
     var twoFactorError        by remember { mutableStateOf<String?>(null) }
     var twoFactorBusy         by remember { mutableStateOf(false) }
     var twoFactorUnsupported  by remember { mutableStateOf(false) }
 
     val fieldColors = OutlinedTextFieldDefaults.colors(
-        focusedTextColor        = NxTheme.colors.textPrimary,
-        unfocusedTextColor      = NxTheme.colors.textPrimary,
-        focusedBorderColor      = NxTheme.colors.primary,
-        unfocusedBorderColor    = NxTheme.colors.textSecondary.copy(alpha = 0.22f),
-        focusedLabelColor       = NxTheme.colors.primary,
-        unfocusedLabelColor     = NxTheme.colors.textSecondary,
-        cursorColor             = NxTheme.colors.primary,
+        focusedTextColor        = NxInk.main,
+        unfocusedTextColor      = NxInk.main,
+        focusedBorderColor      = NxColor.lead(),
+        unfocusedBorderColor    = NxInk.quiet.copy(alpha = 0.22f),
+        focusedLabelColor       = NxColor.lead(),
+        unfocusedLabelColor     = NxInk.quiet,
+        cursorColor             = NxColor.lead(),
         focusedContainerColor   = Color.Transparent,
         unfocusedContainerColor = Color.Transparent
     )
 
-    fun doLogin(service: AuthProvider = authService) {
+    fun doLogin() {
+        // The button and the automation hook are both off while one is in flight, and
+        // Enter in the password field was not: a second sign-in started beside the
+        // first, and on SmartyCraft each login retires the uid the one before it got.
+        if (isLoading) return
         if (login.isBlank() || password.isBlank()) { errorMessage = s.loginErrorEmpty; return }
         focusManager.clearFocus()
         isLoading             = true
         errorMessage          = null
         twoFactorUnsupported  = false
-        hivens.core.diag.ActionRing.record("Login attempt: user=$login")
+        // No account name in any of these: the ring pre-fills a crash report and is
+        // copied into the diagnostic bundle, and what it is for is what happened.
+        hivens.core.diag.ActionRing.record("Login attempt")
         scope.launch {
             try {
                 val session = withContext(Dispatchers.IO) {
-                    val lastServer = profileManager.lastServerId ?: Protocol.DEFAULT_SERVER_ID
-                    val sess = service.login(login, password, lastServer)
-                    if (rememberMe) credentialsManager.save(sess)
+                    val sess = authService.login(login, password, Protocol.DEFAULT_SERVER_ID)
+                    if (rememberMe) credentialsManager.saveAccount(sess, authService.id)
                     sess
                 }
-                hivens.core.diag.ActionRing.record("Login OK: user=$login")
+                hivens.core.diag.ActionRing.record("Login OK")
+                // Cleared on success as well. Where the panel stays on screen after a
+                // sign-in, a profile section signing in a second provider, it went on
+                // showing the spinner over a form that was done.
+                isLoading = false
                 onLogin(session)
             } catch (e: TwoFactorRequiredException) {
                 isLoading = false
-                if (service.capabilities.supports2FA) {
+                if (authService.capabilities.supports2FA) {
                     // Provider runs a real second factor: open the code dialog.
                     hivens.core.diag.ActionRing.record("Login: 2FA required, prompting for code")
-                    val lastServer = profileManager.lastServerId ?: Protocol.DEFAULT_SERVER_ID
                     twoFactorPending = TwoFactorPending(
                         uid = e.uid.orEmpty(),
                         username = login,
                         password = password,
-                        serverId = lastServer,
-                        service = service,
+                        serverId = Protocol.DEFAULT_SERVER_ID,
                     )
                 } else {
                     // The provider raised a second-factor demand it cannot
@@ -155,16 +157,18 @@ fun LoginPanel(
             } catch (e: AuthException) {
                 isLoading = false
                 hivens.core.diag.ActionRing.record(
-                    "Login failed (auth): user=$login ssl=${e.isSslError} msg=${e.message?.take(80)}"
+                    "Login failed (auth): ssl=${e.isSslError} msg=${e.message?.take(80)}"
                 )
                 when {
                     // The certificate question is the shell's to ask now, so the form
                     // no longer draws its own copy of it: the same refusal reaches the
                     // roster and the news, and one dialog for one decision beats a
                     // banner that only the login path could raise. The retry rides
-                    // along -- accepting here means the user wanted to sign in.
+                    // along -- accepting here means the user wanted to sign in. The
+                    // gate records the grant before it runs, so the same provider
+                    // now reaches the host over the bypassed channel.
                     e.isSslError -> certificateGate.request(protocolConfig.sslBypassHost) {
-                        doLogin(insecureAuthService)
+                        doLogin()
                     }
                     else         -> errorMessage = e.message
                         ?.replace("java.lang.Exception: ", "")
@@ -173,7 +177,7 @@ fun LoginPanel(
                 }
             } catch (e: Exception) {
                 isLoading    = false
-                hivens.core.diag.ActionRing.record("Login failed (generic): user=$login msg=${e.message?.take(80)}")
+                hivens.core.diag.ActionRing.record("Login failed (generic): msg=${e.message?.take(80)}")
                 errorMessage = e.message ?: s.loginErrorGeneric
             }
         }
@@ -185,14 +189,25 @@ fun LoginPanel(
         focusManager.clearFocus()
         errorMessage = null
         scope.launch {
-            val session = withContext(Dispatchers.IO) {
-                val sess = offlineProvider.login(name, "", "")
-                // Remember the offline name so a restart -- or the Settings offline
-                // toggle -- restores this identity without re-typing.
-                settingsService.saveSettings(settingsService.getSettings().copy(offlinePlayerName = name))
-                sess
+            // Caught like the sign-in above. Unguarded, a settings file that could not
+            // be written threw out of the composition's scope and raised the crash
+            // dialog over a press of "play offline".
+            val session = try {
+                withContext(Dispatchers.IO) {
+                    val sess = offlineProvider.login(name, "", "")
+                    // Remember the offline name so a restart -- or the Settings offline
+                    // toggle -- restores this identity without re-typing.
+                    settingsService.updateSettings { it.copy(offlinePlayerName = name) }
+                    sess
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                hivens.core.diag.ActionRing.record("Play offline failed: msg=${e.message?.take(80)}")
+                errorMessage = e.message ?: s.loginErrorGeneric
+                return@launch
             }
-            hivens.core.diag.ActionRing.record("Play offline: name=$name")
+            hivens.core.diag.ActionRing.record("Play offline")
             onLogin(session)
         }
     }
@@ -204,21 +219,21 @@ fun LoginPanel(
         scope.launch {
             try {
                 val session = withContext(Dispatchers.IO) {
-                    val sess = pending.service.completeTwoFactor(
+                    val sess = authService.completeTwoFactor(
                         username = pending.username, password = pending.password,
                         serverId = pending.serverId, uid = pending.uid, code = code,
                     )
-                    if (rememberMe) credentialsManager.save(sess)
+                    if (rememberMe) credentialsManager.saveAccount(sess, authService.id)
                     sess
                 }
-                hivens.core.diag.ActionRing.record("Login OK after 2FA: user=${pending.username}")
+                hivens.core.diag.ActionRing.record("Login OK after 2FA")
                 twoFactorBusy = false
                 twoFactorPending = null
                 onLogin(session)
             } catch (e: AuthException) {
                 twoFactorBusy = false
                 hivens.core.diag.ActionRing.record(
-                    "2FA verify failed: user=${pending.username} status=${e.status}"
+                    "2FA verify failed: status=${e.status}"
                 )
                 when (e.status) {
                     AuthStatus.WRONG_CODE -> twoFactorError = s.auth2faInvalid
@@ -270,7 +285,7 @@ fun LoginPanel(
             text       = s.loginTitle,
             style      = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
-            color      = NxTheme.colors.textPrimary
+            color      = NxInk.main
         )
 
         // ── 2FA unsupported banner ────────────────────────────────────────
@@ -285,7 +300,7 @@ fun LoginPanel(
                     modifier = Modifier.align(Alignment.End),
                     shape    = MaterialTheme.shapes.small,
                 ) {
-                    Text(s.auth2faUnsupportedDismiss, color = NxTheme.colors.textSecondary)
+                    Text(s.auth2faUnsupportedDismiss, color = NxInk.quiet)
                 }
             }
         }
@@ -295,11 +310,11 @@ fun LoginPanel(
             Text(
                 text     = errorMessage ?: "",
                 style    = MaterialTheme.typography.bodySmall,
-                color    = NxTheme.colors.error,
+                color    = NxColor.status(Status.Error),
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(
-                        color = NxTheme.colors.error.copy(alpha = 0.08f),
+                        color = NxColor.status(Status.Error).copy(alpha = 0.08f),
                         shape = MaterialTheme.shapes.medium
                     )
                     .padding(8.dp)
@@ -348,14 +363,14 @@ fun LoginPanel(
                 checked         = rememberMe,
                 onCheckedChange = setRememberMe,
                 colors          = CheckboxDefaults.colors(
-                    checkedColor   = NxTheme.colors.primary,
-                    uncheckedColor = NxTheme.colors.textSecondary.copy(alpha = 0.4f)
+                    checkedColor   = NxColor.lead(),
+                    uncheckedColor = NxInk.quiet.copy(alpha = 0.4f)
                 )
             )
             Text(
                 text  = s.loginRemember,
                 style = MaterialTheme.typography.bodySmall,
-                color = NxTheme.colors.textSecondary
+                color = NxInk.quiet
             )
         }
         PuppetToggle("login.rememberMe", rememberMe, onValueChange = setRememberMe)
@@ -368,7 +383,7 @@ fun LoginPanel(
                 modifier  = Modifier.fillMaxWidth().height(42.dp),
                 shape     = MaterialTheme.shapes.small,
                 colors    = ButtonDefaults.buttonColors(
-                    disabledContainerColor = NxTheme.colors.primary.copy(alpha = 0.5f)
+                    disabledContainerColor = NxColor.lead().copy(alpha = 0.5f)
                 ),
                 elevation = ButtonDefaults.buttonElevation(0.dp)
             ) {

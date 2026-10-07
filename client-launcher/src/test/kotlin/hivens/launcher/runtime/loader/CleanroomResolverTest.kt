@@ -98,6 +98,23 @@ class CleanroomResolverTest {
     }
 
     @Test
+    fun `each host takes the text2speech build its rules name`() {
+        val text = javaClass.getResourceAsStream("/loader/cleanroom/cleanroom-0.6.4-alpha-version.json")
+            ?.readBytes()?.decodeToString() ?: error("fixture missing")
+        val libraries = json.decodeFromString(LoaderVersionJson.serializer(), text).libraries
+        val offline = HttpClientProvider { HttpClient(MockEngine { respond("", HttpStatusCode.OK) }) }
+        fun speech(os: String, arm64: Boolean): Set<String> =
+            CleanroomResolver(offline, testTransferEngine(offline), json, mojangOs = os, arm64 = arm64)
+                .hostLibraries(libraries)
+                .filter { it.name.startsWith("com.mojang:text2speech:") }
+                .mapTo(HashSet()) { it.name.substringAfterLast(':') }
+
+        assertEquals(setOf("1.10.3"), speech("linux", arm64 = false))
+        assertEquals(setOf("1.10.3"), speech("osx", arm64 = false), "an Intel Mac is not Apple Silicon")
+        assertEquals(setOf("1.11.3"), speech("osx", arm64 = true))
+    }
+
+    @Test
     fun `registry resolves the cleanroom loader id case-insensitively`() {
         val registry = LoaderRegistry(listOf(resolver))
         assertSame(resolver, registry.resolverFor("cleanroom"))
@@ -136,5 +153,15 @@ class CleanroomResolverTest {
         assertTrue(msg.contains("cleanroom"), "names the loader: $msg")
         assertTrue(msg.contains("9.9.9-alpha"), "names the version: $msg")
         assertTrue(msg.contains("version.json"), "names what is missing: $msg")
+    }
+
+    /** Layered onto another Minecraft version it assembled a classpath that could only crash. */
+    @Test
+    fun `Cleanroom refuses any Minecraft but 1_12_2, and a blank version, before fetching anything`() = runTest {
+        val wrongMc = runCatching { resolver.resolve("1.20.1", "0.3.0") }.exceptionOrNull()
+        val blank = runCatching { resolver.resolve("1.12.2", "") }.exceptionOrNull()
+
+        assertTrue(wrongMc?.message.orEmpty().contains("1.12.2"), "got $wrongMc")
+        assertTrue(blank?.message.orEmpty().contains("version"), "got $blank")
     }
 }

@@ -29,6 +29,12 @@ class LauncherUpdater(private val layout: InstallLayout) {
         source: AssetSource,
         version: String,
     ): UpdateOutcome {
+        // An apply a crash interrupted has moved some files and recorded none of
+        // it. Planning from the recorded manifest would patch files that are
+        // already new, and staging would clear what the resume needs.
+        check(!LayoutApplier(layout).hasPendingApply) {
+            "an interrupted update has not been finished yet; run recoverIfInterrupted first"
+        }
         // The recorded manifest is the baseline; fall back to a live scan the first time
         // the managed layout runs without one.
         val local = LayoutManifest.read(layout.manifestFile)

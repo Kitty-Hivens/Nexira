@@ -1,0 +1,229 @@
+package hivens.launcher.instance
+
+import hivens.core.api.HttpClientProvider
+import hivens.core.api.dto.modrinth.ModrinthDependency
+import hivens.core.api.dto.modrinth.ModrinthFile
+import hivens.core.api.dto.modrinth.ModrinthHashes
+import hivens.core.api.dto.modrinth.ModrinthVersion
+import hivens.core.launch.InstanceWorkRegistry
+import hivens.launcher.modrinth.ModrinthClient
+import hivens.test.testTransferEngine
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.mock.MockEngine
+import io.ktor.client.engine.mock.respond
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.headersOf
+import io.ktor.utils.io.ByteReadChannel
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.MapSerializer
+import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.json.Json
+import java.io.ByteArrayOutputStream
+import java.nio.file.Files
+import java.nio.file.Path
+import java.security.MessageDigest
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
+import kotlin.test.AfterTest
+import kotlin.test.Test
+import kotlin.test.assertContentEquals
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
+
+class InstanceContentUpdaterTest {
+
+    private val temps = mutableListOf<Path>()
+
+    @AfterTest
+    fun cleanup() = temps.forEach { it.toFile().deleteRecursively() }
+
+    private fun sha1(b: ByteArray) = MessageDigest.getInstance("SHA-1").digest(b).joinToString("") { "%02x".format(it) }
+
+    /**
+     * The update knows the hash Modrinth published for the file. Handed to the
+     * transfer, a body that arrives whole but wrong is fetched again. Checked only
+     * after it, the first bad body failed the update.
+     */
+    @Test
+    fun `an update whose first body arrives wrong is fetched again and lands`() = runTest {
+        val dir = Files.createTempDirectory("content-update").also { temps.add(it) }
+        Files.createDirectories(dir.resolve("mods"))
+        Files.writeString(dir.resolve("mods/old.jar"), "OLD")
+        val good = "NEW-BUILD".toByteArray()
+        var served = 0
+        val provider = HttpClientProvider {
+            HttpClient(MockEngine { _ ->
+                served++
+                respond(ByteReadChannel(if (served == 1) "CORRUPTED".toByteArray() else good), HttpStatusCode.OK)
+            })
+        }
+        val modrinth = ModrinthClient(provider, testTransferEngine(provider), Json { ignoreUnknownKeys = true })
+        val updater = InstanceContentUpdater(modrinth, InstanceContentManager(), backgroundScope, InstanceWorkRegistry())
+        val update = ModUpdate(
+            ref = ContentRef(ContentKind.Mod, "old.jar"),
+            installedVersion = "1.0",
+            projectId = "p",
+            versionId = "v",
+            versionNumber = "1.1",
+            versionType = "release",
+            fileName = "new.jar",
+            url = "https://cdn.test/new.jar",
+            sha1 = sha1(good),
+            sizeBytes = good.size.toLong(),
+        )
+
+        assertTrue(updater.start("instance", dir, "Pack", listOf(InstanceContentUpdater.Target(update, enabled = true))))
+        val run = updater.runs.first { it[updater.keyOf(dir)]?.finished == true }.getValue(updater.keyOf(dir))
+
+        assertEquals(emptyList(), run.failed)
+        assertEquals(2, served)
+        assertContentEquals(good, Files.readAllBytes(dir.resolve("mods/new.jar")))
+        assertFalse(Files.exists(dir.resolve("mods/old.jar")))
+    }
+
+    /** A real archive, so the scan reads it as a mod. */
+    private fun jar(marker: String): ByteArray {
+        val out = ByteArrayOutputStream()
+        ZipOutputStream(out).use { z ->
+            z.putNextEntry(ZipEntry("marker.txt"))
+            z.write(marker.toByteArray())
+            z.closeEntry()
+        }
+        return out.toByteArray()
+    }
+
+    private fun version(project: String, id: String, published: String, file: String, bytes: ByteArray, deps: List<ModrinthDependency> = emptyList()) =
+        ModrinthVersion(
+            id = id, projectId = project, name = id, versionNumber = id, versionType = "release",
+            gameVersions = listOf("1.21.1"), loaders = listOf("neoforge"), datePublished = published,
+            files = listOf(ModrinthFile(hashes = ModrinthHashes(sha1(bytes)), url = "https://cdn.test/$file", filename = file, primary = true, size = bytes.size.toLong())),
+            dependencies = deps,
+        )
+
+    /**
+     * A mod made against a newer library than the one in the folder is reported on
+     * the library's row with its pinned build offered, and the update batch does
+     * not swap the library on its own.
+     */
+    @Test
+    fun `a library behind a pin is reported and offered, and an update leaves it alone`() = runTest {
+        val dir = Files.createTempDirectory("content-update").also { temps.add(it) }
+        Files.createDirectories(dir.resolve("mods"))
+        val oldMod = jar("mod 1"); val newMod = jar("mod 2"); val oldLib = jar("lib 1"); val newLib = jar("lib 2")
+        Files.write(dir.resolve("mods/mod-1.jar"), oldMod)
+        Files.write(dir.resolve("mods/lib-1.jar"), oldLib)
+        val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
+        val pin = listOf(ModrinthDependency(projectId = "lib", versionId = "lib-2"))
+        val modV2 = version("mod", "mod-2", "2026-03-02T00:00:00Z", "mod-2.jar", newMod, pin)
+        val libV1 = version("lib", "lib-1", "2026-01-01T00:00:00Z", "lib-1.jar", oldLib)
+        val libV2 = version("lib", "lib-2", "2026-03-01T00:00:00Z", "lib-2.jar", newLib)
+        val hashes = json.encodeToString(MapSerializer(String.serializer(), ModrinthVersion.serializer()), mapOf(sha1(newMod) to modV2, sha1(oldLib) to libV1))
+        val provider = HttpClientProvider {
+            HttpClient(MockEngine { req ->
+                val path = req.url.encodedPath
+                val (body, type) = when {
+                    path.endsWith("/v2/version_files") -> hashes.toByteArray() to "application/json"
+                    path.endsWith("/v2/version_files/update_many") -> "{}".toByteArray() to "application/json"
+                    path.endsWith("/v2/project/lib/version/lib-2") -> json.encodeToString(ModrinthVersion.serializer(), libV2).toByteArray() to "application/json"
+                    path.endsWith("/mod-2.jar") -> newMod to "application/java-archive"
+                    else -> return@MockEngine respond(ByteReadChannel("no"), HttpStatusCode.NotFound)
+                }
+                respond(ByteReadChannel(body), HttpStatusCode.OK, headersOf("Content-Type", type))
+            })
+        }
+        val modrinth = ModrinthClient(provider, testTransferEngine(provider), json)
+        val updater = InstanceContentUpdater(modrinth, InstanceContentManager(), backgroundScope, InstanceWorkRegistry())
+        val update = modV2.swapFor(ContentRef(ContentKind.Mod, "mod-1.jar"), "mod-1")!!
+
+        assertTrue(updater.start("instance", dir, "Pack", listOf(InstanceContentUpdater.Target(update, enabled = true))))
+        val run = updater.runs.first { it[updater.keyOf(dir)]?.finished == true }.getValue(updater.keyOf(dir))
+        assertEquals(1, run.total, "the library is not added to the batch")
+        assertContentEquals(oldLib, Files.readAllBytes(dir.resolve("mods/lib-1.jar")), "the library is left as it was")
+
+        val items = InstanceContentScanner().scan(dir).filter { it.kind == ContentKind.Mod }
+        val outcome = updater.check(dir, items, mcVersion = "1.21.1", loader = "neoforge", force = true)
+        val libRef = ContentRef(ContentKind.Mod, "lib-1.jar")
+        val behind = outcome.behind.getValue(libRef)
+        assertEquals("lib-2", behind.pinned.id)
+        assertEquals("lib-2.jar", outcome.updates.getValue(libRef).fileName, "the pinned build is offered as the library's update")
+    }
+
+    /** A folder with mod-2 (pinning lib-2) and lib-1, and a Modrinth that answers as told. */
+    private inner class PinWorld(
+        val pinLookupFails: Boolean = false,
+        val offerLib15: Boolean = false,
+        modEnabled: Boolean = true,
+    ) {
+        val dir: Path = Files.createTempDirectory("content-pins").also { temps.add(it) }
+        val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
+        val newMod = jar("mod 2"); val oldLib = jar("lib 1"); val midLib = jar("lib 1.5"); val newLib = jar("lib 2")
+        val modV2 = version("mod", "mod-2", "2026-03-02T00:00:00Z", "mod-2.jar", newMod, listOf(ModrinthDependency(projectId = "lib", versionId = "lib-2")))
+        val libV1 = version("lib", "lib-1", "2026-01-01T00:00:00Z", "lib-1.jar", oldLib)
+        val libV15 = version("lib", "lib-15", "2026-02-01T00:00:00Z", "lib-15.jar", midLib)
+        val libV2 = version("lib", "lib-2", "2026-03-01T00:00:00Z", "lib-2.jar", newLib)
+        val updater: InstanceContentUpdater
+
+        init {
+            Files.createDirectories(dir.resolve("mods"))
+            Files.write(dir.resolve(if (modEnabled) "mods/mod-2.jar" else "mods/mod-2.jar.disabled"), newMod)
+            Files.write(dir.resolve("mods/lib-1.jar"), oldLib)
+            val hashes = json.encodeToString(MapSerializer(String.serializer(), ModrinthVersion.serializer()), mapOf(sha1(newMod) to modV2, sha1(oldLib) to libV1))
+            val updates = if (offerLib15) {
+                json.encodeToString(MapSerializer(String.serializer(), ListSerializer(ModrinthVersion.serializer())), mapOf(sha1(oldLib) to listOf(libV15)))
+            } else "{}"
+            val provider = HttpClientProvider {
+                HttpClient(MockEngine { req ->
+                    val path = req.url.encodedPath
+                    val body = when {
+                        path.endsWith("/v2/version_files") -> hashes
+                        path.endsWith("/v2/version_files/update_many") -> updates
+                        path.endsWith("/v2/project/lib/version/lib-2") && !pinLookupFails -> json.encodeToString(ModrinthVersion.serializer(), libV2)
+                        else -> return@MockEngine respond(ByteReadChannel("no"), HttpStatusCode.ServiceUnavailable)
+                    }
+                    respond(ByteReadChannel(body.toByteArray()), HttpStatusCode.OK, headersOf("Content-Type", "application/json"))
+                })
+            }
+            updater = InstanceContentUpdater(ModrinthClient(provider, testTransferEngine(provider), json), InstanceContentManager(), CoroutineScope(SupervisorJob()), InstanceWorkRegistry())
+        }
+
+        suspend fun check(ownLib: Boolean = true): InstanceContentUpdater.CheckOutcome {
+            val mods = InstanceContentScanner().scan(dir).filter { it.kind == ContentKind.Mod }
+            val owned = if (ownLib) mods else mods.filter { it.fileName != "lib-1.jar" }
+            return updater.check(dir, owned, mcVersion = "1.21.1", loader = "neoforge", force = true, context = mods)
+        }
+
+        val libRef = ContentRef(ContentKind.Mod, "lib-1.jar")
+    }
+
+    @Test
+    fun `a pin that could not be looked up leaves the check incomplete instead of clean`() = runTest {
+        val outcome = PinWorld(pinLookupFails = true).check()
+        assertFalse(outcome.complete, "not remembered as nothing behind")
+        assertTrue(outcome.behind.isEmpty())
+    }
+
+    @Test
+    fun `an update older than the pin gives way to the pinned build`() = runTest {
+        val world = PinWorld(offerLib15 = true)
+        val outcome = world.check()
+        assertEquals("lib-2.jar", outcome.updates.getValue(world.libRef).fileName)
+    }
+
+    @Test
+    fun `a library the player does not own is named and not offered`() = runTest {
+        val world = PinWorld()
+        val outcome = world.check(ownLib = false)
+        assertEquals("lib-2", outcome.behind.getValue(world.libRef).pinned.id)
+        assertFalse(world.libRef in outcome.updates)
+    }
+
+    @Test
+    fun `a disabled mod pins nothing`() = runTest {
+        assertTrue(PinWorld(modEnabled = false).check().behind.isEmpty())
+    }
+}

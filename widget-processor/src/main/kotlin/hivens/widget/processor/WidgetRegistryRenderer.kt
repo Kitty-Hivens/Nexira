@@ -1,6 +1,26 @@
 package hivens.widget.processor
 
 /**
+ * The six size arguments a widget declared, still plain numbers.
+ *
+ * A mirror of [hivens.widget.model.WidgetSizing] rather than that type itself.
+ * The renderer emits source, so what it wants is the numbers, and everything in
+ * this file is deliberately free of the types the generated code imports.
+ */
+internal data class SizingArgs(
+    val minWidth: Int = 0,
+    val minHeight: Int = 0,
+    val prefWidth: Int = 0,
+    val prefHeight: Int = 0,
+    val maxWidth: Int = 0,
+    val maxHeight: Int = 0,
+) {
+    /** False for the widget that said nothing, which is most of them. */
+    val declared: Boolean
+        get() = this != SizingArgs()
+}
+
+/**
  * One widget as the registry needs it, with every KSP type left behind. The
  * processor resolves symbols into these; everything downstream (collision
  * detection, source rendering) is a pure function of the list, which is the
@@ -29,6 +49,10 @@ internal data class WidgetModel(
     val injects: List<String> = emptyList(),
     /** The default plane as JSON, or null for a widget that draws none. */
     val surfaceJson: String? = null,
+    /** What the widget needs, wants and can use, per axis. Zeroes mean undeclared. */
+    val sizing: SizingArgs = SizingArgs(),
+    /** The declared arrival as an Entrance constant name, or null for the default. */
+    val enter: String? = null,
 )
 
 /**
@@ -90,6 +114,9 @@ internal fun renderRegistry(
     // warn on a build that has neither.
     val hasProps = widgets.any { it.propsClassFqn != null }
     val hasSurface = widgets.any { it.surfaceJson != null }
+    val hasSizing = widgets.any { it.sizing.declared }
+    if (hasSizing) appendLine("import hivens.widget.model.WidgetSizing")
+    if (widgets.any { it.enter != null }) appendLine("import hivens.widget.model.Entrance")
     if (hasSurface) appendLine("import hivens.widget.model.SurfaceSpec")
     if (hasProps || hasSurface) appendLine("import kotlinx.serialization.json.Json")
     if (hasProps) {
@@ -118,6 +145,15 @@ internal fun renderRegistry(
         appendLine("            override val removable: Boolean = ${entry.removable}")
         if (entry.drawsOwnSurface) appendLine("            override val drawsOwnSurface: Boolean = true")
         appendLine("            override val slots: List<SlotId> = ${entry.slots.toSlotIdListLiteral()}")
+        // Only when the widget said something. A literal of six zeroes on every
+        // descriptor would be the same value the interface already defaults to,
+        // written out ninety times.
+        if (entry.sizing.declared) {
+            appendLine("            override val sizing: WidgetSizing = ${entry.sizing.toLiteral()}")
+        }
+        if (entry.enter != null) {
+            appendLine("            override val defaultEntrance: Entrance? = Entrance.${entry.enter}")
+        }
         if (entry.provides.isNotEmpty()) {
             appendLine("            override val provides: Set<String> = ${entry.provides.toStringSetLiteral()}")
         }
@@ -176,6 +212,25 @@ internal const val PROVIDER_SUFFIX = "Provider"
 internal fun providerFqn(packageName: String, objectName: String): String =
     if (packageName.isEmpty()) "$objectName$PROVIDER_SUFFIX" else "$packageName.$objectName$PROVIDER_SUFFIX"
 
+/**
+ * The declaration as a constructor call naming only what was said.
+ *
+ * Named arguments and zeroes left out, so the generated source reads as the
+ * annotation did and a widget that declares one axis does not appear to have
+ * opinions about the other.
+ */
+private fun SizingArgs.toLiteral(): String {
+    val args = listOfNotNull(
+        "minWidth = $minWidth".takeIf { minWidth != 0 },
+        "minHeight = $minHeight".takeIf { minHeight != 0 },
+        "prefWidth = $prefWidth".takeIf { prefWidth != 0 },
+        "prefHeight = $prefHeight".takeIf { prefHeight != 0 },
+        "maxWidth = $maxWidth".takeIf { maxWidth != 0 },
+        "maxHeight = $maxHeight".takeIf { maxHeight != 0 },
+    )
+    return args.joinToString(prefix = "WidgetSizing(", postfix = ")")
+}
+
 private fun List<String>.toStringSetLiteral(): String =
     joinToString(prefix = "setOf(", postfix = ")") { "\"${it.kotlinEscape()}\"" }
 
@@ -183,5 +238,22 @@ private fun List<String>.toSlotIdListLiteral(): String =
     if (isEmpty()) "emptyList()"
     else joinToString(prefix = "listOf(", postfix = ")") { "SlotId(\"${it.kotlinEscape()}\")" }
 
-private fun String.kotlinEscape(): String =
-    replace("\\", "\\\\").replace("\"", "\\\"")
+/**
+ * [this] as the inside of a Kotlin string literal. Quotes and backslashes alone left
+ * a dollar sign to start a template and a line break to end the literal, so an
+ * annotation value with either generated a file the author never wrote that did
+ * not compile.
+ */
+internal fun String.kotlinEscape(): String = buildString {
+    for (c in this@kotlinEscape) {
+        when (c) {
+            '\\' -> append("\\\\")
+            '"' -> append("\\\"")
+            '$' -> append("\\$")
+            '\n' -> append("\\n")
+            '\r' -> append("\\r")
+            '\t' -> append("\\t")
+            else -> append(c)
+        }
+    }
+}

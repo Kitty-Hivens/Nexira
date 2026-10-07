@@ -4,6 +4,7 @@ import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 
@@ -21,6 +22,12 @@ enum class ShellChord {
     /** Escape -- back out of widget edit mode. Only claimed while an editor is open,
      *  so every dialog and popup keeps its own Escape the rest of the time. */
     ExitEditor,
+
+    /** Ctrl+Z -- take back the last edit. Claimed only while an editor is open. */
+    UndoEdit,
+
+    /** Ctrl+Shift+Z -- put back what an undo took. Same gate as [UndoEdit]. */
+    RedoEdit,
 }
 
 /**
@@ -52,6 +59,7 @@ fun resolveShellChord(event: KeyEvent, debugOverlayAvailable: Boolean, editing: 
     resolveChord(
         key = event.key,
         ctrl = event.isCtrlPressed,
+        shift = event.isShiftPressed,
         released = event.type == KeyEventType.KeyUp,
         debugOverlayAvailable = debugOverlayAvailable,
         editing = editing,
@@ -69,6 +77,9 @@ fun resolveShellChord(event: KeyEvent, debugOverlayAvailable: Boolean, editing: 
 internal fun resolveChord(
     key: Key,
     ctrl: Boolean,
+    // Only one chord reads it, so the callers that predate it say what they meant
+    // by leaving it out rather than by repeating `shift = false` eight times.
+    shift: Boolean = false,
     released: Boolean,
     debugOverlayAvailable: Boolean,
     editing: Boolean,
@@ -79,5 +90,13 @@ internal fun resolveChord(
         ChordResolution(ShellChord.ToggleDebugOverlay.takeIf { released }, consume = true)
     editing && !ctrl && key == Key.Escape ->
         ChordResolution(ShellChord.ExitEditor.takeIf { released }, consume = true)
+    // Gated on [editing] for the reason Escape is: Ctrl+Z belongs to whatever a
+    // person is typing in the rest of the time, and taking it at window scope
+    // would take it from every field in the launcher.
+    editing && ctrl && key == Key.Z ->
+        ChordResolution(
+            (if (shift) ShellChord.RedoEdit else ShellChord.UndoEdit).takeIf { released },
+            consume = true,
+        )
     else -> ChordResolution.Ignored
 }

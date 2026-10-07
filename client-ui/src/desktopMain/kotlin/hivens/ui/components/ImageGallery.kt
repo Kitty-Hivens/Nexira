@@ -62,14 +62,15 @@ import coil3.request.ImageRequest
 import coil3.size.Size
 import hivens.ui.icons.IconKey
 import hivens.core.api.catalogue.CatalogueGalleryItem
+import hivens.core.api.dto.modrinth.ModrinthGalleryImage
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.surface.NxSurface
-import hivens.ui.surface.NxSurfaceLevel
+import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.Motion
-import hivens.ui.theme.NxTheme
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
+import hivens.ui.theme.NxInk
 
 /**
  * One gallery item: a still [Image] or a [Video]. The strip shows the light
@@ -127,6 +128,34 @@ fun galleryMedia(items: List<CatalogueGalleryItem>): List<GalleryMedia> =
             )
         }
     }
+
+/**
+ * A catalogue project's gallery as [GalleryMedia].
+ *
+ * The same furniture a pack's gallery uses, because it is the same thing: a strip
+ * of shots with captions, a lightbox behind it. A second gallery written for mods
+ * would be a second set of cell sizes, a second lightbox and a second answer to
+ * what happens when an author uploaded no captions.
+ *
+ * Featured shots come first. Modrinth returns them in upload order with a flag,
+ * and the flag is the author saying which one to look at.
+ *
+ * Every entry is an image: the catalogue's gallery uploads are stills, so unlike
+ * the mirror's there is no video case to classify.
+ */
+fun modrinthGalleryMedia(images: List<ModrinthGalleryImage>): List<GalleryMedia> =
+    images
+        .sortedByDescending { it.featured }
+        .map {
+            GalleryMedia.Image(
+                thumb = it.url,
+                // The thumbnail is ~350px and upscales to mush at full-window size,
+                // so the lightbox gets the original where there is one.
+                full = it.rawUrl?.takeIf { raw -> raw.isNotBlank() } ?: it.url,
+                title = it.title,
+                description = it.description,
+            )
+        }
 
 /**
  * The narrowest a screenshot cell is allowed to get before the grid drops a
@@ -235,10 +264,8 @@ private fun GalleryCell(item: GalleryMedia, modifier: Modifier, onClick: () -> U
     // shape, so a rounded cell lit up as a square with its corners filled in.
     val interaction = remember { MutableInteractionSource() }
     NxSurface(
-        level    = NxSurfaceLevel.Raised,
+        kind     = SurfaceKind.Card,
         shape    = shape,
-        // No blur behind a cell that is about to be covered by a photograph.
-        blurDp   = 0f,
         interactionSource = interaction,
         modifier = modifier
             .fillMaxHeight()
@@ -284,7 +311,7 @@ private fun GalleryCell(item: GalleryMedia, modifier: Modifier, onClick: () -> U
                         Text(
                             it,
                             style      = MaterialTheme.typography.titleSmall,
-                            color      = NxTheme.colors.textPrimary,
+                            color      = NxInk.main,
                             fontWeight = FontWeight.SemiBold,
                             maxLines   = 1,
                             overflow   = TextOverflow.Ellipsis,
@@ -294,7 +321,7 @@ private fun GalleryCell(item: GalleryMedia, modifier: Modifier, onClick: () -> U
                         Text(
                             it,
                             style    = MaterialTheme.typography.bodySmall,
-                            color    = NxTheme.colors.textSecondary,
+                            color    = NxInk.quiet,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
                         )

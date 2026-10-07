@@ -24,6 +24,9 @@ import org.slf4j.LoggerFactory
  * notifications (download done, update ready) have a home.
  *
  * Lifecycle: [init] once after Koin + strings are ready; [shutdown] on exit.
+ * The two run against each other on a shell restart after a crash, the old
+ * composition shutting down while the new one starts, and they are ordered the
+ * way the tray orders its own (see [lifecycle]).
  * No-throw: a missing notification daemon degrades to "no banner", never a
  * crash -- [isSupported] stays false and [notifyTrayHint] returns false.
  */
@@ -31,13 +34,30 @@ object SystemNotifier {
 
     private val logger = LoggerFactory.getLogger("SystemNotifier")
 
-    enum class State { NOT_STARTED, READY, FAILED }
+    enum class State { NOT_STARTED, INITIALIZING, READY, FAILED }
 
     @Volatile
     private var state: State = State.NOT_STARTED
 
-    private var notifier: Notifier? = null
-    private var unsubscribe: (() -> Unit)? = null
+    @Volatile private var notifier: Notifier? = null
+    @Volatile private var unsubscribe: (() -> Unit)? = null
+
+    /**
+     * Installing a notifier and taking it down happen under this, and [generation]
+     * says whether the install still stands, as in the tray controller.
+     *
+     * Creating one reaches the notification daemon and runs outside the lock, and
+     * the state used to stay NOT_STARTED while it did. A shutdown landing in the
+     * middle cleared the fields that init then filled, and a second init started
+     * its own connection over the first: either way a D-Bus connection and its
+     * event subscription stayed open for the rest of the process with nothing
+     * left to close them.
+     */
+    private val lifecycle = Any()
+    private var generation = 0
+
+    /** How a notifier is made. A seam for tests, which cannot reach a daemon. */
+    internal var factory: (NotifierConfig) -> Notifier? = { Notifier.create(it) }
 
     /**
      * Restore-the-window callback, fired when the user clicks the hint banner
@@ -62,30 +82,41 @@ object SystemNotifier {
      * @param iconBytes App icon (PNG) used as the notification image.
      */
     fun init(appName: String, appId: String, iconBytes: ByteArray) {
-        if (state != State.NOT_STARTED) return
+        val mine = synchronized(lifecycle) {
+            if (state != State.NOT_STARTED) return
+            state = State.INITIALIZING
+            generation
+        }
         try {
-            val n = Notifier.create(
+            val n = factory(
                 NotifierConfig(appName = appName, appId = appId, defaultIconBytes = iconBytes),
             ) ?: run {
                 logger.info("libnotify Notifier.create returned null -- no notification daemon on this session")
-                state = State.FAILED
+                synchronized(lifecycle) { if (generation == mine) state = State.FAILED }
                 return
             }
-            notifier = n
-            unsubscribe = n.onEvent { event ->
-                when (event) {
-                    // A click on the banner body, or on the "Show window" action,
-                    // both mean "bring the launcher back".
-                    is NotificationEvent.Activated -> onShowWindow?.invoke()
-                    is NotificationEvent.ActionInvoked ->
-                        if (event.actionId == ACTION_SHOW) onShowWindow?.invoke()
-                    is NotificationEvent.Dismissed -> Unit
+            synchronized(lifecycle) {
+                if (generation != mine) {
+                    // Shut down while the daemon was being reached: this one is nobody's.
+                    runCatching { n.close() }
+                    return
                 }
+                notifier = n
+                unsubscribe = n.onEvent { event ->
+                    when (event) {
+                        // A click on the banner body, or on the "Show window" action,
+                        // both mean "bring the launcher back".
+                        is NotificationEvent.Activated -> onShowWindow?.invoke()
+                        is NotificationEvent.ActionInvoked ->
+                            if (event.actionId == ACTION_SHOW) onShowWindow?.invoke()
+                        is NotificationEvent.Dismissed -> Unit
+                    }
+                }
+                state = State.READY
             }
-            state = State.READY
             logger.info("SystemNotifier initialized via libnotify (caps={})", n.capabilities)
         } catch (t: Throwable) {
-            state = State.FAILED
+            synchronized(lifecycle) { if (generation == mine) state = State.FAILED }
             logger.error("Failed to initialize SystemNotifier", t)
         }
     }
@@ -112,11 +143,14 @@ object SystemNotifier {
     }
 
     fun shutdown() {
-        runCatching { unsubscribe?.invoke() }
-        runCatching { notifier?.close() }
-        notifier = null
-        unsubscribe = null
-        onShowWindow = null
-        state = State.NOT_STARTED
+        synchronized(lifecycle) {
+            generation++
+            runCatching { unsubscribe?.invoke() }
+            runCatching { notifier?.close() }
+            notifier = null
+            unsubscribe = null
+            onShowWindow = null
+            state = State.NOT_STARTED
+        }
     }
 }

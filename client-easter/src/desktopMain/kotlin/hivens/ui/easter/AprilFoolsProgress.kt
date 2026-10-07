@@ -7,7 +7,7 @@ import kotlin.random.Random
  *
  * Usage: replace every `progressUI` lambda value with
  *   AprilFoolsProgress.wrap(current, total)
- * before passing to [hivens.ui.components.LaunchControlPanel].
+ * before it reaches whatever draws the bar.
  *
  * On April Fools, ~15% of progress ticks will subtract a small random amount
  * instead of advancing -- the bar visually crawls backwards for a moment.
@@ -35,6 +35,13 @@ object AprilFoolsProgress {
         }
  
         val real = downloaded.toFloat() / total
+        // A finished download reads as finished. The lerp only closes a quarter of
+        // the gap per tick and the ticks stop at completion, so the bar always
+        // stopped short of full.
+        if (real >= 1f) {
+            displayProgress = 0f
+            return 1f
+        }
  
         // 15% chance to regress display by a small random step
         displayProgress = if (Random.nextFloat() < 0.15f) {

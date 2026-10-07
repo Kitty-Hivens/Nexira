@@ -70,15 +70,21 @@ internal fun Modifier.dragSelect(
             // A press that lifts before the hold threshold is a tap. It picks only
             // while a selection is running: outside one it belongs to whatever the
             // row itself does with a click.
-            val liftedEarly = try {
+            //
+            // Three endings, not two. waitForUpOrCancellation answers null when the
+            // gesture is cancelled, which is what the list does when it takes the
+            // drag to scroll, and reading that as a tap toggled the row the finger
+            // started on while the person was only scrolling past it.
+            var held = false
+            val up = try {
                 withTimeout(viewConfiguration.longPressTimeoutMillis) { waitForUpOrCancellation() }
-                true
             } catch (_: PointerEventTimeoutCancellationException) {
-                false
+                held = true
+                null
             }
 
-            if (liftedEarly) {
-                if (currentSelecting) {
+            if (!held) {
+                if (up != null && currentSelecting) {
                     indexAt(listState, down.position)?.let { index ->
                         currentKeyAt(index)?.let { key -> currentSetSelected(key, !currentIsSelected(key)) }
                     }

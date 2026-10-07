@@ -3,30 +3,49 @@ package hivens.ui.editor
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import hivens.ui.layout.LayoutGraphRepository
-import hivens.widget.model.CanvasPlacement
-import hivens.widget.model.GridCell
+import hivens.ui.screens.custom.ScreenIcons
+import hivens.ui.screens.custom.DeletedScreen
+import hivens.ui.screens.custom.ScreenLinks
+import hivens.ui.screens.custom.ScreenTrash
+import hivens.widget.model.FlowSpec
+import hivens.widget.model.GRID_MAX
+import hivens.widget.model.LayoutGraph
+import hivens.widget.model.Placement
 import hivens.widget.model.SlotContent
 import hivens.widget.model.SlotId
-import hivens.widget.model.SlotOrientation
 import hivens.widget.model.SlotPath
 import hivens.widget.model.SurfaceId
+import hivens.widget.model.SurfaceInsets
+import hivens.widget.model.ScreenSpec
 import hivens.widget.model.SurfaceSpec
+import hivens.widget.model.addScreen
+import hivens.widget.model.removeScreen
+import hivens.widget.model.updateScreen
+import hivens.widget.model.ViewportSpec
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
 import hivens.widget.model.insertWidget
 import hivens.widget.model.moveWidget
-import hivens.widget.model.placeWidgetInCell
+import hivens.widget.model.placeWidgetInGrid
 import hivens.widget.model.removeWidget
 import hivens.widget.model.reorderInSlot
-import hivens.widget.model.resizeWidgetInCell
-import hivens.widget.model.setGridColumns
-import hivens.widget.model.setSlotOrientation
+import hivens.widget.model.resizeWidgetInGrid
+import hivens.widget.model.setFlow
+import hivens.widget.model.setGrid
+import hivens.widget.model.setViewport
+import hivens.widget.model.setWidgetAnchor
+import hivens.widget.model.setWidgetBounds
 import hivens.widget.model.setWidgetOffset
+import hivens.widget.model.setWidgetPadding
+import hivens.widget.model.setWidgetPinned
 import hivens.widget.model.setWidgetSize
 import hivens.widget.model.setWidgetZ
 import hivens.widget.model.traverse
 import hivens.widget.model.updateWidgetSurface
+import hivens.widget.model.updateWidgetMotion
+import hivens.widget.model.WidgetMotion
 import hivens.widget.model.updateWidgetProps
+import hivens.widget.model.withScreensFrom
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -56,6 +75,62 @@ class EditModeController(
     // serializes dispatch; the repo's own debounced file write stays on [scope].
     @OptIn(ExperimentalCoroutinesApi::class)
     private val writeDispatcher = Dispatchers.Default.limitedParallelism(1)
+
+    // Every edit passes through here, so this is where it can be taken back.
+    // Touched only from [writeDispatcher], which is single-threaded, so the
+    // deques inside need no locking of their own.
+    private val history = EditHistory()
+
+    // What the history holds, mirrored into snapshot state so a toolbar can grey
+    // its buttons. The deques themselves stay on the write thread: a Compose read
+    // of an ArrayDeque being mutated elsewhere is a race the UI would lose rarely
+    // and confusingly.
+    private val _canUndo = mutableStateOf(false)
+    private val _canRedo = mutableStateOf(false)
+    val canUndo: Boolean get() = _canUndo.value
+    val canRedo: Boolean get() = _canRedo.value
+
+    /**
+     * One edit: what the graph was, the change, and the note that it happened.
+     *
+     * [key] groups a run of writes into one step a person can take back. Per
+     * widget and per axis for the geometry ones, which fire on every frame of a
+     * drag; null for a structural change, which is one thing somebody did and
+     * never merges with the next.
+     */
+    private suspend fun edit(
+        key: String?,
+        validate: Boolean = true,
+        transform: (LayoutGraph) -> LayoutGraph,
+    ) {
+        val before = repo.value()
+        repo.update(validate, transform)
+        history.record(key, before, repo.value())
+        publishHistory()
+    }
+
+    private fun publishHistory() {
+        _canUndo.value = history.canUndo
+        _canRedo.value = history.canRedo
+    }
+
+    /** Steps back to the graph before the last edit. Nothing to undo is a no-op. */
+    fun undo() {
+        scope.launch(writeDispatcher) {
+            val previous = history.undo(repo.value()) ?: return@launch
+            repo.update { previous }
+            publishHistory()
+        }
+    }
+
+    /** Steps forward again, until the next edit branches away from it. */
+    fun redo() {
+        scope.launch(writeDispatcher) {
+            val next = history.redo(repo.value()) ?: return@launch
+            repo.update { next }
+            publishHistory()
+        }
+    }
 
     // Window-level Ctrl+E increments this tick. The EditorSurfaceHost
     // observes it via snapshotFlow and flips its own edit state. The
@@ -116,16 +191,16 @@ class EditModeController(
     // happens at the editor layer because the LayoutGraph layer
     // intentionally rejects undeclared slots (no auto-create), so
     // typo-protection stays at the model boundary.
-    // `canvas` seeds an initial CanvasPlacement so a palette drop onto a
-    // Canvas slot is born at the drop point (and at a concrete size) rather
-    // than flashing at (0,0) and recomposing. Null for flow slots.
+    // `placement` seeds an initial position so a palette drop onto a placement
+    // slot is born at the drop point (and at a concrete size) rather than
+    // flashing at the origin and recomposing. Null for flow slots, which derive
+    // the position from the order instead.
     fun addWidget(
         path: SlotPath,
         kind: WidgetKind,
         slots: List<SlotId>,
         index: Int,
-        canvas: CanvasPlacement? = null,
-        surface: SurfaceSpec? = null,
+        placement: Placement? = null,
     ) {
         scope.launch(writeDispatcher) {
             val children = if (slots.isEmpty()) {
@@ -137,20 +212,17 @@ class EditModeController(
                 kind       = kind,
                 instanceId = newInstanceId(),
                 children   = children,
-                canvas     = canvas,
-                // The widget's own declared plane, so one dropped from the palette
-                // looks like the one the bundled layout places. Editable from the
-                // moment it lands, because it is written onto the instance rather
-                // than consulted behind it.
-                surface    = surface,
+                placement  = placement,
+                // No plane of its own: the widget's declared one is read through
+                // resolveSurface until somebody edits it, as for a bundled widget.
             )
-            repo.update { it.insertWidget(path, widget, index) }
+            edit(key = null) { it.insertWidget(path, widget, index) }
         }
     }
 
     fun removeWidget(path: SlotPath, instanceId: String) {
         scope.launch(writeDispatcher) {
-            repo.update { it.removeWidget(path, instanceId) }
+            edit(key = null) { it.removeWidget(path, instanceId) }
         }
     }
 
@@ -160,7 +232,30 @@ class EditModeController(
     // defaults.
     fun updateProps(path: SlotPath, instanceId: String, props: JsonObject) {
         scope.launch(writeDispatcher) {
-            repo.update { it.updateWidgetProps(path, instanceId, props) }
+            // Keyed per widget: a slider in the prop panel emits while it is
+            // dragged, and taking that back is one step, not forty.
+            edit(key = "props:$instanceId") { it.updateWidgetProps(path, instanceId, props) }
+        }
+    }
+
+    // Changes a widget's props from what they are at the moment the change is
+    // applied, read inside the serialized update. The prop panel and a region's own
+    // collapse toggle both write here; handing over a whole object built from what
+    // each had last seen, either one put back what the other had changed between
+    // that read and its write. [historyKey] folds a run of writes to one field, a
+    // dragged slider, into one undo step without folding in a different control.
+    fun updatePropsFrom(
+        path: SlotPath,
+        instanceId: String,
+        historyKey: String,
+        transform: (stored: JsonObject) -> JsonObject,
+    ) {
+        scope.launch(writeDispatcher) {
+            edit(key = "props:$instanceId:$historyKey") { g ->
+                val stored = g.traverse(path)?.widgets?.firstOrNull { it.instanceId == instanceId }?.props
+                    ?: return@edit g
+                g.updateWidgetProps(path, instanceId, transform(stored))
+            }
         }
     }
 
@@ -168,69 +263,139 @@ class EditModeController(
     // transform, so it never bloats the file.
     fun updateSurface(path: SlotPath, instanceId: String, surface: SurfaceSpec?) {
         scope.launch(writeDispatcher) {
-            repo.update { it.updateWidgetSurface(path, instanceId, surface) }
+            edit(key = "surface:$instanceId") { it.updateWidgetSurface(path, instanceId, surface) }
+        }
+    }
+
+    // The instance's own arrival. One that says nothing normalizes to null.
+    fun updateMotion(path: SlotPath, instanceId: String, motion: WidgetMotion?) {
+        scope.launch(writeDispatcher) {
+            edit(key = "motion:$instanceId") { it.updateWidgetMotion(path, instanceId, motion) }
         }
     }
 
     fun reorderInSlot(path: SlotPath, fromIndex: Int, toIndex: Int) {
         scope.launch(writeDispatcher) {
-            repo.update { it.reorderInSlot(path, fromIndex, toIndex) }
+            edit(key = null) { it.reorderInSlot(path, fromIndex, toIndex) }
         }
     }
 
-    // Phase G slot layout. Orientation + grid columns are slot-level;
-    // widget weight is per-instance (set by the drag-dividers in G4).
-    fun setSlotOrientation(path: SlotPath, orientation: SlotOrientation) {
-        scope.launch(writeDispatcher) { repo.update { it.setSlotOrientation(path, orientation) } }
+    // Slot mode. A non-null flow derives each child's position from the order;
+    // null hands that to the children and seeds one onto any that carries none.
+    fun setFlow(path: SlotPath, flow: FlowSpec?) {
+        scope.launch(writeDispatcher) { edit(key = null) { it.setFlow(path, flow) } }
     }
 
-    // Grid column nudge. Reads the current count from the graph INSIDE the
-    // serialized update so rapid +/- clicks compose without a lost-update race; the
-    // model clamps the result to 1..GRID_COLUMNS_MAX.
-    fun nudgeGridColumns(path: SlotPath, delta: Int) {
+    // How the slot shows what does not fit. Null and a static record both clear it.
+    fun setViewport(path: SlotPath, viewport: ViewportSpec?) {
+        scope.launch(writeDispatcher) { edit(key = null) { it.setViewport(path, viewport) } }
+    }
+
+    // Nudges the line length of a wrapped flow. Reads the current value from the
+    // graph INSIDE the serialized update so rapid clicks compose without a
+    // lost-update race; the model clamps the result.
+    fun nudgeWrap(path: SlotPath, delta: Int) {
         scope.launch(writeDispatcher) {
-            repo.update { g ->
-                val current = g.traverse(path)?.gridColumns ?: SlotContent().gridColumns
-                g.setGridColumns(path, current + delta)
+            edit(key = "wrap:$path") { g ->
+                val flow = g.traverse(path)?.flow ?: return@edit g
+                g.setFlow(path, flow.copy(wrap = (flow.wrap + delta).coerceIn(0, GRID_MAX)))
             }
         }
     }
 
-    // Canvas free-placement (orientation == Canvas): offset + size in dp,
-    // z = paint order. Each composes through the model's updateCanvas, so
-    // offset / size / z edits do not clobber one another mid-drag.
+    // Nudges the lattice a placement slot measures in. 0 is free placement, so
+    // stepping down to it is how a lattice becomes a plain canvas again.
+    fun nudgeGrid(path: SlotPath, delta: Int) {
+        scope.launch(writeDispatcher) {
+            edit(key = "grid:$path") { g ->
+                val current = g.traverse(path)?.grid ?: SlotContent().grid
+                g.setGrid(path, current + delta)
+            }
+        }
+    }
+
+    // Placement: offset and size in the slot's own unit, plus anchor and paint
+    // order. Each composes through the model's updatePlacement, so the five do
+    // not clobber one another mid-drag. The geometry ones skip the tree-wide
+    // uniqueness sweep: they fire per drag frame and cannot mint an id.
     fun setWidgetOffset(path: SlotPath, instanceId: String, x: Float, y: Float) {
-        scope.launch(writeDispatcher) { repo.update(validate = false) { it.setWidgetOffset(path, instanceId, x, y) } }
+        scope.launch(writeDispatcher) {
+            edit("offset:$instanceId", validate = false) { it.setWidgetOffset(path, instanceId, x, y) }
+        }
     }
 
     fun setWidgetSize(path: SlotPath, instanceId: String, width: Float, height: Float) {
-        scope.launch(writeDispatcher) { repo.update(validate = false) { it.setWidgetSize(path, instanceId, width, height) } }
-    }
-
-    fun setWidgetZ(path: SlotPath, instanceId: String, z: Int) {
-        scope.launch(writeDispatcher) { repo.update(validate = false) { it.setWidgetZ(path, instanceId, z) } }
-    }
-
-    // Cube grid (orientation == CubeGrid): re-anchor a widget to a target cell
-    // (keeping its span) or resize its span (keeping its anchor). placeWidgetInCell
-    // resolves collisions (pushes the overlapped widgets down) and compacts the
-    // grid, so the whole layout reflows in one transform.
-    fun moveWidgetToCell(path: SlotPath, instanceId: String, col: Int, row: Int, columns: Int) {
         scope.launch(writeDispatcher) {
-            repo.update { g ->
-                val cur = g.traverse(path)?.widgets?.firstOrNull { it.instanceId == instanceId }?.cell ?: GridCell()
-                g.placeWidgetInCell(path, instanceId, cur.copy(col = col, row = row), columns)
+            edit("size:$instanceId", validate = false) { it.setWidgetSize(path, instanceId, width, height) }
+        }
+    }
+
+    // Outer spacing around the widget, set from the panel's sliders. Keyed like the
+    // other geometry writes so a slider drag coalesces into one history entry.
+    fun setWidgetPadding(path: SlotPath, instanceId: String, padding: SurfaceInsets) {
+        scope.launch(writeDispatcher) {
+            edit("padding:$instanceId", validate = false) { it.setWidgetPadding(path, instanceId, padding) }
+        }
+    }
+
+    /**
+     * Offset and size together, which is what dragging a leading edge changes.
+     *
+     * One key, so a resize is one step in the history. As two calls it was two
+     * keys alternating, and a run whose key changes every frame coalesces into
+     * nothing: every frame of the drag would have been its own undo.
+     */
+    fun setWidgetBounds(path: SlotPath, instanceId: String, x: Float, y: Float, width: Float, height: Float) {
+        scope.launch(writeDispatcher) {
+            edit("bounds:$instanceId", validate = false) {
+                it.setWidgetBounds(path, instanceId, x, y, width, height)
             }
         }
     }
 
-    fun resizeWidgetCell(path: SlotPath, instanceId: String, colSpan: Int, rowSpan: Int, columns: Int) {
-        scope.launch(writeDispatcher) { repo.update { it.resizeWidgetInCell(path, instanceId, colSpan, rowSpan, columns) } }
+    // Held in place while the slot scrolls or is moved, or let go.
+    fun setWidgetPinned(path: SlotPath, instanceId: String, pinned: Boolean) {
+        scope.launch(writeDispatcher) { edit(key = null) { it.setWidgetPinned(path, instanceId, pinned) } }
     }
 
-    fun moveWidget(from: SlotPath, to: SlotPath, instanceId: String, toIndex: Int) {
+    fun setWidgetZ(path: SlotPath, instanceId: String, z: Int) {
         scope.launch(writeDispatcher) {
-            repo.update { it.moveWidget(from, to, instanceId, toIndex) }
+            edit("z:$instanceId", validate = false) { it.setWidgetZ(path, instanceId, z) }
+        }
+    }
+
+    fun setWidgetAnchor(path: SlotPath, instanceId: String, anchor: String) {
+        scope.launch(writeDispatcher) { edit(key = null) { it.setWidgetAnchor(path, instanceId, anchor) } }
+    }
+
+    // Lattice move and resize: re-anchor a widget to a target cell keeping its
+    // span, or grow its span keeping its anchor. Neither moves anybody else. A
+    // target that collides snaps to the nearest free cell and a span that would
+    // overlap is clamped, because this is a snap grid over free placement and
+    // not a packer -- gaps are allowed and stay where the user left them.
+    fun moveWidgetInGrid(path: SlotPath, instanceId: String, col: Int, row: Int, columns: Int) {
+        scope.launch(writeDispatcher) {
+            edit("gridmove:$instanceId", validate = false) { g ->
+                val cur = g.traverse(path)?.widgets?.firstOrNull { it.instanceId == instanceId }?.placement
+                    ?: Placement()
+                g.placeWidgetInGrid(path, instanceId, cur.copy(x = col.toFloat(), y = row.toFloat()), columns)
+            }
+        }
+    }
+
+    fun resizeWidgetInGrid(path: SlotPath, instanceId: String, colSpan: Int, rowSpan: Int, columns: Int) {
+        scope.launch(writeDispatcher) {
+            // Same reason the four above skip it: this one fires inside a drag loop,
+            // and a tree-wide walk per frame is what the flag was added to avoid.
+            edit("gridsize:$instanceId", validate = false) {
+                it.resizeWidgetInGrid(path, instanceId, colSpan.toFloat(), rowSpan.toFloat(), columns)
+            }
+        }
+    }
+
+    fun moveWidget(from: SlotPath, to: SlotPath, instanceId: String, toIndex: Int, staysOnSurface: Boolean = false) {
+        scope.launch(writeDispatcher) {
+            edit(key = null) { it.moveWidget(from, to, instanceId, toIndex, staysOnSurface) }
         }
     }
 
@@ -238,15 +403,100 @@ class EditModeController(
     // when a non-removable widget ends up out-of-place, or the user
     // wants to undo a chain of edits on one surface without nuking
     // their whole layout.
+    //
+    // Recorded like any other edit, and that is the point: going back to the
+    // default is the move somebody makes when the arrangement has got away from
+    // them, and it should not be the one thing they cannot take back.
     fun resetSurface(surface: SurfaceId) {
         scope.launch(writeDispatcher) {
+            val before = repo.value()
             repo.resetSurface(surface)
+            history.record(key = null, before = before, after = repo.value())
+            publishHistory()
         }
     }
 
-    // Full reset to the bundled default across every surface.
+    // Full reset to the bundled default across every surface. The screens somebody
+    // made survive it, and so does the way to them: the rail comes back as bundled,
+    // so each one's link is put back on it.
     fun resetAll() {
-        scope.launch(writeDispatcher) { repo.resetAll() }
+        scope.launch(writeDispatcher) {
+            val before = repo.value()
+            repo.resetAll()
+            repo.update { ScreenLinks.ensureLinks(it) }
+            history.record(key = null, before = before, after = repo.value())
+            publishHistory()
+        }
+    }
+
+    /**
+     * Puts a saved arrangement in place of the current one.
+     *
+     * The same two promises a full reset keeps, for the same reason: the screens
+     * somebody made stay, content and all, and the rail keeps a way to each. A
+     * saved arrangement knows nothing of a screen made after it was saved, and
+     * loaded as it stood it deleted that screen, and the widget state behind its
+     * notes went with the next sweep. Recorded like a reset, so loading the wrong
+     * one is a step back rather than a loss.
+     */
+    fun loadArrangement(saved: LayoutGraph) {
+        scope.launch(writeDispatcher) {
+            edit(key = null) { current -> ScreenLinks.ensureLinks(saved.withScreensFrom(current)) }
+        }
+    }
+
+    /**
+     * Changes the arrangement as a whole by [arrange], a shipped arrangement laid
+     * over some of the surfaces. One step in the history, like any other edit.
+     */
+    fun rearrange(arrange: (LayoutGraph) -> LayoutGraph) {
+        scope.launch(writeDispatcher) { edit(key = null, transform = arrange) }
+    }
+
+    // ── Screens somebody made ──────────────────────────────────────────
+
+    /**
+     * Makes a screen called [title] with a blank, static page and a link at the
+     * bottom of the rail. Returns the record at once, before the write lands, so
+     * the caller can wait for it to appear and open it.
+     */
+    fun createScreen(title: String, icon: String = ScreenIcons.DEFAULT): ScreenSpec {
+        val id = newInstanceId()
+        val spec = ScreenSpec(id = id, title = title, icon = icon, surface = SurfaceId("screen.$id"))
+        scope.launch(writeDispatcher) {
+            edit(key = null) { ScreenLinks.ensureLink(it.addScreen(spec), spec) }
+        }
+        return spec
+    }
+
+    /** Renames a made screen or changes its icon. Null leaves that half as it is. */
+    fun updateScreen(id: String, title: String? = null, icon: String? = null) {
+        scope.launch(writeDispatcher) {
+            // Keyed, so typing a name is one step back and not one per letter.
+            edit(key = "screen:$id") { g ->
+                g.updateScreen(id) { it.copy(title = title ?: it.title, icon = icon ?: it.icon) }
+            }
+        }
+    }
+
+    /**
+     * Deletes a made screen, what was on it, and every link to it. [onDeleted] hears
+     * what was deleted, as it stood, for putting it back with [restoreScreen].
+     */
+    internal fun deleteScreen(id: String, onDeleted: (DeletedScreen) -> Unit = {}) {
+        scope.launch(writeDispatcher) {
+            var gone: DeletedScreen? = null
+            edit(key = null) { g ->
+                gone = ScreenTrash.capture(g, id)
+                ScreenLinks.removeLinks(g.removeScreen(id), id)
+            }
+            gone?.let(onDeleted)
+        }
+    }
+
+    /** Puts a deleted screen back as it stood, links included. */
+    internal fun restoreScreen(deleted: DeletedScreen) {
+        scope.launch(writeDispatcher) { edit(key = null) { ScreenTrash.restore(it, deleted) } }
     }
 
     // UUID minting on palette drop. Matches NotificationCenter.kt's

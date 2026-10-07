@@ -2,11 +2,8 @@ package hivens.launcher
 
 import hivens.core.api.interfaces.IJavaManager
 import hivens.core.api.interfaces.ILauncherService
-import hivens.core.api.model.ServerProfile
 import hivens.core.data.CachedManifestSnapshot
-import hivens.core.data.FileManifest
 import hivens.core.data.HeapProfile
-import hivens.core.data.InstanceProfile
 import hivens.core.data.InstanceRuntime
 import hivens.core.data.LauncherLogType
 import hivens.core.data.RuntimePrefs
@@ -17,10 +14,16 @@ import hivens.core.jvm.SystemMemory
 import hivens.core.launch.LaunchError
 import hivens.core.launch.LaunchHandle
 import hivens.core.launch.SpawnResult
-import hivens.launcher.component.ClasspathProvider
+import hivens.core.logging.Redactor
+import hivens.launcher.component.EarlyLoadingScreen
 import hivens.launcher.component.EnvironmentPreparer
 import hivens.launcher.component.GameCommandBuilder
+import hivens.launcher.component.JvmHeapArgs
 import hivens.launcher.component.ProcessLogHandler
+import hivens.launcher.instance.ContentRef
+import hivens.launcher.instance.DependencyIssue
+import hivens.launcher.instance.InstanceContentScanner
+import hivens.launcher.instance.dependencyIssues
 import hivens.launcher.launch.PackPrepBlocked
 import hivens.launcher.runtime.RuntimeProvisioner
 import hivens.launcher.runtime.loader.ResolvedLibrary
@@ -40,16 +43,15 @@ import java.nio.file.Path
 /**
  * Implementation of the Minecraft client launch service.
  *
- * Acts as a facade, coordinating the work of [EnvironmentPreparer] (natives + assets),
- * [ClasspathProvider] (manifest -> classpath), [GameCommandBuilder] (version-specific JVM
- * command) and [ProcessLogHandler] (stdout/stderr interception). All collaborators are
- * supplied via constructor injection so that this service can be unit-tested in isolation.
+ * Acts as a facade, coordinating the work of [EnvironmentPreparer] (natives),
+ * [RuntimeProvisioner] (the loader-resolved runtime), [GameCommandBuilder] (the
+ * JVM command) and [ProcessLogHandler] (stdout/stderr interception). All
+ * collaborators are supplied via constructor injection so that this service can
+ * be unit-tested in isolation.
  */
 internal class LauncherService(
-    private val profileManager: ProfileManager,
     private val javaManager: IJavaManager,
     private val envPreparer: EnvironmentPreparer,
-    private val classpathProvider: ClasspathProvider,
     private val commandBuilder: GameCommandBuilder,
     private val logHandler: ProcessLogHandler,
     private val runtimeProvisioner: RuntimeProvisioner,
@@ -58,83 +60,11 @@ internal class LauncherService(
     private val authlibSwapper: SmrtAuthlibSwapper,
     private val sharedAssetsDir: Path,
     private val sharedLibrariesDir: Path,
+    /** Reads what is in `mods/`, for the dependency check before a spawn. */
+    private val contentScanner: InstanceContentScanner = InstanceContentScanner(),
 ) : ILauncherService {
 
     private val log = LoggerFactory.getLogger(LauncherService::class.java)
-
-    /**
-     * Launches a client with log interception.
-     *
-     * @see [ILauncherService.launchClientWithLogs]
-     */
-    @Deprecated("Retires with the SmartyCraft server list (#318); see the interface for what replaces it.")
-    override suspend fun launchClientWithLogs(
-        sessionData: SessionData,
-        serverProfile: ServerProfile,
-        clientRootPath: Path,
-        javaExecutablePath: Path,
-        adaptiveEnabled: Boolean,
-        onLog: (String, LauncherLogType) -> Unit
-    ): SpawnResult = try {
-        val profile: InstanceProfile = profileManager.getProfile(serverProfile.assetDir)
-        val version = serverProfile.version
-
-        // 1. Heap: pinned -> explicit value; else the machine-aware Automatic baseline,
-        // which the adaptive sizer refines from when it is on.
-        val adaptive = resolveAdaptive(
-            enabled = adaptiveApplies(adaptiveEnabled, profile.fixedMemory),
-            instanceDir = clientRootPath,
-            baseMemoryMb = baselineMemory(profile.fixedMemory, profile.memoryMb, SystemMemory.totalPhysicalMb()),
-        )
-        val memory = adaptive.memoryMb
-
-        // 2. Determining the path to Java
-        val javaExec: String = resolveJavaPath(javaManager, profile, javaExecutablePath, version)
-
-        log.info("Session initialization: {}, Java: {}, Heap: {}MB", serverProfile.name, javaExec, memory)
-        onLog("Running ${serverProfile.name}...", LauncherLogType.INFO)
-
-        // 3. Preparation of native libraries and assets
-        val nativesDir = commandBuilder.getNativesDir(version)
-        envPreparer.prepareNatives(clientRootPath, nativesDir, version)
-        envPreparer.prepareAssets(clientRootPath, "assets-$version.zip")
-
-        // 4. Classpath assembly
-        val manifest = sessionData.fileManifest ?: FileManifest()
-        val excludedModules = emptyList<String>()
-        val classpath = classpathProvider.buildClasspath(clientRootPath, manifest, excludedModules)
-
-        // 5. Assembling the launch command
-        val command = commandBuilder.build(
-            javaExec, memory, clientRootPath,
-            serverProfile, sessionData, profile,
-            classpath,
-            agentJarPath = adaptive.agentJar,
-            metricsOutPath = adaptive.metricsOut,
-        )
-
-        // The SC server list is server-bound by construction -- every launch on it
-        // presents a session to someone's server.
-        SpawnResult.Started(ProcessLaunchHandle(spawnProcess(command, clientRootPath, boundLaunch = true, onLog = onLog)))
-    } catch (e: CancellationException) {
-        throw e
-    } catch (e: Exception) {
-        log.error("Launch failed for {}", serverProfile.name, e)
-        SpawnResult.Failed(LaunchError.Internal(e.message ?: ""))
-    }
-
-    @Deprecated("Retires with the SmartyCraft server list (#318); see the interface for what replaces it.")
-    override suspend fun launchClient(
-        sessionData: SessionData,
-        serverProfile: ServerProfile,
-        clientRootPath: Path,
-        javaExecutablePath: Path,
-    ): SpawnResult {
-        return launchClientWithLogs(
-            sessionData, serverProfile, clientRootPath, javaExecutablePath,
-            adaptiveEnabled = false,
-        ) { _, _ -> /* Logs are ignored */ }
-    }
 
     override suspend fun launchPackClient(
         sessionData: SessionData,
@@ -153,9 +83,14 @@ internal class LauncherService(
     ): SpawnResult = try {
         val mcVersion = manifest.minecraftVersion
         val scBound = manifest.authRequirement?.scServerId != null
+        // Whether this launch can join the server it is bound to at all. An offline
+        // session carries no token, so there is no join for either mechanism below to
+        // steer, and requiring one turned a launch that could still reach
+        // singleplayer into a refused one.
+        val joins = joinsBoundServer(scBound, sessionData)
 
-        // 1. Heap: same tiering as the SC path -- pinned -> explicit value, else the
-        // machine-aware Automatic baseline that the adaptive sizer refines from.
+        // 1. Heap: pinned -> explicit value, else the machine-aware Automatic
+        // baseline that the adaptive sizer refines from.
         val adaptive = resolveAdaptive(
             enabled = adaptiveApplies(adaptiveEnabled, runtime.fixedMemory),
             instanceDir = clientRootPath,
@@ -174,7 +109,8 @@ internal class LauncherService(
             mcVersion = mcVersion,
             loaderName = manifest.loaderName,
             loaderVersion = manifest.loaderVersion,
-        ) { current, total, file -> onLog("Runtime $current/$total: $file", LauncherLogType.INFO) }
+            progress = { current, total, file -> onLog("Runtime $current/$total: $file", LauncherLogType.INFO) },
+        )
 
         // 2b. SC binding: an SC-bound pack provisions the VANILLA authlib (sends the
         // join to Mojang -> 403 for an SC token). Two mechanisms steer it back to
@@ -182,21 +118,22 @@ internal class LauncherService(
         // SC's patched authlib jar (opt-in fallback, swapped onto the classpath
         // here). No-op for Hivens-native packs. The pack's own mods (open-smrt
         // interop included) come from the sync; nothing is injected here.
+        if (scBound && !joins) {
+            onLog("Offline launch: the SmartyCraft join is not possible, so no authlib binding is applied", LauncherLogType.INFO)
+        }
         val resolved = applySmrtBinding(
             manifest, sessionData, mcVersion, baseRuntime,
-            swapAuthlib = useSmartycraftAuthLib, onLog = onLog,
+            swapAuthlib = useSmartycraftAuthLib && joins, onLog = onLog,
         )
 
         // An SC-bound join needs at least one mechanism; with neither, the vanilla
         // authlib hits Mojang and the server rejects the session. Surface it rather
-        // than spawn a guaranteed-to-fail join silently.
-        if (scBound && !useNetworkAgent && !useSmartycraftAuthLib) {
-            onLog(
-                "Neither the network agent nor the SmartyCraft authlib is enabled; the SC join will be rejected",
-                LauncherLogType.WARN,
-            )
+        // than spawn a guaranteed-to-fail join silently. Asked of what was actually
+        // produced: the agent switched on but not extracted is no mechanism either.
+        val authlibAgent = if (joins && useNetworkAgent) agentExtractor.ensureAuthlibAgent() else null
+        joinMechanismWarning(joins, useNetworkAgent, authlibAgent, useSmartycraftAuthLib)?.let {
+            onLog(it, LauncherLogType.WARN)
         }
-        val authlibAgent = if (scBound && useNetworkAgent) agentExtractor.ensureAuthlibAgent() else null
 
         // 3. Java. Major precedence: loader-resolved override -> the pack manifest's
         // own declaration (authoritative for the pack) -> Mojang's per-version field
@@ -215,7 +152,13 @@ internal class LauncherService(
             resolvePackJavaPath(runtime, defaultJava)
         }
 
-        log.info("Session initialization (pack): {}, Java: {} (major {}), Heap: {}MB", displayName, javaExec, javaMajor, memory)
+        val typedHeap = JvmHeapArgs.maxIn(runtime.jvmArgs)
+        if (typedHeap.isEmpty()) {
+            log.info("Session initialization (pack): {}, Java: {} (major {}), Heap: {}MB", displayName, javaExec, javaMajor, memory)
+        } else {
+            log.info("Session initialization (pack): {}, Java: {} (major {}), Heap: {} (typed)", displayName, javaExec, javaMajor, typedHeap)
+            onLog("Memory is set in the JVM arguments (${typedHeap.joinToString(" ")}), the memory setting does not apply", LauncherLogType.INFO)
+        }
 
         // A launch that will carry a token runs the interpreter it was given, and
         // that interpreter decides everything the command line just decided. A
@@ -226,15 +169,45 @@ internal class LauncherService(
             throw PackPrepBlocked(LaunchError.Internal("java-not-executable"))
         }
 
-        // 4. Natives stay per-instance, but are now extracted from the jars the
-        // provisioner resolved from the manifest -- so the LWJGL version matches
-        // the classpath for ANY MC version, not just the few the SC path hardcodes.
-        // Assets are the shared root the provisioner just populated.
+        // 4. Natives stay per-instance, extracted from the jars the provisioner
+        // resolved from the manifest -- so the LWJGL version matches the classpath
+        // for any MC version. Assets are the shared root the provisioner just
+        // populated.
         envPreparer.prepareNativesFromManifest(clientRootPath, nativesDir, resolved.natives, rebuild = boundLaunch)
 
+        // 4a. What the mods need and do not have, said before the game is started
+        // and never acted on. The loader refuses such a pack minutes later with a
+        // crash that names the mod only in its report, if at all.
+        warnAboutDependencies(clientRootPath, manifest.loaderName, onLog)
+
+        // 4b. FML's loading screen, set for this launch and put back when the game
+        // exits. A config that could not be written leaves the screen as the pack
+        // had it, which is a risk to this launch on Wayland but no reason to
+        // refuse it.
+        val earlyScreen = EarlyLoadingScreen.enforced(runtime.earlyLoadingScreen)
+        val restoreScreen = {
+            runCatching { EarlyLoadingScreen.restore(clientRootPath) }
+                .onFailure { log.warn("Could not put config/fml.toml back for {}", displayName, it) }
+            Unit
+        }
+        if (earlyScreen != null && EarlyLoadingScreen.configurableIn(resolved)) {
+            runCatching { EarlyLoadingScreen.prepare(clientRootPath, earlyScreen) }
+                .onSuccess { changed ->
+                    if (changed) onLog("Loader loading screen set to ${if (earlyScreen) "on" else "off"} in config/fml.toml for this launch", LauncherLogType.INFO)
+                }
+                .onFailure {
+                    log.warn("Could not set the loader loading screen for {}", displayName, it)
+                    onLog("Could not write config/fml.toml: ${it.message}", LauncherLogType.WARN)
+                }
+        } else {
+            restoreScreen()
+        }
+
         // 5. Profile-driven command: main class / classpath / args come from the
-        // resolved runtime; assets point at the shared root.
-        val command = commandBuilder.buildPackCommand(
+        // resolved runtime; assets point at the shared root. A command that cannot be
+        // built ends the launch with the loading screen config already written, so it
+        // goes back here, as it does when the spawn itself fails.
+        val command = try { commandBuilder.buildPackCommand(
             javaExec = javaExec,
             memoryMB = memory,
             gameDir = clientRootPath,
@@ -254,16 +227,35 @@ internal class LauncherService(
             windowWidth = runtime.windowWidth.takeIf { runtime.windowSizeOverride },
             windowHeight = runtime.windowHeight.takeIf { runtime.windowSizeOverride },
             fullScreen = runtime.fullScreen,
-        )
+            earlyLoadingScreen = earlyScreen,
+        ) } catch (e: Throwable) {
+            restoreScreen()
+            throw e
+        }
+
+        // The game process echoes its token back in ways no log pattern predicts:
+        // authlib logs it verbatim when it fails to read it as a JWT. Registered
+        // before the command line is logged, and released once both of the
+        // process's streams have ended, which can be after the process itself
+        // when a child it started still holds them.
+        val tokenMask = Redactor.registerSecret(sessionData.accessToken)
 
         // Last statement before the process exists: everything is provisioned,
         // the command is built, and nothing else stands between here and the
         // game reading mods/.
-        if (seal != null && !seal()) {
-            log.error("Refusing to spawn {}: the instance no longer matches the pack", displayName)
-            throw PackPrepBlocked(LaunchError.ContentChangedDuringLaunch)
+        val handle = try {
+            if (seal != null && !seal()) {
+                log.error("Refusing to spawn {}: the instance no longer matches the pack", displayName)
+                throw PackPrepBlocked(LaunchError.ContentChangedDuringLaunch)
+            }
+            ProcessLaunchHandle(spawnProcess(command, clientRootPath, boundLaunch, onLog, tokenMask::close), afterExit = restoreScreen)
+        } catch (e: Throwable) {
+            // No game will read the config, so it goes back now.
+            restoreScreen()
+            tokenMask.close()
+            throw e
         }
-        SpawnResult.Started(ProcessLaunchHandle(spawnProcess(command, clientRootPath, boundLaunch, onLog)))
+        SpawnResult.Started(handle, resolvedLoaderVersion = resolved.loaderVersion)
     } catch (e: PackPrepBlocked) {
         // SC-binding step could not complete; surface the carried reason.
         SpawnResult.Failed(e.error)
@@ -289,13 +281,10 @@ internal class LauncherService(
      * No mods are touched here. A pack carries its own mods (the open-smrt-network
      * interop included) and mod content is the sync's job, scoped to the manifest;
      * injecting a helper on top would duplicate the coremod the pack already ships.
-     * The open-smrt swap lives on the raw server-list path (SmartyModPlanner),
-     * which is the only place the proprietary Smarty jar arrives.
      *
      * The patched authlib comes from the SC session's own file manifest
      * ([SessionData.fileManifest], populated by the pre-spawn re-auth), so it is
-     * pulled from the same distribution the `clients/` cache already uses -- nothing of
-     * SC's is rehosted. Only the resolved classpath entry is rewritten; the
+     * pulled from SC's own client distribution and nothing of SC's is rehosted. Only the resolved classpath entry is rewritten; the
      * shared `libraries/` root stays vanilla (a patched jar there would hit every
      * pack of that MC version and be reverted by the provisioner's size check).
      */
@@ -323,15 +312,33 @@ internal class LauncherService(
     }
 
     /**
-     * Builds, starts, and log-attaches the game process. Both launch paths
-     * (SC server + pack) run on the caller's IO dispatcher, so the blocking
-     * ProcessBuilder.start happens on IO without an extra context switch.
+     * One warning line per requirement a mod in `mods/` has that nothing enabled
+     * meets. A scan that fails is logged and left: the check is advice, and a
+     * folder the scanner cannot read is no reason to stop the launch.
+     */
+    private suspend fun warnAboutDependencies(clientRootPath: Path, loader: String, onLog: (String, LauncherLogType) -> Unit) {
+        val issues = try {
+            dependencyIssues(contentScanner.scanMods(clientRootPath), loader)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            log.warn("Could not check the mods' dependencies in {}", clientRootPath, e)
+            return
+        }
+        for ((ref, list) in issues) for (issue in list) onLog(describeDependencyIssue(ref, issue), LauncherLogType.WARN)
+    }
+
+    /**
+     * Builds, starts, and log-attaches the game process. The launch runs on the
+     * caller's IO dispatcher, so the blocking ProcessBuilder.start happens on IO
+     * without an extra context switch.
      */
     private fun spawnProcess(
         command: List<String>,
         clientRootPath: Path,
         boundLaunch: Boolean,
         onLog: (String, LauncherLogType) -> Unit,
+        onDrained: () -> Unit,
     ): Process {
         val pb = ProcessBuilder(command)
         pb.directory(clientRootPath.toFile())
@@ -345,7 +352,7 @@ internal class LauncherService(
         }
         onLog("CMD: ${java.lang.String.join(" ", command)}", LauncherLogType.INFO)
         val process = pb.start()
-        logHandler.attach(process, onLog)
+        logHandler.attach(process, onLog, onDrained)
         return process
     }
 
@@ -400,6 +407,43 @@ internal class LauncherService(
     }
 
     internal companion object {
+        /**
+         * Whether a launch bound to a SmartyCraft server can join it: bound, and
+         * carrying a session with a token. An offline session has none to send.
+         */
+        internal fun joinsBoundServer(scBound: Boolean, session: SessionData): Boolean =
+            scBound && !session.offline && session.accessToken.isNotBlank()
+
+        /**
+         * What to tell the player when a bound join has nothing to steer it to the
+         * server's auth, or null when something does. [agentJar] is the agent as it
+         * was produced, not the setting: extraction can fail on a full or read-only
+         * disk, and the setting then still reads as covered.
+         */
+        internal fun joinMechanismWarning(
+            joins: Boolean,
+            useNetworkAgent: Boolean,
+            agentJar: Path?,
+            swapAuthlib: Boolean,
+        ): String? = when {
+            !joins || swapAuthlib || agentJar != null -> null
+            useNetworkAgent ->
+                "The network agent could not be prepared and the SmartyCraft authlib is not enabled; the SC join will be rejected"
+            else -> "Neither the network agent nor the SmartyCraft authlib is enabled; the SC join will be rejected"
+        }
+
+        /** The console line for one unmet requirement of the mod at [ref]. */
+        internal fun describeDependencyIssue(ref: ContentRef, issue: DependencyIssue): String {
+            val req = issue.requirement
+            val wanted = req.ranges.joinToString(" or ")
+            return when (issue) {
+                is DependencyIssue.Missing ->
+                    "mods/${ref.fileName} needs ${req.id}${if (wanted.isEmpty()) "" else " $wanted"}, which is not installed or is turned off"
+                is DependencyIssue.WrongVersion ->
+                    "mods/${ref.fileName} needs ${req.id} $wanted, the installed one is ${issue.installed.joinToString(", ")}"
+            }
+        }
+
         /** The vanilla `com.mojang:authlib` classpath entry in [runtime], or null if absent. */
         internal fun findAuthlibLibrary(runtime: ResolvedRuntime): ResolvedLibrary? =
             runtime.libraries.firstOrNull { it.coord.group == "com.mojang" && it.coord.artifact == "authlib" }
@@ -443,11 +487,9 @@ internal class LauncherService(
                  else AutomaticHeap.compute(systemRamMb)
 
         /**
-         * Pack-centric Java path resolution. Mirrors [resolveJavaPath]'s
-         * fallback ladder minus its managed-Java step, which the pack path
-         * has already taken: [RuntimePrefs.javaPath] wins, and without it
-         * the caller's pre-resolved [defaultPath] does (LauncherController
-         * already consulted JavaManager for the pack's Java major).
+         * Java path resolution: [RuntimePrefs.javaPath] wins, and without it
+         * the caller's pre-resolved [defaultPath] does -- the managed-Java step
+         * has already been taken by then, against the pack's declared major.
          */
         internal fun resolvePackJavaPath(
             runtime: RuntimePrefs,
@@ -455,29 +497,6 @@ internal class LauncherService(
         ): String {
             val explicit = runtime.javaPath
             if (!explicit.isNullOrEmpty()) return explicit
-            if (Files.exists(defaultPath)) return defaultPath.toString()
-            return "java"
-        }
-
-        /**
-         * Selects the appropriate Java Runtime.
-         * Priority: Profile Setup -> Managed Java ([IJavaManager]) -> System Java.
-         *
-         * Pulled into the companion (rather than instance method) so tests can
-         * exercise the full priority cascade with a fake [IJavaManager] without
-         * having to construct the rest of [LauncherService]'s collaborators.
-         */
-        internal suspend fun resolveJavaPath(
-            javaManager: IJavaManager,
-            profile: RuntimePrefs,
-            defaultPath: Path,
-            version: String
-        ): String {
-            if (!profile.javaPath.isNullOrEmpty()) return profile.javaPath!!
-            runCatching {
-                val managedPath = javaManager.getJavaPath(version)
-                if (Files.exists(managedPath)) return managedPath.toString()
-            }
             if (Files.exists(defaultPath)) return defaultPath.toString()
             return "java"
         }
@@ -491,11 +510,19 @@ internal class LauncherService(
  * `process.waitFor()` -- cancelling the launch job does not interrupt it, so
  * the orchestrator sends [terminate] first to let the wait return.
  */
-private class ProcessLaunchHandle(private val process: Process) : LaunchHandle {
+internal class ProcessLaunchHandle(
+    private val process: Process,
+    /** Runs once the game has exited, for what the launch changed only for its own duration. */
+    private val afterExit: () -> Unit = {},
+) : LaunchHandle {
     // On IO by its own doing rather than by the caller's promise: the wait is
     // unbounded, and a blocking wait that borrows whatever thread it was called on
     // is one refactor away from parking a dispatcher that had other work.
-    override suspend fun awaitExit(): Int = withContext(Dispatchers.IO) { process.waitFor() }
+    override suspend fun awaitExit(): Int = withContext(Dispatchers.IO) {
+        val code = process.waitFor()
+        afterExit()
+        code
+    }
 
     /**
      * SIGTERM, then SIGKILL if the game did not take the hint.
@@ -512,17 +539,28 @@ private class ProcessLaunchHandle(private val process: Process) : LaunchHandle {
      * click handler -- blocking there would freeze the window on exactly the
      * process that is refusing to die.
      *
-     * Descendants are taken first: killing the parent orphans them, and on Windows
-     * `destroyForcibly` does not reach them at all.
+     * Descendants are listed first, before any signal: killing the parent orphans
+     * them, an orphan is no longer among its descendants, and on Windows
+     * `destroyForcibly` does not reach them at all. They were listed only on the
+     * escalation, after the parent was gone, so a game that took the polite signal
+     * left whatever it had started running, and a launch through a wrapper script
+     * that does not exec left the game itself. What outlives the parent is given
+     * the same polite signal and the same grace, then the forced one.
      */
     override fun terminate() {
+        val children = runCatching { process.descendants().toList() }.getOrDefault(emptyList())
         runCatching { process.destroy() }
         Thread {
             val exited = runCatching { process.waitFor(TERMINATE_GRACE_SECONDS, TimeUnit.SECONDS) }
                 .getOrDefault(false)
-            if (!exited) {
-                runCatching { process.descendants().forEach { child -> child.destroyForcibly() } }
-                runCatching { process.destroyForcibly() }
+            if (!exited) runCatching { process.destroyForcibly() }
+            val left = children.filter { it.isAlive }
+            left.forEach { runCatching { it.destroy() } }
+            val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(TERMINATE_GRACE_SECONDS)
+            left.forEach { child ->
+                val remaining = (deadline - System.nanoTime()).coerceAtLeast(0L)
+                val gone = runCatching { child.onExit().get(remaining, TimeUnit.NANOSECONDS); true }.getOrDefault(false)
+                if (!gone) runCatching { child.destroyForcibly() }
             }
         }.apply {
             isDaemon = true

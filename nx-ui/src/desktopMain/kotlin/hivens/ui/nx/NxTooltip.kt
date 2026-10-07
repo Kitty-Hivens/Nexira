@@ -47,11 +47,11 @@ import androidx.compose.ui.window.PopupProperties
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.Symbol
 import hivens.ui.surface.NxSurface
-import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.theme.Motion
-import hivens.ui.theme.NxTheme
 import hivens.ui.theme.Spacing
 import kotlin.math.roundToInt
+import hivens.ui.theme.NxInk
+import hivens.ui.surface.SurfaceKind
 
 /**
  * Where a tooltip sits relative to what raised it.
@@ -89,6 +89,18 @@ data class NxTooltipBehaviour(
      * from the cursor, which is why the presets never combine the two.
      */
     val enterable: Boolean = false,
+    /**
+     * Whether the tooltip lines up with the START of its anchor or with its
+     * MIDDLE.
+     *
+     * Start is the reveal case and the reason this library anchors at all: a
+     * caption cut by an ellipsis raises the same text in full, and the full copy
+     * has to begin where the truncated one began or it reads as a different
+     * string. A control whose anchor carries no text has nothing to line up with,
+     * and starting a pill twice the button's width at the button's left edge hangs
+     * it off to one side of the thing it names.
+     */
+    val centred: Boolean = false,
 ) {
     companion object {
         /**
@@ -112,6 +124,9 @@ data class NxTooltipBehaviour(
          * to hang off, a long row or a canvas where the anchor is the whole area.
          */
         val LabelAtCursor = Label.copy(placement = NxTooltipPlacement.FollowCursor)
+
+        /** The same label under a control that is a glyph, so it centres on it. */
+        val LabelCentred = Label.copy(centred = true)
 
         /** Explains it. Anchored, so it stays still while it is read. */
         val Explain = NxTooltipBehaviour(
@@ -213,7 +228,7 @@ fun NxTooltip(
                 NxTooltipPlacement.FollowCursor ->
                     remember(cursorX, cursorY, gapPx) { AtCursorPoint(cursorX, cursorY, gapPx) }
                 NxTooltipPlacement.BelowAnchor ->
-                    remember(gapPx) { BelowAnchorStartAligned(gapPx) }
+                    remember(gapPx, behaviour.centred) { BelowAnchorStartAligned(gapPx, behaviour.centred) }
             }
             Popup(
                 popupPositionProvider = provider,
@@ -229,14 +244,8 @@ fun NxTooltip(
                         scaleOut(Motion.tap.of(), targetScale = 0.94f, transformOrigin = TransformOrigin(0f, 0f)),
                 ) {
                     NxSurface(
-                        level = NxSurfaceLevel.Floating,
-                        blurDp = 0f,
-                        // Opaque for the same reason a menu is: it floats over
-                        // arbitrary content, and a translucent body would read
-                        // whatever it happens to cover.
-                        opacity = 1f,
+                        kind = SurfaceKind.Popup,
                         shape = shape,
-                        shadowDp = 6f,
                         modifier = Modifier.hoverable(tooltipInteraction, enabled = behaviour.enterable),
                     ) {
                         Box(Modifier.widthIn(max = behaviour.maxWidth).padding(contentPadding)) { tooltip() }
@@ -280,7 +289,7 @@ fun NxTooltipLabel(text: String) {
     Text(
         text = text,
         style = MaterialTheme.typography.labelSmall,
-        color = NxTheme.colors.textPrimary,
+        color = NxInk.main,
     )
 }
 
@@ -290,7 +299,7 @@ fun NxTooltipGlyphLabel(icon: IconKey, text: String) {
     // Top, not centre: a label long enough to wrap would otherwise park the glyph
     // against the middle of the block, pointing at the gap between its lines.
     Row(verticalAlignment = Alignment.Top) {
-        Symbol(icon, contentDescription = null, tint = NxTheme.colors.textSecondary, size = 16.dp)
+        Symbol(icon, contentDescription = null, tint = NxInk.quiet, size = 16.dp)
         Spacer(Modifier.width(Spacing.s8))
         NxTooltipLabel(text)
     }
@@ -308,14 +317,14 @@ fun NxTooltipTitled(title: String, description: String, shortcut: String? = null
             Text(
                 text = title,
                 style = MaterialTheme.typography.bodyLarge,
-                color = NxTheme.colors.textPrimary,
+                color = NxInk.main,
             )
             if (shortcut != null) {
                 Spacer(Modifier.width(Spacing.s12))
                 Text(
                     text = shortcut,
                     style = MaterialTheme.typography.labelSmall,
-                    color = NxTheme.colors.textSecondary,
+                    color = NxInk.quiet,
                 )
             }
         }
@@ -323,7 +332,7 @@ fun NxTooltipTitled(title: String, description: String, shortcut: String? = null
         Text(
             text = description,
             style = MaterialTheme.typography.bodySmall,
-            color = NxTheme.colors.textSecondary,
+            color = NxInk.quiet,
         )
     }
 }
@@ -341,7 +350,7 @@ fun NxTooltipPreview(caption: String? = null, picture: @Composable () -> Unit) {
             Text(
                 text = caption,
                 style = MaterialTheme.typography.labelSmall,
-                color = NxTheme.colors.textSecondary,
+                color = NxInk.quiet,
             )
         }
     }
@@ -377,19 +386,30 @@ private class AtCursorPoint(
 }
 
 /**
- * Anchors the tooltip's left edge to the trigger's left edge, just below it, and
- * flips above when it would overrun the window bottom. The menu's own provider
- * aligns to the trigger's RIGHT edge because an overflow button opens leftwards;
- * a tooltip reads with its subject, so it starts where the subject starts.
+ * Anchors the tooltip under the trigger and flips above when it would overrun the
+ * window bottom. The menu's own provider aligns to the trigger's RIGHT edge
+ * because an overflow button opens leftwards; a tooltip reads with its subject,
+ * so it begins where the subject begins -- unless the subject is a glyph, which
+ * begins nowhere in particular and is centred on instead.
  */
-private class BelowAnchorStartAligned(private val gapPx: Int) : PopupPositionProvider {
+private class BelowAnchorStartAligned(
+    private val gapPx: Int,
+    private val centred: Boolean = false,
+) : PopupPositionProvider {
     override fun calculatePosition(
         anchorBounds: IntRect,
         windowSize: IntSize,
         layoutDirection: LayoutDirection,
         popupContentSize: IntSize,
     ): IntOffset {
-        val x = anchorBounds.left.coerceIn(0, (windowSize.width - popupContentSize.width).coerceAtLeast(0))
+        val wanted = if (centred) {
+            anchorBounds.left + (anchorBounds.width - popupContentSize.width) / 2
+        } else {
+            anchorBounds.left
+        }
+        // The clamp can only ever pull it back INTO the window, which is why a
+        // control near the right edge shows its tooltip to the left of itself.
+        val x = wanted.coerceIn(0, (windowSize.width - popupContentSize.width).coerceAtLeast(0))
         val below = anchorBounds.bottom + gapPx
         val y = if (below + popupContentSize.height <= windowSize.height) {
             below

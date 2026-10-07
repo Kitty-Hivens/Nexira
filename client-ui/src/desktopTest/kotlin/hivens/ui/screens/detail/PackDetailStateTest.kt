@@ -4,13 +4,15 @@ import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
 import hivens.core.data.PackReference
-import hivens.core.data.SessionData
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import java.nio.file.Path
@@ -29,6 +31,7 @@ import kotlin.test.assertTrue
  * update on the app scope, the playtime a finished session writes back -- does so
  * through the same registry, and the screen has to show what it says.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 class PackDetailStateTest {
 
     private fun pack(id: String = "inst-1", name: String = "Industrial") = PackInstance(
@@ -58,16 +61,16 @@ class PackDetailStateTest {
 
     private fun state(
         repo: IPackRepository,
-        onLaunch: (SessionData, PackInstance) -> Unit = { _, _ -> },
         onAbort: () -> Unit = {},
         onOpenFolder: (Path) -> Unit = {},
+        writeScope: CoroutineScope = CoroutineScope(UnconfinedTestDispatcher()),
     ) = PackDetailState(
         instanceId = "inst-1",
         repo = repo,
         dataDir = Path.of("/data"),
-        launch = onLaunch,
         abort = onAbort,
         openInFileManager = onOpenFolder,
+        writeScope = writeScope,
     )
 
     /** Starts the screen's collection on the test's own scope and lets it settle. */
@@ -75,6 +78,29 @@ class PackDetailStateTest {
         backgroundScope.launch { state.observe() }
         runCurrent()
         return state
+    }
+
+    @Test
+    fun `dismissing the provenance note clears it on the record`() = runTest {
+        val repo = FakeRepo(listOf(pack().copy(notes = "Imported from Prism.")))
+        val state = observing(state(repo, writeScope = backgroundScope))
+
+        state.dismissNotes()
+        runCurrent()
+
+        assertEquals("", repo.observe().value.single().notes, "a note taken down must not come back next launch")
+    }
+
+    @Test
+    fun `dismissing a pack with no note writes nothing`() = runTest {
+        val repo = FakeRepo(listOf(pack()))
+        val state = observing(state(repo, writeScope = backgroundScope))
+        val before = repo.observe().value
+
+        state.dismissNotes()
+        runCurrent()
+
+        assertTrue(before === repo.observe().value, "no note, no write")
     }
 
     @Test
@@ -140,33 +166,6 @@ class PackDetailStateTest {
             state(FakeRepo(listOf(pack()))).instanceDir,
         )
         assertNull(state(FakeRepo()).instanceDir, "a pack the registry does not have has no directory")
-    }
-
-    @Test
-    fun `play launches without waiting to be collected`() = runTest {
-        var launched: PackInstance? = null
-        state(FakeRepo(listOf(pack())), onLaunch = { _, p -> launched = p }).play(SessionData())
-        assertEquals("inst-1", launched?.id)
-
-        var fromNothing: PackInstance? = null
-        state(FakeRepo(), onLaunch = { _, p -> fromNothing = p }).play(SessionData())
-        assertNull(fromNothing, "a pack the registry does not have is not launchable")
-    }
-
-    @Test
-    fun `play carries the record as it stands now`() = runTest {
-        // The launch reads the runtime -- heap, java path, jvm args -- so handing it
-        // the copy the screen opened with would run the game on settings the user
-        // has since changed.
-        var launched: PackInstance? = null
-        val repo = FakeRepo(listOf(pack()))
-        val state = observing(state(repo, onLaunch = { _, p -> launched = p }))
-
-        repo.put(pack(name = "Renamed"))
-        runCurrent()
-        state.play(SessionData())
-
-        assertEquals("Renamed", launched?.displayName)
     }
 
     @Test

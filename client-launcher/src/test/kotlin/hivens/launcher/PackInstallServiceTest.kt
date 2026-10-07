@@ -113,9 +113,10 @@ class PackInstallServiceTest {
         sandbox = Files.createTempDirectory("pack-install-test")
         val partial = sandbox.resolve("instances").resolve("Industrial-partial")
         val service = PackInstallService(
+            // Reserved first and made second, the order every installer keeps.
             runInstall = { _, _, onReserveDir, _ ->
-                Files.createDirectories(partial)
                 onReserveDir(partial)
+                Files.createDirectories(partial)
                 awaitCancellation()
             },
             scope = this,
@@ -145,5 +146,49 @@ class PackInstallServiceTest {
 
         service.dismiss(key)
         assertNull(service.installs.value[key], "dismiss removes the snapshot")
+    }
+
+    /** Each retry of a mistyped Minecraft version used to leave another unregistered directory. */
+    @Test
+    fun `a failed job removes the directory it reserved`() = runTest {
+        sandbox = Files.createTempDirectory("pack-install-test")
+        val partial = sandbox.resolve("instances").resolve("Industrial-failed")
+        val service = PackInstallService(
+            runInstall = { _, _, onReserveDir, _ ->
+                onReserveDir(partial)
+                Files.createDirectories(partial.resolve("mods"))
+                throw IOException("Minecraft version 1.20.9 not found")
+            },
+            scope = this,
+        )
+
+        val key = service.start(pack, version)
+        advanceUntilIdle()
+
+        assertIs<InstallPhase.Failed>(service.installs.value[key]?.phase)
+        assertFalse(Files.exists(partial), "the half-made instance is gone")
+    }
+
+    /**
+     * Two packs whose names reduced to the same directory: the second install
+     * reserved the first's, and cancelling it deleted the first pack, worlds and all.
+     */
+    @Test
+    fun `a directory that was already there when reserved is never cleaned up`() = runTest {
+        sandbox = Files.createTempDirectory("pack-install-test")
+        val existing = Files.createDirectories(sandbox.resolve("instances").resolve("Industrial-other"))
+        Files.writeString(Files.createDirectories(existing.resolve("saves/world")).resolve("level.dat"), "WORLD")
+        val service = PackInstallService(
+            runInstall = { _, _, onReserveDir, _ ->
+                onReserveDir(existing)
+                throw IOException("boom")
+            },
+            scope = this,
+        )
+
+        service.start(pack, version)
+        advanceUntilIdle()
+
+        assertTrue(Files.exists(existing.resolve("saves/world/level.dat")), "another pack's world survives")
     }
 }

@@ -43,6 +43,9 @@ object OptionalContentRules {
      * A toggle is matched by [SmrtModEntry.stableKey] first, then by [filename]
      * as a fallback so state persisted before stable keys existed still
      * applies until it is rewritten on the next toggle.
+     *
+     * Applied as the player left it, conflicts included: the pack is theirs to
+     * break, and [problems] is how a screen says what is wrong with it.
      */
     fun enabledState(mods: List<SmrtModEntry>, toggles: List<ContentToggle>): Map<String, Boolean> {
         val userState = toggles.associate { it.entryId to it.enabled }
@@ -59,12 +62,59 @@ object OptionalContentRules {
      * True when [a] and [b] declare each other (in either direction) under
      * `display.incompatibleWith`. Mutual so the curator only has to mark one side.
      */
-    fun conflicts(mods: List<SmrtModEntry>, a: String, b: String): Boolean {
-        if (a == b) return false
-        val byName = mods.associateBy { it.filename }
-        val aIncompat = byName[a]?.display?.incompatibleWith.orEmpty()
-        val bIncompat = byName[b]?.display?.incompatibleWith.orEmpty()
-        return b in aIncompat || a in bIncompat
+    fun conflicts(mods: List<SmrtModEntry>, a: String, b: String): Boolean = Index(mods).conflicts(a, b)
+
+    /** Something wrong with an enabled mod in a given selection. */
+    sealed interface Problem {
+        /** The other mod the problem is about. */
+        val other: SmrtModEntry
+
+        /** Both are on and cannot run together: one per `role`, or declared incompatible. */
+        data class ConflictsWith(override val other: SmrtModEntry) : Problem
+
+        /** A mod it hard-requires is off. */
+        data class NeedsDisabled(override val other: SmrtModEntry) : Problem
+
+        /**
+         * It is off and [other], which is on, hard-requires it. The other side of
+         * [NeedsDisabled], so a screen that lists only optionals still shows a
+         * required mod's missing library on the library's own row.
+         */
+        data class NeededBy(override val other: SmrtModEntry) : Problem
+    }
+
+    /**
+     * What is wrong with each enabled mod under [state], by filename. A mod with
+     * nothing wrong is absent.
+     *
+     * Reported, never acted on. A player may enable a mod beside one it conflicts
+     * with, or turn off a library something still needs: the launcher does what
+     * they asked and the row says what will go wrong, which is the difference
+     * between a pack they broke on purpose and one they cannot tell is broken.
+     * Both sides of a conflict carry it, since either may be the one to turn off,
+     * and a requirement that is off is reported on both the mod that needs it and
+     * the mod that is off.
+     */
+    fun problems(mods: List<SmrtModEntry>, state: Map<String, Boolean>): Map<String, List<Problem>> {
+        val index = Index(mods)
+        fun on(mod: SmrtModEntry) = mod.required || (state[mod.filename] ?: mod.defaultEnabled)
+        val out = LinkedHashMap<String, MutableList<Problem>>()
+        for (mod in mods) {
+            if (!on(mod)) continue
+            for (other in mods) {
+                if (other.filename != mod.filename && on(other) && index.excludes(mod, other)) {
+                    out.getOrPut(mod.filename) { mutableListOf() } += Problem.ConflictsWith(other)
+                }
+            }
+            for (req in index.hardRequires(mod.filename)) {
+                val needed = index.byName[req] ?: continue
+                if (!on(needed)) {
+                    out.getOrPut(mod.filename) { mutableListOf() } += Problem.NeedsDisabled(needed)
+                    out.getOrPut(needed.filename) { mutableListOf() } += Problem.NeededBy(mod)
+                }
+            }
+        }
+        return out
     }
 
     /**
@@ -73,12 +123,14 @@ object OptionalContentRules {
      * - ENABLING pulls the mod on PLUS the transitive closure of its non-optional
      *   `display.requires` -- so a library (e.g. Mixinbooter) can ship optional +
      *   `default_enabled=false` and follow its consumers on, instead of being
-     *   flat-`required`. For each newly-on mod, mutual exclusions are enforced:
-     *   same-`role` members (one active per interchangeable group) and declared
-     *   `incompatibleWith` are turned off.
+     *   flat-`required`. For each newly-on mod, mutual exclusions are enforced
+     *   among the optionals: same-`role` members (one active per interchangeable
+     *   group) and declared `incompatibleWith` are turned off. A required mod is
+     *   never turned off, and a conflict with one is left for [problems] to show.
      * - DISABLING never cascades: a library that was auto-enabled for another mod
      *   stays put (harmlessly loaded-but-unused) rather than risking the surprise
-     *   of pulling content the user never touched.
+     *   of pulling content the user never touched, and a mod still needing the one
+     *   turned off is shown by [problems] rather than turned off with it.
      *
      * Returns the new state; only optional + present entries change.
      */
@@ -93,39 +145,75 @@ object OptionalContentRules {
             next[filename] = false
             return next
         }
-        val byName = mods.associateBy { it.filename }
-        val toEnable = requiredClosure(byName, filename)
+        val index = Index(mods)
+        val toEnable = index.closure(filename)
         for (f in toEnable) next[f] = true
         for (f in toEnable) {
-            val role = byName[f]?.display?.role
+            val mod = index.byName[f] ?: continue
             for (other in mods) {
-                if (other.filename == f) continue
-                val sameRole = role != null && other.display?.role == role
-                if (sameRole || conflicts(mods, f, other.filename)) {
-                    next[other.filename] = false
-                }
+                // Never one of the mods being turned on: a manifest whose requires and
+                // exclusions contradict each other would otherwise switch off the very
+                // mod the player just enabled, and [problems] reports the contradiction.
+                if (other.filename in toEnable || other.required) continue
+                if (index.excludes(mod, other)) next[other.filename] = false
             }
         }
         return next
     }
 
     /**
-     * [filename] plus the transitive closure of its NON-optional `requires`
-     * (optional/soft deps do not follow). Cycle-safe -- a `requires` cycle in a
-     * bad manifest terminates instead of looping. References to filenames absent
-     * from [byName] are skipped (the resolver surfaces those as warnings).
+     * One manifest's references resolved once, so the rules above ask each
+     * question in a lookup rather than a scan of the whole list.
+     *
+     * A reference in `requires` or `incompatibleWith` names a mod either by its
+     * filename, which carries the mod's version and moves with every build, or by
+     * the [SmrtModEntry.stableKey] the toggles are already keyed on, which does
+     * not. A filename names one entry and wins over a key. A key can name several:
+     * two assets of one GitHub repository share it unless the curator gave them a
+     * slug, and a reference by that key is about each of them. A reference to a
+     * mod this manifest does not carry is dropped.
      */
-    private fun requiredClosure(byName: Map<String, SmrtModEntry>, filename: String): Set<String> {
-        val out = LinkedHashSet<String>()
-        val stack = ArrayDeque<String>()
-        stack.addLast(filename)
-        while (stack.isNotEmpty()) {
-            val f = stack.removeLast()
-            if (!out.add(f)) continue
-            for (req in byName[f]?.display?.requires.orEmpty()) {
-                if (!req.optional && req.filename in byName) stack.addLast(req.filename)
-            }
+    private class Index(mods: List<SmrtModEntry>) {
+        val byName: Map<String, SmrtModEntry> = mods.associateBy { it.filename }
+        private val byKey: Map<String, List<String>> = mods.groupBy({ it.stableKey }, { it.filename })
+
+        /** The filenames [ref] names: the one file it is, or every entry carrying it as a key. */
+        private fun resolve(ref: String): List<String> =
+            if (ref in byName) listOf(ref) else byKey[ref].orEmpty()
+
+        private val requires: Map<String, List<String>> = mods.associate { m ->
+            m.filename to m.display?.requires.orEmpty().filter { !it.optional }.flatMap { resolve(it.filename) }.distinct()
         }
-        return out
+        private val incompatible: Map<String, Set<String>> = mods.associate { m ->
+            m.filename to m.display?.incompatibleWith.orEmpty().flatMapTo(HashSet()) { resolve(it) }
+        }
+
+        fun hardRequires(filename: String): List<String> = requires[filename].orEmpty()
+
+        fun conflicts(a: String, b: String): Boolean =
+            a != b && (b in incompatible[a].orEmpty() || a in incompatible[b].orEmpty())
+
+        /** Whether [a] and [b] cannot both be on: one per `role`, or declared incompatible. */
+        fun excludes(a: SmrtModEntry, b: SmrtModEntry): Boolean {
+            if (a.filename == b.filename) return false
+            val role = a.display?.role
+            return (role != null && b.display?.role == role) || conflicts(a.filename, b.filename)
+        }
+
+        /**
+         * [filename] plus the transitive closure of its NON-optional `requires`
+         * (optional/soft deps do not follow). Cycle-safe -- a `requires` cycle in
+         * a bad manifest terminates instead of looping.
+         */
+        fun closure(filename: String): Set<String> {
+            val out = LinkedHashSet<String>()
+            val stack = ArrayDeque<String>()
+            stack.addLast(filename)
+            while (stack.isNotEmpty()) {
+                val f = stack.removeLast()
+                if (out.add(f)) hardRequires(f).forEach { stack.addLast(it) }
+            }
+            return out
+        }
     }
 }

@@ -10,6 +10,84 @@ nicht gelesen werden, um eine Version zu verstehen.
 
 ## [Unreleased]
 
+## [2.4.6] - 2026-10-07
+
+### Musik
+
+Es gibt jetzt zehn Player-Widgets statt vier, und du wählst den, der zu seinem Platz passt. Neben der Karte mit dem Cover als Hauptsache, der, die die Farbe der gerade laufenden Platte annimmt, der schlichten Anzeige und der, die sich mit dem Stück füllt, gibt es eine Kachel, auf der nichts als das Cover steht, bis der Zeiger darauf liegt, eine Schallplatte, ein Token in der Größe einer einzelnen Zelle und mehrere, die um die Form des Stücks selbst herum gebaut sind. Die bisherige Musikkarte auf der Startseite wird durch die Cover-Karte ersetzt und behält ihren Platz auf dem Bildschirm.
+
+Vier davon zeichnen das Stück. Der Launcher liest die Datei einmal und ermittelt ihre Form, sodass du die Umrisse genau dieser Musik siehst und nicht einen Balken, der sich füllt, und der bereits gespielte Teil ist eingefärbt. Das dauert etwa eine Sekunde pro Datei, einmalig, im Hintergrund, und eine Datei, die sich nicht vermessen lässt, bleibt einfach flach und hinterlässt kein Loch.
+
+Die Warteschlange und deine Stelle darin sind nach einem Neustart noch da, und es wird nichts geöffnet, bevor du auf Wiedergabe drückst.
+
+Dein Desktop weiß jetzt, was läuft. Medientasten funktionieren, das Medien-Widget zeigt Titel, Interpret und Cover, und seine Knöpfe steuern den Launcher. In der Lautstärkeanzeige des Systems erscheint der Ton als Nexira mit einem eigenen Symbol statt als namenloser Java-Prozess, sodass du ihn einzeln leiser stellen, auf eine andere Ausgabe legen oder eine Effektregel darauf richten kannst.
+
+Jede Fortschrittsanzeige reagiert auf einen Druck und folgt einem Ziehen, wo immer sie steht: ein Balken, die Form des Stücks, dieselbe Form hochkant, der Ring um eine Schallplatte oder der ganze Körper einer Karte.
+
+Und eine lange Liste von Kleinigkeiten. Ein Klick auf eine Anzeige trifft jedes Mal statt etwa in der Hälfte der Fälle. Das Ziehen um die Schallplatte folgt weiter der Hand, statt stehen zu bleiben, sobald sie über den Rand gerät. Ein Titelwechsel lässt die Suchleiste nicht mehr mit der Länge des vorherigen Titels rechnen, sodass ein Klick auf die Mitte eines kurzen Stücks nicht mehr an dessen Ende springt. Uhr und Balken stimmen überein. Ein Titel ohne Tags behält einen Namen und benennt sich beim Laden nicht mehr um. Der Wiedergabeknopf auf der Cover-Karte ist im dunklen Erscheinungsbild lesbar. Ein leerer Player öffnet eine Datei überall, wo du ihn anklickst, auch bei Breiten, in denen sein Cover-Quadrat nicht gezeichnet wird.
+
+### Packs und Spielen
+
+Ein Pack, das an keinen Server gebunden ist, startet jetzt immer offline. Bisher konnte es die Sitzung des Kontos erhalten, mit dem du angemeldet warst, und eine Mod in diesem Pack konnte sie an sich nehmen. Die Offline-Anmeldung im Profil funktioniert jetzt und bleibt nach einem Neustart erhalten.
+
+Die Schaltfläche „Spielen“ sagt jetzt, warum du nicht spielen kannst: Das Pack wird aktualisiert, seine Dateien werden geprüft, ein anderes Spiel läuft oder du musst dich anmelden. Während einer Aktualisierung wird die Schaltfläche selbst zum Fortschrittsbalken. In den Widgets „Pack-Hero-Karte“ und „Schnellstart“ kannst du wählen, wo die Erklärung steht: in der Schaltfläche oder daneben.
+
+Ein Pack von Grund auf zu erstellen ist einfacher. Die Loader-Version wird aus einer Liste dessen gewählt, was dieser Loader für deine Minecraft-Version tatsächlich veröffentlicht, mit markiertem empfohlenem Build und markierten Betas, und ein leeres Feld bedeutet weiterhin die neueste. Cleanroom und lwjgl3ify stehen jetzt ebenfalls in der Loader-Liste. Hat ein Loader nichts für die gewählte Version, oder gibt es die Minecraft-Version nicht, sagt der Launcher das sofort und nicht erst, nachdem das ganze Spiel heruntergeladen ist.
+
+Ein Pack merkt sich jetzt die Loader-Version, mit der es installiert wurde. Vorher wechselte ein Pack ohne sie still zu jedem neuen Loader-Release, konnte Forge beim nächsten Start neu installieren und brauchte zum Starten das Internet. Jetzt startet es nach dem ersten Spielen mit jedem Loader auch offline.
+
+NeoForge lässt sich auf Minecraft 1.20.1 und den neuen 26.x-Versionen installieren, wo es vorher scheiterte.
+
+Ein Pack lässt sich nicht löschen, solange sein Spiel läuft oder es aktualisiert wird, und die Löschen-Schaltfläche sagt warum. Beim Löschen verschwinden auch die Sicherungen für ein Zurücksetzen, die vorher für immer auf der Platte blieben.
+
+Ein Pack, das du löschst, während der Launcher im Hintergrund Packs aktualisiert, bleibt gelöscht. Vorher konnte das Update das ganze Pack wieder auf die Festplatte schreiben, wo es Platz belegte, ohne in der Bibliothek aufzutauchen.
+
+Ein in eine lokale Kopie gelöstes Pack gehört jetzt ganz dir: Mods, die du hinzufügst, bleiben, wo sie vorher beim nächsten Start entfernt wurden.
+
+Der Inhalts-Tab zeigt einen Mod nur einmal, auch wenn seine aktive und deaktivierte Kopie beide im Ordner liegen. Das Aktivieren eines Mods holt keine alte Kopie mehr zurück, und eine Datei, deren Kopieren abgebrochen wurde, bleibt nicht halb geschrieben im Mod-Ordner liegen.
+
+Ein Update zurückzusetzen oder die Einstellungen eines Packs zu ändern, während etwas anderes es verändert, setzt Spielzeit, Notizen und andere Einstellungen nicht mehr zurück.
+
+Ein Mod, den du während des Spielens deaktivierst, ist beim nächsten Start deaktiviert, wo er vorher weiter geladen werden konnte.
+
+Wird der Launcher bei laufendem Spiel beendet, fragt er, ob das Spiel weiterlaufen oder beendet werden soll, und zählt die Spielzeit in beiden Fällen.
+
+Ein Spiel aus dem Launcher zu stoppen wartet, bis es wirklich geschlossen ist, bevor „Spielen“ zurückkommt. So lässt sich keine zweite Kopie über eine noch speichernde starten, und die gespielte Zeit wird gezählt.
+
+Stoppst du einen Start, während das Spiel noch vorbereitet wird, bleibt kein Fehler mehr auf dem Knopf „Spielen“ stehen, und ein zweites Spiel kann nicht neben dem ersten starten.
+
+Ein unterbrochenes Update, ob abgebrochen, durch das Schließen des Launchers oder einen Stromausfall, stellt das Pack genau so wieder her, wie es war, statt es halb aktualisiert zu lassen.
+
+### Konten und Anmeldung
+
+Konten mit Zwei-Faktor-Anmeldung fragen den Code einmal ab. Dauerte die Vorbereitung eines Packs länger als eine halbe Minute, meldete sich der Launcher nach deiner Codeeingabe erneut an, was den Code ungültig machte und einen neuen verlangte. Eine langsame Verbindung schickt dir außerdem keinen zweiten Code mehr und meldet einen richtigen Code nicht mehr als falsch.
+
+Meldest du dich von Hand an, während der Launcher noch dein gespeichertes Konto versucht, bleibt das Konto, das du gewählt hast. Gespeicherte Konten überstehen es, wenn der Launcher mitten im Speichern geschlossen wird. Der Schlüssel, mit dem dein SmartyCraft-Konto Aktionen signiert, liegt jetzt mit deinem Passwort im System-Schlüsselbund statt in einer einfachen Datei. Wechselst du danach zu einer älteren Version zurück, melde dich erneut an, bevor du einen Skin hochlädst.
+
+Das Hochladen eines Skins funktioniert auch, nachdem du gespielt hast. Die Garderobe importiert deinen eigenen SmartyCraft-Skin und nicht mehr den eines SmartyCraft-Spielers, der zufällig so heißt wie dein Microsoft-Konto.
+
+Eine SmartyCraft-Anmeldung, die der Launcher nicht abschließen kann, sagt das jetzt bei der Anmeldung. Vorher startete das Spiel trotzdem und scheiterte am Server ohne jede Erklärung.
+
+Den Launcher nach einer neueren Version zu öffnen, schreibt deine gespeicherten Konten nicht mehr in einem älteren Format um. Er sagt dir, dass Änderungen daran nicht erhalten bleiben.
+
+Von allem abmelden meldet dich wirklich ab: Der nächste Start meldet dich nicht mehr offline unter deinem alten Offline-Namen an. Das Profil friert nicht mehr ein, während der System-Schlüsselbund langsam antwortet.
+
+### Privatsphäre
+
+Absturzberichte und Diagnosepakete enthalten deinen Kontonamen nicht mehr, und der Launcher lässt die Anmeldung los, die er einem Spiel übergeben hat, sobald es geschlossen ist. Ein Pack kann den Launcher nicht mehr von einer unverschlüsselten Adresse laden lassen. Ein Mod-Update, das beschädigt ankommt, wird erneut heruntergeladen, statt fehlzuschlagen.
+
+Der Kommandozeilen-Launcher gibt dein Anmeldetoken nicht mehr aus, und ein Absturzbericht setzt deinen Kontonamen nicht mehr in die Adresse der Seite, die er öffnet. Unter macOS lässt dich ein Launcher-Update, das beim Kopieren scheitert, nicht mehr ohne Launcher zurück.
+
+### Alles andere
+
+Unter Linux wird ein Launcher-Update, das kurz nach dem Start abstürzt, rückgängig gemacht, und die vorherige Version kommt von selbst zurück. Vorher wurde die alte Version zwei Sekunden nach dem Start der neuen gelöscht, sodass eine Version, die ihr Fenster öffnete und dann abstürzte, nichts zum Zurückkehren übrig ließ.
+
+Eine Reihe kleiner Dinge, die an einer Stelle funktionierten und an der nächsten nicht, funktionieren jetzt an beiden. Ein Mod, den du installierst, wird samt allem, was er braucht, fertig installiert, auch wenn du die Seite verlässt, und ein Skin, den du in der Garderobe anwendest, kommt an, auch wenn du vor der Antwort weggehst. Das Hochladen eines Skins funktioniert auch direkt, nachdem der Launcher dich von selbst angemeldet hat. Ein gespeichertes Layout zu laden behält die Bildschirme, die du selbst angelegt hast, und lässt sich rückgängig machen. Ein Ziehen im Editor, das du mit Esc abbrichst, lässt den Mauszeiger nicht mehr versteckt zurück, und eine beschädigte Layout-Datei schickt den Launcher nicht mehr in eine Neustart-Schleife. Eine Layout-Datei, die sich nicht lesen lässt, bleibt erhalten, statt bei der ersten Änderung durch das Standard-Layout ersetzt zu werden, und der Launcher sagt dir das.
+
+Ein Video von YouTube oder Vimeo spielt nicht mehr ein Bruchstück von sich statt des ganzen Videos, und das Spulen in einem Video endet nicht mehr mit einem Fehler. Listen mit Loader-Versionen und Neuigkeiten, die hängen, geben jetzt nach zwanzig Sekunden auf, statt zehn Minuten zu laden. Ein Modul, das du im Wiederherstellungsmodus abschaltest, bleibt aus, und ein gestopptes Spiel beendet auch alles, was es gestartet hat.
+
+Wenn du das Design, die Sprache oder die Einstellungen des Launchers änderst, steht das Fenster nicht mehr still, während die Änderung gespeichert wird.
+
 ## [2.4.5] - 2026-09-15
 
 Ein Pack, das zurückgefallen ist, holt sich beim Klick auf Spielen selbst wieder ein. Bisher bemerkte der Launcher, dass die Dateien nicht die des Packs sind, sagte auf dem Bildschirm nichts, hielt die Anmeldung still zurück und startete das Spiel trotzdem, sodass der Server einen ohne jede Erklärung abwies. Hineinzugeraten war leicht: Konnte eine Launcher-Version einige Mods eines Packs nicht installieren und die nächste konnte es, lagen die alten Dateien weiterhin da. Jetzt wird das Fehlende zuerst geladen. Ist der Spiegel nicht erreichbar, läuft der Start genau so ab wie zuvor.

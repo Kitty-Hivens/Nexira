@@ -1,5 +1,10 @@
 package hivens.ui.screens.detail
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -19,7 +24,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -53,20 +57,16 @@ import hivens.core.update.PackUpdateStatusHub
 import hivens.core.update.UpdateDirection
 import hivens.ui.AppState
 import hivens.ui.components.FullscreenVideo
+import hivens.ui.components.LaunchControl
 import hivens.ui.components.VideoMedia
 import hivens.ui.components.isVideoUrl
+import hivens.ui.components.rememberLaunchControl
 import hivens.ui.effects.pixelArtBackground
 import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.core.launch.LaunchControlMode
-import hivens.core.launch.LaunchState
-import hivens.launcher.launch.LauncherController
-import hivens.ui.notifications.IndicationCenter
-import hivens.ui.notifications.IndicationCenter.Companion.controlMode
-import hivens.ui.notifications.IndicationCenter.LaunchIndication
 import hivens.ui.nx.CenteredProgress
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
@@ -75,22 +75,28 @@ import hivens.ui.nx.NxCalloutTone
 import hivens.ui.nx.NxContextMenu
 import hivens.ui.nx.NxMenuItem
 import hivens.ui.nx.NxRow
+import hivens.ui.nx.NxSteadyText
 import hivens.ui.nx.PlayButton
+import hivens.ui.nx.PlayGround
 import hivens.ui.platform.SystemActions
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.screens.ConsoleContent
 import hivens.ui.screens.ConsoleSource
+import hivens.ui.screens.mod.ModTarget
 import hivens.ui.screens.detail.settings.PackSettingsCategory
-import hivens.ui.screens.detail.settings.PackSettingsWindow
+import hivens.ui.screens.detail.settings.PackSettingsSheet
 import hivens.ui.screens.library.FileBrowserPane
 import hivens.ui.screens.library.content.ContentTabPane
+import hivens.ui.screens.library.content.ContentVersionsOverlay
+import hivens.ui.screens.library.content.rememberContentTabState
 import hivens.ui.screens.library.rememberPackArt
 import hivens.ui.screens.library.worlds.WorldsTabPane
-import hivens.ui.theme.NxTheme
+import hivens.ui.surface.NxSurface
+import hivens.ui.surface.SurfaceKind
+import hivens.ui.theme.OnFill
 import hivens.ui.theme.familyForText
 import hivens.ui.theme.decorativePair
-import hivens.ui.theme.origin
 import hivens.ui.utils.ConsoleSettingsStore
 import hivens.ui.utils.GameConsoleService
 import hivens.ui.utils.LogEntry
@@ -99,10 +105,13 @@ import java.nio.file.Path
 import java.time.Duration
 import java.time.Instant
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
+import hivens.ui.theme.Motion
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.Status
+import hivens.ui.theme.originColor
 
 /**
  * Library PackDetail. Hero header + Play bar + tabs (Content / Files /
@@ -123,13 +132,13 @@ fun PackDetailScreen(
     initialShowSettings: Boolean = false,
     initialSettingsSection: PackSettingsCategory? = null,
     onOpenVersions: (fromSettings: Boolean) -> Unit = {},
+    /** Opens the project page for one of this instance's files, or for a search result. */
+    onOpenProject: (ModTarget) -> Unit = {},
 ) {
     PuppetScreen("PackDetail.$instanceId")
     PuppetClick("packDetail.back") { onBack() }
 
     val state = rememberPackDetailState(instanceId)
-    val controller: LauncherController = koinInject()
-    val indications: IndicationCenter = koinInject()
     val updateHub: PackUpdateStatusHub = koinInject()
     val autoUpdateStatuses by updateHub.statuses.collectAsState()
 
@@ -149,43 +158,40 @@ fun PackDetailScreen(
     val instanceDir = state.instanceDir ?: return
 
     var tabIndex by rememberSaveable(pack.id) { mutableIntStateOf(0) }
+    // Saved for the same reason the tab index is: the content tab's holder is
+    // rebuilt on every visit, so a reader who opened the project browser, opened a
+    // page from it and came back landed in the content list rather than in the
+    // search they left.
+    var browsingProjects by rememberSaveable(pack.id) { mutableStateOf(false) }
     val s = LocalStrings.current
 
     var showSettings by remember(pack.id) { mutableStateOf(initialShowSettings) }
+    // Which section the sheet opens on. The gear opens it at the top; a locked
+    // content row opens it where detaching is, since that is what its menu offers.
+    var settingsSection by remember(pack.id) { mutableStateOf(initialSettingsSection) }
+    // Owned here rather than inside the tab, because one thing it holds -- the
+    // version picker -- is a modal over the whole screen, and a modal drawn
+    // inside a tab body is sized and clipped by that body.
+    val contentState = rememberContentTabState(pack)
     val authedSession = (appState as? AppState.Authenticated)?.session
-    val launchIndication by indications.launchIndication(pack.id).collectAsState()
-
-    // The launcher runs one game at a time, and this page only knew about its own
-    // pack: with another one up, Play read as available, the controller refused it,
-    // and the click cost the running game its narration for nothing. Same test the
-    // home launch controls use.
-    // Collapsed to the one question this screen asks before collecting it:
-    // Downloading republishes per progress callback, and this page has no reason
-    // to repaint at frame rate while some other pack downloads.
-    val launcherIdle by remember(controller) {
-        controller.state
-            .map { it is LaunchState.Idle || it is LaunchState.Error }
-            .distinctUntilChanged()
-    }.collectAsState(initial = true)
-    val canPlay = authedSession != null && launcherIdle
+    // The same decision the home widgets make: whether this pack can be played, and
+    // when not, why not in words the control can show.
+    val launchControl = rememberLaunchControl(pack, authedSession)
 
     // The hero's play/abort are the only way to drive a pack launch, so the control
     // surface has to reach them -- a scenario that cannot start a launch cannot check
     // what a launch does to the instance.
-    PuppetClick("packDetail.play", enabled = canPlay) {
-        authedSession?.let { state.play(it) }
+    PuppetClick("packDetail.play", enabled = launchControl.actionable) {
+        launchControl.onClick()
     }
     PuppetClick("packDetail.abort") { state.abortLaunch() }
 
     Column(Modifier.fillMaxSize()) {
         Hero(
             pack           = pack,
-            playEnabled    = canPlay,
-            indication     = launchIndication,
+            launchControl  = launchControl,
             onBack         = onBack,
-            onPlay         = { authedSession?.let { state.play(it) } },
-            onAbort        = { state.abortLaunch() },
-            onOpenSettings = { showSettings = true },
+            onOpenSettings = { settingsSection = null; showSettings = true },
             onOpenFolder   = { state.openFolder() },
             // Any source that pins a version has one worth naming; this used to
             // ask whether the pack came from the mirror, which hid the version of
@@ -200,9 +206,13 @@ fun PackDetailScreen(
         // never shown, so a half-populated import read as an empty success.
         if (pack.notes.isNotBlank()) {
             NxCalloutBanner(
-                body     = pack.notes,
-                tone     = NxCalloutTone.Info,
-                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp),
+                body      = pack.notes,
+                tone      = NxCalloutTone.Info,
+                modifier  = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp),
+                // It reports how this instance came to be, which is read once and
+                // then is a band across the page forever. Closing it clears the
+                // note on the record, so it does not come back next launch.
+                onDismiss = state::dismissNotes,
             )
         }
 
@@ -212,25 +222,65 @@ fun PackDetailScreen(
         // tree, a selected file and every scroll position in it were gone by the
         // time the reader came back one click later.
         val tabRetention = rememberSaveableStateHolder()
-        Box(modifier = Modifier.fillMaxSize().padding(top = 4.dp)) {
-            tabRetention.SaveableStateProvider(tabIndex) {
-            when (tabIndex) {
-                0 -> ContentTabPane(instance = pack)
-                1 -> FileBrowserPane(rootDir = instanceDir, modifier = Modifier.padding(16.dp))
+        // One inset for every tab body, decided here instead of four times over.
+        // Each pane used to bring its own, and the three that disagreed with the
+        // Logs pane put a different amount of air under the same tab strip --
+        // switching tabs nudged the content up and down for no reason anyone
+        // reading the screen could see.
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 16.dp),
+        ) {
+            // The body being left goes quickly and the next fades in after it. Cut, a
+            // body that fills itself in after its first frame (a file tree listed
+            // off-thread, worlds scanned) showed as a run of jumps; and a plain
+            // crossfade left both bodies half clear at once, the wallpaper showing
+            // through two panels at the midpoint.
+            val leave = Motion.tap
+            val arrive = Motion.fade
+            AnimatedContent(
+                targetState    = tabIndex,
+                transitionSpec = {
+                    fadeIn(tween(arrive.durationMs, leave.durationMs / 2, arrive.easing)) togetherWith
+                        fadeOut(tween(leave.durationMs, easing = leave.easing))
+                },
+                label          = "packTab",
+            ) { tab ->
+            tabRetention.SaveableStateProvider(tab) {
+            when (tab) {
+                0 -> ContentTabPane(
+                    instance = pack,
+                    state = contentState,
+                    onOpenProject = onOpenProject,
+                    browsing = browsingProjects,
+                    onBrowsing = { browsingProjects = it },
+                    onOpenPackSettings = {
+                        settingsSection = PackSettingsCategory.Data
+                        showSettings = true
+                    },
+                )
+                1 -> FileBrowserPane(rootDir = instanceDir)
                 2 -> WorldsTabPane(instanceDir = instanceDir)
                 3 -> PackLogsTab(packId = pack.id, instanceDir = instanceDir)
+            }
             }
             }
         }
     }
 
+    // Above the tabs: it covers the screen.
+    ContentVersionsOverlay(instance = pack, state = contentState)
+
+    // A sheet over the whole window, so it is mounted here only for its state: where
+    // it draws is not this screen's bounds.
     if (showSettings) {
-        PackSettingsWindow(
+        PackSettingsSheet(
             pack            = pack,
             instanceDir     = instanceDir,
             onDismiss       = { showSettings = false },
             onOpenVersions  = { onOpenVersions(true) },
-            initialCategory = initialSettingsSection,
+            initialCategory = settingsSection,
         )
     }
 }
@@ -292,17 +342,16 @@ private fun PackLogsTab(packId: String, instanceDir: Path) {
         else                 -> fileEntries?.let { ConsoleSource.FileBacked(it) }  // null while loading
     }
 
-    Surface(
+    NxSurface(
         // Floated card, same treatment as the hero above: full-bleed square
         // edges read as a foreign element next to the rounded cards the rest
-        // of the screen is built from.
-        modifier = Modifier.fillMaxSize().padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
+        // of the screen is built from. The inset around it belongs to the tab
+        // host, which gives every pane the same one.
+        kind     = SurfaceKind.Panel,
+        modifier = Modifier.fillMaxSize(),
         shape    = MaterialTheme.shapes.medium,
-        // Glass tint, not solid: a solid fill broke the app's translucent
-        // aesthetic and left a hard seam against the right panel. The
-        // wallpaper stays softly visible while the tint keeps dense
-        // monospace readable.
-        color    = NxTheme.colors.surface.copy(alpha = 0.85f),
+        // Solid, like every body: dense monospace needs a ground it is read
+        // against, which a tint over the wallpaper could never promise.
     ) {
         Column(Modifier.fillMaxSize()) {
             LogSessionPicker(
@@ -311,7 +360,7 @@ private fun PackLogsTab(packId: String, instanceDir: Path) {
                 onSelectGeneral = { selectedFile = null },
                 onSelectFile    = { selectedFile = it },
             )
-            HorizontalDivider(color = NxTheme.colors.outline.copy(alpha = 0.3f))
+            HorizontalDivider(color = NxColor.wash(NxInk.line, 0.3f))
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 if (source == null) {
                     // A file is selected but still reading -- show the spinner
@@ -365,7 +414,6 @@ private fun LogSessionPicker(
     onSelectFile: (File) -> Unit,
 ) {
     val s = LocalStrings.current
-    val colors = NxTheme.colors
     var open by remember { mutableStateOf(false) }
 
     val currentLabel = selectedFile?.name ?: s.consoleSessionLive
@@ -380,12 +428,12 @@ private fun LogSessionPicker(
         ) {
             Text(
                 text     = s.consoleSessionPickerLabel(currentLabel),
-                color    = colors.textSecondary,
+                color    = NxInk.quiet,
                 fontSize = 11.sp,
             )
             Symbol(icon = NxIcon.ArrowDropDown,
                 contentDescription = null,
-                tint               = colors.textSecondary,
+                tint               = NxInk.quiet,
                 modifier           = Modifier.size(16.dp),
             )
         }
@@ -409,11 +457,8 @@ private fun LogSessionPicker(
 @Composable
 private fun Hero(
     pack: PackInstance,
-    playEnabled: Boolean,
-    indication: LaunchIndication?,
+    launchControl: LaunchControl,
     onBack: () -> Unit,
-    onPlay: () -> Unit,
-    onAbort: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenFolder: () -> Unit,
     versionLabel: String?,
@@ -425,7 +470,7 @@ private fun Hero(
     val bannerUrl = art.bannerUrl
     val bannerIsVideo = bannerUrl != null && isVideoUrl(bannerUrl)
     var bannerFullscreen by remember(bannerUrl) { mutableStateOf(false) }
-    val (hueA, hueB) = NxTheme.colors.decorativePair(pack.id)
+    val (hueA, hueB) = decorativePair(pack.id)
     // Floated card treatment: the app's cards round via the cardCorner token,
     // and a full-bleed square banner read as a foreign element next to them.
     Box(
@@ -514,19 +559,16 @@ private fun Hero(
                     }
                 }
                 // The pill walks the launch: Play -> wait (prepare/sync, inert)
-                // -> Exit (stop the running game) -> Play again. Failed falls
-                // back to Play -- the error toast carries the diagnosis.
-                val mode = indication.controlMode()
+                // -> Exit (stop the running game) -> Play again, and names the
+                // reason when Play is not on offer. Failed falls back to Play --
+                // the error toast carries the diagnosis.
                 PlayButton(
-                    label    = when (mode) {
-                        LaunchControlMode.Stop -> s.packPlayExit
-                        LaunchControlMode.Wait -> s.packPlayWait
-                        LaunchControlMode.Play -> s.packDetailPlay
-                    },
-                    icon     = if (mode == LaunchControlMode.Stop) NxIcon.Stop else NxIcon.PlayArrow,
-                    busy     = mode == LaunchControlMode.Wait,
-                    onClick  = if (mode == LaunchControlMode.Stop) onAbort else onPlay,
-                    enabled  = if (mode == LaunchControlMode.Stop) true else playEnabled,
+                    label    = launchControl.label,
+                    icon     = launchControl.icon,
+                    tone     = launchControl.tone,
+                    progress = launchControl.progress,
+                    onClick  = launchControl.onClick,
+                    ground   = PlayGround.Media,
                     iconOnly = playIconOnly,
                 )
             }
@@ -567,24 +609,30 @@ private fun PackTabBar(selected: Int, onSelect: (Int) -> Unit) {
     ) {
         tabs.forEachIndexed { i, (icon, label) ->
             val active = i == selected
-            val tint = if (active) Color.White else NxTheme.colors.textSecondary
-            Row(
-                modifier = Modifier
-                    .clip(MaterialTheme.shapes.small)
-                    .background(if (active) NxTheme.colors.primary else NxTheme.colors.surface.copy(alpha = 0.5f))
-                    .clickable { onSelect(i) }
-                    .padding(horizontal = 12.dp, vertical = 7.dp),
-                verticalAlignment     = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                Symbol(icon, contentDescription = null, tint = tint, size = 16.dp)
-                Text(
-                    text       = label,
-                    style      = MaterialTheme.typography.labelLarge,
-                    color      = tint,
-                    maxLines   = 1,
-                    fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
-                )
+            val fill = if (active) NxColor.lead() else NxColor.wash(NxInk.quiet, 0.12f)
+            OnFill(fill) {
+                val tint = if (active) NxColor.on(fill) else NxInk.quiet
+                Row(
+                    modifier = Modifier
+                        .clip(MaterialTheme.shapes.small)
+                        .background(fill)
+                        .clickable { onSelect(i) }
+                        .padding(horizontal = 12.dp, vertical = 7.dp),
+                    verticalAlignment     = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Symbol(icon, contentDescription = null, tint = tint, size = 16.dp)
+                    // Steady, not a plain Text: the active tab is bold, bold is wider,
+                    // and the strip used to re-lay itself out on every click -- the tab
+                    // the user pressed moved, and so did the three beside it.
+                    NxSteadyText(
+                        text     = label,
+                        style    = MaterialTheme.typography.labelLarge,
+                        color    = tint,
+                        maxLines = 1,
+                        weight   = if (active) FontWeight.Bold else FontWeight.Normal,
+                    )
+                }
             }
         }
     }
@@ -599,13 +647,14 @@ private fun SourceChip(origin: PackOrigin) {
         PackOrigin.Local       -> "Local"
         PackOrigin.Unknown     -> "Other"
     }
+    val fill = originColor(origin).copy(alpha = 0.9f)
     Box(
         modifier = Modifier
             .clip(MaterialTheme.shapes.extraSmall)
-            .background(NxTheme.colors.origin(origin).copy(alpha = 0.9f))
+            .background(fill)
             .padding(horizontal = 8.dp, vertical = 3.dp),
     ) {
-        Text(label, style = MaterialTheme.typography.labelSmall, color = Color.White, fontWeight = FontWeight.Bold)
+        Text(label, style = MaterialTheme.typography.labelSmall, color = NxColor.on(fill), fontWeight = FontWeight.Bold)
     }
 }
 
@@ -623,14 +672,15 @@ private fun HeroChip(text: String) {
 
 @Composable
 private fun HeroUpdateBadge(text: String, rollback: Boolean, onClick: () -> Unit) {
+    val fill = if (rollback) NxColor.status(Status.Warning) else NxColor.lead()
     Box(
         modifier = Modifier
             .clip(MaterialTheme.shapes.extraSmall)
-            .background(if (rollback) NxTheme.colors.warnAccent else NxTheme.colors.primary)
+            .background(fill)
             .clickable(onClick = onClick)
             .padding(horizontal = 8.dp, vertical = 3.dp),
     ) {
-        Text(text, style = MaterialTheme.typography.labelSmall, color = Color.White, fontWeight = FontWeight.Bold)
+        Text(text, style = MaterialTheme.typography.labelSmall, color = NxColor.on(fill), fontWeight = FontWeight.Bold)
     }
 }
 
@@ -686,8 +736,8 @@ private fun NotFound(onBack: () -> Unit) {
     val s = LocalStrings.current
     Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(s.packDetailNotFoundTitle, style = MaterialTheme.typography.titleLarge, color = NxTheme.colors.textPrimary)
-            Text(s.packDetailNotFoundHint, style = MaterialTheme.typography.bodyMedium, color = NxTheme.colors.textSecondary)
+            Text(s.packDetailNotFoundTitle, style = MaterialTheme.typography.titleLarge, color = NxInk.main)
+            Text(s.packDetailNotFoundHint, style = MaterialTheme.typography.bodyMedium, color = NxInk.quiet)
             NxButton(label = s.packDetailNotFoundBack, onClick = onBack)
         }
     }

@@ -1,6 +1,7 @@
 package hivens.ui.utils
 
 import hivens.launcher.platform.PlatformPaths
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -78,6 +79,24 @@ class GameConsoleServiceTest {
             "buffer keeps the latest maxLines in arrival order",
         )
         assertEquals(7, snap.historyOffset, "dropped entries are counted for history paging")
+    }
+
+    /**
+     * The drainer is the one consumer of an unbounded channel, so a throw that ended
+     * it ended the console for the process. A negative window makes the trim throw,
+     * which is the cheapest way to put a failing message in front of it.
+     */
+    @Test
+    fun `a message that throws does not stop the console`() = runBlocking {
+        val svc = service(maxLines = -1)
+        svc.append("throws in the trim")
+        // Time for the drainer to reach the failing message before the window is
+        // put back, or the message would not fail at all.
+        delay(200)
+        svc.maxLines = 5000
+        svc.append("after")
+        val snap = svc.awaitSnapshot { s -> s.entries.any { it.text == "after" } }
+        assertTrue(snap.entries.any { it.text == "after" })
     }
 
     @Test

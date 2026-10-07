@@ -42,13 +42,14 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.surface.NxSurface
-import hivens.ui.surface.NxSurfaceLevel
+import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.Spacing
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
 import kotlin.math.sqrt
 import kotlin.test.Test
+import hivens.ui.theme.NxColor
 
 /** Three more shapes on the same real track. */
 class MoreConceptsProbe {
@@ -85,9 +86,9 @@ class MoreConceptsProbe {
     private fun sheet(name: String, wDp: Int, hDp: Int, body: @Composable () -> Unit) {
         val d = 3f
         val scene = ImageComposeScene((wDp * d).toInt(), (hDp * d).toInt(), density = Density(d)) {
-            NxTheme(useDarkTheme = true) {
+            NxTheme(dark = true) {
                 Box(
-                    Modifier.fillMaxSize().background(NxTheme.colors.background).padding(Spacing.s16),
+                    Modifier.fillMaxSize().background(NxColor.page).padding(Spacing.s16),
                     contentAlignment = Alignment.Center,
                 ) { body() }
             }
@@ -109,12 +110,12 @@ class MoreConceptsProbe {
     // area on a spool and a linear radius would run out visibly early.
     @Composable
     private fun ConceptCassette() {
-        val c = NxTheme.colors
-        NxSurface(NxSurfaceLevel.Floating, Modifier.width(340.dp), shape = MaterialTheme.shapes.medium) {
+        val c = probeInks()
+        NxSurface(SurfaceKind.Card, Modifier.width(340.dp), shape = MaterialTheme.shapes.medium) {
             Column(Modifier.fillMaxWidth().padding(Spacing.s14)) {
                 Box(
                     Modifier.fillMaxWidth().height(92.dp).clip(RoundedCornerShape(10.dp))
-                        .background(lerp(c.surfaceContainer, Color.Black, 0.35f)),
+                        .background(lerp(c.raised, Color.Black, 0.35f)),
                 ) {
                     Canvas(Modifier.fillMaxSize()) {
                         val hub = size.height * 0.10f
@@ -124,20 +125,20 @@ class MoreConceptsProbe {
                         val rx = size.width * 0.73f
                         // Tape between the reels, the part you can see through the window.
                         drawRect(
-                            color = c.textSecondary.copy(alpha = 0.35f),
+                            color = c.quiet.copy(alpha = 0.35f),
                             topLeft = Offset(lx, cy - 2f),
                             size = GeomSize(rx - lx, 4f),
                         )
                         fun reel(cx: Float, share: Float, lit: Boolean) {
                             val r = hub + (full - hub) * sqrt(share.coerceIn(0f, 1f))
                             drawCircle(
-                                color = if (lit) c.primary.copy(alpha = 0.85f) else c.textSecondary.copy(alpha = 0.45f),
+                                color = if (lit) c.lead.copy(alpha = 0.85f) else c.quiet.copy(alpha = 0.45f),
                                 radius = r, center = Offset(cx, cy),
                                 style = Stroke(width = (r - hub).coerceAtLeast(1.5f)),
                             )
-                            drawCircle(color = c.surfaceContainer, radius = hub, center = Offset(cx, cy))
+                            drawCircle(color = c.raised, radius = hub, center = Offset(cx, cy))
                             drawCircle(
-                                color = c.textSecondary.copy(alpha = 0.5f), radius = hub,
+                                color = c.quiet.copy(alpha = 0.5f), radius = hub,
                                 center = Offset(cx, cy), style = Stroke(width = 1.5f),
                             )
                         }
@@ -147,26 +148,26 @@ class MoreConceptsProbe {
                     // The label sits across the shell, the way a cassette's does.
                     Column(Modifier.align(Alignment.BottomStart).padding(Spacing.s10)) {
                         Text(
-                            title, style = MaterialTheme.typography.bodyMedium, color = c.textPrimary,
+                            title, style = MaterialTheme.typography.bodyMedium, color = c.main,
                             fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis,
                         )
                         Text(
                             "$elapsed / $total", style = MaterialTheme.typography.labelSmall,
-                            color = c.textSecondary, maxLines = 1,
+                            color = c.quiet, maxLines = 1,
                         )
                     }
                 }
                 Spacer(Modifier.height(Spacing.s10))
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        artist, style = MaterialTheme.typography.bodySmall, color = c.textSecondary,
+                        artist, style = MaterialTheme.typography.bodySmall, color = c.quiet,
                         maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
                     )
-                    Glyph(NxIcon.SkipPrevious, 18, c.textSecondary)
+                    Glyph(NxIcon.SkipPrevious, 18, c.quiet)
                     Spacer(Modifier.width(Spacing.s10))
-                    Glyph(NxIcon.Pause, 22, c.textPrimary)
+                    Glyph(NxIcon.Pause, 22, c.main)
                     Spacer(Modifier.width(Spacing.s10))
-                    Glyph(NxIcon.SkipNext, 18, c.textSecondary)
+                    Glyph(NxIcon.SkipNext, 18, c.quiet)
                 }
             }
         }
@@ -178,8 +179,8 @@ class MoreConceptsProbe {
     // carries the time instead of wasting it.
     @Composable
     private fun ConceptColumn() {
-        val c = NxTheme.colors
-        NxSurface(NxSurfaceLevel.Floating, Modifier.width(148.dp), shape = MaterialTheme.shapes.medium) {
+        val c = probeInks()
+        NxSurface(SurfaceKind.Card, Modifier.width(148.dp), shape = MaterialTheme.shapes.medium) {
             Column(Modifier.fillMaxWidth().padding(Spacing.s12)) {
                 Image(
                     cover, null, contentScale = ContentScale.Crop,
@@ -194,7 +195,7 @@ class MoreConceptsProbe {
                         for (i in 0 until n) {
                             val w = (env[i] * size.width).coerceAtLeast(size.width * 0.08f)
                             drawRoundRect(
-                                color = if (i < cut) c.primary else c.textSecondary.copy(alpha = 0.26f),
+                                color = if (i < cut) c.lead else c.quiet.copy(alpha = 0.26f),
                                 topLeft = Offset(0f, i * slot),
                                 size = GeomSize(w, slot * 0.66f),
                                 cornerRadius = CornerRadius(1.5f, 1.5f),
@@ -204,15 +205,15 @@ class MoreConceptsProbe {
                     Spacer(Modifier.width(Spacing.s10))
                     Column(Modifier.weight(1f).fillMaxHeight()) {
                         Text(
-                            title, style = MaterialTheme.typography.bodyMedium, color = c.textPrimary,
+                            title, style = MaterialTheme.typography.bodyMedium, color = c.main,
                             fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis,
                         )
                         Text(
-                            artist, style = MaterialTheme.typography.labelSmall, color = c.textSecondary,
+                            artist, style = MaterialTheme.typography.labelSmall, color = c.quiet,
                             maxLines = 2, overflow = TextOverflow.Ellipsis,
                         )
                         Spacer(Modifier.weight(1f))
-                        Text("$elapsed / $total", style = MaterialTheme.typography.labelSmall, color = c.textSecondary)
+                        Text("$elapsed / $total", style = MaterialTheme.typography.labelSmall, color = c.quiet)
                     }
                 }
                 Spacer(Modifier.height(Spacing.s10))
@@ -221,12 +222,12 @@ class MoreConceptsProbe {
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Glyph(NxIcon.SkipPrevious, 18, c.textSecondary)
+                    Glyph(NxIcon.SkipPrevious, 18, c.quiet)
                     Box(
-                        Modifier.size(40.dp).clip(CircleShape).background(c.primaryContainer),
+                        Modifier.size(40.dp).clip(CircleShape).background(c.leadWash),
                         contentAlignment = Alignment.Center,
-                    ) { Glyph(NxIcon.Pause, 20, c.onPrimaryContainer) }
-                    Glyph(NxIcon.SkipNext, 18, c.textSecondary)
+                    ) { Glyph(NxIcon.Pause, 20, c.main) }
+                    Glyph(NxIcon.SkipNext, 18, c.quiet)
                 }
             }
         }
@@ -238,7 +239,7 @@ class MoreConceptsProbe {
     // by a downsample, because the off-screen renderer has none.
     @Composable
     private fun ConceptGround() {
-        val c = NxTheme.colors
+        val c = probeInks()
         Box(Modifier.width(340.dp).height(112.dp).clip(MaterialTheme.shapes.medium)) {
             Image(coverBlur, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
             Box(
@@ -275,7 +276,7 @@ class MoreConceptsProbe {
                     for (i in 0 until n) {
                         val h = (env[i] * size.height).coerceAtLeast(size.height * 0.08f)
                         drawRoundRect(
-                            color = if (i < cut) c.primary else Color.White.copy(alpha = 0.34f),
+                            color = if (i < cut) c.lead else Color.White.copy(alpha = 0.34f),
                             topLeft = Offset(i * slot + (slot - bar) / 2f, size.height - h),
                             size = GeomSize(bar, h),
                             cornerRadius = CornerRadius(bar / 2f, bar / 2f),

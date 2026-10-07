@@ -16,6 +16,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import hivens.ui.background.BackgroundManager
 import hivens.ui.background.BackgroundMediaKind
 import hivens.ui.background.BackgroundOptimizer
 import hivens.ui.background.backgroundMediaKind
@@ -25,19 +26,22 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxIconButton
-import hivens.ui.theme.NxTheme
 import hivens.ui.utils.pickFile
 import hivens.ui.utils.rememberFileDialogSettings
 import hivens.widget.model.Widget
 import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.path
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 import java.io.File
 import java.nio.file.Path
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.Status
 
 @Widget(id = "bg.image.picker", displayName = "widget.bg.image.picker")
 @Composable
@@ -49,6 +53,10 @@ fun BgImagePickerWidget() {
     // Process singleton: a transcode runs in the app scope and outlives this screen,
     // so the handle to it has to outlive the screen as well.
     val optimizer = koinInject<BackgroundOptimizer>()
+    // Where a picked wallpaper is finished: the app's scope and the shell's own copy
+    // of the settings, because both outlive this screen and the transcode does too.
+    val appScope = koinInject<CoroutineScope>()
+    val backgrounds = koinInject<BackgroundManager>()
     // Downscale target: the monitor's physical pixel height, so a 4K source becomes a
     // display-res wallpaper once and stays crisp at any window size up to the screen.
     val targetHeight = remember { physicalScreenHeight() }
@@ -86,40 +94,22 @@ fun BgImagePickerWidget() {
                             )),
                             settings = dialogSettings,
                         )?.path ?: return@launch
-                        // Time-based media (video, GIF, animated PNG/WebP) taller than
-                        // the screen is transcoded down once and cached; optimize()
-                        // returns the source untouched in every other case. Stills fall
-                        // through to the load-time image cache instead.
-                        val timeBased = withContext(Dispatchers.IO) {
-                            backgroundMediaKind(File(picked)) == BackgroundMediaKind.TimeBased
+                        // Not on this scope: leaving the screen cancels it, and a wait
+                        // for a transcode cancelled that way read as the user's own
+                        // cancel. The transcode finished into the cache, the wallpaper
+                        // was never set, and the next change swept the file away.
+                        appScope.launch {
+                            applyWallpaper(picked, targetHeight, optimizer, backgrounds)
                         }
-                        val resolved = if (timeBased && targetHeight > 0) {
-                            try {
-                                optimizer.optimize(Path.of(picked), targetHeight).toString()
-                            } catch (_: CancellationException) {
-                                // The user stopped the transcode: leave the wallpaper as
-                                // it was rather than setting the oversized source they
-                                // just declined to pay for.
-                                return@launch
-                            } catch (_: Exception) {
-                                picked
-                            }
-                        } else {
-                            picked
-                        }
-                        ctx.update { copy(imagePath = resolved, enabled = true) }
-                        // The cache holds the wallpaper itself for video; everything else
-                        // in it is a transcode of a wallpaper that is no longer set.
-                        optimizer.evictUnused(keep = Path.of(resolved))
                     }
                 },
             )
             if (optimizing != null) {
-                CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = NxTheme.colors.primary)
+                CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = NxColor.lead())
                 NxIconButton(
                     NxIcon.Close, s.backgroundCancelOptimize,
                     onClick = { optimizer.cancel() },
-                    tint    = NxTheme.colors.error,
+                    tint    = NxColor.status(Status.Error),
                 )
             } else if (settings.imagePath != null) {
                 NxIconButton(
@@ -128,7 +118,7 @@ fun BgImagePickerWidget() {
                         ctx.update { copy(imagePath = null, enabled = false) }
                         optimizer.evictUnused(keep = null)
                     },
-                    tint    = NxTheme.colors.error,
+                    tint    = NxColor.status(Status.Error),
                 )
             }
         }
@@ -136,8 +126,45 @@ fun BgImagePickerWidget() {
             Text(
                 text  = settings.imagePath!!.substringAfterLast("/").substringAfterLast("\\"),
                 style = MaterialTheme.typography.labelSmall,
-                color = NxTheme.colors.textSecondary.copy(alpha = 0.5f),
+                color = NxInk.quiet.copy(alpha = 0.5f),
             )
         }
     }
+}
+
+/**
+ * Sets [picked] as the wallpaper, downscaled first when it is time-based media
+ * taller than the screen.
+ *
+ * Video, GIF and animated PNG/WebP taller than the screen are transcoded down once
+ * and cached; optimize() returns the source untouched in every other case. Stills
+ * fall through to the load-time image cache instead.
+ */
+private suspend fun applyWallpaper(
+    picked: String,
+    targetHeight: Int,
+    optimizer: BackgroundOptimizer,
+    backgrounds: BackgroundManager,
+) {
+    val timeBased = withContext(Dispatchers.IO) {
+        backgroundMediaKind(File(picked)) == BackgroundMediaKind.TimeBased
+    }
+    val resolved = if (timeBased && targetHeight > 0) {
+        try {
+            optimizer.optimize(Path.of(picked), targetHeight).toString()
+        } catch (_: CancellationException) {
+            // The user stopped the transcode, which is the one thing that cancels
+            // it on this scope: leave the wallpaper as it was rather than setting
+            // the oversized source they just declined to pay for.
+            return
+        } catch (_: Exception) {
+            picked
+        }
+    } else {
+        picked
+    }
+    backgrounds.update { it.copy(imagePath = resolved, enabled = true) }
+    // The cache holds the wallpaper itself for video; everything else in it is a
+    // transcode of a wallpaper that is no longer set.
+    optimizer.evictUnused(keep = Path.of(resolved))
 }

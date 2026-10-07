@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -12,7 +11,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -20,7 +18,6 @@ import androidx.compose.ui.unit.dp
 import hivens.core.api.interfaces.IJavaManager
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.data.InstanceRuntime
-import hivens.core.data.RuntimePrefs
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
 import hivens.core.jvm.AutomaticHeap
@@ -28,44 +25,52 @@ import hivens.core.jvm.JvmArgsPresets
 import hivens.core.jvm.JvmConfig
 import hivens.core.jvm.SystemMemory
 import hivens.launcher.ProfilerProfileStore
+import hivens.launcher.component.EarlyLoadingScreen
+import hivens.launcher.component.JvmHeapArgs
 import hivens.ui.components.JvmArgsBuilderDialog
 import hivens.ui.components.RamSelector
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.icons.NxIcon
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxField
-import hivens.ui.nx.NxRow
-import hivens.ui.nx.NxSection
-import hivens.ui.nx.NxToggle
-import hivens.ui.theme.NxTheme
+import hivens.ui.nx.NxReveal
+import hivens.ui.nx.NxSettingBlock
+import hivens.ui.nx.NxSettingGroup
+import hivens.ui.nx.NxSettingRow
+import hivens.ui.nx.NxSwitch
+import hivens.ui.theme.NxInk
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 import java.nio.file.Path
 
 /**
  * Launch preferences: heap (via the shared [RamSelector]), the Java executable
- * override + JVM-args builder, and the optional game-window geometry. Every knob
+ * override + JVM-args builder, the optional game-window geometry, and the
+ * loader's own loading screen where the pack's loader has one. Every knob
  * writes onto [InstanceRuntime]; the launch path already honours javaPath and
- * jvmArgs, and window geometry is now wired behind [InstanceRuntime.windowSizeOverride].
+ * jvmArgs, and window geometry is wired behind [InstanceRuntime.windowSizeOverride].
+ *
+ * Java is shown as what it is by default, a runtime the launcher picks and
+ * provisions for this Minecraft version. The path field appears only once somebody
+ * asks for their own: an empty field with a sample path in it read as a setting
+ * left blank by mistake.
  */
 @Composable
 internal fun PackRuntimeSection(
     pack: PackInstance,
     instanceDir: Path,
-    save: (PackInstance) -> Unit,
+    save: (PackEdit) -> Unit,
 ) {
     val s = LocalStrings.current
-    val colors = NxTheme.colors
     val profilerStore: ProfilerProfileStore = koinInject()
     val settingsService: ISettingsService = koinInject()
     val javaManager: IJavaManager = koinInject()
-    val scope = rememberCoroutineScope()
     val runtime = pack.runtime
 
-    fun commit(rt: InstanceRuntime) = save(pack.copy(runtime = rt))
+    // One knob, not the runtime as this frame shows it: the write lands on the
+    // record as it is by then.
+    fun commit(change: (InstanceRuntime) -> InstanceRuntime) = save { it.copy(runtime = change(it.runtime)) }
 
     // Auto-heap resolution mirrors the old settings tab: the adaptive profile when
     // enabled and present, else the physical-memory heuristic.
@@ -79,55 +84,71 @@ internal fun PackRuntimeSection(
     var showJvmBuilder by remember(pack.id) { mutableStateOf(false) }
     var widthText by remember(pack.id) { mutableStateOf(runtime.windowWidth.toString()) }
     var heightText by remember(pack.id) { mutableStateOf(runtime.windowHeight.toString()) }
+    // Asked for, not yet typed: the field shows before a path has been written.
+    var ownJava by remember(pack.id) { mutableStateOf(false) }
+    val customJava = !runtime.javaPath.isNullOrBlank()
 
-    NxSection(s.packSettingsMemory) {
+    NxSettingGroup(s.packSettingsMemory) {
         RamSelector(
             isAuto = !runtime.fixedMemory,
             resolvedAutoMb = resolvedAutoMb,
             // Nothing pinned: offer what the next launch would use anyway, so
             // leaving Auto starts from the real number rather than a constant.
             currentMb = runtime.memoryMb.takeIf { it > 0 } ?: resolvedAutoMb,
-            onAutoSelected = { commit(runtime.copy(fixedMemory = false)) },
-            onValueChanged = { commit(runtime.copy(memoryMb = it, fixedMemory = true)) },
-            modifier = Modifier.fillMaxWidth(),
+            onAutoSelected = { commit { rt -> rt.copy(fixedMemory = false) } },
+            onValueChanged = { commit { rt -> rt.copy(memoryMb = it, fixedMemory = true) } },
         )
+        // What is typed by hand wins, so a heap ceiling named in the arguments is the
+        // one the game gets and this setting is left on screen saying it does not
+        // apply. A typed minimum alone leaves the ceiling to this setting.
+        val typedHeap = remember(runtime.jvmArgs) { JvmHeapArgs.maxIn(runtime.jvmArgs) }
+        if (typedHeap.isNotEmpty()) {
+            NxSettingBlock {
+                Text(
+                    s.packSettingsMemoryFromArgs(typedHeap.joinToString(" ")),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = NxInk.quiet,
+                )
+            }
+        }
     }
 
-    NxSection(s.packSettingsEnvironment) {
+    NxSettingGroup(s.packSettingsEnvironment) {
         val major = requiredJavaMajor(pack, javaManager)
-        Column(Modifier.fillMaxWidth()) {
-            Text(s.packSettingsJava, style = MaterialTheme.typography.labelSmall, color = colors.textSecondary)
-            NxField(
-                value = runtime.javaPath ?: "",
-                onValueChange = { commit(runtime.copy(javaPath = it.ifBlank { null })) },
-                placeholder = s.packSettingsJavaPathPlaceholder,
-                modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    if (runtime.javaPath.isNullOrBlank()) major?.let { s.packSettingsJavaManaged(it) } ?: s.packSettingsJavaCustom
-                    else s.packSettingsJavaCustom,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = colors.textSecondary,
-                    modifier = Modifier.weight(1f),
+        NxSettingRow(
+            title  = s.packSettingsJava,
+            detail = if (customJava) s.packSettingsJavaCustom else major?.let { s.packSettingsJavaManaged(it) } ?: s.packSettingsJavaCustom,
+        ) {
+            if (customJava || ownJava) {
+                NxButton(
+                    s.packSettingsJavaReset,
+                    onClick = { ownJava = false; commit { rt -> rt.copy(javaPath = null) } },
+                    style = NxButtonStyle.Secondary,
+                    compact = true,
                 )
-                if (!runtime.javaPath.isNullOrBlank()) {
-                    NxButton(
-                        s.packSettingsJavaReset,
-                        onClick = { commit(runtime.copy(javaPath = null)) },
-                        style = NxButtonStyle.Tertiary,
-                        compact = true,
-                    )
-                }
+            } else {
+                NxButton(
+                    s.packSettingsJavaPickOwn,
+                    onClick = { ownJava = true },
+                    style = NxButtonStyle.Secondary,
+                    compact = true,
+                )
+            }
+        }
+        NxReveal(visible = customJava || ownJava) {
+            NxSettingBlock {
+                NxField(
+                    value = runtime.javaPath ?: "",
+                    onValueChange = { commit { rt -> rt.copy(javaPath = it.ifBlank { null }) } },
+                    placeholder = s.packSettingsJavaPathPlaceholder,
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
         }
 
-        NxRow(
-            title = s.packSettingsJvmArgs,
-            subtitle = runtime.jvmArgs?.takeIf { it.isNotBlank() } ?: s.packSettingsJvmArgsDefault,
+        NxSettingRow(
+            title  = s.packSettingsJvmArgs,
+            detail = runtime.jvmArgs?.takeIf { it.isNotBlank() } ?: s.packSettingsJvmArgsDefault,
         ) {
             NxButton(
                 s.packSettingsJvmArgsEdit,
@@ -138,48 +159,84 @@ internal fun PackRuntimeSection(
         }
     }
 
-    NxSection(s.packSettingsWindow) {
-        NxToggle(
-            s.packSettingsWindowOverride,
-            runtime.windowSizeOverride,
-            description = s.packSettingsWindowOverrideDesc,
-            icon = NxIcon.OpenInFull,
-        ) { commit(runtime.copy(windowSizeOverride = it)) }
+    NxSettingGroup(s.packSettingsWindow) {
+        NxSettingRow(s.packSettingsWindowOverride, detail = s.packSettingsWindowOverrideDesc) {
+            NxSwitch(runtime.windowSizeOverride, { on -> commit { rt -> rt.copy(windowSizeOverride = on) } })
+        }
 
-        if (runtime.windowSizeOverride) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text(s.packSettingsWidth, style = MaterialTheme.typography.labelSmall, color = colors.textSecondary)
-                    NxField(
-                        value = widthText,
-                        onValueChange = { raw ->
-                            widthText = raw.filter { it.isDigit() }.take(5)
-                            widthText.toIntOrNull()?.takeIf { it in 1..10000 }?.let { commit(runtime.copy(windowWidth = it)) }
-                        },
-                        placeholder = s.packSettingsWidth,
-                        modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
-                    )
-                }
-                Column(Modifier.weight(1f)) {
-                    Text(s.packSettingsHeight, style = MaterialTheme.typography.labelSmall, color = colors.textSecondary)
-                    NxField(
-                        value = heightText,
-                        onValueChange = { raw ->
-                            heightText = raw.filter { it.isDigit() }.take(5)
-                            heightText.toIntOrNull()?.takeIf { it in 1..10000 }?.let { commit(runtime.copy(windowHeight = it)) }
-                        },
-                        placeholder = s.packSettingsHeight,
-                        modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
-                    )
+        NxReveal(visible = runtime.windowSizeOverride) {
+            NxSettingBlock {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(s.packSettingsWidth, style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
+                        NxField(
+                            value = widthText,
+                            onValueChange = { raw ->
+                                widthText = raw.filter { it.isDigit() }.take(5)
+                                widthText.toIntOrNull()?.takeIf { it in 1..10000 }?.let { commit { rt -> rt.copy(windowWidth = it) } }
+                            },
+                            placeholder = s.packSettingsWidth,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(s.packSettingsHeight, style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
+                        NxField(
+                            value = heightText,
+                            onValueChange = { raw ->
+                                heightText = raw.filter { it.isDigit() }.take(5)
+                                heightText.toIntOrNull()?.takeIf { it in 1..10000 }?.let { commit { rt -> rt.copy(windowHeight = it) } }
+                            },
+                            placeholder = s.packSettingsHeight,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
                 }
             }
         }
 
-        NxToggle(s.packSettingsFullscreen, runtime.fullScreen, icon = NxIcon.Tv) {
-            commit(runtime.copy(fullScreen = it))
+        NxSettingRow(s.packSettingsFullscreen) {
+            NxSwitch(runtime.fullScreen, { on -> commit { rt -> rt.copy(fullScreen = on) } })
+        }
+
+        val manifest = pack.cachedManifest
+        if (EarlyLoadingScreen.appliesTo(manifest?.loaderName, manifest?.minecraftVersion)) {
+            val choice = runtime.earlyLoadingScreen
+            // Read again whenever the choice changes: a launch in between may have rewritten it.
+            var packValue by remember(instanceDir) { mutableStateOf<Boolean?>(null) }
+            var read by remember(instanceDir) { mutableStateOf(false) }
+            LaunchedEffect(instanceDir, choice) {
+                packValue = withContext(Dispatchers.IO) { runCatching { EarlyLoadingScreen.readConfig(instanceDir) }.getOrNull() }
+                read = true
+            }
+            val launcherDecides = choice == null && EarlyLoadingScreen.waylandSession
+            // Where the pack's own file is the answer, nothing is shown until it has
+            // been read: a first frame drawn from the default flipped visibly for a
+            // pack that ships the screen off.
+            if (read || choice != null || launcherDecides) {
+                NxSettingRow(
+                    title  = s.packSettingsEarlyScreen,
+                    detail = if (launcherDecides) s.packSettingsEarlyScreenWayland else s.packSettingsEarlyScreenDesc,
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        if (choice != null) {
+                            NxButton(
+                                s.packSettingsEarlyScreenReset,
+                                onClick = { commit { rt -> rt.copy(earlyLoadingScreen = null) } },
+                                style = NxButtonStyle.Tertiary,
+                                compact = true,
+                            )
+                        }
+                        NxSwitch(
+                            EarlyLoadingScreen.effective(choice, packValue),
+                            { on -> commit { rt -> rt.copy(earlyLoadingScreen = on) } },
+                        )
+                    }
+                }
+            }
         }
     }
 
@@ -196,7 +253,7 @@ internal fun PackRuntimeSection(
             javaMajor = requiredJavaMajor(pack, javaManager),
             onDismiss = { showJvmBuilder = false },
             onApply = { newArgs ->
-                commit(runtime.copy(jvmArgs = newArgs.ifBlank { null }))
+                commit { rt -> rt.copy(jvmArgs = newArgs.ifBlank { null }) }
                 showJvmBuilder = false
             },
         )

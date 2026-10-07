@@ -108,4 +108,17 @@ class NavBackStack(root: Screen) {
         while (entries.lastIndex > idx) forwardStack.add(entries.removeAt(entries.lastIndex))
     }
 
+    /**
+     * Drops every entry, back and forward, that [keep] refuses, for a destination
+     * that stopped existing: a screen somebody deleted while it sat in the history.
+     * Going back to it would open a page about nothing. When nothing is left the
+     * stack starts over at [fallback], so the never-empty invariant holds.
+     */
+    fun retainWhere(fallback: Screen, keep: (Screen) -> Boolean) {
+        if (entries.all(keep) && forwardStack.all(keep)) return
+        forwardStack.removeAll { !keep(it) }
+        entries.removeAll { !keep(it) }
+        if (entries.isEmpty()) entries.add(fallback)
+    }
+
 }

@@ -18,18 +18,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import hivens.core.data.SessionData
-import hivens.ui.surface.NxCard
-import hivens.ui.surface.NxSurfaceLevel
+import hivens.ui.surface.NxSurface
+import hivens.ui.surface.SurfaceKind
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.identity.SkinManager
 import hivens.ui.platform.SystemActions
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
-import hivens.ui.theme.NxTheme
 import hivens.widget.api.SlotRenderer
 import hivens.widget.model.SlotId
 import hivens.widget.model.SurfaceId
 import org.koin.compose.koinInject
+import hivens.ui.theme.NxColor
 
 private const val SURFACE = "profile"
 
@@ -40,9 +40,8 @@ private const val SURFACE = "profile"
 // slot stays seeded but unrendered -- its widget is dormant until a
 // dedicated skin screen is built; the skin now leads the Account tab.
 // Header title stays in surface chrome -- a per-screen invariant the user
-// cannot meaningfully remove without losing the screen's identity. Inner
-// glass frame names its own plane rather than taking the default, matching the
-// Settings frame.
+// cannot meaningfully remove without losing the screen's identity. The inner
+// frame is a panel, matching the Settings frame.
 //
 // Only one of `signin` / `account` renders at a time; the inactive slot is
 // unmounted so the editor's chrome decorator does not paint phantom chrome
@@ -98,14 +97,14 @@ fun ProfileSurface(
     CompositionLocalProvider(LocalProfileContext provides ctx) {
         Column(Modifier.fillMaxSize().padding(16.dp)) {
             // Title lives in the top-bar breadcrumb now -- no in-screen duplicate.
-            NxCard(
+            NxSurface(
+                kind     = SurfaceKind.Panel,
                 modifier = Modifier.weight(1f).fillMaxWidth(),
-                level    = NxSurfaceLevel.Raised,
             ) {
                 if (authResolving && session == null) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator(
-                            color       = NxTheme.colors.primary.copy(alpha = 0.35f),
+                            color       = NxColor.wash(NxColor.lead(), 0.35f),
                             modifier    = Modifier.size(28.dp),
                             strokeWidth = 2.dp,
                         )

@@ -21,7 +21,7 @@ class LayoutGraphSurfaceTest {
     private val graph = LayoutGraph(mapOf(home to SurfaceLayout(mapOf(main to SlotContent(listOf(w))))))
 
     private fun surfaceOf(g: LayoutGraph): SurfaceSpec? =
-        g.surfaces[home]!!.slots[main]!!.widgets.first().surface
+        g.surfaces[home]!!.slotsOf(FamilyId.GENERAL)[main]!!.widgets.first().surface
 
     @Test
     fun `updateWidgetSurface sets the surface on the target`() {

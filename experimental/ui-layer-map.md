@@ -926,11 +926,10 @@ viewport covers.
 It is the most reusable code in the UI layer, it is `internal` to a screen package,
 and nothing else can use it.
 
-`ConsoleWindow.kt` also still carries the whole previous rendering pipeline --
-`ConsoleDoc`, `DocSpan`, `ConsoleRender`, `buildConsoleDoc`, `styleDoc` -- which the
-live path replaced with the per-line `LineModels` pass. Its only remaining callers
-are `ConsoleRenderTest` and `ConsolePerfBench`. That is a fossil surface: code kept
-alive by its own tests.
+`ConsoleWindow.kt` used to carry the whole previous rendering pipeline as well
+(`ConsoleDoc`, `DocSpan`, `ConsoleRender`, `buildConsoleDoc`, `styleDoc`), which the
+live path replaced with the per-line `LineModels` pass and which only its own tests
+kept alive. It has been removed with them.
 
 ### What the screens tell us about the modular work
 

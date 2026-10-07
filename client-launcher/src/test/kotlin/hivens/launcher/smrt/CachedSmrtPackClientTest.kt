@@ -144,9 +144,22 @@ class CachedSmrtPackClientTest {
 
         client.listPacks()
         assertEquals(1, counter.get())
-        (smrtCaches.listing as Cache<SmrtPackListing>).invalidate("$mirror/v1/packs")
+        smrtCaches.listing.invalidate("$mirror/v1/packs")
         client.listPacks()
         assertEquals(2, counter.get(), "post-invalidate listPacks reloads")
+    }
+
+    @Test
+    fun `forceRefresh reaches the mirror while the cached listing is still fresh`() = runTest {
+        val counter = AtomicInteger(0)
+        val client = SmrtPackClient(provider(counter, listingBody), mirror, json, caches(TestClock()))
+
+        client.listPacks()
+        client.listPacks()
+        assertEquals(1, counter.get(), "an ambient read stays on the warm cache")
+
+        client.listPacks(forceRefresh = true)
+        assertEquals(2, counter.get(), "a poll must not be answered from cache")
     }
 
     @Test

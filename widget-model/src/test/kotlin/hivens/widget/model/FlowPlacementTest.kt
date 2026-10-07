@@ -4,34 +4,30 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 /**
- * `weight`, `canvas` and `cell` sit on every widget at once, though at most one
- * of them means anything for the slot it happens to be in. The renderer's
- * precedence used to be two copies of a `when` inside a composable, which is
- * both untestable and free to drift; this pins the rule that decides.
+ * A widget carries one [Placement] whatever slot it sits in, and a flow reads
+ * three of its seven fields. The renderer's precedence used to be two copies of
+ * a `when` inside a composable, which is both untestable and free to drift; this
+ * pins the rule that decides.
  *
- * The fields a slot ignores stay on the instance rather than being cleared --
- * flipping a slot's orientation and back must not cost the user their
- * arrangement -- so "ignored" is asserted here, not enforced by wiping data.
+ * The fields a flow ignores stay on the instance rather than being cleared --
+ * flipping a slot's mode and back must not cost the user their arrangement --
+ * so "ignored" is asserted here, not enforced by wiping data.
  */
 class FlowPlacementTest {
 
-    private fun widget(
-        weight: Float = 0f,
-        canvas: CanvasPlacement? = null,
-        cell: GridCell? = null,
-    ) = WidgetInstance(kind = WidgetKind("test.widget"), instanceId = "id", weight = weight, canvas = canvas, cell = cell)
+    private fun widget(placement: Placement? = null) =
+        WidgetInstance(kind = WidgetKind("test.widget"), instanceId = "id", placement = placement)
 
     @Test
-    fun `no placement is natural size`() {
+    fun `no placement at all is natural size`() {
         assertEquals(FlowPlacement.Natural, widget().flowPlacement())
     }
 
     @Test
     fun `weight wins over an explicit size`() {
-        val placement = widget(weight = 2f, canvas = CanvasPlacement(width = 300f, height = 200f)).flowPlacement()
         assertEquals(
             FlowPlacement.Weighted(2f),
-            placement,
+            widget(Placement(weight = 2f, width = 300f, height = 200f)).flowPlacement(),
             "resizing a weighted widget must not strip its flex, or the weighted region stops filling",
         )
     }
@@ -40,33 +36,63 @@ class FlowPlacementTest {
     fun `a resized widget is bounded on the axes it set`() {
         assertEquals(
             FlowPlacement.Bounded(widthDp = 300f, heightDp = 0f),
-            widget(canvas = CanvasPlacement(width = 300f)).flowPlacement(),
+            widget(Placement(width = 300f)).flowPlacement(),
         )
         assertEquals(
             FlowPlacement.Bounded(widthDp = 0f, heightDp = 120f),
-            widget(canvas = CanvasPlacement(height = 120f)).flowPlacement(),
+            widget(Placement(height = 120f)).flowPlacement(),
         )
     }
 
     @Test
-    fun `a canvas offset alone does not size anything in a flow slot`() {
+    fun `an offset alone does not size anything in a flow slot`() {
         assertEquals(
             FlowPlacement.Natural,
-            widget(canvas = CanvasPlacement(x = 40f, y = 80f, z = 3)).flowPlacement(),
-            "position belongs to a canvas slot; a flow slot places by order",
+            widget(Placement(x = 40f, y = 80f, z = 3)).flowPlacement(),
+            "position belongs to a placement slot; a flow places by order",
         )
     }
 
     @Test
-    fun `a grid cell is ignored by a flow slot`() {
+    fun `an anchor alone does not size anything in a flow slot`() {
         assertEquals(
             FlowPlacement.Natural,
-            widget(cell = GridCell(col = 2, row = 1, colSpan = 2)).flowPlacement(),
+            widget(Placement(anchor = Placement.BOTTOM_END)).flowPlacement(),
         )
     }
 
     @Test
     fun `zero weight is not a weight`() {
-        assertEquals(FlowPlacement.Natural, widget(weight = 0f).flowPlacement())
+        assertEquals(FlowPlacement.Natural, widget(Placement(weight = 0f)).flowPlacement())
+    }
+}
+
+/**
+ * The two questions the editor asks a flow before it wraps or decorates a child.
+ *
+ * Both were inline booleans at the call site once, and the first of them was
+ * wrong in a way nothing could see until a grid was drawn in edit mode: every
+ * cell took the height of the whole slot and the lines after the first got none.
+ */
+class FlowShapeTest {
+
+    @Test
+    fun `only an unwrapped horizontal flow lays out like a row`() {
+        assertEquals(true, FlowSpec.Row.rowLike)
+        assertEquals(false, FlowSpec.Column.rowLike)
+        assertEquals(false, FlowSpec.grid(3).rowLike, "a grid is horizontal and is not a row")
+        assertEquals(false, FlowSpec(FlowSpec.VERTICAL, wrap = 3).rowLike)
+    }
+
+    @Test
+    fun `only a uniform wrapped flow sizes its own cells`() {
+        assertEquals(true, FlowSpec.grid(2).uniformGrid)
+        assertEquals(false, FlowSpec.Row.uniformGrid)
+        assertEquals(false, FlowSpec.Column.uniformGrid)
+        assertEquals(
+            false,
+            FlowSpec(FlowSpec.HORIZONTAL, wrap = 2, uniform = false).uniformGrid,
+            "a wrap that is not uniform leaves the size to the child",
+        )
     }
 }

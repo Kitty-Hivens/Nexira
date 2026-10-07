@@ -39,37 +39,25 @@ interface AppStrings {
     val byteUnits: List<String>
 
     // --- Dashboard ---
-    fun dashboardWelcome(name: String): String
-    val dashboardServers: String
-    val dashboardServersEmpty: String
+    fun homeWelcomeGreeting(name: String): String
+    val homeWelcomeSubtitle: String
     /** Shown in the main content area while no session exists — replaces the
      *  ambiguous "spinning indicator forever" state for unauthenticated users. */
-    val dashboardLoginRequiredTitle: String
-    val dashboardLoginRequiredHint: String
 
     // --- Launch Control ---
-    val launchReady: String
-    val launchButton: String
-    val launchAbort: String
     val launchRunning: String
     /** Stops the running game from the dashboard control. */
-    val launchStop: String
     val launchDownloading: String
     val launchPreparing: String
     val launchFailed: String
 
     // --- Launcher States ---
-    val stateInit: String
-    val stateAuth: String
     val stateAuthFail: String
     val stateNoPassword: String
-    val stateSync: String
-    val stateJvm: String
     val stateLaunching: String
     fun stateExitCode(code: Int): String
     fun stateError(msg: String): String
     fun stateMissingAuthProvider(providerKey: String): String
-    fun stateHelperUnavailable(mcVersion: String): String
     fun stateAuthlibUnavailable(mcVersion: String): String
 
     // --- Auth Success ---
@@ -104,10 +92,10 @@ interface AppStrings {
     val settingsThemeModeSystem: String
     val settingsThemeModeWallpaper: String
     val settingsThemeModeSystemUnavailable: String
-    val settingsPaletteFromWallpaper: String
-    val settingsPaletteFromWallpaperDesc: String
     val settingsSurfaceBlur: String
     val settingsSurfaceBlurDesc: String
+    val settingsReduceMotion: String
+    val settingsReduceMotionDesc: String
     val settingsCustomChrome: String
     val settingsCustomChromeDesc: String
     val settingsCustomChromeTiling: String
@@ -121,13 +109,8 @@ interface AppStrings {
     val themePickerApply: String
     val themePickerPreview: String
     val themePickerSelected: String
-    val themePickerColorPrimary: String
-    val themePickerColorSecondary: String
-    val themePickerColorBackground: String
-    val themePickerColorSurface: String
-    val themePickerColorAccent: String
-    val themePickerColorSuccess: String
-    val themePickerColorError: String
+    val themePickerDarkOnly: String
+    val themeFromWallpaper: String
     val themePickerBtnSample: String
     val themePickerBtnOutlined: String
 
@@ -172,34 +155,15 @@ interface AppStrings {
     val paginationNext: String
 
     // --- Server Detail ---
-    val serverDetailTitle: String
-    val serverDetailNoImage: String
-    val serverDetailNoImageHint: String
-    val serverDetailMissingTitle: String
-    fun serverDetailMissingPath(file: String): String
 
     // --- Server Settings ---
-    val serverSettingsSubtitle: String
-    val serverSettingsSectionSystem: String
-    val serverSettingsSectionMods: String
-    val serverSettingsRam: String
-    fun serverSettingsRamValue(mb: Int): String
-    val serverSettingsJava: String
-    fun serverSettingsJavaAuto(version: String): String
-    val serverSettingsJavaHint: String
     val serverSettingsOpenFolder: String
-    val serverSettingsReset: String
 
     // --- Destructive-action confirm dialogs ---
-    val serverSettingsResetConfirmTitle: String
-    val serverSettingsResetConfirmBody: String
     val backgroundResetConfirmTitle: String
     val backgroundResetConfirmBody: String
     val logoutConfirmTitle: String
     val logoutConfirmBody: String
-
-    val serverSettingsNoMods: String
-    val serverSettingsPickJava: String
 
     // --- Update ---
     val updateTitle: String
@@ -294,34 +258,34 @@ interface AppStrings {
 
     // --- Launcher States: Offline ---
     val stateOfflineSkipAuth: String
+    /** A pack that names no server is launched without a session token, whatever account is signed in. */
+    val stateUnboundOffline: String
     val stateOfflineSkipSync: String
     /** Files dropped from mods/ before spawn because the pack does not name them. */
     fun stateForeignContentRemoved(count: Int, names: String): String
     val stateContentChanged: String
     val stateOfflineNoClient: String
-    val stateOfflineNoManifest: String
 
     // --- Server Settings: Extended ---
-    val serverSettingsJvmArgs: String
-    val serverSettingsJvmArgsHint: String
     /** Button label that opens the visual JVM args builder when its toggle is on. */
-    val serverSettingsJvmBuildArgs: String
-    val serverSettingsResolution: String
-    val serverSettingsWidth: String
-    val serverSettingsHeight: String
-    val serverSettingsFullscreen: String
-    val serverSettingsAutoConnect: String
 
     // --- Server Settings: Icon Upload ---
-    val serverSettingsPickIcon: String
 
     // =========================================================================
     // RAM Selector
     // =========================================================================
-    val ramCustomInputLabel: String
     fun ramSystemHint(systemRam: String, recommended: String): String
+    val ramModeTitle: String
+    val ramModeAuto: String
+    val ramModeOwn: String
+    fun ramAutoDetail(resolved: String): String
+    val ramOwnDetail: String
+    val ramAllocated: String
+    val ramUnitGb: String
+    val ramUnitMb: String
+    fun ramOutOfRange(min: String, max: String): String
+    fun ramAboveRecommended(recommended: String): String
     /** Auto-mode chip label; [resolved] is the formatted heap Auto currently resolves to. */
-    fun ramAutoLabel(resolved: String): String
 
     // =========================================================================
     // Mod cards
@@ -332,7 +296,6 @@ interface AppStrings {
     // =========================================================================
     // Server grid
     // =========================================================================
-    val serversFavorites: String
 
     // =========================================================================
     // Custom Background
@@ -413,12 +376,6 @@ interface AppStrings {
     val techSkiaDesc: String
     val techCoilDesc: String
 
-    // --- Spawn Reset ---
-    val spawnResetButton: String
-    val spawnResetLoading: String
-    val spawnResetSuccess: String
-    val spawnResetError: String
-
     // --- Tray ---
     val trayStatusIdle: String
     val trayStatusRunning: String
@@ -437,8 +394,6 @@ interface AppStrings {
     val settingsPreReleasesDesc: String
     val settingsMandatoryUpdates: String
     val settingsMandatoryUpdatesDesc: String
-    val settingsAutoSyncAllPacks: String
-    val settingsAutoSyncAllPacksDesc: String
     val settingsAutoUpdatePacks: String
     val settingsAutoUpdatePacksDesc: String
     val settingsAmberPolicy: String
@@ -456,9 +411,7 @@ interface AppStrings {
     fun settingsMimicVersionPlaceholder(default: String): String
 
     /** Auto-sync progress strip — `Syncing <name> (3/7)` */
-    fun dashboardAutoSyncProgress(serverName: String, current: Int, total: Int): String
     /** Auto-sync byte progress — `123 / 456 MB` */
-    fun dashboardAutoSyncBytes(readMB: Long, totalMB: Long): String
 
     /** Background-activity widget title, shown when the user hasn't set a custom one. */
     val widgetProgressTitle: String
@@ -516,14 +469,12 @@ interface AppStrings {
 
     // --- Smarty server controls (Settings → Smarty) ---
     val settingsSectionSmarty: String
-    val settingsOpenSmrtHelperTitle: String
-    val settingsOpenSmrtHelperDesc: String
-    val settingsStrictModCheckTitle: String
-    val settingsStrictModCheckDesc: String
     val settingsNetworkAgentTitle: String
     val settingsNetworkAgentDesc: String
     val settingsSmartyAuthLibTitle: String
     val settingsSmartyAuthLibDesc: String
+    val settingsReuseSessionTitle: String
+    val settingsReuseSessionDesc: String
 
     // --- Data directory (Settings → Data dir) ---
     val settingsSectionDataDir: String
@@ -663,10 +614,6 @@ interface AppStrings {
     val navBrowse: String
 
     // --- Home view variant picker (in Settings -> Interface) ---
-    val settingsHomeViewTitle: String
-    val settingsHomeViewSub: String
-    val settingsHomeViewClassic: String
-    val settingsHomeViewNew: String
 
     // --- UI style variant picker (in Settings -> Interface) ---
 
@@ -757,12 +704,19 @@ interface AppStrings {
     val backgroundLoopForever: String
     val backgroundLoopOnce: String
 
+    // --- Background audio ---
+    val backgroundAudio: String
+    val backgroundAudioDesc: String
+    val backgroundAudioVolume: String
+    val backgroundAudioStill: String
+    val backgroundLink: String
+    val backgroundLinkDesc: String
+
     // --- Customization extension ---
     val customizationAccentClear: String
     val customizationSectionVisual: String
     val customizationSectionColors: String
     val customizationHexInvalid: String
-    val themePickerAccentOverride: String
 
     // --- Browse screen ---
     val browseTitle: String
@@ -781,6 +735,14 @@ interface AppStrings {
     val createPackMc: String
     val createPackLoader: String
     val createPackLoaderVersion: String
+    /** Placeholder of the loader version field for a loader that resolves its own latest. */
+    val createPackLoaderVersionLatest: String
+    /** Placeholder of the loader version field for a loader that has no latest to offer. */
+    val createPackLoaderVersionRequired: String
+    /** Beside a loader version the loader itself recommends. */
+    val createPackLoaderRecommended: String
+    /** Beside a loader version that is a beta or an alpha. */
+    val createPackLoaderPreRelease: String
     val createPackConfirm: String
     val createPackCancel: String
     val createPackShowSnapshots: String
@@ -849,9 +811,183 @@ interface AppStrings {
     val selectionClear: String
     fun selectionBlockedByPack(count: Int): String
     val contentActionDetails: String
+    val contentLockedTitle: String
+    val contentLockedBody: String
+    val contentLockedOptionalBody: String
+    val contentLockedOpenSettings: String
     val contentActionOpenPage: String
+
+    // Updates for installed content: the check, the batch, and the version picker
+    // a row opens. Counts are interpolated by the locale, which is also where the
+    // plural agreement lives.
+    val contentUpdateCheck: String
+    fun contentUpdateAll(count: Int): String
+    fun contentUpdateRunning(done: Int, total: Int): String
+    val contentUpdateUpToDate: String
+    /** The check itself did not run. Never the same message as "nothing new". */
+    val contentUpdateCheckFailed: String
+    /** The gate before a batch replaces files. The body receives the count. */
+    val contentUpdateConfirmTitle: String
+    fun contentUpdateConfirmBody(count: Int): String
+    val contentUpdateConfirmAction: String
+    /** Row action and its tooltip: the version this file would move to. */
+    fun contentUpdateTo(version: String): String
+    val contentActionVersions: String
+    val contentVersionsTitle: String
+    val contentVersionsUnknown: String
+    val contentVersionsLoadFailed: String
     val contentDetailAuthors: String
     val contentDetailSize: String
+    // ── The project page ─────────────────────────────────────────────────────
+    // The page carries the header, the tabs and the body; the blocks below it
+    // names live in the right rail's project-view family. A page drawn for a jar
+    // the catalogue has never indexed keeps every one of these and answers the
+    // ones it can, so several have an explicit "not known" reading rather than
+    // being left out.
+
+    val modPageTabDescription: String
+    val modPageTabVersions: String
+    val modPageTabChangelog: String
+    val modPageTabGallery: String
+    /** The project has a page and the author left it blank. */
+    val modPageBodyEmpty: String
+    /** There is a description, on a page this file is not linked to. */
+    val modPageBodyUnknown: String
+    val modPageStatDownloads: String
+    val modPageStatFollowers: String
+    /** Marks a file that came from disk rather than from a catalogue. */
+    val modPageLocalFile: String
+    val modPageFindInCatalogue: String
+    /**
+     * The address the archive itself declares, which is the author's own site and
+     * not the catalogue entry. Both are "open a page" and naming them the same way
+     * put two identical labels a centimetre apart pointing at different places.
+     */
+    val modPageHomepage: String
+    /**
+     * Opening the catalogue entry in a browser.
+     *
+     * Lives in the overflow, not on a button. The reference has no such action at
+     * all, because there you are already on that page; here it is worth having and
+     * is still not what a reader came to the page to do.
+     */
+    val modPageOpenInCatalogue: String
+    val modPageCopyLink: String
+
+    /** The page's primary action, which names the pack it is going into. */
+    fun modPageInstallInto(pack: String): String
+    fun modPageInstalledIn(pack: String): String
+    val modPageInstalling: String
+    val modPageInstallFailed: String
+    val modPageInstallRetry: String
+    /** Required dependencies the pack's game version and loader have no build for. */
+    fun modPageInstallMissing(count: Int): String
+    /** The same action on a table row, where the row already names the build. */
+    val modPageInstallShort: String
+
+    /**
+     * Nothing to install, and why, in the two words that decide it.
+     *
+     * The pick is strict: where no build runs on this pack, none is chosen. Saying
+     * which game version and which loader were looked for is the difference
+     * between a refusal and a shrug, and it is what tells a reader to go to the
+     * versions tab and pick one themselves. Only the axes actually KNOWN are
+     * named -- filling a blank one with the unknown placeholder produced a
+     * sentence about our own ignorance rather than about the pack.
+     */
+    fun modPageNoBuildFor(target: String): String
+    /** The same refusal where neither axis is known, so there is nothing to name. */
+    val modPageNoBuildAny: String
+    /** On a build the pack cannot run, which a reader may still install on purpose. */
+    val versionsIncompatibleHint: String
+
+    val versionsColumnVersion: String
+    val versionsColumnGameVersion: String
+    val versionsColumnPlatform: String
+    val versionsColumnPublished: String
+    val versionsColumnDownloads: String
+    /** The build list could not be fetched. Its own words: the pack content's were borrowed and said the wrong thing. */
+    val modPageVersionsFailed: String
+    /** Why it failed, in this pane's own words rather than the mirror's. */
+    val modPageVersionsFailedBody: String
+    /** There is no catalogue entry, so there is no list and never will be. */
+    val modPageVersionsNoEntry: String
+    /** The filter surface over the versions table. */
+    val versionsFilterChannel: String
+    val versionsFilterGameVersion: String
+    val versionsFilterPlatform: String
+    val versionsFilterReset: String
+    fun versionsFilterShown(shown: Int, total: Int): String
+    /** Every build was filtered out, which is not the same as a project with none. */
+    val versionsFilterNoMatch: String
+    fun modPageInstalledVersion(version: String): String
+
+    /**
+     * One build's own page: what it needs, what changed, what it ships.
+     *
+     * The dependency headings are three separate statements and not one list with
+     * a column. "Requires" is a reason a pack will not start, "works with" is a
+     * suggestion, and "does not work with" is a warning, and a reader scanning for
+     * the first must not have to read the other two to find it.
+     */
+    val modVersionRequires: String
+    val modVersionOptional: String
+    val modVersionIncompatible: String
+    val modVersionFiles: String
+    /** The build that ships alongside the one being read, when the author pinned one. */
+    val modVersionPinnedBuild: String
+    /** Marks the file the installer actually takes, where a build ships several. */
+    val modVersionPrimaryFile: String
+    /** The lookup for this one build did not run. Distinct from a build with nothing to say. */
+    val modVersionFailed: String
+
+    val modRailCompatibility: String
+    val modRailGame: String
+    val modRailPlatforms: String
+    val modRailEnvironment: String
+    val modRailLinks: String
+    val modRailTags: String
+    val modRailCreators: String
+    val modRailDetails: String
+    /** Stands where a fact would be for a file nothing can answer it for. */
+    val modRailUnknownValue: String
+
+    val modEnvClientOnly: String
+    val modEnvServerOnly: String
+    val modEnvBoth: String
+    val modEnvEither: String
+
+    val modLinkIssues: String
+    val modLinkSource: String
+    val modLinkWiki: String
+    val modLinkDiscord: String
+    val modLinkDonate: String
+
+    val modLicenseUnknown: String
+    val modLicenseAllRights: String
+    fun modPublishedOn(date: String): String
+    fun modUpdatedOn(date: String): String
+    val modPublishedUnknown: String
+    val modUpdatedUnknown: String
+
+    // What an author declares about their own project. Reported, never accused:
+    // these are facts the reader weighs, so they are written plainly and only the
+    // one that can physically hurt someone is allowed a colour.
+    val modDisclosureTelemetryOptIn: String
+    val modDisclosureTelemetryOptOut: String
+    val modDisclosureTelemetryAlways: String
+    val modDisclosureTelemetry: String
+    val modDisclosureAds: String
+    val modDisclosurePaid: String
+    val modDisclosureAiContent: String
+    val modDisclosureAiFunctionality: String
+    val modDisclosureSystem: String
+    val modDisclosureEpilepsy: String
+
+    /** Compact counts. The catalogue reports millions and a rail column is 300dp. */
+    fun compactMillions(value: String): String
+    fun compactThousands(value: String): String
+
     val contentTabFetchErrorTitle: String
     val contentTabFetchErrorGeneric: String
     val contentTabRetry: String
@@ -873,7 +1009,6 @@ interface AppStrings {
     fun contentTabRoleAltCount(count: Int): String
     val contentTabRoleAlternativesHeader: String
     val contentTabModNoDescription: String
-    fun contentTabModLicensePrefix(license: String): String
     val contentTabModUrlLabel: String
     fun contentTabModSizeLabel(kb: Long): String
     fun contentTabModDependencies(count: Int): String
@@ -945,6 +1080,12 @@ interface AppStrings {
     fun versionPickerCount(n: Int): String
     val versionPickerEmpty: String
     val versionPickerNoChangelog: String
+
+    /** Marks a build that does not run on this instance's game version or loader. */
+    val versionPickerIncompatible: String
+    /** Reveals builds that were folded away because they do not fit here. */
+    fun versionPickerShowIncompatible(count: Int): String
+    val versionPickerHideIncompatible: String
     val versionPickerWarning: String
     fun versionPickerInstall(version: String): String
     fun versionPickerUpgrade(version: String): String
@@ -987,6 +1128,31 @@ interface AppStrings {
     // Pack settings window (floating, section rail)
     val packSettingsTitle: String
     val packSettingsClose: String
+    val packSettingsExpand: String
+    val packSettingsCollapse: String
+    fun packSettingsRuntimeLine(loader: String, mc: String): String
+    fun packSettingsRuntimeVanilla(mc: String): String
+    val packSettingsLoader: String
+    val packSettingsJavaPickOwn: String
+    val packSettingsOptionalCoToggle: String
+    val packLoaderInstalled: String
+    val packLoaderNextLaunch: String
+    val packLoaderModsStay: String
+    val packLoaderApply: String
+    val packLoaderRevert: String
+    /** Under an enabled mod that cannot run beside [name], which is on too. */
+    fun optionalConflictsWith(name: String): String
+    /** Under an enabled mod that needs [name], which is off. */
+    fun optionalNeedsOff(name: String): String
+    /** Under a mod that is off while [name], which is on, needs it. */
+    fun optionalNeededBy(name: String): String
+    /** Under a library older than the build [neededBy] was made against, [version] being that build. */
+    fun contentBehindPin(neededBy: String, version: String): String
+    /** Under a mod that needs mod id [id], which nothing enabled provides. */
+    fun contentDependencyMissing(id: String): String
+    /** Under a mod that needs [name] in [wanted], with [installed] being what is there. */
+    fun contentDependencyVersion(name: String, wanted: String, installed: String): String
+    val packVersionCheckTitle: String
     val packSettingsCategoryGeneral: String
     val packSettingsCategoryRuntime: String
     val packSettingsCategoryVersion: String
@@ -1003,6 +1169,9 @@ interface AppStrings {
     val packSettingsPackId: String
     // Runtime
     val packSettingsMemory: String
+
+    /** Under the memory setting when the instance's JVM arguments name the heap themselves; [flags] are those flags. */
+    fun packSettingsMemoryFromArgs(flags: String): String
     val packSettingsEnvironment: String
     val packSettingsJava: String
     fun packSettingsJavaManaged(major: Int): String
@@ -1018,6 +1187,15 @@ interface AppStrings {
     val packSettingsWidth: String
     val packSettingsHeight: String
     val packSettingsFullscreen: String
+    /**
+     * The window Forge and NeoForge open while mods load. The Wayland line
+     * replaces the plain description while the launcher is the one keeping it
+     * off, because an off switch nobody touched needs its reason beside it.
+     */
+    val packSettingsEarlyScreen: String
+    val packSettingsEarlyScreenDesc: String
+    val packSettingsEarlyScreenWayland: String
+    val packSettingsEarlyScreenReset: String
     // Content
     val packSettingsOptional: String
     val packSettingsOptionalNone: String
@@ -1059,6 +1237,8 @@ interface AppStrings {
     val packSettingsDangerZone: String
     val packSettingsDelete: String
     val packSettingsDeleteDesc: String
+    /** Why a pack cannot be deleted right now: its game is running. */
+    val packDeleteBlockedRunning: String
     // Version -- restore points
     val packVersionSnapshots: String
     val packVersionRestore: String
@@ -1073,6 +1253,25 @@ interface AppStrings {
     val packDetailPlay: String
     /** Shown above the Play button when the user is not authenticated. */
     val packDetailPlayLoginRequired: String
+    /** What the launch control says while the pack's files are being rewritten, one per kind of work. */
+    val launchBlockUpdating: String
+    val launchBlockRepairing: String
+    val launchBlockRecovering: String
+    val launchBlockDeleting: String
+    val launchBlockUpdatingContent: String
+    /** The launch control of a pack whose instance folder is gone. */
+    val launchBlockMissing: String
+    /** The launch control while another pack's launch or game holds the launcher. */
+    val launchBlockOtherRunning: String
+    /** The launch control while its game has been asked to end and has not gone yet. */
+    val launchStopping: String
+    /** Asked on quit while a game is running: whether to leave it running or stop it first. */
+    val quitGameTitle: String
+    fun quitGameBody(packName: String): String
+    val quitLeaveGame: String
+    val quitStopGame: String
+    /** Notification and console text for a launch refused because the pack was busy with its files. */
+    val notifReasonInstanceBusy: String
     /** Wait state on the hero Play pill while the launch prepares or syncs. */
     val packPlayWait: String
     /** Run state on the hero Play pill; activating it stops the game. */
@@ -1123,6 +1322,8 @@ interface AppStrings {
     // Activity pill -- the floating account of what the launcher is doing.
     val editorSurfOverlay: String
     val editorSurfShortOverlay: String
+    val editorSurfBackdrop: String
+    val editorSurfShortBackdrop: String
 
     val activityPillExpand: String
     fun activityPillMore(count: Int): String
@@ -1143,7 +1344,6 @@ interface AppStrings {
     val notifReasonAuthFail: String
     fun notifReasonAuthFailDetail(detail: String): String
     val notifReasonOfflineNoClient: String
-    val notifReasonOfflineNoManifest: String
     val notifReasonTwoFactorExpired: String
     fun notifReasonMissingAuthProvider(providerKey: String): String
 
@@ -1168,17 +1368,49 @@ interface AppStrings {
     fun notifTimeHours(hours: Long): String
     fun notifTimeDays(days: Long): String
 
+    /**
+     * A place that exists and is not built yet.
+     *
+     * One joke, said once. It is the launcher's own voice rather than the flat
+     * apology every other program uses for the same state, and a reader who has
+     * found the edge of what is finished has earned being spoken to like a person.
+     */
+    val notBuiltYetTitle: String
+    val notBuiltYetBody: String
+
+    /**
+     * How long ago, abbreviated, for a column that has no room for a date.
+     *
+     * Abbreviated for the same reason the notification stamps above are: a short
+     * form needs no agreement, so five languages do not each need three plural
+     * branches for a label two characters wide.
+     */
+    val ageJustNow: String
+    fun ageMinutes(minutes: Long): String
+    fun ageHours(hours: Long): String
+    fun ageDays(days: Long): String
+    fun ageMonths(months: Long): String
+    fun ageYears(years: Long): String
+
     // --- Home (new) + launch tiles ---
     val homeRecentTitle: String
     val homeNoPacksTitle: String
+    val homeWhatsNewTitle: String
+    fun homeWhatsNewLauncher(app: String, version: String): String
+    val homeWhatsNewLauncherHint: String
+    fun homeWhatsNewPackReady(version: String): String
+    fun homeWhatsNewPackRollback(version: String): String
+    fun homeWhatsNewPackUpdated(version: String): String
     val homeNoPacksBody: String
     val browseOpen: String
     val homeQuickContinue: String
     val homeQuickStart: String
     val homeQuickButton: String
     fun homeHeroPlaytime(hours: Long): String
+    fun homeFactHours(hours: Long): String
+    val homeFactPlaytime: String
+    val homeFactLastSession: String
     val launchTileReady: String
-    val launchTileBlocked: String
 
     // --- Library widgets ---
     val libraryEmptyTitle: String
@@ -1192,6 +1424,57 @@ interface AppStrings {
     val editorClose: String
     /** Context-menu entry that enters layout edit mode -- the only way in besides Ctrl+E. */
     val editorEnterLayout: String
+    // --- What the retired SmartyCraft client path left on disk ---
+
+    /**
+     * The reminder, and the surface it opens.
+     *
+     * Said plainly and once. The files are the player's -- worlds, configs, mods
+     * they installed -- so the launcher names what it found and what it can do
+     * about it, and does none of it until asked. "Delete" is the honest word for
+     * what deleting is; a launcher that called it "clean up" would be choosing
+     * the word that makes the button easier to press.
+     */
+    val retiredTitle: String
+    fun retiredNoticeBody(count: Int): String
+    val retiredNoticeAction: String
+    val retiredIntro: String
+    fun retiredFound(count: Int, size: String): String
+    val retiredColumnClient: String
+    val retiredColumnSize: String
+    val retiredColumnRuntime: String
+    val retiredColumnChoice: String
+    fun retiredMods(count: Int): String
+    val retiredChoiceKeep: String
+    val retiredChoiceAdopt: String
+    val retiredChoiceDelete: String
+    /**
+    * On a folder whose tree names no Minecraft version.
+    *
+    * Short, because it sits inline among the other facts and the disabled
+    * "keep as a pack" chip beside it already says what follows from it.
+    */
+    val retiredNoVersion: String
+    /** Over the version and loader fields: what the tree said, which the reader may correct. */
+    val retiredDetected: String
+    val retiredLoaderVanilla: String
+    val retiredApply: String
+    val retiredClose: String
+    val retiredBusy: String
+    /** The one sentence that has to be read before the button is pressed. */
+    val retiredWarning: String
+    val retiredAdopted: String
+    /** An adoption that could not move every file keeps its source, and says so. */
+    val retiredAdoptedSourceKept: String
+    val retiredDeleted: String
+    val retiredFailed: String
+    val retiredRemoveFailed: String
+    fun retiredDone(reclaimed: String): String
+    val retiredDoneNothing: String
+    val retiredNeedsVersion: String
+    fun retiredBlockedBy(folders: String): String
+    val retiredPartlyDeleted: String
+
     val editorCancel: String
     val editorDelete: String
     val editorReset: String
@@ -1249,6 +1532,13 @@ interface AppStrings {
     val thresholdErrorTitle: String
     val thresholdOpenLogs: String
     val thresholdQuit: String
+    val widgetStateTooLong: String
+
+    /** Under a prop row whose saved value the widget could not read and replaced with its default. */
+    val editorPropUnreadable: String
+    val thresholdRecovery: String
+    val thresholdRecoveryArmed: String
+    val thresholdRecoveryHint: String
 
     // Toast shown when the shell reloads itself after a recovered crash.
     val recoveryReloadedNotice: String
@@ -1262,7 +1552,39 @@ interface AppStrings {
     val editorSlotRow: String
     val editorSlotGrid: String
     val editorSlotCanvas: String
-    val editorSlotCubeGrid: String
+    val editorSlotViewportTitle: String
+    val editorViewportStatic: String
+    val editorViewportDown: String
+    val editorViewportRight: String
+    val editorViewportScrollbar: String
+    val editorViewportMap: String
+    val editorViewportPaged: String
+    val editorPin: String
+    val editorUnpin: String
+    val modulesTitle: String
+    val modulesChip: String
+    val modulesEmpty: String
+    val modulesReload: String
+    val modulesOpenFolder: String
+    fun moduleWidgets(n: Int): String
+    val moduleOff: String
+    fun moduleOffAfterCrash(failure: String): String
+    fun moduleRefused(reason: String): String
+    val moduleGone: String
+    val moduleForget: String
+    fun moduleCrashedTitle(name: String): String
+    fun moduleCrashedBody(failure: String): String
+    val mapGoHome: String
+    val editorAnchorTitle: String
+    val editorAnchorTopStart: String
+    val editorAnchorTopCenter: String
+    val editorAnchorTopEnd: String
+    val editorAnchorCenterStart: String
+    val editorAnchorCenter: String
+    val editorAnchorCenterEnd: String
+    val editorAnchorBottomStart: String
+    val editorAnchorBottomCenter: String
+    val editorAnchorBottomEnd: String
     val editorSlotLayoutMenuTitle: String
     val editorSlotGridColumns: String
     val editorSlotGridColumnsDecrease: String
@@ -1272,6 +1594,15 @@ interface AppStrings {
     // --- Layout editor: prop panel ---
     val editorResetToDefault: String
     val editorBackingTitle: String
+    /** Header for the per-widget outer spacing section, above the backing one. */
+    val editorPaddingTitle: String
+    val editorMotionTitle: String
+    val editorMotionEnter: String
+    val editorMotionDelay: String
+    val entranceNone: String
+    val entranceFade: String
+    val entranceRise: String
+    val entranceSettle: String
     val editorSurfaceNone: String
     val editorSurfaceOwn: String
     val editorSurfaceAdd: String
@@ -1313,6 +1644,12 @@ interface AppStrings {
     val editorPresetNamePlaceholder: String
     fun editorPresetsSaved(count: Int): String
     val editorPresetsEmpty: String
+    /** Saving or deleting a preset failed on the disk: full, read-only, gone. */
+    val editorPresetWriteFailed: String
+    val editorPresetsBuiltIn: String
+    /** The name of a preset that ships, by its id. The id itself for one this locale does not name. */
+    fun bundledPresetName(id: String): String
+    fun bundledPresetDescription(id: String): String
 
     // --- Layout editor: palette ---
     val editorPaletteHide: String
@@ -1332,9 +1669,28 @@ interface AppStrings {
     // --- Layout editor: host (reset / pill / fab) ---
     val editorResetSurfaceTitle: String
     fun editorResetSurfaceBody(name: String): String
+    val editorResetAllTitle: String
+    val editorResetAllBody: String
     val editorPreview: String
     val editorPreviewHidden: String
     val editorPaletteToggleHide: String
+    val editorRegionProps: String
+    /** Spoken name of a surface tab whose rail is rolled up. [name] is the tab's own name. */
+    fun editorSurfaceFolded(name: String): String
+    val editorNewScreen: String
+    val editorMountRefused: String
+    val screenMissing: String
+    val screenUntitled: String
+    fun screenDefaultTitle(n: Int): String
+    val screenSettingsTitle: String
+    val screenTitleLabel: String
+    val screenIconLabel: String
+    val screenDelete: String
+    fun screenDeleteBody(title: String): String
+    fun screenDeletedTitle(title: String): String
+    val screenRestore: String
+    val editorUndo: String
+    val editorRedo: String
     val editorEscHint: String
     val editorFabEdit: String
     val editorFabDone: String
@@ -1347,14 +1703,12 @@ interface AppStrings {
     val editorSurfShortAbout: String
     val editorSurfShortBg: String
     val editorSurfShortProfile: String
-    val editorSurfShortServer: String
     val editorSurfShortTheme: String
     val editorSurfShortShell: String
     val editorSurfShortTopBar: String
     val editorSurfShortBody: String
 
     // --- Layout editor: surface long names ---
-    val editorSurfHomeClassic: String
     val editorSurfHomeNew: String
     val editorSurfLibrary: String
     val editorSurfLeftRail: String
@@ -1362,7 +1716,6 @@ interface AppStrings {
     val editorSurfAbout: String
     val editorSurfBg: String
     val editorSurfProfile: String
-    val editorSurfServer: String
     val editorSurfTheme: String
     val editorSurfShell: String
     val editorSurfTopBar: String
@@ -1393,6 +1746,9 @@ interface AppStrings {
     val audioPlaybackOptions: String
     /** The two skips, which name themselves on a tooltip because they are glyphs. */
     val audioSkipNext: String
+
+    /** Group label over the queue controls in a player's options panel. */
+    val audioQueue: String
     val audioSkipPrevious: String
     val audioNoFile: String
     val audioStatusReady: String
@@ -1422,8 +1778,14 @@ interface AppStrings {
     // --- Data written by a newer build (read-only for this session) ---
     val readOnlyDataTitle: String
     fun readOnlyDataBody(stores: String): String
+    /** The other direction: too old to read faithfully, so going back helps and updating does not. */
+    fun readOnlyDataBodyOldFormat(stores: String): String
+    /** A file that could not be read at all this time: the next start tries again, and recovery can reset it. */
+    fun readOnlyDataBodyDamaged(stores: String): String
     val readOnlyDataLibrary: String
     val readOnlyDataLayout: String
+    val readOnlyDataTheme: String
+    val readOnlyDataAccounts: String
     val videoFetchingTool: String
     val videoResolvingPage: String
     val videoDownloading: String

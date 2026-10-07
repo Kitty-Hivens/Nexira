@@ -37,11 +37,14 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.Status
 import hivens.ui.widgets.AdaptiveWidget
 import hivens.ui.widgets.scaled
 import hivens.widget.api.rememberProps
 import hivens.widget.api.rememberWidgetState
+import hivens.widget.api.widgetStateRefused
 import hivens.widget.model.PropLabel
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
@@ -71,16 +74,19 @@ data class ChecklistState(val items: List<ChecklistItem> = emptyList(), val next
  */
 @Widget(
     id = "checklist",
+    minWidth = 96, minHeight = 88,
+    prefWidth = 240, prefHeight = 220,
+    maxWidth = 960, maxHeight = 880,
     displayName = "widget.checklist",
     propsClass = ChecklistProps::class,
-    surface = """{"fill":"base","opacity":0.55}""",
+    surface = """{"fill":"panel"}""",
 )
 @Composable
 fun ChecklistWidget(instance: WidgetInstance) {
     val p = instance.rememberProps<ChecklistProps>()
     val strings = LocalStrings.current
-    val palette = NxTheme.colors
     var state by instance.rememberWidgetState { ChecklistState() }
+    val tooLong = instance.widgetStateRefused()
 
     fun add(text: String) {
         val t = text.trim()
@@ -97,7 +103,7 @@ fun ChecklistWidget(instance: WidgetInstance) {
     val shown = if (p.hideCompleted) state.items.filterNot { it.done } else state.items
     val doneCount = state.items.count { it.done }
 
-    AdaptiveWidget(referenceWidth = 240.dp, referenceHeight = 220.dp) { scale ->
+    AdaptiveWidget { scale ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -107,15 +113,17 @@ fun ChecklistWidget(instance: WidgetInstance) {
                 Text(
                     text       = p.title.ifBlank { strings.widgetLabel("widget.checklist") },
                     style      = MaterialTheme.typography.labelLarge.scaled(scale),
-                    color      = palette.textSecondary,
+                    color      = NxInk.quiet,
                     fontWeight = FontWeight.Medium,
                     modifier   = Modifier.weight(1f),
                 )
                 Spacer(Modifier.width(8.dp * scale))
+                // As in the notes widget: past what the store keeps, the tally gives
+                // way to the reason.
                 Text(
-                    text  = "$doneCount/${state.items.size}",
+                    text  = if (tooLong) strings.widgetStateTooLong else "$doneCount/${state.items.size}",
                     style = MaterialTheme.typography.labelSmall.scaled(scale),
-                    color = palette.textSecondary.copy(alpha = 0.6f),
+                    color = if (tooLong) NxColor.status(Status.Error, text = true) else NxInk.quiet,
                 )
             }
 
@@ -129,7 +137,7 @@ fun ChecklistWidget(instance: WidgetInstance) {
                     Text(
                         text     = strings.widgetLabel("widget.checklist.empty"),
                         style    = MaterialTheme.typography.bodySmall.scaled(scale),
-                        color    = palette.textSecondary.copy(alpha = 0.5f),
+                        color    = NxInk.quiet,
                         modifier = Modifier.padding(vertical = 8.dp * scale),
                     )
                 } else {
@@ -147,21 +155,20 @@ fun ChecklistWidget(instance: WidgetInstance) {
 
 @Composable
 private fun ChecklistRow(item: ChecklistItem, scale: Float, onToggle: () -> Unit, onDelete: () -> Unit) {
-    val palette = NxTheme.colors
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier          = Modifier.fillMaxWidth().padding(vertical = 3.dp * scale),
     ) {
         Symbol(icon = if (item.done) NxIcon.CheckBox else NxIcon.CheckBoxOutlineBlank,
             contentDescription = null,
-            tint               = if (item.done) palette.primary else palette.textSecondary,
+            tint               = if (item.done) NxColor.lead() else NxInk.quiet,
             modifier           = Modifier.size(20.dp * scale).clip(RoundedCornerShape(4.dp)).clickable(onClick = onToggle),
         )
         Spacer(Modifier.width(10.dp * scale))
         Text(
             text       = item.text,
             style      = MaterialTheme.typography.bodyMedium.scaled(scale),
-            color      = if (item.done) palette.textSecondary.copy(alpha = 0.6f) else palette.textPrimary,
+            color      = if (item.done) NxInk.quiet else NxInk.main,
             textDecoration = if (item.done) TextDecoration.LineThrough else null,
             maxLines   = 2,
             overflow   = TextOverflow.Ellipsis,
@@ -170,7 +177,7 @@ private fun ChecklistRow(item: ChecklistItem, scale: Float, onToggle: () -> Unit
         Spacer(Modifier.width(6.dp * scale))
         Symbol(icon = NxIcon.Close,
             contentDescription = null,
-            tint               = palette.textSecondary.copy(alpha = 0.5f),
+            tint               = NxInk.quiet,
             modifier           = Modifier.size(16.dp * scale).clip(RoundedCornerShape(4.dp)).clickable(onClick = onDelete),
         )
     }
@@ -179,7 +186,6 @@ private fun ChecklistRow(item: ChecklistItem, scale: Float, onToggle: () -> Unit
 @Composable
 private fun AddRow(scale: Float, onAdd: (String) -> Unit) {
     val strings = LocalStrings.current
-    val palette = NxTheme.colors
     var draft by remember { mutableStateOf("") }
     fun commit() {
         onAdd(draft)
@@ -190,8 +196,8 @@ private fun AddRow(scale: Float, onAdd: (String) -> Unit) {
             value           = draft,
             onValueChange   = { draft = it },
             singleLine      = true,
-            textStyle       = MaterialTheme.typography.bodyMedium.scaled(scale).copy(color = palette.textPrimary),
-            cursorBrush     = SolidColor(palette.primary),
+            textStyle       = MaterialTheme.typography.bodyMedium.scaled(scale).copy(color = NxInk.main),
+            cursorBrush     = SolidColor(NxColor.lead()),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
             keyboardActions = KeyboardActions(onDone = { commit() }),
             modifier        = Modifier.weight(1f),
@@ -200,7 +206,7 @@ private fun AddRow(scale: Float, onAdd: (String) -> Unit) {
                     Text(
                         text  = strings.widgetLabel("widget.checklist.add"),
                         style = MaterialTheme.typography.bodyMedium.scaled(scale),
-                        color = palette.textSecondary.copy(alpha = 0.5f),
+                        color = NxInk.quiet,
                     )
                 }
                 inner()
@@ -216,7 +222,7 @@ private fun AddRow(scale: Float, onAdd: (String) -> Unit) {
         ) {
             Symbol(icon = NxIcon.Add,
                 contentDescription = null,
-                tint               = palette.primary,
+                tint               = NxColor.lead(),
                 modifier           = Modifier.size(18.dp * scale),
             )
         }

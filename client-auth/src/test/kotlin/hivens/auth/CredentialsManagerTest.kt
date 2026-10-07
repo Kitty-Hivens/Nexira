@@ -2,6 +2,8 @@ package hivens.auth
 
 import dev.hivens.libvault.SecretVault
 import dev.hivens.libvault.VaultTier
+import hivens.core.data.NewerBuildData
+import hivens.core.data.ReadOnlyStore
 import hivens.core.data.SessionData
 import hivens.core.security.IKeyringStorage
 import kotlinx.serialization.json.Json
@@ -13,6 +15,10 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.attribute.PosixFilePermission
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CountDownLatch
+import kotlin.concurrent.thread
 import kotlin.io.path.div
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
@@ -84,7 +90,7 @@ class CredentialsManagerTest {
 
     @Test
     fun `save stores secrets under composite keys and only metadata on disk`() {
-        manager.save(session())
+        manager.saveAccount(session(), "smartycraft")
 
         assertEquals("secret-pw", vault.entries[scKey("password")]?.decodeToString())
         assertEquals("fake-game-token", vault.entries[scKey("accessToken")]?.decodeToString())
@@ -98,10 +104,60 @@ class CredentialsManagerTest {
         assertNull(obj["accessToken"], "accessToken must not be on disk")
     }
 
+    /**
+     * The uid is the input to every signed action. In the file next to a player name
+     * it was enough to sign spawn, two-factor and skin upload for the account, while
+     * the token derived from it sat behind the keyring.
+     */
+    @Test
+    fun `the uid goes into the vault and never into the file`() {
+        manager.saveAccount(session(), "smartycraft")
+
+        assertEquals("1", vault.entries[scKey("uid")]?.decodeToString())
+        assertNull(firstAccount()["uid"]?.jsonPrimitive?.contentOrNull, "no uid in credentials.json")
+        assertEquals("1", newManager().load()?.uid)
+    }
+
+    @Test
+    fun `a file that still carries a uid has it moved into the vault on the first read`() {
+        Files.writeString(
+            workDir / "credentials.json",
+            """{"version":6,"activeAccountId":"$scUuid","accounts":[""" +
+                """{"providerId":"smartycraft","accountId":"$scUuid","username":"ChaosA","uuid":"$scUuid","uid":"legacy-uid"}]}""",
+        )
+        vault.entries[scKey("accessToken")] = "fake-game-token".toByteArray()
+
+        assertEquals("legacy-uid", manager.load()?.uid)
+        assertEquals("legacy-uid", vault.entries[scKey("uid")]?.decodeToString())
+        assertNull(firstAccount()["uid"]?.jsonPrimitive?.contentOrNull, "the file no longer carries it")
+        assertEquals("legacy-uid", newManager().load()?.uid, "and it still loads from the vault")
+    }
+
+    @Test
+    fun `a vault that will not take the uid leaves it in the file`() {
+        Files.writeString(
+            workDir / "credentials.json",
+            """{"version":6,"activeAccountId":"$scUuid","accounts":[""" +
+                """{"providerId":"smartycraft","accountId":"$scUuid","username":"ChaosA","uuid":"$scUuid","uid":"legacy-uid"}]}""",
+        )
+        vault.entries[scKey("accessToken")] = "fake-game-token".toByteArray()
+        vault.refuseStore = true
+
+        assertEquals("legacy-uid", manager.load()?.uid)
+        assertEquals("legacy-uid", firstAccount()["uid"]?.jsonPrimitive?.contentOrNull, "dropped from both, it signs nothing")
+    }
+
+    @Test
+    fun `removing an account removes its uid`() {
+        manager.saveAccount(session(), "smartycraft")
+        manager.removeAccount("smartycraft", scUuid)
+        assertNull(vault.entries[scKey("uid")])
+    }
+
     @Test
     fun `save with null password clears the password key, keeps the token`() {
         vault.entries[scKey("password")] = "stale".toByteArray()
-        manager.save(session(password = null))
+        manager.saveAccount(session(password = null), "smartycraft")
 
         assertNull(vault.entries[scKey("password")], "null password must clear the vault entry")
         assertEquals("fake-game-token", vault.entries[scKey("accessToken")]?.decodeToString())
@@ -109,7 +165,7 @@ class CredentialsManagerTest {
 
     @Test
     fun `save with blank accessToken is a no-op`() {
-        manager.save(session(accessToken = ""))
+        manager.saveAccount(session(accessToken = ""), "smartycraft")
         assertFalse(Files.exists(workDir / "credentials.json"))
         assertTrue(vault.entries.isEmpty())
     }
@@ -125,7 +181,7 @@ class CredentialsManagerTest {
 
     @Test
     fun `load round-trips the active account through the vault`() {
-        manager.save(session())
+        manager.saveAccount(session(), "smartycraft")
         val loaded = newManager().load()
         assertNotNull(loaded)
         assertEquals("ChaosA", loaded.playerName)
@@ -135,14 +191,14 @@ class CredentialsManagerTest {
 
     @Test
     fun `load with the access token gone returns null`() {
-        manager.save(session())
+        manager.saveAccount(session(), "smartycraft")
         vault.entries.remove(scKey("accessToken"))
         assertNull(manager.load())
     }
 
     @Test
     fun `load with the password gone yields a null cachedPassword`() {
-        manager.save(session())
+        manager.saveAccount(session(), "smartycraft")
         vault.entries.remove(scKey("password"))
         val loaded = manager.load()
         assertNotNull(loaded)
@@ -165,27 +221,52 @@ class CredentialsManagerTest {
 
     @Test
     fun `two accounts coexist, last saved is active, both load`() {
-        manager.save(session())                                                  // SC
+        manager.saveAccount(session(), "smartycraft")                                                  // SC
         manager.saveAccount(session(uuid = "msuuid", playerName = "MsGamer", refreshToken = "RT", password = null), "microsoft")
 
         assertEquals(2, manager.listAccounts().size)
         assertEquals("msuuid", manager.activeAccountId())
-        assertEquals("ChaosA", manager.loadSession(scUuid)?.playerName)
-        assertEquals("MsGamer", manager.loadSession("msuuid")?.playerName)
+        assertEquals("ChaosA", manager.loadSession("smartycraft", scUuid)?.playerName)
+        assertEquals("MsGamer", manager.loadSession("microsoft", "msuuid")?.playerName)
     }
 
     @Test
     fun `accountFor resolves the session for each provider`() {
-        manager.save(session())
+        manager.saveAccount(session(), "smartycraft")
         manager.saveAccount(session(uuid = "msuuid", playerName = "MsGamer", refreshToken = "RT"), "microsoft")
         assertEquals("ChaosA", manager.accountFor("smartycraft")?.playerName)
         assertEquals("MsGamer", manager.accountFor("microsoft")?.playerName)
         assertNull(manager.accountFor("offline"))
     }
 
+    /**
+     * A rotated refresh token has to be stored, because the old one stops working,
+     * but storing it is not the user choosing that account. Auto-login can finish
+     * after the user has signed in by hand, and it used to take the active slot.
+     */
+    @Test
+    fun `a save that is not a choice of account leaves the active one alone`() {
+        manager.saveAccount(session(), "smartycraft")
+        manager.saveAccount(
+            session(uuid = "msuuid", playerName = "MsGamer", refreshToken = "RT2", password = null),
+            "microsoft",
+            makeActive = false,
+        )
+
+        assertEquals(scUuid, manager.activeAccountId())
+        assertEquals("RT2", vault.entries["microsoft:msuuid:refreshToken"]?.decodeToString())
+    }
+
+    @Test
+    fun `the first account saved without being chosen still becomes active`() {
+        manager.saveAccount(session(), "smartycraft", makeActive = false)
+
+        assertEquals(scUuid, manager.activeAccountId(), "a store with one account has no other to front it")
+    }
+
     @Test
     fun `setActive switches which account load returns`() {
-        manager.save(session())
+        manager.saveAccount(session(), "smartycraft")
         manager.saveAccount(session(uuid = "msuuid", playerName = "MsGamer", refreshToken = "RT"), "microsoft")
         manager.setActive(scUuid)
         assertEquals("ChaosA", manager.load()?.playerName)
@@ -193,7 +274,7 @@ class CredentialsManagerTest {
 
     @Test
     fun `primarySession prefers the licensed Microsoft account over SmartyCraft`() {
-        manager.save(session())                                                  // SC saved first
+        manager.saveAccount(session(), "smartycraft")                                                  // SC saved first
         manager.saveAccount(session(uuid = "msuuid", playerName = "MsGamer", refreshToken = "RT", password = null), "microsoft")
         // Even with SC made active, the licensed account fronts the shell.
         manager.setActive(scUuid)
@@ -202,7 +283,7 @@ class CredentialsManagerTest {
 
     @Test
     fun `primarySession falls back to SmartyCraft when no Microsoft account`() {
-        manager.save(session())
+        manager.saveAccount(session(), "smartycraft")
         assertEquals("ChaosA", manager.primarySession()?.playerName)
     }
 
@@ -213,7 +294,7 @@ class CredentialsManagerTest {
 
     @Test
     fun `a named provider outranks licence priority`() {
-        manager.save(session())
+        manager.saveAccount(session(), "smartycraft")
         manager.saveAccount(session(uuid = "msuuid", playerName = "MsGamer", refreshToken = "RT", password = null), "microsoft")
         // Licence priority alone puts Microsoft in front; naming SmartyCraft is
         // the user overruling that, which is the whole point of the setting.
@@ -222,7 +303,7 @@ class CredentialsManagerTest {
 
     @Test
     fun `a named provider with no account falls back to priority`() {
-        manager.save(session())
+        manager.saveAccount(session(), "smartycraft")
         // The choice survives the account it named being signed out, so it must
         // not strand the shell faceless when that happens.
         assertEquals("ChaosA", manager.primarySession("microsoft")?.playerName)
@@ -230,16 +311,16 @@ class CredentialsManagerTest {
 
     @Test
     fun `re-saving the same identity upserts rather than duplicates`() {
-        manager.save(session())
-        manager.save(session(playerName = "ChaosA"))   // same uuid -> same accountId
+        manager.saveAccount(session(), "smartycraft")
+        manager.saveAccount(session(playerName = "ChaosA"), "smartycraft")   // same uuid -> same accountId
         assertEquals(1, manager.listAccounts().size)
     }
 
     @Test
     fun `removeAccount drops its secrets and reassigns active`() {
-        manager.save(session())
+        manager.saveAccount(session(), "smartycraft")
         manager.saveAccount(session(uuid = "msuuid", playerName = "MsGamer", refreshToken = "RT"), "microsoft")
-        manager.removeAccount("msuuid")
+        manager.removeAccount("microsoft", "msuuid")
 
         assertEquals(1, manager.listAccounts().size)
         assertNull(vault.entries["microsoft:msuuid:accessToken"])
@@ -247,11 +328,150 @@ class CredentialsManagerTest {
         assertEquals("ChaosA", manager.load()?.playerName)
     }
 
+    // ── concurrent writers ─────────────────────────────────────────────────────
+
+    /**
+     * Every mutation reads the whole list, changes one entry and writes the list
+     * back, and one press of Play into the two-factor gate runs two of them side by
+     * side. Unserialised, the slower one wrote back what it had read before the other
+     * landed.
+     */
+    @Test
+    fun `writers running at once do not lose each other's changes`() {
+        val threads = 8
+        val perThread = 25
+        val start = CountDownLatch(1)
+        val workers = (0 until threads).map { t ->
+            thread {
+                start.await()
+                repeat(perThread) { i ->
+                    manager.saveAccount(session(uuid = "u-$t-$i", playerName = "p-$t-$i"), "smartycraft", makeActive = false)
+                }
+            }
+        }
+        start.countDown()
+        workers.forEach { it.join() }
+
+        assertEquals(threads * perThread, manager.listAccounts().size)
+    }
+
+    @Test
+    fun `a flag written beside a save is kept`() {
+        manager.saveAccount(session(), "smartycraft")
+        val start = CountDownLatch(1)
+        val marker = thread { start.await(); repeat(50) { manager.markTwoFactor("smartycraft") } }
+        val saver = thread {
+            start.await()
+            repeat(50) { i -> manager.saveAccount(session(uuid = "other-$i", playerName = "o-$i"), "microsoft", makeActive = false) }
+        }
+        start.countDown()
+        marker.join()
+        saver.join()
+
+        assertTrue(manager.accountFor("smartycraft")?.twoFactor == true)
+        assertEquals(51, manager.listAccounts().size)
+    }
+
+    @Test
+    fun `the accounts file is owner-only and leaves no temp file behind`() {
+        manager.saveAccount(session(), "smartycraft")
+
+        assertFalse(Files.exists(workDir / "credentials.json.tmp"))
+        if (!workDir.fileSystem.supportedFileAttributeViews().contains("posix")) return
+        assertEquals(
+            setOf(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE),
+            Files.getPosixFilePermissions(workDir / "credentials.json"),
+        )
+    }
+
+    // ── a file from a newer build ──────────────────────────────────────────────
+
+    /**
+     * A save stamped the current format over a file a newer build had written and
+     * dropped what that build keeps and this one cannot represent. Every sibling
+     * store already opens such a file read-only.
+     */
+    @Test
+    fun `a file written by a newer build is read and never written back`() {
+        NewerBuildData.reset()
+        val newer = """{"version":7,"activeAccountId":"$scUuid","somethingNewer":{"kept":true},"accounts":[""" +
+            """{"providerId":"smartycraft","accountId":"$scUuid","username":"ChaosA","uuid":"$scUuid"}]}"""
+        Files.writeString(workDir / "credentials.json", newer)
+        vault.entries[scKey("accessToken")] = "fake-game-token".toByteArray()
+
+        assertEquals("ChaosA", manager.load()?.playerName)
+        manager.saveAccount(session(uuid = "other", playerName = "Other"), "smartycraft")
+        manager.markTwoFactor("smartycraft")
+        manager.removeAccount("smartycraft", scUuid)
+
+        assertEquals(newer, Files.readString(workDir / "credentials.json"), "not a byte of it rewritten")
+        assertEquals(setOf(ReadOnlyStore.Accounts), NewerBuildData.affected())
+        NewerBuildData.reset()
+    }
+
+    // ── refreshStored ─────────────────────────────────────────────────────────
+
+    @Test
+    fun `a sign-in the launch made brings the stored account up to its uid and token`() {
+        manager.saveAccount(session(), "smartycraft")
+        manager.saveAccount(session(uuid = "msuuid", playerName = "MsGamer", refreshToken = "RT", password = null), "microsoft")
+
+        manager.refreshStored("smartycraft", session(accessToken = "fresh-token", password = null).copy(uid = "fresh-uid"))
+
+        val stored = manager.accountFor("smartycraft")
+        assertEquals("fresh-uid", stored?.uid)
+        assertEquals("fresh-token", stored?.accessToken)
+        assertEquals("secret-pw", stored?.cachedPassword, "a secret the fresh session lacks is not lost")
+        assertEquals("msuuid", manager.activeAccountId(), "and the active account stays")
+    }
+
+    @Test
+    fun `a sign-in the user chose not to remember stays unremembered`() {
+        manager.refreshStored("smartycraft", session())
+
+        assertFalse(Files.exists(workDir / "credentials.json"))
+        assertTrue(vault.entries.isEmpty())
+    }
+
+    // ── one id under two providers ─────────────────────────────────────────────
+
+    /** The id is the uuid, or the name without one, so two providers can resolve to the same. */
+    private fun twoProvidersOneId() {
+        manager.saveAccount(session(uuid = "shared", playerName = "Shared", accessToken = "sc-token", password = "sc-pw"), "smartycraft")
+        manager.saveAccount(
+            session(uuid = "shared", playerName = "Shared", accessToken = "ms-token", password = null, refreshToken = "ms-rt"),
+            "microsoft",
+        )
+    }
+
+    @Test
+    fun `each provider's account reads its own secrets when the two share an id`() {
+        twoProvidersOneId()
+
+        assertEquals("sc-token", manager.accountFor("smartycraft")?.accessToken)
+        assertEquals("ms-token", manager.accountFor("microsoft")?.accessToken)
+        assertEquals("ms-rt", manager.accountFor("microsoft")?.refreshToken)
+        assertNull(manager.accountFor("smartycraft")?.refreshToken, "another provider's refresh token")
+    }
+
+    @Test
+    fun `removing one provider's account leaves the other's record and secrets`() {
+        twoProvidersOneId()
+
+        manager.removeAccount("microsoft", "shared")
+
+        assertNull(vault.entries["microsoft:shared:accessToken"])
+        assertNull(vault.entries["microsoft:shared:refreshToken"])
+        assertEquals("sc-token", manager.accountFor("smartycraft")?.accessToken, "the other account is still there")
+        manager.clear()
+        assertTrue(vault.entries.isEmpty(), "nothing left in the vault that no record names")
+    }
+
     // ── clear() ──────────────────────────────────────────────────────────────
 
     @Test
     fun `clear wipes every account secret and the file`() {
-        manager.save(session())
+        manager.saveAccount(session(), "smartycraft")
         manager.saveAccount(session(uuid = "msuuid", refreshToken = "RT"), "microsoft")
         manager.clear()
         assertFalse(Files.exists(workDir / "credentials.json"))
@@ -260,7 +480,7 @@ class CredentialsManagerTest {
 
     @Test
     fun `clear is idempotent`() {
-        manager.save(session())
+        manager.saveAccount(session(), "smartycraft")
         manager.clear()
         manager.clear()
         assertFalse(Files.exists(workDir / "credentials.json"))
@@ -384,6 +604,40 @@ class CredentialsManagerTest {
     }
 
     @Test
+    fun `a v5 migration the vault will not write keeps the flat keys and the file`() {
+        Files.writeString(
+            workDir / "credentials.json",
+            """{"username":"ChaosA","uuid":"$scUuid","uid":"1","version":5}""",
+        )
+        vault.entries["accessToken"] = "fake-game-token".toByteArray()
+        vault.entries["password"] = "secret-pw".toByteArray()
+        vault.refuseStore = true
+
+        manager.load()
+
+        assertEquals(5, fileJson()["version"]?.jsonPrimitive?.int, "the v5 file names whose secrets these are")
+        assertEquals("fake-game-token", vault.entries["accessToken"]?.decodeToString(), "the only copy of the token")
+        assertEquals("secret-pw", vault.entries["password"]?.decodeToString(), "the only copy of the password")
+
+        vault.refuseStore = false
+        assertEquals("fake-game-token", newManager().load()?.accessToken, "recovered once the vault writes")
+    }
+
+    @Test
+    fun `a legacy migration the vault will not write keeps the old keyring`() {
+        LegacyCredentialsManager(workDir, json, legacyKeyring).save(session())
+        vault.refuseStore = true
+
+        manager.load()
+
+        assertEquals(4, fileJson()["version"]?.jsonPrimitive?.int)
+        assertTrue(legacyKeyring.entries.isNotEmpty(), "purged with nothing written, the account is gone")
+
+        vault.refuseStore = false
+        assertEquals("fake-game-token", newManager().load()?.accessToken)
+    }
+
+    @Test
     fun `a failed migration is attempted once per run, not per read`() {
         LegacyCredentialsManager(workDir, json, legacyKeyring).save(session())
         legacyKeyring.available = false
@@ -400,11 +654,15 @@ class CredentialsManagerTest {
     // ── Fakes ─────────────────────────────────────────────────────────────────
 
     private class FakeVault : SecretVault {
-        val entries: MutableMap<String, ByteArray> = mutableMapOf()
+        val entries: MutableMap<String, ByteArray> = ConcurrentHashMap()
         override val tier: VaultTier = VaultTier.Memory
         override val backend: String = "fake (test)"
 
+        /** A vault that answers but will not take anything, the way a locked keyring does. */
+        var refuseStore: Boolean = false
+
         override fun store(key: String, secret: ByteArray): Boolean {
+            if (refuseStore) return false
             entries[key] = secret.copyOf()
             return true
         }

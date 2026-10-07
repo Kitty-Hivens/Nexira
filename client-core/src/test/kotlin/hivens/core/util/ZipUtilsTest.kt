@@ -22,8 +22,8 @@ import kotlin.test.assertTrue
  *   - Symlink entries -- added in #187 as a separate vector that
  *     plain Zip Slip checks miss.
  *
- * Happy-path extraction is intentionally light here -- the launcher's
- * extra.zip flow exercises that thoroughly through FileDownloadServiceTest.
+ * Happy-path extraction is intentionally light here -- the natives unpack
+ * exercises it thoroughly through EnvironmentPreparerTest.
  */
 class ZipUtilsTest {
 

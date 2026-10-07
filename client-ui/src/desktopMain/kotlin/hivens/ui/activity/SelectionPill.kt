@@ -34,9 +34,9 @@ import hivens.ui.nx.NxFit
 import hivens.ui.nx.NxIconButton
 import hivens.ui.nx.NxTooltip
 import hivens.ui.surface.NxSurface
-import hivens.ui.surface.NxSurfaceLevel
+import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.Motion
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxInk
 
 /**
  * The same object, narrating what the user has picked instead of what the
@@ -60,7 +60,6 @@ internal fun SelectionPill(
     maxWidth: Dp,
     open: Boolean = true,
 ) {
-    val colors = NxTheme.colors
     val height = props.heightDp.dp
     val corner by animateDpAsState(
         targetValue = if (open) 14.dp else height / 2,
@@ -70,7 +69,7 @@ internal fun SelectionPill(
     val shape = RoundedCornerShape(corner)
 
     NxSurface(
-        level = NxSurfaceLevel.Floating,
+        kind = SurfaceKind.Notice,
         modifier = Modifier
             .heightIn(min = height)
             .widthIn(max = maxWidth)
@@ -78,7 +77,6 @@ internal fun SelectionPill(
             .clip(shape),
         shape = shape,
         shadowDp = 18f,
-        opacity = 1f,
     ) {
         Row(
             // No fillMaxWidth: it stretched the object to the ceiling and, once
@@ -104,7 +102,6 @@ internal fun SelectionPill(
 /** Count, the way to undo it, and the verbs -- all at one level of detail. */
 @Composable
 private fun Body(selection: Selection, s: AppStrings, props: PillProps, labelled: Boolean) {
-    val colors = NxTheme.colors
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(if (labelled) 12.dp else 2.dp),
@@ -113,11 +110,11 @@ private fun Body(selection: Selection, s: AppStrings, props: PillProps, labelled
             text = s.selectionCount(selection.items.size),
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
-            color = colors.textPrimary,
+            color = NxInk.main,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
-        VerticalDivider(Modifier.height(20.dp), color = colors.outline)
+        VerticalDivider(Modifier.height(20.dp), color = NxInk.line)
         if (labelled) {
             NxButton(
                 label = s.selectionClear,
@@ -132,7 +129,7 @@ private fun Body(selection: Selection, s: AppStrings, props: PillProps, labelled
         }
         if (props.showActions && selection.actions.isNotEmpty()) {
             Spacer(Modifier.width(if (labelled) CLUSTER_GAP else 4.dp))
-            VerticalDivider(Modifier.height(26.dp), color = colors.outline)
+            VerticalDivider(Modifier.height(26.dp), color = NxInk.line)
             Verbs(selection, s, labelled)
         }
     }

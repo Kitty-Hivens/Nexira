@@ -76,6 +76,21 @@ object Motion {
         @Composable @ReadOnlyComposable get() = role(EMPHASIS_MS, Arrive, Enter.emphasis, Exit.emphasis)
 
     /**
+     * A mark travelling to the thing it now marks: a tab's underline, a selection
+     * rail, a caret.
+     *
+     * Its own role rather than [tap], because this one crosses a distance the eye
+     * follows rather than answering in place, and rather than [panelSlide],
+     * because nothing arrives or leaves -- it is the SAME mark in two places at
+     * two times, and the journey between them is the whole of what it says.
+     *
+     * No new rung on the scale: it settles at the same pace a selection's colour
+     * does, which is what it is, moved.
+     */
+    val track: MotionRole
+        @Composable @ReadOnlyComposable get() = role(COLOR_MS, Standard)
+
+    /**
      * Ambient movement nothing is waiting on -- parallax, backdrop drift. Long by
      * design: it should never read as a response to an action.
      */

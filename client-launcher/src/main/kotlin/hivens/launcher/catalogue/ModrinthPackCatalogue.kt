@@ -59,14 +59,17 @@ class ModrinthPackCatalogue(private val client: ModrinthClient) : IPackCatalogue
 
     override suspend fun versions(packId: String): List<CataloguePackVersion> =
         client.listVersions(packId).map { v ->
+            // A modpack version's primary file is its .mrpack.
+            val archive = v.files.firstOrNull { it.primary } ?: v.files.firstOrNull()
             CataloguePackVersion(
                 id = v.id,
                 name = v.name,
                 versionNumber = v.versionNumber,
                 mcVersions = v.gameVersions,
                 loaders = v.loaders,
-                // A modpack version's primary file is its .mrpack.
-                downloadUrl = v.files.firstOrNull { it.primary }?.url ?: v.files.firstOrNull()?.url,
+                downloadUrl = archive?.url,
+                downloadSha1 = archive?.hashes?.sha1,
+                downloadSize = archive?.size ?: -1L,
                 channel = VersionChannel.of(v.versionType, v.versionNumber),
                 publishedAt = v.datePublished.ifBlank { null },
                 changelog = v.changelog?.takeIf { it.isNotBlank() },

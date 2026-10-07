@@ -87,10 +87,14 @@ class SkinLibrary(private val dir: Path, private val json: Json) {
      * pile up duplicates. Returns the existing match, else the freshly-added entry.
      * A null [sha] (undecodable) skips the dedup and always adds.
      */
-    fun addUnique(png: ByteArray, name: String, slim: Boolean, now: Long, sha: String?, kind: Kind = Kind.Skin): Entry {
-        if (sha != null) readIndex().skins.firstOrNull { it.kind == kind && it.sha == sha }?.let { return it }
-        return add(png, name, slim, now, kind, sha)
-    }
+    fun addUnique(png: ByteArray, name: String, slim: Boolean, now: Long, sha: String?, kind: Kind = Kind.Skin): Entry =
+        // The look and the add under one hold of the lock, as every other write here
+        // is. Looked up outside it, two imports of the same skin at once, the wardrobe
+        // opening while a profile refresh re-imported, both missed and both added.
+        synchronized(lock) {
+            if (sha != null) readIndex().skins.firstOrNull { it.kind == kind && it.sha == sha }?.let { return@synchronized it }
+            add(png, name, slim, now, kind, sha)
+        }
 
     /** Rewrites the index under [lock]; [transform] sees the entries as they are on disk. */
     private fun mutate(transform: (List<Entry>) -> List<Entry>) = synchronized(lock) {

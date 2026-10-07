@@ -61,7 +61,7 @@ class ConsoleShots {
 
     private fun save(scene: ImageComposeScene, name: String) {
         var f = 0L
-        repeat(14) { scene.render(f); f += 16_000_000L }
+        repeat(14) { scene.render(f).close(); f += 16_000_000L }
         val png = scene.render(f).encodeToData(EncodedImageFormat.PNG) ?: error("encode failed")
         File(outDir, name).writeBytes(png.bytes)
     }

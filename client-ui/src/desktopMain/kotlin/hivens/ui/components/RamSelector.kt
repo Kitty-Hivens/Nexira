@@ -1,40 +1,59 @@
 package hivens.ui.components
 
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import hivens.core.jvm.SystemMemory
+import hivens.ui.customization.sliderKeyboardAdjust
+import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.theme.Motion
-import hivens.ui.theme.NxTheme
+import hivens.ui.nx.NxChoiceChip
+import hivens.ui.nx.NxField
+import hivens.ui.nx.NxReveal
+import hivens.ui.nx.NxSettingBlock
+import hivens.ui.nx.NxSettingRow
+import hivens.ui.nx.NxSliderTrack
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.Status
+import java.util.Locale
+import kotlin.math.floor
+import kotlin.math.round
+import kotlin.math.roundToInt
 
 /**
- * RAM mode selector. Represents a MODE, not just a number:
+ * The heap a pack launches with, as rows of a settings group. Represents a MODE,
+ * not just a number:
  *  - [isAuto] true  -> "Auto": the machine-aware Automatic baseline, refined by the
- *    adaptive sizer when it is on. The chip shows [resolvedAutoMb] -- the heap the next
- *    launch will actually use.
- *  - [isAuto] false -> a pinned (Fixed) value: [currentMb], from a preset or typed.
+ *    adaptive sizer when it is on. The row says what that comes to right now,
+ *    [resolvedAutoMb], the heap the next launch will actually use.
+ *  - [isAuto] false -> a pinned (Fixed) value, [currentMb]: a slider in gigabytes
+ *    over what this machine can spare, and a field beside it for an exact number.
  *
- * Stateless: the host owns the mode. Picking a preset/custom calls [onValueChanged]
- * (pins the instance); the Auto chip calls [onAutoSelected] (un-pins it).
+ * Gigabytes everywhere a person reads or types. The field used to take megabytes
+ * while showing the current value in gigabytes as its hint, so "10" typed against a
+ * hint of "10 GB" meant ten megabytes, fell outside the range and was dropped
+ * without a word. A value outside the range now says so.
+ *
+ * The slider stops at what is recommended for the machine, because that is the
+ * range worth dragging through. The field still takes anything up to the old
+ * ceiling, and a value past the recommendation is kept and warned about rather than
+ * refused: it is the player's machine.
+ *
+ * Stateless: the host owns the mode. Choosing "own" or moving a value calls
+ * [onValueChanged] (pins the instance); "Auto" calls [onAutoSelected] (un-pins it).
  */
 @Composable
 fun RamSelector(
@@ -43,144 +62,114 @@ fun RamSelector(
     currentMb: Int,
     onAutoSelected: () -> Unit,
     onValueChanged: (Int) -> Unit,
-    modifier: Modifier = Modifier
 ) {
     val s = LocalStrings.current
-
     val systemRamMb = remember { SystemMemory.totalPhysicalMb() }
+    val recommendedMb = (systemRamMb * RECOMMENDED_SHARE).toInt()
 
-    val allPresets = listOf(1024, 2048, 3072, 4096, 6144, 8192, 12288, 16384)
-    val presets = remember(systemRamMb) {
-        allPresets.filter { it <= (systemRamMb * 0.75).toInt() }.ifEmpty { listOf(1024, 2048) }
-    }
-
-    // Seed the custom field from a pinned non-preset value (against the machine-FILTERED
-    // presets, so a value pinned above the machine ceiling still shows in the field, not
-    // a missing chip). Keyed on the inputs so a profile load / instance switch re-seeds.
-    var customInput by remember(isAuto, currentMb) {
-        mutableStateOf(if (!isAuto && currentMb in 512..32768 && !presets.contains(currentMb)) currentMb.toString() else "")
-    }
-    var isCustomMode by remember(isAuto, currentMb) { mutableStateOf(!isAuto && !presets.contains(currentMb)) }
-    val focusManager = LocalFocusManager.current
-
-    Column(modifier = modifier.fillMaxWidth()) {
-        Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(s.serverSettingsRam, style = MaterialTheme.typography.bodyMedium, color = NxTheme.colors.textPrimary)
-            Text(
-                formatRam(if (isAuto) resolvedAutoMb else currentMb),
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
-                color = NxTheme.colors.primary
-            )
-        }
-
-        Spacer(Modifier.height(10.dp))
-
-        // Auto mode: full-width chip above the presets. Default for an unpinned instance;
-        // shows the heap Auto resolves to right now (Automatic baseline or adaptive-derived).
-        RamChip(
-            selected = isAuto,
-            label = s.ramAutoLabel(formatRam(resolvedAutoMb)),
-            modifier = Modifier.fillMaxWidth(),
-            onClick = { isCustomMode = false; onAutoSelected() },
-        )
-
-        Spacer(Modifier.height(6.dp))
-
-        // Preset buttons -- picking one pins the instance (Fixed).
-        presets.chunked(4).forEach { row ->
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                row.forEach { preset ->
-                    RamChip(
-                        selected = !isAuto && !isCustomMode && currentMb == preset,
-                        label = formatRam(preset),
-                        modifier = Modifier.weight(1f),
-                        onClick = { isCustomMode = false; onValueChanged(preset) },
-                    )
-                }
-                repeat(4 - row.size) { Spacer(Modifier.weight(1f)) }
-            }
-            Spacer(Modifier.height(6.dp))
-        }
-
-        Spacer(Modifier.height(8.dp))
-
-        // Custom input -- typing a value also pins the instance.
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(s.ramCustomInputLabel, style = MaterialTheme.typography.bodySmall, color = NxTheme.colors.textSecondary, modifier = Modifier.width(100.dp))
-            OutlinedTextField(
-                value = if (isCustomMode) customInput else "",
-                onValueChange = { input ->
-                    customInput = input.filter { it.isDigit() }
-                    isCustomMode = true
-                    customInput.toIntOrNull()?.takeIf { it in 512..32768 }?.let(onValueChanged)
-                },
-                // No fixed height -- Material3 OutlinedTextField needs ~56 dp to lay out
-                // its placeholder; forcing 48 dp clipped it past the bottom border.
-                modifier = Modifier.weight(1f),
-                placeholder = {
-                    Text(
-                        if (isCustomMode) "" else formatRam(if (isAuto) resolvedAutoMb else currentMb),
-                        color = NxTheme.colors.textSecondary.copy(alpha = 0.4f),
-                        fontSize = 13.sp,
-                    )
-                },
-                suffix = { Text("MB", color = NxTheme.colors.textSecondary, fontSize = 12.sp) },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
-                keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = NxTheme.colors.textPrimary, unfocusedTextColor = NxTheme.colors.textPrimary,
-                    cursorColor = NxTheme.colors.primary, focusedBorderColor = NxTheme.colors.primary,
-                    unfocusedBorderColor = NxTheme.colors.textSecondary.copy(alpha = 0.2f),
-                    focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent
-                ),
-                shape = MaterialTheme.shapes.small
-            )
-        }
-
-        Spacer(Modifier.height(4.dp))
-        Text(
-            text = s.ramSystemHint(formatRam(systemRamMb), formatRam((systemRamMb * 0.75).toInt())),
-            style = MaterialTheme.typography.labelSmall,
-            color = NxTheme.colors.textSecondary.copy(alpha = 0.5f)
-        )
-    }
-}
-
-/** A pill used for both the Auto chip and each preset; [selected] drives the fill/text. */
-@Composable
-private fun RamChip(selected: Boolean, label: String, modifier: Modifier, onClick: () -> Unit) {
-    val bg by animateColorAsState(
-        if (selected) NxTheme.colors.primary else NxTheme.colors.surface.copy(alpha = 0.5f),
-        Motion.fade.of(),
-    )
-    val fg by animateColorAsState(
-        if (selected) Color.White else NxTheme.colors.textSecondary,
-        Motion.fade.of(),
-    )
-    Box(
-        modifier = modifier.height(36.dp)
-            .clip(MaterialTheme.shapes.small)
-            .border(
-                1.dp,
-                if (selected) NxTheme.colors.primary.copy(alpha = 0.7f) else NxTheme.colors.outline.copy(alpha = 0.2f),
-                MaterialTheme.shapes.small,
-            )
-            .background(bg)
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center,
+    NxSettingRow(
+        title  = s.ramModeTitle,
+        detail = if (isAuto) s.ramAutoDetail(formatRam(resolvedAutoMb, s)) else s.ramOwnDetail,
     ) {
-        Text(label, fontSize = 12.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium, color = fg, textAlign = TextAlign.Center)
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            NxChoiceChip(s.ramModeAuto, selected = isAuto) { if (!isAuto) onAutoSelected() }
+            // Leaving Auto starts from the number Auto was using, not from a constant.
+            NxChoiceChip(s.ramModeOwn, selected = !isAuto) { if (isAuto) onValueChanged(resolvedAutoMb) }
+        }
+    }
+
+    // Opened out under the row rather than swapped in: the choice above it stays
+    // where it was, and the eye follows what it uncovered.
+    NxReveal(visible = !isAuto) {
+        NxSettingBlock {
+            val sliderTopGb = maxOf(snapGb(recommendedMb / MB_PER_GB, down = true), currentMb / MB_PER_GB, MIN_SLIDER_GB)
+            // The track bare, under a header set like every other row: the slider's own
+            // label is a size larger, made for a page with nothing else on it.
+            val sliderValue = (currentMb / MB_PER_GB).coerceIn(MIN_SLIDER_GB, sliderTopGb)
+            val onSlide: (Float) -> Unit = { gb -> onValueChanged((snapGb(gb) * MB_PER_GB).roundToInt()) }
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    s.ramAllocated,
+                    style      = MaterialTheme.typography.bodyMedium,
+                    color      = NxInk.main,
+                    fontWeight = FontWeight.Medium,
+                    modifier   = Modifier.weight(1f),
+                )
+                Text(formatRam(currentMb, s), style = MaterialTheme.typography.bodyMedium, color = NxInk.quiet)
+            }
+            NxSliderTrack(
+                value         = sliderValue,
+                range         = MIN_SLIDER_GB..sliderTopGb,
+                onValueChange = onSlide,
+                modifier      = Modifier.fillMaxWidth().sliderKeyboardAdjust(sliderValue, MIN_SLIDER_GB..sliderTopGb, STEP_GB, onSlide),
+            )
+
+            // Re-seeded from the record whenever it moves, so a drag on the slider shows
+            // in the field; typing keeps what was typed until it parses.
+            var typed by remember(currentMb) { mutableStateOf(gbText(currentMb)) }
+            val parsed = typed.replace(',', '.').toFloatOrNull()
+            val typedMb = parsed?.let { (it * MB_PER_GB).roundToInt() }
+            val outOfRange = typed.isNotBlank() && (typedMb == null || typedMb !in MIN_MB..MAX_MB)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                NxField(
+                    value         = typed,
+                    onValueChange = { raw ->
+                        typed = raw.filter { it.isDigit() || it == '.' || it == ',' }.take(5)
+                        typed.replace(',', '.').toFloatOrNull()
+                            ?.let { (it * MB_PER_GB).roundToInt() }
+                            ?.takeIf { it in MIN_MB..MAX_MB }
+                            ?.let(onValueChanged)
+                    },
+                    placeholder   = gbText(currentMb),
+                    modifier      = Modifier.width(88.dp),
+                )
+                Text(s.ramUnitGb, style = MaterialTheme.typography.bodyMedium, color = NxInk.quiet)
+            }
+
+            val hint = when {
+                outOfRange -> s.ramOutOfRange(formatRam(MIN_MB, s), formatRam(MAX_MB, s))
+                currentMb > recommendedMb -> s.ramAboveRecommended(formatRam(recommendedMb, s))
+                else -> s.ramSystemHint(formatRam(systemRamMb, s), formatRam(recommendedMb, s))
+            }
+            Text(
+                text  = hint,
+                style = MaterialTheme.typography.bodySmall,
+                color = when {
+                    outOfRange -> NxColor.status(Status.Error, text = true)
+                    currentMb > recommendedMb -> NxColor.status(Status.Warning, text = true)
+                    else -> NxInk.quiet
+                },
+            )
+        }
     }
 }
 
-private fun formatRam(mb: Int): String = when {
-    mb >= 1024 && mb % 1024 == 0 -> "${mb / 1024} GB"
-    mb >= 1024 -> "%.1f GB".format(mb / 1024.0)
-    else -> "$mb MB"
+/** Snapped to the slider's step, rounding down when a ceiling must not be crossed. */
+private fun snapGb(gb: Float, down: Boolean = false): Float {
+    val steps = gb / STEP_GB
+    return (if (down) floor(steps) else round(steps)) * STEP_GB
 }
+
+/** A value as the field shows it: whole gigabytes bare, anything else to a tenth. */
+private fun gbText(mb: Int): String {
+    val gb = mb / MB_PER_GB
+    return if (gb % 1f == 0f) gb.toInt().toString() else String.format(Locale.ROOT, "%.1f", gb)
+}
+
+internal fun formatRam(mb: Int, s: AppStrings): String = when {
+    mb >= 1024 && mb % 1024 == 0 -> "${mb / 1024} ${s.ramUnitGb}"
+    mb >= 1024 -> String.format(Locale.ROOT, "%.1f %s", mb / MB_PER_GB, s.ramUnitGb)
+    else -> "$mb ${s.ramUnitMb}"
+}
+
+private const val MB_PER_GB = 1024f
+
+/** The share of physical memory the slider offers, leaving the rest to the system. */
+private const val RECOMMENDED_SHARE = 0.75
+
+private const val STEP_GB = 0.5f
+private const val MIN_SLIDER_GB = 1f
+
+/** What the field accepts: the range the launcher has always taken. */
+private const val MIN_MB = 512
+private const val MAX_MB = 32768

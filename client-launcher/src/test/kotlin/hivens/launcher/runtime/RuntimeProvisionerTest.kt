@@ -2,6 +2,7 @@ package hivens.launcher.runtime
 
 import hivens.test.testTransferEngine
 import hivens.core.api.HttpClientProvider
+import hivens.launcher.runtime.loader.LibrarySpec
 import hivens.launcher.runtime.loader.LoaderProfile
 import hivens.launcher.runtime.loader.LoaderRegistry
 import hivens.launcher.runtime.loader.LoaderResolver
@@ -341,6 +342,64 @@ class RuntimeProvisionerTest {
         assertTrue(requests.isEmpty(), "a warm relaunch must make ZERO network requests, got: $requests")
     }
 
+    // Another launcher's tree is offered, not trusted: what matches the manifest is
+    // taken without a download, and what does not is downloaded as if absent.
+    @Test
+    fun `an offered tree is taken where it matches and downloaded where it does not`() = runTest {
+        val libBytes = "PATCHY-JAR".toByteArray()
+        val clientBytes = "CLIENT-JAR".toByteArray()
+        val objBytes = "EN-US-LANG".toByteArray()
+        val objHash = sha1(objBytes)
+        val indexJson = """{"objects":{"minecraft/lang/en_us.lang":{"hash":"$objHash","size":${objBytes.size}}}}"""
+        val versionJson = """
+            {
+              "assetIndex": {"id":"1.12","sha1":"${sha1(indexJson)}","size":${indexJson.length},"url":"$INDEX_URL"},
+              "downloads": {"client": {"sha1":"${sha1(clientBytes)}","size":${clientBytes.size},"url":"$CLIENT_URL"}},
+              "libraries": [
+                {"name":"com.mojang:patchy:1.1","downloads":{"artifact":{"path":"com/mojang/patchy/1.1/patchy-1.1.jar","sha1":"${sha1(libBytes)}","size":${libBytes.size},"url":"$LIB_URL"}}}
+              ]
+            }
+        """.trimIndent()
+        val manifestJson = """{"versions":[{"id":"1.12.2","url":"$VERSION_URL"}]}"""
+
+        // The foreign tree: the asset and the client jar are genuine, the library is
+        // the same size as the real one and is not it.
+        val foreign = tmp.resolve("foreign")
+        val seedAssets = foreign.resolve("assets")
+        val seedLibs = foreign.resolve("libraries")
+        val seedClient = foreign.resolve("versions/1.12.2/1.12.2.jar")
+        Files.createDirectories(seedAssets.resolve("objects/${objHash.take(2)}"))
+        Files.write(seedAssets.resolve("objects/${objHash.take(2)}/$objHash"), objBytes)
+        Files.createDirectories(seedLibs.resolve("com/mojang/patchy/1.1"))
+        Files.write(seedLibs.resolve("com/mojang/patchy/1.1/patchy-1.1.jar"), "PATCHY-BAD".toByteArray())
+        Files.createDirectories(seedClient.parent)
+        Files.write(seedClient, clientBytes)
+
+        val requests = mutableListOf<String>()
+        val engine = MockEngine { req ->
+            val url = req.url.toString()
+            requests += url
+            when (url) {
+                MANIFEST_URL -> respond(manifestJson, HttpStatusCode.OK, jsonHeaders)
+                VERSION_URL -> respond(versionJson, HttpStatusCode.OK, jsonHeaders)
+                INDEX_URL -> respond(indexJson, HttpStatusCode.OK, jsonHeaders)
+                LIB_URL -> respond(ByteReadChannel(libBytes), HttpStatusCode.OK)
+                CLIENT_URL -> respond(ByteReadChannel(clientBytes), HttpStatusCode.OK)
+                "$RES_BASE/${objHash.take(2)}/$objHash" -> respond(ByteReadChannel(objBytes), HttpStatusCode.OK)
+                else -> respond("missing: $url", HttpStatusCode.NotFound)
+            }
+        }
+        val p = provisioner(HttpClient(engine))
+
+        p.ensureVanilla("1.12.2", seed = RuntimeSeed(librariesDir = seedLibs, assetsDir = seedAssets, clientJar = seedClient))
+
+        assertEquals("PATCHY-JAR", librariesDir.resolve("com/mojang/patchy/1.1/patchy-1.1.jar").readText(), "the mismatching library was downloaded")
+        assertTrue(LIB_URL in requests)
+        assertEquals("EN-US-LANG", assetsDir.resolve("objects/${objHash.take(2)}/$objHash").readText())
+        assertTrue(requests.none { it.startsWith(RES_BASE) }, "the matching asset was taken, not downloaded")
+        assertTrue(CLIENT_URL !in requests, "the matching client jar was taken, not downloaded")
+    }
+
     @Test
     fun `ensureVanilla throws on sha1 mismatch and leaves no partial file`() = runTest {
         val libBytes = "REAL-LIB".toByteArray()
@@ -439,7 +498,7 @@ class RuntimeProvisionerTest {
         val stub = object : LoaderResolver {
             override val loaderId = "stub"
             override suspend fun resolve(mcVersion: String, loaderVersion: String) =
-                LoaderProfile(libraries = emptyList(), mainClass = "fake.Main", javaMajor = 25)
+                LoaderProfile(version = "test", libraries = emptyList(), mainClass = "fake.Main", javaMajor = 25)
         }
         val p = RuntimeProvisioner(
             librariesDir = librariesDir,
@@ -455,6 +514,125 @@ class RuntimeProvisionerTest {
 
         val resolved = p.ensureRuntime(mcVersion = "1.21.1", loaderName = "stub", loaderVersion = "any")
         assertEquals(25, resolved.javaMajor, "loader profile.javaMajor must win over vanilla.javaMajor")
+    }
+
+    /**
+     * The overlay's coordinates come from a loader profile or an installer's
+     * version json, and `MavenCoord.parse` validates no segment, so the path built
+     * from one is the document's to choose unless it is bounded.
+     */
+    @Test
+    fun `a loader library whose coordinate climbs out of the libraries root is refused`() = runTest {
+        val clientBytes = "C".toByteArray()
+        val indexJson = """{"objects":{}}"""
+        val versionJson = """
+            {
+              "assetIndex": {"id":"17","sha1":"${sha1(indexJson)}","size":${indexJson.length},"url":"$INDEX_URL"},
+              "downloads": {"client": {"sha1":"${sha1(clientBytes)}","size":${clientBytes.size},"url":"$CLIENT_URL"}},
+              "libraries": []
+            }
+        """.trimIndent()
+        val engine = MockEngine { req ->
+            when (req.url.toString()) {
+                MANIFEST_URL -> respond("""{"versions":[{"id":"1.21.1","url":"$VERSION_URL"}]}""", HttpStatusCode.OK, jsonHeaders)
+                VERSION_URL -> respond(versionJson, HttpStatusCode.OK, jsonHeaders)
+                INDEX_URL -> respond(indexJson, HttpStatusCode.OK, jsonHeaders)
+                CLIENT_URL -> respond(ByteReadChannel(clientBytes), HttpStatusCode.OK)
+                else -> respond("missing", HttpStatusCode.NotFound)
+            }
+        }
+        val climbing = object : LoaderResolver {
+            override val loaderId = "stub"
+            override suspend fun resolve(mcVersion: String, loaderVersion: String) = LoaderProfile(
+                version = "test",
+                libraries = listOf(LibrarySpec(MavenCoord.parse("evil:../../out:1"), bundled = "X".toByteArray())),
+                mainClass = "fake.Main",
+            )
+        }
+        val p = RuntimeProvisioner(
+            librariesDir = librariesDir,
+            assetsDir = assetsDir,
+            clientProvider = HttpClientProvider { HttpClient(engine) },
+            transfers = testTransferEngine(HttpClientProvider { HttpClient(engine) }),
+            json = json,
+            loaderRegistry = LoaderRegistry(listOf(climbing)),
+            osName = "Linux",
+            versionManifestUrl = MANIFEST_URL,
+            resourcesBaseUrl = RES_BASE,
+        )
+
+        // `evil/../../out/1/../../out-1.jar` lands beside the libraries root, in a
+        // directory the test can write to. The directories it climbs through exist,
+        // so only the boundary can refuse it.
+        Files.createDirectories(librariesDir.resolve("evil"))
+        Files.createDirectories(tmp.resolve("out/1"))
+        assertFailsWith<IOException> { p.ensureRuntime(mcVersion = "1.21.1", loaderName = "stub", loaderVersion = "any") }
+        assertTrue(!Files.exists(tmp.resolve("out-1.jar")), "nothing is written for the climbing coordinate")
+    }
+
+    /**
+     * A loader nothing here serves used to read as no loader at all: the pack
+     * started as plain vanilla with every mod ignored and nothing said.
+     */
+    @Test
+    fun `a loader nothing here serves is refused before anything is downloaded`() = runTest {
+        val requested = mutableListOf<String>()
+        val engine = MockEngine { req ->
+            requested += req.url.toString()
+            respond("missing", HttpStatusCode.NotFound)
+        }
+        val p = provisioner(HttpClient(engine))
+
+        val failure = runCatching { p.ensureRuntime(mcVersion = "1.20.1", loaderName = "forg", loaderVersion = "") }.exceptionOrNull()
+
+        assertTrue(failure is IOException && "forg" in failure.message.orEmpty(), "got $failure")
+        assertTrue(requested.isEmpty(), "nothing is fetched for a pack that cannot run: $requested")
+    }
+
+    /** Fabric on 1.12.2, or a version typo, used to fail only once the whole vanilla runtime was on disk. */
+    @Test
+    fun `a loader that cannot serve the version fails before the vanilla download`() = runTest {
+        val clientBytes = "C".toByteArray()
+        val indexJson = """{"objects":{}}"""
+        val versionJson = """
+            {
+              "assetIndex": {"id":"17","sha1":"${sha1(indexJson)}","size":${indexJson.length},"url":"$INDEX_URL"},
+              "downloads": {"client": {"sha1":"${sha1(clientBytes)}","size":${clientBytes.size},"url":"$CLIENT_URL"}},
+              "libraries": []
+            }
+        """.trimIndent()
+        val requested = mutableListOf<String>()
+        val engine = MockEngine { req ->
+            requested += req.url.toString()
+            when (req.url.toString()) {
+                MANIFEST_URL -> respond("""{"versions":[{"id":"1.12.2","url":"$VERSION_URL"}]}""", HttpStatusCode.OK, jsonHeaders)
+                VERSION_URL -> respond(versionJson, HttpStatusCode.OK, jsonHeaders)
+                INDEX_URL -> respond(indexJson, HttpStatusCode.OK, jsonHeaders)
+                CLIENT_URL -> respond(ByteReadChannel(clientBytes), HttpStatusCode.OK)
+                else -> respond("missing", HttpStatusCode.NotFound)
+            }
+        }
+        val refusing = object : LoaderResolver {
+            override val loaderId = "fabric"
+            override suspend fun resolve(mcVersion: String, loaderVersion: String): LoaderProfile =
+                throw IOException("fabric has no loader versions for Minecraft $mcVersion")
+        }
+        val p = RuntimeProvisioner(
+            librariesDir = librariesDir,
+            assetsDir = assetsDir,
+            clientProvider = HttpClientProvider { HttpClient(engine) },
+            transfers = testTransferEngine(HttpClientProvider { HttpClient(engine) }),
+            json = json,
+            loaderRegistry = LoaderRegistry(listOf(refusing)),
+            osName = "Linux",
+            versionManifestUrl = MANIFEST_URL,
+            resourcesBaseUrl = RES_BASE,
+        )
+
+        runCatching { p.ensureRuntime(mcVersion = "1.12.2", loaderName = "fabric", loaderVersion = "") }
+            .onSuccess { error("the loader refused, so the runtime must not be provisioned") }
+
+        assertTrue(CLIENT_URL !in requested && INDEX_URL !in requested, "nothing past the version json was fetched: $requested")
     }
 
     private companion object {

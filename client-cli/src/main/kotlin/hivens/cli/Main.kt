@@ -1,5 +1,6 @@
 package hivens.cli
 
+import hivens.core.logging.Redactor
 import hivens.config.Branding
 import hivens.core.api.interfaces.ICredentialStore
 import hivens.core.api.interfaces.IPackRepository
@@ -10,6 +11,9 @@ import hivens.core.launch.LaunchError
 import hivens.core.launch.LaunchLogEvent
 import hivens.core.launch.LaunchState
 import hivens.launcher.bootstrap.LauncherBootstrap
+import hivens.launcher.di.transientPackRegistryModule
+import hivens.launcher.platform.PlatformPaths
+import hivens.launcher.platform.SingleInstance
 import hivens.launcher.launch.LauncherController
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -51,14 +55,31 @@ private fun printVersion() {
     println("${Branding.TITLE} ${Branding.VERSION}")
 }
 
-/** Boots the AWT-free launcher core once and returns the started Koin context. */
-private fun bootLauncher(): Koin {
-    LauncherBootstrap.preBootHeadless()
+/**
+ * Boots the AWT-free launcher core once and returns the started Koin context, or
+ * null when the launcher is running on the same data directory.
+ *
+ * The two cannot share it. Both databases lock their directory for one process, and
+ * this one would either fail on them or hold them while the launcher needs them. So
+ * the command line says so and stops rather than half-working. The pack registry it
+ * does open, it opens for each operation and closes again, so a launcher started
+ * while a launch from here runs is kept waiting for milliseconds, not for the game.
+ */
+private fun bootLauncher(): Koin? {
+    val dataDir = PlatformPaths.system().dataDir
+    if (SingleInstance.heldElsewhere(dataDir)) {
+        System.err.println(
+            "${Branding.TITLE} is running on $dataDir. The command line shares its data and cannot run beside it: " +
+                "close the launcher and try again.",
+        )
+        return null
+    }
+    LauncherBootstrap.preBootHeadless(listOf(transientPackRegistryModule))
     return GlobalContext.get()
 }
 
 private fun runListPacks(): Int {
-    val koin = bootLauncher()
+    val koin = bootLauncher() ?: return EXIT_LAUNCHER_RUNNING
     val packs = runBlocking { koin.get<IPackRepository>().list() }
     if (packs.isEmpty()) {
         println("No installed pack instances. Install one from the GUI, then 'nexira-cli launch <id>'.")
@@ -80,7 +101,7 @@ private fun runListPacks(): Int {
 }
 
 private fun runLaunch(cmd: CliCommand.Launch): Int {
-    val koin = bootLauncher()
+    val koin = bootLauncher() ?: return EXIT_LAUNCHER_RUNNING
     val instance = runBlocking { koin.get<IPackRepository>().get(cmd.packId) }
     if (instance == null) {
         System.err.println("No installed pack instance with id '${cmd.packId}'. Run 'nexira-cli list'.")
@@ -99,7 +120,10 @@ private fun runLaunch(cmd: CliCommand.Launch): Int {
         // Console output: the controller emits semantic events + game stdout
         // on `events`; render to stdout. Cancelled once a terminal state lands.
         val output = launch {
-            controller.events.collect { println(renderEvent(it)) }
+            // Through the redactor, as the GUI console is: the command line carries the
+            // access token and authlib echoes it, and terminal output is what gets
+            // pasted into a bug report.
+            controller.events.collect { println(Redactor.redact(renderEvent(it))) }
         }
         // Coarse progress: dedup consecutive same-class states so the per-byte
         // Downloading storm does not flood the terminal.
@@ -121,7 +145,7 @@ private fun runLaunch(cmd: CliCommand.Launch): Int {
 
         when (terminal) {
             is LaunchState.Error -> {
-                System.err.println("Launch failed: ${renderError(terminal.reason)}")
+                System.err.println(Redactor.redact("Launch failed: ${renderError(terminal.reason)}"))
                 1
             }
             else -> 0
@@ -142,17 +166,16 @@ private fun resolveSession(koin: Koin, cmd: CliCommand.Launch): SessionData? {
         }
         else -> {
             // smartycraft / microsoft: reuse the session the GUI stored in the
-            // keyring; the controller re-auths SC-bound packs pre-spawn.
-            val store = koin.get<ICredentialStore>()
-            val stored = store.accountFor(cmd.provider) ?: store.load()
+            // keyring; the controller re-auths SC-bound packs pre-spawn. The
+            // provider asked for or nothing: falling back to whichever account was
+            // active ran a launch meant for one provider under another identity.
+            val stored = koin.get<ICredentialStore>().accountFor(cmd.provider)
             if (stored == null) {
                 System.err.println(
                     "No stored '${cmd.provider}' account. Sign in via the GUI first, then retry.",
                 )
-                null
-            } else {
-                cmd.user?.let { stored.copy(playerName = it) } ?: stored
             }
+            stored
         }
     }
 }
@@ -177,6 +200,7 @@ private fun renderEvent(event: LaunchLogEvent): String = when (event) {
     is LaunchLogEvent.TargetServer -> "-> ${event.name}" + if (event.offline) " (offline)" else ""
     is LaunchLogEvent.SessionStarted -> "session: ${event.targetLabel ?: event.targetId ?: "?"}"
     LaunchLogEvent.OfflineSkipAuth -> "(offline: skipping auth)"
+    LaunchLogEvent.UnboundOffline -> "(no server binding: launching offline, no session token)"
     is LaunchLogEvent.AuthSucceeded -> "auth ok (${event.uuid})"
     LaunchLogEvent.NoPassword -> "(no cached password; offline fallback)"
     // The cause decides what a stale session means here too: launching on it is
@@ -199,16 +223,19 @@ private fun renderError(reason: LaunchError): String = when (reason) {
     LaunchError.ContentChangedDuringLaunch ->
         "pack content changed while the launch was being prepared; sync the pack and try again"
     LaunchError.OfflineNoClient -> "no installed client directory (install/sync the pack first)"
-    LaunchError.OfflineNoManifest -> "no cached manifest from a prior online run"
     LaunchError.TwoFactorExpired -> "2FA session expired -- re-login via the GUI"
-    is LaunchError.HelperUnavailable -> "open-smrt helper unavailable for MC ${reason.mcVersion}"
     is LaunchError.AuthlibUnavailable -> "SmartyCraft authlib unavailable for MC ${reason.mcVersion}"
     is LaunchError.MissingAuthProvider -> "sign in with '${reason.providerKey}' to play this pack (use the GUI)"
+    is LaunchError.InstanceBusy -> "the pack is busy (${reason.work.name.lowercase()}), try again when it finishes"
 }
+
+/** Exit code for a command refused because the launcher holds the data directory. */
+private const val EXIT_LAUNCHER_RUNNING = 3
 
 private fun coarseLabel(state: LaunchState): String? = when (state) {
     is LaunchState.Prepare -> "prepare:${state.stage}"
     is LaunchState.Downloading -> "downloading"
     is LaunchState.GameRunning -> "running"
+    is LaunchState.Stopping -> "stopping"
     LaunchState.Idle, is LaunchState.Error -> null
 }

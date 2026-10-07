@@ -4,7 +4,14 @@ import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
 import hivens.core.data.PackReference
+import hivens.core.io.InstanceMutationLock
+import hivens.core.launch.InstanceWorkRegistry
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -16,6 +23,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class ApplyRecoveryTest {
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -30,11 +38,11 @@ class ApplyRecoveryTest {
     }
 
     /** A repository whose write is interrupted, as a shutdown mid-rollback interrupts it. */
-    private class CancellingRepo : IPackRepository {
+    private class CancellingRepo(private val held: PackInstance) : IPackRepository {
         private val flow = MutableStateFlow<List<PackInstance>>(emptyList())
         override fun observe(): StateFlow<List<PackInstance>> = flow
-        override suspend fun list(): List<PackInstance> = emptyList()
-        override suspend fun get(id: String): PackInstance? = null
+        override suspend fun list(): List<PackInstance> = listOf(held)
+        override suspend fun get(id: String): PackInstance? = held.takeIf { it.id == id }
         override suspend fun put(instance: PackInstance): Unit = throw CancellationException("shutting down")
         override suspend fun delete(id: String) = Unit
     }
@@ -83,13 +91,19 @@ class ApplyRecoveryTest {
         Files.writeString(modsDir.resolve("a.jar"), "new-a")
         Files.writeString(modsDir.resolve("b.jar"), "new-b")
         journal.begin(PendingApply("1", dir, snap.id, "5", "6", managed.toList(), 100L))
+        // What the registry says by the time the launcher starts again: the build the
+        // crash interrupted, and a session played after the snapshot was taken.
+        repo.put(preUpdate.copy(pinnedPackVersion = "6", playtimeSeconds = 900, notes = "after"))
 
-        val recovered = ApplyRecovery(snapshots, repo, journal, dataDir).recoverInterrupted()
+        val recovered = ApplyRecovery(snapshots, repo, journal, dataDir, InstanceWorkRegistry()).recoverInterrupted()
 
         assertEquals(listOf(dir), recovered)
         assertEquals("old-a", Files.readString(modsDir.resolve("a.jar")), "captured file restored to pre-update bytes")
         assertFalse(Files.exists(modsDir.resolve("b.jar")), "apply-added file removed")
         assertEquals(false, repo.get("1")?.followLatest, "recovered instance is pinned")
+        assertEquals("5", repo.get("1")?.pinnedPackVersion, "to the build it had")
+        assertEquals(900, repo.get("1")?.playtimeSeconds, "and nothing else is wound back with it")
+        assertEquals("after", repo.get("1")?.notes)
         assertTrue(journal.listPending().isEmpty(), "marker cleared")
         assertTrue(snapshots.list(dir).isEmpty(), "snapshot consumed")
     }
@@ -111,7 +125,7 @@ class ApplyRecoveryTest {
         val entry = PendingApply("1", dir, snap.id, "5", "6", managed.toList(), 100L)
         journal.begin(entry)
 
-        val recovery = ApplyRecovery(snapshots, CancellingRepo(), journal, dataDir)
+        val recovery = ApplyRecovery(snapshots, CancellingRepo(instance("1", dir)), journal, dataDir, InstanceWorkRegistry())
         val outcome = runCatching { recovery.recoverInterrupted() }
 
         assertTrue(outcome.exceptionOrNull() is CancellationException, "the cancellation must propagate, not be logged as a failure")
@@ -121,13 +135,58 @@ class ApplyRecoveryTest {
         )
     }
 
+    /**
+     * Recovery and the auto-update pass meet on one instance lock, and the lock says
+     * nothing about who goes first. When the update got it, it committed and cleared
+     * the marker, and a recovery working from the listing it took before waiting
+     * restored the older snapshot over the build that had just landed.
+     */
+    @Test
+    fun `a marker cleared while recovery waited for the lock is not rolled back`() = runTest {
+        val dataDir = Files.createTempDirectory("rec4")
+        val dir = "industrial"
+        val clientDir = dataDir.resolve("instances").resolve(dir)
+        val modsDir = clientDir.resolve("mods")
+        Files.createDirectories(modsDir)
+        Files.writeString(modsDir.resolve("a.jar"), "old-a")
+
+        val snapshots = PackSnapshotService(dataDir, json)
+        val journal = ApplyJournal(dataDir, json)
+        val managed = setOf("mods/a.jar")
+        val snap = snapshots.capture(clientDir, instance("1", dir), managed, "snap-1", 100L)
+        journal.begin(PendingApply("1", dir, snap.id, "5", "6", managed.toList(), 100L))
+
+        // Something else holds the instance, and finishes its update while recovery
+        // is queued behind it.
+        val release = CompletableDeferred<Unit>()
+        launch {
+            InstanceMutationLock.withLock(clientDir) {
+                release.await()
+                Files.delete(modsDir.resolve("a.jar"))
+                Files.writeString(modsDir.resolve("a.jar"), "committed-a")
+                journal.complete(dir)
+            }
+        }
+        advanceUntilIdle()
+
+        val recovery = ApplyRecovery(snapshots, FakeRepo(), journal, dataDir, InstanceWorkRegistry(), io = StandardTestDispatcher(testScheduler))
+        var recovered: List<String>? = null
+        launch { recovered = recovery.recoverInterrupted() }
+        advanceUntilIdle()
+        release.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals(emptyList(), recovered)
+        assertEquals("committed-a", Files.readString(modsDir.resolve("a.jar")), "the update that landed stays")
+    }
+
     @Test
     fun `recoverInterrupted clears the marker when the snapshot is gone`() = runTest {
         val dataDir = Files.createTempDirectory("rec2")
         val journal = ApplyJournal(dataDir, json)
         journal.begin(PendingApply("1", "gone", "missing-snap", "5", "6", listOf("mods/a.jar"), 100L))
 
-        val recovered = ApplyRecovery(PackSnapshotService(dataDir, json), FakeRepo(), journal, dataDir).recoverInterrupted()
+        val recovered = ApplyRecovery(PackSnapshotService(dataDir, json), FakeRepo(), journal, dataDir, InstanceWorkRegistry()).recoverInterrupted()
 
         assertTrue(recovered.isEmpty())
         assertTrue(journal.listPending().isEmpty(), "unrecoverable marker cleared so it does not loop every boot")

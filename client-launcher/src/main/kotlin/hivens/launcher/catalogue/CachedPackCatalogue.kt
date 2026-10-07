@@ -17,8 +17,10 @@ import kotlinx.coroutines.flow.map
  * fresh one in turn so the refresh replaces the list instead of clearing it.
  *
  * Wraps rather than being folded into each source: a catalogue's job is to map
- * its own wire shape onto [CataloguePack], and both sources want the same
- * caching over the result of that.
+ * its own wire shape onto [CataloguePack], and a source that pages wants the
+ * same caching over the result of that, whichever source it is. The mirror is
+ * not wrapped: its search filters a listing that is already cached, see
+ * [MirrorPackCatalogue].
  */
 class CachedPackCatalogue(
     private val delegate: IPackCatalogueService,

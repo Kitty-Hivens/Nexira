@@ -5,6 +5,7 @@ import hivens.core.api.interfaces.ISettingsService
 import hivens.core.api.interfaces.IUpdateApplicator
 import hivens.core.data.ReleaseChannel
 import hivens.core.data.SettingsData
+import hivens.core.platform.Arch
 import hivens.test.MockResponse
 import hivens.test.buildMockClient
 import io.ktor.http.*
@@ -536,7 +537,7 @@ class UpdateServiceTest {
             GitHubAsset("SHA256SUMS.txt", "https://example.com/checksums", 512),
         )
 
-        val result = svc.findAssetForCurrentOS(assets)
+        val result = svc.findAssetForCurrentOS(assets, "v2.0.0")
         assertNotNull(result, "Should find an asset for current OS")
 
         val os = System.getProperty("os.name").lowercase()
@@ -559,13 +560,29 @@ class UpdateServiceTest {
             GitHubAsset("README.md", "https://example.com/readme", 1024),
             GitHubAsset("SHA256SUMS.txt", "https://example.com/checksums", 512),
         )
-        assertNull(svc.findAssetForCurrentOS(assets))
+        assertNull(svc.findAssetForCurrentOS(assets, "v2.0.0"))
     }
 
     @Test
     fun `findAssetForCurrentOS returns null for empty asset list`() {
         val svc = createService("{}")
-        assertNull(svc.findAssetForCurrentOS(emptyList()))
+        assertNull(svc.findAssetForCurrentOS(emptyList(), "v2.0.0"))
+    }
+
+    // The installer-over-portable preference, pinned on every host by reporting
+    // Windows for the length of the test. Gated on the real OS instead, it ran
+    // nowhere this project is developed or built.
+    @Test
+    fun `findAssetForCurrentOS picks the Setup installer over the portable ZIP on Windows`() {
+        val svc = createService("{}")
+        val assets = listOf(
+            GitHubAsset("AuraLauncher-2.0.0-Setup.exe", "https://example.com/setup.exe", 50_000_000),
+            GitHubAsset("AuraLauncher-2.0.0-Windows-Portable.zip", "https://example.com/portable.zip", 60_000_000),
+            GitHubAsset("AuraLauncher-2.0.0-x86_64.AppImage", "https://example.com/appimage", 70_000_000),
+        )
+        asOs("Windows 11", "amd64") {
+            assertEquals("AuraLauncher-2.0.0-Setup.exe", svc.findAssetForCurrentOS(assets, "v2.0.0")?.name)
+        }
     }
 
     @Test
@@ -575,10 +592,23 @@ class UpdateServiceTest {
         val assets = listOf(
             GitHubAsset("AuraLauncher-2.0.0-Windows-Portable.zip", "https://example.com/portable.zip", 60_000_000),
         )
-        val os = System.getProperty("os.name").lowercase()
-        if (os.contains("windows")) {
+        asOs("Windows 11", "amd64") {
             // Portable ZIP doesn't end with .exe -- should return null
-            assertNull(svc.findAssetForCurrentOS(assets))
+            assertNull(svc.findAssetForCurrentOS(assets, "v2.0.0"))
+        }
+    }
+
+    /** Runs [block] with the JVM reporting [os] on [arch], and puts the real values back. */
+    private fun asOs(os: String, arch: String, block: () -> Unit) {
+        val originalOs = System.getProperty("os.name")
+        val originalArch = System.getProperty("os.arch")
+        try {
+            System.setProperty("os.name", os)
+            System.setProperty("os.arch", arch)
+            block()
+        } finally {
+            System.setProperty("os.name", originalOs)
+            System.setProperty("os.arch", originalArch)
         }
     }
 
@@ -596,7 +626,7 @@ class UpdateServiceTest {
             )
             assertEquals(
                 "AuraLauncher-3.0.0-aarch64.dmg",
-                svc.findAssetForCurrentOS(assets)?.name,
+                svc.findAssetForCurrentOS(assets, "v2.0.0")?.name,
                 "Apple Silicon must NOT receive the x86_64 DMG (would fail with 'not supported on this Mac')",
             )
         } finally {
@@ -619,7 +649,7 @@ class UpdateServiceTest {
             )
             assertEquals(
                 "AuraLauncher-3.0.0-x86_64.dmg",
-                svc.findAssetForCurrentOS(assets)?.name,
+                svc.findAssetForCurrentOS(assets, "v2.0.0")?.name,
                 "Intel Mac must NOT receive the aarch64 DMG (Rosetta only goes x86_64 -> arm, not arm -> x86_64)",
             )
         } finally {
@@ -645,12 +675,83 @@ class UpdateServiceTest {
             )
             assertEquals(
                 "AuraLauncher-2.2.11.dmg",
-                svc.findAssetForCurrentOS(assets)?.name,
+                svc.findAssetForCurrentOS(assets, "v2.0.0")?.name,
             )
         } finally {
             System.setProperty("os.name", originalOs)
             System.setProperty("os.arch", originalArch)
         }
+    }
+
+    /** Runs [block] as a Linux host of [arch], restoring the real properties after. */
+    private fun <T> onLinux(arch: String = "amd64", block: () -> T): T {
+        val originalOs = System.getProperty("os.name")
+        val originalArch = System.getProperty("os.arch")
+        try {
+            System.setProperty("os.name", "Linux")
+            System.setProperty("os.arch", arch)
+            return block()
+        } finally {
+            System.setProperty("os.name", originalOs)
+            System.setProperty("os.arch", originalArch)
+        }
+    }
+
+    @Test
+    fun `the AppImage name carries the channel and the architecture, never the version`() {
+        val svc = createService("{}")
+        assertEquals("Nexira-x86_64.AppImage", svc.linuxAssetName("v2.4.6", Arch.X64))
+        assertEquals("Nexira-x86_64.AppImage", svc.linuxAssetName("v2.5.0-beta3", Arch.X64), "a beta is the release install")
+        assertEquals("Nexira-nightly-x86_64.AppImage", svc.linuxAssetName("v2.4.6-nightly3883", Arch.X64))
+        assertEquals("Nexira-aarch64.AppImage", svc.linuxAssetName("v2.4.6", Arch.ARM64))
+    }
+
+    /**
+     * A second AppImage in one release is how another libc or architecture would
+     * arrive. Taking the first one that ends in .AppImage would hand this machine
+     * whichever sorted first.
+     */
+    @Test
+    fun `Linux takes its own AppImage by name when a release carries several`() {
+        val svc = createService("{}")
+        val assets = listOf(
+            GitHubAsset("Nexira-x86_64-musl.AppImage", "https://example.com/musl", 70_000_000),
+            GitHubAsset("Nexira-aarch64.AppImage", "https://example.com/arm", 70_000_000),
+            GitHubAsset("Nexira-x86_64.AppImage", "https://example.com/glibc", 70_000_000),
+        )
+        assertEquals("Nexira-x86_64.AppImage", onLinux { svc.findAssetForCurrentOS(assets, "v2.5.0") }?.name)
+        assertEquals("Nexira-aarch64.AppImage", onLinux("aarch64") { svc.findAssetForCurrentOS(assets, "v2.5.0") }?.name)
+    }
+
+    @Test
+    fun `a nightly release is read for the nightly AppImage`() {
+        val svc = createService("{}")
+        val assets = listOf(GitHubAsset("Nexira-nightly-x86_64.AppImage", "https://example.com/nightly", 70_000_000))
+        assertEquals(
+            "Nexira-nightly-x86_64.AppImage",
+            onLinux { svc.findAssetForCurrentOS(assets, "v2.5.0-nightly4000") }?.name,
+        )
+    }
+
+    /** Releases from before the channel names still install, from the update manager or a lagging mirror. */
+    @Test
+    fun `a release named before the channel names falls back to its only AppImage`() {
+        val svc = createService("{}")
+        val assets = listOf(
+            GitHubAsset("Nexira-2.4.5-x86_64.AppImage", "https://example.com/legacy", 70_000_000),
+            GitHubAsset("SHA256SUMS.txt", "https://example.com/checksums", 512),
+        )
+        assertEquals("Nexira-2.4.5-x86_64.AppImage", onLinux { svc.findAssetForCurrentOS(assets, "v2.4.5") }?.name)
+    }
+
+    @Test
+    fun `several AppImages with none named for this machine is no update rather than a guess`() {
+        val svc = createService("{}")
+        val assets = listOf(
+            GitHubAsset("Nexira-x86_64-musl.AppImage", "https://example.com/musl", 70_000_000),
+            GitHubAsset("Nexira-aarch64.AppImage", "https://example.com/arm", 70_000_000),
+        )
+        assertNull(onLinux { svc.findAssetForCurrentOS(assets, "v2.5.0") })
     }
 
     // ═══════════════════════════════════════════════════════════════════════════

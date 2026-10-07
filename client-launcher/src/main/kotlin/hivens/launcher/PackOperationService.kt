@@ -1,6 +1,8 @@
 package hivens.launcher
 
 import hivens.core.data.PackInstance
+import hivens.core.launch.InstanceWork
+import hivens.core.launch.InstanceWorkRegistry
 import hivens.launcher.instance.InstanceSizeService
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -14,7 +16,7 @@ import java.util.concurrent.ConcurrentHashMap
 
 /** Which long operation an instance is running. The two read differently: one puts a
  *  different build in place, the other puts the installed one back. */
-enum class PackOperationKind { Update, Repair }
+enum class PackOperationKind(internal val work: InstanceWork) { Update(InstanceWork.Update), Repair(InstanceWork.Repair) }
 
 /** Lifecycle of one operation, published under the instance it runs on. */
 sealed interface PackOperationPhase {
@@ -70,6 +72,7 @@ data class PackOperation(
 class PackOperationService(
     private val scope: CoroutineScope,
     private val sizes: InstanceSizeService,
+    private val work: InstanceWorkRegistry,
 ) {
     private val log = LoggerFactory.getLogger(PackOperationService::class.java)
 
@@ -96,7 +99,10 @@ class PackOperationService(
         publish(id, kind, PackOperationPhase.Running(0, 0, ""))
         val job = scope.launch {
             try {
-                publish(id, kind, block { current, total, path -> publish(id, kind, PackOperationPhase.Running(current, total, path)) })
+                val outcome = work.during(id, kind.work) {
+                    block { current, total, path -> publish(id, kind, PackOperationPhase.Running(current, total, path)) }
+                }
+                publish(id, kind, outcome)
             } catch (e: CancellationException) {
                 // Only process shutdown cancels these. Drop the entry rather than
                 // leaving a Running phase nothing will ever finish.

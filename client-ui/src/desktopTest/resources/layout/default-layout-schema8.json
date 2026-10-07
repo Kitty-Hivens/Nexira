@@ -1,0 +1,416 @@
+{
+  "schema_version": 8,
+  "graph": {
+    "surfaces": {
+      "appshell.overlay": {
+        "slots": {
+          "bottom": {
+            "widgets": [
+              {
+                "kind": "appshell.activity.pill",
+                "instance_id": "appshell-activity-pill-default"
+              }
+            ]
+          }
+        }
+      },
+      "appshell.root": {
+        "slots": {
+          "regions": {
+            "orientation": "Column",
+            "widgets": [
+              {
+                "kind": "appshell.region.top",
+                "instance_id": "appshell-region-top-default"
+              },
+              {
+                "kind": "appshell.region.body",
+                "instance_id": "appshell-region-body-default",
+                "weight": 1.0
+              }
+            ]
+          }
+        }
+      },
+      "appshell.body": {
+        "slots": {
+          "content": {
+            "orientation": "Row",
+            "widgets": [
+              {
+                "kind": "appshell.region.left",
+                "instance_id": "appshell-region-left-default",
+                "props": {
+                  "widthDp": 65
+                }
+              },
+              {
+                "kind": "appshell.region.center",
+                "instance_id": "appshell-region-center-default",
+                "weight": 1.0
+              },
+              {
+                "kind": "appshell.region.right",
+                "instance_id": "appshell-region-right-default",
+                "props": {
+                  "widthDp": 265
+                }
+              }
+            ]
+          }
+        }
+      },
+      "appshell.topbar": {
+        "slots": {
+          "left": {
+            "orientation": "Row",
+            "widgets": [
+              {
+                "kind": "appshell.topbar.breadcrumb",
+                "instance_id": "appshell-topbar-breadcrumb-default"
+              }
+            ]
+          }
+        }
+      },
+      "home.classic": {
+        "slots": {
+          "main": {
+            "widgets": [
+              {
+                "kind": "home.classic.content",
+                "instance_id": "home-classic-content-default"
+              }
+            ]
+          }
+        }
+      },
+      "home.new": {
+        "slots": {
+          "main": {
+            "widgets": [
+              {
+                "kind": "home.new.welcome",
+                "instance_id": "home-new-welcome-default",
+                "props": {
+                  "showSubtitle": false
+                }
+              },
+              {
+                "kind": "home.new.spacer",
+                "instance_id": "home-new-spacer-default"
+              },
+              {
+                "kind": "home.new.hero",
+                "instance_id": "home-new-hero-default"
+              },
+              {
+                "kind": "home.new.recent",
+                "instance_id": "home-new-recent-default"
+              }
+            ]
+          }
+        }
+      },
+      "library": {
+        "slots": {
+          "header": {
+            "widgets": [
+              {
+                "kind": "library.header",
+                "instance_id": "library-header-default"
+              }
+            ]
+          },
+          "body": {
+            "widgets": [
+              {
+                "kind": "library.body",
+                "instance_id": "library-body-default"
+              }
+            ]
+          }
+        }
+      },
+      "appshell.leftrail": {
+        "slots": {
+          "top": {
+            "widgets": [
+              {
+                "kind": "nav.entry",
+                "instance_id": "appshell-leftrail-nav-home",
+                "props": {
+                  "target": "Home"
+                }
+              },
+              {
+                "kind": "nav.entry",
+                "instance_id": "appshell-leftrail-nav-library",
+                "props": {
+                  "target": "Library"
+                }
+              },
+              {
+                "kind": "nav.entry",
+                "instance_id": "appshell-leftrail-nav-browse",
+                "props": {
+                  "target": "Browse"
+                }
+              },
+              {
+                "kind": "nav.entry",
+                "instance_id": "appshell-leftrail-nav-profile",
+                "props": {
+                  "target": "Profile"
+                }
+              },
+              {
+                "kind": "nav.entry",
+                "instance_id": "appshell-leftrail-nav-wardrobe",
+                "props": {
+                  "target": "Wardrobe"
+                }
+              },
+              {
+                "kind": "nav.entry",
+                "instance_id": "appshell-leftrail-nav-settings",
+                "props": {
+                  "target": "Settings"
+                }
+              },
+              {
+                "kind": "nav.entry",
+                "instance_id": "appshell-leftrail-nav-about",
+                "props": {
+                  "target": "About"
+                }
+              }
+            ]
+          },
+          "bottom": {
+            "widgets": [
+              {
+                "kind": "nav.entry",
+                "instance_id": "appshell-leftrail-nav-console",
+                "props": {
+                  "target": "Console"
+                }
+              },
+              {
+                "kind": "nav.entry",
+                "instance_id": "appshell-leftrail-nav-logout",
+                "props": {
+                  "target": "Logout"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "appshell.rightrail": {
+        "slots": {
+          "news": {
+            "widgets": [
+              {
+                "kind": "appshell.rightrail.compactnews",
+                "instance_id": "appshell-rightrail-compactnews-default"
+              }
+            ]
+          },
+          "bottom": {
+            "widgets": [
+              {
+                "kind": "notifications.history",
+                "instance_id": "appshell-rightrail-history-default"
+              }
+            ]
+          }
+        }
+      },
+      "bg.settings": {
+        "slots": {
+          "controls": {
+            "widgets": [
+              {
+                "kind": "bg.enable.toggle",
+                "instance_id": "bg-enable-toggle-default"
+              },
+              {
+                "kind": "bg.image.picker",
+                "instance_id": "bg-image-picker-default"
+              },
+              {
+                "kind": "bg.scale.mode",
+                "instance_id": "bg-scale-mode-default"
+              },
+              {
+                "kind": "bg.position.x",
+                "instance_id": "bg-position-x-default"
+              },
+              {
+                "kind": "bg.position.y",
+                "instance_id": "bg-position-y-default"
+              },
+              {
+                "kind": "bg.fx.blur",
+                "instance_id": "bg-fx-blur-default"
+              },
+              {
+                "kind": "bg.fx.darken",
+                "instance_id": "bg-fx-darken-default"
+              },
+              {
+                "kind": "bg.fx.opacity",
+                "instance_id": "bg-fx-opacity-default"
+              },
+              {
+                "kind": "bg.fx.saturation",
+                "instance_id": "bg-fx-saturation-default"
+              },
+              {
+                "kind": "bg.fx.parallax",
+                "instance_id": "bg-fx-parallax-default"
+              },
+              {
+                "kind": "bg.fx.vignette",
+                "instance_id": "bg-fx-vignette-default"
+              },
+              {
+                "kind": "bg.fx.animspeed",
+                "instance_id": "bg-fx-animspeed-default"
+              },
+              {
+                "kind": "bg.loop.mode",
+                "instance_id": "bg-loop-mode-default"
+              },
+              {
+                "kind": "bg.tint",
+                "instance_id": "bg-tint-default"
+              },
+              {
+                "kind": "bg.reset",
+                "instance_id": "bg-reset-default"
+              }
+            ]
+          }
+        }
+      },
+      "about": {
+        "slots": {
+          "left": {
+            "widgets": [
+              {
+                "kind": "about.logo",
+                "instance_id": "about-logo-default"
+              },
+              {
+                "kind": "about.credits",
+                "instance_id": "about-credits-default"
+              }
+            ]
+          },
+          "right": {
+            "widgets": [
+              {
+                "kind": "about.update.panel",
+                "instance_id": "about-update-panel-default"
+              },
+              {
+                "kind": "about.system.card",
+                "instance_id": "about-system-card-default"
+              },
+              {
+                "kind": "about.links.card",
+                "instance_id": "about-links-card-default"
+              }
+            ]
+          }
+        }
+      },
+      "server.details": {
+        "slots": {
+          "text": {
+            "widgets": [
+              {
+                "kind": "server.details.title",
+                "instance_id": "server-details-title-default"
+              },
+              {
+                "kind": "server.details.tagbar",
+                "instance_id": "server-details-tagbar-default"
+              },
+              {
+                "kind": "server.details.description",
+                "instance_id": "server-details-description-default"
+              }
+            ]
+          },
+          "image": {
+            "widgets": [
+              {
+                "kind": "server.details.banner",
+                "instance_id": "server-details-banner-default"
+              }
+            ]
+          }
+        }
+      },
+      "profile": {
+        "slots": {
+          "nav": {
+            "widgets": [
+              {
+                "kind": "profile.nav",
+                "instance_id": "profile-nav-default"
+              }
+            ]
+          },
+          "skin": {
+            "widgets": [
+              {
+                "kind": "profile.skin.section",
+                "instance_id": "profile-skin-section-default"
+              }
+            ]
+          },
+          "account": {
+            "widgets": [
+              {
+                "kind": "profile.account.section",
+                "instance_id": "profile-account-section-default"
+              }
+            ]
+          },
+          "signin": {
+            "widgets": [
+              {
+                "kind": "profile.signin",
+                "instance_id": "profile-signin-default"
+              }
+            ]
+          }
+        }
+      },
+      "theme.picker": {
+        "slots": {
+          "grid": {
+            "widgets": [
+              {
+                "kind": "theme.picker.grid",
+                "instance_id": "theme-picker-grid-default"
+              }
+            ]
+          },
+          "preview": {
+            "widgets": [
+              {
+                "kind": "theme.picker.preview",
+                "instance_id": "theme-picker-preview-default"
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}

@@ -39,6 +39,29 @@ class AudioPlaybackStateMappingTest {
     }
 
     @Test
+    fun playingBeforeFirstPlayIsReady() {
+        // Skinema starts as soon as it is constructed and takes a pause on its own
+        // thread, so an engine opened for a file nobody asked to hear is briefly
+        // playing while silenced. Reported as playing, the transport offered a
+        // pause button over no sound for a tick of every open and every scrub into
+        // a finished track.
+        assertEquals(
+            PlaybackState.Ready(file, positionMs = 0, durationMs = 3000),
+            mapPlaybackState(file, VideoPlayer.State.Playing, started = false, posMs = 0, durMs = 3000),
+        )
+    }
+
+    @Test
+    fun seekingBeforeFirstPlayIsReady() {
+        // The same window, reached through the other sounding state: a scrub into a
+        // track that had finished re-opens the engine and seeks it at once.
+        assertEquals(
+            PlaybackState.Ready(file, positionMs = 45_000, durationMs = 3000),
+            mapPlaybackState(file, VideoPlayer.State.Seeking, started = false, posMs = 45_000, durMs = 3000),
+        )
+    }
+
+    @Test
     fun pausedBeforeFirstPlayIsReady() {
         assertEquals(
             PlaybackState.Ready(file, positionMs = 0, durationMs = 3000),

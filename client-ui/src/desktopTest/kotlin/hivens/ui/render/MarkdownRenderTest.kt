@@ -6,10 +6,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import hivens.ui.FRAME_NANOS
 import hivens.ui.theme.NxTheme
 import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.EncodedImageFormat
@@ -18,6 +20,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.Test
 import kotlin.test.assertTrue
+import hivens.ui.theme.NxColor
 
 /**
  * Off-screen render of a pack description through the whole markdown -> HTML ->
@@ -87,32 +90,41 @@ class MarkdownRenderTest {
         Licensed under LGPL. Report issues on [the tracker](https://example.invalid/issues).
     """.trimIndent()
 
+    @OptIn(ExperimentalComposeUiApi::class)
     private fun render(name: String) {
         val out = Path.of("build/render", name)
         Files.createDirectories(out.parent)
         val scene = ImageComposeScene(1100, 1600, density = Density(1f)) {
-            NxTheme(useDarkTheme = true) {
-                Box(Modifier.fillMaxSize().background(NxTheme.colors.background)) {
+            NxTheme(dark = true) {
+                Box(Modifier.fillMaxSize().background(NxColor.page)) {
                     Box(Modifier.verticalScroll(rememberScrollState()).padding(32.dp)) {
                         MarkdownHtml(markdown = body, onLink = {})
                     }
                 }
             }
         }
-        val painted: Double
+        var painted: Double
         try {
+            // The markdown and HTML parses run off the composition, so the page
+            // has nothing to draw until they land, and how long that takes is the
+            // machine's business. A fixed frame count lost that race on a slow CI
+            // runner. So the frames go on until text is on the page and the scene
+            // stops asking for more, bounded by a deadline only a real hang reaches.
+            val deadline = System.nanoTime() + SETTLE_TIMEOUT_NANOS
             var frameNanos = 0L
-            // With a pause between frames, because the markdown and HTML parses
-            // run off the composition now and the page has nothing to draw until
-            // they land.
-            repeat(30) {
-                scene.render(frameNanos)
-                frameNanos += 16_000_000L
+            while (true) {
+                val frame = scene.render(frameNanos)
+                frameNanos += FRAME_NANOS
+                painted = inkFraction(frame)
+                val done = painted > MIN_INK && !scene.hasInvalidations()
+                if (done || System.nanoTime() > deadline) {
+                    Files.write(out, frame.encodeToData(EncodedImageFormat.PNG)?.bytes ?: error("PNG encode failed"))
+                    frame.close()
+                    break
+                }
+                frame.close()
                 Thread.sleep(20)
             }
-            val frame = scene.render(frameNanos)
-            Files.write(out, frame.encodeToData(EncodedImageFormat.PNG)?.bytes ?: error("PNG encode failed"))
-            painted = inkFraction(frame)
         } finally {
             scene.close()
         }
@@ -144,5 +156,7 @@ class MarkdownRenderTest {
     private companion object {
         /** Prose is mostly ground; a page with text on it still clears a few percent. */
         const val MIN_INK = 0.02
+
+        const val SETTLE_TIMEOUT_NANOS = 15_000_000_000L
     }
 }

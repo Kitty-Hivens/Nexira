@@ -31,6 +31,7 @@ import java.io.File
 import kotlin.io.path.createTempDirectory
 import kotlin.test.AfterTest
 import kotlin.test.Test
+import hivens.ui.theme.NxColor
 
 /**
  * The two news channels side by side, because the difference between them is
@@ -61,14 +62,17 @@ class NewsChannelRenderTest {
             else NewsPage(items = items, page = 1, totalPages = 1)
     }
 
+    // On the event thread: the rail subscribes a snapshotFlow (see onEventThread).
+    private fun sheet(name: String, dark: Boolean, body: @Composable () -> Unit) = onEventThread { drawSheet(name, dark, body) }
+
     @OptIn(ExperimentalComposeUiApi::class)
-    private fun sheet(name: String, dark: Boolean, body: @Composable () -> Unit) {
+    private fun drawSheet(name: String, dark: Boolean, body: @Composable () -> Unit) {
         val d = 2f
         val scene = ImageComposeScene((320 * d).toInt(), (300 * d).toInt(), density = Density(d)) {
             LocaleProvider(AppLocale.RUSSIAN) {
-                NxTheme(useDarkTheme = dark) {
+                NxTheme(dark = dark) {
                     Box(
-                        Modifier.fillMaxSize().background(NxTheme.colors.background).padding(Spacing.s8),
+                        Modifier.fillMaxSize().background(NxColor.page).padding(Spacing.s8),
                         contentAlignment = Alignment.TopStart,
                     ) {
                         Box(Modifier.width(300.dp)) { body() }
@@ -76,13 +80,9 @@ class NewsChannelRenderTest {
                 }
             }
         }
-        var t = 0L
-        var img = scene.render(t)
         // The feed is fetched in an effect, so the first frame is the skeleton.
-        repeat(30) {
-            t += 16_000_000L
-            img = scene.render(t)
-        }
+        val t = scene.settle(frames = 30)
+        val img = scene.render(t)
         scene.close()
         File("build/render").mkdirs()
         img.encodeToData(EncodedImageFormat.PNG)?.bytes?.let {

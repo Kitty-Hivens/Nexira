@@ -1,28 +1,34 @@
 package hivens.ui.editor
 
 import androidx.compose.runtime.ProvidedValue
-import hivens.core.data.HomeView
 import hivens.ui.Screen
 import hivens.ui.i18n.AppStrings
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
+import hivens.ui.screens.custom.ScreenIcons
 import hivens.ui.widgets.about.LocalAboutContext
 import hivens.ui.widgets.about.STUB_ABOUT
 import hivens.ui.widgets.bgsettings.LocalBgSettingsContext
 import hivens.ui.widgets.bgsettings.STUB_BG_SETTINGS
-import hivens.ui.widgets.home.classic.LocalHomeClassicContext
 import hivens.ui.widgets.home.new.LocalHomeNewContext
 import hivens.ui.widgets.library.LocalLibraryContext
 import hivens.ui.widgets.profile.LocalProfileContext
 import hivens.ui.widgets.profile.STUB_PROFILE
-import hivens.ui.widgets.serverdetails.LocalServerDetailsContext
-import hivens.ui.widgets.serverdetails.STUB_SERVER_DETAILS
 import hivens.ui.widgets.shell.LocalLeftRailContext
 import hivens.ui.widgets.shell.LocalRightRailContext
+import hivens.ui.widgets.shell.LocalShellContext
 import hivens.ui.widgets.themepicker.LocalThemePickerContext
 import hivens.ui.widgets.themepicker.STUB_THEME_PICKER
+import hivens.widget.model.FamilyId
 import hivens.widget.model.LayoutGraph
+import hivens.widget.model.ScreenSpec
+import hivens.widget.model.SlotId
+import hivens.widget.model.SlotPath
 import hivens.widget.model.SurfaceId
+import hivens.widget.model.screen
+import hivens.widget.model.screenOn
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.jsonPrimitive
 
 /**
  * What the editor knows about one surface.
@@ -51,7 +57,21 @@ internal class EditorSurfaceSpec(
      * Whether this screen mounts the surface as its centre pane. Null for the
      * shell surfaces, which are present on every screen.
      */
-    val mountedOn: ((Screen, HomeView) -> Boolean)? = null,
+    val mountedOn: ((Screen) -> Boolean)? = null,
+    /**
+     * The region widget this surface is the inside of, by kind.
+     *
+     * A region's own settings and its contents were on different tabs, and the
+     * tab carrying the settings was named after the container rather than the
+     * region: the right rail's width lived under "the row of regions" while what
+     * is in the rail lived under "right rail". So anybody wanting a wider rail
+     * had to know that the frame is a row, and that the row is a surface, and
+     * which of the three widgets in it is the one they can see.
+     *
+     * Named here so the region's own tab can offer its settings, which is where
+     * a person looks for them. Null for a surface that is nobody's inside.
+     */
+    val ownerRegion: String? = null,
 )
 
 /**
@@ -66,20 +86,13 @@ internal object EditorSurfaces {
 
     private val centre: List<EditorSurfaceSpec> = listOf(
         EditorSurfaceSpec(
-            id        = SurfaceId("home.classic"),
-            icon      = NxIcon.Home,
-            name      = { it.editorSurfHomeClassic },
-            shortName = { it.editorSurfShortHome },
-            stub      = LocalHomeClassicContext provides STUB_HOME_CLASSIC,
-            mountedOn = { screen, view -> screen == Screen.Home && view == HomeView.Classic },
-        ),
-        EditorSurfaceSpec(
             id        = SurfaceId("home.new"),
             icon      = NxIcon.Home,
             name      = { it.editorSurfHomeNew },
             shortName = { it.editorSurfShortHome },
             stub      = LocalHomeNewContext provides STUB_HOME_NEW,
-            mountedOn = { screen, view -> screen == Screen.Home && view == HomeView.New },
+            mountedOn = { screen -> screen == Screen.Home },
+            ownerRegion = "appshell.region.center",
         ),
         EditorSurfaceSpec(
             id        = SurfaceId("library"),
@@ -87,7 +100,8 @@ internal object EditorSurfaces {
             name      = { it.editorSurfLibrary },
             shortName = { it.editorSurfShortLibrary },
             stub      = LocalLibraryContext provides STUB_LIBRARY,
-            mountedOn = { screen, _ -> screen == Screen.Library },
+            mountedOn = { screen -> screen == Screen.Library },
+            ownerRegion = "appshell.region.center",
         ),
         EditorSurfaceSpec(
             id        = SurfaceId("about"),
@@ -95,7 +109,8 @@ internal object EditorSurfaces {
             name      = { it.editorSurfAbout },
             shortName = { it.editorSurfShortAbout },
             stub      = LocalAboutContext provides STUB_ABOUT,
-            mountedOn = { screen, _ -> screen == Screen.About },
+            mountedOn = { screen -> screen == Screen.About },
+            ownerRegion = "appshell.region.center",
         ),
         EditorSurfaceSpec(
             id        = SurfaceId("bg.settings"),
@@ -103,7 +118,8 @@ internal object EditorSurfaces {
             name      = { it.editorSurfBg },
             shortName = { it.editorSurfShortBg },
             stub      = LocalBgSettingsContext provides STUB_BG_SETTINGS,
-            mountedOn = { screen, _ -> screen == Screen.BackgroundSettings },
+            mountedOn = { screen -> screen == Screen.BackgroundSettings },
+            ownerRegion = "appshell.region.center",
         ),
         EditorSurfaceSpec(
             id        = SurfaceId("profile"),
@@ -111,15 +127,8 @@ internal object EditorSurfaces {
             name      = { it.editorSurfProfile },
             shortName = { it.editorSurfShortProfile },
             stub      = LocalProfileContext provides STUB_PROFILE,
-            mountedOn = { screen, _ -> screen == Screen.Profile },
-        ),
-        EditorSurfaceSpec(
-            id        = SurfaceId("server.details"),
-            icon      = NxIcon.Home,
-            name      = { it.editorSurfServer },
-            shortName = { it.editorSurfShortServer },
-            stub      = LocalServerDetailsContext provides STUB_SERVER_DETAILS,
-            mountedOn = { screen, _ -> screen is Screen.ServerDetails },
+            mountedOn = { screen -> screen == Screen.Profile },
+            ownerRegion = "appshell.region.center",
         ),
         EditorSurfaceSpec(
             id        = SurfaceId("theme.picker"),
@@ -127,7 +136,8 @@ internal object EditorSurfaces {
             name      = { it.editorSurfTheme },
             shortName = { it.editorSurfShortTheme },
             stub      = LocalThemePickerContext provides STUB_THEME_PICKER,
-            mountedOn = { screen, _ -> screen == Screen.ThemePicker },
+            mountedOn = { screen -> screen == Screen.ThemePicker },
+            ownerRegion = "appshell.region.center",
         ),
     )
 
@@ -139,6 +149,12 @@ internal object EditorSurfaces {
             icon      = NxIcon.Layers,
             name      = { it.editorSurfTopBar },
             shortName = { it.editorSurfShortTopBar },
+            // Stands the shell context down for the palette's off-surface preview
+            // (the breadcrumb reads it). One entry covers every shell reader: the
+            // stubs array is spread globally, and it sits below the real provider so
+            // on-screen widgets still see live data.
+            stub        = LocalShellContext provides STUB_SHELL,
+            ownerRegion = "appshell.region.top",
         ),
         EditorSurfaceSpec(
             id        = SurfaceId("appshell.overlay"),
@@ -147,12 +163,19 @@ internal object EditorSurfaces {
             shortName = { it.editorSurfShortOverlay },
         ),
         EditorSurfaceSpec(
+            id        = SurfaceId("appshell.backdrop"),
+            icon      = NxIcon.Wallpaper,
+            name      = { it.editorSurfBackdrop },
+            shortName = { it.editorSurfShortBackdrop },
+        ),
+        EditorSurfaceSpec(
             id          = SurfaceId("appshell.leftrail"),
             icon        = NxIcon.ViewSidebar,
             name        = { it.editorSurfLeftRail },
             shortName   = { it.editorSurfShortLeftRail },
             hasSettings = true,
             stub        = LocalLeftRailContext provides STUB_LEFTRAIL,
+            ownerRegion = "appshell.region.left",
         ),
         EditorSurfaceSpec(
             id        = SurfaceId("appshell.rightrail"),
@@ -160,6 +183,7 @@ internal object EditorSurfaces {
             name      = { it.editorSurfRightRail },
             shortName = { it.editorSurfShortRightRail },
             stub      = LocalRightRailContext provides STUB_RIGHTRAIL,
+            ownerRegion = "appshell.region.right",
         ),
         EditorSurfaceSpec(
             id        = SurfaceId("appshell.body"),
@@ -177,9 +201,39 @@ internal object EditorSurfaces {
 
     val all: List<EditorSurfaceSpec> = centre + shell
 
+    /** Whether [id] is one of the shell's own surfaces, the ones every screen has. */
+    fun isShell(id: SurfaceId): Boolean = shell.any { it.id == id }
+
     private val byId: Map<SurfaceId, EditorSurfaceSpec> = all.associateBy { it.id }
 
     fun spec(id: SurfaceId): EditorSurfaceSpec? = byId[id]
+
+    /**
+     * The spec for [id], screens somebody made included.
+     *
+     * Those are in the graph and nowhere else, so a lookup that only asked the
+     * compiled-in list found nothing for them, and the editor drew a made screen's
+     * tab with its raw surface id and no way to its settings.
+     */
+    fun specIn(id: SurfaceId, graph: LayoutGraph): EditorSurfaceSpec? =
+        byId[id] ?: graph.screenOn(id)?.let(::madeScreen)
+
+    /**
+     * What the editor knows about a made screen, read off its record.
+     *
+     * Settings, because a made screen has its own: its name, its icon, and the way
+     * to delete it. No stub, because a made screen provides no context of its own;
+     * whatever its widgets read, the shell provides.
+     */
+    private fun madeScreen(spec: ScreenSpec): EditorSurfaceSpec = EditorSurfaceSpec(
+        id          = spec.surface,
+        icon        = ScreenIcons.of(spec.icon),
+        name        = { s -> spec.title.ifBlank { s.screenUntitled } },
+        shortName   = { s -> spec.title.ifBlank { s.screenUntitled } },
+        hasSettings = true,
+        mountedOn   = { screen -> screen == Screen.Custom(spec.id) },
+        ownerRegion = "appshell.region.center",
+    )
 
     /**
      * Every no-op context the editor stands in for, in one array the host
@@ -198,11 +252,87 @@ internal object EditorSurfaces {
      * is missing, so in practice this only filters a surface that genuinely is
      * not part of this build's layout.
      */
-    fun availableFor(screen: Screen, homeView: HomeView, graph: LayoutGraph): List<SurfaceId> {
+    fun availableFor(screen: Screen, graph: LayoutGraph): List<SurfaceId> {
         val known = graph.surfaces.keys
-        val main = centre.firstOrNull { it.mountedOn?.invoke(screen, homeView) == true }
-        return (listOfNotNull(main) + shell)
-            .map { it.id }
-            .filter { it in known }
+        val main = when (screen) {
+            // A made screen's surface is named by its record, which is in the graph.
+            is Screen.Custom -> graph.screen(screen.id)?.let(::madeScreen)
+            else -> centre.firstOrNull { it.mountedOn?.invoke(screen) == true }
+        }
+        return (listOfNotNull(main) + shell).map { it.id }.filter { it in known }
     }
+
+    /**
+     * Whether this surface is folded away rather than on screen.
+     *
+     * A collapsed rail is not a place to arrange anything: its drop targets are a
+     * hairline and the widgets said to be in there are not on screen to be
+     * dragged. It is still the only place its own width, plane and the collapse
+     * itself can be reached from, so the answer marks the tab rather than
+     * removing it. A tab that disappears when a rail folds takes the way back
+     * with it.
+     *
+     * The stored prop is the whole question. The right rail also folds itself away
+     * below a window width it cannot lay out in, but only outside the editor: edit
+     * mode renders it at its full width whatever the window measures, so counting
+     * that fold here marked a tab folded while the rail it names was on screen.
+     */
+    fun foldedAway(surface: SurfaceId, graph: LayoutGraph): Boolean = when (surface.value) {
+        "appshell.rightrail" -> graph.regionCollapsed("appshell.region.right")
+        "appshell.leftrail" -> graph.regionCollapsed("appshell.region.left")
+        else -> false
+    }
+
+    /**
+     * Where the region widget that owns [surface] lives, so its own settings can
+     * be opened from the tab of the thing it contains.
+     *
+     * Two frames hold all five regions and the model does not say which, so both
+     * are searched rather than mapped: a table saying "the top bar is in the root
+     * and the rails are in the body" is a fourth place the frame's shape is
+     * written down, and the one that would be wrong after it changed.
+     *
+     * Null when the surface is nobody's inside, or when the frame does not carry
+     * the region this build expects.
+     */
+    fun ownerRegionOf(surface: SurfaceId, graph: LayoutGraph): Pair<SlotPath, String>? {
+        val kind = specIn(surface, graph)?.ownerRegion ?: return null
+        return FRAMES.firstNotNullOfOrNull { (frame, slot) ->
+            val path = SlotPath(frame, slot)
+            graph.surfaces[frame]
+                ?.slotsOf(FamilyId.GENERAL)
+                ?.get(slot)
+                ?.widgets
+                ?.firstOrNull { it.kind.value == kind }
+                ?.let { path to it.instanceId }
+        }
+    }
+
+    /** The two slots the shell's regions live in: the window's column and its row. */
+    private val FRAMES = listOf(
+        SurfaceId("appshell.root") to SlotId("regions"),
+        SurfaceId("appshell.body") to SlotId("content"),
+    )
+
+    /**
+     * The collapse prop on a shell region, false when the region or the prop is
+     * absent.
+     *
+     * Both frames are searched, for the reason [ownerRegionOf] searches both: the
+     * model does not say which frame holds a region, and a region moved to the
+     * other one read as permanently unfolded while its own settings chip went on
+     * resolving.
+     */
+    private fun LayoutGraph.regionCollapsed(kind: String): Boolean =
+        FRAMES.firstNotNullOfOrNull { (frame, slot) ->
+            surfaces[frame]
+                ?.slotsOf(FamilyId.GENERAL)
+                ?.get(slot)
+                ?.widgets
+                ?.firstOrNull { it.kind.value == kind }
+                ?.props
+                ?.get("collapsed")
+                ?.jsonPrimitive
+                ?.booleanOrNull
+        } ?: false
 }

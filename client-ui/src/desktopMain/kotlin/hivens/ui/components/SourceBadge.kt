@@ -5,9 +5,8 @@ import androidx.compose.ui.Modifier
 import hivens.core.api.dto.smrt.SmrtSource
 import hivens.core.data.PackOrigin
 import hivens.ui.nx.NxSourceBadge
-import hivens.ui.theme.NxTheme
-import hivens.ui.theme.origin
-import hivens.ui.theme.source
+import hivens.ui.theme.originColor
+import hivens.ui.theme.sourceColor
 
 // Provenance pill wrappers: map the two domain types (a pack's [PackOrigin]
 // and a mirror entry's [SmrtSource]) onto the neutral [NxSourceBadge], so the
@@ -22,7 +21,7 @@ fun SourceBadge(origin: PackOrigin, modifier: Modifier = Modifier) {
         PackOrigin.Local       -> "Local"
         PackOrigin.Unknown     -> "Other"
     }
-    NxSourceBadge(label = label, color = NxTheme.colors.origin(origin), modifier = modifier)
+    NxSourceBadge(label = label, color = originColor(origin), modifier = modifier)
 }
 
 @Composable
@@ -35,5 +34,5 @@ fun SourceBadge(source: SmrtSource, modifier: Modifier = Modifier) {
         is SmrtSource.Github     -> "GitHub"
         is SmrtSource.Unknown    -> "Unknown"
     }
-    NxSourceBadge(label = label, color = NxTheme.colors.source(source), modifier = modifier)
+    NxSourceBadge(label = label, color = sourceColor(source), modifier = modifier)
 }

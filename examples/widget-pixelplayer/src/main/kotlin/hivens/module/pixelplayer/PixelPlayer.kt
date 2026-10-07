@@ -150,12 +150,17 @@ internal class PixelPlayer private constructor() {
 
     /** Seek to a fraction of the track. The bar is discrete, so this arrives snapped. */
     fun seekTo(fraction: Float) {
+        // Under the gate like every other compound operation: a step suspended in
+        // its close would otherwise have this seek the player it is about to drop
+        // and write a position onto the track that replaces it.
         scope.launch(engine) {
-            val duration = _state.value.durationMs
-            if (duration <= 0L) return@launch
-            val target = (fraction.coerceIn(0f, 1f) * duration).toLong()
-            player?.seek(target * 1_000_000L, exact = true)
-            _state.value = _state.value.copy(positionMs = target)
+            gate.withLock {
+                val duration = _state.value.durationMs
+                if (duration <= 0L) return@withLock
+                val target = (fraction.coerceIn(0f, 1f) * duration).toLong()
+                player?.seek(target * 1_000_000L, exact = true)
+                _state.value = _state.value.copy(positionMs = target)
+            }
         }
     }
 
@@ -180,7 +185,13 @@ internal class PixelPlayer private constructor() {
         if (views.decrementAndGet() > 0) return
         scope.launch {
             delay(NO_VIEW_GRACE_MS.milliseconds)
-            if (views.get() == 0) withContext(engine) { close() }
+            // The count is read inside the gate, on the engine, and the close runs
+            // there too. Read outside, a view remounting right at the end of the
+            // grace could open a track between the check and the close, and the
+            // close then shut the player that had just been opened for it.
+            withContext(engine) {
+                gate.withLock { if (views.get() == 0) close() }
+            }
         }
     }
 
@@ -198,10 +209,22 @@ internal class PixelPlayer private constructor() {
         if (resume) openCurrent(autoPlay = true)
     }
 
-    private fun openCurrent(autoPlay: Boolean) {
+    /**
+     * Opens the current track. [tries] is how many tracks may still be tried from
+     * here when this one will not open, so a folder with nothing playable in it
+     * goes round once and stops rather than spinning.
+     */
+    private fun openCurrent(autoPlay: Boolean, tries: Int = _state.value.tracks.size) {
         val file = _state.value.current ?: return
         val p = runCatching { VideoPlayer(path = file, loop = false, audio = true) }.getOrElse {
             _state.value = _state.value.copy(failed = true, playing = false)
+            // A file that will not even open is one file as well, the same as one
+            // that fails mid-decode below. Stopping here left the queue halted on
+            // it, because the poll loop that skips a failed track never started.
+            if (autoPlay && tries > 1) {
+                moveToNext()
+                openCurrent(autoPlay = true, tries = tries - 1)
+            }
             return
         }
         player = p
@@ -280,11 +303,16 @@ internal class PixelPlayer private constructor() {
     private fun advanceFromPoll() {
         pollJob = null
         dropEngine()
+        if (_state.value.tracks.isEmpty()) return
+        moveToNext()
+        openCurrent(autoPlay = true)
+    }
+
+    /** Points the state at the following track, wrapping, with nothing of the last one left on it. */
+    private fun moveToNext() {
         val s = _state.value
-        if (s.tracks.isEmpty()) return
         val next = (s.index + 1) % s.tracks.size
         _state.value = s.copy(index = next, positionMs = 0, durationMs = 0, title = "", artist = "", artwork = null, failed = false, playing = false)
-        openCurrent(autoPlay = true)
     }
 
     /** Closes the engine and forgets it. Does not touch the poll job. */

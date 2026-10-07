@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -36,6 +38,7 @@ import hivens.core.update.PackUpdateStatusHub
 import hivens.core.update.UpdateDirection
 import hivens.ui.Screen
 import hivens.ui.components.SourceBadge
+import hivens.ui.components.rememberPackDeleteBlock
 import hivens.ui.effects.pixelArtBackground
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
@@ -49,13 +52,14 @@ import hivens.ui.nx.NxMetaChipTone
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.screens.detail.PackDetailScreen
 import hivens.ui.theme.Dimens
-import hivens.ui.theme.NxTheme
 import hivens.ui.theme.familyForText
 import hivens.ui.theme.decorativePair
 import java.time.Duration
 import java.time.Instant
 import kotlin.math.roundToInt
 import org.koin.compose.koinInject
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.Status
 
 /**
  * One Library row. Same three-layer background as the Browse card: a
@@ -80,7 +84,7 @@ fun PackCard(
     modifier: Modifier = Modifier,
 ) {
     val s = LocalStrings.current
-    val (hueA, hueB) = NxTheme.colors.decorativePair(instance.id)
+    val (hueA, hueB) = decorativePair(instance.id)
     val art = rememberPackArt(instance)
     PuppetClick("library.pack.${instance.id}") { onOpenDetail() }
     val indications: IndicationCenter = koinInject()
@@ -136,11 +140,31 @@ fun PackCard(
                         if (showBadge) SourceBadge(instance.packRef.origin)
                     }
 
-                    Row(
-                        verticalAlignment     = Alignment.CenterVertically,
+                    // One line, and a chip is placed at its own width or not at all.
+                    // A plain row narrowed its last child to make everything fit, so
+                    // a source that publishes long version strings ended the row on a
+                    // word chopped in half.
+                    //
+                    // The cap below is not a yielding: it is a ceiling, so the row is
+                    // at most 180 + fork + last-played wide. Narrower than that -- a
+                    // small window with the right panel open -- and the last chip is
+                    // dropped rather than cut, which is the honest shape but is a
+                    // fact going missing with nothing said about it.
+                    FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        itemVerticalAlignment = Alignment.CenterVertically,
+                        maxLines              = 1,
                     ) {
-                        NxMetaChip(instance.packRef.version ?: "—", tone = NxMetaChipTone.OnMedia)
+                        // Capped, because it is the one chip here with no bound on its
+                        // length: a Modrinth pack names a build SNAPSHOT-0.0.0-2026.07.17
+                        // and that alone filled the row, pushing "last played" off the
+                        // card entirely. Truncated it still says which build; absent, the
+                        // other facts say nothing.
+                        NxMetaChip(
+                            instance.packRef.version ?: "—",
+                            modifier = Modifier.widthIn(max = VERSION_CHIP_MAX),
+                            tone = NxMetaChipTone.OnMedia,
+                        )
                         instance.forkedFrom?.let {
                             NxMetaChip("fork", tone = NxMetaChipTone.OnMediaAccent)
                         }
@@ -151,6 +175,7 @@ fun PackCard(
                 // No Play / Settings on the card: the whole card opens the detail,
                 // where launch + every setting live. Card keeps only the overflow
                 // (open folder / delete) as out-of-the-way quick actions.
+                val deleteBlock = rememberPackDeleteBlock(instance.id)
                 NxKebabButton(contentDescription = s.packCardMore, tint = Color.White) { dismiss ->
                     NxMenuItem(
                         label   = s.serverSettingsOpenFolder,
@@ -161,6 +186,8 @@ fun PackCard(
                         label       = s.editorDelete,
                         icon        = NxIcon.Delete,
                         destructive = true,
+                        hint        = deleteBlock,
+                        enabled     = deleteBlock == null,
                         onClick     = { dismiss(); onDelete() },
                     )
                 }
@@ -176,29 +203,57 @@ fun PackCard(
         // corner while a launch is in flight; clicking routes straight to the
         // versions screen through the nav mediator.
         if (indication == null) {
-            val hub: PackUpdateStatusHub = koinInject()
-            val nav: NavRequests = koinInject()
-            val statuses by hub.statuses.collectAsState()
-            (statuses[instance.id] as? PackUpdateStatus.Pending)?.let { pending ->
-                UpdateBadgePill(
-                    isRollback = pending.direction == UpdateDirection.Older,
-                    onClick    = { nav.open(Screen.PackVersions(instance.id)) },
-                    modifier   = Modifier.align(Alignment.TopEnd).padding(10.dp),
-                )
-            }
+            PendingUpdateBadge(instance.id, Modifier.align(Alignment.TopEnd).padding(10.dp))
         }
     }
 }
 
+/**
+ * How much of the row a version string may take before it yields.
+ *
+ * Leaves room for the fork mark and for when the pack was last played, which
+ * are the two facts a long build name used to push off the card.
+ */
+private val VERSION_CHIP_MAX = 180.dp
+
+/**
+ * The pill for a build move waiting on [packId], or nothing when none is. Read from the
+ * status hub and routed to the versions screen, so every card that carries it says the
+ * same thing and leads to the same place.
+ */
+@Composable
+internal fun PendingUpdateBadge(
+    packId: String,
+    modifier: Modifier = Modifier,
+    /** Over a picture by default; a row on a plane passes [NxMetaChipTone.Surface]. */
+    tone: NxMetaChipTone = NxMetaChipTone.OnMedia,
+) {
+    val hub: PackUpdateStatusHub = koinInject()
+    val nav: NavRequests = koinInject()
+    val statuses by hub.statuses.collectAsState()
+    val pending = statuses[packId] as? PackUpdateStatus.Pending ?: return
+    UpdateBadgePill(
+        isRollback = pending.direction == UpdateDirection.Older,
+        onClick    = { nav.open(Screen.PackVersions(packId)) },
+        modifier   = modifier,
+        tone       = tone,
+    )
+}
+
 /** Compact pill for a pending build move; the card-corner sibling of [LaunchStatusPill]. */
 @Composable
-private fun UpdateBadgePill(isRollback: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun UpdateBadgePill(
+    isRollback: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    tone: NxMetaChipTone = NxMetaChipTone.OnMedia,
+) {
     val s = LocalStrings.current
     NxMetaChip(
         text     = if (isRollback) s.packVersionRollbackBadge else s.packVersionUpdateBadge,
         modifier = modifier,
-        tone     = NxMetaChipTone.OnMedia,
-        dot      = if (isRollback) NxTheme.colors.warnAccent else NxTheme.colors.primary,
+        tone     = tone,
+        dot      = if (isRollback) NxColor.status(Status.Warning) else NxColor.lead(),
         onClick  = onClick,
     )
 }
@@ -208,11 +263,12 @@ private fun UpdateBadgePill(isRollback: Boolean, onClick: () -> Unit, modifier: 
 private fun LaunchStatusPill(indication: IndicationCenter.LaunchIndication, modifier: Modifier = Modifier) {
     val s = LocalStrings.current
     val (dotColor, label) = when (indication) {
-        IndicationCenter.LaunchIndication.Preparing -> NxTheme.colors.progressAccent to s.launchPreparing
+        IndicationCenter.LaunchIndication.Preparing -> NxColor.status(Status.Info) to s.launchPreparing
         is IndicationCenter.LaunchIndication.Downloading ->
-            NxTheme.colors.progressAccent to (indication.progress?.let { "${(it * 100).roundToInt()}%" } ?: s.launchDownloading.removeSuffix(":"))
-        IndicationCenter.LaunchIndication.Running -> NxTheme.colors.success to s.launchRunning
-        IndicationCenter.LaunchIndication.Failed  -> NxTheme.colors.error to s.launchFailed
+            NxColor.status(Status.Info) to (indication.progress?.let { "${(it * 100).roundToInt()}%" } ?: s.launchDownloading.removeSuffix(":"))
+        IndicationCenter.LaunchIndication.Running -> NxColor.status(Status.Success) to s.launchRunning
+        IndicationCenter.LaunchIndication.Stopping -> NxColor.status(Status.Info) to s.launchStopping
+        IndicationCenter.LaunchIndication.Failed  -> NxColor.status(Status.Error) to s.launchFailed
     }
     NxMetaChip(text = label, modifier = modifier, tone = NxMetaChipTone.OnMedia, dot = dotColor)
 }
@@ -231,22 +287,22 @@ private fun PackAvatar(iconUrl: String?, displayName: String, hue: Color) {
 
 @Composable
 private fun LastPlayedChip(lastPlayedEpoch: Long) {
+    NxMetaChip(lastPlayedLabel(lastPlayedEpoch), tone = NxMetaChipTone.OnMedia)
+}
+
+/** When a pack was last played, in the words a card uses: "1 h ago", "never played". */
+@Composable
+internal fun lastPlayedLabel(lastPlayedEpoch: Long): String {
     val s = LocalStrings.current
-    if (lastPlayedEpoch <= 0L) {
-        NxMetaChip(s.packCardNeverPlayed, tone = NxMetaChipTone.OnMedia)
-        return
-    }
-    val now = Instant.now()
-    val then = Instant.ofEpochSecond(lastPlayedEpoch)
-    val dur = Duration.between(then, now)
-    val label = when {
+    if (lastPlayedEpoch <= 0L) return s.packCardNeverPlayed
+    val dur = Duration.between(Instant.ofEpochSecond(lastPlayedEpoch), Instant.now())
+    return when {
         dur.toMinutes() < 1   -> s.packCardPlayedJustNow
         dur.toHours()   < 1   -> s.packCardPlayedMinutesAgo(dur.toMinutes())
         dur.toDays()    < 1   -> s.packCardPlayedHoursAgo(dur.toHours())
         dur.toDays()    < 14  -> s.packCardPlayedDaysAgo(dur.toDays())
         else                  -> s.packCardPlayedLongAgo
     }
-    NxMetaChip(label, tone = NxMetaChipTone.OnMedia)
 }
 
 /** The card's on-media meta chip, kept as a named alias for other over-banner surfaces. */

@@ -8,10 +8,9 @@ import hivens.core.api.protocol.StatusOnlyResponse
 /**
  * Wire-protocol abstraction over a SmartyCraft-compatible launcher
  * backend. Encapsulates all communication with the upstream
- * `*.smartycraft.ru` endpoints; the repositories
- * ([hivens.core.api.ServerRepository], [hivens.core.api.SkinRepository],
- * etc.) and the SmartyCraft auth provider consume this interface and no
- * longer know URL paths, `action=` strings, or signature schemes.
+ * `*.smartycraft.ru` endpoints; [hivens.core.api.SkinRepository] and the
+ * SmartyCraft auth provider consume this interface and no longer know URL paths,
+ * `action=` strings, or signature schemes.
  *
  * Two implementations planned:
  * - `SmartycraftV1Protocol` (in `client-launcher`) speaks the legacy
@@ -33,9 +32,9 @@ import hivens.core.api.protocol.StatusOnlyResponse
  *   [hivens.core.api.protocol.ProtocolStatus]; switch on the enum so
  *   unknown future statuses degrade gracefully to
  *   [hivens.core.api.protocol.ProtocolStatus.ERROR].
- * - Signed actions (spawn, twoauth, uploadSkin, uploadCloak) take `uid`
- *   and `login` as parameters because the signature scheme requires
- *   both; the implementation builds the `check=` MD5 internally.
+ * - Signed actions (twoauth, uploadSkin, uploadCloak) take `uid` and
+ *   `login` as parameters because the signature scheme requires both;
+ *   the implementation builds the `check=` MD5 internally.
  */
 interface IServerProtocol {
 
@@ -61,14 +60,6 @@ interface IServerProtocol {
      * code before treating the session as established.
      */
     suspend fun login(request: LoginRequest): LoginResponse
-
-    /**
-     * Resets the player's spawn point on the named server. Distinct
-     * from "start game session" -- the in-game session is established
-     * by passing [LoginResponse.session] to the child JVM as
-     * `--accessToken`; there is no separate server call for that.
-     */
-    suspend fun spawn(uid: String, login: String, server: String): StatusOnlyResponse
 
     /** Verifies TOTP 2FA code (sent after [login] returned `TWOAUTH`). */
     suspend fun twoauth(uid: String, login: String, code: String): StatusOnlyResponse

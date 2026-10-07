@@ -1,6 +1,5 @@
 package hivens.ui.nx
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -18,6 +17,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -26,9 +26,10 @@ import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.surface.NxSurface
-import hivens.ui.surface.NxSurfaceLevel
-import hivens.ui.theme.NxTheme
 import hivens.ui.theme.Spacing
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.NxInk
+import hivens.ui.surface.SurfaceKind
 
 /**
  * A clickable navigation row: icon + title (+ optional [subtitle]) + a trailing
@@ -46,16 +47,17 @@ fun NxNavRow(
     modifier: Modifier = Modifier,
     subtitle: String? = null,
     trailing: IconKey = NxIcon.ChevronRight,
-    iconTint: Color = NxTheme.colors.primary,
+    /** Null is the theme's lead colour, resolved on the row's own plane. */
+    iconTint: Color? = null,
 ) {
     val shape = MaterialTheme.shapes.medium
     val interaction = remember { MutableInteractionSource() }
     val alpha = softHoverAlpha(interaction)
+    val tint = NxInk.main
     NxSurface(
-        // Same level as an NxSection plane so a standalone nav card reads as the same
-        // material as the section planes around it, not a step-darker odd one out.
-        level    = NxSurfaceLevel.Floating,
-        blurDp   = 0f,
+        // A panel, like the section planes around it, so a standalone nav card reads
+        // as the same material rather than as an odd one out.
+        kind     = SurfaceKind.Panel,
         shape    = shape,
         modifier = modifier
             .fillMaxWidth()
@@ -65,22 +67,22 @@ fun NxNavRow(
         Row(
             modifier              = Modifier
                 .fillMaxWidth()
-                .background(NxTheme.colors.textPrimary.copy(alpha = alpha))
+                .drawBehind { drawSoftHover(tint, alpha.value) }
                 .padding(Spacing.s16),
             verticalAlignment     = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-                Symbol(icon, null, tint = iconTint, size = 24.dp)
+                Symbol(icon, null, tint = iconTint ?: NxColor.lead(), size = 24.dp)
                 Spacer(Modifier.width(Spacing.s16))
                 Column {
-                    Text(title, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(title, color = NxInk.main, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     if (subtitle != null) {
-                        Text(subtitle, style = MaterialTheme.typography.bodySmall, color = NxTheme.colors.textSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        Text(subtitle, style = MaterialTheme.typography.bodySmall, color = NxInk.quiet, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     }
                 }
             }
-            Symbol(trailing, null, tint = NxTheme.colors.textSecondary)
+            Symbol(trailing, null, tint = NxInk.quiet)
         }
     }
 }

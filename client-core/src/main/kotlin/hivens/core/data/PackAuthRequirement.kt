@@ -36,7 +36,7 @@ sealed interface PackAuthRequirement {
     /**
      * Pack joins a SmartyCraft game server identified by [serverId].
      * The launcher re-runs `authService.login(player, pass, serverId)`
-     * before spawn -- mirrors the SC server-list launch path.
+     * before spawn, so the game is handed a session minted for that launch.
      */
     @Serializable
     data class SmartyCraft(val serverId: String) : PackAuthRequirement {

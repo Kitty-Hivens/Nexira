@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -27,8 +26,12 @@ import hivens.ui.nx.NxButton
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetField
 import hivens.ui.puppet.PuppetScreen
-import hivens.ui.theme.NxTheme
+import hivens.ui.surface.NxSurface
+import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.LocalMonoFamily
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.Status
 
 /**
  * Microsoft device-code prompt: shows the verification URL + the user code to
@@ -55,10 +58,10 @@ fun DeviceCodeDialog(
         onDismissRequest = onCancel,
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
-        Surface(
+        NxSurface(
+            kind = SurfaceKind.Dialog,
             modifier = Modifier.width(420.dp),
             shape = MaterialTheme.shapes.large,
-            color = NxTheme.colors.surface,
         ) {
             Column(
                 Modifier.fillMaxWidth().padding(24.dp),
@@ -67,17 +70,17 @@ fun DeviceCodeDialog(
                 Text(
                     s.msaTitle,
                     style = MaterialTheme.typography.titleMedium,
-                    color = NxTheme.colors.textPrimary,
+                    color = NxInk.main,
                 )
                 Text(
                     s.msaInstruction,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = NxTheme.colors.textSecondary,
+                    color = NxInk.quiet,
                 )
                 Text(
                     verificationUri,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = NxTheme.colors.primary,
+                    color = NxColor.lead(text = true),
                 )
                 PuppetField("login.msa.verificationUrl", verificationUri, enabled = false) {}
 
@@ -90,7 +93,7 @@ fun DeviceCodeDialog(
                         fontSize = 26.sp,
                         letterSpacing = 4.sp,
                         textAlign = TextAlign.Center,
-                        color = NxTheme.colors.textPrimary,
+                        color = NxInk.main,
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
@@ -99,7 +102,7 @@ fun DeviceCodeDialog(
                 if (errorMessage != null) {
                     Text(
                         errorMessage,
-                        color = NxTheme.colors.error,
+                        color = NxColor.status(Status.Error, text = true),
                         style = MaterialTheme.typography.bodySmall,
                     )
                 } else {
@@ -107,13 +110,13 @@ fun DeviceCodeDialog(
                         CircularProgressIndicator(
                             modifier = Modifier.size(16.dp),
                             strokeWidth = 2.dp,
-                            color = NxTheme.colors.primary,
+                            color = NxColor.lead(),
                         )
                         Spacer(Modifier.width(10.dp))
                         Text(
                             s.msaWaiting,
                             style = MaterialTheme.typography.bodySmall,
-                            color = NxTheme.colors.textSecondary,
+                            color = NxInk.quiet,
                         )
                     }
                 }
@@ -126,7 +129,7 @@ fun DeviceCodeDialog(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     TextButton(onClick = onCancel) {
-                        Text(s.auth2faCancel, color = NxTheme.colors.textSecondary)
+                        Text(s.auth2faCancel, color = NxInk.quiet)
                     }
                     PuppetClick("login.msa.cancel") { onCancel() }
                     Spacer(Modifier.width(8.dp))

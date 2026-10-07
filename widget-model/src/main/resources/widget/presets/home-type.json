@@ -1,0 +1,58 @@
+{
+  "schema_version": 15,
+  "id": "home-type",
+  "graph": {
+    "surfaces": {
+      "home.new": {
+        "families": {
+          "general": {
+            "slots": {
+              "main": {
+                "widgets": [
+                  {
+                    "kind": "home.new.continue",
+                    "instance_id": "preset-type-continue",
+                    "placement": {
+                      "padding": {
+                        "start": 24.0,
+                        "end": 24.0,
+                        "top": 20.0
+                      }
+                    }
+                  },
+                  {
+                    "kind": "home.new.whatsnew",
+                    "instance_id": "preset-type-whatsnew",
+                    "placement": {
+                      "padding": {
+                        "start": 24.0,
+                        "end": 24.0
+                      }
+                    }
+                  },
+                  {
+                    "kind": "home.new.packlist",
+                    "instance_id": "preset-type-packlist",
+                    "placement": {
+                      "padding": {
+                        "start": 24.0,
+                        "end": 24.0,
+                        "bottom": 20.0
+                      }
+                    }
+                  }
+                ],
+                "flow": {
+                  "direction": "vertical",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

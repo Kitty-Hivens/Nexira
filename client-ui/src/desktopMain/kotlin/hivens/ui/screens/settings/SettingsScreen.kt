@@ -8,19 +8,21 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import hivens.config.ExperimentalProtocolOverride
 import hivens.config.Protocol
 import hivens.core.api.interfaces.ISettingsService
-import hivens.core.data.HomeView
 import hivens.launcher.platform.PlatformPaths
 import hivens.ui.surface.NxCard
-import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.i18n.AppLocale
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetScreen
+import hivens.ui.utils.PreferenceWriter
 import org.koin.compose.koinInject
+import hivens.ui.surface.NxSurface
+import hivens.ui.surface.SurfaceKind
 
 /**
  * Settings orchestrator: form state, persistence, the "saved" banner,
@@ -38,14 +40,13 @@ fun SettingsScreen(
     onOpenThemePicker: () -> Unit,
     currentLocale: AppLocale,
     onLocaleChanged: (AppLocale) -> Unit,
-    homeView: HomeView,
-    onHomeViewChanged: (HomeView) -> Unit,
     onOpenBackgroundSettings: () -> Unit = {},
     onOpenAbout: () -> Unit = {}
 ) {
     PuppetScreen("Settings")
 
     val settingsService: ISettingsService = koinInject()
+    val preferences: PreferenceWriter     = koinInject()
     val paths: PlatformPaths              = koinInject()
     val s = LocalStrings.current
 
@@ -60,24 +61,32 @@ fun SettingsScreen(
     val sectionRetention = rememberSaveableStateHolder()
 
     fun save() {
-        val toPersist = form.mergeInto(settingsService.getSettings())
-        settingsService.saveSettings(toPersist)
-        // Apply the mimic-version override immediately so the next protocol
-        // handshake picks it up. Without this the user would have to restart
-        // for the change to take effect, even though the system property
-        // mechanism Protocol.MIMIC_LAUNCHER_VERSION reads is live.
-        @OptIn(ExperimentalProtocolOverride::class)
-        Protocol.setMimicLauncherVersion(toPersist.mimicVersionOverride)
+        // The form as it stands at the click. The write lands later on the writer's
+        // thread, by which time the form may have moved on.
+        val asClicked = Snapshot.takeSnapshot()
+        preferences.write("the settings") {
+            val toPersist = try {
+                asClicked.enter { settingsService.updateSettings { form.mergeInto(it) } }
+            } finally {
+                asClicked.dispose()
+            }
+            // Apply the mimic-version override immediately so the next protocol
+            // handshake picks it up. Without this the user would have to restart
+            // for the change to take effect, even though the system property
+            // mechanism Protocol.MIMIC_LAUNCHER_VERSION reads is live.
+            @OptIn(ExperimentalProtocolOverride::class)
+            Protocol.setMimicLauncherVersion(toPersist.mimicVersionOverride)
+        }
     }
 
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         // Title lives in the top-bar breadcrumb now -- no in-screen duplicate.
-        // The frame is an NxCard: a library-owned tonal body + bevel hairline that
-        // stays a distinct plane under any style and with no wallpaper, instead of
-        // a glass-alpha that collapsed when the coat came off.
-        NxCard(
+        // The frame is a panel: an opaque body and a bevel hairline that stays a
+        // distinct plane with or without a wallpaper, and the sections inside it
+        // step up from it rather than from the page.
+        NxSurface(
+            kind     = SurfaceKind.Panel,
             modifier = Modifier.weight(1f).fillMaxWidth(),
-            level    = NxSurfaceLevel.Raised,
         ) {
             Row(Modifier.fillMaxSize().padding(16.dp)) {
                 SettingsCategoryNav(
@@ -114,8 +123,6 @@ fun SettingsScreen(
                             onOpenBackgroundSettings     = onOpenBackgroundSettings,
                             currentLocale                = currentLocale,
                             onLocaleChanged              = onLocaleChanged,
-                            homeView                     = homeView,
-                            onHomeViewChanged            = onHomeViewChanged,
                         )
                         SettingsCategory.Console -> ConsoleSection()
                         SettingsCategory.Network -> NetworkSection()
@@ -124,10 +131,9 @@ fun SettingsScreen(
                             save = ::save,
                         )
                         SettingsCategory.Advanced -> AdvancedSection(
-                            paths           = paths,
-                            form            = form,
-                            save            = ::save,
-                            initialSettings = initialSettings,
+                            paths = paths,
+                            form  = form,
+                            save  = ::save,
                         )
                         SettingsCategory.Diagnostics -> DiagnosticsSection(
                             paths       = paths,

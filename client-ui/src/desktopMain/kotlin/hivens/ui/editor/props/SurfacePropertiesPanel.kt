@@ -17,12 +17,14 @@ import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -52,15 +54,20 @@ import hivens.ui.customization.CustomizationSettings
 import hivens.ui.customization.NavSelectionStyle
 import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetToggle
-import hivens.ui.screens.settings.settingsRowBackground
+import hivens.ui.nx.NxRow
 import hivens.ui.nx.NxSwitch
+import hivens.ui.surface.NxSurface
 import hivens.ui.editor.rememberDockOffset
-import hivens.ui.theme.NxTheme
 import hivens.ui.widgets.customization.HexField
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
+import hivens.ui.surface.SurfaceKind
+import hivens.ui.theme.OnFill
 
 // Right-edge settings panel for a whole SURFACE (region), distinct from the
 // per-widget WidgetPropPanel. Opened from the editor pill's settings affordance
@@ -79,6 +86,28 @@ fun SurfacePropertiesPanel(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    EditorSidePanel(visible = visible, title = title, icon = NxIcon.ViewSidebar, onDismiss = onDismiss, modifier = modifier) {
+        NavSelectionControl(customization = customization, onChange = onCustomizationChanged)
+    }
+}
+
+/**
+ * The editor's right-edge panel frame: a solid popup 320 wide, sliding in from the
+ * edge, with a header that drags it off the edge and closes it.
+ *
+ * One frame for every panel about a whole thing rather than one widget, so a
+ * region's settings and a made screen's settings sit in the same place and move
+ * the same way.
+ */
+@Composable
+internal fun EditorSidePanel(
+    visible: Boolean,
+    title: String,
+    icon: IconKey,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit,
+) {
     AnimatedVisibility(
         visible  = visible,
         enter    = fadeIn(spring()) + slideInHorizontally(spring(stiffness = Spring.StiffnessMediumLow)) { it },
@@ -86,21 +115,22 @@ fun SurfacePropertiesPanel(
         modifier = modifier,
     ) {
         val s = LocalStrings.current
-            // Draggable dock: the header drags this offset (session-scoped), like the
+        // Draggable dock: the header drags this offset (session-scoped), like the
         // widget palette, so the panel can be pulled off the right edge.
         val offset = rememberDockOffset()
-        Column(
+        NxSurface(
+            // A popup: solid and above everything, so a settings panel stays
+            // readable and does not composite with the layers it floats over.
+            kind     = SurfaceKind.Popup,
+            shape    = MaterialTheme.shapes.large,
+            shadowDp = PANEL_SHADOW_DP,
             modifier = Modifier
                 .graphicsLayer { translationX = offset.value.x; translationY = offset.value.y }
                 .width(320.dp)
                 .fillMaxHeight()
-                .padding(top = 64.dp, bottom = 96.dp, end = 16.dp)
-                .shadow(elevation = 18.dp, shape = MaterialTheme.shapes.large)
-                .clip(MaterialTheme.shapes.large)
-                // Solid surface, no glass: a settings panel must stay readable and
-                // not composite with the layers it floats over.
-                .background(NxTheme.colors.surface),
+                .padding(top = 64.dp, bottom = 96.dp, end = 16.dp),
         ) {
+        Column(Modifier.fillMaxSize()) {
             Row(
                 verticalAlignment     = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -116,31 +146,34 @@ fun SurfacePropertiesPanel(
                             val down = awaitFirstDown(requireUnconsumed = true)
                             down.consume()
                             drag(down.id) { change ->
-                                change.consume()
+                                // Delta first: positionChange() reports Offset.Zero once
+                                // the change is consumed, so claiming it before reading it
+                                // moves the panel by nothing.
                                 offset.drag(change.positionChange())
+                                change.consume()
                             }
                         }
                     }
                     .padding(start = 14.dp, end = 6.dp, top = 12.dp, bottom = 6.dp),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Symbol(icon = NxIcon.ViewSidebar,
+                    Symbol(icon = icon,
                         contentDescription = null,
-                        tint               = NxTheme.colors.primary,
+                        tint               = NxColor.lead(),
                         modifier           = Modifier.size(18.dp),
                     )
                     Spacer(Modifier.width(8.dp))
                     Text(
                         text       = title,
                         style      = MaterialTheme.typography.titleSmall,
-                        color      = NxTheme.colors.textPrimary,
+                        color      = NxInk.main,
                         fontWeight = FontWeight.SemiBold,
                     )
                 }
                 IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
                     Symbol(icon = NxIcon.Close,
                         contentDescription = s.editorClose,
-                        tint               = NxTheme.colors.textSecondary,
+                        tint               = NxInk.quiet,
                         modifier           = Modifier.size(16.dp),
                     )
                 }
@@ -153,9 +186,9 @@ fun SurfacePropertiesPanel(
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = 14.dp, vertical = 4.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                NavSelectionControl(customization = customization, onChange = onCustomizationChanged)
-            }
+                content             = content,
+            )
+        }
         }
     }
 }
@@ -173,20 +206,20 @@ private fun NavSelectionControl(
 ) {
     val s = LocalStrings.current
 
+    // A group of choices set into the panel, so a field: one step back from it.
+    NxSurface(SurfaceKind.Field, Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(MaterialTheme.shapes.medium)
-            .background(settingsRowBackground())
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Column {
-            Text(s.navSelectionTitle, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
+            Text(s.navSelectionTitle, color = NxInk.main, fontWeight = FontWeight.Bold)
             Text(
                 s.navSelectionSub,
                 style = MaterialTheme.typography.bodySmall,
-                color = NxTheme.colors.textSecondary,
+                color = NxInk.quiet,
             )
         }
 
@@ -196,31 +229,30 @@ private fun NavSelectionControl(
         ) {
             NavSelectionStyle.entries.forEach { variant ->
                 val selected = customization.navSelectionStyle == variant
+                val fill = if (selected) NxColor.wash(NxColor.lead(), 0.18f) else NxColor.wash(NxInk.quiet, 0.08f)
                 Box(
                     modifier = Modifier
                         .clip(MaterialTheme.shapes.small)
-                        .background(
-                            if (selected) NxTheme.colors.primary.copy(alpha = 0.18f)
-                            else NxTheme.colors.surface.copy(alpha = 0.4f),
-                        )
+                        .background(fill)
                         .border(
                             width = 1.dp,
-                            color = if (selected) NxTheme.colors.primary
-                            else NxTheme.colors.outline.copy(alpha = 0.25f),
+                            color = if (selected) NxColor.lead() else NxInk.line,
                             shape = MaterialTheme.shapes.small,
                         )
-                        .clickable { onChange(customization.copy(navSelectionStyle = variant)) }
+                        .clickable { onChange(customization.withNavSelectionStyle(variant)) }
                         .padding(horizontal = 8.dp, vertical = 6.dp),
                 ) {
-                    Text(
-                        text       = navSelectionStyleLabel(variant, s),
-                        style      = MaterialTheme.typography.bodySmall,
-                        color      = if (selected) NxTheme.colors.primary else NxTheme.colors.textSecondary,
-                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                    )
+                    OnFill(fill) {
+                        Text(
+                            text       = navSelectionStyleLabel(variant, s),
+                            style      = MaterialTheme.typography.bodySmall,
+                            color      = if (selected) NxColor.lead(text = true) else NxInk.quiet,
+                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                        )
+                    }
                 }
                 PuppetClick("settings.navSelection.${variant.name}") {
-                    onChange(customization.copy(navSelectionStyle = variant))
+                    onChange(customization.withNavSelectionStyle(variant))
                 }
             }
         }
@@ -250,7 +282,7 @@ private fun NavSelectionControl(
             Text(
                 text  = s.navSelectionAccent,
                 style = MaterialTheme.typography.bodySmall,
-                color = NxTheme.colors.textSecondary,
+                color = NxInk.quiet,
             )
             Row(
                 modifier              = Modifier.fillMaxWidth(),
@@ -279,6 +311,7 @@ private fun NavSelectionControl(
             }
         }
     }
+    }
 }
 
 private fun navSelectionStyleLabel(variant: NavSelectionStyle, s: AppStrings): String =
@@ -291,25 +324,17 @@ private fun navSelectionStyleLabel(variant: NavSelectionStyle, s: AppStrings): S
         NavSelectionStyle.None    -> s.navStyleNone
     }
 
-// Smaller than a full settings-screen switch row (bodyLarge): the 320dp
-// surface panel cramps long toggle names, so the label drops to bodySmall and
-// takes the row's remaining width with the Switch pinned at the end.
+// The library's row in its panel form: smaller than a settings-screen row, because
+// a 320dp panel cramps long toggle names. This was the third hand-rolled answer to
+// "a label with a control beside it" in one feature. The row it replaces differed
+// from the other two only in which of them it happened to be written after.
+//
+// No pinned label column, unlike the prop panel: this block is a list of toggles
+// rather than a form of unlike controls, and a switch against the far edge is what
+// a list of them reads as.
 @Composable
 private fun CompactSwitchRow(title: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
-    Row(
-        modifier              = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment     = Alignment.CenterVertically,
-    ) {
-        Text(
-            text     = title,
-            style    = MaterialTheme.typography.bodySmall,
-            color    = NxTheme.colors.textPrimary,
-            modifier = Modifier.weight(1f),
-        )
-        NxSwitch(
-            checked         = checked,
-            onCheckedChange = onCheckedChange,
-        )
+    NxRow(title = title, compact = true) {
+        NxSwitch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }

@@ -20,8 +20,15 @@ import java.nio.file.StandardOpenOption
  *   - a shutdown hook flushes the lock cleanly and logs release; without it,
  *     the JVM still cleans up on exit but we lose the audit trail when
  *     diagnosing "two instances running" complaints.
- *   - the lock file carries the holder's PID so a stuck process can be
- *     identified by inspection (`cat ~/.local/share/nexira/.lock`).
+ *   - the holder's PID is written beside the lock so a stuck process can be
+ *     identified by inspection (`cat ~/.local/share/nexira/.lock.pid`). It is a
+ *     separate file and `.lock` itself stays empty, for the reason [writePid]
+ *     gives.
+ *
+ * Whether an instance is RUNNING is the lock and never the PID beside it: the
+ * file outlives a process that died without releasing, so it answers who last
+ * held it rather than who holds it. `flock -n ~/.local/share/nexira/.lock true`
+ * succeeds exactly when nobody does.
  *
  * Failure mode is **fail-open**: if lock acquisition itself crashes for
  * an unexpected reason (FS oddities, permissions), we log the warning
@@ -79,6 +86,28 @@ object SingleInstance {
             log.warn("Lock acquisition failed; failing open to avoid bricking startup", e)
             true
         }
+    }
+
+    /**
+     * Whether another process holds the lock on [dataDir], asked without taking it
+     * for keeps and without signalling anybody. For a process that must not run
+     * beside the launcher (the command line), which needs to know rather than to
+     * raise a window. False when the question itself fails, the same fail-open
+     * reading [acquire] makes.
+     */
+    fun heldElsewhere(dataDir: Path): Boolean {
+        val lockFile = dataDir.resolve(".lock")
+        if (!Files.exists(lockFile)) return false
+        return runCatching {
+            FileChannel.open(lockFile, StandardOpenOption.READ, StandardOpenOption.WRITE).use { channel ->
+                val lock = try {
+                    channel.tryLock()
+                } catch (_: OverlappingFileLockException) {
+                    return@use true
+                }
+                if (lock == null) true else { lock.release(); false }
+            }
+        }.getOrDefault(false)
     }
 
     /**

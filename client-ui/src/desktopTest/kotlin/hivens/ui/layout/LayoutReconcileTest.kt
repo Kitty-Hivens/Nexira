@@ -1,9 +1,12 @@
 package hivens.ui.layout
 
+import hivens.widget.model.DefaultLayout
+import hivens.widget.model.FamilyId
+import hivens.widget.model.FamilyLayout
+import hivens.widget.model.LAYOUT_SCHEMA
 import hivens.widget.model.LayoutGraph
 import hivens.widget.model.SlotContent
 import hivens.widget.model.SlotId
-import hivens.widget.model.SlotOrientation
 import hivens.widget.model.SurfaceId
 import hivens.widget.model.SurfaceLayout
 import hivens.widget.model.WidgetInstance
@@ -34,8 +37,14 @@ class LayoutReconcileTest {
     }
 
     @Test
-    fun `CURRENT_SCHEMA is the schema this build migrates up to`() {
-        assertEquals(8, LayoutReconcile.CURRENT_SCHEMA)
+    fun `the schema is one number, and the bundled default carries the same one`() {
+        // A literal here is what let the two drift: the resource said 8 while the
+        // build had moved to 9, and the loader read the stamp and discarded it, so
+        // the mismatch was invisible until a step was added. Both sides now name
+        // the same constant, and loading the bundle is the assertion, because
+        // DefaultLayout refuses a resource stamped with anything else.
+        assertEquals(LAYOUT_SCHEMA, LayoutReconcile.CURRENT_SCHEMA)
+        DefaultLayout.load()
     }
 
 
@@ -48,7 +57,56 @@ class LayoutReconcileTest {
         ))
         val out = ok(LayoutReconcile.reconcile(4, user, default))
         assertTrue(SurfaceId("b") in out.surfaces, "missing default surface must seed")
-        assertTrue(SlotId("added") in out.surfaces[SurfaceId("a")]!!.slots, "missing default slot must seed")
+        assertTrue(SlotId("added") in out.surfaces[SurfaceId("a")]!!.slotsOf(FamilyId.GENERAL), "missing default slot must seed")
+    }
+
+    @Test
+    fun `reconcile seeds a family the release added and leaves the reader's own alone`() {
+        // A family is structural, exactly like a slot: the editor has no op that
+        // creates or deletes one, so a family in the bundled default and absent from
+        // the user's file is always an upstream addition. Without this the rail would
+        // switch to a family that is not in the graph and draw nothing, with no way
+        // back from inside the product.
+        val project = FamilyId("projectView")
+        val user = LayoutGraph(surfaces = mapOf(
+            SurfaceId("rail") to SurfaceLayout(slots = mapOf(SlotId("news") to SlotContent(listOf(widget("k", "i1"))))),
+        ))
+        val default = LayoutGraph(surfaces = mapOf(
+            SurfaceId("rail") to SurfaceLayout(families = mapOf(
+                FamilyId.GENERAL to FamilyLayout(mapOf(SlotId("news") to SlotContent())),
+                project to FamilyLayout(mapOf(SlotId("modData") to SlotContent())),
+            )),
+        ))
+
+        val out = ok(LayoutReconcile.reconcile(LayoutReconcile.CURRENT_SCHEMA, user, default))
+        val rail = out.surfaces[SurfaceId("rail")]!!
+
+        assertTrue(project in rail.families, "a family added by the release must seed")
+        assertTrue(SlotId("modData") in rail.slotsOf(project))
+        // The reader's own arrangement in the family they already had is not
+        // replaced by the default's empty one.
+        assertEquals(listOf("i1"), rail.slotsOf(FamilyId.GENERAL)[SlotId("news")]!!.widgets.map { it.instanceId })
+    }
+
+    @Test
+    fun `reconcile seeds a slot added inside a non-general family`() {
+        val project = FamilyId("projectView")
+        val user = LayoutGraph(surfaces = mapOf(
+            SurfaceId("rail") to SurfaceLayout(families = mapOf(
+                project to FamilyLayout(mapOf(SlotId("modData") to SlotContent())),
+            )),
+        ))
+        val default = LayoutGraph(surfaces = mapOf(
+            SurfaceId("rail") to SurfaceLayout(families = mapOf(
+                project to FamilyLayout(mapOf(
+                    SlotId("modData") to SlotContent(),
+                    SlotId("authorData") to SlotContent(),
+                )),
+            )),
+        ))
+
+        val out = ok(LayoutReconcile.reconcile(LayoutReconcile.CURRENT_SCHEMA, user, default))
+        assertTrue(SlotId("authorData") in out.surfaces[SurfaceId("rail")]!!.slotsOf(project))
     }
 
     @Test

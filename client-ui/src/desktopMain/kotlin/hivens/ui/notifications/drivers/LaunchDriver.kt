@@ -28,6 +28,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.transformWhile
 import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
@@ -37,10 +38,9 @@ import java.util.concurrent.ConcurrentHashMap
 // LaunchState carries no target identity, so binding the observer to the
 // click that started the launch is how we key the resulting
 // notification / indication / session entries on the right [LaunchTarget].
-// One observer for both pack launches (LaunchTarget.Pack) and SC server
-// launches (LaunchTarget.Server) -- the controller exposes the same state
-// shape for both, and the target abstraction normalises the (id, label,
-// icon, source-key) tuple.
+// The target normalises the (id, label, icon, source-key) tuple, so the
+// observer is written once against it rather than against whatever the
+// controller was handed.
 class LaunchDriver(
     private val controller: LauncherController,
     private val notifications: NotificationCenter,
@@ -120,6 +120,10 @@ class LaunchDriver(
                             is LaunchState.Prepare     -> onPrepare(target, state)
                             is LaunchState.Downloading -> onDownloading(target, state)
                             is LaunchState.GameRunning -> onRunning(target, state)
+                            // Still this pack's session: its files are in use until
+                            // the process goes, and the control waits rather than
+                            // offering Play or a second Stop.
+                            is LaunchState.Stopping    -> indications.setLaunchIndication(target.id, LaunchIndication.Stopping)
                             is LaunchState.Error       -> onError(target, state.reason)
                             LaunchState.Idle           -> onIdle(target)
                         }
@@ -132,6 +136,19 @@ class LaunchDriver(
                 // evicted by age, and the surface only offers Dismiss once a phase
                 // is terminal, so nothing could ever remove it.
                 activities.dismiss(launchKey(target))
+                // The indication and the session go too, the same three the failure
+                // arm clears. A new launch is only accepted once the previous one has
+                // ended, so a cancelled observer's launch is over even when the
+                // observer never saw it end (the state is conflated). Left behind,
+                // its pack kept showing Exit, and that Exit stopped whichever game
+                // was running next. Unless the launch that replaced it is the same
+                // pack's, whose observer owns these entries now.
+                val self = currentCoroutineContext()[Job]
+                val current = observerJobs[target.id]
+                if (current == null || current === self) {
+                    indications.setLaunchIndication(target.id, null)
+                    sessions.unregister(target.id)
+                }
                 throw e
             } catch (e: Exception) {
                 log.warn("LaunchDriver observation aborted for ${target.id}", e)
@@ -205,7 +222,6 @@ class LaunchDriver(
     }
 
     private fun onPrepare(target: LaunchTarget, state: LaunchState.Prepare) {
-        val s = stringsProvider()
         indications.setLaunchIndication(target.id, LaunchIndication.Preparing)
         reportActivity(
             target,
@@ -218,9 +234,7 @@ class LaunchDriver(
     }
 
     private fun onDownloading(target: LaunchTarget, state: LaunchState.Downloading) {
-        // null = indeterminate per LaunchIndication.Downloading.progress
-        // contract; NaN sentinel goes only to NotificationEvent.progress
-        // where the renderer branches on isNaN.
+        // null = indeterminate per LaunchIndication.Downloading.progress contract.
         val fraction: Float? = when {
             state.totalBytes > 0L      -> state.downloadedBytes.toFloat() / state.totalBytes
             state.downloadedBytes > 0L -> null
@@ -233,12 +247,6 @@ class LaunchDriver(
             ActivityPhase.Running(state.downloadedBytes, state.totalBytes),
             actions = setOf(ActivityAction.Cancel),
         )
-
-        val s = stringsProvider()
-        val notifProgress: Float = fraction ?: Float.NaN
-        val displayPct =
-            if (fraction == null) s.notifPackSyncIndeterminate
-            else s.notifPackSyncPercent((fraction * 100).toInt())
         // Live progress is the activity surface's job; the notification
         // centre keeps outcomes, which are what its history is for.
     }
@@ -255,7 +263,7 @@ class LaunchDriver(
             packInstanceId  = target.id,
             packDisplayName = target.displayName,
             packIconUrl     = target.iconUrl,
-            abort           = { controller.abort() },
+            abort           = { controller.abort(target.id) },
             showConsole     = { gameConsole.show() },
         )
         // Wire command-input -> process stdin while the game is alive.
@@ -295,20 +303,13 @@ class LaunchDriver(
             // again, so the player clicks Play once and types a code once.
             indications.setLaunchIndication(target.id, null)
             activities.dismiss(launchKey(target))
-            val serverId = when (target) {
-                is LaunchTarget.Server -> target.server.assetDir
-                is LaunchTarget.Pack -> (target.instance.cachedManifest?.authRequirement as? PackAuthRequirement.SmartyCraft)
-                    ?.serverId
-                    ?: (target.instance.cachedManifest?.authRequirement as? PackAuthRequirement.Both)?.serverId
-                    ?: ""
-            }
+            val requirement = target.instance.cachedManifest?.authRequirement
+            val serverId = (requirement as? PackAuthRequirement.SmartyCraft)?.serverId
+                ?: (requirement as? PackAuthRequirement.Both)?.serverId
+                ?: ""
             twoFactorGate.request(target.displayName, serverId) { session ->
                 appScope.launch {
-                    val accepted = when (target) {
-                        is LaunchTarget.Pack -> controller.launchPackInstance(session, target.instance)
-                        is LaunchTarget.Server -> controller.launch(session, target.server)
-                    }
-                    if (accepted) observe(target)
+                    if (controller.launchPackInstance(session, target.instance, sessionMintedForLaunch = true)) observe(target)
                 }
             }
             return
@@ -330,7 +331,7 @@ class LaunchDriver(
                 // Offer offline for a pack whose online auth failed: offline runs
                 // the modpack in singleplayer (an SC-bound pack still can't join
                 // its server offline). Only when an offline identity is resolvable.
-                if (target is LaunchTarget.Pack && reason.isAuthFailure()) {
+                if (reason.isAuthFailure()) {
                     val instance = target.instance
                     offlineName()?.let { name ->
                         add(NotifAction("play_offline", s.notifActionPlayOffline) {
@@ -360,7 +361,7 @@ class LaunchDriver(
             val session = offlineProvider.login(name, "", "")
             // Only narrate what the controller took: this action lives on a sticky
             // notification, so it can be clicked long after another game is up.
-            if (controller.launchPackInstance(session, instance)) observe(LaunchTarget.Pack(instance))
+            if (controller.launchPackInstance(session, instance)) observe(LaunchTarget(instance))
         }
     }
 
@@ -407,11 +408,10 @@ class LaunchDriver(
                                                 ?.let { s.notifReasonInternalDetail(it) }
                                                 ?: s.notifReasonInternal
         is LaunchError.MissingAuthProvider -> s.notifReasonMissingAuthProvider(reason.providerKey)
-        is LaunchError.HelperUnavailable   -> s.stateHelperUnavailable(reason.mcVersion)
+        is LaunchError.InstanceBusy        -> s.notifReasonInstanceBusy
         is LaunchError.AuthlibUnavailable  -> s.stateAuthlibUnavailable(reason.mcVersion)
         LaunchError.ContentChangedDuringLaunch -> s.stateContentChanged
         LaunchError.OfflineNoClient        -> s.notifReasonOfflineNoClient
-        LaunchError.OfflineNoManifest      -> s.notifReasonOfflineNoManifest
         LaunchError.TwoFactorExpired       -> s.notifReasonTwoFactorExpired
     }
 }

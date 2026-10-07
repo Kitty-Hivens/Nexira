@@ -19,16 +19,15 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -43,6 +42,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
@@ -58,6 +58,15 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.text.InlineTextContent
+import androidx.compose.foundation.text.appendInlineContent
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.text.Placeholder
+import androidx.compose.ui.text.PlaceholderVerticalAlign
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.sp
+import kotlin.math.roundToInt
+import androidx.compose.ui.text.style.BaselineShift
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withLink
@@ -72,12 +81,15 @@ import coil3.request.ImageRequest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import coil3.size.Size as CoilSize
+import coil3.compose.SubcomposeAsyncImage
 import hivens.ui.components.isPlayableVideoUrl
+import androidx.compose.ui.text.style.TextOverflow
+import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.theme.Motion
-import hivens.ui.theme.NxTheme
-import hivens.ui.theme.bevelHairline
+import hivens.ui.surface.NxSurface
+import hivens.ui.surface.SurfaceKind
 import org.intellij.markdown.flavours.gfm.GFMFlavourDescriptor
 import org.intellij.markdown.html.HtmlGenerator
 import org.intellij.markdown.parser.CancellationToken
@@ -89,6 +101,8 @@ import org.jsoup.nodes.Node
 import org.jsoup.nodes.TextNode
 import java.awt.Desktop
 import java.net.URI
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
 
 /**
  * In-launcher HTML renderer -- the velocipede before the standalone lib extraction
@@ -98,8 +112,10 @@ import java.net.URI
  *
  * Deliberately block-flow only: no CSS box model, flex or grid (those land in the
  * extracted Compose-MP engine). Honoured CSS is the inline subset that maps 1:1 to
- * Compose params -- `color` (spans) + `text-align`/`align` (blocks); everything
- * else is ignored, not faked.
+ * Compose params: `color` on spans, `text-align` and `align` on blocks, and
+ * `width` on images and table cells. A percentage is a share of the column or the
+ * row. Pixels are a ceiling on an image and a fixed width on a table column.
+ * Everything else is ignored, not faked.
  */
 
 /** Convert GitHub-flavoured markdown to an HTML string for [HtmlBody]. */
@@ -192,7 +208,7 @@ fun MarkdownHtml(
 fun HtmlBody(
     html: String,
     modifier: Modifier = Modifier,
-    baseColor: Color = NxTheme.colors.textPrimary,
+    baseColor: Color = NxInk.main,
     onLink: (String) -> Unit = ::openInBrowser,
 ) {
     val parsed by produceState<Pair<String, Element>?>(null, html) {
@@ -202,14 +218,20 @@ fun HtmlBody(
     val ctx = InlineCtx(
         linkColor = linkColor(baseColor),
         baseColor = baseColor,
-        codeBg = NxTheme.colors.surface,
+        codeBg = NxColor.wash(NxInk.quiet, CODE_WASH),
     )
     Column(modifier, verticalArrangement = Arrangement.spacedBy(BLOCK_GAP)) {
         blocks(body, ctx, onLink)
     }
 }
 
-private data class InlineCtx(val linkColor: Color, val baseColor: Color, val codeBg: Color)
+private data class InlineCtx(
+    val linkColor: Color,
+    val baseColor: Color,
+    val codeBg: Color,
+    /** Every run of text is bold, as in a table's header cells. */
+    val bold: Boolean = false,
+)
 
 /**
  * What a link in a description is drawn in.
@@ -228,6 +250,12 @@ private fun linkColor(onBase: Color): Color =
 
 private val LINK_ON_DARK = Color(0xFF63A9FF)
 private val LINK_ON_LIGHT = Color(0xFF1A62CC)
+
+/** How far inline code is tinted toward the quiet ink, so it stands apart on whatever plane holds the text. */
+private const val CODE_WASH = 0.12f
+
+/** A highlighter's yellow, thin enough that text in either theme stays readable over it. */
+private val MARK_BG = Color(0x66FFD54F)
 
 /**
  * Air between two blocks of prose. A description is paragraphs, lists and code
@@ -254,6 +282,7 @@ private const val MAX_BLOCK_DEPTH = 32
 
 private val BLOCK_TAGS = setOf(
     "p", "div", "section", "article", "header", "footer", "main", "aside", "figure", "center",
+    "iframe",
     "h1", "h2", "h3", "h4", "h5", "h6",
     "ul", "ol", "li", "blockquote", "pre", "hr", "table", "thead", "tbody", "tr", "details", "summary",
 )
@@ -262,6 +291,27 @@ private sealed interface Frag
 private class InlineRun(val nodes: List<Node>) : Frag
 private class BlockEl(val el: Element) : Frag
 
+/**
+ * How many bare `<br>` a run consists of, or zero when it holds anything else.
+ *
+ * Only a run that is NOTHING but breaks and whitespace counts: a `<br>` inside a
+ * sentence is a line break and is already handled where the text is built.
+ */
+private fun breakRun(nodes: List<Node>): Int {
+    var count = 0
+    for (n in nodes) {
+        when {
+            n is TextNode && n.text().isBlank() -> {}
+            n is Element && n.tagName().equals("br", true) -> count++
+            else -> return 0
+        }
+    }
+    return count
+}
+
+/** Vertical air one spacer `<br>` buys, which is a line of prose and no more. */
+private val BREAK_HEIGHT = 10.dp
+
 /** Split a parent's children into block elements and runs of inline nodes (pure -- no composition). */
 private fun group(parent: Element): List<Frag> {
     val out = ArrayList<Frag>()
@@ -269,7 +319,7 @@ private fun group(parent: Element): List<Frag> {
     fun flush() { if (inline.isNotEmpty()) { out.add(InlineRun(inline.toList())); inline.clear() } }
     for (n in parent.childNodes()) {
         val tag = (n as? Element)?.tagName()?.lowercase()
-        if (tag != null && (tag in BLOCK_TAGS || tag == "img")) {
+        if (tag != null && (tag in BLOCK_TAGS || (tag == "img" && !isInlineIcon(n)))) {
             flush(); out.add(BlockEl(n))
         } else {
             inline.add(n)
@@ -306,8 +356,16 @@ private fun ColumnScope.blocks(
                 // came out as its alt text.
                 val imgs = imageRunOfNodes(frag.nodes)
                 val ann = if (imgs == null) buildInline(frag.nodes, ctx, onLink) else null
+                val spacers = if (imgs == null) breakRun(frag.nodes) else 0
                 if (imgs != null) ImageRunBlock(imgs, onLink, center = center)
-                else if (ann != null && ann.text.isNotBlank()) Text(
+                // A run of bare `<br>` between two blocks is how a description
+                // spaces itself out -- Essential's uses thirty-nine of them, four
+                // at a time. They carry no text, so the blank-text guard below
+                // dropped every one of them and the page came out with its
+                // pictures stacked flush against each other. The author asked for
+                // air; this is the air.
+                else if (spacers > 0) Spacer(Modifier.height(BREAK_HEIGHT * spacers))
+                else if (ann != null && ann.text.isNotBlank()) HtmlText(
                     ann,
                     style    = TextStyle(
                         color = ctx.baseColor,
@@ -361,7 +419,7 @@ private fun ColumnScope.block(
             val top = if (tag == "h1" || tag == "h2") 10.dp else 4.dp
             val ruled = tag == "h1" || tag == "h2"
             Column(Modifier.padding(top = top)) {
-                Text(
+                HtmlText(
                     buildInline(el.childNodes(), ctx, onLink),
                     style    = base.copy(color = ctx.baseColor, textAlign = align, fontWeight = FontWeight.Bold),
                     modifier = if (centred) Modifier.fillMaxWidth() else Modifier,
@@ -370,7 +428,7 @@ private fun ColumnScope.block(
                 // section from the paragraph above it once a description runs long
                 // enough to have sections at all.
                 if (ruled) HorizontalDivider(
-                    color = NxTheme.colors.outline.copy(alpha = 0.35f),
+                    color = NxInk.line,
                     modifier = Modifier.padding(top = 5.dp),
                 )
             }
@@ -387,15 +445,16 @@ private fun ColumnScope.block(
             val imgs = imageRunOf(el)
             when {
                 imgs != null -> ImageRunBlock(imgs, onLink, center = centred)
-                el.children().any { it.tagName().lowercase() in BLOCK_TAGS || it.tagName().equals("img", true) } ->
-                    blocks(el, ctx, onLink, centred, depth + 1)
+                el.children().any {
+                    it.tagName().lowercase() in BLOCK_TAGS || (it.tagName().equals("img", true) && !isInlineIcon(it))
+                } -> blocks(el, ctx, onLink, centred, depth + 1)
                 else -> {
                     // An empty paragraph is markup, not content. Drawn anyway it
                     // took a full line plus the gap between blocks, and a run of
                     // them -- which is how some descriptions space themselves --
                     // opened holes down the page.
                     val ann = buildInline(el.childNodes(), ctx, onLink)
-                    if (ann.text.isNotBlank()) Text(
+                    if (ann.text.isNotBlank()) HtmlText(
                         ann,
                         style    = TextStyle(color = ctx.baseColor, lineHeight = PROSE_LINE_HEIGHT, textAlign = align),
                         modifier = if (centred) Modifier.fillMaxWidth() else Modifier,
@@ -416,7 +475,7 @@ private fun ColumnScope.block(
         // characters of markdown -- took over a minute to lay out one line, on the
         // thread that draws. Drawing it behind the content costs one rectangle.
         "blockquote" -> {
-            val bar = NxTheme.colors.primary.copy(alpha = 0.55f)
+            val bar = NxColor.wash(NxColor.lead(), 0.55f)
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -428,24 +487,24 @@ private fun ColumnScope.block(
         // Scrolls sideways rather than wrapping. Wrapped code is code with its
         // structure taken out, and a line long enough to wrap is usually the one
         // being copied.
-        "pre" -> Box(
-            Modifier.fillMaxWidth()
-                .clip(MaterialTheme.shapes.small)
-                .background(NxTheme.colors.surface)
-                .border(1.dp, bevelHairline(NxTheme.colors.surface), MaterialTheme.shapes.small)
-                .horizontalScroll(rememberScrollState())
-                .padding(12.dp),
-        ) {
-            Text(
-                el.wholeText().trimEnd(),
-                style = TextStyle(color = ctx.baseColor, fontFamily = FontFamily.Monospace),
-            )
+        "pre" -> NxSurface(SurfaceKind.Panel, modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.small) {
+            Box(
+                Modifier.fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(12.dp),
+            ) {
+                Text(
+                    el.wholeText().trimEnd(),
+                    style = TextStyle(color = ctx.baseColor, fontFamily = FontFamily.Monospace),
+                )
+            }
         }
         "hr" -> HorizontalDivider(
-            color = NxTheme.colors.outline.copy(alpha = 0.4f),
+            color = NxInk.line,
             modifier = Modifier.padding(vertical = 6.dp),
         )
         "img" -> ImageBlock(el)
+        "iframe" -> EmbedBlock(el, onLink)
         "table" -> TableBlock(el, ctx, onLink, depth)
         "details" -> DetailsBlock(el, ctx, onLink, depth)
         // div / section / li / summary / details / unknown container -> flow children (propagating center).
@@ -464,7 +523,7 @@ private fun ListBlock(el: Element, ctx: InlineCtx, onLink: (String) -> Unit, ord
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         val loose = buildInline(stray, ctx, onLink)
         if (loose.text.isNotBlank()) {
-            Text(loose, style = TextStyle(color = ctx.baseColor, lineHeight = PROSE_LINE_HEIGHT))
+            HtmlText(loose, style = TextStyle(color = ctx.baseColor, lineHeight = PROSE_LINE_HEIGHT))
         }
         items.forEachIndexed { i, li ->
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -487,46 +546,272 @@ private fun TableBlock(el: Element, ctx: InlineCtx, onLink: (String) -> Unit, de
     // The rows of THIS table. A descendant query hoists a nested table's rows
     // into the outer one, where they are drawn as extra rows and again inside the
     // cell that holds the nested table -- the same content twice, in two shapes.
-    val rows = remember(el) {
-        el.select("tr").filter { row -> row.parents().firstOrNull { it.tagName().equals("table", true) } === el }
+    val rows = remember(el) { el.select("tr").filter { row -> owningTable(row) === el } }
+    val cellsByRow = remember(el) {
+        rows.map { tr -> tr.children().filter { it.tagName().equals("td", true) || it.tagName().equals("th", true) } }
     }
-    val shape = MaterialTheme.shapes.small
-    val body = NxTheme.colors.surface
-    val line = bevelHairline(body, 0.14f)
-    val banded = bevelHairline(body, 0.05f)
-    val headerBg = bevelHairline(body, 0.10f)
-    Column(
-        Modifier.fillMaxWidth()
-            .clip(shape)
-            .background(body)
-            .border(1.dp, line, shape),
-    ) {
-        rows.forEachIndexed { rowIdx, tr ->
-            val cells = tr.children().filter { it.tagName().equals("td", true) || it.tagName().equals("th", true) }
-            val header = cells.any { it.tagName().equals("th", true) }
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(if (header) headerBg else if (rowIdx % 2 == 0) body else banded)
-                    .height(IntrinsicSize.Min),
-            ) {
-                cells.forEachIndexed { cellIdx, cell ->
-                    Text(
-                        buildInline(cell.childNodes(), ctx, onLink),
-                        modifier = Modifier.weight(1f).padding(horizontal = 12.dp, vertical = 7.dp),
-                        style = TextStyle(
-                            color = ctx.baseColor,
-                            lineHeight = PROSE_LINE_HEIGHT,
-                            fontWeight = if (header) FontWeight.Bold else FontWeight.Normal,
-                        ),
-                    )
-                    if (cellIdx < cells.lastIndex) Box(Modifier.width(1.dp).fillMaxHeight().background(line))
+    // One set of columns for the whole table, not one per row. Widths are usually
+    // declared once, on the header or the first row, and every row below is meant
+    // to line up under it.
+    val columns = remember(el) { tableColumns(cellsByRow) }
+    NxSurface(SurfaceKind.Panel, modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.small) {
+        val line = NxInk.line
+        val banded = NxColor.wash(NxInk.main, BANDED_ROW_WASH)
+        val headerBg = NxColor.wash(NxInk.main, HEADER_ROW_WASH)
+        Column(Modifier.fillMaxWidth()) {
+            rows.forEachIndexed { rowIdx, tr ->
+                val cells = cellsByRow[rowIdx]
+                val slots = remember(tr) { rowSlots(cells, columns) }
+                val header = cells.any { it.tagName().equals("th", true) }
+                TableRow(
+                    slots = slots,
+                    line = line,
+                    modifier = when {
+                        header -> Modifier.background(headerBg)
+                        rowIdx % 2 == 0 -> Modifier
+                        else -> Modifier.background(banded)
+                    },
+                ) {
+                    cells.forEach { cell -> TableCell(cell, header, ctx, onLink, depth) }
                 }
+                if (rowIdx < rows.size - 1) HorizontalDivider(color = line)
             }
-            if (rowIdx < rows.size - 1) HorizontalDivider(color = line)
         }
     }
 }
+
+/** How far a banded row and a header row are tinted toward the main ink. */
+private const val BANDED_ROW_WASH = 0.05f
+private const val HEADER_ROW_WASH = 0.10f
+
+/** The nearest table above [el], so a nested table's rows are not taken for the outer one's. */
+private fun owningTable(el: Element): Element? {
+    var p = el.parent()
+    while (p != null && !p.tagName().equals("table", true)) p = p.parent()
+    return p
+}
+
+/**
+ * One row, laid out by hand.
+ *
+ * Each cell is measured at exactly the width its slot works out to, the row takes
+ * the height of its tallest cell, and the rules between columns are drawn at the
+ * boundaries that measurement produced. A Row with weights cannot mix fixed and
+ * shared widths the way a table does, and stretching a rule to the row's height
+ * needs the row's intrinsic height, which nests: once a cell can hold a table of
+ * its own, every level measured the level inside it again.
+ *
+ * Fixed widths are held to most of the row, so a table declared wider than the
+ * column still leaves its shared columns something to draw in.
+ */
+@Composable
+private fun TableRow(
+    slots: List<ColumnSpan>,
+    line: Color,
+    modifier: Modifier,
+    content: @Composable () -> Unit,
+) {
+    val rules = remember { RuleXs() }
+    Layout(
+        content = content,
+        modifier = modifier
+            .fillMaxWidth()
+            .drawBehind {
+                val w = 1.dp.toPx()
+                for (x in rules.xs) drawRect(line, topLeft = Offset(x.toFloat(), 0f), size = Size(w, size.height))
+            },
+    ) { measurables, constraints ->
+        val fixed = slots.map { it.fixedPx.dp.roundToPx().toFloat() }
+        val shareTotal = slots.sumOf { it.share.toDouble() }.toFloat()
+        val width = if (constraints.hasBoundedWidth) constraints.maxWidth.toFloat()
+                    else fixed.sum() + slots.count { it.share > 0f } * UNBOUNDED_SHARE.roundToPx()
+        val fixedSum = fixed.sum()
+        val scale = if (fixedSum > width * MAX_FIXED_FRACTION) width * MAX_FIXED_FRACTION / fixedSum else 1f
+        val remaining = (width - fixedSum * scale).coerceAtLeast(0f)
+        // Boundaries from a running sum, rounded once each, so the rounding never
+        // opens a gap or an overlap between two cells.
+        val edges = IntArray(slots.size + 1)
+        var acc = 0f
+        slots.forEachIndexed { i, s ->
+            val shared = if (shareTotal > 0f) remaining * s.share / shareTotal
+                         else if (i == slots.lastIndex) remaining else 0f
+            acc += fixed[i] * scale + shared
+            edges[i + 1] = acc.roundToInt().coerceAtMost(width.roundToInt())
+        }
+        val placeables = measurables.mapIndexed { i, m ->
+            val w = (edges[i + 1] - edges[i]).coerceAtLeast(0)
+            m.measure(Constraints(minWidth = w, maxWidth = w))
+        }
+        val height = placeables.maxOfOrNull { it.height } ?: 0
+        rules.xs = IntArray((slots.size - 1).coerceAtLeast(0)) { edges[it + 1] }
+        layout(width.roundToInt(), height) {
+            placeables.forEachIndexed { i, p -> p.placeRelative(edges[i], 0) }
+        }
+    }
+}
+
+/** Where the last measurement put the rules; read by the draw that follows it. */
+private class RuleXs(var xs: IntArray = IntArray(0))
+
+/** What a shared column is given when nothing above says how wide the row is. */
+private val UNBOUNDED_SHARE = 200.dp
+
+/** The most of a row that fixed-width columns may claim before they are scaled down. */
+private const val MAX_FIXED_FRACTION = 0.7f
+
+/**
+ * One cell. Text is a line of text, and anything more is laid out like the page.
+ *
+ * Descriptions use a table as a layout grid far more often than as a table: a
+ * picture in one cell and a heading with its paragraph in the other, row after
+ * row. Drawn as one run of text, the picture was reduced to its alt text, usually
+ * nothing, and the heading ran into its paragraph as the same sentence.
+ */
+@Composable
+private fun TableCell(
+    cell: Element,
+    header: Boolean,
+    ctx: InlineCtx,
+    onLink: (String) -> Unit,
+    depth: Int,
+) {
+    val align = cssTextAlign(cell)
+    // A cell is never itself a match: `td` and `th` are not in the query.
+    val rich = remember(cell) { cell.selectFirst(RICH_CELL_QUERY) != null }
+    // A header cell is bold however much it holds, which is what a browser does
+    // with a `th`. Carried in the context so every run of text inside it agrees.
+    val cellCtx = if (header) ctx.copy(bold = true) else ctx
+    if (rich) {
+        Column(
+            Modifier.padding(horizontal = 12.dp, vertical = CELL_PAD_V),
+            horizontalAlignment = when (align) {
+                TextAlign.Center -> Alignment.CenterHorizontally
+                TextAlign.End, TextAlign.Right -> Alignment.End
+                else -> Alignment.Start
+            },
+            verticalArrangement = Arrangement.spacedBy(BLOCK_GAP),
+        ) { blocks(cell, cellCtx, onLink, center = align == TextAlign.Center, depth = depth + 1) }
+    } else {
+        HtmlText(
+            buildInline(cell.childNodes(), cellCtx, onLink),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = CELL_PAD_V),
+            style = TextStyle(color = ctx.baseColor, lineHeight = PROSE_LINE_HEIGHT, textAlign = align),
+        )
+    }
+}
+
+private val CELL_PAD_V = 8.dp
+
+/** What makes a cell more than a line of text. */
+private val RICH_CELL_QUERY = (BLOCK_TAGS + "img").joinToString(", ")
+
+/**
+ * How much of a row one cell or one column takes: a share of what the fixed
+ * columns leave, plus a fixed width in CSS pixels. A single column has one or the
+ * other. A cell spanning several has the sum of theirs.
+ */
+internal data class ColumnSpan(val share: Float, val fixedPx: Float)
+
+/**
+ * The columns of a table, from the widths its cells declare.
+ *
+ * A column's width is the first one declared by a cell that sits in that column
+ * alone, from whichever row declares it. Percentages are shares, and shares that
+ * fall short of a hundred are scaled up to fill the row, which is what a browser
+ * does with a table spanning its column. Pixel widths are fixed when something
+ * else in the table is not, and proportions when every column is in pixels,
+ * since a fixed table wider than the column has nowhere to go. A column that
+ * declares nothing shares what the others left, and never less than a floor,
+ * because `width="100%"` beside an undeclared cell means "take the rest", not
+ * "leave the other one nothing".
+ */
+internal fun tableColumns(rows: List<List<Element>>): List<ColumnSpan> {
+    val declared = ArrayList<CssWidth?>()
+    var count = 0
+    for (cells in rows) {
+        var col = 0
+        for (cell in cells) {
+            val span = colspan(cell)
+            while (declared.size < col + span) declared.add(null)
+            if (span == 1 && declared[col] == null) declared[col] = declaredWidth(cell)
+            col += span
+        }
+        count = maxOf(count, col)
+    }
+    if (count == 0) return emptyList()
+    while (declared.size < count) declared.add(null)
+    val percentSum = declared.sumOf { ((it as? CssWidth.Percent)?.value ?: 0f).toDouble() }.toFloat()
+    val anyPercent = declared.any { it is CssWidth.Percent }
+    val undeclared = declared.count { it == null }
+    val allPx = declared.all { it is CssWidth.Px }
+    val leftover = if (undeclared > 0) maxOf((100f - percentSum) / undeclared, MIN_UNDECLARED_SHARE) else 0f
+    return declared.map { w ->
+        when (w) {
+            is CssWidth.Percent -> ColumnSpan(share = w.value, fixedPx = 0f)
+            is CssWidth.Px -> if (allPx) ColumnSpan(share = w.value, fixedPx = 0f) else ColumnSpan(share = 0f, fixedPx = w.value)
+            null -> ColumnSpan(share = if (anyPercent) leftover else 1f, fixedPx = 0f)
+        }
+    }
+}
+
+/**
+ * What each cell of one row takes, in order, followed by one empty slot for any
+ * columns the row does not reach, so a short row still lines up with the rest.
+ */
+internal fun rowSlots(cells: List<Element>, columns: List<ColumnSpan>): List<ColumnSpan> {
+    val out = ArrayList<ColumnSpan>()
+    var col = 0
+    for (cell in cells) {
+        val span = colspan(cell)
+        val covered = columns.subList(col.coerceAtMost(columns.size), (col + span).coerceAtMost(columns.size))
+        out.add(ColumnSpan(covered.sumOf { it.share.toDouble() }.toFloat(), covered.sumOf { it.fixedPx.toDouble() }.toFloat()))
+        col += span
+    }
+    if (col < columns.size) {
+        val rest = columns.subList(col, columns.size)
+        out.add(ColumnSpan(rest.sumOf { it.share.toDouble() }.toFloat(), rest.sumOf { it.fixedPx.toDouble() }.toFloat()))
+    }
+    return out
+}
+
+private fun colspan(cell: Element): Int = (cell.attr("colspan").trim().toIntOrNull() ?: 1).coerceIn(1, MAX_COLSPAN)
+
+private const val MAX_COLSPAN = 64
+
+/** The least share, out of a hundred, that a column declaring nothing is left with. */
+private const val MIN_UNDECLARED_SHARE = 15f
+
+/** A width as an element declares it, in the attribute or in its style. */
+internal sealed interface CssWidth {
+    data class Percent(val value: Float) : CssWidth
+    data class Px(val value: Float) : CssWidth
+}
+
+/**
+ * The width [el] declares, or null when it declares none that can be read.
+ * The style wins over the attribute, as it does in a browser.
+ */
+internal fun declaredWidth(el: Element): CssWidth? {
+    val fromStyle = Regex("(?:^|;)\\s*width\\s*:\\s*([^;]+)", RegexOption.IGNORE_CASE)
+        .find(el.attr("style"))?.groupValues?.getOrNull(1)?.trim()
+    val raw = (fromStyle ?: el.attr("width")).trim().lowercase(Locale.ROOT)
+    if (raw.isEmpty()) return null
+    // Finite and bounded before anything adds them up: `1e40` parses, as infinity,
+    // and a row whose share is infinite hands every cell a pixel.
+    return when {
+        raw.endsWith("%") -> raw.dropLast(1).trim().toFloatOrNull()
+            ?.takeIf { it.isFinite() && it > 0f }?.let { CssWidth.Percent(it.coerceAtMost(100f)) }
+        else -> raw.removeSuffix("px").trim().toFloatOrNull()
+            ?.takeIf { it.isFinite() && it > 0f }?.let { CssWidth.Px(it.coerceAtMost(MAX_DECLARED_PX)) }
+    }
+}
+
+/** Wider than any column a description is shown in, and small enough to add up safely. */
+private const val MAX_DECLARED_PX = 4096f
+
+/** A declared percentage width as a share of the column, capped at all of it. */
+private fun widthFraction(el: Element): Float? =
+    (declaredWidth(el) as? CssWidth.Percent)?.value?.let { (it / 100f).coerceIn(0.01f, 1f) }
 
 /**
  * A `<details>` that actually folds.
@@ -552,14 +837,14 @@ private fun DetailsBlock(el: Element, ctx: InlineCtx, onLink: (String) -> Unit, 
     }
     var open by remember(el) { mutableStateOf(el.hasAttr("open")) }
     val shape = MaterialTheme.shapes.small
-    val line = bevelHairline(NxTheme.colors.surface, 0.14f)
+    val line = NxInk.line
     Column(
         Modifier.fillMaxWidth().clip(shape).border(1.dp, line, shape),
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(bevelHairline(NxTheme.colors.surface, 0.10f))
+                .background(NxColor.wash(NxInk.main, HEADER_ROW_WASH))
                 .clickable { open = !open }
                 .padding(horizontal = 12.dp, vertical = 9.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -571,8 +856,8 @@ private fun DetailsBlock(el: Element, ctx: InlineCtx, onLink: (String) -> Unit, 
                 tint = ctx.baseColor,
                 modifier = Modifier.size(18.dp),
             )
-            Text(
-                summary?.let { buildInline(it.childNodes(), ctx, onLink) } ?: AnnotatedString(""),
+            HtmlText(
+                summary?.let { buildInline(it.childNodes(), ctx, onLink) } ?: InlineText(AnnotatedString(""), emptyMap()),
                 style = TextStyle(color = ctx.baseColor, fontWeight = FontWeight.Bold),
             )
         }
@@ -598,19 +883,144 @@ private fun DetailsBlock(el: Element, ctx: InlineCtx, onLink: (String) -> Unit, 
  * stays a row only if no member of it can set the height of the rest.
  */
 @Composable
-private fun SizedImage(src: String, alt: String?, maxHeight: Dp?, modifier: Modifier = Modifier) {
+private fun SizedImage(
+    src: String,
+    alt: String?,
+    maxHeight: Dp?,
+    maxWidth: Dp? = null,
+    // A percentage width is a demand, not a ceiling: `width="80%"` means the
+    // picture spans four fifths of what holds it, scaled up if it has to be,
+    // which is what a browser draws.
+    fraction: Float? = null,
+    modifier: Modifier = Modifier,
+) {
+    // Trimmed first. A description is hand-written HTML and authors leave a space
+    // inside the quotes; `URI()` throws on one, the gate below then read the
+    // address as unfetchable, and a perfectly good banner was dropped with
+    // nothing anywhere saying why.
+    val url = src.trim()
+    // A picture that is not drawn leaves its alt text, as a browser does. Without
+    // it a cell holding nothing but an unreachable logo came out empty.
+    var failed by remember(url) { mutableStateOf(false) }
     // Same gate the links get, for the same reason: a description is written by a
     // third party, and an image source is a fetch the page performs on its own.
     // A `file:` source would make remote text drive a local read.
-    if (!isFetchableUrl(src)) return
+    if (!isFetchableUrl(url) || failed) {
+        if (!alt.isNullOrBlank()) Text(alt, style = TextStyle(color = NxInk.quiet), modifier = modifier)
+        return
+    }
+    // The picture's own proportions, once it has arrived. A width the column sets
+    // is not enough on its own: inside a scrolling page the height is unbounded,
+    // the loader then keeps the picture at its natural size, and a small image at
+    // `width="100%"` sat in the middle of a wide empty box. With the ratio the box
+    // has a height, and Fit scales the picture up to fill it.
+    var ratio by remember(url) { mutableStateOf<Float?>(null) }
     AsyncImage(
-        model              = src,
+        model              = url,
         contentDescription = alt,
         contentScale       = ContentScale.Fit,
+        onSuccess          = { state ->
+            if (fraction != null) {
+                val size = state.painter.intrinsicSize
+                if (size.isSpecified && size.width > 0f && size.height > 0f) ratio = size.width / size.height
+            }
+        },
+        onError            = { failed = true },
         modifier           = modifier
+            .then(if (fraction != null) Modifier.fillMaxWidth(fraction) else Modifier)
+            .then(if (maxWidth != null) Modifier.widthIn(max = maxWidth) else Modifier)
+            .then(ratio?.let { Modifier.aspectRatio(it) } ?: Modifier)
             .then(if (maxHeight != null) Modifier.heightIn(max = maxHeight) else Modifier)
             .clip(MaterialTheme.shapes.small),
     )
+}
+
+/**
+ * An embedded video, as far as a native window can honour one.
+ *
+ * A description is HTML and authors put a YouTube player at the top of it. There
+ * is no web view here to run one in, and the previous answer was to drop the
+ * element entirely -- so the page opened on a paragraph about a mod whose whole
+ * pitch was the trailer above it.
+ *
+ * Drawn as the still and a play mark, which is what a player looks like before
+ * anybody presses it, and the press goes out to a browser. That still is fetched
+ * from Google, so opening a mod page reaches Google whenever the description
+ * embeds a video -- a deliberate choice, taken because the alternative was a page
+ * visibly poorer than the one it is a native answer to. Everything else on the
+ * page already fetches from wherever the author pointed it.
+ */
+@Composable
+private fun EmbedBlock(el: Element, onLink: (String) -> Unit) {
+    val src = el.attr("src").trim().ifBlank { el.attr("data-src").trim() }
+    val id = youtubeId(src) ?: return
+    val watch = "https://www.youtube.com/watch?v=$id"
+    Box(
+        modifier = Modifier
+            .padding(vertical = 8.dp)
+            .fillMaxWidth()
+            // The shape of the thing rather than the size of the frame: an author
+            // writing width="560" height="315" is describing 16:9, and the column
+            // decides how much of it there is room for.
+            .aspectRatio(16f / 9f)
+            .clip(MaterialTheme.shapes.small)
+            .background(Color.Black)
+            .clickable { onLink(watch) },
+        contentAlignment = Alignment.Center,
+    ) {
+        // The sharp frame where the upload has one, the one every video has where
+        // it does not. maxres is absent on older and lower-resolution uploads, and
+        // a missing still would leave a black rectangle with a button on it.
+        SubcomposeAsyncImage(
+            model = "$THUMB_BASE/$id/maxresdefault.jpg",
+            contentDescription = el.attr("title").trim().ifBlank { null },
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize(),
+            error = {
+                AsyncImage(
+                    model = "$THUMB_BASE/$id/hqdefault.jpg",
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            },
+        )
+        // Ours, not theirs: a neutral plate and a white triangle is the universal
+        // mark for this, and wearing another product's badge would be claiming to
+        // BE their player rather than to link to it.
+        Box(
+            Modifier.size(width = 64.dp, height = 46.dp)
+                .clip(MaterialTheme.shapes.small)
+                .background(Color.Black.copy(alpha = 0.62f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Symbol(NxIcon.PlayArrow, contentDescription = null, tint = Color.White, size = 30.dp)
+        }
+    }
+}
+
+/** Where a video's still frames live. */
+private const val THUMB_BASE = "https://i.ytimg.com/vi"
+
+/**
+ * The video an embed stands for, or null when the source is not one we can name.
+ *
+ * An unknown frame is left undrawn rather than turned into a link nobody can
+ * judge: a description is third-party HTML, and an iframe is where an advert
+ * would be.
+ */
+private fun youtubeId(src: String): String? {
+    if (!isBrowsableUrl(src)) return null
+    val host = runCatching { URI(src).host }.getOrNull()?.removePrefix("www.")?.lowercase() ?: return null
+    val id = when (host) {
+        "youtube.com", "youtube-nocookie.com" ->
+            src.substringAfter("/embed/", "").substringBefore('?').substringBefore('/')
+                .ifBlank { Regex("[?&]v=([^&]+)").find(src)?.groupValues?.getOrNull(1).orEmpty() }
+        "youtu.be" -> URI(src).path.orEmpty().trim('/').substringBefore('/')
+        else -> return null
+    }
+    // A video id is opaque but bounded; anything else came from a URL we misread.
+    return id.takeIf { it.isNotBlank() && it.length <= 24 && it.all { c -> c.isLetterOrDigit() || c == '-' || c == '_' } }
 }
 
 /** A row of badges stays a row; a tall one in it would set the height of the rest. */
@@ -620,13 +1030,58 @@ private val BADGE_MAX_HEIGHT = 220.dp
 private fun ImageBlock(el: Element) {
     val src = el.attr("src").ifBlank { el.attr("data-src") }
     if (src.isBlank()) return
-    // HTML width/height are CSS px, not dp -- honouring them as dp overflowed the
-    // column (a width="660" banner blew past the content), so they are ignored.
-    SizedImage(src, el.attr("alt").ifBlank { null }, maxHeight = null)
+    // A declared size is a CEILING here, never a demand. Ignoring it altogether
+    // was the previous answer and it drew a 250-wide Patreon badge at its natural
+    // 1100, which is the same defect the other way round: an author who says 250
+    // is saying "no larger than", and clamping to the column means honouring that
+    // can no longer overflow the way a fixed width did.
+    SizedImage(
+        src = src,
+        alt = el.attr("alt").ifBlank { null },
+        maxHeight = declaredPx(el, "height"),
+        maxWidth = declaredPx(el, "width"),
+        fraction = widthFraction(el),
+    )
 }
 
-/** A still image and its optional wrapping link. */
-private data class ImgItem(val src: String, val alt: String, val href: String?)
+/**
+ * A size the author declared, in CSS pixels, from the attribute or the style.
+ *
+ * Read as dp, which is only true at one scale, and that is fine for a ceiling:
+ * too generous on a dense display is a picture at its natural size, which is
+ * what the page did everywhere before.
+ */
+private fun declaredPx(el: Element, axis: String): Dp? {
+    val fromAttr = el.attr(axis).trim()
+    val fromStyle = Regex("(?:^|;)\\s*$axis\\s*:\\s*([0-9.]+)\\s*px", RegexOption.IGNORE_CASE)
+        .find(el.attr("style"))?.groupValues?.getOrNull(1)
+    val raw = (fromStyle ?: fromAttr).removeSuffix("px").trim()
+    val value = raw.toFloatOrNull() ?: return null
+    return value.takeIf { it > 0f }?.dp
+}
+
+/**
+ * A still image and its optional wrapping link, with the size its tag declared:
+ * pixel ceilings and a percentage share of the column, read once here so a
+ * picture in a run is sized by the same rules as one on its own.
+ */
+private data class ImgItem(
+    val src: String,
+    val alt: String,
+    val href: String?,
+    val maxWidth: Dp? = null,
+    val maxHeight: Dp? = null,
+    val fraction: Float? = null,
+)
+
+private fun imgItem(img: Element, href: String?) = ImgItem(
+    src = imgSrc(img),
+    alt = img.attr("alt"),
+    href = href,
+    maxWidth = declaredPx(img, "width"),
+    maxHeight = declaredPx(img, "height"),
+    fraction = widthFraction(img),
+)
 
 /**
  * The images of a paragraph whose only significant content is images (bare or
@@ -648,7 +1103,7 @@ private fun imageRunOfNodes(nodes: List<Node>): List<ImgItem>? {
         when (node) {
             is TextNode -> if (node.text().isNotBlank()) return false
             is Element -> when (node.tagName().lowercase()) {
-                "img" -> items.add(ImgItem(imgSrc(node), node.attr("alt"), href))
+                "img" -> items.add(imgItem(node, href))
                 "br" -> {}
                 "a" -> {
                     val h = node.attr("href").ifBlank { null } ?: href
@@ -690,7 +1145,7 @@ private fun ImageRunBlock(items: List<ImgItem>, onLink: (String) -> Unit, center
         val interaction = remember { MutableInteractionSource() }
         val hovered by interaction.collectIsHoveredAsState()
         val ring by animateColorAsState(
-            targetValue = if (hovered && href != null) NxTheme.colors.primary else Color.Transparent,
+            targetValue = if (hovered && href != null) NxColor.lead() else Color.Transparent,
             animationSpec = Motion.tap.of(),
             label = "figure-hover",
         )
@@ -710,7 +1165,13 @@ private fun ImageRunBlock(items: List<ImgItem>, onLink: (String) -> Unit, center
                     ),
                 contentAlignment = Alignment.Center,
             ) {
-                SizedImage(lone.src, lone.alt.ifBlank { null }, maxHeight = null)
+                SizedImage(
+                    lone.src,
+                    lone.alt.ifBlank { null },
+                    maxHeight = lone.maxHeight,
+                    maxWidth = lone.maxWidth,
+                    fraction = lone.fraction,
+                )
                 if (href != null && isPlayableVideoUrl(href)) {
                     Box(
                         modifier         = Modifier.size(48.dp).clip(CircleShape)
@@ -739,7 +1200,17 @@ private fun ImageRunBlock(items: List<ImgItem>, onLink: (String) -> Unit, center
                 // Through the same gate a lone image goes through. Reached
                 // directly, this branch fetched whatever a description named --
                 // one image was refused and two were not.
-                SizedImage(item.src, item.alt.ifBlank { null }, BADGE_MAX_HEIGHT)
+                // The badge ceiling keeps a row of badges a row. A picture that
+                // declares its share of the line is not a badge and is sized by
+                // that share, so the ceiling does not apply to it.
+                SizedImage(
+                    item.src,
+                    item.alt.ifBlank { null },
+                    maxHeight = if (item.fraction != null) item.maxHeight
+                                else item.maxHeight?.let { minOf(it, BADGE_MAX_HEIGHT) } ?: BADGE_MAX_HEIGHT,
+                    maxWidth = item.maxWidth,
+                    fraction = item.fraction,
+                )
                 if (href != null && isPlayableVideoUrl(href)) {
                     Box(
                         modifier         = Modifier.size(48.dp).clip(CircleShape).background(Color.Black.copy(alpha = 0.5f)),
@@ -753,21 +1224,98 @@ private fun ImageRunBlock(items: List<ImgItem>, onLink: (String) -> Unit, center
     }
 }
 
-private fun buildInline(nodes: List<Node>, ctx: InlineCtx, onLink: (String) -> Unit): AnnotatedString =
-    buildAnnotatedString { nodes.forEach { appendInline(it, ctx, onLink) } }
+/**
+ * Where the run is, for the one whitespace rule that needs to know.
+ *
+ * HTML drops whitespace at the start of a line: a source that writes a hard break
+ * as a backslash and a newline leaves that newline in the markup, and a browser
+ * renders nothing for it. Jsoup's `text()` collapses a run of whitespace to one
+ * space but does not remove it, so without this every line after a break began
+ * with a space and sat a few pixels right of the one above it. Two lines of prose
+ * under a heading is where it shows, and it showed on every description written
+ * that way.
+ */
+private class InlineFlow(
+    var atLineStart: Boolean = true,
+    val icons: MutableMap<String, InlineTextContent> = LinkedHashMap(),
+)
 
-private fun AnnotatedString.Builder.appendInline(node: Node, ctx: InlineCtx, onLink: (String) -> Unit) {
+/** A run of text and the small pictures that sit on its lines. */
+private class InlineText(val text: AnnotatedString, val icons: Map<String, InlineTextContent>)
+
+private fun buildInline(nodes: List<Node>, ctx: InlineCtx, onLink: (String) -> Unit): InlineText {
+    val flow = InlineFlow()
+    val text = buildAnnotatedString {
+        if (ctx.bold) withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { nodes.forEach { appendInline(it, ctx, flow, onLink) } }
+        else nodes.forEach { appendInline(it, ctx, flow, onLink) }
+    }
+    return InlineText(text, flow.icons)
+}
+
+@Composable
+private fun HtmlText(content: InlineText, style: TextStyle, modifier: Modifier = Modifier) {
+    Text(content.text, modifier = modifier, style = style, inlineContent = content.icons)
+}
+
+/**
+ * The size of a picture small enough to sit on a line of text, or null for one
+ * that is not.
+ *
+ * A mod's icon beside its name, a key glyph in a controls table, a flag beside a
+ * language: always a few pixels square, and always with the size written on the
+ * tag. Drawn as a block of its own, the icon took a line and pushed its label to
+ * the next one. Only a declared size qualifies, since a line has to be laid out
+ * before anything is downloaded and an undeclared picture could be any size.
+ */
+private fun inlineIconSize(img: Element): Pair<Float, Float>? {
+    if (!img.tagName().equals("img", true) || !isFetchableUrl(imgSrc(img).trim())) return null
+    val w = declaredPx(img, "width")?.value
+    val h = declaredPx(img, "height")?.value
+    if (w == null && h == null) return null
+    if ((w ?: 0f) > INLINE_ICON_MAX || (h ?: 0f) > INLINE_ICON_MAX) return null
+    return (w ?: h!!) to (h ?: w!!)
+}
+
+private fun isInlineIcon(node: Node): Boolean = node is Element && inlineIconSize(node) != null
+
+/** The largest declared size that still reads as an icon on a line rather than a figure. */
+private const val INLINE_ICON_MAX = 48f
+
+private fun AnnotatedString.Builder.appendInline(
+    node: Node,
+    ctx: InlineCtx,
+    flow: InlineFlow,
+    onLink: (String) -> Unit,
+) {
     when (node) {
-        is TextNode -> append(node.text())
+        is TextNode -> {
+            val text = if (flow.atLineStart) node.text().trimStart() else node.text()
+            if (text.isNotEmpty()) {
+                append(text)
+                flow.atLineStart = false
+            }
+        }
         is Element -> {
-            fun kids() = node.childNodes().forEach { appendInline(it, ctx, onLink) }
+            fun kids() = node.childNodes().forEach { appendInline(it, ctx, flow, onLink) }
             when (node.tagName().lowercase()) {
-                "br" -> append("\n")
+                "br" -> {
+                    append("\n")
+                    flow.atLineStart = true
+                }
                 "b", "strong" -> withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { kids() }
                 "i", "em" -> withStyle(SpanStyle(fontStyle = FontStyle.Italic)) { kids() }
                 "u", "ins" -> withStyle(SpanStyle(textDecoration = TextDecoration.Underline)) { kids() }
                 "s", "del", "strike" -> withStyle(SpanStyle(textDecoration = TextDecoration.LineThrough)) { kids() }
                 "code" -> withStyle(SpanStyle(fontFamily = FontFamily.Monospace, background = ctx.codeBg)) { kids() }
+                // Key names in a keybind table, which is most of what a mod's
+                // controls section is: set apart the way code is, since that is
+                // what a browser does with them too.
+                "kbd", "samp", "tt" -> withStyle(SpanStyle(fontFamily = FontFamily.Monospace, background = ctx.codeBg)) { kids() }
+                "sup" -> withStyle(SpanStyle(fontSize = 0.75.em, baselineShift = BaselineShift.Superscript)) { kids() }
+                "sub" -> withStyle(SpanStyle(fontSize = 0.75.em, baselineShift = BaselineShift.Subscript)) { kids() }
+                "small" -> withStyle(SpanStyle(fontSize = 0.85.em)) { kids() }
+                "big" -> withStyle(SpanStyle(fontSize = 1.2.em)) { kids() }
+                "mark" -> withStyle(SpanStyle(background = MARK_BG)) { kids() }
                 "a" -> {
                     val href = node.attr("href")
                     // Underlined on hover, not at rest. A page of prose whose every
@@ -790,8 +1338,32 @@ private fun AnnotatedString.Builder.appendInline(node: Node, ctx: InlineCtx, onL
                     val c = cssColor(node)
                     if (c == null) kids() else withStyle(SpanStyle(color = c)) { kids() }
                 }
-                // Inline image -> its alt text (v1; block-level images render as AsyncImage).
-                "img" -> node.attr("alt").takeIf { it.isNotBlank() }?.let { append(it) }
+                // A small picture sits on the line at the size it declares. Any other
+                // picture that reaches a line falls back to its alt text, which is
+                // ink on the line like any other, so the line has started.
+                "img" -> {
+                    val icon = inlineIconSize(node)
+                    val alt = node.attr("alt")
+                    if (icon != null) {
+                        val id = "icon${flow.icons.size}"
+                        val src = imgSrc(node).trim()
+                        flow.icons[id] = InlineTextContent(
+                            Placeholder(icon.first.sp, icon.second.sp, PlaceholderVerticalAlign.TextCenter),
+                        ) {
+                            AsyncImage(
+                                model = src,
+                                contentDescription = alt.ifBlank { null },
+                                contentScale = ContentScale.Fit,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        }
+                        appendInlineContent(id, alt.ifBlank { " " })
+                        flow.atLineStart = false
+                    } else if (alt.isNotBlank()) {
+                        append(alt)
+                        flow.atLineStart = false
+                    }
+                }
                 // Unknown inline element -> its content, never the raw tag.
                 else -> kids()
             }

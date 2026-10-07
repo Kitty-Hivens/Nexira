@@ -27,6 +27,7 @@ import hivens.core.update.mergedWith
 import hivens.core.update.reconcileMods
 import hivens.launcher.smrt.SmrtPackClient
 import hivens.launcher.smrt.SmrtSyncService
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOn
@@ -34,8 +35,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
 import java.nio.file.Path
-import java.time.Instant
-import java.util.UUID
 
 /**
  * Drives a mirror pack instance from its installed build to another one -- a
@@ -60,8 +59,11 @@ class PackUpdateService(
     private val snapshotService: PackSnapshotService,
     private val journal: ApplyJournal,
     private val dataDir: Path,
+    /** The reader's language tag, for the release notes the mirror writes per language. */
+    private val language: () -> String = { "" },
 ) : PackUpdater {
     private val log = LoggerFactory.getLogger(PackUpdateService::class.java)
+    private val guard = ApplyGuard(snapshotService, journal, repository)
 
     private fun clientDirOf(instance: PackInstance): Path =
         dataDir.resolve("instances").resolve(instance.instanceDirName)
@@ -109,7 +111,8 @@ class PackUpdateService(
      * specific version switches/rolls back to that build. Re-reads the instance
      * and re-scans under [InstanceMutationLock] so the applied plan is
      * self-consistent, then commits the new baseline, version, cached snapshot,
-     * and carried-over optional-toggle set.
+     * and carried-over optional-toggle set. Throws [InstanceRemovedException] when
+     * the instance was deleted while this waited for the lock.
      */
     override suspend fun applyUpdate(
         instance: PackInstance,
@@ -128,63 +131,30 @@ class PackUpdateService(
         val clientDir = clientDirOf(instance)
         return InstanceMutationLock.withLock(clientDir) {
             withContext(Dispatchers.IO) {
-                val fresh = repository.get(instance.id) ?: instance
+                val fresh = repository.get(instance.id) ?: throw InstanceRemovedException(instance)
                 val targetManifest = target.toBaselineManifest()
                 val paths = fresh.installedManifest?.flatten()?.keys.orEmpty() + targetManifest.flatten().keys
                 val plan = computePlan(fresh, target, targetManifest, scanInstanceState(clientDir, paths))
                 val compat = gradeCompat(fresh, target)
                 val enabledState = OptionalContentRules.enabledState(target.mods, fresh.optionalContent)
-                // Snapshot the pack-managed files before ANY change so a failed apply
-                // auto-reverts and a structural / no-baseline update stays recoverable
-                // (hardlinks make it cheap; a label-only no-op skips it).
-                val managed = managedRealPaths(fresh.installedManifest, targetManifest)
-                val snapshot = if (!plan.isEmpty) {
-                    val now = Instant.now().toEpochMilli()
-                    snapshotService.capture(clientDir, fresh, managed, "$now-${UUID.randomUUID().toString().take(8)}", now)
-                } else {
-                    null
-                }
-                // Journal the in-flight apply (snapshot id + managed set) BEFORE the
-                // first file write, so a hard crash between here and the commit is
-                // rolled back on the next start instead of leaving a half-updated pack.
-                if (snapshot != null) {
-                    journal.begin(
-                        PendingApply(
-                            instanceId = fresh.id,
-                            instanceDirName = fresh.instanceDirName,
-                            snapshotId = snapshot.id,
-                            fromVersion = currentVersionOf(fresh),
-                            toVersion = target.packVersion,
-                            managedPaths = managed.toList(),
-                            startedAtEpoch = snapshot.createdAtEpoch,
-                        )
-                    )
-                }
-                try {
+                val commitBuild: suspend () -> Unit = {
                     syncService.applyUpdate(clientDir, target, plan, enabledState, progress)
-                    commit(fresh, target, enabledState, pinExplicit = targetVersion != null)
-                    // The instance just moved, so the mirror views that describe
-                    // "where it should be" are a build out of date. Left alone,
-                    // the next check answers from a cache older than this apply
-                    // and reports an update back to the build we came from.
-                    client.invalidatePack(packId)
-                    if (snapshot != null) journal.complete(fresh.instanceDirName)
-                } catch (e: Throwable) {
-                    if (snapshot != null) {
-                        try {
-                            repository.put(snapshotService.restore(clientDir, fresh.instanceDirName, snapshot.id, managed))
-                            snapshotService.delete(fresh.instanceDirName, snapshot.id)
-                        } catch (re: Throwable) {
-                            // Apply failed AND the auto-rollback failed: keep the snapshot
-                            // for a manual restore and surface both errors, don't mask the
-                            // original apply failure with the restore one.
-                            e.addSuppressed(re)
-                        }
-                        journal.complete(fresh.instanceDirName)
-                    }
-                    throw e
+                    commit(fresh, target, pinExplicit = targetVersion != null)
                 }
-                if (snapshot != null) snapshotService.prune(fresh.instanceDirName, KEEP_SNAPSHOTS)
+                // A label-only move writes no file, so there is nothing to snapshot
+                // or roll back and it commits bare.
+                if (plan.isEmpty) {
+                    commitBuild()
+                } else {
+                    val managed = managedRealPaths(fresh.installedManifest, targetManifest)
+                    guard.apply(clientDir, fresh, managed, currentVersionOf(fresh), target.packVersion, commitBuild)
+                }
+                // After the commit and outside it: the update is done by here, and a
+                // cache that failed to clear is no reason to undo it. Left alone, the
+                // next check answers from a cache older than this apply and reports
+                // an update back to the build we came from.
+                runCatching { client.invalidatePack(packId) }
+                    .onFailure { if (it is CancellationException) throw it else log.warn("update: could not drop the cached views of {}", packId, it) }
                 log.info(
                     "update: pack={} {} -> {} ({} add, {} update, {} delete, {} conflict, compat={})",
                     packId, currentVersionOf(fresh), target.packVersion,
@@ -342,14 +312,16 @@ class PackUpdateService(
     private suspend fun commit(
         instance: PackInstance,
         target: SmrtPackManifest,
-        enabledState: Map<String, Boolean>,
         pinExplicit: Boolean,
     ) {
-        repository.put(
-            instance.copy(
-                packRef = instance.packRef.copy(version = target.packVersion),
+        // Onto the record as it is at the commit, not as it was read when the update
+        // began: an update takes minutes, and a game exiting meanwhile records its
+        // playtime, which a whole-record write put back to zero.
+        repository.update(instance.id) { current ->
+            current.copy(
+                packRef = current.packRef.copy(version = target.packVersion),
                 pinnedPackVersion = target.packVersion,
-                followLatest = if (pinExplicit) false else instance.followLatest,
+                followLatest = if (pinExplicit) false else current.followLatest,
                 installedManifest = target.toBaselineManifest(),
                 cachedManifest = CachedManifestSnapshot(
                     minecraftVersion = target.minecraft.version,
@@ -358,9 +330,15 @@ class PackUpdateService(
                     javaMajor = target.java.major,
                     authRequirement = target.auth?.toDomain(),
                 ),
-                optionalContent = OptionalContentRules.togglesFrom(target.mods, enabledState),
+                // The choice as it stands now, carried onto the new build. The files
+                // were placed from the choice read when the apply began, and a switch
+                // made during it is relabelled once the lock is released.
+                optionalContent = OptionalContentRules.togglesFrom(
+                    target.mods,
+                    OptionalContentRules.enabledState(target.mods, current.optionalContent),
+                ),
             )
-        )
+        }
     }
 
     /**
@@ -369,12 +347,18 @@ class PackUpdateService(
      * and the listing already arrives sorted by it.
      */
     override suspend fun availableBuilds(instance: PackInstance): List<PackBuild> = withContext(Dispatchers.IO) {
-        client.listBuilds(instance.packRef.id).builds
+        val tag = language()
+        client.listBuilds(instance.packRef.id).builds.map { it.forLanguage(tag) }
     }
 
     /** The same listing, stale-then-fresh, for a screen that must not miss a build the cache predates. */
     override fun availableBuildsStream(instance: PackInstance): Flow<List<PackBuild>> =
-        client.buildsStream(instance.packRef.id).map { it.builds }.flowOn(Dispatchers.IO)
+        client.buildsStream(instance.packRef.id)
+            .map { listing ->
+                val tag = language()
+                listing.builds.map { it.forLanguage(tag) }
+            }
+            .flowOn(Dispatchers.IO)
 
     /** Snapshots [instance] can be rolled back to, newest first. */
     override fun listSnapshots(instance: PackInstance): List<PackSnapshot> =
@@ -382,26 +366,22 @@ class PackUpdateService(
 
     /**
      * Roll [instance] back to snapshot [snapshotId]: restore the captured files
-     * and the pre-update instance record under the mutation lock. Returns the
-     * restored instance.
+     * and the pre-update build onto the record under the mutation lock. Returns the
+     * record as written.
      */
     override suspend fun rollback(instance: PackInstance, snapshotId: String): PackInstance {
         val clientDir = clientDirOf(instance)
         return InstanceMutationLock.withLock(clientDir) {
             withContext(Dispatchers.IO) {
-                val current = repository.get(instance.id) ?: instance
+                val current = repository.get(instance.id) ?: throw InstanceRemovedException(instance)
                 val managed = managedRealPaths(null, current.installedManifest ?: FileManifest())
                 val restored = snapshotService.restore(clientDir, current.instanceDirName, snapshotId, managed)
                 // A rollback is a deliberate pin: stop following latest so the update we
                 // just undid is not re-applied on the next startup.
-                val pinned = restored.copy(followLatest = false)
-                repository.put(pinned)
-                pinned
+                repository.update(current.id) { it.withBuildOf(restored).copy(followLatest = false) }
+                    ?: current.withBuildOf(restored).copy(followLatest = false)
             }
         }
     }
 
-    private companion object {
-        private const val KEEP_SNAPSHOTS = 3
-    }
 }

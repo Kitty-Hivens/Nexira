@@ -15,10 +15,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
-import java.util.HashSet;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -54,7 +54,10 @@ public final class ProfilerAgent {
     private static final AtomicLong gcCount = new AtomicLong(0L);
     private static final AtomicLong gcPauseTotalMs = new AtomicLong(0L);
     private static final AtomicBoolean liveSetReliable = new AtomicBoolean(false);
-    private static final Set<String> heapPools = new HashSet<>();
+    // Filled on the premain thread and read on the notification thread. A plain set
+    // has no publication edge between the two, and a read that saw it empty would
+    // sum nothing and degrade the heap profile without a word.
+    private static final Set<String> heapPools = ConcurrentHashMap.newKeySet();
 
     /** Serializes the periodic flush against the final shutdown write so the two
      *  threads never race on the shared {@code <out>.tmp} staging file. */

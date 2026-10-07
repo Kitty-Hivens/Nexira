@@ -36,7 +36,6 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -52,11 +51,13 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.nx.NxButton
+import hivens.ui.nx.NxSteadyText
 import hivens.ui.nx.RetryStateBlock
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetField
 import hivens.ui.puppet.PuppetScreen
-import hivens.ui.theme.NxTheme
+import hivens.ui.surface.NxSurface
+import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.Dimens
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.flowOn
@@ -65,6 +66,9 @@ import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 import org.slf4j.LoggerFactory
 import kotlin.time.Duration.Companion.milliseconds
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.OnFill
 
 /**
  * Browse = the catalogue of everything installable, across sources. A source
@@ -174,6 +178,9 @@ fun BrowseScreen(
                 logger.warn("browse: no catalogue is registered for {}", origin)
                 if (state !is BrowseState.Loaded) state = BrowseState.Empty
             }
+        // A source that answers with its whole listing has no further pages, and
+        // asking it for one only returns the same list again.
+        if (!catalogue.paged) endReached = true
         try {
             // Stale first, fresh behind it. Assigning an equal list is not a
             // repaint -- the state is compared, not trusted -- so a refresh that
@@ -209,6 +216,30 @@ fun BrowseScreen(
                     // not get them back either. Only entries the list does not
                     // already hold are a reason to start again.
                     val shown = (state as? BrowseState.Loaded)?.packs
+                    // A source with no pages hands over the entire list each time,
+                    // so its answer IS the list: a pack published or withdrawn, or a
+                    // card reworded, replaces it where it stands. Nothing was scrolled
+                    // onto it to lose, and the reader is not sent back to the top.
+                    if (!catalogue.paged) {
+                        if (packs == shown) {
+                            logger.debug("browse: {} re-listed the same {} pack(s)", origin, packs.size)
+                            return@collect
+                        }
+                        logger.info("browse: {} listed {} pack(s)", origin, packs.size)
+                        state = BrowseState.Loaded(packs)
+                        session.put(
+                            origin,
+                            submittedQuery,
+                            BrowseSession.Snapshot(
+                                packs = packs,
+                                nextPage = 0,
+                                endReached = true,
+                                firstVisibleIndex = listState.firstVisibleItemIndex,
+                                firstVisibleOffset = listState.firstVisibleItemScrollOffset,
+                            ),
+                        )
+                        return@collect
+                    }
                     if (shown != null && newIn(packs, shown).isEmpty()) {
                         logger.info("browse: {} re-listed the same {} pack(s)", origin, packs.size)
                         return@collect
@@ -307,7 +338,11 @@ fun BrowseScreen(
     // Where the reader had got to, kept with the list it belongs to. Written on
     // the way out rather than on every scroll: the position only matters to a
     // return, and a write per frame of scrolling is a write per frame.
-    DisposableEffect(origin, submittedQuery) {
+    //
+    // Keyed on everything the cursor is keyed on. A retry makes page and endReached
+    // new states, and an effect that outlived it went on reading the old ones, so a
+    // retry followed by paging was put away with the new list and the old cursor.
+    DisposableEffect(origin, submittedQuery, retryTick) {
         val forOrigin = origin
         val forQuery = submittedQuery
         onDispose {
@@ -390,38 +425,38 @@ private fun prefetchCardArt(context: PlatformContext, packs: List<CataloguePack>
 /** Compact, rounded, filled search field (a bare OutlinedTextField sat too tall and read as a form input). */
 @Composable
 private fun SearchField(value: String, onValueChange: (String) -> Unit, placeholder: String) {
-    BasicTextField(
-        value         = value,
-        onValueChange = onValueChange,
-        singleLine    = true,
-        textStyle     = MaterialTheme.typography.bodyMedium.copy(color = NxTheme.colors.textPrimary),
-        cursorBrush   = SolidColor(NxTheme.colors.primary),
-        modifier      = Modifier.fillMaxWidth(),
-    ) { inner ->
-        Row(
-            modifier          = Modifier
-                .fillMaxWidth()
-                .clip(MaterialTheme.shapes.large)
-                .background(NxTheme.colors.surface)
-                .padding(horizontal = 14.dp, vertical = 11.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Symbol(
-                NxIcon.Search,
-                contentDescription = null,
-                tint               = NxTheme.colors.textSecondary,
-                modifier           = Modifier.size(18.dp),
-            )
-            Spacer(Modifier.width(10.dp))
-            Box(Modifier.weight(1f)) {
-                if (value.isEmpty()) {
-                    Text(
-                        text  = placeholder,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = NxTheme.colors.textSecondary,
-                    )
+    NxSurface(SurfaceKind.Field, modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
+        BasicTextField(
+            value         = value,
+            onValueChange = onValueChange,
+            singleLine    = true,
+            textStyle     = MaterialTheme.typography.bodyMedium.copy(color = NxInk.main),
+            cursorBrush   = SolidColor(NxColor.lead()),
+            modifier      = Modifier.fillMaxWidth(),
+        ) { inner ->
+            Row(
+                modifier          = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 11.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Symbol(
+                    NxIcon.Search,
+                    contentDescription = null,
+                    tint               = NxInk.quiet,
+                    modifier           = Modifier.size(18.dp),
+                )
+                Spacer(Modifier.width(10.dp))
+                Box(Modifier.weight(1f)) {
+                    if (value.isEmpty()) {
+                        Text(
+                            text  = placeholder,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = NxInk.quiet,
+                        )
+                    }
+                    inner()
                 }
-                inner()
             }
         }
     }
@@ -429,21 +464,29 @@ private fun SearchField(value: String, onValueChange: (String) -> Unit, placehol
 
 @Composable
 private fun SourceTab(label: String, selected: Boolean, onClick: () -> Unit) {
+    val fill = if (selected) NxColor.lead() else NxColor.wash(NxInk.quiet, UNSELECTED_TAB_WASH)
     Box(
         modifier = Modifier
             .clip(MaterialTheme.shapes.small)
-            .background(if (selected) NxTheme.colors.primary else NxTheme.colors.surface)
+            .background(fill)
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 8.dp),
     ) {
-        Text(
-            text       = label,
-            style      = MaterialTheme.typography.labelLarge,
-            color      = if (selected) Color.White else NxTheme.colors.textSecondary,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-        )
+        OnFill(fill) {
+            // Measured bold, drawn at the weight it currently wears. A heavier face is
+            // wider, so selecting a source used to widen its tab and slide every tab
+            // after it out from under the cursor that had just pressed one.
+            NxSteadyText(
+                text   = label,
+                style  = MaterialTheme.typography.labelLarge,
+                color  = if (selected) NxColor.on(fill) else NxInk.quiet,
+                weight = if (selected) FontWeight.Bold else FontWeight.Normal,
+            )
+        }
     }
 }
+
+private const val UNSELECTED_TAB_WASH = 0.10f
 
 private fun originLabel(origin: PackOrigin): String = when (origin) {
     PackOrigin.Mirror -> "Hivens"
@@ -457,7 +500,7 @@ private fun originLabel(origin: PackOrigin): String = when (origin) {
 private fun BrowseLoading() {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         CircularProgressIndicator(
-            color       = NxTheme.colors.primary.copy(alpha = 0.55f),
+            color       = NxColor.wash(NxColor.lead(), 0.55f),
             strokeWidth = 2.dp,
             modifier    = Modifier.size(28.dp),
         )
@@ -475,13 +518,13 @@ private fun BrowseEmpty(onRetry: () -> Unit) {
             Text(
                 text       = s.browseEmptyTitle,
                 style      = MaterialTheme.typography.titleLarge,
-                color      = NxTheme.colors.textPrimary,
+                color      = NxInk.main,
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
                 text      = s.browseEmptyMessage,
                 style     = MaterialTheme.typography.bodyMedium,
-                color     = NxTheme.colors.textSecondary,
+                color     = NxInk.quiet,
                 textAlign = TextAlign.Center,
                 modifier  = Modifier.widthIn(max = 420.dp),
             )

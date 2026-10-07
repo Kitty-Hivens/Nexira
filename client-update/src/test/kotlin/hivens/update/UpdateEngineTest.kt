@@ -3,9 +3,12 @@ package hivens.update
 import hivens.core.data.FileManifest
 import hivens.core.data.flatten
 import hivens.core.io.AtomicFiles
+import hivens.core.update.FileAction
 import hivens.core.update.LauncherPatch
+import hivens.core.update.LauncherUpdatePlan
 import hivens.core.update.LauncherUpdatePlanner
 import kotlinx.serialization.json.Json
+import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.createParentDirectories
@@ -17,6 +20,8 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class UpdateEngineTest {
+
+    private val markerJson = Json { encodeDefaults = true }
 
     private fun write(root: Path, rel: String, content: String): Path {
         val p = root.resolve(rel); p.createParentDirectories(); Files.writeString(p, content); return p
@@ -136,9 +141,9 @@ class UpdateEngineTest {
             // Stage everything, then simulate a crash AFTER the commit marker was written
             // but BEFORE the moves ran: write the marker by hand, leave staging intact.
             val staged = UpdateStager(layout, source).stage(plan, remote)
-            val marker = layout.stagingDir.resolve(".commit.json")
+            val marker = layout.applyMarker
             val commit = ApplyCommit("2.0.0", staged.staged.keys.toList(), staged.deletes)
-            AtomicFiles.writeString(marker, Json { encodeDefaults = true }.encodeToString(ApplyCommit.serializer(), commit))
+            AtomicFiles.writeString(marker, markerJson.encodeToString(ApplyCommit.serializer(), commit))
 
             // Fresh applier (new process) recovers.
             LayoutApplier(layout).recover { v -> if (v == "2.0.0") remote else null }
@@ -189,6 +194,111 @@ class UpdateEngineTest {
             val staged = UpdateStager(layout, FakeSource(server, emptyMap())).stage(plan, remote)
             LayoutApplier(layout).apply(staged, remote, "2.0.0")
             assertTrue(Files.exists(layout.aotCache), "AOT cache should be kept when the jar is unchanged")
+        } finally {
+            deleteTree(base)
+        }
+    }
+
+    /** Stages the full release and leaves an apply marker as a crash before the moves would. */
+    private fun interruptedApply(layout: InstallLayout, server: Path, remote: FileManifest): ApplyCommit {
+        val local = LayoutManifest.scan(layout.root, excludes = layout.bookkeeping)
+        val staged = UpdateStager(layout, FakeSource(server, emptyMap()))
+            .stage(LauncherUpdatePlanner.plan(local, remote), remote)
+        val commit = ApplyCommit("2.0.0", staged.staged.keys.toList(), staged.deletes)
+        AtomicFiles.writeString(layout.applyMarker, markerJson.encodeToString(ApplyCommit.serializer(), commit))
+        return commit
+    }
+
+    @Test
+    fun aNewUpdateDoesNotClearWhatAnInterruptedOneStillHasToMove() {
+        val (base, live, server) = setup()
+        try {
+            val layout = InstallLayout(live)
+            val remote = LayoutManifest.scan(server)
+            interruptedApply(layout, server, remote)
+
+            // Staging used to be emptied here, marker included, and the resume that
+            // followed read every missing staged file as already moved.
+            assertFailsWith<IllegalStateException> {
+                UpdateStager(layout, FakeSource(server, emptyMap())).stage(LauncherUpdatePlanner.plan(remote, remote), remote)
+            }
+            assertFailsWith<IllegalStateException> {
+                LauncherUpdater(layout).update(remote, emptyMap(), FakeSource(server, emptyMap()), "3.0.0")
+            }
+            assertTrue(Files.exists(layout.applyMarker))
+            assertTrue(Files.exists(layout.stagingDir.resolve("lib/nexira.jar")), "the staged files the resume needs are gone")
+
+            LayoutApplier(layout).recover { v -> if (v == "2.0.0") remote else null }
+            assertContentEqualsBytes(server.resolve("lib/nexira.jar"), live.resolve("lib/nexira.jar"))
+        } finally {
+            deleteTree(base)
+        }
+    }
+
+    @Test
+    fun recoveryWithoutTheTargetManifestKeepsTheMarkerForTheNextStart() {
+        val (base, live, server) = setup()
+        try {
+            val layout = InstallLayout(live)
+            val remote = LayoutManifest.scan(server)
+            interruptedApply(layout, server, remote)
+
+            LayoutApplier(layout).recover { null } // offline, or the release is not reachable yet
+
+            assertTrue(Files.exists(layout.applyMarker), "dropping it leaves the layout half applied for good")
+            assertFalse(Files.exists(layout.versionFile))
+
+            LayoutApplier(layout).recover { v -> if (v == "2.0.0") remote else null }
+            assertEquals("2.0.0", read(layout.versionFile))
+            assertFalse(Files.exists(layout.applyMarker))
+        } finally {
+            deleteTree(base)
+        }
+    }
+
+    @Test
+    fun aManifestPathOutsideTheInstallIsRefusedBeforeAnythingIsFetched() {
+        val (base, live, server) = setup()
+        try {
+            val layout = InstallLayout(live)
+            val remote = LayoutManifest.scan(server)
+            var fetched = false
+            val source = object : AssetSource {
+                override fun fetchFile(path: String, dest: Path) { fetched = true }
+                override fun fetchPatch(patch: LauncherPatch, dest: Path) { fetched = true }
+            }
+
+            assertFailsWith<IOException> {
+                UpdateStager(layout, source).stage(LauncherUpdatePlan(listOf(FileAction.Download("../../.profile"))), remote)
+            }
+            assertFalse(fetched)
+            assertFalse(Files.exists(base.resolve(".profile")))
+        } finally {
+            deleteTree(base)
+        }
+    }
+
+    @Test
+    fun anApplyThatWouldMoveOrDeleteOutsideTheInstallMovesNothing() {
+        val (base, live, server) = setup()
+        try {
+            val layout = InstallLayout(live)
+            val remote = LayoutManifest.scan(server)
+            val victim = write(base, "victim", "keep me")
+            val jarBefore = Files.readAllBytes(live.resolve("lib/nexira.jar"))
+            val stagedJar = write(layout.stagingDir, "lib/nexira.jar", "new jar")
+
+            assertFailsWith<IOException> {
+                LayoutApplier(layout).apply(
+                    StagedUpdate(mapOf("lib/nexira.jar" to stagedJar), deletes = listOf("../victim")),
+                    remote,
+                    "2.0.0",
+                )
+            }
+
+            assertEquals("keep me", read(victim))
+            assertContentEquals(jarBefore, Files.readAllBytes(live.resolve("lib/nexira.jar")), "one bad path refuses the whole apply")
+            assertFalse(Files.exists(layout.applyMarker))
         } finally {
             deleteTree(base)
         }

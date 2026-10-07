@@ -1,9 +1,9 @@
 package hivens.ui.screens.library.worlds
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -25,8 +25,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -43,8 +41,11 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.nx.CenteredProgress
 import hivens.ui.nx.NxSectionHeader
+import hivens.ui.nx.NxSwap
 import hivens.ui.nx.RetryStateBlock
-import hivens.ui.theme.NxTheme
+import hivens.ui.surface.NxCard
+import hivens.ui.surface.NxSurface
+import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.familyForText
 import java.io.File
 import java.nio.file.Path
@@ -55,6 +56,7 @@ import java.time.format.FormatStyle
 import java.util.Base64
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import hivens.ui.theme.NxInk
 
 /**
  * Library PackDetail Worlds tab. Two stacked sections:
@@ -89,16 +91,24 @@ fun WorldsTabPane(instanceDir: Path, modifier: Modifier = Modifier) {
         }.getOrElse { WorldsState.Error }
     }
 
-    when (val st = state) {
-        WorldsState.Loading -> CenteredProgress(modifier.fillMaxSize())
-        WorldsState.Error -> RetryStateBlock(
-            title      = s.worldsTabErrorTitle,
-            message    = s.worldsTabErrorMessage,
-            retryLabel = s.contentTabRetry,
-            onRetry    = { retryTick++ },
-            modifier   = modifier.fillMaxSize().padding(16.dp),
-        )
-        is WorldsState.Loaded -> WorldsList(worlds = st.worlds, servers = st.servers, modifier = modifier)
+    // One panel under the whole tab, as the Logs tab has, from the first frame: the
+    // section headings are text and need something under them, and a panel that
+    // only arrived with the scan left a frame of bare wallpaper and then a jump.
+    // What is on it changes by a fade, so the scan landing is not a second jump.
+    NxSurface(SurfaceKind.Panel, modifier = modifier.fillMaxSize()) {
+        NxSwap(target = state, label = "worldsState") { st ->
+            when (st) {
+                WorldsState.Loading -> CenteredProgress(Modifier.fillMaxSize())
+                WorldsState.Error -> RetryStateBlock(
+                    title      = s.worldsTabErrorTitle,
+                    message    = s.worldsTabErrorMessage,
+                    retryLabel = s.contentTabRetry,
+                    onRetry    = { retryTick++ },
+                    modifier   = Modifier.fillMaxSize(),
+                )
+                is WorldsState.Loaded -> WorldsList(worlds = st.worlds, servers = st.servers)
+            }
+        }
     }
 }
 
@@ -115,11 +125,11 @@ private sealed interface WorldsState {
 private fun WorldsList(
     worlds: List<WorldEntry>,
     servers: List<MultiplayerServerEntry>,
-    modifier: Modifier,
 ) {
     val s = LocalStrings.current
     LazyColumn(
-        modifier            = modifier.fillMaxSize().padding(16.dp),
+        modifier            = Modifier.fillMaxSize(),
+        contentPadding      = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item { NxSectionHeader(text = s.worldsTabLocalSection(worlds.size)) }
@@ -143,71 +153,68 @@ private fun WorldsList(
             items(count = servers.size, key = { it }) { i -> ServerCard(entry = servers[i]) }
         }
 
-        item { Spacer(Modifier.height(8.dp)) }
     }
 }
 
 @Composable
 private fun EmptyHint(text: String) {
-    Box(
-        modifier         = Modifier
-            .fillMaxWidth()
-            .clip(MaterialTheme.shapes.medium)
-            .background(NxTheme.colors.surface.copy(alpha = 0.4f))
-            .padding(20.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text  = text,
-            style = MaterialTheme.typography.bodySmall,
-            color = NxTheme.colors.textSecondary,
-        )
+    NxSurface(SurfaceKind.Panel, modifier = Modifier.fillMaxWidth()) {
+        Box(
+            modifier         = Modifier.fillMaxWidth().padding(20.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text  = text,
+                style = MaterialTheme.typography.bodySmall,
+                color = NxInk.quiet,
+            )
+        }
     }
 }
 
 @Composable
 private fun WorldCard(world: WorldEntry) {
     val s = LocalStrings.current
-    Row(
-        modifier              = Modifier
-            .fillMaxWidth()
-            .clip(MaterialTheme.shapes.medium)
-            .background(NxTheme.colors.surface.copy(alpha = 0.5f))
-            .padding(12.dp),
-        verticalAlignment     = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        WorldThumb(iconPath = world.iconPath)
+    NxCard(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier              = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalAlignment     = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            WorldThumb(iconPath = world.iconPath)
 
-        // Minecraft's own world-list layout: icon, name, then two muted lines
-        // (folder + last-played date, game mode + version) instead of a row of
-        // accent chips -- "Overworld" sat on nearly every world and read as noise.
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(
-                text       = world.displayName,
-                fontFamily = familyForText(world.displayName),
-                style      = MaterialTheme.typography.bodyLarge,
-                color      = NxTheme.colors.textPrimary,
-                fontWeight = FontWeight.SemiBold,
-                maxLines   = 1,
-                overflow   = TextOverflow.Ellipsis,
-            )
-            Text(
-                text     = worldSubtitle(world),
-                style    = MaterialTheme.typography.labelSmall,
-                color    = NxTheme.colors.textSecondary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            val info = worldInfoLine(world, s)
-            if (info.isNotBlank()) {
+            // Minecraft's own world-list layout: icon, name, then two muted lines
+            // (folder + last-played date, game mode + version) instead of a row of
+            // accent chips -- "Overworld" sat on nearly every world and read as noise.
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
-                    text     = info,
+                    text       = world.displayName,
+                    fontFamily = familyForText(world.displayName),
+                    style      = MaterialTheme.typography.bodyLarge,
+                    color      = NxInk.main,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines   = 1,
+                    overflow   = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text     = worldSubtitle(world),
                     style    = MaterialTheme.typography.labelSmall,
-                    color    = NxTheme.colors.textSecondary,
+                    color    = NxInk.quiet,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+                val info = worldInfoLine(world, s)
+                if (info.isNotBlank()) {
+                    Text(
+                        text     = info,
+                        style    = MaterialTheme.typography.labelSmall,
+                        color    = NxInk.quiet,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
         }
     }
@@ -215,26 +222,27 @@ private fun WorldCard(world: WorldEntry) {
 
 @Composable
 private fun WorldThumb(iconPath: String?) {
-    Box(
-        modifier         = Modifier
-            .size(56.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .background(NxTheme.colors.surfaceVariant),
-        contentAlignment = Alignment.Center,
+    NxSurface(
+        kind          = SurfaceKind.Field,
+        modifier      = Modifier.size(56.dp),
+        shape         = RoundedCornerShape(8.dp),
+        borderWidthDp = 0f,
     ) {
-        if (iconPath != null) {
-            AsyncImage(
-                model              = File(iconPath),
-                contentDescription = null,
-                modifier           = Modifier.size(56.dp),
-                filterQuality      = FilterQuality.None,
-            )
-        } else {
-            Symbol(icon = NxIcon.Public,
-                contentDescription = null,
-                tint               = Color.White.copy(alpha = 0.55f),
-                modifier           = Modifier.size(28.dp),
-            )
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            if (iconPath != null) {
+                AsyncImage(
+                    model              = File(iconPath),
+                    contentDescription = null,
+                    modifier           = Modifier.size(56.dp),
+                    filterQuality      = FilterQuality.None,
+                )
+            } else {
+                Symbol(icon = NxIcon.Public,
+                    contentDescription = null,
+                    tint               = NxInk.quiet,
+                    modifier           = Modifier.size(28.dp),
+                )
+            }
         }
     }
 }
@@ -242,40 +250,40 @@ private fun WorldThumb(iconPath: String?) {
 @Composable
 private fun ServerCard(entry: MultiplayerServerEntry) {
     val s = LocalStrings.current
-    Row(
-        modifier              = Modifier
-            .fillMaxWidth()
-            .clip(MaterialTheme.shapes.medium)
-            .background(NxTheme.colors.surface.copy(alpha = 0.45f))
-            .padding(12.dp),
-        verticalAlignment     = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        ServerThumb(iconBase64 = entry.iconBase64)
+    NxCard(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier              = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalAlignment     = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            ServerThumb(iconBase64 = entry.iconBase64)
 
-        Column(modifier = Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(
-                    text       = entry.name,
-                    style      = MaterialTheme.typography.bodyLarge,
-                    color      = NxTheme.colors.textPrimary,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines   = 1,
-                    overflow   = TextOverflow.Ellipsis,
-                )
-                if (entry.hidden) {
-                    Symbol(icon = NxIcon.VisibilityOff,
-                        contentDescription = s.worldsTabServerHiddenLabel,
-                        tint               = NxTheme.colors.textSecondary,
-                        modifier           = Modifier.size(14.dp),
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text       = entry.name,
+                        style      = MaterialTheme.typography.bodyLarge,
+                        color      = NxInk.main,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines   = 1,
+                        overflow   = TextOverflow.Ellipsis,
                     )
+                    if (entry.hidden) {
+                        Symbol(icon = NxIcon.VisibilityOff,
+                            contentDescription = s.worldsTabServerHiddenLabel,
+                            tint               = NxInk.quiet,
+                            modifier           = Modifier.size(14.dp),
+                        )
+                    }
                 }
+                Text(
+                    text  = entry.ip,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = NxInk.quiet,
+                )
             }
-            Text(
-                text  = entry.ip,
-                style = MaterialTheme.typography.labelSmall,
-                color = NxTheme.colors.textSecondary,
-            )
         }
     }
 }
@@ -286,26 +294,27 @@ private fun ServerThumb(iconBase64: String?) {
         if (iconBase64.isNullOrBlank()) null
         else runCatching { Base64.getDecoder().decode(iconBase64) }.getOrNull()
     }
-    Box(
-        modifier         = Modifier
-            .size(48.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .background(NxTheme.colors.surfaceVariant),
-        contentAlignment = Alignment.Center,
+    NxSurface(
+        kind          = SurfaceKind.Field,
+        modifier      = Modifier.size(48.dp),
+        shape         = RoundedCornerShape(8.dp),
+        borderWidthDp = 0f,
     ) {
-        if (bytes != null) {
-            AsyncImage(
-                model              = bytes,
-                contentDescription = null,
-                modifier           = Modifier.size(48.dp),
-                filterQuality      = FilterQuality.None,
-            )
-        } else {
-            Symbol(icon = NxIcon.Computer,
-                contentDescription = null,
-                tint               = Color.White.copy(alpha = 0.55f),
-                modifier           = Modifier.size(24.dp),
-            )
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            if (bytes != null) {
+                AsyncImage(
+                    model              = bytes,
+                    contentDescription = null,
+                    modifier           = Modifier.size(48.dp),
+                    filterQuality      = FilterQuality.None,
+                )
+            } else {
+                Symbol(icon = NxIcon.Computer,
+                    contentDescription = null,
+                    tint               = NxInk.quiet,
+                    modifier           = Modifier.size(24.dp),
+                )
+            }
         }
     }
 }

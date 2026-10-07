@@ -18,6 +18,8 @@ class LibrarySpec(
     val url: String? = null,
     val sha1: String? = null,
     val size: Long = 0,
+    /** Checked when [sha1] is null, for a source that publishes only an md5 (LiteLoader's releases). */
+    val md5: String? = null,
     /**
      * Raw jar bytes when the artifact is bundled inside an installer rather
      * than published at a URL (the Forge universal jar lives in the installer's
@@ -65,6 +67,13 @@ data class PlaceOnlyFile(
 data class LoaderProfile(
     val libraries: List<LibrarySpec>,
     val mainClass: String,
+    /**
+     * The loader version this profile is, which is not always the one asked for: a
+     * blank request resolves to the latest, and legacy Forge substitutes the nearest
+     * published build for one that never was. Recorded so a pack that pinned
+     * nothing is pinned to what it got, rather than moving on the next launch.
+     */
+    val version: String,
     val jvmArgs: List<String> = emptyList(),
     val gameArgs: List<String> = emptyList(),
     /**
@@ -170,6 +179,8 @@ data class ResolvedRuntime(
      * module. Null for legacy/vanilla, which already carry the full client on `-cp`.
      */
     val clientResourcesJar: Path? = null,
+    /** The loader version resolved for this runtime, or null for vanilla. See [LoaderProfile.version]. */
+    val loaderVersion: String? = null,
 )
 
 /**
@@ -184,7 +195,24 @@ interface LoaderResolver {
     val loaderId: String
 
     suspend fun resolve(mcVersion: String, loaderVersion: String): LoaderProfile
+
+    /**
+     * The versions this loader publishes for [mcVersion], newest first, for a
+     * person to pick from. Empty when the loader has no listing to offer.
+     */
+    suspend fun availableVersions(mcVersion: String): List<LoaderVersionOption> = emptyList()
 }
+
+/**
+ * One loader version on offer. [recommended] is the loader's own pick where it
+ * makes one (Forge's promotions); [stable] is false for a beta or an alpha, so a
+ * picker can say so rather than leave it to the version string.
+ */
+data class LoaderVersionOption(
+    val version: String,
+    val stable: Boolean = true,
+    val recommended: Boolean = false,
+)
 
 /**
  * Looks up the [LoaderResolver] for a manifest's loader name. `vanilla`,
@@ -193,10 +221,18 @@ interface LoaderResolver {
 class LoaderRegistry(resolvers: List<LoaderResolver>) {
     private val byId: Map<String, LoaderResolver> = resolvers.associateBy { it.loaderId.lowercase() }
 
+    /** The resolver for [loaderName], or null when it names vanilla or a loader nothing here serves. */
     fun resolverFor(loaderName: String?): LoaderResolver? {
-        val id = loaderName?.trim()?.lowercase()?.takeIf { it.isNotEmpty() } ?: return null
-        if (id == "vanilla" || id == "none") return null
-        return byId[id]
+        if (isVanilla(loaderName)) return null
+        return byId[loaderName!!.trim().lowercase()]
+    }
+
+    companion object {
+        /** Whether [loaderName] means no loader at all, as opposed to one this build does not know. */
+        fun isVanilla(loaderName: String?): Boolean {
+            val id = loaderName?.trim()?.lowercase()
+            return id.isNullOrEmpty() || id == "vanilla" || id == "none"
+        }
     }
 }
 

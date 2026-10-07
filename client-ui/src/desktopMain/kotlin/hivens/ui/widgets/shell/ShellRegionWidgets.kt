@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
@@ -36,6 +37,8 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathOperation
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.dp
@@ -57,11 +60,11 @@ import hivens.ui.chrome.windowDragArea
 import hivens.ui.editor.EditModeController
 import hivens.ui.editor.EditModeState
 import hivens.ui.editor.LocalEditMode
+import hivens.ui.editor.LocalShellChromeBounds
+import hivens.ui.editor.reportsContentPane
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.surface.NxSurface
-import hivens.ui.surface.NxSurfaceLevel
-import hivens.ui.theme.NxTheme
 import hivens.widget.api.LocalSlotPath
 import hivens.widget.api.SlotRenderer
 import hivens.widget.api.rememberProps
@@ -75,18 +78,17 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import org.koin.compose.koinInject
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
+import hivens.ui.surface.SurfaceKind
+import hivens.ui.theme.NxTheme
+import hivens.ui.surface.defaultOpacity
+import hivens.widget.api.LocalLayoutGraph
+import hivens.widget.model.walkInstances
+import kotlinx.serialization.json.intOrNull
 
-/**
- * The chrome's opacity when nothing overrides it.
- *
- * The rail, the top bar and the centre's corner wedge all draw at this number, and
- * the wedge only does its job -- carrying the content's corner into the chrome --
- * while it is exactly the colour of the plane it joins. They were three separate
- * literals that happened to agree, which is how they came apart: a plane whose
- * opacity was refused on light left a visible patch at the seam.
- */
-private const val CHROME_OPACITY_PCT = 35
 
 /**
  * Props for the CENTRE region: the page under every screen.
@@ -115,15 +117,14 @@ data class ShellCenterRegionProps(
  * asking for more blur quietly asked for less fill. Two of the four values the preset
  * carried never reached a pixel at all.
  *
- * -1 means "the theme's own floor", which is what an unnamed opacity has always
- * drawn: 92% on dark, solid on light.
+ * -1 means "the kind's own", which is solid.
  */
 internal fun Int.regionOpacity(): Float? = takeIf { it >= 0 }?.let { it / 100f }
 
 /**
  * Props for the RIGHT region. It draws no divider, so no divider knob exists here --
  * the prop panel shows only what works. Defaults are the panel's shipped look: the
- * theme's own floor, no blur, swipe-to-collapse off.
+ * panel's own solid body, no blur, swipe-to-collapse off.
  */
 @Serializable
 data class ShellRightRegionProps(
@@ -136,15 +137,15 @@ data class ShellRightRegionProps(
 
 /**
  * Props for the LEFT region (the navigation rail). Like the right panel it renders its
- * own [NxSurface], at [CHROME_OPACITY_PCT] by default -- a see-through chrome that
- * prioritises the wallpaper behind it.
+ * own [NxSurface], as chrome: solid in the step above the page by default, glass when
+ * the layout names an opacity under one.
  */
 @Serializable
 data class ShellLeftRegionProps(
     @PropLabel("widget.appshell.region.widthDp") @PropRange(0.0, 600.0) val widthDp: Int = 0,
     @PropLabel("widget.appshell.region.showDivider") val showDivider: Boolean = false,
     @PropLabel("widget.appshell.region.collapsed") val collapsed: Boolean = false,
-    @PropLabel("widget.appshell.region.opacityPct") @PropRange(-1.0, 100.0) val opacityPct: Int = CHROME_OPACITY_PCT,
+    @PropLabel("widget.appshell.region.opacityPct") @PropRange(-1.0, 100.0) val opacityPct: Int = -1,
     @PropLabel("widget.appshell.region.blurDp") @PropRange(0.0, 40.0) val blurDp: Int = 0,
 )
 
@@ -184,17 +185,19 @@ val LocalShellContext = compositionLocalOf<ShellContext> {
 
 @Composable
 private fun RowScope.RegionDivider(show: Boolean) {
-    if (show) VerticalDivider(Modifier.fillMaxHeight(), color = NxTheme.colors.outline)
+    if (show) VerticalDivider(Modifier.fillMaxHeight(), color = NxInk.line)
 }
 
-// Shown for a collapsed region while editing: thin but visible, so the region's
-// edit chrome (and its Tune affordance -- the only un-collapse path in edit
-// mode) stays hoverable. A fully-returned region leaves nothing to hover.
+// Shown for a collapsed LEFT rail while editing: thin but visible, so its edit
+// chrome (the Tune, the only un-collapse path the left rail has in edit mode) stays
+// hoverable. A fully-returned region leaves nothing to hover. The right rail dropped
+// its strip: Ctrl+N reopens the right rail while editing, so it needs no hover target,
+// and the strip only narrowed the editing canvas below its live width.
 @Composable
 private fun CollapsedRegionStrip() {
     NxSurface(
-        NxSurfaceLevel.Base, Modifier.width(22.dp).fillMaxHeight(), RectangleShape,
-        borderWidthDp = 0f, opacity = 0.4f,
+        SurfaceKind.Chrome, Modifier.width(22.dp).fillMaxHeight(), RectangleShape,
+        opacity = 0.4f, blurDp = 0f,
     ) {}
 }
 
@@ -202,7 +205,7 @@ private fun CollapsedRegionStrip() {
  * Left region: the navigation rail plus the divider that separates it from the
  * center. removable=false -- losing the rail would navigation-lock the launcher.
  */
-@Widget(id = "appshell.region.left", displayName = "widget.appshell.region.left", removable = false, propsClass = ShellLeftRegionProps::class, drawsOwnSurface = true)
+@Widget(id = "appshell.region.left", enter = "none", displayName = "widget.appshell.region.left", removable = false, propsClass = ShellLeftRegionProps::class, drawsOwnSurface = true)
 @Composable
 fun ShellLeftRegion(instance: WidgetInstance) {
     val props = instance.rememberProps<ShellLeftRegionProps>()
@@ -213,16 +216,21 @@ fun ShellLeftRegion(instance: WidgetInstance) {
     val ctx = LocalShellContext.current
     Row(Modifier.fillMaxHeight()) {
         // The width lands on the rail, not on the row that also holds the divider.
-        // On the row, the surface's weight(1f) took whatever the divider left, so a
-        // named width came out a hairline short whenever the divider was on.
-        val railWidth = if (props.widthDp > 0) Modifier.width(props.widthDp.dp) else Modifier.weight(1f)
-        // The rail is an NxSurface at 35% by default. AppSidebar's NavigationRail is
-        // transparent so this owns the background, and the divider stays OUTSIDE the
-        // surface so the tinted area is exactly the rail. Light stops being forced
-        // opaque here: a named opacity is a named opacity on either theme now.
+        // On the row, the surface took whatever the divider left, so a named width
+        // came out a hairline short whenever the divider was on.
+        //
+        // No name means [NAV_RAIL_DEFAULT_WIDTH], the same answer the right rail
+        // gives. It used to mean a weight of the row, and a weight inside a row that
+        // is itself measured at its contents is the whole row: setting the width
+        // back to zero swallowed the window, and took the panel that could undo it
+        // with it. Its contents are no answer either, since the rail's slots fill
+        // whatever width they are offered so the items centre in it.
+        val railWidth = Modifier.width(if (props.widthDp > 0) props.widthDp.dp else NAV_RAIL_DEFAULT_WIDTH)
+        // The rail is chrome, solid unless the layout says otherwise. AppSidebar's
+        // NavigationRail is transparent so this owns the background, and the divider
+        // stays OUTSIDE the surface so the body covers exactly the rail.
         NxSurface(
-            NxSurfaceLevel.Base, railWidth.fillMaxHeight(), RectangleShape,
-            borderWidthDp = 0f,
+            SurfaceKind.Chrome, railWidth.fillMaxHeight(), RectangleShape,
             opacity = props.opacityPct.regionOpacity(), blurDp = props.blurDp.toFloat(),
         ) {
             AppSidebar(
@@ -239,23 +247,55 @@ fun ShellLeftRegion(instance: WidgetInstance) {
 }
 
 /**
+ * The nav rail's width when nothing overrides it.
+ *
+ * Mirrors what the bundled layout stores, so a graph that lost the prop draws the
+ * rail it always drew rather than a rail of some other size.
+ */
+val NAV_RAIL_DEFAULT_WIDTH = 65.dp
+
+/**
  * Center region: the screen router. Carries weight=1 in the default layout so it
  * flexes between the two rails. removable=false and never collapsible -- without
  * it there is no content area.
  */
-@Widget(id = "appshell.region.center", displayName = "widget.appshell.region.center", removable = false, propsClass = ShellCenterRegionProps::class, drawsOwnSurface = true)
+@Widget(id = "appshell.region.center", enter = "none", displayName = "widget.appshell.region.center", removable = false, propsClass = ShellCenterRegionProps::class, drawsOwnSurface = true)
 @Composable
 fun ShellCenterRegion(instance: WidgetInstance) {
     val props = instance.rememberProps<ShellCenterRegionProps>()
-    // The wedge is the chrome reaching around the corner, so it takes the chrome's
-    // colour rather than one of its own -- see [CHROME_OPACITY_PCT].
-    val chrome = NxTheme.colors.surface.copy(alpha = CHROME_OPACITY_PCT / 100f)
+    // The wedge is the chrome reaching around the corner, so it takes the rail's own
+    // colour rather than one of its own: the step above the page, at the opacity the
+    // rail actually draws at. It only does its job while it is exactly that colour, so
+    // the rail's named opacity is read off the layout rather than assumed.
+    val graph = LocalLayoutGraph.current
+    val railOpacity = remember(graph) {
+        // Read as the region's own props class reads it: a value of the wrong shape
+        // in a hand-edited file is no opacity rather than a throw in the region that
+        // is always on screen, which restarted the shell on every start.
+        (graph.walkInstances().firstOrNull { it.kind.value == "appshell.region.left" }
+            ?.props?.get("opacityPct") as? JsonPrimitive)?.intOrNull?.regionOpacity()
+    }
+    val chrome = NxTheme.colours.step(1).copy(alpha = railOpacity ?: SurfaceKind.Chrome.defaultOpacity())
     val cornerDp = 12.dp
+    // This rectangle is what the editor's overlays sit over. Reported rather than
+    // reconstructed from the rails' props: a rail animates, folds itself away on a
+    // narrow window and carries an inset, so the props do not carry the answer.
+    val chromeBounds = LocalShellChromeBounds.current
+    // onGloballyPositioned never fires for a node that is removed, so without this
+    // the holder keeps the last rectangle for good and the overlays stay inset
+    // around a pane that is no longer on screen.
+    DisposableEffect(chromeBounds) {
+        onDispose { chromeBounds.center = null }
+    }
     NxSurface(
-        NxSurfaceLevel.Base, Modifier.fillMaxSize(), RectangleShape,
-        borderWidthDp = 0f,
+        SurfaceKind.Chrome,
+        Modifier.fillMaxSize().reportsContentPane(chromeBounds),
+        RectangleShape,
         opacity = props.opacityPct.regionOpacity(), blurDp = props.blurDp.toFloat(),
     ) {
+        // Under everything the screen draws: a layer for decor, a field of
+        // particles say, that shows wherever the screen leaves the pane open.
+        SlotRenderer(SurfaceId(BACKDROP_SURFACE), SlotId("layers"), Modifier.matchParentSize())
         LocalShellContext.current.centerBody()
         // Nestle the content's top-start corner into the chrome (Modrinth-style).
         // A chrome-colored wedge, not a clip -- clipping the (transparent over a
@@ -281,17 +321,21 @@ fun ShellCenterRegion(instance: WidgetInstance) {
 /** Sub-surface for widgets that float over the content rather than sit in it. */
 private const val OVERLAY_SURFACE = "appshell.overlay"
 
-private const val RAIL_COLLAPSED_GRAB = 0 // collapsed reserves no width -- it is not part of the layout; reopen via Ctrl+N / edit-mode Tune
+/** Sub-surface for decor under the content: the pane's backdrop. */
+private const val BACKDROP_SURFACE = "appshell.backdrop"
+
+private const val RAIL_COLLAPSED_GRAB = 0 // collapsed reserves no width and is not part of the layout, reopen via Ctrl+N
 private val AUTO_COLLAPSE_BELOW = 980.dp   // window narrower than this auto-collapses the right rail
 
 /**
  * The right rail's width when nothing overrides it.
  *
- * Public because the shell insets its editor chrome by the same amount, and the
- * two were separate literals that happened to agree: a rail given another width
- * left the overlay measuring against a number nobody had updated.
+ * Mirrors what the bundled layout stores, the way [NAV_RAIL_DEFAULT_WIDTH] does,
+ * so a graph that lost the prop draws the rail it always drew. The editor used to
+ * read this to inset its own chrome; it measures the content pane now, so this is
+ * the rail's business alone.
  */
-val RAIL_DEFAULT_WIDTH = 265.dp
+internal val RAIL_DEFAULT_WIDTH = 265.dp
 
 /**
  * How far the panel sits off the window's edges: clear of the top bar, the bottom
@@ -310,37 +354,50 @@ private val RAIL_INSET = 4.dp
  * strips: a horizontal swipe anywhere on the rail shuts it (the width tracks the
  * pointer and snaps on release; vertical scrolls and taps still reach the news).
  *
- * Collapsed it reserves no width at all -- see [RAIL_COLLAPSED_GRAB] -- so there is
- * nothing left on screen to swipe, and it reopens through Ctrl+N or, in edit mode,
- * the region's own Tune. Neither reaches it while the window is under
+ * Collapsed it reserves no width at all (see [RAIL_COLLAPSED_GRAB]) in either mode,
+ * so there is nothing left on screen to swipe, and it reopens through Ctrl+N. Edit
+ * mode used to draw a 22dp strip so the region stayed hoverable for a mouse Tune,
+ * but that strip narrowed the editing canvas below its live width, so it is gone and
+ * Ctrl+N is the reopen. Ctrl+N does not reach it while the window is under
  * [AUTO_COLLAPSE_BELOW]: the auto-collapse is not a state the chord can leave,
  * because there is no room to open into. This used to describe a slim catch at the edge; the catch
  * went to zero and the sentence outlived it. Edit mode keeps the static
  * prop-driven behaviour.
  */
-@Widget(id = "appshell.region.right", displayName = "widget.appshell.region.right", removable = false, propsClass = ShellRightRegionProps::class, drawsOwnSurface = true)
+@Widget(id = "appshell.region.right", enter = "none", displayName = "widget.appshell.region.right", removable = false, propsClass = ShellRightRegionProps::class, drawsOwnSurface = true)
 @Composable
 fun ShellRightRegion(instance: WidgetInstance) {
     val props = instance.rememberProps<ShellRightRegionProps>()
-    // The panel is an NxSurface at Floating depth: a SurfaceContainerHigh body (a step
-    // up the tonal ladder from the page) plus a luminance-derived bevel, so it reads
-    // as a distinct plane over any wallpaper and with none. Its opacity and blur are
+    // The panel is a [SurfaceKind.Panel]: one step above the page plus a
+    // luminance-derived bevel, so it reads as a distinct plane over any wallpaper
+    // and with none. Its opacity and blur are
     // the editable pair.
     val editing = LocalEditMode.current is EditModeState.On
     val path = LocalSlotPath.current
     val controller: EditModeController = koinInject()
     val toggleCollapse: () -> Unit = {
-        // Merge over the raw stored props so widthDp (and other tuning) survives
-        // the flip -- updateProps replaces the whole object.
-        controller.updateProps(
-            path,
-            instance.instanceId,
-            JsonObject(instance.props + ("collapsed" to JsonPrimitive(!props.collapsed))),
-        )
+        // Flipped from the props as they are when the write lands, not as this
+        // composition last saw them: a slider in the prop panel writes the same
+        // record, and a flip built on an older copy undid it, or was undone by it.
+        controller.updatePropsFrom(path, instance.instanceId, historyKey = "collapsed") { stored ->
+            val collapsed = (stored["collapsed"] as? JsonPrimitive)?.booleanOrNull ?: ShellRightRegionProps().collapsed
+            JsonObject(stored + ("collapsed" to JsonPrimitive(!collapsed)))
+        }
     }
     // Ctrl+N (window-level, see AppShell) toggles the rail. rememberUpdatedState
     // keeps the flip reading the latest collapsed value across recompositions.
     val currentToggle by rememberUpdatedState(toggleCollapse)
+    // Where a swipe left the rail, written as that value rather than as a flip. The
+    // gesture outlives recomposition, and a flip decided against the props it was
+    // created with skipped the write after Ctrl+N had changed them: the rail shut on
+    // screen and stayed open in the file, so the next Ctrl+N did nothing visible.
+    val setCollapsed: (Boolean) -> Unit = { collapse ->
+        controller.updatePropsFrom(path, instance.instanceId, historyKey = "collapsed") { stored ->
+            JsonObject(stored + ("collapsed" to JsonPrimitive(collapse)))
+        }
+    }
+    val currentSetCollapsed by rememberUpdatedState(setCollapsed)
+    val currentlyCollapsed by rememberUpdatedState(props.collapsed)
     LaunchedEffect(Unit) {
         var seen = controller.rightRailToggleSignal.value
         snapshotFlow { controller.rightRailToggleSignal.value }.collect { tick ->
@@ -364,10 +421,14 @@ fun ShellRightRegion(instance: WidgetInstance) {
 
     // Edit mode: static, no swipe/animation.
     if (editing) {
-        if (props.collapsed) { CollapsedRegionStrip(); return }
+        // Collapsed reserves nothing in edit mode too, so the editing canvas is the
+        // width it will be live: no 22dp strip stealing from the centre and pushing
+        // right-edge widgets into an overflow that exists only while editing. Reopen
+        // stays Ctrl+N (window-scoped, fires while editing), so nothing is stranded.
+        if (props.collapsed) return
         val sized = Modifier.width(if (props.widthDp > 0) props.widthDp.dp else RAIL_DEFAULT_WIDTH)
         NxSurface(
-            NxSurfaceLevel.Floating,
+            SurfaceKind.Panel,
             sized.fillMaxHeight().padding(start = RAIL_INSET, top = RAIL_INSET, bottom = RAIL_INSET).clip(panelShape),
             panelShape,
             opacity = props.opacityPct.regionOpacity(), blurDp = props.blurDp.toFloat(),
@@ -413,7 +474,12 @@ fun ShellRightRegion(instance: WidgetInstance) {
                 onDragEnd = {
                     val collapse = widthAnim.value < (collapsedPx + expandedPx) / 2f
                     scope.launch { widthAnim.animateTo(if (collapse) collapsedPx else expandedPx) }
-                    if (collapse != props.collapsed) toggleCollapse()
+                    currentSetCollapsed(collapse)
+                },
+                // A swipe cut short goes back where the rail stands rather than
+                // staying at whatever partial width the pointer left it.
+                onDragCancel = {
+                    scope.launch { widthAnim.animateTo(if (currentlyCollapsed) collapsedPx else expandedPx) }
                 },
             )
         }
@@ -433,7 +499,7 @@ fun ShellRightRegion(instance: WidgetInstance) {
         // as the rail widens.
         if (widthAnim.value > collapsedPx + 1f) {
             NxSurface(
-                NxSurfaceLevel.Floating,
+                SurfaceKind.Panel,
                 Modifier.fillMaxSize().padding(start = RAIL_INSET, top = RAIL_INSET, bottom = RAIL_INSET).clip(panelShape),
                 panelShape,
                 opacity = props.opacityPct.regionOpacity(), blurDp = props.blurDp.toFloat(),
@@ -463,7 +529,7 @@ data class ShellTopRegionProps(
     @PropLabel("widget.appshell.topbar.heightDp") @PropRange(36.0, 72.0) val heightDp: Int = 44,
     @PropLabel("widget.appshell.topbar.cornerStyle") val cornerStyle: CornerStyle = CornerStyle.Rect,
     @PropLabel("widget.appshell.topbar.groupStyle") val groupStyle: GroupStyle = GroupStyle.LineSeparated,
-    @PropLabel("widget.appshell.topbar.opacityPct") @PropRange(-1.0, 100.0) val opacityPct: Int = CHROME_OPACITY_PCT,
+    @PropLabel("widget.appshell.topbar.opacityPct") @PropRange(-1.0, 100.0) val opacityPct: Int = -1,
     @PropLabel("widget.appshell.topbar.blurDp") @PropRange(0.0, 40.0) val blurDp: Int = 0,
     @PropLabel("widget.appshell.topbar.controls") val controls: WindowControlsMode = WindowControlsMode.Auto,
 )
@@ -478,7 +544,7 @@ private const val TOPBAR_SURFACE = "appshell.topbar"
  * [WindowControlsMode] (hidden by default on tiling WMs). removable=false --
  * losing the bar would strand window controls on a floating DE.
  */
-@Widget(id = "appshell.region.top", displayName = "widget.appshell.region.top", removable = false, propsClass = ShellTopRegionProps::class, drawsOwnSurface = true)
+@Widget(id = "appshell.region.top", enter = "none", displayName = "widget.appshell.region.top", removable = false, propsClass = ShellTopRegionProps::class, drawsOwnSurface = true)
 @Composable
 fun ShellTopRegion(instance: WidgetInstance) {
     val props = instance.rememberProps<ShellTopRegionProps>()
@@ -531,8 +597,7 @@ fun ShellTopRegion(instance: WidgetInstance) {
 
     when (props.groupStyle) {
         GroupStyle.LineSeparated -> NxSurface(
-            NxSurfaceLevel.Base, barModifier, shape,
-            borderWidthDp = 0f,
+            SurfaceKind.Chrome, barModifier, shape,
             opacity = props.opacityPct.regionOpacity(), blurDp = props.blurDp.toFloat(),
         ) {
             Row(
@@ -558,12 +623,11 @@ fun ShellTopRegion(instance: WidgetInstance) {
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             if (HOST_IS_MAC && showControls) {
-                NxSurface(NxSurfaceLevel.Base, Modifier.fillMaxHeight(), shape, borderWidthDp = 0f, opacity = props.opacityPct.regionOpacity(), blurDp = props.blurDp.toFloat()) { Caption() }
+                NxSurface(SurfaceKind.Chrome, Modifier.fillMaxHeight(), shape, opacity = props.opacityPct.regionOpacity(), blurDp = props.blurDp.toFloat()) { Caption() }
             }
             AppGlyph()
             NxSurface(
-                NxSurfaceLevel.Base, Modifier.fillMaxHeight(), shape,
-                borderWidthDp = 0f,
+                SurfaceKind.Chrome, Modifier.fillMaxHeight(), shape,
                 opacity = props.opacityPct.regionOpacity(), blurDp = props.blurDp.toFloat(),
             ) {
                 Row(Modifier.fillMaxHeight().padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -572,8 +636,7 @@ fun ShellTopRegion(instance: WidgetInstance) {
             }
             DragLane()
             NxSurface(
-                NxSurfaceLevel.Base, Modifier.fillMaxHeight(), shape,
-                borderWidthDp = 0f,
+                SurfaceKind.Chrome, Modifier.fillMaxHeight(), shape,
                 opacity = props.opacityPct.regionOpacity(), blurDp = props.blurDp.toFloat(),
             ) {
                 Row(Modifier.fillMaxHeight().padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -581,7 +644,7 @@ fun ShellTopRegion(instance: WidgetInstance) {
                 }
             }
             if (!HOST_IS_MAC && showControls) {
-                NxSurface(NxSurfaceLevel.Base, Modifier.fillMaxHeight(), shape, borderWidthDp = 0f, opacity = props.opacityPct.regionOpacity(), blurDp = props.blurDp.toFloat()) { Caption() }
+                NxSurface(SurfaceKind.Chrome, Modifier.fillMaxHeight(), shape, opacity = props.opacityPct.regionOpacity(), blurDp = props.blurDp.toFloat()) { Caption() }
             }
         }
     }
@@ -596,7 +659,7 @@ private fun AppGlyph() {
         icon = NxIcon.DarkMode,
         contentDescription = null,
         modifier = Modifier.padding(start = 10.dp, end = 6.dp),
-        tint = NxTheme.colors.primary,
+        tint = NxColor.lead(),
         size = 20.dp,
     )
 }
@@ -607,7 +670,7 @@ private fun AppGlyph() {
 private fun BarDivider() {
     VerticalDivider(
         modifier = Modifier.height(18.dp).padding(horizontal = 4.dp),
-        color = NxTheme.colors.outline,
+        color = NxInk.line,
     )
 }
 
@@ -615,10 +678,10 @@ private fun BarDivider() {
  * Body region: the nested Row of the three original shell regions (left rail,
  * center, right panel). It exists so the root surface can stack the top bar over
  * the body in a Column; the Row itself lives in the appshell.body sub-surface
- * (the orientation comes from that slot, mirroring the appshell.leftrail nesting).
+ * (the arrangement comes from that slot, mirroring the appshell.leftrail nesting).
  * removable=false -- it carries the entire app body.
  */
-@Widget(id = "appshell.region.body", displayName = "widget.appshell.region.body", removable = false)
+@Widget(id = "appshell.region.body", enter = "none", displayName = "widget.appshell.region.body", removable = false)
 @Composable
 fun ShellBodyRegion() {
     SlotRenderer(SurfaceId("appshell.body"), SlotId("content"), Modifier.fillMaxSize())

@@ -1,5 +1,6 @@
 package hivens.ui.background
 
+import hivens.ui.widgets.toWidgetColorOrNull
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -47,6 +48,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
+import hivens.ui.theme.NxColor
 
 private val log = LoggerFactory.getLogger("CustomBackground")
 
@@ -65,12 +67,25 @@ fun CustomBackground(
     modifier: Modifier = Modifier,
     mousePosProvider: () -> Offset = { Offset(0.5f, 0.5f) },
     onTone: (WallpaperTone) -> Unit = {},
+    /**
+     * Where a level set from a player widget goes, while the wallpaper is what the
+     * transport is pointed at.
+     *
+     * Narrow rather than the whole settings writer: the painter has no business
+     * writing an arbitrary setting, and the one field it can honestly own is the
+     * loudness of the thing it is playing.
+     */
+    onAudioVolume: (Float) -> Unit = {},
 ) {
     if (!settings.hasUsableImage()) {
-        LaunchedEffect(Unit) { onTone(WallpaperTone(null, null)) }
+        LaunchedEffect(Unit) { onTone(WallpaperTone.NONE) }
         return
     }
     val file = File(settings.imagePath!!)
+    // The darkening is the theme's page colour, not black: it is the one place the
+    // theme reaches a page that has a picture on it, and black left every theme
+    // looking the same over the same wallpaper.
+    val page = NxColor.page
 
     Box(modifier = modifier.fillMaxSize()) {
         AnimatedParallaxImage(
@@ -78,18 +93,20 @@ fun CustomBackground(
             settings         = settings,
             mousePosProvider = mousePosProvider,
             onTone           = onTone,
+            onAudioVolume    = onAudioVolume,
         )
 
-        // Darkening overlay
+        // Darkening overlay, in the page colour.
         if (settings.darkenAmount > 0f) {
-            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = settings.darkenAmount)))
+            Box(Modifier.fillMaxSize().background(page.copy(alpha = settings.darkenAmount)))
         }
 
         // Color tint overlay
         if (settings.tintColor != null && settings.tintOpacity > 0f) {
-            val tint = try {
-                Color(("FF" + settings.tintColor.removePrefix("#")).toLong(16))
-            } catch (_: Exception) { null }
+            // The parser every other colour the launcher reads goes through. Prefixed
+            // with FF by hand, a three-digit value parsed as a wrong colour, and an
+            // eight-digit one lost its own alpha.
+            val tint = settings.tintColor.toWidgetColorOrNull()
             if (tint != null) {
                 Box(Modifier.fillMaxSize().background(tint.copy(alpha = settings.tintOpacity)))
             }
@@ -108,7 +125,7 @@ fun CustomBackground(
                             brush = Brush.radialGradient(
                                 colors = listOf(
                                     Color.Transparent,
-                                    Color.Black.copy(alpha = settings.vignetteIntensity * 0.6f)
+                                    page.copy(alpha = settings.vignetteIntensity * 0.6f)
                                 ),
                                 center = Offset(centerX, centerY),
                                 radius = radius
@@ -129,6 +146,7 @@ private fun AnimatedParallaxImage(
     settings: BackgroundSettings,
     mousePosProvider: () -> Offset,
     onTone: (WallpaperTone) -> Unit,
+    onAudioVolume: (Float) -> Unit,
 ) {
     // Scale mode and alignment (Backdrop.kt) decide where every pixel of the
     // wallpaper lands.
@@ -146,18 +164,32 @@ private fun AnimatedParallaxImage(
     // through Skinema. Only the active branch composes, so switching media kind
     // tears down the other's decode/player state.
     val staticBitmap = resolved?.bitmap
-    // Material-You seed: static from the decoded bitmap (off-thread); video from its
-    // first decoded frame (via the player's onSeed). Either feeds the palette seed.
-    var videoSeed by remember(file) { mutableStateOf<Int?>(null) }
-    val videoPainter = if (mediaKind == BackgroundMediaKind.TimeBased)
-        rememberSkinemaFrame(file, settings.animationSpeedMultiplier, settings.loopMode, settings.hardwareDecode, onSeed = { videoSeed = it }) else null
-    // Seed + brightness in ONE pixel read (a large wallpaper is tens of MB; two reads
-    // OOM'd). Video only exposes its seed, so brightness falls back to the seed's luma.
+    // The wallpaper's colours: a still's from the decoded bitmap (off the UI thread), a
+    // video's from its first decoded frame.
+    var videoColours by remember(file) { mutableStateOf<List<Int>>(emptyList()) }
+    val videoPainter = if (mediaKind == BackgroundMediaKind.TimeBased) {
+        rememberSkinemaFrame(
+            file            = file,
+            speedMultiplier = settings.animationSpeedMultiplier,
+            loopMode        = settings.loopMode,
+            hardwareDecode  = settings.hardwareDecode,
+            audio           = settings.audio,
+            audioVolume     = settings.audioVolume,
+            link            = settings.linkToPlayers,
+            onAudioVolume   = onAudioVolume,
+            onColours       = { videoColours = it },
+        )
+    } else {
+        null
+    }
+    // Colours and brightness in ONE pixel read (a large wallpaper is tens of MB, two
+    // reads OOM'd). A video hands over only its colours, so its brightness is the luma
+    // of the first one.
     val staticTone by produceState<WallpaperTone?>(null, staticBitmap) {
         value = staticBitmap?.let { bmp -> withContext(Dispatchers.Default) { wallpaperToneFromImage(bmp) } }
     }
-    val seedArgb = staticTone?.seedArgb ?: videoSeed
-    val avgLuminance = staticTone?.avgLuminance ?: videoSeed?.let { luminanceOfArgb(it) }
+    val colours = staticTone?.colours ?: videoColours
+    val avgLuminance = staticTone?.avgLuminance ?: videoColours.firstOrNull()?.let { luminanceOfArgb(it) }
 
     val painter: Painter? = when {
         staticBitmap != null -> remember(staticBitmap) { BitmapPainter(staticBitmap) }
@@ -168,12 +200,15 @@ private fun AnimatedParallaxImage(
     // Saturation applies at the Image, so it covers the static painter and every
     // video frame alike.
     val saturationFilter = remember(settings.saturation) { bgSaturationFilter(settings.saturation) }
-    // The palette's two inputs, and nothing else. A frosted surface used to need the
+    // What the wallpaper tells the theme, and nothing else. A frosted surface used to need the
     // whole wallpaper recipe here so it could reproduce the image under itself; it
     // blurs the canvas beneath it now, so the recipe has no second reader and the
     // effect no longer re-fires on every slider tick.
-    LaunchedEffect(seedArgb, avgLuminance) {
-        onTone(WallpaperTone(seedArgb = seedArgb, avgLuminance = avgLuminance))
+    // Nothing is reported until the picture says something: an empty answer while it
+    // decodes would read as "no wallpaper" and drop the theme made from it.
+    LaunchedEffect(colours, avgLuminance) {
+        if (colours.isEmpty() && avgLuminance == null) return@LaunchedEffect
+        onTone(WallpaperTone(colours = colours, avgLuminance = avgLuminance))
     }
 
     // alpha OUTSIDE the blur (leftmost = outermost): an opacity tick then only

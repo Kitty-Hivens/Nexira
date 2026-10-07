@@ -1,0 +1,508 @@
+package hivens.ui.layout
+
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import hivens.widget.model.GRID_MAX
+import hivens.widget.model.anchorHorizontalBias
+import hivens.widget.model.anchorVerticalBias
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.floatOrNull
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.put
+
+/**
+ * The half of the ladder that runs BEFORE the graph is decoded.
+ *
+ * [Migrations] takes a `LayoutGraph` and can therefore only change what is
+ * inside one: a widget's kind, its props, where it sits. It cannot change the
+ * SHAPE of the file, because by the time it runs the decoder has already read
+ * it, and the shared Json ignores unknown keys. A field removed from the model
+ * is gone before the ladder sees it, so a structural change made there would
+ * silently drop whatever it was supposed to carry across.
+ *
+ * So structure migrates here, on the raw object, and meaning migrates there, on
+ * the decoded one. Both are keyed off the same `schema_version`, and both run on
+ * every path that reads a graph from outside this build: the layout file and an
+ * imported preset.
+ */
+internal object JsonMigrations {
+
+    /**
+     * Brings the raw `graph` object from [fromVersion] up to
+     * [LayoutReconcile.CURRENT_SCHEMA]. A version at or above the current one
+     * is returned untouched, which is also what a file this build just wrote
+     * hits.
+     */
+    fun apply(fromVersion: Int, graph: JsonObject): JsonObject {
+        require(fromVersion >= 1) { "schema_version must be >= 1, got $fromVersion" }
+        var current = graph
+        for (step in fromVersion until LayoutReconcile.CURRENT_SCHEMA) {
+            current = step(step + 1)(current)
+        }
+        return current
+    }
+
+    private fun step(toVersion: Int): (JsonObject) -> JsonObject = when (toVersion) {
+        10 -> ::collapseOrientationsIntoPlacement
+        11 -> ::wrapSlotsInGeneralFamily
+        12 -> ::dropRetiredServerLayout
+        13 -> ::compensateHomeSlotPadding
+        14 -> ::scrollTheBackgroundControls
+        // 15 adds the screens somebody made. Nothing in an older file has to move,
+        // so the step is the identity; the bump is for the other direction, where an
+        // older build would drop the list on its next write and has to open the
+        // file read-only instead.
+        else -> { it -> it }
+    }
+
+    /**
+     * The background controls scrolled because their screen wrapped the slot in a
+     * scroll. That wrap is gone and the slot says it now, so a file written before
+     * has to say it too, or the column of sixteen controls is cut at the bottom of
+     * the panel with no way to reach the rest.
+     *
+     * Every family of the surface, and whatever the slot holds: the scroll was the
+     * screen's and applied to whatever the reader had put there. A slot that
+     * already names a viewport keeps it.
+     */
+    private fun scrollTheBackgroundControls(graph: JsonObject): JsonObject {
+        val surfaces = graph["surfaces"]?.asObjectOrNull() ?: return graph
+        val bg = surfaces[BG_SURFACE]?.asObjectOrNull() ?: return graph
+        val families = bg["families"]?.asObjectOrNull() ?: return graph
+        val newFamilies = families.mapValues { (_, family) ->
+            val obj = family.asObjectOrNull() ?: return@mapValues family
+            val slots = obj["slots"]?.asObjectOrNull() ?: return@mapValues family
+            val controls = slots[BG_SLOT]?.asObjectOrNull() ?: return@mapValues family
+            if (controls["viewport"].let { it != null && it !is JsonNull }) return@mapValues family
+            val scrolled = buildJsonObject {
+                controls.forEach { (k, v) -> if (k != "viewport") put(k, v) }
+                put("viewport", buildJsonObject {
+                    put("kind", "scroll")
+                    put("axis", "vertical")
+                })
+            }
+            buildJsonObject {
+                obj.forEach { (k, v) -> if (k != "slots") put(k, v) }
+                put("slots", JsonObject(slots + (BG_SLOT to scrolled)))
+            }
+        }
+        if (JsonObject(newFamilies) == families) return graph
+        val newBg = buildJsonObject {
+            bg.forEach { (k, v) -> if (k != "families") put(k, v) }
+            put("families", JsonObject(newFamilies))
+        }
+        return buildJsonObject {
+            graph.forEach { (k, v) -> if (k != "surfaces") put(k, v) }
+            put("surfaces", JsonObject(surfaces + (BG_SURFACE to newBg)))
+        }
+    }
+
+    private const val BG_SURFACE = "bg.settings"
+    private const val BG_SLOT = "controls"
+
+    // The home slot dropped its blanket 24/20 padding: widgets own their spacing
+    // now, carried on each placement. A widget placed against that padded inner edge
+    // would jump toward the window by that much, so this puts the same gap back on
+    // each PLACED widget as its own padding, on the side its anchor counts from, and
+    // the arrangement is preserved while the gap becomes the widget's to change. Only
+    // a placement slot (flow explicitly null) carries offsets to compensate; the
+    // bundled flow default is seeded with its own padding instead and is left alone.
+    private const val HOME_SLOT_PAD_H = 24f
+    private const val HOME_SLOT_PAD_V = 20f
+    private val PLACEMENT_SLOTS_OWNER = "home.new"
+
+    private fun compensateHomeSlotPadding(graph: JsonObject): JsonObject {
+        val surfaces = graph["surfaces"]?.asObjectOrNull() ?: return graph
+        val home = surfaces[PLACEMENT_SLOTS_OWNER]?.asObjectOrNull() ?: return graph
+        val families = home["families"]?.asObjectOrNull() ?: return graph
+        val newFamilies = families.mapValues { (_, fam) -> compensateFamilyMain(fam) }
+        // Identity when nothing was compensated (no home.new, a flow main, no placed
+        // widgets), so a file that needs no change is handed back the same object the
+        // ladder's own no-op contract rests on.
+        if (JsonObject(newFamilies) == families) return graph
+        val newHome = buildJsonObject {
+            home.forEach { (k, v) -> if (k != "families") put(k, v) }
+            put("families", JsonObject(newFamilies))
+        }
+        return buildJsonObject {
+            graph.forEach { (k, v) -> if (k != "surfaces") put(k, v) }
+            put("surfaces", JsonObject(surfaces + (PLACEMENT_SLOTS_OWNER to newHome)))
+        }
+    }
+
+    private fun compensateFamilyMain(family: JsonElement): JsonElement {
+        val obj = family.asObjectOrNull() ?: return family
+        val slots = obj["slots"]?.asObjectOrNull() ?: return family
+        val main = slots["main"]?.asObjectOrNull() ?: return family
+        // Placement mode is flow explicitly null. A flow slot has offsets nowhere to
+        // compensate and keeps the padding the seed gives it.
+        if (main["flow"] !is JsonNull) return family
+        val widgets = main["widgets"]?.jsonArrayOrNull() ?: return family
+        val newMain = buildJsonObject {
+            main.forEach { (k, v) -> if (k != "widgets") put(k, v) }
+            put("widgets", JsonArray(widgets.map { compensatePlacedWidget(it) }))
+        }
+        return buildJsonObject {
+            obj.forEach { (k, v) -> if (k != "slots") put(k, v) }
+            put("slots", JsonObject(slots + ("main" to newMain)))
+        }
+    }
+
+    private fun compensatePlacedWidget(widget: JsonElement): JsonElement {
+        val obj = widget.asObjectOrNull() ?: return widget
+        val placement = obj["placement"]?.asObjectOrNull() ?: return widget
+        val anchor = (placement["anchor"] as? JsonPrimitive)?.contentOrNull ?: "topStart"
+        val hBias = anchorHorizontalBias(anchor)
+        val vBias = anchorVerticalBias(anchor)
+        // The side the offset counts from is the side the removed padding sat on. A
+        // centred axis does not move under symmetric padding, so it gets nothing.
+        val addStart = if (hBias < 0.5f) HOME_SLOT_PAD_H else 0f
+        val addEnd = if (hBias > 0.5f) HOME_SLOT_PAD_H else 0f
+        val addTop = if (vBias < 0.5f) HOME_SLOT_PAD_V else 0f
+        val addBottom = if (vBias > 0.5f) HOME_SLOT_PAD_V else 0f
+        // A widget centred on both axes moves nowhere under symmetric padding, so it
+        // is handed back unchanged rather than gaining an empty padding record.
+        if (addStart == 0f && addEnd == 0f && addTop == 0f && addBottom == 0f) return widget
+        val existing = placement["padding"]?.asObjectOrNull()
+        fun eff(side: String): Float =
+            (existing?.get(side) as? JsonPrimitive)?.floatOrNull
+                ?: (existing?.get("all") as? JsonPrimitive)?.floatOrNull ?: 0f
+        val start = eff("start") + addStart
+        val end = eff("end") + addEnd
+        val top = eff("top") + addTop
+        val bottom = eff("bottom") + addBottom
+        val newPadding = buildJsonObject {
+            if (start != 0f) put("start", JsonPrimitive(start))
+            if (end != 0f) put("end", JsonPrimitive(end))
+            if (top != 0f) put("top", JsonPrimitive(top))
+            if (bottom != 0f) put("bottom", JsonPrimitive(bottom))
+        }
+        val newPlacement = buildJsonObject {
+            placement.forEach { (k, v) -> if (k != "padding") put(k, v) }
+            put("padding", newPadding)
+        }
+        return buildJsonObject {
+            obj.forEach { (k, v) -> if (k != "placement") put(k, v) }
+            put("placement", newPlacement)
+        }
+    }
+
+    /**
+     * The surfaces the SmartyCraft server list stood on, and the widgets that
+     * only ever drew on them, leave with it.
+     *
+     * A surface nothing mounts is not inert: it still holds whatever the reader
+     * arranged on it, the editor still lists it, and its widgets still count
+     * against a graph that is loaded and written on every change. Dropped here
+     * rather than left to the registry-aware pass, because that one reaps widget
+     * KINDS it does not recognise and has nothing to say about a surface.
+     *
+     * The kinds go here too, and that is not a duplicate of the pass. The pass
+     * prunes only after a schema bump, and only on the layout FILE; a preset
+     * carrying a retired kind is reconciled without it and writes the kind back
+     * into a graph that is already current, where nothing will ever reap it. So
+     * a reader who once dragged the server banner onto the right rail and saved
+     * a preset would carry an invisible hole between machines forever.
+     *
+     * Named explicitly rather than derived from the bundled layout: a surface or
+     * kind absent from the default is not necessarily retired, and a build that
+     * simply failed to load its own default would otherwise take the reader's
+     * arrangement with it.
+     */
+    private fun dropRetiredServerLayout(graph: JsonObject): JsonObject {
+        val surfaces = graph["surfaces"]?.asObjectOrNull() ?: return graph
+        val kept = surfaces
+            .filterKeys { it !in RETIRED_SURFACES }
+            .mapValues { (_, layout) -> dropRetiredKinds(layout) }
+        if (JsonObject(kept) == surfaces) return graph
+        return buildJsonObject {
+            graph.forEach { (key, value) -> if (key != "surfaces") put(key, value) }
+            put("surfaces", JsonObject(kept))
+        }
+    }
+
+    /** Every slot of every family, plus the nested slots a container carries. */
+    private fun dropRetiredKinds(layout: JsonElement): JsonElement {
+        val obj = layout.asObjectOrNull() ?: return layout
+        val families = obj["families"]?.asObjectOrNull() ?: return layout
+        return buildJsonObject {
+            obj.forEach { (key, value) -> if (key != "families") put(key, value) }
+            put("families", JsonObject(families.mapValues { (_, family) -> filterFamily(family) }))
+        }
+    }
+
+    private fun filterFamily(family: JsonElement): JsonElement {
+        val obj = family.asObjectOrNull() ?: return family
+        val slots = obj["slots"]?.asObjectOrNull() ?: return family
+        return buildJsonObject {
+            obj.forEach { (key, value) -> if (key != "slots") put(key, value) }
+            put("slots", JsonObject(slots.mapValues { (_, slot) -> filterSlot(slot) }))
+        }
+    }
+
+    private fun filterSlot(slot: JsonElement): JsonElement {
+        val obj = slot.asObjectOrNull() ?: return slot
+        val widgets = obj["widgets"]?.jsonArrayOrNull() ?: return slot
+        val kept = widgets
+            .filter { (it.asObjectOrNull()?.get("kind") as? JsonPrimitive)?.contentOrNull !in RETIRED_KINDS }
+            .map { filterWidget(it) }
+        return buildJsonObject {
+            obj.forEach { (key, value) -> if (key != "widgets") put(key, value) }
+            put("widgets", JsonArray(kept))
+        }
+    }
+
+    private fun filterWidget(widget: JsonElement): JsonElement {
+        val obj = widget.asObjectOrNull() ?: return widget
+        val children = obj["children"]?.asObjectOrNull() ?: return widget
+        return buildJsonObject {
+            obj.forEach { (key, value) -> if (key != "children") put(key, value) }
+            put("children", JsonObject(children.mapValues { (_, child) -> filterSlot(child) }))
+        }
+    }
+
+    private fun JsonElement.jsonArrayOrNull(): JsonArray? = this as? JsonArray
+
+    private val RETIRED_SURFACES = setOf("home.classic", "server.details")
+
+    private val RETIRED_KINDS = setOf(
+        "home.classic.content",
+        "server.details.title",
+        "server.details.tagbar",
+        "server.details.description",
+        "server.details.banner",
+    )
+
+    /**
+     * A surface's slots become one family's slots, named `general`.
+     *
+     * Everything a file written before families describes is what the surface
+     * shows when nothing has asked for anything else, which is exactly what the
+     * general family is. So the step is a wrap and not a translation: the slot map
+     * moves down one level under a name it already had implicitly, and no widget,
+     * position or arrangement is touched.
+     *
+     * Only the top level moves. A container widget's `children` still keys slots
+     * directly, because a family is a property of a SURFACE -- the thing code
+     * navigates and swaps -- and a widget nested inside one is already inside
+     * whichever family is showing it.
+     */
+    private fun wrapSlotsInGeneralFamily(graph: JsonObject): JsonObject {
+        val surfaces = graph["surfaces"]?.asObjectOrNull() ?: return graph
+        return buildJsonObject {
+            graph.forEach { (key, value) -> if (key != "surfaces") put(key, value) }
+            put("surfaces", JsonObject(surfaces.mapValues { (_, layout) -> wrapSurface(layout) }))
+        }
+    }
+
+    private fun wrapSurface(layout: JsonElement): JsonElement {
+        val obj = layout.asObjectOrNull() ?: return layout
+        // Already wrapped: a hand-edited file, or one this build wrote and then
+        // re-read through a lower stamp. Wrapping twice would bury the reader's
+        // arrangement under a family nothing renders.
+        if (obj["families"] != null) return layout
+        val slots = obj["slots"] ?: JsonObject(emptyMap())
+        return buildJsonObject {
+            obj.forEach { (key, value) -> if (key != "slots") put(key, value) }
+            put(
+                "families",
+                buildJsonObject {
+                    put("general", buildJsonObject { put("slots", slots) })
+                },
+            )
+        }
+    }
+
+    /**
+     * Five slot orientations become one flow with a direction and a line length,
+     * plus one placement mode with a unit, and three per-widget position fields
+     * become one record.
+     *
+     * The mapping is one to one in both directions, so nothing is lost and no
+     * arrangement moves. A stack is a vertical flow, a row a horizontal one, a
+     * grid a horizontal flow that wraps into equal cells, a canvas a placement
+     * slot measuring in dp, and a cube grid a placement slot measuring in cells
+     * of the lattice its column count already described.
+     *
+     * The widget's own record is read against its slot's OLD orientation,
+     * because that is what decided which of `weight`, `canvas` and `cell` meant
+     * anything. A widget carrying all three (which the old model allowed, and
+     * which flipping a slot back and forth produced) keeps the one its slot was
+     * actually reading and drops the rest, which is the same answer the renderer
+     * was giving on screen.
+     */
+    private fun collapseOrientationsIntoPlacement(graph: JsonObject): JsonObject {
+        val surfaces = graph["surfaces"]?.asObjectOrNull() ?: return graph
+        return buildJsonObject {
+            graph.forEach { (key, value) -> if (key != "surfaces") put(key, value) }
+            put("surfaces", JsonObject(surfaces.mapValues { (_, layout) -> migrateSurface(layout) }))
+        }
+    }
+
+    private fun migrateSurface(layout: JsonElement): JsonElement {
+        val obj = layout.asObjectOrNull() ?: return layout
+        val slots = obj["slots"]?.asObjectOrNull() ?: return layout
+        return buildJsonObject {
+            obj.forEach { (key, value) -> if (key != "slots") put(key, value) }
+            put("slots", JsonObject(slots.mapValues { (_, slot) -> migrateSlot(slot) }))
+        }
+    }
+
+    private fun migrateSlot(slot: JsonElement): JsonElement {
+        val obj = slot.asObjectOrNull() ?: return slot
+        val orientation = obj["orientation"]?.asStringOrNull()?.trim().orEmpty()
+        // Clamped exactly where the old renderer clamped it. It read the column
+        // count as coerceAtLeast(1), so a zero or a negative in a hand-edited file
+        // drew a one-column grid; carrying the raw number across would turn that
+        // into a free slot measuring in dp, and a cell address of (3, 2) would be
+        // read as three dp by two.
+        val columns = obj.int("gridColumns", LEGACY_DEFAULT_COLUMNS).coerceIn(1, GRID_MAX)
+
+        // A slot whose widgets are not a list is not a slot. Emptying it here would
+        // hand the user a blank pane with no word said, where before the decoder
+        // threw and the repository fell back to the bundled default with a line in
+        // the log. The throw is the honest answer and the caller already catches it.
+        val widgets = obj["widgets"]?.let {
+            it.asArrayOrNull() ?: throw IllegalArgumentException("a slot's widgets must be a list, got ${it::class.simpleName}")
+        } ?: JsonArray(emptyList())
+        val migrated = widgets.map { migrateWidget(it, orientation) }
+
+        return buildJsonObject {
+            // Anything this step does not own is carried across at every level, not
+            // only on the widget: the step rewrites a shape and does not get to
+            // decide what else a newer build put beside it.
+            obj.forEach { (key, value) -> if (key !in RETIRED_SLOT_KEYS) put(key, value) }
+            put("widgets", JsonArray(migrated))
+            when (orientation) {
+                "Canvas" -> {
+                    put("flow", JsonNull)
+                    put("grid", 0)
+                }
+                "CubeGrid" -> {
+                    put("flow", JsonNull)
+                    put("grid", columns)
+                }
+                "Grid" -> {
+                    put("flow", flowOf(horizontal = true, wrap = columns, uniform = true))
+                    put("grid", 0)
+                }
+                "Row" -> {
+                    put("flow", flowOf(horizontal = true, wrap = 0, uniform = false))
+                    put("grid", 0)
+                }
+                // Column, the sentinel a newer build's value folded to, an absent
+                // key, and anything unrecognised. All of them rendered as a plain
+                // column before this step, so all of them become one.
+                else -> {
+                    put("flow", flowOf(horizontal = false, wrap = 0, uniform = false))
+                    put("grid", 0)
+                }
+            }
+        }
+    }
+
+    private fun migrateWidget(widget: JsonElement, slotOrientation: String): JsonElement {
+        val obj = widget.asObjectOrNull() ?: return widget
+        val placement = placementFor(obj, slotOrientation)
+
+        return buildJsonObject {
+            // Everything the widget carried that this step does not own is copied
+            // across untouched, including keys a newer build may have added: the
+            // step rewrites a shape, it does not get to decide what else belongs.
+            obj.forEach { (key, value) ->
+                if (key !in RETIRED_WIDGET_KEYS) put(key, value)
+            }
+            obj["children"]?.asObjectOrNull()?.let { children ->
+                put("children", JsonObject(children.mapValues { (_, c) -> migrateSlot(c) }))
+            }
+            if (placement != null) put("placement", placement)
+        }
+    }
+
+    private fun placementFor(widget: JsonObject, slotOrientation: String): JsonObject? {
+        val weight = widget.float("weight")
+        val canvas = widget["canvas"]?.asObjectOrNull()
+        val cell = widget["cell"]?.asObjectOrNull()
+
+        return when (slotOrientation) {
+            "CubeGrid" -> cell?.let {
+                placement(
+                    x = it.float("col"), y = it.float("row"),
+                    width = it.float("colSpan", 1f), height = it.float("rowSpan", 1f),
+                    z = it.int("z"),
+                )
+            }
+            "Canvas" -> canvas?.let {
+                placement(
+                    x = it.float("x"), y = it.float("y"),
+                    width = it.float("width"), height = it.float("height"),
+                    z = it.int("z"),
+                )
+            }
+            // A flow read the weight first and the canvas size as an upper bound.
+            // The offset and the layer meant nothing there, so they are not carried:
+            // writing them would make a widget that had merely visited a canvas look
+            // deliberately placed to every later reader.
+            else -> {
+                val w = canvas?.float("width") ?: 0f
+                val h = canvas?.float("height") ?: 0f
+                if (weight <= 0f && w <= 0f && h <= 0f) null
+                else placement(width = w, height = h, weight = weight)
+            }
+        }
+    }
+
+    private fun placement(
+        x: Float = 0f,
+        y: Float = 0f,
+        width: Float = 0f,
+        height: Float = 0f,
+        z: Int = 0,
+        weight: Float = 0f,
+    ): JsonObject = buildJsonObject {
+        put("anchor", "topStart")
+        put("x", x)
+        put("y", y)
+        put("width", width)
+        put("height", height)
+        put("z", z)
+        put("weight", weight)
+    }
+
+    private fun flowOf(horizontal: Boolean, wrap: Int, uniform: Boolean): JsonObject = buildJsonObject {
+        put("direction", if (horizontal) "horizontal" else "vertical")
+        put("wrap", wrap)
+        put("uniform", uniform)
+    }
+
+    /** What the old shape kept per widget and the new one folds into `placement`. */
+    private val RETIRED_WIDGET_KEYS = setOf("weight", "canvas", "cell", "children")
+
+    /** What the old shape kept per slot and the new one says as a flow and a unit. */
+    private val RETIRED_SLOT_KEYS = setOf("orientation", "gridColumns", "widgets")
+
+    /** The old default column count, which a file written before the key existed implies. */
+    private const val LEGACY_DEFAULT_COLUMNS = 2
+
+    // ── Reading a file somebody may have edited by hand ──────────────────
+
+    private fun JsonElement.asObjectOrNull(): JsonObject? = this as? JsonObject
+
+    private fun JsonElement.asArrayOrNull(): JsonArray? = this as? JsonArray
+
+    private fun JsonElement.asStringOrNull(): String? =
+        (this as? JsonPrimitive)?.takeIf { it.isString }?.content
+
+    // A number somewhere a number was expected, or the fallback. Guarded against a
+    // nested object rather than left to throw: the accessor beside these already
+    // forgives a wrong shape, and one field of one widget must not take a file down.
+    private fun JsonObject.float(key: String, fallback: Float = 0f): Float =
+        (this[key] as? JsonPrimitive)?.floatOrNull ?: fallback
+
+    private fun JsonObject.int(key: String, fallback: Int = 0): Int =
+        (this[key] as? JsonPrimitive)?.intOrNull ?: fallback
+}

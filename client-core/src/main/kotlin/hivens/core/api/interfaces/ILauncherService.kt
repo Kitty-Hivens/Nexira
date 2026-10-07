@@ -1,6 +1,5 @@
 package hivens.core.api.interfaces
 
-import hivens.core.api.model.ServerProfile
 import hivens.core.data.CachedManifestSnapshot
 import hivens.core.data.InstanceRuntime
 import hivens.core.data.LauncherLogType
@@ -10,46 +9,9 @@ import java.nio.file.Path
 
 interface ILauncherService {
     /**
-     * Assembles and spawns the Minecraft launch process; returns a
-     * [SpawnResult] -- [SpawnResult.Started] with the process handle, or
-     * [SpawnResult.Failed] carrying the semantic launch error.
-     */
-    @Deprecated(
-        "Deprecated since 2.4.0; removed in 2.5.0 at the latest. The SmartyCraft server list is being retired: a pack is the unit of content, and the raw-server path duplicates install, sync and launch with an older, weaker set of guarantees (see #318). New work belongs on launchPackClient.",
-        level = DeprecationLevel.WARNING,
-    )
-    suspend fun launchClient(
-        sessionData: SessionData,
-        serverProfile: ServerProfile,
-        clientRootPath: Path,
-        javaExecutablePath: Path,
-    ): SpawnResult
-
-    /** Same as [launchClient], plus streams stdout / stderr through [onLog]. */
-    @Deprecated(
-        "Deprecated since 2.4.0; removed in 2.5.0 at the latest. The SmartyCraft server list is being retired: a pack is the unit of content, and the raw-server path duplicates install, sync and launch with an older, weaker set of guarantees (see #318). New work belongs on launchPackClient.",
-        level = DeprecationLevel.WARNING,
-    )
-    suspend fun launchClientWithLogs(
-        sessionData: SessionData,
-        serverProfile: ServerProfile,
-        clientRootPath: Path,
-        javaExecutablePath: Path,
-        adaptiveEnabled: Boolean = false,
-        onLog: (String, LauncherLogType) -> Unit,
-    ): SpawnResult
-
-    /**
-     * Pack-centric launch path. Spawns the JVM against a Hivens
-     * mirror pack instance, using the [runtime] settings (heap, JVM
-     * args, java path) tied to the [PackInstance] and the static
+     * Spawns the JVM against a pack instance, using the [runtime] settings
+     * (heap, JVM args, java path) tied to the [PackInstance] and the static
      * [manifest] snapshot recorded at install / sync time.
-     *
-     * The legacy [launchClient] / [launchClientWithLogs] path is SC
-     * server-centric and reaches for per-server [InstanceProfile]
-     * data via the legacy [hivens.launcher.ProfileManager]; this
-     * method is the equivalent for pack-centric instances and bypasses
-     * that whole branch.
      *
      * @param sessionData      Player session (player name, uuid,
      *                         accessToken). Pack-centric mirror packs

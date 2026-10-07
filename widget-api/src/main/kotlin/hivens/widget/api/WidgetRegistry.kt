@@ -1,10 +1,12 @@
 package hivens.widget.api
 
 import androidx.compose.runtime.Composable
+import hivens.widget.model.Entrance
 import hivens.widget.model.SlotId
 import hivens.widget.model.SurfaceSpec
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
+import hivens.widget.model.WidgetSizing
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.JsonObject
 
@@ -61,6 +63,19 @@ interface WidgetDescriptor {
     val injects: Set<String>
         get() = emptySet()
 
+    // What this widget needs, wants and can use, per axis. Populated by the KSP
+    // processor from @Widget(minWidth = ..., prefWidth = ..., ...). Undeclared by
+    // default, which reads as "no floor, no ceiling, content decides" everywhere
+    // it is consulted. See [hivens.widget.model.WidgetSizing].
+    val sizing: WidgetSizing
+        get() = WidgetSizing.UNDECLARED
+
+    // How this widget arrives when its surface opens. Populated by the KSP
+    // processor from @Widget(enter = ...). Null is [Entrance.DEFAULT]. See
+    // [resolveEntrance] for how it meets an instance's own.
+    val defaultEntrance: Entrance?
+        get() = null
+
     @Composable
     fun Render(instance: WidgetInstance)
 }
@@ -87,3 +102,12 @@ interface WidgetRegistry {
  */
 fun WidgetDescriptor.resolveSurface(instance: WidgetInstance): SurfaceSpec? =
     instance.surface ?: defaultSurface
+
+/**
+ * How an instance arrives: its own character if it names one this build knows,
+ * otherwise its widget's declaration, otherwise [Entrance.DEFAULT]. Same order as
+ * [resolveSurface]. An id from a newer build that this one does not know falls
+ * through to the declaration rather than to nothing.
+ */
+fun WidgetDescriptor.resolveEntrance(instance: WidgetInstance): Entrance =
+    Entrance.parse(instance.motion?.enter) ?: defaultEntrance ?: Entrance.DEFAULT

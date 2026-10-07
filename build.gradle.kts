@@ -93,34 +93,41 @@ subprojects {
             dependencies.add("testImplementation", dependencies.platform(rootProject.libs.junit.bom))
 
             configure<JavaPluginExtension> {
-                sourceCompatibility = JavaVersion.VERSION_26
-                targetCompatibility = JavaVersion.VERSION_26
-                // Vendor-loose toolchain pin: any JDK 26 distribution works
+                sourceCompatibility = JavaVersion.VERSION_27
+                targetCompatibility = JavaVersion.VERSION_27
+                // Vendor-loose toolchain pin: any JDK 27 distribution works
                 // (Liberica is the project's documented choice and what CI
                 // pulls via JAVA_DISTRIBUTION=liberica, but Temurin / Zulu /
                 // Microsoft / etc. are all fine locally). Pinning the
                 // languageVersion is what makes new contributors with
-                // JDK <26 on PATH auto-download a 26 via the
+                // JDK <27 on PATH auto-download a 27 via the
                 // foojay-resolver-convention plugin in settings.gradle.kts
                 // instead of failing with cryptic "no matching toolchain"
                 // errors. Game-side JRE is provisioned separately by
                 // JavaManagerService (Liberica) and is independent of this.
                 toolchain {
-                    languageVersion.set(JavaLanguageVersion.of(26))
+                    languageVersion.set(JavaLanguageVersion.of(27))
                 }
             }
         }
         // Kotlin's compilerOptions.jvmTarget defaults to JVM_1_8 if a
         // subproject's build script does not set it. A new module added
-        // without explicit kotlin { jvmToolchain(26) } / compilerOptions {
-        // jvmTarget = JVM_26 } would silently produce JVM 1.8 bytecode
-        // while loading Java 26 classes from dependencies -- an at-runtime
+        // without explicit kotlin { jvmToolchain(27) } / compilerOptions {
+        // jvmTarget = JVM_27 } would silently produce JVM 1.8 bytecode
+        // while loading Java 27 classes from dependencies -- an at-runtime
         // LinkageError waiting to happen, invisible until a 9+-only API
         // gets touched. Force-set on every Kotlin/JVM compile task so the
         // bytecode floor always matches the Java target above.
+        //
+        // Warnings are errors, test sources included. A warning nobody has to act
+        // on is one nobody reads: the build had grown eighty-odd of them, and a new
+        // one that mattered would have scrolled past with the rest. A warning that
+        // is right to keep is answered where it stands, with an opt-in or a
+        // suppression that says why, rather than left for the next reader.
         tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile>().configureEach {
             compilerOptions {
-                jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_26)
+                jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_27)
+                allWarningsAsErrors.set(true)
             }
         }
     }
@@ -193,6 +200,16 @@ subprojects {
         // reaching it means stuck, not slow.
         systemProperty("junit.jupiter.execution.timeout.default", "2m")
         systemProperty("junit.jupiter.execution.timeout.thread.mode.default", "SEPARATE_THREAD")
+
+        // Probe switches reach the test worker. Gradle does not forward -D to a
+        // forked test JVM, so the invocation the probes document in their own
+        // KDoc was true only through the environment-variable half of it, and a
+        // probe asked for by system property quietly did not run.
+        // systemPropertiesPrefixedBy registers the read with the configuration
+        // cache, for the same reason the CI flag above goes through a provider.
+        providers.systemPropertiesPrefixedBy("nexira.probe.").get().forEach { (key, value) ->
+            systemProperty(key, value)
+        }
 
         // A deadlocked test worker is worse than a failing one: GitHub withholds
         // a job's log until the job ends, so a hang yields no test report and no

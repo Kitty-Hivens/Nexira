@@ -8,7 +8,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import hivens.ui.i18n.EnglishStrings
@@ -19,6 +18,7 @@ import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertTrue
+import hivens.ui.theme.NxColor
 
 /**
  * The digit cells carry the code itself, so "invisible under some style" is the one
@@ -66,12 +66,12 @@ class ConfirmCodeCellsRenderTest {
         val scene = ImageComposeScene(width = width, height = height, density = Density(1f)) {
             // The real theme entry point rather than a hand-provided palette, so the
             // sheet shows what the app resolves, tonal ladder included.
-            NxTheme(useDarkTheme = dark) {
+            NxTheme(dark = dark) {
                 CompositionLocalProvider(
                     LocalStrings provides EnglishStrings,
                 ) {
                     Column(
-                        modifier = Modifier.fillMaxSize().background(NxTheme.colors.background).padding(16.dp),
+                        modifier = Modifier.fillMaxSize().background(NxColor.page).padding(16.dp),
                     ) { Cells() }
                 }
             }

@@ -22,10 +22,16 @@ data class StoredAccount(
 interface AccountStore : ICredentialStore {
 
     /**
-     * Persist [session] as the [providerId] account and make it active. No-op when
-     * the accessToken is blank (an offline identity carries nothing to store).
+     * Persist [session] as the [providerId] account and, unless [makeActive] says
+     * otherwise, make it active. No-op when the accessToken is blank (an offline
+     * identity carries nothing to store).
+     *
+     * [makeActive] false is for a write that has to land without being a choice of
+     * account. A refresh token the provider has just rotated is the only one that
+     * still works, so it is saved, but a refresh at startup is not the user picking
+     * that account, and only an interactive sign-in should move the active slot.
      */
-    fun saveAccount(session: SessionData, providerId: String)
+    fun saveAccount(session: SessionData, providerId: String, makeActive: Boolean = true)
 
     /**
      * Records that [providerId]'s account answers to a second factor, so nothing
@@ -52,9 +58,6 @@ interface AccountStore : ICredentialStore {
      */
     fun clearTwoFactor(providerId: String)
 
-    /** Active-account shim for [ICredentialStore] writers; infers the provider from the session shape. */
-    fun save(session: SessionData)
-
     fun listAccounts(): List<StoredAccount>
 
     fun activeAccountId(): String?
@@ -72,11 +75,17 @@ interface AccountStore : ICredentialStore {
      */
     fun primarySession(preferredProviderId: String? = null): SessionData?
 
-    fun loadSession(accountId: String): SessionData?
+    /**
+     * The stored session of one account. An account is its provider and its id
+     * together: the id is the uuid, or the player name without one, so two
+     * providers can share it.
+     */
+    fun loadSession(providerId: String, accountId: String): SessionData?
 
     fun setActive(accountId: String)
 
-    fun removeAccount(accountId: String)
+    /** Removes [providerId]'s account [accountId] and its secrets, and no other provider's. */
+    fun removeAccount(providerId: String, accountId: String)
 
     /** Wipe every account's secrets and the file. */
     fun clear()

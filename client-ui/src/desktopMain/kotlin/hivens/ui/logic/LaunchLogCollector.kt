@@ -55,6 +55,7 @@ fun LaunchLogCollector(
                     LogType.INFO,
                 )
                 is LaunchLogEvent.OfflineSkipAuth -> gameConsole.append(s.stateOfflineSkipAuth, LogType.WARN)
+                is LaunchLogEvent.UnboundOffline -> gameConsole.append(s.stateUnboundOffline, LogType.INFO)
                 is LaunchLogEvent.AuthSucceeded -> gameConsole.append(s.authSuccess(event.uuid), LogType.INFO)
                 is LaunchLogEvent.NoPassword -> gameConsole.append(s.stateNoPassword, LogType.WARN)
                 is LaunchLogEvent.AuthFailed -> gameConsole.append(
@@ -109,9 +110,8 @@ private fun localizeError(error: LaunchError, s: AppStrings): String = when (err
     is LaunchError.Internal             -> s.stateError(error.message)
     is LaunchError.ContentChangedDuringLaunch -> s.stateContentChanged
     is LaunchError.OfflineNoClient      -> s.stateOfflineNoClient
-    is LaunchError.OfflineNoManifest    -> s.stateOfflineNoManifest
     is LaunchError.TwoFactorExpired     -> s.auth2faExpired
-    is LaunchError.HelperUnavailable    -> s.stateHelperUnavailable(error.mcVersion)
     is LaunchError.AuthlibUnavailable   -> s.stateAuthlibUnavailable(error.mcVersion)
     is LaunchError.MissingAuthProvider  -> s.stateMissingAuthProvider(error.providerKey)
+    is LaunchError.InstanceBusy         -> s.notifReasonInstanceBusy
 }

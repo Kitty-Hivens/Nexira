@@ -1,8 +1,16 @@
 package hivens.launcher.component
 
 import hivens.core.data.LauncherLogType
+import java.io.ByteArrayInputStream
+import java.io.PipedInputStream
+import java.io.PipedOutputStream
+import java.util.Collections
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 /**
  * Covers the line-level classifier in [ProcessLogHandler]. The pipe
@@ -207,5 +215,30 @@ class ProcessLogHandlerTest {
             listOf("a".repeat(10), "$esc[93m"),
             assemble("a".repeat(10) + "$esc[93m", maxLen = 12, starveThreshold = 10_000),
         )
+    }
+
+    // ── drain hook ──────────────────────────────────────────────────────────
+
+    @Test fun `the drain hook waits for both streams and runs after their last line`() {
+        val lines = Collections.synchronizedList(mutableListOf<String>())
+        val drained = CountDownLatch(1)
+        var linesAtDrain = -1
+        val stderrWriter = PipedOutputStream()
+        val stderr = PipedInputStream(stderrWriter)
+
+        ProcessLogHandler().attachStreams(
+            stdout = ByteArrayInputStream("out\n".toByteArray()),
+            stderr = stderr,
+            onLog = { text, _ -> lines += text },
+            onDrained = { linesAtDrain = lines.size; drained.countDown() },
+        )
+
+        // stdout has ended, stderr is still open: a child of the game can hold
+        // a stream past the game's own exit, and what it writes is still masked.
+        assertFalse(drained.await(300, TimeUnit.MILLISECONDS))
+        stderrWriter.write("err\n".toByteArray())
+        stderrWriter.close()
+        assertTrue(drained.await(5, TimeUnit.SECONDS))
+        assertEquals(2, linesAtDrain)
     }
 }

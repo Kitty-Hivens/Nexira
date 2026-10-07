@@ -18,12 +18,13 @@ import hivens.launcher.instance.PackInstanceService
 import hivens.launcher.update.PackUpdateService
 import hivens.ui.utils.humanSize
 import hivens.ui.components.DestructiveConfirmDialog
+import hivens.ui.components.rememberPackDeleteBlock
 import hivens.ui.components.rememberRunningPackGuard
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
-import hivens.ui.nx.NxRow
-import hivens.ui.nx.NxSection
+import hivens.ui.nx.NxSettingGroup
+import hivens.ui.nx.NxSettingRow
 import hivens.ui.platform.SystemActions
 import hivens.ui.puppet.PuppetClick
 import kotlinx.coroutines.CoroutineScope
@@ -35,7 +36,7 @@ import java.nio.file.Path
  * Storage + lifecycle: open the instance folder (with its on-disk size), verify
  * and repair its files, detach a remote instance into a Local copy, and the
  * destructive delete. The delete and detach both go through [PackInstanceService]
- * so file/registry ordering lives in one place; deleting closes the window since
+ * so file/registry ordering lives in one place; deleting closes the sheet since
  * the pack is gone.
  *
  * Repair sits here rather than under Version because it is an operation on the
@@ -45,7 +46,7 @@ import java.nio.file.Path
  * not touched, so it is a repair rather than a reset.
  *
  * It runs through [PackOperationService], which owns it for as long as it takes:
- * a repair walks the whole pack and outlives the window that asked for it, and
+ * a repair walks the whole pack and outlives the sheet that asked for it, and
  * only one operation at a time may rewrite an instance.
  */
 @Composable
@@ -60,8 +61,8 @@ internal fun PackDataSection(
     val updates: PackUpdateService = koinInject()
     val operations: PackOperationService = koinInject()
     val sizes: InstanceSizeService = koinInject()
-    // Both actions here rewrite the instance and outlive this window: deleting it
-    // makes the screen behind resolve to a dead end, which disposes the window --
+    // Both actions here rewrite the instance and outlive this sheet: deleting it
+    // makes the screen behind resolve to a dead end, which disposes the sheet --
     // and on the composition's scope that cancelled the delete's own tail, so the
     // size entry for an instance that no longer exists was left behind.
     val scope: CoroutineScope = koinInject()
@@ -72,6 +73,7 @@ internal fun PackDataSection(
 
     var pendingDelete by remember(pack.id) { mutableStateOf(false) }
     val busy = operation?.isRunning == true
+    val deleteBlock = rememberPackDeleteBlock(pack.id)
 
     // Asks for a measurement rather than taking one: the service walks the tree
     // only when what it holds is too old to serve, so moving between sections
@@ -89,8 +91,13 @@ internal fun PackDataSection(
         }
     }
 
-    NxSection(s.packSettingsStorage) {
-        NxRow(title = s.packSettingsFolder, subtitle = sizeText ?: s.packSettingsSizeComputing) {
+    // Detaching costs the instance its update source and cannot be undone from
+    // here. The browsing surface already refuses to carry the action for that
+    // reason; one click and no question was not much better.
+    var confirmDetach by remember { mutableStateOf(false) }
+
+    NxSettingGroup(s.packSettingsStorage) {
+        NxSettingRow(s.packSettingsFolder, detail = sizeText ?: s.packSettingsSizeComputing) {
             NxButton(
                 s.packSettingsOpenFolder,
                 onClick = { SystemActions.openFolder(instanceDir.toString()) },
@@ -101,7 +108,7 @@ internal fun PackDataSection(
         // Mirror-only: a repair measures the instance against a published manifest,
         // and a local or imported pack has none to measure against.
         if (pack.packRef.origin == PackOrigin.Mirror) {
-            NxRow(title = s.packSettingsRepair, subtitle = s.packSettingsRepairDesc) {
+            NxSettingRow(s.packSettingsRepair, detail = s.packSettingsRepairDesc) {
                 PuppetClick("packSettings.data.repair") { runningGuard.run(::runRepair) }
                 NxButton(
                     s.packSettingsRepairAction,
@@ -113,20 +120,7 @@ internal fun PackDataSection(
             }
         }
         if (pack.packRef.origin != PackOrigin.Local) {
-            // Detaching costs the instance its update source and cannot be undone
-            // from here. The browsing surface already refuses to carry the action
-            // for that reason; one click and no question was not much better.
-            var confirmDetach by remember { mutableStateOf(false) }
-            if (confirmDetach) {
-                DestructiveConfirmDialog(
-                    title        = s.packSettingsDetach,
-                    body         = s.packSettingsDetachDesc,
-                    confirmLabel = s.packSettingsDetachAction,
-                    onConfirm    = { scope.launch { service.detachToLocal(pack) } },
-                    onDismiss    = { confirmDetach = false },
-                )
-            }
-            NxRow(title = s.packSettingsDetach, subtitle = s.packSettingsDetachDesc) {
+            NxSettingRow(s.packSettingsDetach, detail = s.packSettingsDetachDesc) {
                 NxButton(
                     s.packSettingsDetachAction,
                     onClick = { confirmDetach = true },
@@ -137,18 +131,29 @@ internal fun PackDataSection(
         }
     }
 
-    NxSection(s.packSettingsDangerZone) {
-        NxRow(title = s.packSettingsDelete, subtitle = s.packSettingsDeleteDesc) {
+    NxSettingGroup(s.packSettingsDangerZone, danger = true) {
+        NxSettingRow(s.packSettingsDelete, detail = deleteBlock ?: s.packSettingsDeleteDesc) {
             NxButton(
                 s.packSettingsDelete,
                 onClick = { pendingDelete = true },
                 style = NxButtonStyle.Destructive,
+                enabled = deleteBlock == null,
                 compact = true,
             )
         }
     }
 
     runningGuard.Dialog()
+
+    if (confirmDetach) {
+        DestructiveConfirmDialog(
+            title        = s.packSettingsDetach,
+            body         = s.packSettingsDetachDesc,
+            confirmLabel = s.packSettingsDetachAction,
+            onConfirm    = { scope.launch { service.detachToLocal(pack) } },
+            onDismiss    = { confirmDetach = false },
+        )
+    }
 
     if (pendingDelete) {
         DestructiveConfirmDialog(
@@ -158,10 +163,7 @@ internal fun PackDataSection(
             onConfirm = {
                 pendingDelete = false
                 scope.launch {
-                    if (service.deleteCompletely(pack)) {
-                        sizes.forget(pack.id)
-                        onDismiss()
-                    }
+                    if (service.deleteCompletely(pack) == PackInstanceService.DeleteOutcome.Deleted) onDismiss()
                 }
             },
             onDismiss = { pendingDelete = false },

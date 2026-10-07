@@ -50,12 +50,18 @@ abstract class PackagingExtension @Inject constructor(objects: ObjectFactory) {
     abstract val modules: ListProperty<String>
 
     /**
-     * JVM arguments baked into the jpackage launcher script via repeated
-     * `--java-options` flags. Single source of truth for the runtime
-     * launch profile; mirrors what the AppImage AppRun also hands to
-     * java, with platform-conditional entries excluded by the consumer.
+     * JVM arguments baked into the jpackage launcher script (Windows, macOS) via
+     * repeated `--java-options` flags.
      */
     abstract val jvmArgs: ListProperty<String>
+
+    /**
+     * JVM arguments the Linux AppImage's AppRun hands to java. Emitted into the
+     * generated profile for `scripts/build-appimage.sh`, so the AppRun is written
+     * from configuration rather than a list typed into the script. The consumer
+     * builds both lists from one shared base and names what differs.
+     */
+    abstract val appImageJvmArgs: ListProperty<String>
 
     /** Icon for the Windows jpackage app image (`.ico`). */
     abstract val windowsIcon: RegularFileProperty
@@ -136,7 +142,8 @@ abstract class JlinkOptionsExtension {
      * to cut class-loading off the cold start.
      *
      * The dump runs as `<image>/bin/java -Xshare:dump` under the module-system flags
-     * taken from [PackagingExtension.jvmArgs], rather than through jlink's
+     * taken from [PackagingExtension.jvmArgs] (from [PackagingExtension.appImageJvmArgs]
+     * for the AppImage's own archive), rather than through jlink's
      * `--generate-cds-archive`; see [ModuleSystemArgs] for why the flag set at dump
      * time has to equal the one the launcher uses.
      *

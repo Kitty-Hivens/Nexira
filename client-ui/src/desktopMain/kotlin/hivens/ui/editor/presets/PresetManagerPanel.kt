@@ -1,6 +1,5 @@
 package hivens.ui.editor.presets
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,7 +18,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -30,7 +28,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -43,13 +40,22 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.nx.NxButton
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.theme.NxTheme
+import hivens.ui.surface.NxCard
+import hivens.ui.surface.NxSurface
+import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.LocalMonoFamily
 import java.text.DateFormat
 import java.util.Date
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.Status
+import org.slf4j.LoggerFactory
+
+private val log = LoggerFactory.getLogger("PresetManagerPanel")
 
 // Modal preset manager. Reached via the "Presets" chip on the
 // edit-mode pill. Lists existing presets with Load / Delete / Export
@@ -63,6 +69,9 @@ fun PresetManagerPanel(
     onDelete: suspend (PresetMeta) -> Unit,
     onExport: (PresetMeta) -> Unit,
     listProvider: () -> List<PresetMeta>,
+    /** Ids of the presets that ship, offered above the saved ones. */
+    builtIns: List<String> = emptyList(),
+    onApplyBuiltIn: (String) -> Unit = {},
 ) {
     if (!visible) return
 
@@ -70,19 +79,37 @@ fun PresetManagerPanel(
     val scope = rememberCoroutineScope()
     var presets by remember(visible) { mutableStateOf(emptyList<PresetMeta>()) }
     var newName by remember(visible) { mutableStateOf("") }
+    var writeFailed by remember(visible) { mutableStateOf(false) }
+    // A save, a delete or the listing, with a failure said in the dialog. They run
+    // on this composition's scope, where an exception nothing catches restarts the
+    // shell, as the file pickers' own guard explains: a full disk or a read-only
+    // profile took the edit session down with it.
+    fun guarded(action: suspend () -> Unit) {
+        scope.launch {
+            try {
+                action()
+                writeFailed = false
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                log.error("Preset storage failed", e)
+                writeFailed = true
+            }
+        }
+    }
     // Init empty + load off the UI thread: listProvider() is a directory scan and
     // ran twice before (once here during composition, once in the effect).
-    LaunchedEffect(Unit) { presets = withContext(Dispatchers.IO) { listProvider() } }
+    LaunchedEffect(Unit) { guarded { presets = withContext(Dispatchers.IO) { listProvider() } } }
 
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
-        Surface(
-            color           = NxTheme.colors.surface,
-            shape           = MaterialTheme.shapes.large,
-            shadowElevation = 18.dp,
-            modifier        = Modifier
+        NxSurface(
+            kind     = SurfaceKind.Dialog,
+            shape    = MaterialTheme.shapes.large,
+            shadowDp = 18f,
+            modifier = Modifier
                 .width(520.dp)
                 .height(620.dp),
         ) {
@@ -96,120 +123,140 @@ fun PresetManagerPanel(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Symbol(icon = NxIcon.Inventory2,
                             contentDescription = null,
-                            tint               = NxTheme.colors.primary,
+                            tint               = NxColor.lead(),
                             modifier           = Modifier.size(22.dp),
                         )
                         Spacer(Modifier.width(10.dp))
                         Text(
                             text       = s.editorPresetsTitle,
                             style      = MaterialTheme.typography.titleMedium,
-                            color      = NxTheme.colors.textPrimary,
+                            color      = NxInk.main,
                             fontWeight = FontWeight.SemiBold,
                         )
                     }
                     IconButton(onClick = onDismiss) {
                         Symbol(NxIcon.Close, contentDescription = s.editorClose,
-                             tint = NxTheme.colors.textSecondary)
+                             tint = NxInk.quiet)
                     }
                 }
                 Spacer(Modifier.height(4.dp))
                 Text(
                     text  = s.editorPresetsIntro,
                     style = MaterialTheme.typography.bodySmall,
-                    color = NxTheme.colors.textSecondary,
+                    color = NxInk.quiet,
                 )
 
                 Spacer(Modifier.height(16.dp))
 
                 // Save row
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(NxTheme.colors.surfaceVariant.copy(alpha = 0.55f))
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                NxSurface(
+                    kind     = SurfaceKind.Field,
+                    shape    = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth(),
                 ) {
-                    BasicTextField(
-                        value         = newName,
-                        onValueChange = { newName = it },
-                        singleLine    = true,
-                        textStyle     = TextStyle(
-                            color    = NxTheme.colors.textPrimary,
-                            fontSize = 14.sp,
-                        ),
-                        cursorBrush   = SolidColor(NxTheme.colors.primary),
-                        modifier      = Modifier.weight(1f),
-                        decorationBox = { inner ->
-                            if (newName.isEmpty()) {
-                                Text(
-                                    text  = s.editorPresetNamePlaceholder,
-                                    color = NxTheme.colors.textSecondary.copy(alpha = 0.55f),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                )
-                            }
-                            inner()
-                        },
-                    )
-                    Spacer(Modifier.width(10.dp))
-                    NxButton(
-                        label   = s.editorSave,
-                        onClick = {
-                            val n = newName.trim()
-                            if (n.isNotEmpty()) {
-                                scope.launch {
-                                    onSaveCurrent(n)
-                                    newName = ""
-                                    // Reload AFTER the write lands (and off the UI
-                                    // thread): listing before the suspend save
-                                    // completed showed a stale set missing the
-                                    // just-saved preset.
-                                    presets = withContext(Dispatchers.IO) { listProvider() }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                    ) {
+                        BasicTextField(
+                            value         = newName,
+                            onValueChange = { newName = it },
+                            singleLine    = true,
+                            textStyle     = TextStyle(
+                                color    = NxInk.main,
+                                fontSize = 14.sp,
+                            ),
+                            cursorBrush   = SolidColor(NxColor.lead()),
+                            modifier      = Modifier.weight(1f),
+                            decorationBox = { inner ->
+                                if (newName.isEmpty()) {
+                                    Text(
+                                        text  = s.editorPresetNamePlaceholder,
+                                        color = NxInk.quiet,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                    )
                                 }
-                            }
-                        },
-                        icon    = NxIcon.Save,
-                        enabled = newName.isNotBlank(),
-                        compact = true,
+                                inner()
+                            },
+                        )
+                        Spacer(Modifier.width(10.dp))
+                        NxButton(
+                            label   = s.editorSave,
+                            onClick = {
+                                val n = newName.trim()
+                                if (n.isNotEmpty()) {
+                                    guarded {
+                                        onSaveCurrent(n)
+                                        newName = ""
+                                        // Reload AFTER the write lands (and off the UI
+                                        // thread): listing before the suspend save
+                                        // completed showed a stale set missing the
+                                        // just-saved preset.
+                                        presets = withContext(Dispatchers.IO) { listProvider() }
+                                    }
+                                }
+                            },
+                            icon    = NxIcon.Save,
+                            enabled = newName.isNotBlank(),
+                            compact = true,
+                        )
+                    }
+                }
+
+                if (writeFailed) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text  = s.editorPresetWriteFailed,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = NxColor.status(Status.Error, text = true),
                     )
                 }
 
                 Spacer(Modifier.height(16.dp))
 
-                Text(
-                    text       = s.editorPresetsSaved(presets.size),
-                    style      = MaterialTheme.typography.labelMedium,
-                    color      = NxTheme.colors.textSecondary,
-                    fontWeight = FontWeight.Medium,
-                )
-                Spacer(Modifier.height(8.dp))
-
-                if (presets.isEmpty()) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(NxTheme.colors.surfaceVariant.copy(alpha = 0.35f)),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            text  = s.editorPresetsEmpty,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = NxTheme.colors.textSecondary,
-                        )
+                // One scrolling list for both kinds, so the ready-made ones never
+                // squeeze the saved ones out of the dialog or the other way round.
+                LazyColumn(
+                    modifier            = Modifier.fillMaxWidth().weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    if (builtIns.isNotEmpty()) {
+                        item(key = "built-in-header") { SectionLabel(s.editorPresetsBuiltIn) }
+                        items(items = builtIns, key = { "built-in:$it" }) { id ->
+                            BuiltInRow(
+                                name        = s.bundledPresetName(id),
+                                description = s.bundledPresetDescription(id),
+                                onApply     = { onApplyBuiltIn(id) },
+                            )
+                        }
+                        item(key = "built-in-gap") { Spacer(Modifier.height(10.dp)) }
                     }
-                } else {
-                    LazyColumn(
-                        modifier            = Modifier.fillMaxWidth().weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
+                    item(key = "saved-header") { SectionLabel(s.editorPresetsSaved(presets.size)) }
+                    if (presets.isEmpty()) {
+                        item(key = "saved-empty") {
+                            NxSurface(
+                                kind     = SurfaceKind.Panel,
+                                shape    = RoundedCornerShape(10.dp),
+                                modifier = Modifier.fillMaxWidth().height(96.dp),
+                            ) {
+                                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                    Text(
+                                        text  = s.editorPresetsEmpty,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = NxInk.quiet,
+                                    )
+                                }
+                            }
+                        }
+                    } else {
                         items(items = presets, key = { it.name }) { meta ->
                             PresetRow(
                                 meta     = meta,
                                 onLoad   = { onLoad(meta) },
                                 onDelete = {
-                                    scope.launch {
+                                    guarded {
                                         onDelete(meta)
                                         presets = withContext(Dispatchers.IO) { listProvider() }
                                     }
@@ -225,6 +272,54 @@ fun PresetManagerPanel(
 }
 
 @Composable
+private fun SectionLabel(text: String) {
+    Text(
+        text       = text,
+        style      = MaterialTheme.typography.labelMedium,
+        color      = NxInk.quiet,
+        fontWeight = FontWeight.Medium,
+        modifier   = Modifier.padding(bottom = 2.dp),
+    )
+}
+
+/**
+ * A preset that ships. Applied, never deleted or exported: it is part of the
+ * launcher, and it changes only the surfaces it is about.
+ */
+@Composable
+private fun BuiltInRow(name: String, description: String, onApply: () -> Unit) {
+    val s = LocalStrings.current
+    NxCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp)) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text       = name,
+                    style      = MaterialTheme.typography.bodyLarge,
+                    color      = NxInk.main,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines   = 1,
+                    overflow   = TextOverflow.Ellipsis,
+                )
+                if (description.isNotBlank()) {
+                    Text(
+                        text  = description,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = NxInk.quiet,
+                    )
+                }
+            }
+            Spacer(Modifier.width(8.dp))
+            NxButton(label = s.editorApply, onClick = onApply, compact = true)
+        }
+    }
+}
+
+@Composable
 private fun PresetRow(
     meta: PresetMeta,
     onLoad: () -> Unit,
@@ -232,46 +327,46 @@ private fun PresetRow(
     onExport: () -> Unit,
 ) {
     val s = LocalStrings.current
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
-            .background(NxTheme.colors.surfaceVariant.copy(alpha = 0.55f))
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text(
-                text       = meta.name,
-                style      = MaterialTheme.typography.bodyLarge,
-                color      = NxTheme.colors.textPrimary,
-                fontWeight = FontWeight.SemiBold,
-                maxLines   = 1,
-                overflow   = TextOverflow.Ellipsis,
-            )
-            Text(
-                text       = formatTime(meta.createdAt),
-                style      = MaterialTheme.typography.labelSmall,
-                color      = NxTheme.colors.textSecondary.copy(alpha = 0.75f),
-                fontFamily = LocalMonoFamily.current,
-            )
-        }
-        Spacer(Modifier.width(8.dp))
-        NxButton(label = s.editorApply, onClick = onLoad, compact = true)
-        Spacer(Modifier.width(4.dp))
-        IconButton(onClick = onExport, modifier = Modifier.size(36.dp)) {
-            Symbol(icon = NxIcon.Upload,
-                contentDescription = s.editorExport,
-                tint               = NxTheme.colors.textSecondary,
-                modifier           = Modifier.size(18.dp),
-            )
-        }
-        IconButton(onClick = onDelete, modifier = Modifier.size(36.dp)) {
-            Symbol(icon = NxIcon.Delete,
-                contentDescription = s.editorDelete,
-                tint               = NxTheme.colors.error,
-                modifier           = Modifier.size(18.dp),
-            )
+    NxCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp)) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text       = meta.name,
+                    style      = MaterialTheme.typography.bodyLarge,
+                    color      = NxInk.main,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines   = 1,
+                    overflow   = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text       = formatTime(meta.createdAt),
+                    style      = MaterialTheme.typography.labelSmall,
+                    color      = NxInk.quiet,
+                    fontFamily = LocalMonoFamily.current,
+                )
+            }
+            Spacer(Modifier.width(8.dp))
+            NxButton(label = s.editorApply, onClick = onLoad, compact = true)
+            Spacer(Modifier.width(4.dp))
+            IconButton(onClick = onExport, modifier = Modifier.size(36.dp)) {
+                Symbol(icon = NxIcon.Upload,
+                    contentDescription = s.editorExport,
+                    tint               = NxInk.quiet,
+                    modifier           = Modifier.size(18.dp),
+                )
+            }
+            IconButton(onClick = onDelete, modifier = Modifier.size(36.dp)) {
+                Symbol(icon = NxIcon.Delete,
+                    contentDescription = s.editorDelete,
+                    tint               = NxColor.status(Status.Error),
+                    modifier           = Modifier.size(18.dp),
+                )
+            }
         }
     }
 }

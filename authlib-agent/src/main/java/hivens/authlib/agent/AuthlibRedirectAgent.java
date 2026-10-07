@@ -53,8 +53,12 @@ public final class AuthlibRedirectAgent {
     public static void premain(String agentArgs, Instrumentation inst) {
         try {
             inst.addTransformer(new Redirector(buildReplacements(parseHost(agentArgs))));
-        } catch (Throwable ignored) {
-            // an agent must never break the launch
+        } catch (Throwable t) {
+            // An agent must never break the launch, and must not fail without a
+            // word either: with no transformer the game talks to the upstream
+            // endpoints, the server refuses the join, and this line is the only
+            // trace on the player's machine of why.
+            System.err.println("[authlib-agent] could not register the redirect, authlib is left as shipped: " + t);
         }
     }
 
@@ -129,8 +133,11 @@ public final class AuthlibRedirectAgent {
                     out = forceSignedTextures(out);
                 }
                 return out == classfileBuffer ? null : out;
-            } catch (Throwable ignored) {
-                return null; // leave the original class on any trouble
+            } catch (Throwable t) {
+                // Leave the original class on any trouble, and say which one: a class
+                // left as shipped means a join or a skin that goes to the upstream.
+                System.err.println("[authlib-agent] could not rewrite " + className + ", left as shipped: " + t);
+                return null;
             }
         }
     }

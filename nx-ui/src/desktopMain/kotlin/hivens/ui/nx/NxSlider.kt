@@ -28,7 +28,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
@@ -40,8 +39,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import hivens.ui.customization.sliderKeyboardAdjust
 import hivens.ui.theme.Motion
-import hivens.ui.theme.NxTheme
 import hivens.ui.theme.Spacing
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.NxInk
 
 /**
  * A labeled slider whose track is **bounded** so it never runs to the window
@@ -76,7 +76,7 @@ fun NxSlider(
             Text(
                 label,
                 style      = if (compact) MaterialTheme.typography.labelSmall else MaterialTheme.typography.bodyLarge,
-                color      = if (enabled) NxTheme.colors.textPrimary else NxTheme.colors.textSecondary,
+                color      = if (enabled) NxInk.main else NxInk.quiet,
                 fontWeight = FontWeight.Medium,
                 maxLines   = 1,
                 overflow   = TextOverflow.Ellipsis,
@@ -85,7 +85,7 @@ fun NxSlider(
             Text(
                 valueText,
                 style    = MaterialTheme.typography.bodySmall,
-                color    = NxTheme.colors.textSecondary,
+                color    = NxInk.quiet,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -141,7 +141,6 @@ fun NxSliderTrack(
     val hovered by interaction.collectIsHoveredAsState()
     var dragging by remember { mutableStateOf(false) }
     val width = remember { mutableFloatStateOf(0f) }
-    val palette = NxTheme.colors
     // The travel is inset in pixels, and the pointer reports pixels: mixing the dp
     // magnitude in here put the zero of the scale a radius away from the track's own
     // start on every display that is not at 1x.
@@ -168,8 +167,11 @@ fun NxSliderTrack(
         label         = "sliderThumb",
     )
 
-    val active = if (enabled) palette.primary else palette.textSecondary.copy(alpha = 0.35f)
-    val rest = palette.outline.copy(alpha = if (hovered && enabled) 0.32f else 0.2f)
+    val active = if (enabled) NxColor.lead() else NxInk.off
+    val rest = NxColor.wash(NxInk.quiet, if (hovered && enabled) 0.4f else 0.28f)
+    // A hairline of the ink that reads on the fill, so the knob keeps an edge where
+    // the fill behind it is the identical colour.
+    val ring = NxColor.on(active).copy(alpha = 0.25f)
 
     Box(
         modifier
@@ -217,11 +219,9 @@ fun NxSliderTrack(
                 )
             }
             drawCircle(color = active, radius = thumb.toPx(), center = Offset(x, cy))
-            // A hairline of the same ink at a quarter strength, so the knob keeps an
-            // edge where the fill behind it is the identical colour.
             if (enabled) {
                 drawCircle(
-                    color = Color.White.copy(alpha = 0.16f),
+                    color = ring,
                     radius = thumb.toPx(),
                     center = Offset(x, cy),
                     style = Stroke(width = 1.dp.toPx()),

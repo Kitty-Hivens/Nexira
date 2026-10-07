@@ -4,19 +4,21 @@
 
 [versions]
 # ── Toolchain & language plugins ─────────────────────────────────────────────
-kotlin            = "2.4.10"
-compose           = "1.12.0"
-buildconfigPlugin = "6.0.10"
-versionsPlugin    = "0.61.0"
-# ksp tracks its own release line, decoupled from the Kotlin version. 2.3.10 is
-# the latest published KSP; KSP2 runs on the Analysis API and compiles cleanly
-# against the Kotlin 2.4.10 toolchain here (:widget-processor / :client-ui
-# kspKotlinDesktop both green). Bump when a newer KSP ships; it does not need to
-# match the Kotlin minor.
-ksp               = "2.3.11"
+# A beta on purpose: 2.5.0-Beta1 is the first Kotlin line with JvmTarget.JVM_27,
+# and the build targets Java 27 bytecode. Every 2.4.x stops at JVM_26. Move to
+# 2.5.0 when it ships stable.
+kotlin            = "2.5.0-Beta1"
+compose           = "1.13.0-alpha01"
+buildconfigPlugin = "6.1.2"
+versionsPlugin    = "0.64.0"
+# ksp tracks its own release line, decoupled from the Kotlin version. KSP2 runs
+# on the Analysis API it bundles, so it does not need to match the Kotlin minor
+# (:widget-processor / :client-ui kspKotlinDesktop are the check). Bump when a
+# newer KSP ships.
+ksp               = "2.3.12"
 
 # ── Core libraries ───────────────────────────────────────────────────────────
-ktor              = "3.5.2"
+ktor              = "3.6.0"
 # Test-only. Pinned to whatever ktor-client-okhttp resolves, so the
 # certificate helper matches the TLS stack under test.
 okhttp            = "5.5.0"
@@ -30,7 +32,7 @@ coroutines        = "1.11.0"
 # which has no stable release on any line the desktop target has used. The
 # version here is the alpha paired with the compose core above; the two move
 # together, and the pairing is the only thing that makes an alpha acceptable.
-composeMaterial3  = "1.12.0-alpha03"
+composeMaterial3  = "1.13.0-alpha01"
 # androidx graphics-shapes -- rounded polygons with corner SMOOTHING (squircles)
 # and star/polygon outlines, which RoundedCornerShape cannot express. Already on
 # the classpath transitively; declared so the source depends on it deliberately.
@@ -39,7 +41,7 @@ composeMaterial3  = "1.12.0-alpha03"
 graphicsShapes    = "1.1.0"
 markdownRenderer  = "0.45.0"
 # org.jetbrains:markdown -- md->html parser under markdown-m3, used directly by the in-launcher HTML renderer (hivens.ui.render).
-markdown          = "0.7.9"
+markdown          = "0.7.16"
 # jsoup -- HTML parsing for the in-launcher HTML renderer.
 jsoup             = "1.23.2"
 # Coil 3 -- async image loading (pack + mod icons, Browse cards). Deliberately no
@@ -54,15 +56,15 @@ coil              = "3.6.0"
 # font manager. Chosen over Batik for being a fraction of the size and for having
 # no script engine and no external-entity resolution to switch off: description
 # markup is written by third parties.
-jsvg              = "2.1.0"
+jsvg              = "2.2.0"
 # Material You colour science (Monet) -- pure Kotlin port, no Compose dep.
 # Seeds a tonal palette from the wallpaper; mapped onto NxColors.
 materialColorUtils = "5.0.1"
-filekit           = "0.15.0"
+filekit           = "0.16.0"
 
 # ── Logging ──────────────────────────────────────────────────────────────────
-slf4j             = "2.0.18"
-logback           = "1.6.3"
+slf4j             = "2.0.20"
+logback           = "1.6.5"
 
 # ── Misc runtime ─────────────────────────────────────────────────────────────
 commonsCompress   = "1.28.0"
@@ -109,7 +111,7 @@ libvault          = "0.2.1"
 # exact version `compose` above resolves). It also moves the FFmpeg pin to the
 # n9.0 line, which renames every soname the loader asks for, so it pairs only
 # with the natives below.
-skinema           = "0.8.0"
+skinema           = "0.8.2"
 
 # The natives are versioned as the FFmpeg build they carry plus a repack
 # revision, not as the library: skinema names the natives version it pairs with
@@ -121,6 +123,12 @@ skinema           = "0.8.0"
 # so a bump of one without the other is a Gradle resolution conflict rather than
 # an UnsatisfiedLinkError on the first frame. Bump both, or neither.
 skinemaNatives    = "9.0.1-1"
+
+# System audio (Kitty-Hivens/libsound) -- Panama bindings to the libpulse and
+# libdbus the machine already has. Ships no natives of its own, unlike skinema,
+# so there is no per-platform classifier to keep in step: what it needs is on
+# the system or the feature reports itself absent.
+libsound          = "0.2.0"
 
 # ── Test ─────────────────────────────────────────────────────────────────────
 # One version for the whole platform: JUnit 6 merged the Jupiter 5.x and Platform
@@ -192,6 +200,15 @@ libvault                        = { group = "dev.hivens", name = "libvault", ver
 # per-platform runtimeOnly classifiers, declared directly in client-ui.
 skinema-compose                 = { group = "dev.hivens", name = "skinema-compose", version.ref = "skinema" }
 skinema-skiko                   = { group = "dev.hivens", name = "skinema-skiko",   version.ref = "skinema" }
+
+# libsound-core carries the contracts and the session types a consumer compiles
+# against; -session carries MPRIS and its two siblings. libsound-dbus arrives
+# with it and is not depended on directly. -audio is the output channel itself:
+# a named stream the desktop mixer shows, and PipeWire natively rather than
+# through its PulseAudio server.
+libsound-core                   = { group = "dev.hivens", name = "libsound-core",    version.ref = "libsound" }
+libsound-session                = { group = "dev.hivens", name = "libsound-session", version.ref = "libsound" }
+libsound-audio                  = { group = "dev.hivens", name = "libsound-audio",   version.ref = "libsound" }
 
 # JNA dropped — was only present for dorkbox/SystemTray. libtray is
 # pure java.lang.foreign (Project Panama) and pulls no JNA transitively.

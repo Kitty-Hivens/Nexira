@@ -18,11 +18,12 @@ class DecodeDiagnosticTest {
 
     private val uid = "a921e0baf5d4c4454774b09586a32d94"
     private val session = "vRfeed1IvnNZPZFJ6c02h1qkxBru+PXd3KJA6OLWy18="
+    private val json = Json { ignoreUnknownKeys = true }
 
     private fun failureOnRealShape(): Throwable {
         val body = """{"status":"OK","playername":"TestPlayer","uid":"$uid",""" +
             """"uuid":"1e86dc3ad14dc24f4706915bb7d8593a","session":"$session","money":"not-an-int"}"""
-        return runCatching { Json { ignoreUnknownKeys = true }.decodeFromString(LoginResponse.serializer(), body) }
+        return runCatching { json.decodeFromString(LoginResponse.serializer(), body) }
             .exceptionOrNull() ?: error("the fixture must fail to decode")
     }
 

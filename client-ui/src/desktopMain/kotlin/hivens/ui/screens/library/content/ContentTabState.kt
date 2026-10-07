@@ -11,6 +11,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import hivens.core.api.dto.modrinth.ModrinthProject
+import hivens.core.api.dto.modrinth.ModrinthVersion
 import hivens.core.api.dto.smrt.SmrtModEntry
 import hivens.core.api.dto.smrt.SmrtPackManifest
 import hivens.core.api.interfaces.IMirrorPackClient
@@ -19,11 +20,19 @@ import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
 import hivens.core.smrt.ModIconResolver
 import hivens.launcher.instance.ContentKind
+import hivens.launcher.instance.ContentRef
+import hivens.launcher.instance.DependencyIssue
+import hivens.launcher.instance.dependencyIssues
 import hivens.launcher.instance.InstalledContent
 import hivens.launcher.instance.InstanceContentManager
 import hivens.launcher.instance.ContentFolderWatch
 import hivens.launcher.instance.InstanceContentScanner
+import hivens.launcher.instance.InstanceContentUpdater
+import hivens.launcher.instance.ModUpdate
 import hivens.launcher.instance.PackPlacedContent
+import hivens.launcher.instance.folderName
+import hivens.launcher.instance.pathIn
+import hivens.launcher.instance.swapFor
 import hivens.launcher.launch.LauncherController
 import hivens.launcher.modrinth.ModrinthClient
 import hivens.launcher.platform.PlatformPaths
@@ -31,9 +40,11 @@ import hivens.ui.utils.pickFiles
 import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
 import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.path
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
@@ -102,7 +113,14 @@ internal class ContentTabState(
     private val controller: LauncherController,
     private val iconResolver: ModIconResolver,
     private val modrinth: ModrinthClient,
+    private val updater: InstanceContentUpdater,
     private val watch: ContentFolderWatch,
+    /**
+     * Answers that outlive this tab. Read straight into [iconCache] when a scan
+     * lands, so a return visit paints the icons it already knew on the first
+     * frame instead of re-hashing every jar in the folder to find them again.
+     */
+    private val icons: ContentIconStore,
     private val scope: CoroutineScope,
     /**
      * Where a change to the files on disk runs.
@@ -166,9 +184,95 @@ internal class ContentTabState(
         private set
     var pendingBulkDelete by mutableStateOf<List<InstalledContent>>(emptyList())
         private set
-    var detailsOf by mutableStateOf<InstalledContent?>(null)
-    var browsing by mutableStateOf(false)
+
+    // -- updates --------------------------------------------------------------
+
+    /**
+     * What Modrinth says is newer, per installed file. Empty until a check runs,
+     * which is not the same as "everything is current" -- [checked] separates the
+     * two, so the toolbar can stay quiet instead of claiming a folder is up to
+     * date before anyone has asked.
+     */
+    var updates by mutableStateOf<Map<ContentRef, ModUpdate>>(emptyMap())
         private set
+    var checkingUpdates by mutableStateOf(false)
+        private set
+    var checked by mutableStateOf(false)
+        private set
+
+    /**
+     * The last check could not be completed. Distinct from finding nothing: one
+     * says the folder is current, the other says nobody managed to ask.
+     */
+    var checkFailed by mutableStateOf(false)
+        private set
+
+    /** The batch this instance has in flight, or the outcome of its last one. */
+    var updateRun by mutableStateOf<InstanceContentUpdater.Run?>(null)
+        private set
+
+    /** The row whose version list is open, and what has been loaded for it. */
+    var versionsOf by mutableStateOf<InstalledContent?>(null)
+        private set
+    var versionList by mutableStateOf<List<ModrinthVersion>?>(null)
+        private set
+    /**
+     * Two different empty lists, and they need different words: Modrinth has no
+     * record of this file at all, or it has and the fetch did not come back.
+     */
+    var versionsUnknown by mutableStateOf(false)
+        private set
+    var versionsFailed by mutableStateOf(false)
+        private set
+    var switchingTo by mutableStateOf<String?>(null)
+        private set
+
+    /**
+     * What each enabled mod needs and nothing enabled meets, read from the archives
+     * themselves. Local, so it is known as soon as the scan lands and follows every
+     * toggle.
+     */
+    val dependencyProblems: Map<ContentRef, List<DependencyIssue>> by derivedStateOf {
+        dependencyIssues(items.orEmpty(), instance.cachedManifest?.loaderName)
+    }
+
+    /** The name of whatever provides mod id [id], for a sentence about it, or the id itself. */
+    fun providerName(id: String): String =
+        items.orEmpty().firstOrNull { c -> c.provides.any { it.id.equals(id, ignoreCase = true) } }?.displayName ?: id
+
+    /**
+     * Rows older than the build another installed mod pinned, from the last check.
+     * Shown on the row with its update offered, and never swapped on their own.
+     */
+    var behind by mutableStateOf<Map<ContentRef, InstanceContentUpdater.PinBehind>>(emptyMap())
+        private set
+
+    /**
+     * [behind] for rows still on disk under the name they were found by, while the
+     * mod that needs the newer build is still there and on: a warning about a mod
+     * that was deleted or turned off since would name something no longer loaded.
+     */
+    val liveBehind: Map<ContentRef, InstanceContentUpdater.PinBehind> by derivedStateOf {
+        val present = items.orEmpty().filter { it.enabled }.mapTo(mutableSetOf()) { ContentRef(it.kind, it.fileName) }
+        val all = items.orEmpty().mapTo(mutableSetOf()) { ContentRef(it.kind, it.fileName) }
+        behind.filter { (ref, pin) -> ref in all && pin.neededByRef in present }
+    }
+
+    /**
+     * Updates for rows that are still on disk under the name they were found by.
+     *
+     * An applied update renames the file, so its entry here would otherwise keep
+     * offering a version that is already installed until the next check came back.
+     */
+    val liveUpdates: Map<ContentRef, ModUpdate> by derivedStateOf {
+        val present = items.orEmpty().mapTo(mutableSetOf()) { ContentRef(it.kind, it.fileName) }
+        updates.filterKeys { it in present }
+    }
+
+    /** Rows the player may actually have replaced, which is what "update all" means here. */
+    val updatable: List<InstalledContent> by derivedStateOf {
+        items.orEmpty().filter { rulesFor(it).canDelete }
+    }
 
     /**
      * Icons for every scanned item, off-screen rows included, so scrolling is
@@ -181,6 +285,11 @@ internal class ContentTabState(
     // mods, resource packs and shaders are all Modrinth project types). Powers
     // the open-page action and fills details a sparse archive leaves blank.
     private val projectCache = mutableStateMapOf<String, ModrinthProject?>()
+
+    // The Modrinth version a file IS, resolved by the same hash lookup the project
+    // resolution already pays for. The version picker needs it to mark which row of
+    // the list the instance is actually sitting on.
+    private val versionCache = mutableStateMapOf<String, ModrinthVersion>()
 
     private var manifest by mutableStateOf<SmrtPackManifest?>(null)
 
@@ -204,6 +313,11 @@ internal class ContentTabState(
      */
     private val optionalNames: Set<String> by derivedStateOf {
         manifestMods.values.filterNot { it.required }.map { it.filename }.toSet()
+    }
+
+    /** What is wrong with the pack's mods as the player has them set, by filename. Once per change, not per row. */
+    private val packProblems: Map<String, List<OptionalContentRules.Problem>> by derivedStateOf {
+        manifest?.let { OptionalContentRules.problems(it.mods, optionalState) }.orEmpty()
     }
 
     /**
@@ -270,6 +384,9 @@ internal class ContentTabState(
     // leave a previous prefetch racing the new one over the same keys.
     private var iconJob: Job? = null
 
+    /** The open row's version lookup, for the same reason [iconJob] exists. */
+    private var versionsJob: Job? = null
+
     /**
      * The installed list and its icons, alongside the pack manifest on a mirror
      * pack. Alongside rather than after: the manifest is a network fetch and only
@@ -335,17 +452,36 @@ internal class ContentTabState(
         // Re-read alongside the scan rather than once at open: an update rewrites
         // the record and the folder together, and the rows would otherwise keep
         // classifying against the file set of the build that was replaced.
-        placed = withContext(Dispatchers.IO) { placedKeysFrom(PackPlacedContent.paths(instanceDir)) }
-        items = scanned
-        prefetchIcons(scanned)
+        val placedKeys = withContext(Dispatchers.IO) { placedKeysFrom(PackPlacedContent.paths(instanceDir)) }
+        // Written on the composition's thread, for the reason the icon prefetch
+        // gives below. A rescan that follows a change to the disk runs on the app's
+        // scope, and these fields used to be assigned from whichever IO thread that
+        // left it on.
+        withContext(Dispatchers.Main) {
+            placed = placedKeys
+            items = scanned
+            prefetchIcons(scanned)
+        }
     }
 
     /**
      * Embedded icon first (free), then Modrinth by file hash, then a probe of the
      * jar, then nothing and the row draws a letter. Bounded concurrency keeps a
      * big pack from stampeding the network and the disk at once.
+     *
+     * Only answers reach the cache. Every rescan cancels the prefetch in flight,
+     * and a file that has just been installed is precisely the one being resolved
+     * when the next rescan lands, so a cancellation written down as "no icon"
+     * would single out the mod the person had just chosen.
      */
     private fun prefetchIcons(list: List<InstalledContent>) {
+        // What the process already knows, taken synchronously and before anything
+        // is drawn. Only what is left over is worth a coroutine.
+        list.forEach { c ->
+            val key = c.selectionKey()
+            if (iconCache.containsKey(key)) return@forEach
+            icons.get(storeKey(c))?.let { iconCache[key] = it }
+        }
         iconJob?.cancel()
         iconJob = scope.launch {
             val gate = Semaphore(ICON_PREFETCH_CONCURRENCY)
@@ -357,15 +493,29 @@ internal class ContentTabState(
                         val resolved = gate.withPermit {
                             val file = fileOf(c)
                             val embedded = c.iconBytes
-                            runCatching {
-                                when {
-                                    embedded != null -> ContentIconState.Bytes(embedded)
-                                    else -> iconResolver.resolveByFile(file)?.let { ContentIconState.Url(it) }
-                                        ?: scanner.probeJarIcon(file)?.let { ContentIconState.Bytes(it) }
+                            // The archive's own art, which is local and final.
+                            val probed = { scanner.probeJarIcon(file)?.let { ContentIconState.Bytes(it) } }
+                            when {
+                                embedded != null -> ContentIconState.Bytes(embedded)
+                                else -> try {
+                                    iconResolver.resolveByFile(file)?.let { ContentIconState.Url(it) }
+                                        ?: probed()
                                         ?: ContentIconState.None
+                                } catch (e: CancellationException) {
+                                    throw e
+                                } catch (e: Exception) {
+                                    // The catalogue could not be ASKED. The archive
+                                    // can still answer, and its answer is final; a
+                                    // letter is not, so where the archive has
+                                    // nothing either, nothing is written down and
+                                    // the next scan asks again. Writing the letter
+                                    // here is what kept a just-installed mod on one
+                                    // for the rest of the visit.
+                                    probed()
                                 }
-                            }.getOrDefault(ContentIconState.None)
-                        }
+                            }
+                        } ?: return@launch
+                        icons.put(storeKey(c), resolved)
                         // Resolved off-thread, written on the composition's own
                         // thread. Assigning straight from a worker used whatever
                         // snapshot the coroutine had inherited and threw once that
@@ -386,6 +536,7 @@ internal class ContentTabState(
         manifestEntry   = entryFor(content),
         userOwned       = userOwns(content),
         optionalEnabled = optionalState[content.fileName],
+        problems        = packProblems[content.fileName].orEmpty(),
     )
 
     /**
@@ -488,9 +639,16 @@ internal class ContentTabState(
 
     // -- add / delete ---------------------------------------------------------
 
-    /** Drop files into the folder the active filter points at (mods by default). */
+    /**
+     * Drop files into the folder the active filter points at (mods by default).
+     *
+     * The dialog belongs to the screen and the copy to the app. Opened on the app's
+     * scope, the native dialog outlived the tab that asked for it, which is the
+     * thing the picker helper's callers are meant to avoid. Once files are chosen,
+     * the copy is the disk's business and runs to the end wherever the reader goes.
+     */
     fun addFiles(dialogSettings: FileKitDialogSettings) {
-        writeScope.launch {
+        scope.launch {
             val kind = filter.kind ?: ContentKind.Mod
             val extensions = if (kind == ContentKind.Mod) listOf("jar") else listOf("zip")
             val picked = pickFiles(
@@ -498,7 +656,8 @@ internal class ContentTabState(
                 settings = dialogSettings,
             )
             val sources = picked.orEmpty().map { Path.of(it.path) }
-            if (sources.isNotEmpty()) {
+            if (sources.isEmpty()) return@launch
+            writeScope.launch {
                 manager.addFiles(instanceDir, kind, sources)
                 rescan()
             }
@@ -532,22 +691,224 @@ internal class ContentTabState(
         if (targets.isEmpty()) return
         writeScope.launch {
             targets.forEach { manager.delete(instanceDir, it.kind, it.fileName) }
-            if (single == null) clearSelection()
+            if (single == null) withContext(Dispatchers.Main) { clearSelection() }
             rescan()
         }
     }
 
     // -- browse ---------------------------------------------------------------
 
-    fun startBrowsing() {
-        browsing = true
+    /**
+     * Picks up whatever the project browser downloaded.
+     *
+     * Whether the browser is OPEN is not kept here. This holder is rebuilt on every
+     * visit, so a reader who opened the browser, opened a project page from it and
+     * came back landed in the content list instead of the search they left. The
+     * flag lives beside the tab index now, which is saved for exactly that reason.
+     */
+    fun refreshAfterBrowse() {
+        // Asked again after the rescan: a mod installed from the browser can pin a
+        // newer build of a library the folder already had, and the check is what
+        // says so. The check's own cache is keyed on the file set, so an unchanged
+        // folder costs nothing.
+        scope.launch {
+            rescan()
+            // One at a time: the pane starts a check of its own when the list lands,
+            // and two finishing out of order left the older answer on screen.
+            if (!checkingUpdates) checkUpdates()
+        }
     }
 
-    /** Coming back from the browser picks up whatever it downloaded. */
-    fun stopBrowsing() {
-        browsing = false
-        scope.launch { rescan() }
+    // -- updates --------------------------------------------------------------
+
+    /**
+     * Ask Modrinth what is newer for the files this instance may replace.
+     *
+     * Runs once when the tab opens and again on demand. Only the editable rows
+     * are asked about: a mod the pack owns cannot be swapped from here, and
+     * offering an update that the next pack sync would undo is worse than not
+     * offering one.
+     */
+    suspend fun checkUpdates(force: Boolean = false) {
+        val targets = updatable
+        val mcVersion = instance.cachedManifest?.minecraftVersion.orEmpty()
+        // Nothing to ask about, or nothing to ask WITH. An instance whose manifest
+        // has not been read yet has no game version to match against, and saying
+        // "everything is up to date" off the back of a question never asked is the
+        // one answer here that would be a lie.
+        // Every field is written on the composition's thread: a finished batch calls
+        // this from the app's scope.
+        if (targets.isEmpty()) {
+            withContext(Dispatchers.Main) { checked = true }
+            return
+        }
+        if (mcVersion.isBlank()) return
+        withContext(Dispatchers.Main) { checkingUpdates = true }
+        try {
+            val outcome = updater.check(
+                instanceDir = instanceDir,
+                items       = targets,
+                mcVersion   = mcVersion,
+                loader      = loaderId(),
+                force       = force,
+                // The pack's own mods too, for the pinned-build check alone: either
+                // side can pin a library the other side carries.
+                context     = items.orEmpty().filter { it.kind == ContentKind.Mod },
+            )
+            // Whatever came back is worth keeping even when the round was not
+            // complete; what the round could not answer is reported separately
+            // rather than drawn as an answer.
+            withContext(Dispatchers.Main) {
+                updates = outcome.updates
+                behind = outcome.behind
+                checkFailed = !outcome.complete
+                checked = true
+            }
+        } catch (e: CancellationException) {
+            // Leaving the tab cancels this. It is not a failed check, and telling
+            // the reader it was would be a notice about their own navigation.
+            throw e
+        } catch (e: Exception) {
+            // The previous answer stands: a check that could not run is not
+            // evidence that the updates it found last time have gone away.
+            withContext(Dispatchers.Main) { checkFailed = true }
+        } finally {
+            withContext(NonCancellable + Dispatchers.Main) { checkingUpdates = false }
+        }
     }
+
+    /**
+     * Follow the batch this instance has running, if any.
+     *
+     * The run belongs to the app, not to the tab, so coming back to a tab left
+     * mid-update finds the line where it actually is. A finished run stays until
+     * the screen takes it down, which is what lets it report what failed.
+     */
+    suspend fun watchUpdateRun() {
+        updater.runs.collect { all -> updateRun = all[updater.keyOf(instanceDir)] }
+    }
+
+    /**
+     * How many updates the confirm gate is currently asking about, or 0 when it
+     * is not open. The count is the question -- "update 52 projects?" -- so it is
+     * what gets held rather than a bare boolean.
+     */
+    var pendingUpdateAll by mutableStateOf(0)
+        private set
+
+    fun requestUpdateAll() {
+        pendingUpdateAll = liveUpdates.size
+    }
+
+    fun cancelUpdateAll() {
+        pendingUpdateAll = 0
+    }
+
+    /** Install every update found, in one batch. */
+    fun updateAll() {
+        pendingUpdateAll = 0
+        startUpdates(liveUpdates.values.toList())
+    }
+
+    /** Install the one update found for [content]. */
+    fun update(content: InstalledContent) {
+        liveUpdates[ContentRef(content.kind, content.fileName)]?.let { startUpdates(listOf(it)) }
+    }
+
+    private fun startUpdates(chosen: List<ModUpdate>) {
+        if (chosen.isEmpty()) return
+        val enabledBy = items.orEmpty().associate { ContentRef(it.kind, it.fileName) to rulesFor(it).effectiveEnabled }
+        val targets = chosen.map { InstanceContentUpdater.Target(it, enabledBy[it.ref] ?: true) }
+        updater.start(instance.id, instanceDir, instance.displayName, targets) {
+            rescan()
+            // The batch is done with the folder; re-asking is one request and it
+            // is the only thing that can tell a swap that kept its file name from
+            // an update still waiting.
+            if (updater.runs.value[updater.keyOf(instanceDir)]?.finished == true) checkUpdates(force = true)
+        }
+    }
+
+    // -- versions -------------------------------------------------------------
+
+    /**
+     * Open the version list for a row: every build Modrinth has of that project,
+     * so a player can move to one that is not simply the newest -- back off a
+     * broken release, or forward onto a beta on purpose.
+     */
+    fun openVersions(content: InstalledContent) {
+        // The previous row's lookup is taken down first. Without that, closing one
+        // row and opening another let the FIRST answer land under the second row's
+        // name -- and picking a build from that list swapped the shown row's file
+        // for a jar belonging to a different mod entirely.
+        versionsJob?.cancel()
+        versionsOf = content
+        versionList = null
+        versionsFailed = false
+        versionsUnknown = false
+        versionsJob = scope.launch {
+            try {
+                val project = resolveProject(content)
+                if (project == null) {
+                    versionsUnknown = true
+                    return@launch
+                }
+                versionList = withContext(Dispatchers.IO) { modrinth.listVersions(project.id) }
+            } catch (e: CancellationException) {
+                // The window was closed, or the tab left. Neither is a failure to
+                // report back into a window that is no longer there.
+                throw e
+            } catch (e: Exception) {
+                versionsFailed = true
+            }
+        }
+    }
+
+    fun closeVersions() {
+        versionsJob?.cancel()
+        versionsJob = null
+        versionsOf = null
+        versionList = null
+        versionsFailed = false
+        versionsUnknown = false
+    }
+
+    /** The version id the open row is currently on, once its hash has been resolved. */
+    fun installedVersionId(content: InstalledContent): String? =
+        versionCache[content.selectionKey()]?.id
+
+    /**
+     * Put [version] where the row's file is. Same path as an update: fetch,
+     * check against the published hash, swap, keeping the on/off state.
+     */
+    fun switchTo(content: InstalledContent, version: ModrinthVersion) {
+        val ref = ContentRef(content.kind, content.fileName)
+        val swap = version.swapFor(ref, content.version) ?: return
+        switchingTo = version.id
+        val started = updater.start(
+            instance.id,
+            instanceDir,
+            instance.displayName,
+            listOf(InstanceContentUpdater.Target(swap, rulesFor(content).effectiveEnabled)),
+        ) {
+            rescan()
+            if (updater.runs.value[updater.keyOf(instanceDir)]?.finished == true) {
+                // The batch runs on the app scope; what it changes on screen is
+                // written where the screen reads it from.
+                withContext(Dispatchers.Main) {
+                    switchingTo = null
+                    closeVersions()
+                }
+                checkUpdates(force = true)
+            }
+        }
+        if (!started) switchingTo = null
+    }
+
+    private fun loaderId(): String =
+        instance.cachedManifest?.loaderName
+            ?.takeIf { it.isNotBlank() && !it.equals("vanilla", ignoreCase = true) }
+            ?.lowercase()
+            .orEmpty()
 
     // -- modrinth -------------------------------------------------------------
 
@@ -555,15 +916,20 @@ internal class ContentTabState(
      * The item's Modrinth project by file hash, cached per item. Kind-agnostic
      * (mod, resource pack and shader all resolve the same way); null means
      * Modrinth does not index this file and callers fall back to embedded data.
+     *
+     * Throws when the lookup could not be made, which is a different answer from
+     * null and must not be filed as one. A row asked about while the network was
+     * down was otherwise recorded as absent from the catalogue for as long as the
+     * tab lived, taking its version list and its page link down with it.
      */
     suspend fun resolveProject(content: InstalledContent): ModrinthProject? {
         val key = content.selectionKey()
         if (projectCache.containsKey(key)) return projectCache[key]
         val file = fileOf(content)
         val project = withContext(Dispatchers.IO) {
-            val sha1 = runCatching { sha1Of(file) }.getOrNull() ?: return@withContext null
-            val version = runCatching { modrinth.versionByHash(sha1) }.getOrNull() ?: return@withContext null
-            runCatching { modrinth.resolveProject(version.projectId) }.getOrNull()
+            val version = modrinth.versionByHash(sha1Of(file)) ?: return@withContext null
+            withContext(Dispatchers.Main) { versionCache[key] = version }
+            modrinth.resolveProject(version.projectId)
         }
         projectCache[key] = project
         return project
@@ -575,9 +941,11 @@ internal class ContentTabState(
     private fun entryFor(content: InstalledContent): SmrtModEntry? =
         if (isMirror && content.kind == ContentKind.Mod) manifestMods[content.fileName] else null
 
-    private fun fileOf(content: InstalledContent): Path =
-        instanceDir.resolve(content.kind.folder())
-            .resolve(if (content.enabled) content.fileName else content.fileName + DISABLED_SUFFIX)
+    private fun fileOf(content: InstalledContent): Path = content.pathIn(instanceDir)
+
+    /** Where this file's icon is filed for the life of the process. */
+    private fun storeKey(content: InstalledContent): String =
+        iconKey(instanceDir.normalize().toString(), content.selectionKey(), content.sizeBytes)
 
     private companion object {
         const val ICON_PREFETCH_CONCURRENCY = 8
@@ -592,6 +960,8 @@ internal fun rememberContentTabState(instance: PackInstance): ContentTabState {
     val controller: LauncherController = koinInject()
     val iconResolver: ModIconResolver = koinInject()
     val modrinth: ModrinthClient = koinInject()
+    val updater: InstanceContentUpdater = koinInject()
+    val icons: ContentIconStore = koinInject()
     val scope = rememberCoroutineScope()
     val writeScope: CoroutineScope = koinInject()
     val state = remember(instance.id) {
@@ -604,7 +974,9 @@ internal fun rememberContentTabState(instance: PackInstance): ContentTabState {
             controller   = controller,
             iconResolver = iconResolver,
             modrinth     = modrinth,
+            updater      = updater,
             watch        = ContentFolderWatch(),
+            icons        = icons,
             scope        = scope,
             writeScope   = writeScope,
         )
@@ -624,13 +996,15 @@ internal fun rememberContentTabState(instance: PackInstance): ContentTabState {
  * mod it is the pack's optional-content state, which may differ from the raw
  * on-disk `.disabled` until the async relabel lands. [optional] says the toggle
  * routes through the pack rather than through a rename. A required pack mod gets
- * no toggle at all -- you cannot disable what the pack mandates.
+ * no toggle at all -- you cannot disable what the pack mandates. [problem] is what
+ * is wrong with the mod as the pack is set, shown on the row and never acted on.
  */
 internal data class ContentRowRules(
     val effectiveEnabled: Boolean,
     val showToggle: Boolean,
     val optional: Boolean,
     val canDelete: Boolean,
+    val problem: OptionalContentRules.Problem? = null,
 )
 
 /**
@@ -638,7 +1012,8 @@ internal data class ContentRowRules(
  * does not curate it and when the instance is not on a mirror pack at all.
  * [userOwned] says the file is the player's rather than the pack's, which is the
  * caller's reading of the instance and not something derivable from the row.
- * [optionalEnabled] is the pack's optional-content state for the file, if any.
+ * [optionalEnabled] is the pack's optional-content state for the file, if any,
+ * and [problems] what the pack's rules say is wrong with it as things are set.
  *
  * Resource and shader packs are cosmetic rather than part of the pack contract,
  * so they stay user-managed even while the instance is tracked; mods do not.
@@ -648,6 +1023,7 @@ internal fun contentRowRules(
     manifestEntry: SmrtModEntry?,
     userOwned: Boolean,
     optionalEnabled: Boolean?,
+    problems: List<OptionalContentRules.Problem> = emptyList(),
 ): ContentRowRules {
     val freeEdit = userOwned || content.kind != ContentKind.Mod
     val optional = manifestEntry != null && !manifestEntry.required
@@ -660,6 +1036,7 @@ internal fun contentRowRules(
         showToggle = freeEdit || optional,
         optional   = optional,
         canDelete  = freeEdit,
+        problem    = problems.firstOrNull().takeIf { manifestEntry != null },
     )
 }
 
@@ -740,19 +1117,11 @@ internal fun placedKeysFrom(paths: Set<String>?): Set<String>? =
 /** Which of this tab's folders a manifest asset lands in, or null when it lands elsewhere. */
 internal fun kindOfDest(dest: String): ContentKind? =
     when (dest.substringBefore('/')) {
-        ContentKind.Mod.folder()          -> ContentKind.Mod
-        ContentKind.ResourcePack.folder() -> ContentKind.ResourcePack
-        ContentKind.ShaderPack.folder()   -> ContentKind.ShaderPack
+        ContentKind.Mod.folderName()          -> ContentKind.Mod
+        ContentKind.ResourcePack.folderName() -> ContentKind.ResourcePack
+        ContentKind.ShaderPack.folderName()   -> ContentKind.ShaderPack
         else                              -> null
     }
-
-internal fun ContentKind.folder(): String = when (this) {
-    ContentKind.Mod -> "mods"
-    ContentKind.ResourcePack -> "resourcepacks"
-    ContentKind.ShaderPack -> "shaderpacks"
-}
-
-internal const val DISABLED_SUFFIX = ".disabled"
 
 internal fun sha1Of(file: Path): String {
     val md = MessageDigest.getInstance("SHA-1")

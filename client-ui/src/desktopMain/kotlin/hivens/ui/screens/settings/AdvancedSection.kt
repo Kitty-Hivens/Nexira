@@ -16,7 +16,6 @@ import androidx.compose.ui.unit.dp
 import hivens.config.ExperimentalProtocolOverride
 import hivens.config.Protocol
 import hivens.core.data.AmberUpdatePolicy
-import hivens.core.data.SettingsData
 import hivens.core.diag.ActionRing
 import hivens.launcher.platform.DataDirMover
 import hivens.launcher.platform.PlatformPaths
@@ -49,6 +48,10 @@ import java.nio.file.Path
 import java.nio.file.Paths
 import kotlin.system.exitProcess
 import kotlin.time.Duration.Companion.milliseconds
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.OnFill
+import hivens.ui.theme.Status
 
 private val log = LoggerFactory.getLogger("AdvancedSection")
 
@@ -73,7 +76,6 @@ internal fun AdvancedSection(
     paths: PlatformPaths,
     form: SettingsFormState,
     save: () -> Unit,
-    initialSettings: SettingsData,
 ) {
     val s = LocalStrings.current
     val desktop: DesktopIntegration = koinInject()
@@ -83,6 +85,21 @@ internal fun AdvancedSection(
     var desktopDone   by remember { mutableStateOf(false) }
     val moveScope     = rememberCoroutineScope()
     val dialogSettings = rememberFileDialogSettings(s.settingsDataDirMove)
+    // What each debounced field below last saved, so its effect saves a change and
+    // nothing else. Compared with the settings as the screen opened, a field cleared
+    // after a save matched them again and the clear was never written.
+    var savedMimic    by remember { mutableStateOf(form.mimicVersionText) }
+    var savedNewsFeed by remember { mutableStateOf(form.altNewsFeedUrl) }
+    // Leaving the category, or Settings, cancels those two effects with whatever
+    // they had not written yet, and coming back found nothing to save because the
+    // field already held the text. Written on the way out instead, as the pack
+    // settings sheet does with its own settling edit.
+    val currentSave by rememberUpdatedState(save)
+    DisposableEffect(Unit) {
+        onDispose {
+            if (form.mimicVersionText != savedMimic || form.altNewsFeedUrl != savedNewsFeed) currentSave()
+        }
+    }
 
     NxSection(s.settingsSectionUpdates) {
         NxToggle(s.settingsPreReleases, form.preReleasesEnabled, description = s.settingsPreReleasesDesc) {
@@ -158,9 +175,9 @@ internal fun AdvancedSection(
         PuppetToggle("settings.mimicVersion", form.mimicOverrideEnabled) { form.mimicOverrideEnabled = it; save() }
 
         // The revealed field is debounced (400 ms after the last keystroke) because
-        // save() does a synchronous file write and applies the value to live protocol
-        // traffic; per-keystroke saves would stutter and push partial values. The
-        // toggle flip persists immediately via its own callback.
+        // save() writes the file and applies the value to live protocol traffic, and
+        // per-keystroke saves would write the disk once per key and push partial
+        // values. The toggle flip persists immediately via its own callback.
         if (form.mimicOverrideEnabled) {
             // Filter at every keystroke: the value flows into a User-Agent header, a
             // JVM system property, and the spawned game's -Dminecraft.launcher.version
@@ -183,10 +200,10 @@ internal fun AdvancedSection(
                 }
             }
             LaunchedEffect(form.mimicVersionText) {
-                // Skip the initial-composition fire when the field equals the persisted value.
-                if (form.mimicVersionText == (initialSettings.mimicVersionOverride ?: "")) return@LaunchedEffect
+                if (form.mimicVersionText == savedMimic) return@LaunchedEffect
                 delay(400.milliseconds)
                 save()
+                savedMimic = form.mimicVersionText
             }
         }
     }
@@ -195,14 +212,14 @@ internal fun AdvancedSection(
 
     // The news widget's second channel. There is no toggle beside it because the
     // field IS the switch: blank means the channel is not configured and nothing is
-    // fetched for it. Debounced like the mimic field, and for the same reason --
-    // save() is a synchronous file write.
+    // fetched for it. Debounced like the mimic field, so the file is not written
+    // once per keystroke.
     NxSection(s.settingsSectionNews) {
-        Text(s.settingsAltNewsFeed, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.Medium)
+        Text(s.settingsAltNewsFeed, color = NxInk.main, fontWeight = FontWeight.Medium)
         Text(
             text  = s.settingsAltNewsFeedDesc,
             style = MaterialTheme.typography.bodySmall,
-            color = NxTheme.colors.textSecondary,
+            color = NxInk.quiet,
         )
         NxField(
             value         = form.altNewsFeedUrl,
@@ -212,19 +229,20 @@ internal fun AdvancedSection(
         )
         PuppetField("settings.altNewsFeed", form.altNewsFeedUrl) { form.altNewsFeedUrl = it }
         LaunchedEffect(form.altNewsFeedUrl) {
-            if (form.altNewsFeedUrl == (initialSettings.altNewsFeedUrl ?: "")) return@LaunchedEffect
+            if (form.altNewsFeedUrl == savedNewsFeed) return@LaunchedEffect
             delay(400.milliseconds)
             save()
+            savedNewsFeed = form.altNewsFeedUrl
         }
     }
 
     Spacer(Modifier.height(16.dp))
 
     NxSection(s.settingsSectionDataDir) {
-        Text(s.settingsDataDirCurrent, style = MaterialTheme.typography.bodySmall, color = NxTheme.colors.textSecondary)
+        Text(s.settingsDataDirCurrent, style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
         Text(
             text       = paths.dataDir.toAbsolutePath().toString(),
-            color      = NxTheme.colors.textPrimary,
+            color      = NxInk.main,
             fontWeight = FontWeight.SemiBold,
             style      = MaterialTheme.typography.bodyMedium,
         )
@@ -271,42 +289,47 @@ internal fun AdvancedSection(
             },
         )
         if (showError != null) {
-            Text(showError!!, style = MaterialTheme.typography.bodySmall, color = NxTheme.colors.error)
+            Text(showError!!, style = MaterialTheme.typography.bodySmall, color = NxColor.status(Status.Error))
         }
     }
 
     if (pendingTarget != null) {
         val target = pendingTarget!!
-        AlertDialog(
-            onDismissRequest = { pendingTarget = null },
-            title = { Text(s.settingsDataDirConfirmTitle) },
-            text  = {
-                Text(s.settingsDataDirConfirmBody(
-                    paths.dataDir.toAbsolutePath().toString(),
-                    target.toAbsolutePath().toString(),
-                ))
-            },
-            confirmButton = {
-                NxButton(label = s.settingsDataDirQuitNow, onClick = {
-                    val ok = DataDirMover.schedule(source = paths.dataDir, target = target)
-                    if (ok) {
-                        ActionRing.record("Data-dir move scheduled: ${paths.dataDir} -> $target -- quitting for restart")
-                        // Hard exit -- user explicitly clicked "Quit now". The pending move
-                        // applies only after restart, so a clean process termination is right.
-                        exitProcess(0)
-                    } else {
-                        // Schedule refused (target validation raced); let the user re-pick.
-                        pendingTarget = null
+        val container = NxTheme.colours.step(NxTheme.colours.topStep)
+        OnFill(container) {
+            AlertDialog(
+                onDismissRequest = { pendingTarget = null },
+                title = { Text(s.settingsDataDirConfirmTitle) },
+                text  = {
+                    Text(s.settingsDataDirConfirmBody(
+                        paths.dataDir.toAbsolutePath().toString(),
+                        target.toAbsolutePath().toString(),
+                    ))
+                },
+                confirmButton = {
+                    NxButton(label = s.settingsDataDirQuitNow, onClick = {
+                        val ok = DataDirMover.schedule(source = paths.dataDir, target = target)
+                        if (ok) {
+                            ActionRing.record("Data-dir move scheduled: ${paths.dataDir} -> $target -- quitting for restart")
+                            // Hard exit -- user explicitly clicked "Quit now". The pending move
+                            // applies only after restart, so a clean process termination is right.
+                            exitProcess(0)
+                        } else {
+                            // Schedule refused (target validation raced); let the user re-pick.
+                            pendingTarget = null
+                        }
+                    })
+                },
+                dismissButton = {
+                    OutlinedButton(onClick = { pendingTarget = null }, shape = MaterialTheme.shapes.small) {
+                        Text(s.sslWarningCancel)
                     }
-                })
-            },
-            dismissButton = {
-                OutlinedButton(onClick = { pendingTarget = null }, shape = MaterialTheme.shapes.small) {
-                    Text(s.sslWarningCancel)
-                }
-            },
-            containerColor = NxTheme.colors.surface,
-        )
+                },
+                containerColor    = container,
+                titleContentColor = NxInk.main,
+                textContentColor  = NxInk.quiet,
+            )
+        }
     }
 }
 

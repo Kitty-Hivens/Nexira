@@ -54,7 +54,7 @@ class ParallaxRecompositionTest {
         }
         try {
             var t = 0L
-            fun frame() { scene.render(t); t += FRAME }
+            fun frame() { scene.render(t).close(); t += FRAME }
             repeat(4) { frame() }
             val settled = compositions
 
@@ -96,7 +96,7 @@ class ParallaxRecompositionTest {
         }
         try {
             var t = 0L
-            fun frame() { scene.render(t); t += FRAME }
+            fun frame() { scene.render(t).close(); t += FRAME }
             repeat(4) { frame() }
             val settled = compositions
 
@@ -124,7 +124,7 @@ class ParallaxRecompositionTest {
             Box(Modifier.fillMaxSize())
         }
         try {
-            scene.render(0L)
+            scene.render(0L).close()
             assertTrue(!built, "parallax at zero intensity still built a spring")
         } finally {
             scene.close()

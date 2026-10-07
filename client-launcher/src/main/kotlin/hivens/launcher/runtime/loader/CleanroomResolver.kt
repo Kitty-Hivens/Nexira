@@ -4,8 +4,11 @@ import hivens.core.api.HttpClientProvider
 import hivens.core.net.SkipIfPresent
 import hivens.core.net.Transfer
 import hivens.core.net.TransferEngine
+import hivens.core.platform.Arch
+import hivens.core.platform.OS
 import hivens.launcher.runtime.MavenCoord
 import hivens.launcher.runtime.MojangLibrary
+import hivens.launcher.runtime.libraryRulesAllow
 import io.ktor.client.request.prepareGet
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.http.isSuccess
@@ -52,36 +55,66 @@ class CleanroomResolver(
     private val transfers: TransferEngine,
     private val json: Json,
     private val releaseBase: String = CLEANROOM_RELEASES,
+    private val releasesApi: String = CLEANROOM_RELEASES_API,
+    /** Where a version's installer is kept, so a relaunch downloads nothing. */
+    cacheDir: Path? = null,
+    /** The host's rules name and whether it is arm64, read off the machine unless a test names them. */
+    private val mojangOs: String = OS.platform.mojang,
+    private val arm64: Boolean = OS.arch == Arch.ARM64,
 ) : LoaderResolver {
 
     override val loaderId: String = "cleanroom"
 
     private val log = LoggerFactory.getLogger(CleanroomResolver::class.java)
+    private val cache = LoaderSourceCache(cacheDir)
 
     override suspend fun resolve(mcVersion: String, loaderVersion: String): LoaderProfile =
         withContext(Dispatchers.IO) {
+            // The only index of its releases is GitHub's rate-limited API, which a
+            // launch does not ask, so a blank version has nothing to resolve to. It
+            // used to reach the URL as an empty segment and come back as a bare 404.
+            if (loaderVersion.isBlank()) throw IOException("Cleanroom needs a version to install, and none was given")
+            // It modernises one Minecraft version and nothing else, and layered onto
+            // another it assembled a classpath that could only crash.
+            if (mcVersion != CLEANROOM_MINECRAFT) throw IOException("Cleanroom runs on Minecraft $CLEANROOM_MINECRAFT, not $mcVersion")
+            val kept = cache.fileFor(loaderId, loaderVersion, "installer.jar")
+            kept?.takeIf { Files.isRegularFile(it) }?.let { cached ->
+                runCatching { profileFrom(cached, loaderVersion) }
+                    .onFailure { cache.discard(cached) }
+                    .getOrNull()
+                    ?.let { return@withContext it }
+            }
             val installerUrl =
                 "${releaseBase.trimEnd('/')}/$loaderVersion/cleanroom-$loaderVersion-installer.jar"
             log.info("cleanroom: fetching installer {}", installerUrl)
-            val installer = Files.createTempFile("cleanroom-$loaderVersion-installer", ".jar")
+            val installer = kept ?: Files.createTempFile("cleanroom-$loaderVersion-installer", ".jar")
             try {
                 downloadTo(installerUrl, installer)
-                ZipFile(installer.toFile()).use { zip ->
-                    val versionEntry = zip.getEntry("version.json")
-                        ?: throw IOException("cleanroom installer $loaderVersion has no version.json")
-                    val version = json.decodeFromString(
-                        LoaderVersionJson.serializer(),
-                        zip.getInputStream(versionEntry).readBytes().decodeToString(),
-                    )
-                    buildProfile(
-                        version.mainClass,
-                        version.minecraftArguments,
-                        version.libraries.map { toSpec(it, zip) },
-                    )
-                }
+                profileFrom(installer, loaderVersion)
             } finally {
-                Files.deleteIfExists(installer)
+                if (kept == null) Files.deleteIfExists(installer)
             }
+        }
+
+    private fun profileFrom(installer: Path, loaderVersion: String): LoaderProfile =
+        ZipFile(installer.toFile()).use { zip ->
+            val versionEntry = zip.getEntry("version.json")
+                ?: throw IOException("cleanroom installer $loaderVersion has no version.json")
+            val version = json.decodeFromString(
+                LoaderVersionJson.serializer(),
+                zip.getInputStream(versionEntry).readBytes().decodeToString(),
+            )
+            buildProfile(
+                version.mainClass,
+                version.minecraftArguments,
+                hostLibraries(version.libraries).map { toSpec(it, zip) },
+            ).copy(version = loaderVersion)
+        }
+
+    override suspend fun availableVersions(mcVersion: String): List<LoaderVersionOption> =
+        if (mcVersion != CLEANROOM_MINECRAFT) emptyList()
+        else withContext(Dispatchers.IO) {
+            githubReleaseVersions(clientProvider, json, releasesApi) { "cleanroom-$it-installer.jar" }
         }
 
     /**
@@ -100,6 +133,7 @@ class CleanroomResolver(
         return LoaderProfile(
             libraries = classpath,
             mainClass = mainClass,
+            version = "",
             gameArgs = extractTweakClassArgs(minecraftArguments),
             // Cleanroom's installer version.json is a complete, self-contained set
             // (inheritsFrom null). Replacing the vanilla libraries wholesale drops
@@ -112,6 +146,20 @@ class CleanroomResolver(
             javaMajor = CLEANROOM_JAVA_MAJOR,
         )
     }
+
+    /**
+     * The libraries this host runs, by their rules, as the modern installer path
+     * reads them. The json lists every platform's: two text2speech builds, one for
+     * Apple Silicon and one for everything else, and without the rules the merge
+     * kept whichever came last and put the Apple Silicon one on every machine.
+     *
+     * The natives are left for the provisioner, which keeps this host's by their
+     * classifier, so the override still describes every platform.
+     */
+    internal fun hostLibraries(libraries: List<MojangLibrary>): List<MojangLibrary> =
+        libraries.filter { lib ->
+            MavenCoord.parse(lib.name).nativeClassifier != null || libraryRulesAllow(lib.rules, mojangOs, arm64)
+        }
 
     /** A version.json library as a download spec: a Maven-Central url when the
      *  entry carries one, else the bytes bundled in the installer's `maven/`
@@ -145,6 +193,9 @@ class CleanroomResolver(
 
     companion object {
         const val CLEANROOM_RELEASES = "https://github.com/CleanroomMC/Cleanroom/releases/download"
+        const val CLEANROOM_RELEASES_API = "https://api.github.com/repos/CleanroomMC/Cleanroom/releases?per_page=50"
+        /** The one Minecraft version Cleanroom builds on. */
+        const val CLEANROOM_MINECRAFT = "1.12.2"
         /** Required Java major, from upstream docs (not declared in any artifact). */
         const val CLEANROOM_JAVA_MAJOR = 25
     }

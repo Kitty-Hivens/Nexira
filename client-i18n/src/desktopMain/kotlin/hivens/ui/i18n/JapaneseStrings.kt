@@ -43,34 +43,21 @@ object JapaneseStrings : AppStrings {
     override val navForward = "進む"
 
     // Dashboard
-    override fun dashboardWelcome(name: String) = "おかえりなさい、${name}"
-    override val dashboardServers = "利用可能なサーバー"
-    override val dashboardServersEmpty = "サーバーが見つかりません"
-    override val dashboardLoginRequiredTitle = "サインインしてサーバーを表示"
-    override val dashboardLoginRequiredHint = "SmartyCraft のサーバー一覧は認証の内側にあります。プロフィールからサインインしてください。"
+    override fun homeWelcomeGreeting(name: String) = "おかえりなさい、${name}"
+    override val homeWelcomeSubtitle = "前回の続きから始めましょう。"
 
     // Launch Control
-    override val launchReady = "プレイ準備完了"
-    override val launchButton = "プレイ"
-    override val launchAbort = "キャンセル"
     override val launchRunning = "ゲーム実行中"
-    override val launchStop = "停止"
     override val launchDownloading = "ダウンロード中:"
     override val launchPreparing = "準備中"
     override val launchFailed = "起動に失敗しました"
 
     // Launcher States
-    override val stateInit = "初期化中..."
-    override val stateAuth = "認証中..."
     override val stateAuthFail = "認証エラー (オフライン?)"
     override val stateNoPassword = "パスワードが見つからないため、現在のセッションを使用します。"
-    override val stateSync = "ファイルを同期中..."
-    override val stateJvm = "JVM を準備中..."
     override val stateLaunching = "プロセスを開始中..."
     override fun stateExitCode(code: Int) = "ゲームが終了コード $code で終了しました"
     override fun stateError(msg: String) = "エラー: ${msg}"
-    override fun stateHelperUnavailable(mcVersion: String) =
-        "Minecraft $mcVersion 向けの open-smrt ヘルパーがありません。独自の Smarty Mod を動かさないよう起動を中止しました。それでも使う場合は、設定でヘルパーの置き換えを無効にしてください。"
     override fun stateAuthlibUnavailable(mcVersion: String) =
         "Minecraft $mcVersion 向けの SmartyCraft authlib を取得できませんでした。参加が拒否されるため起動を中止しました。接続と SmartyCraft へのサインインを確認して、もう一度お試しください。"
     override fun stateMissingAuthProvider(providerKey: String) = when (providerKey) {
@@ -108,10 +95,10 @@ object JapaneseStrings : AppStrings {
     override val settingsThemeModeSystem = "システム"
     override val settingsThemeModeWallpaper = "壁紙"
     override val settingsThemeModeSystemUnavailable = "この環境ではシステムの配色を利用できません"
-    override val settingsPaletteFromWallpaper = "壁紙から配色を生成"
-    override val settingsPaletteFromWallpaperDesc = "オフの場合、テーマは自身の配色を保ちます"
     override val settingsSurfaceBlur = "パネル背面をぼかす"
     override val settingsSurfaceBlurDesc = "毎フレームわずかに負荷がかかります。オフでもパネルの形と不透明度は変わりません"
+    override val settingsReduceMotion = "動きを減らす"
+    override val settingsReduceMotionDesc = "画面を開いたときウィジェットはすぐに表示され、パーティクルは静止します"
     override val settingsCustomChrome = "アプリ内タイトルバー"
     override val settingsCustomChromeDesc = "ウィンドウのタイトルバーをアプリ独自の上部バーに置き換えます。次回の起動から有効になります。"
     override val settingsCustomChromeTiling = "お使いのウィンドウマネージャーはタイトルバーを描画しないため、ここでは何も変わりません。"
@@ -125,13 +112,8 @@ object JapaneseStrings : AppStrings {
     override val themePickerApply = "適用"
     override val themePickerPreview = "プレビュー"
     override val themePickerSelected = "選択中"
-    override val themePickerColorPrimary = "プライマリ"
-    override val themePickerColorSecondary = "セカンダリ"
-    override val themePickerColorBackground = "背景"
-    override val themePickerColorSurface = "サーフェス"
-    override val themePickerColorAccent = "アクセント"
-    override val themePickerColorSuccess = "成功"
-    override val themePickerColorError = "エラー"
+    override val themePickerDarkOnly = "ダークのみ"
+    override val themeFromWallpaper = "壁紙から"
     override val themePickerBtnSample = "サンプルボタン"
     override val themePickerBtnOutlined = "枠線ボタン"
 
@@ -157,33 +139,14 @@ object JapaneseStrings : AppStrings {
     override val paginationNext = "次のページ"
 
     // Server Detail
-    override val serverDetailTitle = "サーバー情報"
-    override val serverDetailNoImage = "画像なし"
-    override val serverDetailNoImageHint = "banner.png"
-    override val serverDetailMissingTitle = "情報がありません"
-    override fun serverDetailMissingPath(file: String) = "次の場所に $file を作成してください:"
 
     // Server Settings
-    override val serverSettingsSubtitle = "起動設定"
-    override val serverSettingsSectionSystem = "システム"
-    override val serverSettingsSectionMods = "Mod"
-    override val serverSettingsRam = "メモリ"
-    override fun serverSettingsRamValue(mb: Int) = "メモリ: $mb MB"
-    override val serverSettingsJava = "Java バージョン"
-    override fun serverSettingsJavaAuto(version: String) = "自動 ($version)"
-    override val serverSettingsJavaHint = "空欄にすると同梱の Java を使用します"
     override val serverSettingsOpenFolder = "フォルダーを開く"
-    override val serverSettingsReset = "クライアントをリセット"
 
-    override val serverSettingsResetConfirmTitle = "このクライアントをリセットしますか?"
-    override val serverSettingsResetConfirmBody = "このサーバーのクライアントについて、ダウンロード済みのファイルがすべて完全に削除されます。元に戻せません。"
     override val backgroundResetConfirmTitle = "背景をリセットしますか?"
     override val backgroundResetConfirmBody = "カスタム背景の設定がすべて既定値に戻ります。"
     override val logoutConfirmTitle = "ログアウトしますか?"
     override val logoutConfirmBody = "保存されたサインイン情報がこの端末から削除されます。再度ログインするには認証情報の入力が必要です。"
-
-    override val serverSettingsNoMods = "任意 Mod はありません"
-    override val serverSettingsPickJava = "Java を選択"
 
     // Update
     override val updateTitle = "更新があります"
@@ -271,33 +234,32 @@ object JapaneseStrings : AppStrings {
 
     // --- Launcher States: Offline ---
     override val stateOfflineSkipAuth = "オフラインモード — 認証を省略しました"
+    override val stateUnboundOffline = "このパックはサーバーに紐付いていないため、オフラインで起動し、セッショントークンは渡されません"
     override val stateOfflineSkipSync = "オフラインモード — ファイル同期を省略し、ローカルのファイルを使用します"
     override fun stateForeignContentRemoved(count: Int, names: String) =
         "パックに含まれないファイルを $count 件削除しました: $names"
     override val stateContentChanged = "パックが変更されたため起動を中止しました。パックのファイルは変更しないでください。"
     override val stateOfflineNoClient = "クライアントのファイルが見つかりません。先にオンラインでダウンロードしてください。"
-    override val stateOfflineNoManifest = "このサーバーのマニフェストがキャッシュにありません。オフラインで起動する前に、一度オンラインでログインしてください。"
 
     // --- Server Settings: Extended ---
-    override val serverSettingsJvmArgs = "JVM 引数"
-    override val serverSettingsJvmArgsHint = "-XX:+UseZGC -Dfoo=bar"
-    override val serverSettingsJvmBuildArgs = "引数を組み立てる"
-    override val serverSettingsResolution = "ウィンドウサイズ"
-    override val serverSettingsWidth = "幅"
-    override val serverSettingsHeight = "高さ"
-    override val serverSettingsFullscreen = "フルスクリーン"
-    override val serverSettingsAutoConnect = "サーバーに自動接続"
 
     // --- Server Settings: Icon Upload ---
-    override val serverSettingsPickIcon = "サーバーアイコンを選択"
 
     // =========================================================================
     // RAM Selector
     // =========================================================================
-    override val ramCustomInputLabel = "任意の値:"
     override fun ramSystemHint(systemRam: String, recommended: String) =
         "システム: $systemRam • 推奨の上限: $recommended"
-    override fun ramAutoLabel(resolved: String) = "自動 · 約 ${resolved}"
+    override val ramModeTitle = "メモリ量"
+    override val ramModeAuto = "自動"
+    override val ramModeOwn = "指定"
+    override fun ramAutoDetail(resolved: String) = "このシステムとこのパックに合わせて決めます。今は ${resolved} です。"
+    override val ramOwnDetail = "起動のたびにこの量を割り当てます。"
+    override val ramAllocated = "割り当て"
+    override val ramUnitGb = "GB"
+    override val ramUnitMb = "MB"
+    override fun ramOutOfRange(min: String, max: String) = "${min} から ${max} まで"
+    override fun ramAboveRecommended(recommended: String) = "${recommended} を超えると、システムやゲームのヒープ外メモリが足りなくなることがあります"
 
     // =========================================================================
     // Mod cards
@@ -308,7 +270,6 @@ object JapaneseStrings : AppStrings {
     // =========================================================================
     // Server grid
     // =========================================================================
-    override val serversFavorites = "★ お気に入り"
 
     // =========================================================================
     // Custom Background
@@ -387,12 +348,6 @@ object JapaneseStrings : AppStrings {
     override val techSkiaDesc = "グラフィックスレンダラー"
     override val techCoilDesc = "画像読み込み"
 
-    // --- Spawn Reset ---
-    override val spawnResetButton = "スポーンに戻る"
-    override val spawnResetLoading = "リセット中..."
-    override val spawnResetSuccess = "完了しました。再接続すると反映されます"
-    override val spawnResetError = "サーバーエラー"
-
     // --- Tray ---
     override val trayStatusIdle = "待機中"
     override val trayStatusRunning = "ゲーム実行中"
@@ -408,8 +363,6 @@ object JapaneseStrings : AppStrings {
     override val settingsPreReleasesDesc = "安定版に昇格する前のベータ版を受け取ります。"
     override val settingsMandatoryUpdates = "必須の更新"
     override val settingsMandatoryUpdatesDesc = "上流のプロトコルが壊れた場合に、重要な更新を入れるまで起動を止めます。既定はオフです。この下限は自分の起動も止めうるため、従うかどうかは意識して選ぶ設定です。"
-    override val settingsAutoSyncAllPacks = "起動時に SmartyCraft クライアントを自動同期"
-    override val settingsAutoSyncAllPacksDesc = "ランチャーの起動時に、導入済みの SmartyCraft クライアントを背景で再同期します。二段階認証を使っている場合はログインしません。ログインするとコードで解除したセッションが無効になるためです。したがって、以前の手動サインインがキャッシュしたマニフェストだけを使い、それがないサーバーは飛ばします。SmartyCraft 経路は 2.5.0 で廃止予定で、不具合も修正しません。ミラーのパックが推奨経路です。背景で通信量を消費します。"
     override val settingsAutoUpdatePacks = "導入済みインスタンスを自動更新"
     override val settingsAutoUpdatePacksDesc = "導入済みのパックを最新ビルドに保ちます。安全な更新は背景で適用し、Minecraft やローダーが変わる場合は下の方針に従います。手動で更新したい場合はオフにしてください。"
     override val settingsAmberPolicy = "ビルドで Minecraft かローダーが変わるとき"
@@ -424,9 +377,6 @@ object JapaneseStrings : AppStrings {
     override val settingsMimicVersion = "擬装するランチャーのバージョン"
     override val settingsMimicVersionDesc = "ハンドシェイクと User-Agent で上流に送るバージョン文字列を固定します。空欄なら同梱の既定値を使います。上流が Nexira のリリース周期より速くバージョンを上げた場合にだけ設定してください。保存後、次のプロトコル呼び出しから有効になります。再起動は不要です。"
     override fun settingsMimicVersionPlaceholder(default: String) = "既定: ${default}"
-    override fun dashboardAutoSyncProgress(serverName: String, current: Int, total: Int) =
-        "$serverName を同期中 ($current/$total)"
-    override fun dashboardAutoSyncBytes(readMB: Long, totalMB: Long) = "$readMB / $totalMB MB"
     override val widgetProgressTitle = "背景の処理"
     override val widgetProgressIdle = "いまダウンロード中のものはありません。"
     override fun widgetTabDefaultLabel(index: Int) = "タブ ${index}"
@@ -485,14 +435,12 @@ object JapaneseStrings : AppStrings {
     override fun sslBypassExpiresAt(formatted: String) = "期限: ${formatted}"
 
     override val settingsSectionSmarty = "Smarty サーバー"
-    override val settingsOpenSmrtHelperTitle = "代替の smrt ネットワークヘルパーを使う"
-    override val settingsOpenSmrtHelperDesc = "Smarty サーバーで、上流の Smarty Mod を私たちのオープンソースのヘルパーに置き換えます。ネットワーク機能は同じで、監視の仕組みはありません。そのゲームバージョン向けの代替がない場合は、元の Mod を動かすのではなく起動を中止します。"
-    override val settingsStrictModCheckTitle = "Mod の厳密な検証"
-    override val settingsStrictModCheckDesc = "同期のあと、サーバーが要求していないものを mods フォルダーからすべて削除します。導入は綺麗に保たれますが、自分で追加した Mod も消えます。"
     override val settingsNetworkAgentTitle = "ネットワーク支援エージェントを使う"
     override val settingsNetworkAgentDesc = "ゲームの起動時にログイン先を SmartyCraft に向けます。対象はゲーム内の参加処理とスキンの確認です。SmartyCraft が改変したログインライブラリを差し込まなくても参加時の認証が通り、スキンも読み込まれます。SmartyCraft のサーバーに参加するには必要です。"
     override val settingsSmartyAuthLibTitle = "SmartyCraft のログインライブラリを使う"
     override val settingsSmartyAuthLibDesc = "従来の方式です。SmartyCraft のクライアントから改変済みのログインライブラリを取り出し、元のものの代わりにパックへ置きます。上のネットワークエージェントに置き換えられ、予備として残しています。ファイルを取得できない場合は起動を中止します。既定はオフです。"
+    override val settingsReuseSessionTitle = "セッションを保持する（実験的）"
+    override val settingsReuseSessionDesc = "起動のたびにログインし直しません。一度のログインが長く保つため、二要素コードは毎回ではなく一度だけ求められます。サーバーがセッションを終了した場合、次回の起動で再ログインを求めます。既定はオフです。"
 
     override val settingsSectionDataDir = "データディレクトリ"
     override val settingsDataDirCurrent = "現在のパス:"
@@ -614,11 +562,6 @@ object JapaneseStrings : AppStrings {
     override val navLibrary = "ライブラリ"
     override val navBrowse = "探す"
 
-    override val settingsHomeViewTitle = "ホームの表示"
-    override val settingsHomeViewSub = "既定はモダンなホームです。従来のダッシュボードも切り替えひとつで使えます。"
-    override val settingsHomeViewClassic = "クラシック"
-    override val settingsHomeViewNew = "モダン"
-
     // --- Left-rail selection style ---
     override val navSelectionTitle = "選択中の項目の見せ方"
     override val navSelectionSub = "左のレールで現在の項目をどう強調するか"
@@ -696,11 +639,17 @@ object JapaneseStrings : AppStrings {
     override val backgroundLoopForever = "ずっと"
     override val backgroundLoopOnce = "一度だけ"
 
+    override val backgroundAudio = "サウンド"
+    override val backgroundAudioDesc = "壁紙自身の音声トラックを再生します。アニメーション速度は音のテンポも変えます。"
+    override val backgroundAudioVolume = "音量"
+    override val backgroundAudioStill = "静止した壁紙には音声も再生位置もありません。"
+    override val backgroundLink = "プレイヤーから操作する"
+    override val backgroundLinkDesc = "プレイヤーウィジェットとメディアキーが壁紙を操作します。一時停止で映像も止まります。"
+
     override val customizationAccentClear = "上書きを解除"
     override val customizationSectionVisual = "見た目"
     override val customizationSectionColors = "色の上書き"
     override val customizationHexInvalid = "16 進数が不正です"
-    override val themePickerAccentOverride = "アクセントの上書き (即時)"
 
     override val browseTitle = "探す"
     override val browseSearchPlaceholder = "パックを検索"
@@ -711,7 +660,11 @@ object JapaneseStrings : AppStrings {
     override val createPackName = "名前"
     override val createPackMc = "Minecraft のバージョン"
     override val createPackLoader = "ローダー"
-    override val createPackLoaderVersion = "ローダーのバージョン (任意)"
+    override val createPackLoaderVersion = "ローダーのバージョン"
+    override val createPackLoaderVersionLatest = "空欄で最新版"
+    override val createPackLoaderVersionRequired = "このローダーでは必須です"
+    override val createPackLoaderRecommended = "推奨"
+    override val createPackLoaderPreRelease = "プレリリース"
     override val createPackConfirm = "作成"
     override val createPackCancel = "キャンセル"
     override val createPackShowSnapshots = "スナップショットを表示"
@@ -790,9 +743,108 @@ object JapaneseStrings : AppStrings {
     override val selectionClear = "選択を解除"
     override fun selectionBlockedByPack(count: Int) = "このうち $count 件はパックのものです。管理するにはインスタンスを切り離してください。"
     override val contentActionDetails = "詳細"
+    override val contentLockedTitle = "パックの MOD"
+    override val contentLockedBody = "この MOD はパックがインストールと更新を管理しているため、ここでは無効化、削除、バージョン変更はできません。次の更新で元に戻ります。自分で管理するには設定でパックを切り離してください。以後パックは更新されなくなります。"
+    override val contentLockedOptionalBody = "パックの任意 MOD です。無効にはできますが、パックが更新を管理している間は削除やバージョン変更はできません。"
+    override val contentLockedOpenSettings = "パックの設定"
     override val contentActionOpenPage = "ページを開く"
+    override val contentUpdateCheck = "更新を確認"
+    override fun contentUpdateAll(count: Int) = "すべて更新 ($count)"
+    override fun contentUpdateRunning(done: Int, total: Int) = "更新中 $done / $total"
+    override val contentUpdateUpToDate = "すべて最新です"
+    override val contentUpdateCheckFailed = "確認できませんでした"
+    override val contentUpdateConfirmTitle = "プロジェクトを更新しますか?"
+    override fun contentUpdateConfirmBody(count: Int) = "$count 件のファイルを Modrinth の新しいビルドに置き換えます。"
+    override val contentUpdateConfirmAction = "更新"
+    override fun contentUpdateTo(version: String) = "$version に更新"
+    override val contentActionVersions = "バージョン"
+    override val contentVersionsTitle = "バージョンを選択"
+    override val contentVersionsUnknown = "Modrinth はこのファイルを認識していません"
+    override val contentVersionsLoadFailed = "バージョン一覧を取得できませんでした"
     override val contentDetailAuthors = "作者"
     override val contentDetailSize = "サイズ"
+    override val modPageTabDescription = "説明"
+    override val modPageTabVersions = "バージョン"
+    override val modPageTabChangelog = "更新履歴"
+    override val modPageTabGallery = "ギャラリー"
+    override val modPageBodyEmpty = "作者はこのプロジェクトについて何も書いていません。"
+    override val modPageBodyUnknown = "説明はプロジェクトページにありますが、Modrinth はこのファイルを認識していません。"
+    override val modPageStatDownloads = "ダウンロード"
+    override val modPageStatFollowers = "フォロワー"
+    override val modPageLocalFile = "ローカルファイル"
+    override val modPageFindInCatalogue = "Modrinth で探す"
+    override val modPageHomepage = "プロジェクトのサイト"
+    override val modPageOpenInCatalogue = "Modrinth で開く"
+    override val modPageCopyLink = "リンクをコピー"
+    override fun modPageInstallInto(pack: String) = "$pack にインストール"
+    override fun modPageInstalledIn(pack: String) = "$pack に導入済み"
+    override val modPageInstalling = "インストール中"
+    override val modPageInstallFailed = "インストールできませんでした"
+    override val modPageInstallRetry = "再試行"
+    override fun modPageInstallMissing(count: Int) = "不足している依存関係: $count"
+    override val modPageInstallShort = "インストール"
+    override fun modPageNoBuildFor(target: String) = "$target 向けのビルドはありません"
+    override val modPageNoBuildAny = "適合するビルドがありません"
+    override val versionsIncompatibleHint = "このビルドは別のローダーまたはゲームバージョン向けです"
+    override val versionsColumnVersion = "バージョン"
+    override val versionsColumnGameVersion = "ゲームバージョン"
+    override val versionsColumnPlatform = "プラットフォーム"
+    override val versionsColumnPublished = "公開日"
+    override val versionsColumnDownloads = "ダウンロード"
+    override val modPageVersionsFailed = "ビルド一覧を取得できませんでした"
+    override val modPageVersionsFailedBody = "カタログが応答しませんでした。接続を確認してもう一度お試しください。"
+    override val modPageVersionsNoEntry = "Modrinth はこのファイルを認識していないため、ビルド一覧はありません"
+    override val versionsFilterChannel = "チャンネル"
+    override val versionsFilterGameVersion = "ゲームバージョン"
+    override val versionsFilterPlatform = "プラットフォーム"
+    override val versionsFilterReset = "リセット"
+    override fun versionsFilterShown(shown: Int, total: Int) = "$total 件中 $shown 件を表示"
+    override val versionsFilterNoMatch = "この条件に一致するビルドはありません"
+    override fun modPageInstalledVersion(version: String) = "インストール済み: $version"
+
+    override val modVersionRequires = "必須"
+    override val modVersionOptional = "併用可能"
+    override val modVersionIncompatible = "併用不可"
+    override val modVersionFiles = "ファイル"
+    override val modVersionPinnedBuild = "指定されたビルド"
+    override val modVersionPrimaryFile = "メインファイル"
+    override val modVersionFailed = "このビルドを読み込めませんでした"
+    override val modRailCompatibility = "対応状況"
+    override val modRailGame = "Minecraft"
+    override val modRailPlatforms = "プラットフォーム"
+    override val modRailEnvironment = "動作環境"
+    override val modRailLinks = "リンク"
+    override val modRailTags = "タグ"
+    override val modRailCreators = "制作者"
+    override val modRailDetails = "詳細"
+    override val modRailUnknownValue = "?"
+    override val modEnvClientOnly = "クライアントのみ"
+    override val modEnvServerOnly = "サーバーのみ"
+    override val modEnvBoth = "クライアントとサーバー"
+    override val modEnvEither = "クライアントまたはサーバー"
+    override val modLinkIssues = "問題を報告"
+    override val modLinkSource = "ソースコード"
+    override val modLinkWiki = "Wiki"
+    override val modLinkDiscord = "Discord"
+    override val modLinkDonate = "作者を支援"
+    override val modLicenseUnknown = "ライセンスの記載なし"
+    override val modLicenseAllRights = "無断転載禁止"
+    override fun modPublishedOn(date: String) = "公開 $date"
+    override fun modUpdatedOn(date: String) = "更新 $date"
+    override val modPublishedUnknown = "公開日は不明"
+    override val modUpdatedUnknown = "更新日は不明"
+    override val modDisclosureTelemetryOptIn = "テレメトリ、手動で有効化"
+    override val modDisclosureTelemetryOptOut = "テレメトリ、手動で無効化"
+    override val modDisclosureTelemetryAlways = "テレメトリ、無効化できません"
+    override val modDisclosureTelemetry = "テレメトリ"
+    override val modDisclosureAds = "広告を含みます"
+    override val modDisclosurePaid = "有料機能を含みます"
+    override val modDisclosureAiContent = "AI が生成した素材を含みます"
+    override val modDisclosureAiFunctionality = "生成モデルを呼び出します"
+    override val modDisclosureSystem = "ゲーム外でシステムを操作します"
+    override val modDisclosureEpilepsy = "光の点滅に関する警告"
+    override fun compactMillions(value: String) = "$value 百万"
+    override fun compactThousands(value: String) = "$value 千"
     override val contentTabFetchErrorTitle = "パックの内容を読み込めませんでした"
     override val contentTabFetchErrorGeneric = "ミラーのマニフェストを読み込めませんでした。"
     override val contentTabRetry = "再試行"
@@ -819,7 +871,6 @@ object JapaneseStrings : AppStrings {
         if (count == 0) "選択肢は 1 つ" else "代替 $count 件"
     override val contentTabRoleAlternativesHeader = "このパック内の代替"
     override val contentTabModNoDescription = "マニフェストにはまだ説明がありません。"
-    override fun contentTabModLicensePrefix(license: String) = "ライセンス: ${license}"
     override val contentTabModUrlLabel = "Mod のページ"
     override fun contentTabModSizeLabel(kb: Long) = "$kb KB"
     override fun contentTabModDependencies(count: Int) = "依存関係 ($count)"
@@ -884,6 +935,9 @@ object JapaneseStrings : AppStrings {
     override fun versionPickerCount(n: Int) = "$n 個のバージョン"
     override val versionPickerEmpty = "バージョンが選ばれていません"
     override val versionPickerNoChangelog = "このバージョンには変更履歴がありません"
+    override val versionPickerIncompatible = "このインスタンスには合いません"
+    override fun versionPickerShowIncompatible(count: Int) = "非対応を表示 ($count)"
+    override val versionPickerHideIncompatible = "非対応を隠す"
     override val versionPickerWarning = "バージョンを変えるとパックのファイルが書き換わります。適用の前に復元ポイントを取ります。"
     override fun versionPickerInstall(version: String) = "$version をインストール"
     override fun versionPickerUpgrade(version: String) = "$version に更新"
@@ -926,6 +980,25 @@ object JapaneseStrings : AppStrings {
 
     override val packSettingsTitle = "パックの設定"
     override val packSettingsClose = "閉じる"
+    override val packSettingsExpand = "広げる"
+    override val packSettingsCollapse = "戻す"
+    override fun packSettingsRuntimeLine(loader: String, mc: String) = "${mc} の ${loader}"
+    override fun packSettingsRuntimeVanilla(mc: String) = "Minecraft ${mc}"
+    override val packSettingsLoader = "ローダー"
+    override val packSettingsJavaPickOwn = "自分で指定"
+    override val packSettingsOptionalCoToggle = "MOD を有効にすると、必要なものも有効になり、両立できないものは無効になります。"
+    override val packLoaderInstalled = "現在"
+    override val packLoaderNextLaunch = "次回の起動時に適用され、そのときにローダーがインストールされます。"
+    override val packLoaderModsStay = "MOD はフォルダーにそのまま残ります。別のローダー用の MOD は読み込まれません。"
+    override val packLoaderApply = "適用"
+    override val packLoaderRevert = "元に戻す"
+    override fun optionalConflictsWith(name: String) = "$name と競合しています"
+    override fun optionalNeedsOff(name: String) = "無効になっている $name が必要です"
+    override fun optionalNeededBy(name: String) = "無効ですが、$name に必要です"
+    override fun contentBehindPin(neededBy: String, version: String) = "$neededBy には $version 以降が必要です"
+    override fun contentDependencyMissing(id: String) = "$id が必要ですが、入っていないか無効です"
+    override fun contentDependencyVersion(name: String, wanted: String, installed: String) = "$name $wanted が必要ですが、入っているのは $installed です"
+    override val packVersionCheckTitle = "アップデート"
     override val packSettingsCategoryGeneral = "全般"
     override val packSettingsCategoryRuntime = "起動"
     override val packSettingsCategoryVersion = "バージョン"
@@ -940,9 +1013,10 @@ object JapaneseStrings : AppStrings {
     override fun packSettingsForkedFrom(name: String) = "$name から派生"
     override val packSettingsPackId = "パック ID"
     override val packSettingsMemory = "メモリ"
+    override fun packSettingsMemoryFromArgs(flags: String) = "JVM 引数で指定されているため（$flags）、この設定は適用されません"
     override val packSettingsEnvironment = "実行環境"
     override val packSettingsJava = "Java"
-    override fun packSettingsJavaManaged(major: Int) = "管理下 — Java ${major}"
+    override fun packSettingsJavaManaged(major: Int) = "ランチャーが管理: Java ${major}"
     override val packSettingsJavaCustom = "Java のパスを指定"
     override val packSettingsJavaPathPlaceholder = "/path/to/bin/java"
     override val packSettingsJavaReset = "管理下のものを使う"
@@ -955,6 +1029,10 @@ object JapaneseStrings : AppStrings {
     override val packSettingsWidth = "幅"
     override val packSettingsHeight = "高さ"
     override val packSettingsFullscreen = "フルスクリーン"
+    override val packSettingsEarlyScreen = "Mod の読み込み画面"
+    override val packSettingsEarlyScreenDesc = "ゲームが自分のウィンドウを開くまで、Mod の読み込み状況を表示するウィンドウ"
+    override val packSettingsEarlyScreenWayland = "Wayland ではオフです。Mod の読み込み中にワークスペースを切り替えると起動に失敗します"
+    override val packSettingsEarlyScreenReset = "既定に戻す"
     override val packSettingsOptional = "任意の内容"
     override val packSettingsOptionalNone = "このパックに選べる項目はありません"
     override val packContentPresenceClient = "クライアントのみ"
@@ -971,7 +1049,7 @@ object JapaneseStrings : AppStrings {
     override val packSettingsOpenFolder = "開く"
     override val packSettingsSizeComputing = "サイズを計算中"
     override val packSettingsDetach = "ローカルに切り離す"
-    override val packSettingsDetachDesc = "自分専用の複製になります。由来は残ります"
+    override val packSettingsDetachDesc = "自分専用の複製になります。更新とパックのサーバーへのログインはなくなり、由来は残ります"
     override val packSettingsDetachAction = "切り離す"
     override val packSettingsRepair = "ファイルを検証して修復"
     override val packSettingsRepairDesc = "すべてのファイルを調べ、壊れているものだけを戻します"
@@ -988,6 +1066,7 @@ object JapaneseStrings : AppStrings {
     override val packSettingsDangerZone = "取り扱い注意"
     override val packSettingsDelete = "パックを削除"
     override val packSettingsDeleteDesc = "インスタンスのファイルは完全に消えます"
+    override val packDeleteBlockedRunning = "削除するにはゲームを終了してください"
     override val packVersionSnapshots = "復元ポイント"
     override val packVersionRestore = "復元"
     override val packVersionSnapshotsHint = "復元ポイントは自分の変更を保ちます。構造が変わる更新の前に自動で取られます"
@@ -998,6 +1077,19 @@ object JapaneseStrings : AppStrings {
     override fun packDetailInstanceDirHint(dirName: String) = "インスタンスのフォルダー: instances/${dirName}"
     override val packDetailPlay = "プレイ"
     override val packDetailPlayLoginRequired = "プレイするにはサインイン"
+    override val launchBlockUpdating = "更新中…"
+    override val launchBlockRepairing = "ファイルを確認中…"
+    override val launchBlockRecovering = "復元中…"
+    override val launchBlockDeleting = "削除中…"
+    override val launchBlockUpdatingContent = "Mod を更新中…"
+    override val launchBlockMissing = "ファイルが見つかりません"
+    override val launchBlockOtherRunning = "別のゲームが起動中です"
+    override val launchStopping = "終了中…"
+    override val quitGameTitle = "ゲームが起動中です"
+    override fun quitGameBody(packName: String) = "「$packName」はまだ起動しています。起動したままにするか、終了前に停止できます。プレイ時間はどちらの場合も記録されます。"
+    override val quitLeaveGame = "起動したまま終了"
+    override val quitStopGame = "ゲームを停止して終了"
+    override val notifReasonInstanceBusy = "パックのファイルを更新または確認しているため、起動しませんでした。完了してから再度起動してください。"
     override val packPlayWait = "お待ちください"
     override val packPlayExit = "終了"
     override val packDetailNotFoundTitle = "インスタンスが見つかりません"
@@ -1037,6 +1129,8 @@ object JapaneseStrings : AppStrings {
     override fun notifInstallCancelled(packName: String) = "$packName のインストールを中止しました"
     override val editorSurfOverlay = "浮動レイヤー"
     override val editorSurfShortOverlay = "浮動"
+    override val editorSurfBackdrop = "背面レイヤー"
+    override val editorSurfShortBackdrop = "背面"
 
     override val activityPillExpand = "すべて表示"
     override fun activityPillMore(count: Int) = "+${count}"
@@ -1056,7 +1150,6 @@ object JapaneseStrings : AppStrings {
     override val notifReasonAuthFail = "認証に失敗しました"
     override fun notifReasonAuthFailDetail(detail: String) = detail
     override val notifReasonOfflineNoClient = "パックのファイルがディスクにありません"
-    override val notifReasonOfflineNoManifest = "キャッシュしたマニフェストがありません。一度オンラインで同期してください"
     override val notifReasonTwoFactorExpired = "認証情報を更新するため、もう一度サインインしてください"
     override val notifSessionStaleTitle = "セッションを更新できませんでした"
     override val notifSessionStaleRejected = "認証サーバーがサインインを拒否しました。ゲームは古いセッションで起動しますが、サーバーへの参加はまず失敗します。もう一度サインインしてください。"
@@ -1076,18 +1169,34 @@ object JapaneseStrings : AppStrings {
     override fun notifTimeMinutes(minutes: Long) = "${minutes}分"
     override fun notifTimeHours(hours: Long) = "${hours}時間"
     override fun notifTimeDays(days: Long) = "${days}日"
+    override val notBuiltYetTitle = "こんにちは。まだ作られていない機能を見つけました"
+    override val notBuiltYetBody = "おめでとうございます。あとは待つだけです。"
+    override val ageJustNow = "たった今"
+    override fun ageMinutes(minutes: Long) = "$minutes 分前"
+    override fun ageHours(hours: Long) = "$hours 時間前"
+    override fun ageDays(days: Long) = "$days 日前"
+    override fun ageMonths(months: Long) = "$months か月前"
+    override fun ageYears(years: Long) = "$years 年前"
 
     // --- Home (new) + launch tiles ---
     override val homeRecentTitle = "あなたのパック"
     override val homeNoPacksTitle = "パックがまだありません"
+    override val homeWhatsNewTitle = "新着"
+    override fun homeWhatsNewLauncher(app: String, version: String) = "$app $version が公開されました"
+    override val homeWhatsNewLauncherHint = "変更点を見てインストール"
+    override fun homeWhatsNewPackReady(version: String) = "ビルド $version が待機中"
+    override fun homeWhatsNewPackRollback(version: String) = "配信元が $version に戻りました"
+    override fun homeWhatsNewPackUpdated(version: String) = "$version に更新済み"
     override val homeNoPacksBody = "「探す」から何か入れると、ここに並びます。"
     override val browseOpen = "「探す」を開く"
     override val homeQuickContinue = "続ける"
     override val homeQuickStart = "起動"
     override val homeQuickButton = "プレイ"
     override fun homeHeroPlaytime(hours: Long) = "プレイ時間 $hours 時間"
+    override fun homeFactHours(hours: Long) = "$hours 時間"
+    override val homeFactPlaytime = "プレイ時間"
+    override val homeFactLastSession = "前回のプレイ"
     override val launchTileReady = "起動"
-    override val launchTileBlocked = "まだプレイできません"
 
     // --- Library widgets ---
     override val libraryEmptyTitle = "いまは空です"
@@ -1100,6 +1209,36 @@ object JapaneseStrings : AppStrings {
     // --- Layout editor: common actions ---
     override val editorClose = "閉じる"
     override val editorEnterLayout = "レイアウトを編集"
+    override val retiredTitle = "旧サーバー経路が残したファイル"
+    override fun retiredNoticeBody(count: Int) = "SmartyCraft のサーバー一覧から $count 個のフォルダーが残っています。もう誰も読みません。"
+    override val retiredNoticeAction = "整理する"
+    override val retiredIntro = "SmartyCraft のサーバー一覧はなくなり、これらのフォルダーが残りました。ワールド、設定、導入した MOD はあなたのものです。ローカルパックとして残すか、削除して容量を取り戻せます。"
+    override fun retiredFound(count: Int, size: String) = "$count 個のフォルダー、$size"
+    override val retiredColumnClient = "フォルダー"
+    override val retiredColumnSize = "サイズ"
+    override val retiredColumnRuntime = "Minecraft とローダー"
+    override val retiredColumnChoice = "操作"
+    override fun retiredMods(count: Int) = "MOD $count 個"
+    override val retiredChoiceKeep = "そのまま"
+    override val retiredChoiceAdopt = "パックとして残す"
+    override val retiredChoiceDelete = "削除"
+    override val retiredNoVersion = "Minecraft のバージョンが不明です"
+    override val retiredDetected = "フォルダーから読み取った値です。違う場合は直してください。"
+    override val retiredLoaderVanilla = "なし"
+    override val retiredApply = "実行"
+    override val retiredClose = "閉じる"
+    override val retiredBusy = "処理中..."
+    override val retiredWarning = "削除は取り消せません。ランチャーにこれらのフォルダーの控えはありません。"
+    override val retiredAdopted = "パックとして残しました"
+    override val retiredAdoptedSourceKept = "パックとして残しました。一部のファイルが移らなかったため、元のフォルダーは残しています"
+    override val retiredDeleted = "削除しました"
+    override val retiredFailed = "できませんでした"
+    override val retiredRemoveFailed = "削除できません。ファイルが使用中です"
+    override fun retiredDone(reclaimed: String) = "完了しました。$reclaimed を解放しました。"
+    override val retiredDoneNothing = "完了しました。"
+    override val retiredNeedsVersion = "このフォルダーが動いていた Minecraft のバージョンを入力すると、パックにできます。"
+    override fun retiredBlockedBy(folders: String) = "Minecraft のバージョンが必要です: $folders"
+    override val retiredPartlyDeleted = "一部だけ削除されました。残ったファイルがあります"
     override val editorCancel = "キャンセル"
     override val editorDelete = "削除"
     override val editorReset = "初期化"
@@ -1130,6 +1269,7 @@ object JapaneseStrings : AppStrings {
         "widget.appshell.region.top" to "タイトルバー",
         "widget.appshell.region.body" to "主要領域",
         "widget.appshell.topbar.breadcrumb" to "パンくず",
+        "widget.appshell.topbar.sessions" to "実行中のゲーム",
         "widget.appshell.topbar.heightDp" to "高さ",
         "widget.appshell.topbar.cornerStyle" to "角の形",
         "widget.appshell.topbar.groupStyle" to "まとめ方",
@@ -1138,12 +1278,18 @@ object JapaneseStrings : AppStrings {
         "widget.appshell.topbar.controls" to "ウィンドウ操作",
         "widget.appshell.region.right" to "右のパネル",
         "widget.appshell.region.showDivider" to "区切り線",
-        "widget.appshell.region.widthDp" to "幅 (0 は可変)",
+        "widget.appshell.region.widthDp" to "幅 (0 は自動)",
+        "widget.mod.tags" to "プロジェクトのタグ",
+        "widget.mod.creators" to "プロジェクトの制作者",
+        "widget.mod.compatibility" to "プロジェクトの対応状況",
+        "widget.mod.links" to "プロジェクトのリンク",
+        "widget.mod.details" to "プロジェクトの詳細",
         "widget.appshell.rightrail.compactnews" to "お知らせ",
         "widget.appshell.rightrail.compactnews.maxItems" to "最大件数 (0 はすべて)",
         "widget.appshell.rightrail.compactnews.showTitle" to "見出しを表示",
         "widget.appshell.rightrail.compactnews.imageSource" to "画像の取得元",
         "widget.appshell.rightrail.compactnews.channel" to "チャンネル",
+        "widget.bg.audio" to "壁紙のサウンド",
         "widget.bg.enable.toggle" to "背景のオンオフ",
         "widget.bg.fx.animspeed" to "アニメーション速度",
         "widget.bg.fx.blur" to "ぼかし",
@@ -1171,7 +1317,6 @@ object JapaneseStrings : AppStrings {
         "widget.container.tabs.label2" to "タブ 2",
         "widget.container.tabs.label3" to "タブ 3",
         "widget.container.tabs.tabCount" to "タブ数",
-        "widget.home.classic.content" to "クラシックのダッシュボード",
         "widget.home.new.clock" to "時計",
         "widget.home.new.clock.accent" to "強調色",
         "widget.home.new.clock.faceSize" to "文字盤の大きさ",
@@ -1182,10 +1327,9 @@ object JapaneseStrings : AppStrings {
         "widget.home.new.hero" to "パックの大判カード",
         "widget.home.new.hero.height" to "高さ",
         "widget.home.new.hero.showMeta" to "付随情報",
+        "widget.home.new.hero.playLayout" to "ボタンの構成",
         "widget.home.new.launchbutton" to "起動ボタン",
         "widget.home.new.launchbutton.label" to "ラベル",
-        "widget.home.new.music" to "音楽プレーヤー",
-        "widget.home.new.music.title" to "見出し",
         "widget.home.new.playback.mini" to "ミニプレーヤー",
         "widget.home.new.player.timeline" to "プレイヤー: カード全体が進行バー",
         "widget.home.new.player.timeline.fill" to "再生済みの塗り",
@@ -1196,13 +1340,47 @@ object JapaneseStrings : AppStrings {
         "widget.home.new.player.seeded.tint" to "ジャケットの混色",
         "widget.home.new.player.cover" to "ジャケット付きプレーヤー",
         "widget.home.new.player.cover.showAlbum" to "アルバムを表示",
+        "widget.home.new.player.wave" to "プレイヤー: 音そのものが絵",
+        "widget.home.new.player.wave.showTimes" to "経過と全体の時間を表示",
+        "widget.home.new.player.ground" to "プレイヤー: ジャケットが背景",
+        "widget.home.new.player.ground.dim" to "暗さ",
+        "widget.home.new.player.record" to "プレイヤー: レコード",
+        "widget.home.new.player.record.showCaption" to "ディスクの下に曲名を表示",
+        "widget.home.new.player.record.size" to "最大の幅",
+        "widget.home.new.player.column" to "プレイヤー: 縦型",
+        "widget.home.new.player.column.showCover" to "ジャケットを表示",
+        "widget.home.new.player.column.size" to "最大の幅",
+        "widget.home.new.player.tile" to "プレイヤー: ジャケットのタイル",
+        "widget.home.new.player.tile.showCaption" to "通常時も曲名を表示",
+        "widget.home.new.player.tile.size" to "最大の幅",
+        "widget.home.new.player.token" to "プレイヤー: トークン",
+        "widget.home.new.player.token.showCover" to "中央にジャケット",
+        "widget.home.new.player.token.size" to "最大の幅",
         "widget.home.new.progress" to "背景の処理",
         "widget.home.new.progress.idleText" to "待機中の文",
         "widget.home.new.progress.title" to "見出し",
         "widget.home.new.quicklaunch" to "クイック起動",
         "widget.home.new.quicklaunch.buttonLabel" to "ボタンのラベル",
+        "widget.home.new.quicklaunch.playLayout" to "ボタンの構成",
         "widget.home.new.recent" to "パックのタイル",
-        "widget.home.new.recent.maxTiles" to "タイルの数",
+        "widget.home.new.whatsnew" to "新着",
+        "widget.decor.particles" to "パーティクル",
+        "widget.decor.particles.field" to "種類",
+        "widget.decor.particles.density" to "密度",
+        "widget.home.new.continue" to "続きから (大)",
+        "widget.home.new.continue.showFacts" to "情報",
+        "widget.home.new.packlist" to "パック一覧",
+        "widget.home.new.spines" to "パックの背表紙",
+        "widget.home.new.time" to "大きな時刻",
+        "widget.home.new.time.showDate" to "日付",
+        "widget.home.new.hero.fillHeight" to "高さを満たす",
+        "widget.home.new.packlist.title" to "タイトル",
+        "widget.home.new.packlist.maxRows" to "行数 (0: すべて)",
+        "widget.home.new.packlist.skipContinued" to "続きのパックを除く",
+        "widget.home.new.hero.followWidth" to "幅に合わせて伸ばす",
+        "widget.home.new.recent.rows" to "行数",
+        "widget.home.new.recent.tileWidth" to "タイルの最小幅",
+        "widget.home.new.recent.maxTiles" to "タイルの上限 (0: 入るだけ)",
         "widget.home.new.recent.title" to "見出し",
         "widget.home.new.spacer" to "余白",
         "widget.home.new.spacer.height" to "高さ",
@@ -1219,6 +1397,7 @@ object JapaneseStrings : AppStrings {
         "widget.library.header.title" to "見出し",
         "widget.library.header.show" to "見出しを表示",
         "widget.nav.entry" to "ナビ項目",
+        "widget.nav.screen" to "画面へのリンク",
         "widget.notes.scratch" to "メモ",
         "widget.notes.scratch.placeholder" to "何か書いてください...",
         "widget.notes.scratch.title" to "タイトル",
@@ -1236,11 +1415,6 @@ object JapaneseStrings : AppStrings {
         "widget.profile.nav" to "プロフィールのナビ",
         "widget.profile.skin.section" to "スキン",
         "widget.profile.skin.section.previewHeight" to "プレビューの高さ",
-        "widget.server.details.banner" to "サーバーのバナー",
-        "widget.server.details.banner.cornerRadius" to "角の丸み",
-        "widget.server.details.description" to "サーバーの説明",
-        "widget.server.details.tagbar" to "サーバーのタグ",
-        "widget.server.details.title" to "サーバーの名前",
         "widget.theme.picker.grid" to "テーマの一覧",
         "widget.theme.picker.preview" to "テーマのプレビュー",
     )
@@ -1276,6 +1450,11 @@ object JapaneseStrings : AppStrings {
     override val thresholdErrorTitle = "起動に失敗"
     override val thresholdOpenLogs = "ログフォルダーを開く"
     override val thresholdQuit = "終了"
+    override val widgetStateTooLong = "長すぎて保存できません"
+    override val editorPropUnreadable = "保存された値を読み込めないため、既定値を使用しています"
+    override val thresholdRecovery = "リカバリーで再起動"
+    override val thresholdRecoveryArmed = "次の起動でリカバリーが開きます"
+    override val thresholdRecoveryHint = "--recovery または NEXIRA_RECOVERY=1 を付けて起動してもリカバリーが開きます"
     override val recoveryReloadedNotice = "エラーのあとインターフェースを再読み込みしました"
     override val editorSave = "保存"
     override val editorApply = "適用"
@@ -1287,7 +1466,39 @@ object JapaneseStrings : AppStrings {
     override val editorSlotRow = "横並び"
     override val editorSlotGrid = "グリッド"
     override val editorSlotCanvas = "キャンバス"
-    override val editorSlotCubeGrid = "キューブグリッド"
+    override val editorSlotViewportTitle = "スクロール"
+    override val editorViewportStatic = "なし"
+    override val editorViewportDown = "縦"
+    override val editorViewportRight = "横"
+    override val editorViewportScrollbar = "スクロールバー"
+    override val editorViewportMap = "マップ"
+    override val editorViewportPaged = "ページ単位"
+    override val editorPin = "固定する"
+    override val editorUnpin = "固定を解除"
+    override val modulesTitle = "ウィジェットモジュール"
+    override val modulesChip = "モジュール"
+    override val modulesEmpty = "モジュールはありません。フォルダに .jar を置いて読み込み直してください。"
+    override val modulesReload = "フォルダを読み込み直す"
+    override val modulesOpenFolder = "フォルダを開く"
+    override fun moduleWidgets(n: Int) = "ウィジェット: $n"
+    override val moduleOff = "オフ"
+    override fun moduleOffAfterCrash(failure: String) = "クラッシュしたためオフにしました: $failure"
+    override fun moduleRefused(reason: String) = "読み込まれていません: $reason"
+    override val moduleGone = "ファイルがありません。忘れるまでウィジェットは保持されます。"
+    override val moduleForget = "忘れる"
+    override fun moduleCrashedTitle(name: String) = "ウィジェットモジュール「$name」がクラッシュしました"
+    override fun moduleCrashedBody(failure: String) = "ランチャーを続けるためにオフにしました ($failure)。エディタの「モジュール」から再びオンにできます。"
+    override val mapGoHome = "コンテンツへ戻る"
+    override val editorAnchorTitle = "アンカー"
+    override val editorAnchorTopStart = "左上"
+    override val editorAnchorTopCenter = "上"
+    override val editorAnchorTopEnd = "右上"
+    override val editorAnchorCenterStart = "左"
+    override val editorAnchorCenter = "中央"
+    override val editorAnchorCenterEnd = "右"
+    override val editorAnchorBottomStart = "左下"
+    override val editorAnchorBottomCenter = "下"
+    override val editorAnchorBottomEnd = "右下"
     override val editorSlotLayoutMenuTitle = "レイアウト"
     override val editorSlotGridColumns = "列数"
     override val editorSlotGridColumnsDecrease = "列を減らす"
@@ -1297,6 +1508,14 @@ object JapaneseStrings : AppStrings {
     // --- Layout editor: prop panel ---
     override val editorResetToDefault = "既定に戻す"
     override val editorBackingTitle = "下地"
+    override val editorPaddingTitle = "余白"
+    override val editorMotionTitle = "登場"
+    override val editorMotionEnter = "登場のしかた"
+    override val editorMotionDelay = "遅延 (ms)"
+    override val entranceNone = "なし"
+    override val entranceFade = "フェード"
+    override val entranceRise = "浮上"
+    override val entranceSettle = "着地"
     override val editorSurfaceNone = "このウィジェットは面を描きません。追加すると背後に面が入り、形を整えられます。"
     override val editorSurfaceAdd = "面を追加"
     override val editorSurfaceOwn = "このウィジェットは自分で面を描くため、ここに設定するものはありません。形は状態に応じて変わり、保存された記録では表せません。"
@@ -1314,7 +1533,7 @@ object JapaneseStrings : AppStrings {
     override val editorSurfaceBlur = "ぼかし"
     override val editorSurfaceBorder = "枠線"
     override val editorSurfaceShadow = "影"
-    override val editorSurfaceFillHint = "空欄はテーマに従います。段の名前 (base、raised、floating、sunken) は配色に追従し、#RRGGBB や #AARRGGBB は追従しません。"
+    override val editorSurfaceFillHint = "空欄はテーマに従います。面の名前 (panel、card、field、popup、chrome) もテーマに従い、ウィジェットを囲むものを基準にします。#RRGGBB や #AARRGGBB は従いません。"
     override val editorSurfaceShapeKind = "形"
     override val editorSurfaceSmoothing = "なめらかさ"
     override val editorSurfaceCornerTopStart = "角 左上"
@@ -1335,6 +1554,24 @@ object JapaneseStrings : AppStrings {
     override val editorPresetNamePlaceholder = "プリセットの名前..."
     override fun editorPresetsSaved(count: Int) = "保存済み ($count)"
     override val editorPresetsEmpty = "空です。いまのレイアウトを最初のプリセットとして保存してください。"
+    override val editorPresetWriteFailed = "プリセットのフォルダーに書き込めませんでした。ディスクの空き容量と、フォルダーに書き込めるかを確認してください。"
+    override val editorPresetsBuiltIn = "既成"
+    override fun bundledPresetName(id: String) = when (id) {
+        "home-type" -> "ホーム: タイポグラフィ"
+        "home-column" -> "ホーム: カラム"
+        "home-spines" -> "ホーム: 背表紙"
+        "home-dock" -> "ホーム: ドック"
+        "home-bento" -> "ホーム: ベントー"
+        else -> id
+    }
+    override fun bundledPresetDescription(id: String) = when (id) {
+        "home-type" -> "続きのパックを大きく、ライブラリを一覧で"
+        "home-column" -> "左に縦長のカード、隣にパックのグリッド"
+        "home-spines" -> "棚に並ぶ帯、ひとつを開いて"
+        "home-dock" -> "上に時刻、下にパックを一列に"
+        "home-bento" -> "重要度に応じたセル、続きのパックが最大"
+        else -> ""
+    }
 
     // --- Layout editor: palette ---
     override val editorPaletteHide = "パレットを隠す"
@@ -1356,9 +1593,27 @@ object JapaneseStrings : AppStrings {
     override val editorResetSurfaceTitle = "面を既定に戻しますか?"
     override fun editorResetSurfaceBody(name: String) =
         "「$name」は同梱の既定レイアウトのウィジェット配置に戻ります。この面での変更 (追加したウィジェット、並べ替え、削除) はすべて失われます。ほかの面はそのままです。"
+    override val editorResetAllTitle = "すべての面を既定に戻しますか?"
+    override val editorResetAllBody = "すべての面が同梱の既定レイアウトの配置に戻り、どの面での変更もすべて失われます。自分で作った画面は残ります。"
     override val editorPreview = "プレビュー"
     override val editorPreviewHidden = "非表示"
     override val editorPaletteToggleHide = "隠す"
+    override val editorRegionProps = "この領域"
+    override fun editorSurfaceFolded(name: String) = "$name (折りたたみ中)"
+    override val editorNewScreen = "新しい画面"
+    override val editorMountRefused = "この面はすでに上で開かれているため、ここでは開きません"
+    override val screenMissing = "この画面はもうありません"
+    override val screenUntitled = "無題"
+    override fun screenDefaultTitle(n: Int) = "画面 $n"
+    override val screenSettingsTitle = "画面"
+    override val screenTitleLabel = "名前"
+    override val screenIconLabel = "アイコン"
+    override val screenDelete = "画面を削除"
+    override fun screenDeleteBody(title: String) = "「$title」とその中身は、レールのボタンと一緒に削除されます。"
+    override fun screenDeletedTitle(title: String) = "画面「$title」を削除しました"
+    override val screenRestore = "元に戻す"
+    override val editorUndo = "元に戻す"
+    override val editorRedo = "やり直す"
     override val editorEscHint = "Esc で終了"
     override val editorFabEdit = "レイアウトを編集"
     override val editorFabDone = "編集を終える"
@@ -1371,14 +1626,12 @@ object JapaneseStrings : AppStrings {
     override val editorSurfShortAbout = "情報"
     override val editorSurfShortBg = "背景"
     override val editorSurfShortProfile = "プロフィール"
-    override val editorSurfShortServer = "サーバー"
     override val editorSurfShortTheme = "テーマ"
     override val editorSurfShortShell = "シェル"
     override val editorSurfShortTopBar = "上部"
     override val editorSurfShortBody = "本体"
 
     // --- Layout editor: surface long names ---
-    override val editorSurfHomeClassic = "ホーム (クラシック)"
     override val editorSurfHomeNew = "ホーム (新)"
     override val editorSurfLibrary = "ライブラリ"
     override val editorSurfLeftRail = "横のパネル"
@@ -1386,7 +1639,6 @@ object JapaneseStrings : AppStrings {
     override val editorSurfAbout = "このアプリについて"
     override val editorSurfBg = "背景の設定"
     override val editorSurfProfile = "プロフィール"
-    override val editorSurfServer = "サーバーの詳細"
     override val editorSurfTheme = "テーマの選択"
     override val editorSurfShell = "アプリの外枠"
     override val editorSurfTopBar = "上部バー"
@@ -1406,6 +1658,7 @@ object JapaneseStrings : AppStrings {
     override val audioRepeatQueue = "キュー全体"
     override val audioPlaybackOptions = "再生"
     override val audioSkipNext = "次の曲"
+    override val audioQueue = "キュー"
     override val audioSkipPrevious = "前の曲"
     override val audioNoFile = "ファイルなし"
     override val audioStatusReady = "準備完了"
@@ -1435,8 +1688,16 @@ object JapaneseStrings : AppStrings {
     override fun readOnlyDataBody(stores: String) =
         "新しいビルドのランチャーが書き込んでいます: $stores。読み取り専用で開いているため、このセッションでは書き戻せません。" +
             "変更はランチャーを閉じると失われます。編集するには更新してください。"
+    override fun readOnlyDataBodyOldFormat(stores: String) =
+        "このビルドが正確に読めない形式で保存されています: $stores。ファイルはそのまま残し、読み取り専用で開いています。" +
+            "今の変更は終了時に失われます。古いビルドなら読み込めます。"
+    override fun readOnlyDataBodyDamaged(stores: String) =
+        "今回は読み込めませんでした: $stores。ファイルはそのまま残し、読み取り専用で開いています。今の変更は終了時に失われます。" +
+            "次の起動でもう一度読み込みます。それでも読めない場合は、リカバリーモードでリセットできます。"
     override val readOnlyDataLibrary = "パックのライブラリ"
     override val readOnlyDataLayout = "レイアウト"
+    override val readOnlyDataTheme    = "テーマ"
+    override val readOnlyDataAccounts = "保存済みのアカウント"
     override val videoFetchingTool = "ダウンローダーを取得中"
     override val videoResolvingPage = "ページを読み取り中"
     override val videoDownloading = "ダウンロード中"

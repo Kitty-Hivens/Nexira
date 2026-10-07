@@ -21,7 +21,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Density
 import hivens.ui.surface.NxSurface
-import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.text.needsCjkFace
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.Spacing
@@ -29,6 +28,9 @@ import hivens.ui.theme.nexiraCjkFamily
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
 import kotlin.test.Test
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
+import hivens.ui.surface.SurfaceKind
 
 /**
  * Proof that the whole chain holds: locale, strings, and the face that draws
@@ -45,18 +47,18 @@ class JapaneseUiRenderProbe {
 
     @Composable
     private fun Panel(title: String, rows: List<Pair<String, String>>) {
-        NxSurface(NxSurfaceLevel.Floating, Modifier.width(360.dp()), shape = MaterialTheme.shapes.medium) {
+        NxSurface(SurfaceKind.Panel, Modifier.width(360.dp()), shape = MaterialTheme.shapes.medium) {
             Column(Modifier.fillMaxWidth().padding(Spacing.s16)) {
                 Text(
                     title, style = MaterialTheme.typography.titleMedium,
-                    color = NxTheme.colors.textPrimary, fontWeight = FontWeight.SemiBold,
+                    color = NxInk.main, fontWeight = FontWeight.SemiBold,
                 )
                 Spacer(Modifier.height(Spacing.s12))
                 rows.forEach { (label, sub) ->
                     Row(Modifier.fillMaxWidth().padding(vertical = Spacing.s6)) {
                         Column(Modifier.width(320.dp())) {
-                            Text(label, style = MaterialTheme.typography.bodyMedium, color = NxTheme.colors.textPrimary)
-                            Text(sub, style = MaterialTheme.typography.labelSmall, color = NxTheme.colors.textSecondary)
+                            Text(label, style = MaterialTheme.typography.bodyMedium, color = NxInk.main)
+                            Text(sub, style = MaterialTheme.typography.labelSmall, color = NxInk.quiet)
                         }
                     }
                 }
@@ -78,9 +80,9 @@ class JapaneseUiRenderProbe {
                 } else {
                     nexiraCjkFamily()
                 }
-                NxTheme(useDarkTheme = true, uiFamily = family) {
+                NxTheme(dark = true, uiFamily = family) {
                     Box(
-                        Modifier.fillMaxSize().background(NxTheme.colors.background).padding(Spacing.s16),
+                        Modifier.fillMaxSize().background(NxColor.page).padding(Spacing.s16),
                         contentAlignment = Alignment.Center,
                     ) {
                         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s16)) {

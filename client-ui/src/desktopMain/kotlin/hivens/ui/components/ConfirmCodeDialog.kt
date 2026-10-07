@@ -45,9 +45,11 @@ import hivens.ui.nx.NxButtonStyle
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetField
 import hivens.ui.surface.NxSurface
-import hivens.ui.surface.NxSurfaceLevel
+import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.LocalMonoFamily
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.Status
 
 /** How many digits the second factor asks for. */
 private const val CODE_LENGTH = 6
@@ -106,7 +108,7 @@ fun ConfirmCodeDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
-        NxSurface(level = NxSurfaceLevel.Floating, modifier = Modifier.width(420.dp)) {
+        NxSurface(SurfaceKind.Dialog, modifier = Modifier.width(420.dp)) {
             Column(
                 Modifier.fillMaxWidth().padding(24.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -115,12 +117,12 @@ fun ConfirmCodeDialog(
                     s.auth2faTitle,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = NxTheme.colors.textPrimary,
+                    color = NxInk.main,
                 )
                 Text(
                     s.auth2faPrompt,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = NxTheme.colors.textSecondary,
+                    color = NxInk.quiet,
                 )
 
                 PuppetField("$puppetPrefix.code", code, enabled = !isSubmitting) { accept(it) }
@@ -140,8 +142,8 @@ fun ConfirmCodeDialog(
                         keyboardActions = KeyboardActions(
                             onDone = { if (complete && !isSubmitting) onSubmit(code) },
                         ),
-                        cursorBrush = SolidColor(NxTheme.colors.primary),
-                        textStyle = TextStyle(color = NxTheme.colors.textPrimary),
+                        cursorBrush = SolidColor(NxColor.lead()),
+                        textStyle = TextStyle(color = NxInk.main),
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(56.dp)
@@ -154,7 +156,7 @@ fun ConfirmCodeDialog(
                 if (errorMessage != null) {
                     Text(
                         errorMessage,
-                        color = NxTheme.colors.error,
+                        color = NxColor.status(Status.Error, text = true),
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
@@ -168,7 +170,7 @@ fun ConfirmCodeDialog(
                         CircularProgressIndicator(
                             modifier = Modifier.size(18.dp),
                             strokeWidth = 2.dp,
-                            color = NxTheme.colors.primary,
+                            color = NxColor.lead(),
                         )
                         Spacer(Modifier.width(12.dp))
                     }
@@ -204,13 +206,13 @@ internal fun ConfirmCodeCellsForTest(code: String, hasError: Boolean = false, di
 
 @Composable
 /**
- * One cell per digit. The cell taking the next character carries the accent border,
+ * One cell per digit. The cell taking the next character carries a wash of the accent,
  * so the caret's position is legible even though the real caret is on the hidden
  * field above.
  */
 private fun CodeCells(code: String, hasError: Boolean, dimmed: Boolean) {
     val shape = MaterialTheme.shapes.small
-    val accent = if (hasError) NxTheme.colors.error else NxTheme.colors.primary
+    val accent = if (hasError) NxColor.status(Status.Error) else NxColor.lead()
     Row(
         Modifier.fillMaxWidth().alpha(if (dimmed) 0.6f else 1f),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -219,8 +221,7 @@ private fun CodeCells(code: String, hasError: Boolean, dimmed: Boolean) {
             val filled = index < code.length
             val isNext = index == code.length
             NxSurface(
-                level = NxSurfaceLevel.Sunken,
-                blurDp = 0f,
+                kind = SurfaceKind.Field,
                 shape = shape,
                 modifier = Modifier.weight(1f).height(56.dp),
             ) {
@@ -228,10 +229,7 @@ private fun CodeCells(code: String, hasError: Boolean, dimmed: Boolean) {
                     Modifier
                         .fillMaxWidth()
                         .height(56.dp)
-                        .background(
-                            color = if (isNext) accent.copy(alpha = 0.10f) else NxTheme.colors.surface.copy(alpha = 0f),
-                            shape = shape,
-                        ),
+                        .then(if (isNext) Modifier.background(NxColor.wash(accent, 0.10f), shape) else Modifier),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
@@ -240,7 +238,7 @@ private fun CodeCells(code: String, hasError: Boolean, dimmed: Boolean) {
                             fontFamily = LocalMonoFamily.current,
                             fontSize = 24.sp,
                             textAlign = TextAlign.Center,
-                            color = if (hasError) NxTheme.colors.error else NxTheme.colors.textPrimary,
+                            color = if (hasError) NxColor.status(Status.Error, text = true) else NxInk.main,
                         ),
                     )
                 }

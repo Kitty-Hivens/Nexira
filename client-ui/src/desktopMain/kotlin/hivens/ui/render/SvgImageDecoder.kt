@@ -28,6 +28,7 @@ import java.io.ByteArrayOutputStream
 import java.util.Base64
 import javax.imageio.ImageIO
 import kotlin.math.ceil
+import kotlin.math.roundToInt
 
 /**
  * Rasterises an SVG at the size the SVG itself declares.
@@ -160,8 +161,11 @@ internal class SvgImageDecoder(
             val askedW = if (forcedWidth > 0) forcedWidth else ceilOrZero(declared.width)
             val askedH = if (forcedHeight > 0) forcedHeight else ceilOrZero(declared.height)
             if (askedW <= 0 || askedH <= 0 || askedW > MAX_EDGE || askedH > MAX_EDGE) return null
-            val width = askedW.coerceAtMost(cap)
-            val height = askedH.coerceAtMost(cap)
+            // Scaled down as one shape. Each edge capped on its own squashed an
+            // oversized wide or tall icon instead of shrinking it.
+            val shrink = minOf(1.0, cap.toDouble() / maxOf(askedW, askedH))
+            val width = (askedW * shrink).roundToInt().coerceAtLeast(1)
+            val height = (askedH * shrink).roundToInt().coerceAtLeast(1)
             if (budget != null && !budget.take(width, height)) return null
 
             val raster = BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB)
@@ -198,7 +202,10 @@ internal class SvgImageDecoder(
             val unit = ABSOLUTE_UNITS.keys.firstOrNull { v.endsWith(it) }
             val number = (if (unit != null) v.dropLast(unit.length) else v).trim().toFloatOrNull() ?: return 0
             val px = number * (unit?.let { ABSOLUTE_UNITS.getValue(it) } ?: 1f)
-            return ceilOrZero(px).coerceAtMost(MAX_ICON_EDGE)
+            // Bounded by the refusal limit only. Capping it at the icon size here
+            // took the two edges of a box down separately, and the squash survived
+            // into the raster; rasterise brings the box to size as one shape.
+            return ceilOrZero(px).coerceAtMost(MAX_EDGE)
         }
 
         /** CSS absolute units, in pixels. The relative ones are deliberately absent. */

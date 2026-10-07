@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import hivens.ui.theme.NxColor
 
 /**
  * Provenance pill: a short [label] on the source's brand [color]. Domain-neutral
@@ -19,10 +20,15 @@ fun NxSourceBadge(
     label: String,
     color: Color,
     modifier: Modifier = Modifier,
-) = NxPill(
-    text       = label,
-    container  = color.copy(alpha = 0.85f),
-    label      = Color.White,
-    modifier   = modifier,
-    fontWeight = FontWeight.Bold,
-)
+) {
+    // The brand colour is data and stays as given. The label is whichever ink reads on
+    // it. It used to be white on every brand, which a bright one does not survive.
+    val fill = NxColor.wash(color, 0.85f)
+    NxPill(
+        text       = label,
+        container  = fill,
+        label      = NxColor.on(fill),
+        modifier   = modifier,
+        fontWeight = FontWeight.Bold,
+    )
+}

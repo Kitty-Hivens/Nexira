@@ -1,0 +1,473 @@
+package hivens.ui.screens.detail.settings
+
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import coil3.compose.SubcomposeAsyncImage
+import hivens.core.api.interfaces.IMirrorPackClient
+import hivens.core.api.interfaces.IPackRepository
+import hivens.core.data.CachedManifestSnapshot
+import hivens.core.data.PackInstance
+import hivens.core.data.PackOrigin
+import hivens.core.update.PackUpdater
+import hivens.core.update.VersionChannel
+import hivens.launcher.PackOperation
+import hivens.launcher.PackOperationKind
+import hivens.launcher.PackOperationPhase
+import hivens.launcher.PackOperationService
+import hivens.ui.components.ChannelChip
+import hivens.ui.i18n.AppStrings
+import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.NxIcon
+import hivens.ui.nx.NxIconButton
+import hivens.ui.nx.NxMetaChip
+import hivens.ui.nx.NxMetaChipTone
+import hivens.ui.nx.NxSideSheet
+import hivens.ui.nx.NxTabRow
+import hivens.ui.puppet.PuppetClick
+import hivens.ui.puppet.PuppetScreen
+import hivens.ui.screens.mod.loaderLabel
+import hivens.ui.customization.LocalCustomization
+import hivens.ui.theme.Motion
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.Status
+import hivens.ui.theme.decorativeColor
+import hivens.ui.utils.shortNameList
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import org.koin.compose.koinInject
+import java.nio.file.Path
+
+/**
+ * A change to a pack's settings, as a function of the record rather than a copy of
+ * it: applied to whatever the record holds when it is written, so the fields it
+ * does not touch are never carried back from an older read.
+ */
+internal typealias PackEdit = (PackInstance) -> PackInstance
+
+/** An edit on screen that the registry has not carried back yet. */
+private class Edit(val change: PackEdit, val persist: Boolean) {
+    /** This edit followed by [next]: a second change made before the first is written builds on it. */
+    fun then(next: PackEdit, persistNext: Boolean) =
+        Edit({ next(change(it)) }, persist || persistNext)
+}
+
+/**
+ * How long an edit waits before it is written: long enough that typing is one
+ * write rather than one per character, short enough that a click on Close right
+ * after a toggle is the dispose path's problem and not a visible lag.
+ */
+private const val EDIT_SETTLE_MS = 250L
+
+/**
+ * A pack's settings, in a sheet that comes in from the right edge of the window and
+ * leaves the pack page readable beside it: the header names the pack and what it
+ * runs on, the sections are tabs along the top, and the footer is a layout-stable
+ * status strip for the section-launched async work (an update apply, a failed
+ * check), so progress never reflows the panes (Rule 6).
+ *
+ * It was a window mounted inside the centre pane, so its scrim stopped at the rails
+ * and the title bar, and it was sized as a share of that pane. The sheet sits over
+ * the whole window ([NxSideSheet]), keeps one width whatever the display, and widens
+ * on request.
+ *
+ * The long operations it narrates belong to [PackOperationService], not to this
+ * composition: reopening the sheet over a repair that is still running finds it
+ * and picks the narration back up, where sheet-local state would have shown an
+ * idle footer and offered to start a second one.
+ *
+ * Each control hands [save] a [PackEdit] naming the fields it changes, and the
+ * rewritten record arrives back through [pack] because the screen that hosts this
+ * sheet follows the registry. There is no separate form-state blob, and the write
+ * lives here rather than in each section: one write per settled edit, applied
+ * through [IPackRepository.update] to the record as it is at that moment. Writing
+ * the copy this sheet was showing put back whatever had changed underneath it
+ * during the edit: playtime recorded at exit, a build an update had committed.
+ */
+@Composable
+fun PackSettingsSheet(
+    pack: PackInstance,
+    instanceDir: Path,
+    onDismiss: () -> Unit,
+    onOpenVersions: () -> Unit = {},
+    /** Section to open on, or null for the default. Set when returning from the version screen. */
+    initialCategory: PackSettingsCategory? = null,
+) {
+    val s = LocalStrings.current
+    val repo: IPackRepository = koinInject()
+    val appScope: CoroutineScope = koinInject()
+    PuppetScreen("PackSettings.${pack.id}")
+
+    // What the controls render: the record, plus the edit that has not come back
+    // through it yet. A put is a durable write on another dispatcher and the fields
+    // here are fully controlled, so rendering straight off the record dropped
+    // characters between the keystroke and the record catching up, and left a
+    // switch sitting still until it did. Edits compose onto the overlay, so a
+    // second one made inside that window builds on the first.
+    //
+    // The overlay lives only until the write it stands for has been made: from
+    // then on the record is the truth again, whatever it says -- our value, a
+    // write that failed and reverted, or a build applied underneath. [Edit.persist]
+    // is false for an edit something else writes (optional content goes through the
+    // launcher), where the wait is for that write rather than for one made here.
+    var edit by remember(pack.id) { mutableStateOf<Edit?>(null) }
+    val shown = edit?.change?.invoke(pack) ?: pack
+    LaunchedEffect(edit) {
+        val current = edit ?: return@LaunchedEffect
+        // Settle first: a text field commits per keystroke, and one durable write
+        // per character both hammers the registry and lets two of them reach it out
+        // of order -- leaving the record on an older value than the field shows.
+        // A newer edit cancels this effect, so only what the typing settles on is
+        // written, and only ever one write at a time.
+        delay(EDIT_SETTLE_MS)
+        if (current.persist) repo.update(pack.id, current.change)
+        if (edit === current) edit = null
+    }
+    // Closing the sheet is not what discards an edit it has not written yet, and
+    // the composition scope above dies with it.
+    val unwritten = rememberUpdatedState(edit)
+    DisposableEffect(pack.id) {
+        val id = pack.id
+        onDispose {
+            unwritten.value?.takeIf { it.persist }?.let { pendingEdit ->
+                appScope.launch { repo.update(id, pendingEdit.change) }
+            }
+        }
+    }
+
+    /** Show an edit and persist it. */
+    val save: (PackEdit) -> Unit = { change -> edit = edit?.then(change, persistNext = true) ?: Edit(change, persist = true) }
+
+    /** Show an edit that something else persists -- optional content goes through the launcher. */
+    val adopt: (PackEdit) -> Unit = { change -> edit = edit?.then(change, persistNext = false) ?: Edit(change, persist = false) }
+
+    val isMirror = pack.packRef.origin == PackOrigin.Mirror
+    // Whether anything can offer this instance other builds, asked of the updater
+    // rather than inferred from where the pack came from.
+    val updater: PackUpdater = koinInject()
+    val hasVersionFeed = remember(pack.packRef.origin) { updater.handles(pack) }
+    // A local pack has no feed and still has a version to set: its loader's.
+    val isLocal = pack.packRef.origin == PackOrigin.Local
+    val categories = remember(hasVersionFeed, isMirror, isLocal) {
+        PackSettingsCategory.entries.filter {
+            (hasVersionFeed || isLocal || !it.needsVersionFeed) && (isMirror || !it.needsOptionalContent)
+        }
+    }
+    var selected by remember(pack.id) { mutableStateOf(initialCategory ?: PackSettingsCategory.General) }
+    // A detach mid-session drops the Version section; fall back so the pane never
+    // dispatches a category the tabs no longer show.
+    if (selected !in categories) selected = PackSettingsCategory.General
+    var expanded by remember(pack.id) { mutableStateOf(false) }
+
+    val operations: PackOperationService = koinInject()
+    val inFlight by operations.operations.collectAsState()
+    val operation = inFlight[pack.id]
+    // A check is short and belongs to the sheet, so its failure is a sheet-local
+    // line rather than an entry in the app-scoped registry.
+    var notice by remember(pack.id) { mutableStateOf<String?>(null) }
+
+    // The result of a finished operation is read here and nowhere else, so it is
+    // dropped when the sheet goes: a repair from twenty minutes ago has nothing to
+    // say to the next visit. A running one is left alone -- closing the sheet is
+    // not what ends it.
+    DisposableEffect(pack.id) {
+        onDispose { operations.dismiss(pack.id) }
+    }
+
+    NxSideSheet(onDismissRequest = onDismiss, expanded = expanded) { close ->
+        PuppetClick("packSettings.close") { close() }
+        SheetHeader(
+            pack       = shown,
+            isMirror   = isMirror,
+            expanded   = expanded,
+            onExpand   = { expanded = !expanded },
+            onClose    = close,
+        )
+        categories.forEach { category ->
+            PuppetClick("packSettings.category.${category.name}") { selected = category }
+        }
+        NxTabRow(
+            tabs     = categories.map { it.label(s) },
+            selected = categories.indexOf(selected),
+            onSelect = { selected = categories[it] },
+            modifier = Modifier.padding(horizontal = 24.dp),
+        )
+        Box(Modifier.fillMaxWidth().padding(top = 8.dp).height(1.dp).background(NxInk.line))
+
+        // The section being left goes first, fading where it stands, and the next one
+        // comes in a moment later from the side its tab is on. Moving both at once laid
+        // two panes over each other for the length of the move.
+        val still = LocalCustomization.current.reduceMotion
+        val slide = Motion.panelSlide
+        val fade = Motion.fade
+        val leave = Motion.tap
+        AnimatedContent(
+            targetState = selected,
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            transitionSpec = {
+                if (still) {
+                    EnterTransition.None togetherWith ExitTransition.None
+                } else {
+                    val forward = categories.indexOf(targetState) > categories.indexOf(initialState)
+                    val towards = if (forward) 1 else -1
+                    val after = leave.durationMs
+                    (
+                        slideInHorizontally(tween(slide.durationMs, after, slide.easing)) { it / SECTION_TRAVEL * towards } +
+                            fadeIn(tween(fade.durationMs, after, fade.easing))
+                        ) togetherWith fadeOut(tween(leave.durationMs, easing = leave.easing))
+                }
+            },
+            label = "packSettingsSection",
+        ) { section ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 24.dp, vertical = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(28.dp),
+            ) {
+                when (section) {
+                    PackSettingsCategory.General ->
+                        PackGeneralSection(shown, save)
+                    PackSettingsCategory.Runtime ->
+                        PackRuntimeSection(shown, instanceDir, save)
+                    PackSettingsCategory.Version ->
+                        PackVersionSection(shown, operation, save, onOpenVersions, onNotice = { notice = it })
+                    PackSettingsCategory.Content ->
+                        PackContentSection(shown, adopt)
+                    PackSettingsCategory.Data ->
+                        PackDataSection(shown, instanceDir, operation, onDismiss)
+                }
+            }
+        }
+
+        FooterStatus(operation, notice)
+    }
+}
+
+/** How far a section travels on a tab change, as a share of the sheet's width. */
+private const val SECTION_TRAVEL = 24
+
+/**
+ * Identity header: the pack's mark, what the sheet is and which pack and runtime it
+ * is about, the installed build with its channel where a source names one, then
+ * widen and close. Channel data arrives best-effort (offline settings stay fully
+ * usable; the chips just do not render).
+ */
+@Composable
+private fun SheetHeader(
+    pack: PackInstance,
+    isMirror: Boolean,
+    expanded: Boolean,
+    onExpand: () -> Unit,
+    onClose: () -> Unit,
+) {
+    val s = LocalStrings.current
+    val mirror: IMirrorPackClient = koinInject()
+    val installed = pack.pinnedPackVersion ?: pack.packRef.version
+
+    // Best-effort: offline (or a faked client) just means no channel chip.
+    val installedChannel by produceState<VersionChannel?>(null, pack.id, installed) {
+        if (!isMirror || installed.isNullOrBlank()) return@produceState
+        value = runCatching { mirror.fetchManifestVersion(pack.packRef.id, installed).versionChannel }.getOrNull()
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 24.dp, end = 16.dp, top = 18.dp, bottom = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        HeaderAvatar(pack)
+        Column(Modifier.weight(1f)) {
+            Text(
+                s.packSettingsTitle,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = NxInk.main,
+                maxLines = 1,
+            )
+            Text(
+                listOfNotNull(pack.displayName, pack.cachedManifest?.let { runtimeLine(it, s) }).joinToString(" · "),
+                style = MaterialTheme.typography.bodySmall,
+                color = NxInk.quiet,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        if (isMirror && installed != null) {
+            NxMetaChip("v$installed", tone = NxMetaChipTone.Surface)
+            installedChannel?.let { ChannelChip(it) }
+        }
+        NxIconButton(
+            icon = if (expanded) NxIcon.CloseFullscreen else NxIcon.OpenInFull,
+            contentDescription = if (expanded) s.packSettingsCollapse else s.packSettingsExpand,
+            onClick = onExpand,
+        )
+        NxIconButton(
+            icon = NxIcon.Close,
+            contentDescription = s.packSettingsClose,
+            onClick = onClose,
+        )
+    }
+}
+
+/**
+ * What a pack runs on, in one phrase: the loader with its version on a Minecraft
+ * version. The loader version is the part nothing else on screen showed, and the
+ * one a player needs to say which build of the loader a crash came from.
+ */
+internal fun runtimeLine(m: CachedManifestSnapshot, s: AppStrings): String {
+    val loader = m.loaderName
+        .takeIf { it.isNotBlank() && !it.equals("vanilla", ignoreCase = true) }
+        ?.let(::loaderLabel)
+    return when {
+        loader == null -> s.packSettingsRuntimeVanilla(m.minecraftVersion)
+        m.loaderVersion.isBlank() -> s.packSettingsRuntimeLine(loader, m.minecraftVersion)
+        else -> s.packSettingsRuntimeLine("$loader ${m.loaderVersion}", m.minecraftVersion)
+    }
+}
+
+@Composable
+private fun HeaderAvatar(pack: PackInstance) {
+    val initials = pack.displayName
+        .split(' ', '-', '_')
+        .filter { it.isNotBlank() }
+        .take(2)
+        .joinToString("") { it.first().uppercaseChar().toString() }
+        .ifEmpty { "?" }
+    val fallbackTint = decorativeColor(pack.id)
+    val box = Modifier.size(40.dp).clip(RoundedCornerShape(10.dp))
+    SubcomposeAsyncImage(
+        model              = pack.iconUrl,
+        contentDescription = null,
+        contentScale       = ContentScale.Crop,
+        modifier           = box,
+        loading            = { Box(Modifier.fillMaxSize().background(fallbackTint)) },
+        error              = {
+            Box(Modifier.fillMaxSize().background(fallbackTint), contentAlignment = Alignment.Center) {
+                Text(initials, color = Color.White, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+            }
+        },
+    )
+}
+
+/**
+ * Layout-stable footer strip: the instance's long operation, or -- when it has
+ * none -- whatever the sheet itself has to report.
+ */
+@Composable
+private fun FooterStatus(operation: PackOperation?, notice: String?) {
+    val s = LocalStrings.current
+    Box(
+        modifier = Modifier.fillMaxWidth().height(34.dp).padding(horizontal = 24.dp, vertical = 6.dp),
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        val phase = operation?.phase
+        when {
+            phase is PackOperationPhase.Running -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                if (phase.total > 0) {
+                    LinearProgressIndicator(
+                        progress = { phase.current.toFloat() / phase.total },
+                        modifier = Modifier.width(140.dp),
+                        color    = NxColor.lead(),
+                    )
+                    Text(
+                        text     = when (operation.kind) {
+                            PackOperationKind.Update -> s.packVersionsApplying(phase.current, phase.total, phase.path)
+                            PackOperationKind.Repair -> s.packSettingsRepairProgress(phase.current, phase.total, phase.path)
+                        },
+                        style    = MaterialTheme.typography.labelSmall,
+                        color    = NxInk.quiet,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                } else {
+                    LinearProgressIndicator(modifier = Modifier.width(140.dp), color = NxColor.lead())
+                }
+            }
+            phase is PackOperationPhase.Updated -> Text(
+                text  = s.packVersionsApplied(phase.version),
+                style = MaterialTheme.typography.labelSmall,
+                color = NxColor.status(Status.Success, text = true),
+            )
+            // A repair that left something unresolved is not a success line. The
+            // instance is short of a file the pack names either way, and saying so
+            // in the same green as "all intact" is what let a half-finished repair
+            // read as a finished one.
+            phase is PackOperationPhase.Repaired && phase.failed.isNotEmpty() -> Text(
+                text  = s.packSettingsRepairIncomplete(
+                    phase.checked,
+                    phase.repaired,
+                    phase.failed.size,
+                    shortNameList(phase.failed),
+                ),
+                style    = MaterialTheme.typography.labelSmall,
+                color    = NxColor.status(Status.Warning, text = true),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            phase is PackOperationPhase.Repaired -> Text(
+                text  = s.packSettingsRepairDone(phase.checked, phase.repaired),
+                style = MaterialTheme.typography.labelSmall,
+                color = NxColor.status(Status.Success, text = true),
+            )
+            phase is PackOperationPhase.Failed -> FooterError(s.packVersionsFailed(phase.message))
+            notice != null -> FooterError(notice)
+        }
+    }
+}
+
+@Composable
+private fun FooterError(text: String) {
+    Text(
+        text     = text,
+        style    = MaterialTheme.typography.labelSmall,
+        color    = NxColor.status(Status.Error, text = true),
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+    )
+}

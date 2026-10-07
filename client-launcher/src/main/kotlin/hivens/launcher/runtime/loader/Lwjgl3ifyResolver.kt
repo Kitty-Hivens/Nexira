@@ -5,6 +5,7 @@ import hivens.core.platform.Platform
 import hivens.launcher.runtime.MavenCoord
 import hivens.launcher.runtime.MojangLibrary
 import hivens.launcher.runtime.flattenArguments
+import hivens.core.net.metadataTimeout
 import io.ktor.client.request.prepareGet
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.isSuccess
@@ -13,6 +14,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
 import java.io.IOException
+import java.nio.file.Path
 
 /**
  * lwjgl3ify resolver: Minecraft 1.7.10 modernised onto LWJGL3 and Java 21+.
@@ -53,24 +55,44 @@ class Lwjgl3ifyResolver(
     private val json: Json,
     osName: String = System.getProperty("os.name", ""),
     private val releaseBase: String = LWJGL3IFY_RELEASES,
+    private val releasesApi: String = LWJGL3IFY_RELEASES_API,
+    /** Where a version's profile is kept, so a relaunch needs no release fetch. */
+    cacheDir: Path? = null,
 ) : LoaderResolver {
 
     override val loaderId: String = "lwjgl3ify"
 
     private val log = LoggerFactory.getLogger(Lwjgl3ifyResolver::class.java)
     private val mojangOs: String = Platform.classify(osName).mojang
+    private val cache = LoaderSourceCache(cacheDir)
 
     override suspend fun resolve(mcVersion: String, loaderVersion: String): LoaderProfile =
         withContext(Dispatchers.IO) {
-            val url = "${releaseBase.trimEnd('/')}/$loaderVersion/version.json"
-            log.info("lwjgl3ify: fetching profile {}", url)
-            val text = clientProvider.current.prepareGet(url).execute { resp ->
-                if (!resp.status.isSuccess()) {
-                    throw IOException("lwjgl3ify $loaderVersion: GET $url -> HTTP ${resp.status}")
+            // No index to ask for the latest, as with Cleanroom.
+            if (loaderVersion.isBlank()) throw IOException("lwjgl3ify needs a version to install, and none was given")
+            // As with Cleanroom: one Minecraft version, and nothing else to layer onto.
+            if (mcVersion != LWJGL3IFY_MINECRAFT) throw IOException("lwjgl3ify runs on Minecraft $LWJGL3IFY_MINECRAFT, not $mcVersion")
+            val kept = cache.fileFor(loaderId, loaderVersion, "version.json")
+            val parsed = cache.readText(kept)
+                ?.let { runCatching { json.decodeFromString(LoaderVersionJson.serializer(), it) }.getOrNull() }
+                ?: run {
+                    val url = "${releaseBase.trimEnd('/')}/$loaderVersion/version.json"
+                    log.info("lwjgl3ify: fetching profile {}", url)
+                    val text = clientProvider.current.prepareGet(url) { metadataTimeout() }.execute { resp ->
+                        if (!resp.status.isSuccess()) {
+                            throw IOException("lwjgl3ify $loaderVersion: GET $url -> HTTP ${resp.status}")
+                        }
+                        resp.bodyAsText()
+                    }
+                    json.decodeFromString(LoaderVersionJson.serializer(), text).also { cache.writeText(kept, text) }
                 }
-                resp.bodyAsText()
-            }
-            buildProfile(json.decodeFromString(LoaderVersionJson.serializer(), text))
+            buildProfile(parsed).copy(version = loaderVersion)
+        }
+
+    override suspend fun availableVersions(mcVersion: String): List<LoaderVersionOption> =
+        if (mcVersion != LWJGL3IFY_MINECRAFT) emptyList()
+        else withContext(Dispatchers.IO) {
+            githubReleaseVersions(clientProvider, json, releasesApi) { "version.json" }
         }
 
     /**
@@ -85,6 +107,7 @@ class Lwjgl3ifyResolver(
         return LoaderProfile(
             libraries = classpath,
             mainClass = version.mainClass,
+            version = "",
             jvmArgs = stripCommandOwnedArgs(flattenArguments(args?.jvm.orEmpty(), mojangOs)),
             gameArgs = extractTweakClassArgs(flattenArguments(args?.game.orEmpty(), mojangOs)),
             removeFromBase = { it.group == LWJGL2_GROUP || it.groupArtifact in SUPERSEDED_BY_FORGEPATCHES },
@@ -130,6 +153,7 @@ class Lwjgl3ifyResolver(
 
     companion object {
         const val LWJGL3IFY_RELEASES = "https://github.com/GTNewHorizons/lwjgl3ify/releases/download"
+        const val LWJGL3IFY_RELEASES_API = "https://api.github.com/repos/GTNewHorizons/lwjgl3ify/releases?per_page=50"
         /** Vanilla's LWJGL2 maven group, dropped so LWJGL3 is the only LWJGL on -cp. */
         const val LWJGL2_GROUP = "org.lwjgl.lwjgl"
 
@@ -147,7 +171,9 @@ class Lwjgl3ifyResolver(
             "org.apache.commons:commons-compress",
             "org.apache.commons:commons-lang3",
         )
-        /** Target Java major; the profile declares none, upstream targets 17-21. */
+        /** The one Minecraft version lwjgl3ify builds on. */
+        const val LWJGL3IFY_MINECRAFT = "1.7.10"
+        /** Target Java major. The profile declares none, and upstream targets 17 to 21. */
         const val LWJGL3IFY_JAVA_MAJOR = 21
     }
 }

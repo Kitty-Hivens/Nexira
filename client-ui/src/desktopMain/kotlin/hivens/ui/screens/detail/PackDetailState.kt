@@ -8,12 +8,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackInstance
-import hivens.core.data.SessionData
 import hivens.launcher.launch.LauncherController
 import hivens.launcher.platform.PlatformPaths
-import hivens.ui.notifications.LaunchTarget
-import hivens.ui.notifications.drivers.LaunchDriver
 import hivens.ui.platform.SystemActions
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import java.nio.file.Path
 
@@ -41,18 +40,20 @@ internal sealed interface PackResolution {
  * composable that owns IO also cannot be tested without a composition, so the
  * resolve path had no coverage at all.
  *
- * Launching arrives as [launch] / [abort] lambdas rather than the controller
- * itself. The screen no longer names a launcher type, and the holder stays
- * constructible in a test without one.
+ * Stopping arrives as an [abort] lambda rather than the controller itself, so
+ * the holder stays constructible in a test without one. Starting a launch is
+ * not here: the launch control decides whether and how, for this page and the
+ * home widgets alike (see [hivens.ui.components.rememberLaunchControl]).
  */
 @Stable
 internal class PackDetailState(
     private val instanceId: String,
     private val repo: IPackRepository,
     private val dataDir: Path,
-    private val launch: (SessionData, PackInstance) -> Unit,
     private val abort: () -> Unit,
     private val openInFileManager: (Path) -> Unit,
+    /** App scope: the record write must outlive the screen that asked for it. */
+    private val writeScope: CoroutineScope,
 ) {
     var resolution by mutableStateOf(resolve(repo.observe().value))
         private set
@@ -85,12 +86,25 @@ internal class PackDetailState(
             ?.let { PackResolution.Ready(it) }
             ?: PackResolution.NotFound
 
-    fun play(session: SessionData) {
-        val target = pack ?: return
-        launch(session, target)
-    }
-
     fun abortLaunch() = abort()
+
+    /**
+     * Take the provenance notice down for good.
+     *
+     * The note is a one-time message about how this instance came to be -- an
+     * import that could not fetch every file, a pack built here -- and once it
+     * has been read it is a permanent band across the top of the page reporting
+     * something that happened once. Cleared on the record rather than hidden in
+     * the screen, so it stays gone after a restart.
+     */
+    fun dismissNotes() {
+        val target = pack ?: return
+        if (target.notes.isBlank()) return
+        // The one field, on the record as it stands: the copy in hand can predate an
+        // update commit or a playtime write, and putting it back whole undid them, or
+        // brought back an instance deleted meanwhile.
+        writeScope.launch { repo.update(target.id) { it.copy(notes = "") } }
+    }
 
     fun openFolder() {
         instanceDir?.let(openInFileManager)
@@ -102,23 +116,15 @@ internal fun rememberPackDetailState(instanceId: String): PackDetailState {
     val repo: IPackRepository = koinInject()
     val paths: PlatformPaths = koinInject()
     val controller: LauncherController = koinInject()
-    val launchDriver: LaunchDriver = koinInject()
-    return remember(instanceId, repo, paths, controller, launchDriver) {
+    val writeScope: CoroutineScope = koinInject()
+    return remember(instanceId, repo, paths, controller, writeScope) {
         PackDetailState(
             instanceId = instanceId,
             repo       = repo,
             dataDir    = paths.dataDir,
-            // Launch first, then observe: the controller answers whether it took
-            // this launch, and only a launch that started has anything to narrate.
-            // The state it publishes is a StateFlow, so the observer still sees the
-            // Prepare it subscribes after.
-            launch     = { session, pack ->
-                if (controller.launchPackInstance(session, pack)) {
-                    launchDriver.observe(LaunchTarget.Pack(pack))
-                }
-            },
-            abort      = controller::abort,
+            abort      = { controller.abort(instanceId) },
             openInFileManager = { dir -> SystemActions.openFolder(dir.toString()) },
+            writeScope = writeScope,
         )
     }
 }

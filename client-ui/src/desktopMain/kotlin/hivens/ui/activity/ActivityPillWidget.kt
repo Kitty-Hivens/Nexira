@@ -67,9 +67,10 @@ import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxProgressBar
 import hivens.ui.surface.NxSurface
-import hivens.ui.surface.NxSurfaceLevel
+import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.Motion
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.Status
 import hivens.widget.api.rememberProps
 import hivens.widget.model.PropLabel
 import hivens.widget.model.PropRange
@@ -79,6 +80,7 @@ import kotlinx.coroutines.delay
 import kotlinx.serialization.Serializable
 import org.koin.compose.koinInject
 import kotlin.time.Duration.Companion.milliseconds
+import hivens.ui.theme.NxInk
 
 /** How the measure is drawn. See the design review for what each costs. */
 @Serializable
@@ -219,7 +221,6 @@ internal fun Pill(
     maxWidth: Dp,
     open: Boolean = true,
 ) {
-    val colors = NxTheme.colors
     val height = props.heightDp.dp
     // A panel's corner, not a capsule's. A fully rounded object at this size
     // reads as a chip no matter what is in it; the radius is what makes it a
@@ -236,10 +237,12 @@ internal fun Pill(
     val shape = RoundedCornerShape(corner)
     val fraction = activity.fraction()
     val failed = activity.phase as? ActivityPhase.Failed
-    val accent = if (failed != null) colors.criticalAccent else colors.progressAccent
+    val status = if (failed != null) Status.Error else Status.Info
 
     NxSurface(
-        level = NxSurfaceLevel.Floating,
+        // A notice is opaque: the object floats over arbitrary content, so the
+        // legibility floor cannot depend on what happens to be behind it.
+        kind = SurfaceKind.Notice,
         // The bound is required, not optional: the title takes a weight, and a
         // weight in a Row with unbounded width is undefined -- which is how the
         // controls ended up drawn outside the body.
@@ -261,10 +264,9 @@ internal fun Pill(
         // gained a shadow the moment a selection took over and lost it again
         // afterwards.
         shadowDp = 18f,
-        // Opaque body: the object floats over arbitrary content, so the
-        // legibility floor cannot depend on what happens to be behind it.
-        opacity = 1f,
     ) {
+        // Asked for inside the body so it is fitted to the pill rather than to the page under it.
+        val accent = NxColor.status(status)
         // Rule 5: the measure is a property of the object, not a widget parked
         // inside it. Both overlays measure against the surface's OWN bounds via
         // this BoxScope -- matching a wrapping Box put the stroke outside the
@@ -274,7 +276,7 @@ internal fun Pill(
                 Modifier.matchParentSize().clip(shape),
                 contentAlignment = Alignment.CenterStart,
             ) {
-                Box(Modifier.fillMaxSize(fraction ?: 0f).background(accent.copy(alpha = 0.22f)))
+                Box(Modifier.fillMaxSize(fraction ?: 0f).background(NxColor.wash(accent, 0.22f)))
             }
         }
         Row(
@@ -303,7 +305,7 @@ internal fun Pill(
                     text = activity.title,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
-                    color = colors.textPrimary,
+                    color = NxInk.main,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     // The name yields first: the measure is the part a truncation
@@ -314,7 +316,7 @@ internal fun Pill(
                     Text(
                         text = it,
                         style = MaterialTheme.typography.labelSmall,
-                        color = colors.textSecondary,
+                        color = NxInk.quiet,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -328,7 +330,7 @@ internal fun Pill(
             // The break between what this is about and what can be done to it.
             // Without it the row reads as one undifferentiated strip.
             if (props.showActions && activity.actions.isNotEmpty()) {
-                VerticalDivider(Modifier.height(26.dp), color = colors.outline)
+                VerticalDivider(Modifier.height(26.dp), color = NxInk.line)
                 Spacer(Modifier.width(2.dp))
             }
             if (props.showActions) {
@@ -369,7 +371,7 @@ private fun EdgeMeasure(
     shape: androidx.compose.foundation.shape.RoundedCornerShape,
     modifier: Modifier,
 ) {
-    val trackColor = NxTheme.colors.textSecondary.copy(alpha = 0.22f)
+    val trackColor = NxColor.wash(NxInk.quiet, 0.22f)
     // A job whose size is not known yet still has to look alive. A static track
     // reads as stalled, which is what a launcher does for the first seconds of
     // every install -- exactly when the user is watching hardest.

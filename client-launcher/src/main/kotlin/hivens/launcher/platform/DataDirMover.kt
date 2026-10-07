@@ -1,5 +1,6 @@
 package hivens.launcher.platform
 
+import hivens.core.io.deleteTree
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.LinkOption
@@ -26,21 +27,29 @@ import java.util.stream.Collectors
  *     apply do we commit the new dir as the override).
  *  2. UI prompts the user to restart.
  *  3. On next startup, BEFORE [PlatformPaths] is consulted, the launcher
- *     calls [applyPending]. It copies the source tree to the target,
- *     verifies the copy, deletes the source, commits the new path as
- *     `data-dir`, and clears the pending markers.
- *  4. If [applyPending] fails partway through, the pending markers stay
- *     set so a retry can happen on a later restart. Source and target
- *     both exist until the apply completes (no destructive ordering).
+ *     calls [applyPending]. It marks the target as a move in progress
+ *     ([IN_PROGRESS_MARKER]), copies the source tree into it, verifies the
+ *     copy, drops the marker, commits the new path as `data-dir` and clears
+ *     the pending markers, and only then deletes the source.
+ *  4. If the copy fails partway through, the pending markers stay set and
+ *     the target keeps its marker, so the next start knows the contents are
+ *     its own unfinished copy and starts it again rather than refusing it.
+ *  5. The source is deleted after the commit, because on Windows this very
+ *     process holds files in it open (the single-instance lock, the log), so
+ *     the delete can fail partway. Whatever it leaves is recorded as
+ *     `data-dir-stale-source` and deleted at the next start, when nothing
+ *     holds it any more. Deleting first used to leave a half-deleted source
+ *     as the data dir and the complete copy unused.
  *
  * Failure modes handled:
  *  - Target doesn't exist -> created
  *  - Target is the source -> no-op, clears pending
- *  - Target already has launcher files -> refused; pending cleared with
- *    error log. User must pick an empty dir or merge manually.
+ *  - Target already has contents that are not an unfinished copy of ours ->
+ *    refused; pending cleared with error log. User must pick an empty dir
+ *    or merge manually.
  *  - Target is inside source -> refused (would recurse during copy)
- *  - I/O failure mid-copy -> target deleted, source intact, pending kept
- *    (retry on next start)
+ *  - I/O failure or a count mismatch mid-copy -> what was copied is
+ *    removed, source intact, pending kept (retry on next start)
  */
 object DataDirMover {
     // Lazy logger -- DataDirMover is referenced from Main.kt's bootstrap
@@ -85,6 +94,7 @@ object DataDirMover {
      */
     fun applyPending(confFile: Path = BootstrapConf.defaultPath()) {
         val conf = BootstrapConf.read(confFile)
+        conf[BootstrapConf.KEY_STALE_SOURCE]?.let { removeStaleSource(it, conf[BootstrapConf.KEY_DATA_DIR], confFile) }
         val sourceStr = conf[BootstrapConf.KEY_PENDING_SOURCE] ?: return
         val targetStr = conf[BootstrapConf.KEY_PENDING_TARGET] ?: return
 
@@ -101,8 +111,10 @@ object DataDirMover {
             return
         }
 
-        // Target already populated (not just the dir, but contents): refuse.
-        if (Files.exists(target) && hasContents(target)) {
+        // Target already populated (not just the dir, but contents): refuse, unless
+        // what is there is this move's own unfinished copy, which is started again.
+        val ownPartialCopy = Files.isRegularFile(target.resolve(IN_PROGRESS_MARKER))
+        if (Files.exists(target) && hasContents(target) && !ownPartialCopy) {
             log.error(
                 "target {} already has contents -- refusing to overwrite. " +
                     "Clearing pending markers; user must pick an empty dir or merge manually.",
@@ -112,31 +124,77 @@ object DataDirMover {
             return
         }
 
-        try {
-            if (!Files.exists(target)) Files.createDirectories(target)
+        val srcCount = try {
+            if (ownPartialCopy) {
+                log.info("target {} holds an unfinished copy from an earlier start, copying again", target)
+                clearCopy(target)
+            }
+            Files.createDirectories(target)
+            Files.writeString(target.resolve(IN_PROGRESS_MARKER), sourceStr)
             copyTree(source, target)
-            // Verify file count matches before deleting source -- cheap sanity.
+            // Verify file count matches before anything is committed -- cheap sanity.
             val srcCount = countFiles(source)
-            val dstCount = countFiles(target)
+            val dstCount = countFiles(target) - 1 // the marker
             if (srcCount != dstCount) {
-                log.error("copy verification failed: source={} files, target={} -- leaving both intact, retry next start", srcCount, dstCount)
+                log.error("copy verification failed: source={} files, target={} -- removing the copy, retry next start", srcCount, dstCount)
+                clearCopy(target)
                 return
             }
-            deleteTree(source)
-            commit(targetStr, confFile)
-            log.info("Data-dir move complete: {} files relocated", srcCount)
+            Files.delete(target.resolve(IN_PROGRESS_MARKER))
+            srcCount
         } catch (e: Exception) {
-            log.error("applyPending() failed mid-flight -- pending markers retained for retry: {}", e.message, e)
+            log.error("applyPending() failed mid-copy -- removing the copy, pending markers retained for retry: {}", e.message, e)
+            runCatching { clearCopy(target) }
+                .onFailure { log.warn("could not remove the unfinished copy in {}; the next start recognises it by its marker", target, it) }
+            return
+        }
+
+        commit(targetStr, confFile, staleSource = sourceStr)
+        log.info("Data-dir move committed: {} files relocated", srcCount)
+        removeStaleSource(sourceStr, targetStr, confFile)
+    }
+
+    /**
+     * Deletes what is left of the old data dir after a committed move, and stops
+     * remembering it once it is gone. Best effort: a file this process still holds
+     * keeps it for the next start. Never the directory in use, whatever the conf says.
+     */
+    private fun removeStaleSource(stale: String, dataDir: String?, confFile: Path) {
+        val path = Paths.get(stale)
+        if (dataDir != null && path.normalize() == Paths.get(dataDir).normalize()) {
+            BootstrapConf.update(confFile) { it.remove(BootstrapConf.KEY_STALE_SOURCE) }
+            return
+        }
+        runCatching { deleteTree(path) }
+            .onFailure { log.warn("old data dir {} not fully removed, trying again next start: {}", path, it.message) }
+        if (!Files.exists(path)) {
+            BootstrapConf.update(confFile) { it.remove(BootstrapConf.KEY_STALE_SOURCE) }
         }
     }
 
-    private fun commit(newDataDir: String, confFile: Path) {
+    /** Empties [target] of what a copy put there, keeping the directory itself. */
+    private fun clearCopy(target: Path) {
+        if (!Files.exists(target)) return
+        Files.walk(target).use { stream ->
+            stream.sorted(Comparator.reverseOrder()).filter { it != target }.forEach { Files.deleteIfExists(it) }
+        }
+    }
+
+    private fun commit(newDataDir: String, confFile: Path, staleSource: String? = null) {
         BootstrapConf.update(confFile) { conf ->
             conf[BootstrapConf.KEY_DATA_DIR] = newDataDir
             conf.remove(BootstrapConf.KEY_PENDING_SOURCE)
             conf.remove(BootstrapConf.KEY_PENDING_TARGET)
+            if (staleSource != null) conf[BootstrapConf.KEY_STALE_SOURCE] = staleSource
         }
     }
+
+    /**
+     * Written into the target before the copy starts and removed once it has been
+     * verified. A target holding it is this move's own unfinished copy, which a
+     * retry may replace, rather than somebody's directory, which it must not.
+     */
+    internal const val IN_PROGRESS_MARKER = ".nexira-move-in-progress"
 
     private fun clearPending(confFile: Path) {
         BootstrapConf.update(confFile) { conf ->
@@ -161,19 +219,13 @@ object DataDirMover {
                     return@forEach
                 }
                 val rel = source.relativize(src)
+                if (isProcessFile(rel)) return@forEach
                 val dst = target.resolve(rel.toString())
                 when {
                     Files.isDirectory(src) -> if (!Files.exists(dst)) Files.createDirectories(dst)
                     else -> Files.copy(src, dst, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES)
                 }
             }
-        }
-    }
-
-    private fun deleteTree(root: Path) {
-        if (!Files.exists(root)) return
-        Files.walk(root).use { stream ->
-            stream.sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) }
         }
     }
 
@@ -188,7 +240,20 @@ object DataDirMover {
      */
     private fun countFiles(root: Path): Long =
         Files.walk(root).use { stream ->
-            stream.filter { Files.isRegularFile(it, LinkOption.NOFOLLOW_LINKS) }
+            stream.filter { Files.isRegularFile(it, LinkOption.NOFOLLOW_LINKS) && !isProcessFile(root.relativize(it)) }
                 .collect(Collectors.counting())
         }
+
+    /**
+     * A file that belongs to the running process rather than to the data: the
+     * single-instance lock, its pid and the raise signal, at the top of the
+     * directory. Not copied, since the next start makes its own in the new place,
+     * and not copyable on Windows anyway: this process holds a mandatory lock on
+     * `.lock`, and a read of it fails there even from the same process, which failed
+     * the whole copy on every start.
+     */
+    private fun isProcessFile(rel: Path): Boolean =
+        rel.nameCount == 1 && rel.fileName.toString() in PROCESS_FILES
+
+    private val PROCESS_FILES = setOf(".lock", ".lock.pid", ".show")
 }

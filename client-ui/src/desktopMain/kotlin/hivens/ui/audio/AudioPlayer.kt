@@ -1,7 +1,9 @@
 package hivens.ui.audio
 
+import dev.hivens.libsound.LatencyProfile
 import dev.hivens.skinema.player.VideoPlayer
 import hivens.ui.diag.SkinemaGate
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -14,6 +16,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
+import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -40,6 +43,51 @@ class AudioPlayer(
      * drag across the whole track is one write and not one per frame.
      */
     private val persistVolume: (Float) -> Unit = {},
+    /**
+     * The queue as the last session left it, and which entry was loaded.
+     *
+     * Restored without opening anything: the engine is what costs a decode thread
+     * and a device, and [play] already opens on demand for a track whose engine
+     * was released. So a launch comes back to the track that was there, named and
+     * ready, and pays for it only when somebody presses play.
+     */
+    initialQueue: List<Path> = emptyList(),
+    initialIndex: Int = -1,
+    /** Where a settled queue goes. Debounced, off the engine thread. */
+    private val persistQueue: (List<Path>, Int) -> Unit = { _, _ -> },
+    /**
+     * Where the sound leaves, when the system will have it under our own name.
+     *
+     * Null, and skinema opens a line for itself exactly as it always did. That is
+     * the fallback and not a degraded mode: what the system output buys is a
+     * stream the mixer shows as Nexira rather than as an anonymous JVM, and
+     * losing that must never cost the sound itself.
+     */
+    private val output: AudioOutput? = null,
+    /**
+     * Where an open file comes from.
+     *
+     * Defaulted, so nothing that builds a player has to know this exists, and a
+     * parameter rather than a hard call so the orchestration around it can be
+     * driven without FFmpeg on the path. What lives above this seam is every
+     * decision the launcher makes about playback: what a queue does at its end,
+     * what a repeat mode means, what a scrub into a finished track reopens into,
+     * and whether a track running into the next one is ever called paused.
+     */
+    private val engines: PlaybackEngines = SkinemaEngines,
+    /**
+     * The one lane every engine touch and the poll loop run on.
+     *
+     * Single by construction, which is what confines the mutable fields below to
+     * one thread: no locking, no torn reads, and no UI freeze when a close blocks
+     * while it joins a decode thread. `limitedParallelism(1)` gives that queue
+     * without owning a dedicated thread.
+     *
+     * A parameter for the same reason the engine is one. All of the behaviour here
+     * is coroutines, so a test that cannot advance them can only wait and hope, and
+     * a scheduler it drives is single-lane in the same way this is.
+     */
+    private val engine: CoroutineDispatcher = Dispatchers.IO.limitedParallelism(1),
 ) {
     private val log = LoggerFactory.getLogger(AudioPlayer::class.java)
 
@@ -85,10 +133,6 @@ class AudioPlayer(
      */
     val track: StateFlow<TrackInfo?> = _track.asStateFlow()
 
-    // Serializes engine ops + the poll loop onto one IO thread. limitedParallelism(1)
-    // gives a confinement queue without owning a dedicated thread.
-    private val engine = Dispatchers.IO.limitedParallelism(1)
-
     private val _queue = MutableStateFlow<List<Path>>(emptyList())
 
     /**
@@ -107,7 +151,7 @@ class AudioPlayer(
     // Confined to [engine] -- only ever touched inside a launch(engine) { } below.
     // The queue flows are written from there too; they are flows rather than plain
     // fields only because the UI reads them.
-    private var player: VideoPlayer? = null
+    private var player: PlaybackEngine? = null
     private var pollJob: Job? = null
     // Skinema represents both "opened, never played" and "played then paused"
     // as State.Paused; this carries the distinction the UI needs (Ready vs
@@ -117,12 +161,48 @@ class AudioPlayer(
     /** The entry the engine is on, derived rather than stored so the two cannot part. */
     private val loadedFile: Path? get() = _queue.value.getOrNull(_queueIndex.value)
 
+    private var queueWrite: Job? = null
+
+    init {
+        // Files that have since moved take their entry with them rather than
+        // sitting in the queue as a row that cannot play, and the index follows
+        // whatever is left.
+        val surviving = initialQueue.filter { runCatching { Files.isRegularFile(it) }.getOrDefault(false) }
+        if (surviving.isNotEmpty()) {
+            _queue.value = surviving
+            val index = initialIndex.coerceIn(0, surviving.lastIndex)
+            _queueIndex.value = index
+            _state.value = PlaybackState.Ready(surviving[index], positionMs = 0L, durationMs = 0L)
+        }
+    }
+
+    /**
+     * Writes the queue once it has settled.
+     *
+     * Debounced for the same reason the loudness is: the settings file is a
+     * read-modify-write of the whole document, and stepping through a queue with
+     * the skip button would otherwise write it once per press.
+     */
+    private fun rememberQueue() {
+        val files = _queue.value
+        val index = _queueIndex.value
+        queueWrite?.cancel()
+        queueWrite = scope.launch {
+            delay(QUEUE_WRITE_DELAY_MS.milliseconds)
+            withContext(Dispatchers.IO) { runCatching { persistQueue(files, index) } }
+        }
+    }
+
     /** One file: a queue of one, so every path through the player is the same path. */
     fun open(file: Path) = open(listOf(file))
 
     /**
-     * Replaces the queue with [files] and loads the first of them, silent, the way
-     * a single open has always behaved: the user pressed a picker, not Play.
+     * Replaces the queue with [files] and loads the first of them, sounding only if
+     * a track was already playing when it arrived.
+     *
+     * A first open with nothing playing stays silent, the way a picker rather than a
+     * Play press always has. An open onto a playing track keeps playing, because
+     * changing what is on while the transport runs is a change of track, not a stop.
      *
      * Replaces rather than appends because this is what the picker does, and a
      * picker that grew the queue every time would make "open" mean "open plus
@@ -132,8 +212,12 @@ class AudioPlayer(
         if (files.isEmpty()) return
         scope.launch(engine) {
             log.info("Audio open requested: {} file(s)", files.size)
+            // Read before the load, which closes the current engine and clears the
+            // flag: this is the transport as it stood when the open arrived.
+            val wasPlaying = _state.value is PlaybackState.Playing
             _queue.value = files
-            loadAt(0, autoplay = false)
+            loadAt(0, autoplay = wasPlaying)
+            rememberQueue()
         }
     }
 
@@ -149,6 +233,7 @@ class AudioPlayer(
             val start = _queue.value.size
             _queue.value = _queue.value + files
             if (hadNothing) loadAt(start, autoplay = false)
+            rememberQueue()
         }
     }
 
@@ -194,6 +279,7 @@ class AudioPlayer(
                 edit.reload -> loadAt(edit.index, autoplay = started)
                 else -> _queueIndex.value = edit.index
             }
+            rememberQueue()
         }
     }
 
@@ -209,6 +295,19 @@ class AudioPlayer(
         val file = _queue.value.getOrNull(index) ?: return
         closeCurrent()
         _queueIndex.value = index
+        // The identity moves as ONE step, and before the engine is opened rather
+        // than after. A reader takes the index and the state together, and between
+        // the two assignments this used to describe the new entry of the queue with
+        // the previous entry's file: a track nothing had ever played, named by an
+        // id nothing would name again, with the old cover still beside it. The gap
+        // was the whole of an FFmpeg open, so anything watching the player rather
+        // than sampling it twice a second caught it every time.
+        _state.value = if (autoplay) {
+            PlaybackState.Playing(file, positionMs = 0L, durationMs = 0L)
+        } else {
+            PlaybackState.Ready(file, positionMs = 0L, durationMs = 0L)
+        }
+        rememberQueue()
         started = autoplay
         // Metadata belongs to the file, so this is the only place it is dropped: a
         // track that ended, or was stopped, is still the track that is loaded.
@@ -226,11 +325,6 @@ class AudioPlayer(
             // first audible buffer, so opening a track makes no sound.
             p.setVolume(0f)
             p.pause()
-        }
-        _state.value = if (autoplay) {
-            PlaybackState.Playing(file, positionMs = 0L, durationMs = 0L)
-        } else {
-            PlaybackState.Ready(file, positionMs = 0L, durationMs = 0L)
         }
         startPolling()
     }
@@ -255,15 +349,31 @@ class AudioPlayer(
      * Constructs the engine for [file], reporting a refusal or a failed open on
      * [state]. Confined to [engine] like every other player touch.
      */
-    private fun openPlayer(file: Path): VideoPlayer? {
+    private fun openPlayer(file: Path): PlaybackEngine? {
         if (!SkinemaGate.enabled) {
             log.warn("Audio open refused: the skinema module is disabled")
             _state.value = PlaybackState.Error(file, AudioError.OpenFailed)
             return null
         }
+        // Named rather than passed inline, so an engine that does not take it
+        // leaves it to somebody. Skinema closes the sink it was handed and can
+        // only do that once it has one, and the one thing that reliably throws
+        // out of this constructor is a natives bundle that will not load, which
+        // does not get better on the next press: each press opened a stream on
+        // the sound server and dropped it unreferenced. Not yet a stream on the
+        // graph, since a sink connects on its first open, but it is an arena and
+        // a registration and it is ours until the engine takes it.
+        //
+        // RELAXED (a 200 ms buffer) because this is a music track nobody is syncing
+        // to a picture: the depth rides out an occasional GC pause a shorter buffer
+        // would underrun on, and the added latency is imperceptible for playback.
+        // The video wallpaper keeps the default, where audio must stay in step with
+        // the frame.
+        val sink = output?.sink(LatencyProfile.RELAXED)
         return try {
-            VideoPlayer(path = file, loop = false, audio = true)
+            engines.open(file, sink)
         } catch (e: Exception) {
+            runCatching { sink?.close() }
             openFailed(file, e)
         } catch (e: LinkageError) {
             // A natives bundle that is missing, or from another FFmpeg line,
@@ -272,11 +382,12 @@ class AudioPlayer(
             // press of Play as a crash instead of a track that will not open.
             // Narrower than Throwable on purpose: an OutOfMemoryError here is
             // not a file that failed to open.
+            runCatching { sink?.close() }
             openFailed(file, e)
         }
     }
 
-    private fun openFailed(file: Path, cause: Throwable): VideoPlayer? {
+    private fun openFailed(file: Path, cause: Throwable): PlaybackEngine? {
         log.error("Failed to open audio file {}", file, cause)
         _state.value = PlaybackState.Error(file, AudioError.OpenFailed)
         return null
@@ -292,9 +403,17 @@ class AudioPlayer(
      * Skinema counts in nanoseconds, so the millisecond the UI works in is
      * converted here rather than at every call site. A track that ran to its end
      * was released by the poll loop, and it is still the track that is loaded, so
-     * a seek into it re-opens the file exactly as [play] does -- the alternative
-     * is a scrubber that silently does nothing once the track finishes, which
-     * from the user's side is the same as a broken control.
+     * a seek into it re-opens the file -- the alternative is a scrubber that
+     * silently does nothing once the track finishes, which from the user's side is
+     * the same as a broken control.
+     *
+     * A re-opened engine is silenced AND paused, which is the pair [loadAt] uses
+     * for an open nobody asked to hear. Skinema begins playing as soon as it is
+     * constructed, so silencing alone left the track running inaudibly with its
+     * position climbing, and the poll loop reported that as playing: a transport
+     * offering a pause button over no sound. The engine is only ever absent here
+     * after a release or a stop, and neither leaves anything started, so this is
+     * the whole of the re-open case rather than one branch of it.
      *
      * The position is clamped into the container's own duration where one is
      * known: a drag to the very end of a bar is a request for the end of the
@@ -305,7 +424,8 @@ class AudioPlayer(
             val file = loadedFile ?: return@launch
             val p = player ?: openPlayer(file)?.also {
                 player = it
-                it.setVolume(if (started) _volume.value else 0f)
+                it.setVolume(0f)
+                it.pause()
                 startPolling()
             } ?: return@launch
             val durationNanos = p.durationNanos
@@ -360,13 +480,29 @@ class AudioPlayer(
                 val p = player ?: break
                 val file = loadedFile ?: break
                 val st = p.state
-                _state.value = mapPlaybackState(
-                    file    = file,
-                    st      = st,
-                    started = started,
-                    posMs   = p.positionNanos() / 1_000_000L,
-                    durMs   = (p.durationNanos ?: 0L) / 1_000_000L,
-                )
+                val ended = st == VideoPlayer.State.Ended
+                val looping = ended && _repeat.value == RepeatMode.One
+                val next = if (ended && !looping) {
+                    nextQueueIndex(_queue.value.size, _queueIndex.value, _repeat.value)
+                } else {
+                    null
+                }
+                // A track about to be followed by another is not paused, and the
+                // difference is not cosmetic: Ended maps to Ready, Ready is what
+                // every desktop protocol reads as paused, and publishing it turned
+                // the transport in a media widget into a play button and back on
+                // every track boundary and every turn of a one-track loop. The gap
+                // between the last sample of one file and the first of the next
+                // belongs to neither of them, so nothing is said about it.
+                if (!(started && (looping || next != null))) {
+                    _state.value = mapPlaybackState(
+                        file    = file,
+                        st      = st,
+                        started = started,
+                        posMs   = p.positionNanos() / 1_000_000L,
+                        durMs   = (p.durationNanos ?: 0L) / 1_000_000L,
+                    )
+                }
                 // Once per file: null is cleared only by open(), and a file with
                 // no tags still resolves to a title, so this cannot re-fire.
                 if (_track.value == null && st != VideoPlayer.State.Opening) readMetadata(p, file)
@@ -379,18 +515,17 @@ class AudioPlayer(
                     log.error("Audio playback failed for {}", file, st.cause)
                     break
                 }
-                if (st == VideoPlayer.State.Ended) {
+                if (ended) {
                     // Repeating ONE track is a seek, not a reopen: the engine is
                     // still alive at this point and rewinding it keeps the decode
                     // thread and the audio device, so the loop is seamless and the
                     // mode can change while the track plays.
-                    if (_repeat.value == RepeatMode.One) {
+                    if (looping) {
                         p.seek(0L)
                         p.resume()
                         delay(POLL_INTERVAL_MS.milliseconds)
                         continue
                     }
-                    val next = nextQueueIndex(_queue.value.size, _queueIndex.value, _repeat.value)
                     // A finished track holds a decode thread and the audio device
                     // open for nothing either way. Drop them WITHOUT closeCurrent(),
                     // which would join the very job this runs on.
@@ -416,7 +551,7 @@ class AudioPlayer(
      * [engine] -- a several-megapixel cover would otherwise sit in front of
      * every transport command queued behind it.
      */
-    private suspend fun readMetadata(p: VideoPlayer, file: Path) {
+    private suspend fun readMetadata(p: PlaybackEngine, file: Path) {
         val artwork = p.coverArt?.let { withContext(Dispatchers.Default) { decodeArtwork(it) } }
         _track.value = trackInfoFrom(p.tags, file, artwork)
     }
@@ -433,9 +568,19 @@ class AudioPlayer(
         started = false
     }
 
-    private companion object {
+    internal companion object {
+        /**
+         * How often the engine is read, and therefore how often this player says
+         * anything about itself.
+         *
+         * Not private, because it is no longer only this class's business: the
+         * media session is driven by these flows rather than by a clock of its own,
+         * so the rate a jump is measured against is this number. A copy of it over
+         * there would go quietly wrong the day this one moved.
+         */
         const val POLL_INTERVAL_MS = 200L
-        const val VOLUME_WRITE_DELAY_MS = 500L
+        private const val VOLUME_WRITE_DELAY_MS = 500L
+        private const val QUEUE_WRITE_DELAY_MS = 800L
     }
 }
 
@@ -455,8 +600,15 @@ internal fun mapPlaybackState(
     durMs: Long,
 ): PlaybackState = when (st) {
     VideoPlayer.State.Opening -> PlaybackState.Ready(file, positionMs = 0L, durationMs = durMs)
-    VideoPlayer.State.Playing -> PlaybackState.Playing(file, posMs, durMs)
-    VideoPlayer.State.Seeking -> PlaybackState.Playing(file, posMs, durMs)
+    // Started is asked of the sounding states as well, not only of Paused. An
+    // engine opened for a file nobody pressed play on is silenced and paused, but
+    // Skinema begins playing the moment it is constructed and takes the pause on
+    // its own thread, so a poll landing inside that window finds it playing. Left
+    // unasked, the transport showed a pause button over silence for a tick of
+    // every open and every scrub into a track that had finished.
+    VideoPlayer.State.Playing, VideoPlayer.State.Seeking ->
+        if (started) PlaybackState.Playing(file, posMs, durMs)
+        else PlaybackState.Ready(file, posMs, durMs)
     VideoPlayer.State.Paused ->
         if (started) PlaybackState.Paused(file, posMs, durMs)
         else PlaybackState.Ready(file, posMs, durMs)

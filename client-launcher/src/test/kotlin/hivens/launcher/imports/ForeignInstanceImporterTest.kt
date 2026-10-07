@@ -5,6 +5,8 @@ import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
 import hivens.launcher.runtime.RuntimeProvisioner
+import hivens.launcher.runtime.RuntimeSeed
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.flow.StateFlow
@@ -65,22 +67,21 @@ class ForeignInstanceImporterTest {
         return src
     }
 
-    private fun importer(dataDir: Path, libs: Path, assets: Path, repo: IPackRepository): ForeignInstanceImporter {
-        val provisioner = mockk<RuntimeProvisioner>(relaxed = true)
+    private val provisioner = mockk<RuntimeProvisioner>(relaxed = true)
+
+    private fun importer(dataDir: Path, repo: IPackRepository): ForeignInstanceImporter {
         val java = mockk<IJavaManager>()
         every { java.detectJavaVersion(any()) } returns 21
-        return ForeignInstanceImporter(provisioner, java, repo, dataDir, libs, assets)
+        return ForeignInstanceImporter(provisioner, java, repo, dataDir)
     }
 
     @Test
-    fun `imports content, dedups the vanilla runtime, registers a Local instance`() = runTest {
+    fun `imports content, offers the vanilla runtime, registers a Local instance`() = runTest {
         val src = buildSource()
         val dataDir = tmp("nexira-data")
-        val libs = dataDir.resolve("libraries")
-        val assets = dataDir.resolve("assets")
         val repo = FakeRepo()
 
-        val instance = importer(dataDir, libs, assets, repo).import(
+        val instance = importer(dataDir, repo).import(
             DiscoveredInstance(
                 launcher = ForeignLauncher.Ftb, id = "sb4", displayName = "StoneBlock 4",
                 gameDir = src, mcVersion = "1.21.1", loader = "neoforge", loaderVersion = "21.1.1",
@@ -99,11 +100,20 @@ class ForeignInstanceImporterTest {
         assertFalse(Files.exists(clientDir.resolve("versions")))
         assertFalse(Files.exists(clientDir.resolve("logs")))
         assertFalse(Files.exists(clientDir.resolve("launcher_accounts.json")), "launcher secrets are not carried")
-        // Runtime deduped into the shared roots (+ client-jar remap to the maven coord).
-        assertEquals("ASSET", Files.readString(assets.resolve("objects/ab/abcdef123")))
-        assertEquals("INDEX", Files.readString(assets.resolve("indexes/17.json")))
-        assertEquals("LIB", Files.readString(libs.resolve("net/example/lib/1.0/lib-1.0.jar")))
-        assertEquals("CLIENT", Files.readString(libs.resolve("net/minecraft/minecraft/1.21.1/minecraft-1.21.1.jar")))
+        // The runtime is offered to the provisioner, which takes only what matches
+        // the manifest. Nothing is put into the shared roots by the importer itself.
+        coVerify {
+            provisioner.ensureRuntime(
+                "1.21.1", "neoforge", "21.1.1", any(),
+                RuntimeSeed(
+                    librariesDir = src.resolve("libraries"),
+                    assetsDir = src.resolve("assets"),
+                    clientJar = src.resolve("versions/1.21.1/1.21.1.jar"),
+                ),
+            )
+        }
+        assertFalse(Files.exists(dataDir.resolve("assets")), "the importer adopts nothing on its own")
+        assertFalse(Files.exists(dataDir.resolve("libraries")))
         // Registered.
         assertEquals(1, repo.stored.size)
         assertEquals(PackOrigin.Local, instance.packRef.origin)
@@ -116,7 +126,7 @@ class ForeignInstanceImporterTest {
         val dataDir = tmp("nexira-data2")
         val repo = FakeRepo()
         assertFailsWith<java.io.IOException> {
-            importer(dataDir, dataDir.resolve("libraries"), dataDir.resolve("assets"), repo).import(
+            importer(dataDir, repo).import(
                 DiscoveredInstance(
                     launcher = ForeignLauncher.Vanilla, id = "root", displayName = ".minecraft",
                     gameDir = tmp("bare"), mcVersion = null,
@@ -127,16 +137,29 @@ class ForeignInstanceImporterTest {
     }
 
     @Test
+    fun `refuses a named loader whose version is unknown`() = runTest {
+        val dataDir = tmp("nexira-data4")
+        val repo = FakeRepo()
+        assertFailsWith<java.io.IOException> {
+            importer(dataDir, repo).import(
+                DiscoveredInstance(
+                    launcher = ForeignLauncher.Vanilla, id = "profile:x", displayName = "Modded",
+                    gameDir = tmp("modded"), mcVersion = "1.20.1", loader = "forge", loaderVersion = null,
+                ),
+            )
+        }
+        assertTrue(repo.stored.isEmpty())
+    }
+
+    @Test
     fun `an instance without a vanilla-layout runtime still imports (no seeding)`() = runTest {
         val src = tmp("modrinth-like")
         write(src.resolve("mods/A.jar"), "A")
         write(src.resolve("options.txt"), "O")
         val dataDir = tmp("nexira-data3")
-        val libs = dataDir.resolve("libraries")
-        val assets = dataDir.resolve("assets")
         val repo = FakeRepo()
 
-        val instance = importer(dataDir, libs, assets, repo).import(
+        val instance = importer(dataDir, repo).import(
             DiscoveredInstance(
                 launcher = ForeignLauncher.Prism, id = "p", displayName = "Prism Pack",
                 gameDir = src, mcVersion = "1.20.1", loader = "fabric", loaderVersion = "0.16.0",
@@ -144,7 +167,7 @@ class ForeignInstanceImporterTest {
         )
         val clientDir = dataDir.resolve("instances").resolve(instance.instanceDirName)
         assertEquals("A", Files.readString(clientDir.resolve("mods/A.jar")))
-        assertFalse(Files.exists(assets), "no vanilla-layout source -> shared roots left untouched")
+        coVerify { provisioner.ensureRuntime("1.20.1", "fabric", "0.16.0", any(), null) }
         assertEquals(1, repo.stored.size)
     }
 }

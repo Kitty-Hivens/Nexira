@@ -3,6 +3,8 @@ package hivens.auth
 import dev.hivens.libvault.SecretVault
 import hivens.core.io.writeStringOwnerOnly
 import hivens.core.api.interfaces.ICredentialStore
+import hivens.core.data.NewerBuildData
+import hivens.core.data.ReadOnlyStore
 import hivens.core.data.SessionData
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -14,10 +16,16 @@ import java.nio.file.Path
 /**
  * Provider-keyed multi-account credential storage on top of [libvault][SecretVault].
  *
- * Each account's two/three secrets -- accessToken, optional password (SmartyCraft),
+ * Each account's secrets -- accessToken, optional password and uid (SmartyCraft),
  * optional refreshToken (Microsoft) -- live in the [vault] under composite keys
  * `"<providerId>:<accountId>:<field>"`; `credentials.json` (v6) holds only the
- * non-secret account list plus which one is active. The active account is the one
+ * non-secret account list plus which one is active.
+ *
+ * The SmartyCraft uid counts as a secret: it is the input to every signed action,
+ * so the file plus a player name was enough to sign spawn, two-factor and skin
+ * upload for the account. It used to sit in the file in cleartext; a file that
+ * still carries one has it moved into the vault on the first read of a run (see
+ * [moveUidsIntoVault]). The active account is the one
  * [load] returns (so existing read-only [ICredentialStore] callers are unchanged).
  *
  * `accountId` is the dash-free uuid when present, else the username -- stable
@@ -35,7 +43,8 @@ import java.nio.file.Path
  * recurse through the same read path.
  *
  * A migration that recovers nothing stamps the v6 format over the old file only
- * when the store it asked actually answered. A store that could not be read leaves
+ * when the store it asked actually answered, and one that recovers something
+ * stamps it only once the vault has taken what it recovered. A store that could not be read leaves
  * the file alone: the stamp is one-way, so writing it on an unreachable keyring
  * would trade a temporary outage for a permanent loss of the account.
  *
@@ -64,12 +73,38 @@ class CredentialsManager(
     @Volatile
     private var legacyUnreadableThisRun = false
 
+    /**
+     * Whether the file was written by a newer build. Read as far as this build
+     * understands it and never written back: a save would stamp the current
+     * version over it and drop whatever that build keeps that this one cannot
+     * represent, the way every sibling store already refuses to.
+     */
+    @Volatile
+    private var readOnly = false
+
+    /** Whether this run has already tried to move cleartext uids into the vault. */
+    @Volatile
+    private var uidsMovedThisRun = false
+
+    /**
+     * Held across every read-modify-write of the file.
+     *
+     * Each mutation reads the whole account list, changes one entry and writes the
+     * list back, and several run at once: one press of Play into the two-factor gate
+     * starts the gate's own save and the launch's flag write side by side. Without
+     * the lock the slower one wrote back the list it had read before the other
+     * landed, and the change in between was lost, the two-factor flag re-armed
+     * among them. One process holds the data directory (SingleInstance), so a lock
+     * in memory covers every writer there is.
+     */
+    private val lock = Any()
+
     // ── ICredentialStore: the active session ──────────────────────────────────
 
     override fun load(): SessionData? {
         val file = readAccountsFile() ?: return null
         val active = file.activeAccountId ?: return null
-        return loadSession(active)
+        return file.accounts.firstOrNull { it.accountId == active }?.let(::sessionOf)
     }
 
     // ── multi-account API ───────────────────────────────────────────────────────
@@ -81,51 +116,77 @@ class CredentialsManager(
 
     override fun activeAccountId(): String? = readAccountsFile()?.activeAccountId
 
-    override fun saveAccount(session: SessionData, providerId: String) {
+    override fun saveAccount(session: SessionData, providerId: String, makeActive: Boolean) {
         if (session.accessToken.isBlank()) return
+        synchronized(lock) { saveAccountLocked(session, providerId, makeActive) }
+    }
+
+    private fun saveAccountLocked(session: SessionData, providerId: String, makeActive: Boolean) {
         val accountId = accountIdFor(session)
+        val current = readAccountsFile() ?: SavedAccountsFile()
+        if (readOnly) return
+        val previous = current.accounts.firstOrNull { it.accountId == accountId && it.providerId == providerId }
         val account = SavedAccount(
             providerId = providerId,
             accountId = accountId,
             username = session.playerName,
             uuid = session.uuid,
-            uid = session.uid.ifBlank { null },
+            // The vault holds the uid. A cleartext one survives only where the vault
+            // has refused it this run and this session brings none to replace it.
+            uid = if (session.uid.isBlank()) previous?.uid else null,
             displayName = session.playerName,
             // Sticky: a re-login that happens to arrive without the flag must not
             // clear what an earlier second factor established. Releasing it takes
             // the explicit [clearTwoFactor] instead.
-            twoFactor = session.twoFactor ||
-                readAccountsFile()?.accounts?.firstOrNull {
-                    it.accountId == accountId && it.providerId == providerId
-                }?.twoFactor == true,
+            twoFactor = session.twoFactor || previous?.twoFactor == true,
         )
-        val current = readAccountsFile() ?: SavedAccountsFile()
         val merged = current.accounts.filterNot { it.accountId == accountId && it.providerId == providerId } + account
         storeSecrets(providerId, accountId, session)
-        writeAccountsFile(current.copy(version = CURRENT_VERSION, activeAccountId = accountId, accounts = merged))
+        val active = if (makeActive) accountId else current.activeAccountId ?: accountId
+        writeAccountsFile(current.copy(version = CURRENT_VERSION, activeAccountId = active, accounts = merged))
         log.info("Saved account {} ({}) -- vault tier={}", accountId, providerId, vault.tier)
     }
 
-    override fun save(session: SessionData) = saveAccount(session, inferProviderId(session))
+    override fun refreshStored(providerId: String, session: SessionData) {
+        if (session.accessToken.isBlank()) return
+        synchronized(lock) {
+            val accountId = accountIdFor(session)
+            val stored = readAccountsFile()?.accounts
+                ?.firstOrNull { it.providerId == providerId && it.accountId == accountId }
+                ?: return
+            // A secret the fresh session does not carry is not one the account lost.
+            val merged = session.copy(
+                cachedPassword = session.cachedPassword ?: secret(stored, FIELD_PASSWORD),
+                refreshToken = session.refreshToken ?: secret(stored, FIELD_REFRESH_TOKEN),
+            )
+            saveAccountLocked(merged, providerId, makeActive = false)
+        }
+    }
 
     override fun markTwoFactor(providerId: String) {
-        val file = readAccountsFile() ?: return
-        val updated = file.accounts.map {
-            if (it.providerId == providerId && !it.twoFactor) it.copy(twoFactor = true) else it
+        synchronized(lock) {
+            val file = readAccountsFile() ?: return
+            if (readOnly) return
+            val updated = file.accounts.map {
+                if (it.providerId == providerId && !it.twoFactor) it.copy(twoFactor = true) else it
+            }
+            if (updated == file.accounts) return
+            writeAccountsFile(file.copy(accounts = updated))
+            log.info("armed the two-factor gate on {} -- no silent sign-in from here", providerId)
         }
-        if (updated == file.accounts) return
-        writeAccountsFile(file.copy(accounts = updated))
-        log.info("armed the two-factor gate on {} -- no silent sign-in from here", providerId)
     }
 
     override fun clearTwoFactor(providerId: String) {
-        val file = readAccountsFile() ?: return
-        val updated = file.accounts.map {
-            if (it.providerId == providerId && it.twoFactor) it.copy(twoFactor = false) else it
+        synchronized(lock) {
+            val file = readAccountsFile() ?: return
+            if (readOnly) return
+            val updated = file.accounts.map {
+                if (it.providerId == providerId && it.twoFactor) it.copy(twoFactor = false) else it
+            }
+            if (updated == file.accounts) return
+            writeAccountsFile(file.copy(accounts = updated))
+            log.info("released the two-factor gate on {} -- the provider asked for no second factor", providerId)
         }
-        if (updated == file.accounts) return
-        writeAccountsFile(file.copy(accounts = updated))
-        log.info("released the two-factor gate on {} -- the provider asked for no second factor", providerId)
     }
 
     /**
@@ -138,17 +199,17 @@ class CredentialsManager(
      */
     override fun accountFor(providerId: String): SessionData? {
         val account = readAccountsFile()?.accounts?.firstOrNull { it.providerId == providerId } ?: return null
-        return loadSession(account.accountId)
+        return sessionOf(account)
     }
 
     override fun primarySession(preferredProviderId: String?): SessionData? {
         val accounts = readAccountsFile()?.accounts ?: return null
         if (preferredProviderId != null) {
             accounts.firstOrNull { it.providerId == preferredProviderId }
-                ?.let { account -> loadSession(account.accountId)?.let { return it } }
+                ?.let { account -> sessionOf(account)?.let { return it } }
         }
         for (account in accounts.sortedBy { facePriorityIndex(it.providerId) }) {
-            loadSession(account.accountId)?.let { return it }
+            sessionOf(account)?.let { return it }
         }
         return null
     }
@@ -156,17 +217,29 @@ class CredentialsManager(
     private fun facePriorityIndex(providerId: String): Int =
         FACE_PRIORITY.indexOf(providerId).let { if (it < 0) FACE_PRIORITY.size else it }
 
-    override fun loadSession(accountId: String): SessionData? {
-        val account = readAccountsFile()?.accounts?.firstOrNull { it.accountId == accountId } ?: return null
+    override fun loadSession(providerId: String, accountId: String): SessionData? =
+        readAccountsFile()?.accounts
+            ?.firstOrNull { it.providerId == providerId && it.accountId == accountId }
+            ?.let(::sessionOf)
+
+    /**
+     * The session [account] describes, its secrets read under its own provider.
+     *
+     * An account is a provider and an id together. The id is the uuid, or the
+     * player name where there is none, so two providers can share one, and the
+     * lookups that went from a record to its id and back again read whichever
+     * record came first: another provider's token, password and refresh token.
+     */
+    private fun sessionOf(account: SavedAccount): SessionData? {
         val accessToken = secret(account, FIELD_ACCESS_TOKEN)
         if (accessToken.isNullOrBlank()) {
-            log.warn("account {} has metadata but no accessToken in the vault -- treating as gone", accountId)
+            log.warn("account {} ({}) has metadata but no accessToken in the vault -- treating as gone", account.accountId, account.providerId)
             return null
         }
         return SessionData(
             playerName = account.username,
             uuid = account.uuid,
-            uid = account.uid ?: "",
+            uid = secret(account, FIELD_UID) ?: account.uid ?: "",
             accessToken = accessToken,
             cachedPassword = secret(account, FIELD_PASSWORD),
             refreshToken = secret(account, FIELD_REFRESH_TOKEN),
@@ -176,45 +249,111 @@ class CredentialsManager(
     }
 
     override fun setActive(accountId: String) {
-        val file = readAccountsFile() ?: return
-        if (file.accounts.none { it.accountId == accountId }) return
-        writeAccountsFile(file.copy(activeAccountId = accountId))
+        synchronized(lock) {
+            val file = readAccountsFile() ?: return
+            if (readOnly) return
+            if (file.accounts.none { it.accountId == accountId }) return
+            writeAccountsFile(file.copy(activeAccountId = accountId))
+        }
     }
 
-    override fun removeAccount(accountId: String) {
-        val file = readAccountsFile() ?: return
-        val account = file.accounts.firstOrNull { it.accountId == accountId } ?: return
-        deleteSecrets(account.providerId, accountId)
-        val remaining = file.accounts.filterNot { it.accountId == accountId }
-        if (remaining.isEmpty()) {
-            deleteFile()
-        } else {
-            val newActive = if (file.activeAccountId == accountId) remaining.first().accountId else file.activeAccountId
-            writeAccountsFile(file.copy(activeAccountId = newActive, accounts = remaining))
+    override fun removeAccount(providerId: String, accountId: String) {
+        synchronized(lock) {
+            val file = readAccountsFile() ?: return
+            if (readOnly) return
+            if (file.accounts.none { it.providerId == providerId && it.accountId == accountId }) return
+            deleteSecrets(providerId, accountId)
+            // This one account, not every record sharing its id: another provider's
+            // record kept in the file is what still names its secrets, and dropping
+            // it left them in the keyring under keys nothing could reach to clear.
+            val remaining = file.accounts.filterNot { it.providerId == providerId && it.accountId == accountId }
+            if (remaining.isEmpty()) {
+                deleteFile()
+            } else {
+                val activeGone = file.activeAccountId == accountId && remaining.none { it.accountId == accountId }
+                val newActive = if (activeGone) remaining.first().accountId else file.activeAccountId
+                writeAccountsFile(file.copy(activeAccountId = newActive, accounts = remaining))
+            }
         }
     }
 
     override fun clear() {
-        readAccountsFile()?.accounts?.forEach { deleteSecrets(it.providerId, it.accountId) }
-        // Drop any lingering legacy flat keys too.
-        vault.delete(LEGACY_KEY_ACCESS_TOKEN)
-        vault.delete(LEGACY_KEY_PASSWORD)
-        deleteFile()
+        synchronized(lock) {
+            val file = readAccountsFile()
+            if (readOnly) return
+            file?.accounts?.forEach { deleteSecrets(it.providerId, it.accountId) }
+            // Drop any lingering legacy flat keys too.
+            vault.delete(LEGACY_KEY_ACCESS_TOKEN)
+            vault.delete(LEGACY_KEY_PASSWORD)
+            deleteFile()
+        }
     }
 
     // ── persistence + migration ─────────────────────────────────────────────────
 
     /** Reads the v6 accounts file, migrating a pre-v6 file in place on first read. */
     private fun readAccountsFile(): SavedAccountsFile? {
+        val (_, file) = readRaw() ?: return null
+        if (file.version > CURRENT_VERSION) noteNewerBuild(file.version)
+        if (file.version >= CURRENT_VERSION) {
+            return if (!uidsMovedThisRun && file.accounts.any { it.uid != null }) moveUidsIntoVault() else file
+        }
+        if (legacyUnreadableThisRun) return SavedAccountsFile()
+        // Under the lock and read again: a migration writes, and another reader may
+        // have finished it while this one waited.
+        return synchronized(lock) {
+            val (text, again) = readRaw() ?: return@synchronized null
+            when {
+                again.version >= CURRENT_VERSION -> again
+                legacyUnreadableThisRun -> SavedAccountsFile()
+                else -> migrate(text)
+            }
+        }
+    }
+
+    /**
+     * Moves every uid a file still carries in cleartext into the vault, then writes
+     * the file without them. Only when the vault took every one of them: a uid the
+     * file loses and the vault never got would leave the account unable to sign
+     * anything until it signs in again. Tried once per run either way, since reads
+     * run inside composition and the vault may be a keyring that is down.
+     */
+    private fun moveUidsIntoVault(): SavedAccountsFile? = synchronized(lock) {
+        val (_, file) = readRaw() ?: return@synchronized null
+        if (uidsMovedThisRun || readOnly) return@synchronized file
+        uidsMovedThisRun = true
+        val carrying = file.accounts.filter { it.uid != null }
+        if (carrying.isEmpty()) return@synchronized file
+        val stored = carrying.all { account ->
+            runCatching {
+                vault.store(compositeKey(account.providerId, account.accountId, FIELD_UID), account.uid!!.toByteArray())
+            }.getOrDefault(false)
+        }
+        if (!stored) {
+            log.warn("the vault did not take the stored uids; credentials.json keeps them for now")
+            return@synchronized file
+        }
+        val cleared = file.copy(accounts = file.accounts.map { it.copy(uid = null) })
+        writeAccountsFile(cleared)
+        log.info("moved {} uid(s) out of credentials.json into the vault", carrying.size)
+        cleared
+    }
+
+    private fun noteNewerBuild(version: Int) {
+        if (readOnly) return
+        readOnly = true
+        NewerBuildData.record(ReadOnlyStore.Accounts)
+        log.warn("credentials.json is format {}, newer than {} -- written by a newer build; open read-only", version, CURRENT_VERSION)
+    }
+
+    private fun readRaw(): Pair<String, SavedAccountsFile>? {
         if (!Files.exists(credentialsFile)) return null
         val text = runCatching { Files.readString(credentialsFile) }.getOrElse { return null }
         val file = runCatching { json.decodeFromString(SavedAccountsFile.serializer(), text) }.getOrElse {
             log.warn("credentials.json unreadable -- treating as no saved accounts")
             return null
         }
-        if (file.version >= CURRENT_VERSION) return file
-        if (legacyUnreadableThisRun) return SavedAccountsFile()
-        return migrate(text)
+        return text to file
     }
 
     private fun migrate(rawV5OrOlder: String): SavedAccountsFile {
@@ -239,12 +378,26 @@ class CredentialsManager(
             log.warn("v5 credentials present and the vault returned no token -- leaving them for the next launch")
             return SavedAccountsFile()
         }
-        vault.store(compositeKey(PROVIDER_SMARTYCRAFT, accountId, FIELD_ACCESS_TOKEN), token.toByteArray())
+        val tokenStored = vault.store(compositeKey(PROVIDER_SMARTYCRAFT, accountId, FIELD_ACCESS_TOKEN), token.toByteArray())
         val pass = vault.retrieve(LEGACY_KEY_PASSWORD)?.decodeToString()
             ?: vault.retrieve(compositeKey(PROVIDER_SMARTYCRAFT, accountId, FIELD_PASSWORD))?.decodeToString()
-        if (pass != null) vault.store(compositeKey(PROVIDER_SMARTYCRAFT, accountId, FIELD_PASSWORD), pass.toByteArray())
+        val passStored = pass == null || vault.store(compositeKey(PROVIDER_SMARTYCRAFT, accountId, FIELD_PASSWORD), pass.toByteArray())
+        if (!tokenStored || !passStored) {
+            // The flat keys are the only copy until the new ones are written, and the
+            // stamp below drops them, so a vault that reads but refuses a write keeps
+            // the v5 file and its keys for the next launch.
+            legacyUnreadableThisRun = true
+            log.warn("the vault did not take the v5 secrets -- leaving them for the next launch")
+            return SavedAccountsFile()
+        }
+        // Into the vault with the other secrets, or left in the file when it will not
+        // take it: the v5 file is the only other copy.
+        val uidStored = v5.uid.isNullOrBlank() ||
+            vault.store(compositeKey(PROVIDER_SMARTYCRAFT, accountId, FIELD_UID), v5.uid.toByteArray())
 
-        val account = SavedAccount(PROVIDER_SMARTYCRAFT, accountId, v5.username, v5.uuid, v5.uid, v5.username)
+        val account = SavedAccount(
+            PROVIDER_SMARTYCRAFT, accountId, v5.username, v5.uuid, if (uidStored) null else v5.uid, v5.username,
+        )
         val file = SavedAccountsFile(CURRENT_VERSION, accountId, listOf(account))
         writeAccountsFile(file)                       // stamp v6 only AFTER the re-key
         vault.delete(LEGACY_KEY_ACCESS_TOKEN)
@@ -278,10 +431,17 @@ class CredentialsManager(
             }
         }
         val accountId = accountIdFor(recovered)
-        storeSecrets(PROVIDER_SMARTYCRAFT, accountId, recovered)
+        if (!storeSecrets(PROVIDER_SMARTYCRAFT, accountId, recovered)) {
+            // The old keyring is purged below, so it stays the only copy until the
+            // vault has taken every secret.
+            legacyUnreadableThisRun = true
+            log.warn("the vault did not take the legacy secrets -- leaving them for the next launch")
+            return SavedAccountsFile()
+        }
+        // The uid went into the vault with the other secrets above.
         val account = SavedAccount(
             PROVIDER_SMARTYCRAFT, accountId, recovered.playerName, recovered.uuid,
-            recovered.uid.ifBlank { null }, recovered.playerName,
+            null, recovered.playerName,
         )
         val file = SavedAccountsFile(CURRENT_VERSION, accountId, listOf(account))
         writeAccountsFile(file)
@@ -290,20 +450,31 @@ class CredentialsManager(
         return file
     }
 
-    private fun storeSecrets(providerId: String, accountId: String, session: SessionData) {
-        vault.store(compositeKey(providerId, accountId, FIELD_ACCESS_TOKEN), session.accessToken.toByteArray())
-        putOrDelete(compositeKey(providerId, accountId, FIELD_PASSWORD), session.cachedPassword)
-        putOrDelete(compositeKey(providerId, accountId, FIELD_REFRESH_TOKEN), session.refreshToken)
+    /** Whether the vault took every secret [session] carries. */
+    private fun storeSecrets(providerId: String, accountId: String, session: SessionData): Boolean {
+        val token = vault.store(compositeKey(providerId, accountId, FIELD_ACCESS_TOKEN), session.accessToken.toByteArray())
+        val password = putOrDelete(compositeKey(providerId, accountId, FIELD_PASSWORD), session.cachedPassword)
+        val refresh = putOrDelete(compositeKey(providerId, accountId, FIELD_REFRESH_TOKEN), session.refreshToken)
+        // Stored when known and otherwise left as it is: a session rebuilt without
+        // one says nothing about the account no longer having one.
+        val uid = session.uid.takeIf { it.isNotBlank() }
+            ?.let { vault.store(compositeKey(providerId, accountId, FIELD_UID), it.toByteArray()) }
+            ?: true
+        return token && password && refresh && uid
     }
 
     private fun deleteSecrets(providerId: String, accountId: String) {
         vault.delete(compositeKey(providerId, accountId, FIELD_ACCESS_TOKEN))
         vault.delete(compositeKey(providerId, accountId, FIELD_PASSWORD))
         vault.delete(compositeKey(providerId, accountId, FIELD_REFRESH_TOKEN))
+        vault.delete(compositeKey(providerId, accountId, FIELD_UID))
     }
 
-    private fun putOrDelete(key: String, value: String?) {
-        if (value != null) vault.store(key, value.toByteArray()) else vault.delete(key)
+    /** False only when a value to keep was refused. A delete of nothing is not a failure. */
+    private fun putOrDelete(key: String, value: String?): Boolean {
+        if (value != null) return vault.store(key, value.toByteArray())
+        vault.delete(key)
+        return true
     }
 
     private fun secret(account: SavedAccount, field: String): String? =
@@ -327,9 +498,6 @@ class CredentialsManager(
 
     private fun accountIdFor(session: SessionData): String = session.uuid.ifBlank { session.playerName }
 
-    private fun inferProviderId(session: SessionData): String =
-        if (session.refreshToken != null) PROVIDER_MICROSOFT else PROVIDER_SMARTYCRAFT
-
     private fun compositeKey(providerId: String, accountId: String, field: String): String =
         "$providerId:$accountId:$field"
 
@@ -339,6 +507,10 @@ class CredentialsManager(
         val accountId: String,
         val username: String = "",
         val uuid: String = "",
+        /**
+         * A uid in cleartext, from before the vault held it. Read so such a file
+         * still signs in, and cleared once [moveUidsIntoVault] has moved it.
+         */
         val uid: String? = null,
         val displayName: String = "",
         /**
@@ -379,6 +551,7 @@ class CredentialsManager(
         const val FIELD_ACCESS_TOKEN = "accessToken"
         const val FIELD_PASSWORD = "password"
         const val FIELD_REFRESH_TOKEN = "refreshToken"
+        const val FIELD_UID = "uid"
 
         // Flat keys written by the v5 store; read once during migration, then dropped.
         const val LEGACY_KEY_ACCESS_TOKEN = "accessToken"

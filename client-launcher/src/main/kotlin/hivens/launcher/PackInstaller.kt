@@ -1,5 +1,6 @@
 package hivens.launcher
 
+import hivens.launcher.instance.instanceDirName
 import hivens.core.api.dto.smrt.SmrtPackManifest
 import hivens.core.api.dto.smrt.SmrtPackSummary
 import hivens.core.api.dto.smrt.toBaselineManifest
@@ -55,7 +56,7 @@ class PackInstaller(
         progress: (current: Int, total: Int, filename: String) -> Unit = { _, _, _ -> },
     ): PackInstance {
         val instanceId  = UUID.randomUUID().toString()
-        val instanceDir = sanitizeInstanceDir("$packId-$instanceId")
+        val instanceDir = instanceDirName(packId, instanceId)
         val clientDir   = dataDir.resolve("instances").resolve(instanceDir)
 
         // Reserve before any bytes land, so a cancel that fires inside sync
@@ -123,13 +124,4 @@ class PackInstaller(
         log.info("install: registered instance {} in repository", instanceId)
         return instance
     }
-
-    /**
-     * Filesystem-safe instance directory name. Strip characters
-     * that would trip case-insensitive filesystems (Windows / HFS+)
-     * or shell tooling, and bound the length so the absolute path
-     * stays under typical PATH_MAX even for deep data-dir roots.
-     */
-    private fun sanitizeInstanceDir(raw: String): String =
-        raw.replace(Regex("[^A-Za-z0-9._-]"), "_").take(96)
 }

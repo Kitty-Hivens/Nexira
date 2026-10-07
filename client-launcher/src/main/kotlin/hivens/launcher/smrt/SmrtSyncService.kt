@@ -25,6 +25,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
 import java.io.IOException
+import java.io.InputStream
+import java.net.URI
 import java.nio.file.Files
 import java.nio.file.Path
 import java.security.MessageDigest
@@ -32,19 +34,23 @@ import java.nio.file.StandardCopyOption
 import java.util.Comparator
 
 /**
- * v2-manifest sync. Parallel to [hivens.launcher.FileDownloadService] but speaks the
- * smrt mirror's flat `mods[] + assets[]` shape with a per-entry source
- * pointer, instead of SC's recursive `{directories,files}` tree.
+ * v2-manifest sync. Speaks the smrt mirror's flat `mods[] + assets[]` shape with
+ * a per-entry source pointer.
  *
  * Throws on any download error or sha1 mismatch. The caller does not
- * get a partial-success indicator and there is no silent fallback to
- * the SC sync path -- mirror failures must surface, otherwise a broken
- * mirror is masked by a stale-but-working SC sync and the regression
- * stays invisible.
+ * get a partial-success indicator: a mirror failure surfaces rather than
+ * leaving an instance that only looks installed.
  */
 class SmrtSyncService(
     private val modrinth: ModrinthClient,
     private val transfers: TransferEngine,
+    /**
+     * How a mod is opened to be hashed. A seam for the case that matters most and
+     * is hardest to arrange: a jar that cannot be read. Mode bits do not bind root
+     * or some filesystems, so a test that made the file unreadable switched itself
+     * off in exactly the containers CI runs in.
+     */
+    private val openForDigest: (Path) -> InputStream = { Files.newInputStream(it) },
 ) : IPackSyncService {
     private val log = LoggerFactory.getLogger(SmrtSyncService::class.java)
 
@@ -120,13 +126,11 @@ class SmrtSyncService(
             // and the loader, or the server, is what brings it up.
             reportUnfetchable(manifest.packId, sink.unfetchable)
             transfers.fetchAll(sink.transfers) { p -> progress?.invoke(p.filesDone, p.filesTotal, p.current) }
-            reportStuckVariants(manifest.packId, sweepStale(stuck))
+            settleStuck(clientDir, manifest.packId, stuck, manifest.mods.map { it.filename })
 
-            // Drop manifest-removed mods and catch foreign payloads that
-            // the wipe missed (an SC sync ran between two mirror syncs
-            // without touching the marker, so the wipe gate saw a stale
-            // "mirror" value). Only top-level mods/{expected_filename}
-            // entries survive.
+            // Drop manifest-removed mods and any other archive the manifest
+            // does not name. Only top-level mods/{expected_filename} entries
+            // survive.
             val expected = manifest.mods.flatMap { listOf(it.filename, "${it.filename}.disabled") }.toSet()
             // One rule for both cases. The old split -- wipe everything on a source
             // change, drop stray jars otherwise -- dates from the clients era, where
@@ -186,7 +190,7 @@ class SmrtSyncService(
             val report = transfers.verifyAndRepair(suspect) { p ->
                 progress?.invoke(p.filesDone, p.filesTotal, p.current)
             }
-            reportStuckVariants(manifest.packId, sweepStale(stuck))
+            settleStuck(clientDir, manifest.packId, stuck, manifest.mods.map { it.filename })
             // A verify is a full comparison against the manifest, so it is exactly the
             // moment the instance can be vouched for -- write the roster here too.
             // Without this, "verify and repair" checked every file and still left the
@@ -289,7 +293,12 @@ class SmrtSyncService(
         current = fetches.size
         // Before the relabel below, which declines while both names exist and would
         // otherwise leave the switched-off mod loading under its active name.
-        reportStuckVariants(manifest.packId, sweepStale(stuck))
+        settleStuck(
+            clientDir,
+            manifest.packId,
+            stuck,
+            (plan.toAdd + plan.toUpdate).filter { it.startsWith(MODS_PREFIX) }.map { it.removePrefix(MODS_PREFIX) },
+        )
 
         for (path in plan.toDelete) {
             current++
@@ -434,7 +443,7 @@ class SmrtSyncService(
 
     private fun sha1Of(file: Path): String {
         val digest = MessageDigest.getInstance("SHA-1")
-        Files.newInputStream(file).use { input ->
+        openForDigest(file).use { input ->
             val buffer = ByteArray(1 shl 16)
             while (true) {
                 val read = input.read(buffer)
@@ -510,30 +519,42 @@ class SmrtSyncService(
     override fun relabel(clientDir: Path, mods: List<SmrtModEntry>, enabledState: Map<String, Boolean>): List<String> {
         val modsDir = clientDir.resolve("mods")
         if (!Files.isDirectory(modsDir)) return emptyList()
-        val failed = mutableListOf<String>()
+        val failed = mutableListOf<PendingVariants.Op>()
+        val settled = mutableListOf<String>()
         for (mod in mods) {
             val enabled = enabledState[mod.filename] ?: (mod.required || mod.defaultEnabled)
             val active = resolveSafe(modsDir, mod.filename, "mod ${mod.filename}")
             val disabled = resolveSafe(modsDir, "${mod.filename}.disabled", "mod ${mod.filename}")
             val from = if (enabled) disabled else active
             val to = if (enabled) active else disabled
-            if (Files.exists(from) && !Files.exists(to)) {
-                runCatching {
+            when {
+                Files.exists(from) && !Files.exists(to) -> runCatching {
                     fileOpRetry("smrt relabel ${mod.filename}") {
                         Files.move(from, to, StandardCopyOption.REPLACE_EXISTING)
                     }
-                }.onFailure {
+                }.onSuccess { settled += mod.filename }.onFailure {
                     // A lock that outlives the retry means a holder we can't evict --
                     // typically the running game's classloader, which on Windows keeps
-                    // the jar open without delete-sharing. The intent is already
-                    // persisted in optionalContent, so the next launch's sync applies
-                    // it; record the file instead of pretending the flip took effect.
-                    failed += mod.filename
-                    log.warn("smrt relabel: {} still held after retries; applies on next launch", mod.filename)
+                    // the jar open without delete-sharing. Nothing else would ever
+                    // retry it: a launch runs no sync. So it is written down for the
+                    // next launch to carry out, once that game has let go.
+                    failed += PendingVariants.Op.Move(from.fileName.toString(), to.fileName.toString())
+                    log.warn("smrt relabel: {} still held after retries; applies at the next launch", mod.filename)
                 }
+                // Already where the choice wants it, so whatever an earlier attempt
+                // left pending about this mod no longer stands.
+                !Files.exists(from) -> settled += mod.filename
+                // Both names present: the pass that fetched the copy owns that case
+                // and has recorded its own leftover.
+                else -> Unit
             }
         }
-        return failed
+        PendingVariants.update(clientDir, set = failed, cleared = settled)
+        return failed.map { it.key }
+    }
+
+    override suspend fun settlePending(clientDir: Path): List<String> = withContext(Dispatchers.IO) {
+        InstanceMutationLock.withLock(clientDir) { PendingVariants.settle(clientDir) }
     }
 
 
@@ -771,6 +792,17 @@ class SmrtSyncService(
     }
 
     /**
+     * [sweepStale], then the pending record brought in line with this pass: what
+     * [placed] names is settled unless its leftover is still here, and a leftover
+     * is written down for the next launch to drop.
+     */
+    private fun settleStuck(clientDir: Path, packId: String, stuck: List<Path>, placed: List<String>) {
+        val left = sweepStale(stuck)
+        PendingVariants.update(clientDir, set = left.map { PendingVariants.Op.Drop(it) }, cleared = placed)
+        reportStuckVariants(packId, left)
+    }
+
+    /**
      * Says when a mod the player switched off is still the one on disk under its
      * loadable name.
      *
@@ -788,7 +820,7 @@ class SmrtSyncService(
             packId, loadable.size, loadable,
         )
         ActionRing.record(
-            "$packId: ${loadable.size} file(s) held open, the content change applies after the game restarts (${loadable.joinToString()})",
+            "$packId: ${loadable.size} file(s) held open, the content change applies at the next launch (${loadable.joinToString()})",
         )
     }
 
@@ -971,6 +1003,16 @@ class SmrtSyncService(
             return Planned.Unfetchable("its author disallows third-party distribution, so it has to be installed by hand")
         }
         val url = resolveUrl(source)
+        // The address is the manifest's to name and the bytes are pinned by sha1, so
+        // nothing it points at can install the wrong file. The request itself still
+        // happens on its say-so, and in plaintext it tells anyone on the route what
+        // the player is installing and can be aimed at whatever answers http on the
+        // local network. Over https the far end has to hold a certificate for the
+        // name, which nothing on a LAN does.
+        if (!isHttps(url)) {
+            log.warn("smrt sync: skipping {}, the manifest names a non-https address for it", label)
+            return Planned.Unfetchable("the pack names an address that is not https for it")
+        }
         log.debug("smrt sync: fetching {} <- {}", label, url)
         return Planned.Fetch(
             Transfer(
@@ -1010,6 +1052,9 @@ class SmrtSyncService(
         // Kept exhaustive so a new SmrtSource variant forces a decision here.
         is SmrtSource.Unknown    -> error("resolveUrl called on an unsupported source")
     }
+
+    private fun isHttps(url: String): Boolean =
+        runCatching { URI(url).scheme.equals("https", ignoreCase = true) }.getOrDefault(false)
 
     /**
      * Up-to-date check: file exists, right size, right sha1. Cheap
@@ -1054,7 +1099,7 @@ class SmrtSyncService(
          * reuses the inode rewrites the snapshot's copy along with the live one, and
          * the rollback then restores the bytes it was supposed to undo.
          */
-        internal val INSTANCE_STATE_FILES = listOf(ROSTER_FILE, SOURCE_MARKER_FILE)
+        internal val INSTANCE_STATE_FILES = listOf(ROSTER_FILE, SOURCE_MARKER_FILE, PendingVariants.FILE_NAME)
 
         /** What a mod is identified by when it sits unpacked in a directory. */
         private val MOD_METADATA = listOf("mcmod.info", "META-INF/mods.toml", "fabric.mod.json")

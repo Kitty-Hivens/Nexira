@@ -1,6 +1,7 @@
 package hivens.ui.screens.library.content
 
 import hivens.core.api.dto.modrinth.ModrinthSearchHit
+import hivens.launcher.instance.ModInstaller
 import kotlinx.coroutines.test.runTest
 import java.io.IOException
 import kotlin.test.Test
@@ -18,9 +19,21 @@ class ModBrowserStateTest {
 
     private fun hit(id: String) = ModrinthSearchHit(projectId = id, slug = id, title = id)
 
+    /** An install that landed, reporting what the instance holds afterwards. */
+    private fun landed(vararg present: String) =
+        ModInstaller.Outcome(installed = listOf("mod.jar"), present = present.toSet())
+
+    private val nothing = ModInstaller.Outcome()
+
+    private fun state(
+        search: suspend (String) -> List<ModrinthSearchHit> = { emptyList() },
+        install: suspend (ModrinthSearchHit) -> ModInstaller.Outcome = { landed(it.projectId) },
+        present: suspend () -> Set<String> = { emptySet() },
+    ) = ModBrowserState(search = search, install = install, presentProjects = present)
+
     @Test
     fun `a successful install marks the project installed`() = runTest {
-        val state = ModBrowserState(search = { emptyList() }, install = { true })
+        val state = state()
 
         state.installMod(hit("jei"))
 
@@ -31,7 +44,7 @@ class ModBrowserStateTest {
 
     @Test
     fun `a download that throws does not report success`() = runTest {
-        val state = ModBrowserState(search = { emptyList() }, install = { throw IOException("connection reset") })
+        val state = state(install = { throw IOException("connection reset") })
 
         state.installMod(hit("jei"))
 
@@ -42,7 +55,7 @@ class ModBrowserStateTest {
 
     @Test
     fun `a project with no build for this pack is a failure, not an install`() = runTest {
-        val state = ModBrowserState(search = { emptyList() }, install = { false })
+        val state = state(install = { nothing })
 
         state.installMod(hit("jei"))
 
@@ -53,7 +66,7 @@ class ModBrowserStateTest {
     @Test
     fun `retrying clears the previous failure`() = runTest {
         var succeed = false
-        val state = ModBrowserState(search = { emptyList() }, install = { succeed })
+        val state = state(install = { if (succeed) landed(it.projectId) else nothing })
 
         state.installMod(hit("jei"))
         assertEquals(setOf("jei"), state.failed)
@@ -67,7 +80,7 @@ class ModBrowserStateTest {
 
     @Test
     fun `a failed search shows an empty result rather than a spinner forever`() = runTest {
-        val state = ModBrowserState(search = { throw IOException("offline") }, install = { true })
+        val state = state(search = { throw IOException("offline") })
 
         state.runSearch("jei")
 
@@ -75,8 +88,39 @@ class ModBrowserStateTest {
     }
 
     @Test
+    fun `the folder decides what reads as installed, not this session`() = runTest {
+        val state = state(present = { setOf("sodium", "iris", "jei") })
+
+        state.loadInstalled()
+
+        assertEquals(setOf("sodium", "iris", "jei"), state.installed,
+            "a pack of ninety mods must not be offered its own contents to install")
+    }
+
+    @Test
+    fun `a dependency pulled in behind an install stops offering itself`() = runTest {
+        // Installing Iris drags Sodium along, and Sodium has its own row in the
+        // same result list.
+        val state = state(install = { landed("iris", "sodium") })
+
+        state.installMod(hit("iris"))
+
+        assertTrue("sodium" in state.installed, "the dependency landed, so its row is not an install")
+        assertTrue("iris" in state.installed)
+    }
+
+    @Test
+    fun `a folder that cannot be read leaves the browser usable`() = runTest {
+        val state = state(present = { throw IOException("offline") })
+
+        state.loadInstalled()
+
+        assertTrue(state.installed.isEmpty(), "unknown is not installed")
+    }
+
+    @Test
     fun `search results reach the browser`() = runTest {
-        val state = ModBrowserState(search = { listOf(hit("jei"), hit("journeymap")) }, install = { true })
+        val state = state(search = { listOf(hit("jei"), hit("journeymap")) })
 
         state.runSearch("j")
 

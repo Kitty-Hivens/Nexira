@@ -63,11 +63,10 @@ typealias PackInstallRunner = suspend (
  * notification driver can render it.
  *
  * Cancellation is deliberate only: [cancel] (a user pressing Cancel) or process
- * shutdown when [scope] is torn down. On cancel the partial instance directory
- * -- captured via the installer's reserve hook -- is deleted, so an aborted
- * install does not leave an orphan under `instances/`. A successful install
- * registers its instance in the repository the way it always did; a failed one
- * does not.
+ * shutdown when [scope] is torn down. On cancel and on failure the partial
+ * instance directory -- captured via the installer's reserve hook -- is deleted,
+ * so neither leaves an orphan under `instances/`. A successful install registers
+ * its instance in the repository the way it always did; a failed one does not.
  */
 class PackInstallService(
     private val runInstall: PackInstallRunner,
@@ -107,8 +106,8 @@ class PackInstallService(
      * cleanup machinery, so it survives the composition that kicked it off and
      * surfaces through [installs] (and the notification driver). Re-invoking with
      * an already-running [key] is a no-op that returns the same key. [block]
-     * gets the reserve hook (its dir is deleted on cancel) and a progress sink,
-     * and returns the registered [PackInstance].
+     * gets the reserve hook (its dir is deleted on cancel or failure) and a
+     * progress sink, and returns the registered [PackInstance].
      */
     fun run(
         key: String,
@@ -121,9 +120,16 @@ class PackInstallService(
     ): String {
         jobs[key]?.let { if (it.isActive) return key }
 
-        // Dirs the job reserves before writing. Race-free precise cleanup:
-        // on cancel we delete exactly these, never a sibling job's dir.
+        // Dirs the job reserves before writing. Race-free precise cleanup: on
+        // cancel or failure we delete exactly these, never a sibling job's dir,
+        // and never one that was already there when it was reserved. That one
+        // belongs to another pack, and deleting it on a cancel was how cancelling
+        // one install took another pack's worlds with it.
         val reservedDirs = ConcurrentHashMap.newKeySet<Path>()
+        val reserve: (Path) -> Unit = { dir ->
+            if (Files.exists(dir)) log.warn("pack job {} reserved {}, which already exists; it will not be cleaned up", key, dir)
+            else reservedDirs.add(dir)
+        }
 
         _installs.update {
             it + (key to InstallSnapshot(key, origin, packId, versionId, title, iconUrl, InstallPhase.Running(0, 0, "")))
@@ -132,7 +138,7 @@ class PackInstallService(
         val job = scope.launch {
             try {
                 val instance = block(
-                    { reservedDirs.add(it) },
+                    reserve,
                     { current, total, filename -> updatePhase(key, InstallPhase.Running(current, total, filename)) },
                 )
                 updatePhase(key, InstallPhase.Succeeded(instance.id))
@@ -142,6 +148,10 @@ class PackInstallService(
                 throw e
             } catch (e: Exception) {
                 log.warn("pack job failed for {}", key, e)
+                // A failed create or import used to keep its directory: each retry of
+                // a mistyped Minecraft version left another one, unregistered, and an
+                // import's included a whole copied game directory.
+                cleanupReserved(reservedDirs)
                 updatePhase(key, InstallPhase.Failed(e.message ?: e::class.simpleName.orEmpty()))
             } finally {
                 jobs.remove(key)

@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,8 +32,9 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.theme.Motion
-import hivens.ui.theme.NxTheme
 import hivens.widget.model.SlotPath
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
 
 // Rendered by SlotRenderer when a slot has no widgets and the editor
 // has supplied this decorator. Two purposes:
@@ -51,6 +53,7 @@ fun EmptySlotPlaceholder(
     registry: DropTargetRegistry,
 ) {
     val s = LocalStrings.current
+    DisposableEffect(path, registry) { onDispose { registry.withdrawPlaceholder(path) } }
     val breathRhythm = Motion.ownRhythm(BREATH_MS)
     val breath by rememberInfiniteTransition(label = "empty-slot-breath").animateFloat(
         initialValue  = 0.45f,
@@ -71,14 +74,14 @@ fun EmptySlotPlaceholder(
             // thing on screen, so a drop aimed at the top edge of the dashes
             // missed and was discarded without a word.
             .onGloballyPositioned { c: LayoutCoordinates ->
-                registry.registerSlot(path, c.boundsInWindow())
+                registry.registerPlaceholder(path, c.boundsInWindow())
             }
             .padding(vertical = 6.dp),
         contentAlignment = Alignment.Center,
     ) {
         // Dashed border via Canvas so we can use PathEffect; M3's
         // border modifier does not support dashed strokes.
-        val borderColor = NxTheme.colors.primary.copy(alpha = breath)
+        val borderColor = NxColor.lead().copy(alpha = breath)
         // Every length here is dp converted at draw time. They used to be bare
         // floats, which a DrawScope reads as device pixels: on a 2K display the
         // border came out at half its weight with half-length dashes, and the
@@ -103,13 +106,13 @@ fun EmptySlotPlaceholder(
             ) {
                 Symbol(icon = NxIcon.Add,
                     contentDescription = null,
-                    tint               = NxTheme.colors.primary.copy(alpha = breath),
+                    tint               = NxColor.lead().copy(alpha = breath),
                     modifier           = Modifier.padding(end = 6.dp),
                 )
                 Text(
                     text       = s.editorDragWidgetHere,
                     style      = MaterialTheme.typography.bodySmall,
-                    color      = NxTheme.colors.textSecondary,
+                    color      = NxInk.quiet,
                     fontWeight = FontWeight.Medium,
                 )
             }

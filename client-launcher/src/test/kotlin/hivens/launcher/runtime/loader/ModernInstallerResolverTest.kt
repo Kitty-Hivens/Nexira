@@ -13,6 +13,14 @@ import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.http.HttpStatusCode
+import io.ktor.utils.io.ByteReadChannel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
+import org.junit.jupiter.api.condition.EnabledOnOs
+import org.junit.jupiter.api.condition.OS as JunitOs
 import kotlinx.serialization.json.Json
 import java.io.IOException
 import java.nio.file.Files
@@ -89,6 +97,27 @@ class ModernInstallerResolverTest {
             val spec = resolver().harvest(MojangLibrary(name = "net.foo:bar:1.0"), staging)
 
             assertEquals(file, spec.localFile)
+        } finally {
+            staging.toFile().deleteRecursively()
+        }
+    }
+
+    /**
+     * The version json is the installer's output, and the path it names is read
+     * and then copied into the shared root. One that leaves the installer's
+     * libraries directory would hand over a file from anywhere on the disk.
+     */
+    @Test
+    fun `harvest refuses a path that leaves the installer's libraries directory`() {
+        val staging = Files.createTempDirectory("modern-harvest-climb")
+        try {
+            Files.createDirectories(staging.resolve("libraries"))
+            Files.writeString(staging.resolve("outside.jar"), "not the installer's")
+            val lib = MojangLibrary(
+                name = "net.evil:lib:1",
+                downloads = MojangLibraryDownloads(MojangArtifact("../outside.jar", "", 0, "")),
+            )
+            assertFailsWith<IOException> { resolver().harvest(lib, staging) }
         } finally {
             staging.toFile().deleteRecursively()
         }
@@ -212,6 +241,77 @@ class ModernInstallerResolverTest {
         }
     }
 
+    /**
+     * The installer used to be waited on with a plain `waitFor` of up to twenty
+     * minutes that no cancellation reached, so a stopped launch left it writing into
+     * a cache the next launch then deleted. A shell script stands in for the JVM: it
+     * marks that it started, sleeps, and marks that it finished, which it must not
+     * get to do.
+     */
+    @Test
+    @EnabledOnOs(JunitOs.LINUX, disabledReason = "the stand-in installer is a shell script")
+    fun `a cancelled launch kills the installer instead of waiting for it`() = runBlocking {
+        val cache = Files.createTempDirectory("modern-cancel")
+        val fakeJava = cache.resolve("java").also {
+            Files.writeString(it, "#!/bin/sh\ntouch started\nsleep 30\ntouch finished\n")
+            it.toFile().setExecutable(true)
+        }
+        val engine = MockEngine { respond(ByteReadChannel("JAR".toByteArray()), HttpStatusCode.OK) }
+        val resolver = ModernInstallerResolver(
+            clientProvider = HttpClientProvider { HttpClient(engine) },
+            transfers = testTransferEngine(HttpClientProvider { HttpClient(engine) }),
+            json = Json { ignoreUnknownKeys = true },
+            javaManager = object : IJavaManager {
+                override suspend fun getJavaPath(version: String): Path = fakeJava
+                override suspend fun getJavaPathForMajor(javaMajor: Int, onProgress: (String) -> Unit): Path = fakeJava
+            },
+            cacheDir = cache,
+            loaderId = "neoforge",
+            latestVersion = { "21.1.0" },
+        ) { _, version -> "https://example.test/neoforge-$version-installer.jar" }
+        val target = cache.resolve("neoforge-1.21.1-21.1.0")
+        try {
+            val job = launch(Dispatchers.IO) { resolver.resolve("1.21.1", "21.1.0") }
+            withTimeout(15_000) { while (!Files.exists(target.resolve("started"))) delay(50) }
+
+            job.cancel()
+            withTimeout(10_000) { job.join() }
+            delay(1_500)
+
+            assertFalse(Files.exists(target.resolve("finished")), "the installer outlived the launch that started it")
+        } finally {
+            cache.toFile().deleteRecursively()
+        }
+    }
+
+    /**
+     * The Forge installer compares the jars it repacks against hashes made with the
+     * reference zlib. On the game's JDK those jars are compressed by the system
+     * zlib, which on Arch and Fedora is zlib-ng, and every install failed there.
+     */
+    @Test
+    fun `the Forge installer runs on Java 8 whatever the game needs`() = runBlocking {
+        val asked = ArrayList<Int>()
+        val java = object : IJavaManager {
+            override suspend fun getJavaPath(version: String): Path = Path.of("/bin/java")
+            override suspend fun getJavaPathForMajor(javaMajor: Int, onProgress: (String) -> Unit): Path {
+                asked.add(javaMajor)
+                throw IOException("stop before running anything")
+            }
+        }
+        val engine = MockEngine { respond(ByteReadChannel("JAR".toByteArray()), HttpStatusCode.OK) }
+        val cache = Files.createTempDirectory("forge-java")
+        try {
+            val provider = HttpClientProvider { HttpClient(engine) }
+            val forge = ModernInstallerResolver.forge(provider, testTransferEngine(provider), Json { ignoreUnknownKeys = true }, java, cache)
+            runCatching { forge.resolve("1.20.1", "47.4.10") }
+            assertEquals(listOf(ModernInstallerResolver.FORGE_INSTALLER_JAVA), asked)
+            assertEquals(8, ModernInstallerResolver.FORGE_INSTALLER_JAVA)
+        } finally {
+            cache.toFile().deleteRecursively()
+        }
+    }
+
     @Test
     fun `ForgeResolver splits launchwrapper era at Minecraft 1_12`() {
         assertTrue(ForgeResolver.isLaunchwrapperEra("1.12.2"))
@@ -223,10 +323,44 @@ class ModernInstallerResolverTest {
     }
 
     @Test
-    fun `neoforgeVersionPrefix maps Minecraft to the NeoForge version-index prefix`() {
-        assertEquals("21.1.", ModernInstallerResolver.neoforgeVersionPrefix("1.21.1"))
-        assertEquals("21.0.", ModernInstallerResolver.neoforgeVersionPrefix("1.21")) // no patch -> .0
-        assertEquals("20.4.", ModernInstallerResolver.neoforgeVersionPrefix("1.20.4"))
+    fun `neoforgeLine maps each Minecraft era to NeoForge's artifact and prefix`() {
+        assertEquals(NeoForgeLine("neoforge", "21.1."), ModernInstallerResolver.neoforgeLine("1.21.1"))
+        assertEquals(NeoForgeLine("neoforge", "21.0."), ModernInstallerResolver.neoforgeLine("1.21")) // no patch -> .0
+        assertEquals(NeoForgeLine("neoforge", "20.4."), ModernInstallerResolver.neoforgeLine("1.20.4"))
+        // Published under Forge's coordinates, with the Minecraft version in front.
+        assertEquals(NeoForgeLine("forge", "1.20.1-"), ModernInstallerResolver.neoforgeLine("1.20.1"))
+        // The year-numbered releases keep every part.
+        assertEquals(NeoForgeLine("neoforge", "26.3.0."), ModernInstallerResolver.neoforgeLine("26.3"))
+        assertEquals(NeoForgeLine("neoforge", "26.1.2."), ModernInstallerResolver.neoforgeLine("26.1.2"))
+    }
+
+    @Test
+    fun `pickNeoForge takes the newest release, else the newest beta, never a snapshot`() {
+        val index = listOf(
+            "21.1.250", "26.1.0.0-alpha.1+snapshot-1", "26.1.0.19-beta",
+            "26.2.0.87-beta", "26.2.0.86", "26.2.0.88",
+            "26.3.0.15-beta", "26.3.0.16-beta",
+        )
+        assertEquals("26.2.0.88", ModernInstallerResolver.pickNeoForge(index, NeoForgeLine("neoforge", "26.2.0.")))
+        assertEquals("26.3.0.16-beta", ModernInstallerResolver.pickNeoForge(index, NeoForgeLine("neoforge", "26.3.0.")),
+            "a release NeoForge only has betas for is still installable")
+        assertEquals("26.1.0.19-beta", ModernInstallerResolver.pickNeoForge(index, NeoForgeLine("neoforge", "26.1.0.")))
+        assertNull(ModernInstallerResolver.pickNeoForge(index, NeoForgeLine("neoforge", "27.1.0.")))
+    }
+
+    @Test
+    fun `the 1_20_1 line reads the forge artifact and accepts a version typed without its prefix`() {
+        val line = ModernInstallerResolver.neoforgeLine("1.20.1")
+        val index = listOf("1.20.1-47.1.105", "1.20.1-47.1.106", "47.1.82")
+        assertEquals("1.20.1-47.1.106", ModernInstallerResolver.pickNeoForge(index, line), "the stray unprefixed entry is not this line")
+        assertEquals("1.20.1-47.1.106", ModernInstallerResolver.neoforgeCoordinate(line, "47.1.106"))
+        assertEquals("1.20.1-47.1.106", ModernInstallerResolver.neoforgeCoordinate(line, "1.20.1-47.1.106"))
+    }
+
+    @Test
+    fun `a Forge version typed with its Minecraft prefix is not prefixed twice`() {
+        assertEquals("47.2.0", ModernInstallerResolver.forgeBuild("1.20.1", "1.20.1-47.2.0"))
+        assertEquals("47.2.0", ModernInstallerResolver.forgeBuild("1.20.1", "47.2.0"))
     }
 
     @Test

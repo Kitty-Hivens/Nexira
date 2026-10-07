@@ -2,17 +2,17 @@ package hivens.launcher.news
 
 import hivens.core.api.HttpClientProvider
 import hivens.core.api.interfaces.INewsFeed
-import hivens.core.api.interfaces.IServerListService
 import hivens.core.cache.Cache
 import hivens.core.cache.PassthroughCache
 import hivens.core.cache.read
+import hivens.core.data.NewsItem
 import hivens.core.data.NewsPage
 import hivens.launcher.network.ServerProtocolConfig
+import hivens.core.net.metadataTimeout
 import io.ktor.client.call.body
 import io.ktor.client.request.get
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.future.await
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
 
@@ -38,7 +38,13 @@ import org.slf4j.LoggerFactory
 class SmartyCraftNewsFeed(
     private val clientProvider: HttpClientProvider,
     private val config: ServerProtocolConfig,
-    private val dashboard: IServerListService,
+    /**
+     * The three entries the dashboard payload carries, as the floor below the
+     * archive. A function rather than the service that answers it: the feed
+     * needs the news and nothing else out of that call, and the caching of it
+     * is the wiring's business.
+     */
+    private val dashboardNews: suspend () -> List<NewsItem>,
     private val cache: Cache<NewsPage> = PassthroughCache(),
 ) : INewsFeed {
 
@@ -68,7 +74,7 @@ class SmartyCraftNewsFeed(
     private suspend fun load(index: Int): NewsPage = withContext(Dispatchers.IO) {
         val url = "${config.baseUrl.trimEnd('/')}/index_page$index"
         runCatching {
-            val html: String = clientProvider.current.get(url).body()
+            val html: String = clientProvider.current.get(url) { metadataTimeout() }.body()
             SmartyNewsParser.parse(html, config.baseUrl, index).also {
                 if (it.items.isEmpty()) {
                     log.warn("News page {} parsed to nothing -- upstream markup may have moved", index)
@@ -87,7 +93,7 @@ class SmartyCraftNewsFeed(
      * would settle for them.
      */
     private suspend fun dashboardFloor(): NewsPage =
-        runCatching { dashboard.fetchDashboardData().await().news }
+        runCatching { dashboardNews() }
             .onFailure {
                 if (it is CancellationException) throw it
                 log.warn("News fallback to the dashboard failed", it)

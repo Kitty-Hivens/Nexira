@@ -7,7 +7,7 @@ import java.nio.file.Path
 // Adapter from the cross-widget service contract to the concrete
 // Skinema-backed AudioPlayer (FFmpeg via Panama). AudioPlayer is the
 // Koin singleton -- one player per launcher process -- so every widget
-// that mounts MusicPlayerWidget binds to the same underlying state.
+// that mounts a player widget binds to the same underlying state.
 // Removing the widget unregisters the service but leaves AudioPlayer
 // alive; re-adding the widget re-binds to the same player and the
 // track keeps playing.

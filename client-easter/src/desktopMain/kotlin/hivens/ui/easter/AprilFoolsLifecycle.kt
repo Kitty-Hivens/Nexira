@@ -60,13 +60,19 @@ interface AprilFoolsLifecycle {
      */
     fun requestCloseDialog(onActualClose: () -> Unit)
 
-    // ── Card tracker (SquareServerCard manual chaos integration) ──────────
+    // ── Card tracker (manual chaos integration) ───────────────────────────
 
     /**
-     * Server cards are not buttons, so they register manually with the chaos
-     * engine. Real impl returns a live tracker; NoOp returns a stub whose
-     * setters / disposer are no-ops and [ChaosCardTracker.originalVisible]
-     * stays `true` (cards never go invisible because they never escape).
+     * A card is not a button, so it registers with the chaos engine by hand.
+     *
+     * Nothing registers today: the server cards that did are gone with the
+     * server list, and the escape-card event has not been re-pointed at the
+     * surfaces that replaced them. Kept because the mechanism is the event, and
+     * re-aiming it is a smaller job than writing it again.
+     *
+     * Real impl returns a live tracker; NoOp returns a stub whose setters /
+     * disposer are no-ops and [ChaosCardTracker.originalVisible] stays `true`
+     * (cards never go invisible because they never escape).
      */
     fun acquireCardTracker(
         id: String,

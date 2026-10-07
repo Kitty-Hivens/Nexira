@@ -1,12 +1,14 @@
 package hivens.launcher
 
 import hivens.core.io.UnpackBudget
+import hivens.core.io.deleteTree
 import hivens.core.io.UnpackLimits
 import hivens.core.api.interfaces.IJavaManager
 import hivens.core.net.SkipIfPresent
 import hivens.core.net.Transfer
 import hivens.core.net.TransferEngine
 import hivens.core.platform.OS
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
@@ -15,9 +17,11 @@ import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream
 import org.slf4j.LoggerFactory
 import java.io.*
 import java.nio.file.*
-import java.nio.file.attribute.BasicFileAttributes
 import java.nio.file.attribute.PosixFilePermission
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 class JavaManagerService(
     baseDir: Path,
@@ -43,10 +47,19 @@ class JavaManagerService(
 
         val folderName = "java-$javaMajor-$os-$arch"
         val targetDir = runtimesDir.resolve(folderName)
+        // One provisioning per runtime directory at a time, the same rule the loader
+        // installer keeps. A stop during the unpack does not stop the unpack, it runs
+        // to the end on IO, and a second Play started meanwhile deleted `.incoming`
+        // under it or swapped the directory out from under the first.
+        installLock(targetDir).withLock { provision(javaMajor, os, arch, targetDir, onProgress) }
+    }
+
+    private suspend fun provision(javaMajor: Int, os: String, arch: String, targetDir: Path, onProgress: (String) -> Unit): Path {
+        recoverInterruptedSwap(targetDir)
 
         val existing = findJavaExecutable(targetDir)
         if (existing != null && isJavaUsable(existing)) {
-            return@withContext existing
+            return existing
         }
         if (existing != null) {
             log.warn("Java at {} failed -version check, treating as broken and re-downloading", existing)
@@ -68,7 +81,7 @@ class JavaManagerService(
         }
 
         onProgress("Java $javaMajor ready")
-        return@withContext executable
+        return executable
     }
 
     private suspend fun downloadAndUnpack(version: Int, targetDir: Path, onProgress: (String) -> Unit = {}) {
@@ -136,6 +149,11 @@ class JavaManagerService(
                     Files.deleteIfExists(archive)
                 }
                 return
+            } catch (e: CancellationException) {
+                // A stopped launch, not a failed mirror. Caught below, it walked on to
+                // the next mirror, which threw at once, and the launch reported every
+                // mirror failing for a download nobody let finish.
+                throw e
             } catch (e: Exception) {
                 // Whatever arrived is left where it is. The partial beside this
                 // archive is what the next attempt continues from, and on the route
@@ -221,9 +239,14 @@ class JavaManagerService(
      */
     internal fun installUnpacked(archive: Path, targetDir: Path, isZip: Boolean) {
         val incoming = targetDir.resolveSibling("${targetDir.fileName}.incoming")
-        val previous = targetDir.resolveSibling("${targetDir.fileName}.previous")
-        deleteDirectoryRecursively(incoming)
-        deleteDirectoryRecursively(previous)
+        val previous = previousOf(targetDir)
+        deleteTree(incoming)
+        // Whatever is under `.previous` now is either the only copy, left there by a
+        // swap that never finished, or a stale one beside a complete install. Put the
+        // first back before clearing the name: deleted here, it went before the new
+        // archive had even been fetched.
+        recoverInterruptedSwap(targetDir)
+        deleteTree(previous)
         Files.createDirectories(incoming)
 
         try {
@@ -240,38 +263,36 @@ class JavaManagerService(
             // short as the filesystem allows.
             if (Files.exists(targetDir)) Files.move(targetDir, previous)
             Files.move(incoming, targetDir)
-            deleteDirectoryRecursively(previous)
+            deleteTree(previous)
         } catch (e: Exception) {
-            runCatching { deleteDirectoryRecursively(incoming) }
+            runCatching { deleteTree(incoming) }
             // A swap that failed between the two renames leaves the install
             // under `.previous`; put it back rather than leaving the user with
             // nothing.
             if (!Files.exists(targetDir) && Files.exists(previous)) {
                 runCatching { Files.move(previous, targetDir) }
             }
-            runCatching { deleteDirectoryRecursively(previous) }
+            runCatching { deleteTree(previous) }
             throw e
         }
     }
 
-    private fun deleteDirectoryRecursively(path: Path) {
-        if (!Files.exists(path)) return
-        Files.walkFileTree(path, object : SimpleFileVisitor<Path>() {
-            override fun visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult {
-                // Remove Read-Only attributes before deleting
-                try {
-                    Files.setAttribute(file, "dos:readonly", false)
-                } catch (_: Exception) { /* Ignorable on non-Windows */ }
-
-                Files.delete(file)
-                return FileVisitResult.CONTINUE
-            }
-            override fun postVisitDirectory(dir: Path, exc: IOException?): FileVisitResult {
-                Files.delete(dir)
-                return FileVisitResult.CONTINUE
-            }
-        })
+    /**
+     * Puts back an install that a swap left under `.previous`.
+     *
+     * The swap renames the working copy aside and the new one into place. A crash
+     * between the two leaves the working copy under the other name and nothing
+     * where the launcher looks, and nothing else ever read it back.
+     */
+    internal fun recoverInterruptedSwap(targetDir: Path) {
+        val previous = previousOf(targetDir)
+        if (Files.exists(targetDir) || !Files.exists(previous)) return
+        runCatching { Files.move(previous, targetDir) }
+            .onSuccess { log.info("Restored the Java runtime an unfinished install left at {}", previous) }
+            .onFailure { log.warn("Could not restore the Java runtime left at {}", previous, it) }
     }
+
+    private fun previousOf(targetDir: Path): Path = targetDir.resolveSibling("${targetDir.fileName}.previous")
 
     private fun setExecutablePermissions(path: Path) {
         try {
@@ -528,5 +549,10 @@ class JavaManagerService(
         internal const val DOWNLOAD_UA =
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
                 "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+
+        /** One lock per runtime directory, shared by every instance of the service in the process. */
+        private val installLocks = ConcurrentHashMap<Path, Mutex>()
+
+        private fun installLock(dir: Path): Mutex = installLocks.computeIfAbsent(dir.toAbsolutePath().normalize()) { Mutex() }
     }
 }

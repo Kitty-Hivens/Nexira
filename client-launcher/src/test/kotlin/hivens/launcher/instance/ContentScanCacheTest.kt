@@ -151,4 +151,126 @@ class ContentScanCacheTest {
         assertEquals("Cool Mod", c.lookup(jar.normalize().toString(), size, mtime)?.meta?.name)
         instance.toFile().deleteRecursively()
     }
+
+    /**
+     * The second open of a pack reads the cache, so the cache has to carry
+     * everything the parse found. The loader and the game version were added to
+     * the parse and not to the stored record, and a jar therefore knew what it
+     * ran on exactly once -- the first time its pack was opened.
+     */
+    @Test
+    fun `a cached re-read keeps the loader and the game version`() = runTest {
+        val instance = Files.createTempDirectory("inst")
+        val mods = Files.createDirectories(instance.resolve("mods"))
+        ZipOutputStream(Files.newOutputStream(mods.resolve("fab.jar"))).use { out ->
+            out.putNextEntry(ZipEntry("fabric.mod.json"))
+            out.write(
+                """{"schemaVersion":1,"id":"fab","name":"Fab","version":"1.0","depends":{"minecraft":"1.21.1"}}"""
+                    .toByteArray(),
+            )
+            out.closeEntry()
+        }
+        val c = cache()
+        val jar = mods.resolve("fab.jar")
+        val first = InstanceContentScanner(c).scan(instance).single()
+        assertEquals(listOf("fabric"), first.loaders)
+        assertEquals(listOf("1.21.1"), first.gameVersions)
+
+        // Asked of the CACHE ENTRY, not of a second scan. A second scan re-parses
+        // the jar whenever the entry is missing and answers correctly either way,
+        // so it would have passed with the fields dropped on the way in.
+        val stored = c.lookup(jar.normalize().toString(), Files.size(jar), Files.getLastModifiedTime(jar).toMillis())
+        assertEquals(listOf("fabric"), stored?.meta?.loaders, "the entry itself carries the loaders")
+        assertEquals(listOf("1.21.1"), stored?.meta?.gameVersions)
+
+        val second = InstanceContentScanner(c).scan(instance).single()
+        assertEquals(listOf("fabric"), second.loaders)
+        assertEquals(listOf("1.21.1"), second.gameVersions)
+        instance.toFile().deleteRecursively()
+    }
+
+    /**
+     * A jar that declares BOTH manifests runs under both, and the scanner named
+     * only whichever it happened to read first: a Fabric mod sitting in a Fabric
+     * pack reported itself as NeoForge on its own page.
+     */
+    @Test
+    fun `a multiloader jar names every loader it declares`() = runTest {
+        val instance = Files.createTempDirectory("inst")
+        val mods = Files.createDirectories(instance.resolve("mods"))
+        ZipOutputStream(Files.newOutputStream(mods.resolve("both.jar"))).use { out ->
+            out.putNextEntry(ZipEntry("fabric.mod.json"))
+            out.write(FABRIC_TWO_VERSIONS.toByteArray())
+            out.closeEntry()
+            out.putNextEntry(ZipEntry("META-INF/neoforge.mods.toml"))
+            out.write(NEOFORGE_TOML.toByteArray())
+            out.closeEntry()
+        }
+        val item = InstanceContentScanner(cache()).scan(instance).single()
+        assertEquals(listOf("neoforge", "fabric"), item.loaders)
+        instance.toFile().deleteRecursively()
+    }
+
+    /**
+     * Fabric declares `depends.minecraft` as a set of alternatives. Taking the
+     * first turned a mod built for the pack's own version into one built for the
+     * version before it, on every mod whose author listed both.
+     */
+    @Test
+    fun `a fabric jar keeps every game version it names`() = runTest {
+        val instance = Files.createTempDirectory("inst")
+        val mods = Files.createDirectories(instance.resolve("mods"))
+        ZipOutputStream(Files.newOutputStream(mods.resolve("multi.jar"))).use { out ->
+            out.putNextEntry(ZipEntry("fabric.mod.json"))
+            out.write(FABRIC_TWO_VERSIONS.toByteArray())
+            out.closeEntry()
+        }
+        val item = InstanceContentScanner(cache()).scan(instance).single()
+        assertEquals(listOf("1.21", "1.21.1"), item.gameVersions)
+        instance.toFile().deleteRecursively()
+    }
+
+    /**
+     * A commented-out dependency block is a claim the manifest deliberately does
+     * not make, and the flat line scan was reading it anyway.
+     */
+    @Test
+    fun `a commented-out range is not a declared range`() = runTest {
+        val instance = Files.createTempDirectory("inst")
+        val mods = Files.createDirectories(instance.resolve("mods"))
+        ZipOutputStream(Files.newOutputStream(mods.resolve("commented.jar"))).use { out ->
+            out.putNextEntry(ZipEntry("META-INF/mods.toml"))
+            out.write(COMMENTED_TOML.toByteArray())
+            out.closeEntry()
+        }
+        val item = InstanceContentScanner(cache()).scan(instance).single()
+        assertEquals(emptyList(), item.gameVersions)
+        assertEquals(listOf("forge"), item.loaders)
+        instance.toFile().deleteRecursively()
+    }
+
+    private companion object {
+        val FABRIC_TWO_VERSIONS = """
+            {"schemaVersion":1,"id":"m","name":"M","version":"1.0","depends":{"minecraft":["1.21","1.21.1"]}}
+        """.trimIndent()
+
+        val NEOFORGE_TOML = """
+            modLoader="javafml"
+            [[mods]]
+            modId="m"
+            displayName="M"
+            [[dependencies.m]]
+            modId="minecraft"
+            versionRange="[1.21,)"
+        """.trimIndent()
+
+        val COMMENTED_TOML = """
+            [[mods]]
+            modId="c"
+            displayName="C"
+            #[[dependencies.c]]
+            #modId="minecraft"
+            #versionRange="[1.18,1.20.4]"
+        """.trimIndent()
+    }
 }

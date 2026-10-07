@@ -4,23 +4,21 @@ import hivens.auth.AuthProvider
 import hivens.auth.AuthProviderRegistry
 import hivens.core.api.AuthException
 import hivens.core.api.TwoFactorRequiredException
-import hivens.core.api.interfaces.IFileDownloadService
 import hivens.core.api.interfaces.IJavaManager
 import hivens.core.api.interfaces.ILauncherService
-import hivens.core.api.interfaces.IManifestProcessorService
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.api.interfaces.IPackSyncService
 import hivens.core.api.interfaces.RosterVerdict
 import hivens.core.api.interfaces.ISettingsService
-import hivens.core.api.model.ServerProfile
 import hivens.core.data.AuthStatus
-import hivens.core.data.FileManifest
 import hivens.core.data.PackAuthRequirement
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
 import hivens.core.data.SessionData
 import hivens.core.data.SettingsData
 import hivens.core.launch.AuthRefreshFailure
+import hivens.core.launch.InstanceWork
+import hivens.core.launch.InstanceWorkRegistry
 import hivens.core.launch.LaunchError
 import hivens.core.launch.LaunchHandle
 import hivens.core.launch.LaunchLogEvent
@@ -30,13 +28,11 @@ import dev.hivens.libvault.Vault
 import dev.hivens.libvault.VaultConfig
 import dev.hivens.libvault.VaultTier
 import hivens.auth.CredentialsManager
-import hivens.launcher.ManifestCache
-import hivens.launcher.ProfileManager
-import hivens.launcher.smrt.SmartyModPlanner
 import hivens.launcher.smrt.SmrtPackClient
 import io.mockk.coEvery
 import io.mockk.coJustRun
 import io.mockk.coVerify
+import io.mockk.coVerifyOrder
 import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
@@ -49,8 +45,10 @@ import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.serialization.json.Json
 import java.nio.file.Files
 import java.nio.file.Path
@@ -66,11 +64,11 @@ import kotlin.test.assertTrue
 /**
  * Smoke + edge tests for the post-B1 [LauncherController]. Mocking strategy:
  *
- * - **Interfaces** (`AuthProvider`, `IFileDownloadService`, …) are mocked
+ * - **Interfaces** (`AuthProvider`, `ILauncherService`, …) are mocked
  *   with `mockk()` since they go through `java.lang.reflect.Proxy` and do
  *   not require Byte Buddy class retransformation.
- * - **Final classes** (`ProfileManager`, `ManifestCache`, `CredentialsManager`)
- *   are instantiated for real against the test sandbox directory. Reason:
+ * - **Final classes** (`CredentialsManager`) are instantiated for real against
+ *   the test sandbox directory. Reason:
  *   this project's tests run on JDK 25, and the mockk-bundled Byte Buddy
  *   (1.14.x) cannot transform Java 25 bytecode -- recording an `every {}`
  *   block on a final-class mock invokes the real method on an uninitialized
@@ -92,25 +90,12 @@ class LauncherControllerTest {
     private lateinit var authService: AuthProvider
     private lateinit var packSyncService: IPackSyncService
     private lateinit var settingsService: ISettingsService
-    private lateinit var downloadService: IFileDownloadService
     private lateinit var javaManagerService: IJavaManager
     private lateinit var launcherService: ILauncherService
-    private lateinit var manifestProcessor: IManifestProcessorService
     private lateinit var credentialsManager: CredentialsManager
-    private lateinit var manifestCache: ManifestCache
-    private lateinit var profileManager: ProfileManager
     private lateinit var packRepository: IPackRepository
     private lateinit var smrtPackClient: SmrtPackClient
-    private lateinit var smartyPlanner: SmartyModPlanner
-
-    private val server = ServerProfile(
-        name     = "TestSrv",
-        title    = "Test",
-        version  = "1.7.10",
-        ip       = "127.0.0.1",
-        port     = 25565,
-        assetDir = "test",
-    )
+    private val work = InstanceWorkRegistry()
 
     @BeforeTest
     fun setUp() {
@@ -119,17 +104,9 @@ class LauncherControllerTest {
 
         authService        = mockk()
         settingsService    = mockk()
-        downloadService    = mockk()
         javaManagerService = mockk()
         launcherService    = mockk()
-        manifestProcessor  = mockk()
 
-        // Real instances: cheaper than fighting mockk on JDK 25, and the
-        // default no-data behavior (empty profile map, missing manifest
-        // file, no credentials.json) is exactly what the smoke + edge
-        // paths expect.
-        profileManager     = ProfileManager(sandbox, json)
-        manifestCache      = ManifestCache(sandbox.resolve("manifest-cache"), json)
         // A real in-memory vault so save() -> load() round-trips (the relaxed
         // mock returned null from retrieve, breaking the re-auth flow). Memory
         // tier skips the keyring probe entirely. No legacy file is written, so
@@ -139,20 +116,15 @@ class LauncherControllerTest {
             json,
             Vault.open(VaultConfig(namespace = "nexira-launcher-test", preferredTiers = listOf(VaultTier.Memory))),
         ) { mockk(relaxed = true) }
-        // PackRepository + SmrtPackClient: pack-centric controller
-        // dependencies. SC-only tests do not call `launchPackInstance`,
-        // so a relaxed mockk on both is enough to satisfy the
-        // constructor without any stubbing.
         packRepository     = mockk(relaxed = true)
+        // The interface's own read-then-write, so a test that stubs get and captures
+        // put sees an update the way the production default performs it.
+        coEvery { packRepository.update(any(), any()) } coAnswers {
+            val transform = secondArg<(PackInstance) -> PackInstance>()
+            packRepository.get(firstArg())?.let { current -> transform(current).also { packRepository.put(it) } }
+        }
         smrtPackClient     = mockk(relaxed = true)
-        // No Smarty swap in SC-launch tests; the helper never resolves, so the
-        // plan injects nothing. The swap path has its own test.
-        smartyPlanner      = SmartyModPlanner(resolveHelper = { null }, manifestProcessor = manifestProcessor)
 
-        every { manifestProcessor.calculateIgnoredFiles(any(), any()) } returns emptySet()
-        // Swap planning (enabled by default in SettingsData) flattens the manifest
-        // to find Smarty jars to strip; no Smarty in these SC-launch fixtures.
-        every { manifestProcessor.flattenManifest(any()) } returns emptyMap()
         coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/usr/bin/java")
         // The registry only reads provider ids; the controller's SC gate checks
         // contains("smartycraft").
@@ -169,90 +141,22 @@ class LauncherControllerTest {
         runCatching { sandbox.deleteRecursively() }
     }
 
-    private fun newController(scope: TestScope) = LauncherController(
+    private fun newController(
+        scope: TestScope,
+        registry: AuthProviderRegistry = AuthProviderRegistry(listOf(authService)),
+    ) = LauncherController(
         authService          = authService,
-        authProviderRegistry = AuthProviderRegistry(listOf(authService)),
+        authProviderRegistry = registry,
         credentialsManager   = credentialsManager,
         settingsService    = settingsService,
-        downloadService    = downloadService,
-        javaManagerService = javaManagerService,
         launcherService    = launcherService,
-        manifestProcessor  = manifestProcessor,
-        manifestCache      = manifestCache,
-        profileManager     = profileManager,
         packRepository     = packRepository,
         smrtPackClient     = smrtPackClient,
         smrtSyncService    = packSyncService,
-        smartyPlanner      = smartyPlanner,
         dataDirectory      = sandbox,
         appScope           = scope,
+        work               = work,
     )
-
-    @Test
-    fun `happy online launch lands in Idle and emits expected event sequence`() = runTest {
-        every { settingsService.getSettings() } returns SettingsData()
-
-        val session = SessionData(
-            playerName = "tester",
-            uuid = "before-login",
-            accessToken = "stale-token",
-            cachedPassword = "pw",
-            fileManifest = FileManifest(),
-        )
-        val refreshed = session.copy(uuid = "after-login", accessToken = "fresh-token")
-        coEvery { authService.login("tester", "pw", "test") } returns refreshed
-
-        coJustRun {
-            downloadService.processSession(
-                session = any(),
-                serverId = any(),
-                targetDir = any(),
-                extraCheckSum = any(),
-                ignoredFiles = any(),
-                messageUI = any(),
-                progressUI = any(),
-                verifyUI = any(),
-                injectModJar = any(),
-                strictModCheck = any(),
-                helperKeepGlobs = any(),
-            )
-        }
-
-        val handle = mockk<LaunchHandle>()
-        coEvery { handle.awaitExit() } returns 0
-        every { handle.terminate() } just runs
-        coEvery {
-            launcherService.launchClientWithLogs(any(), any(), any(), any(), any(), any())
-        } returns SpawnResult.Started(handle)
-
-        val controller = newController(this)
-        val collected = mutableListOf<LaunchLogEvent>()
-        val collectorJob = launch { controller.events.toList(collected) }
-
-        controller.launch(session, server, onSessionRefreshed = null)
-        advanceUntilIdle()
-
-        assertEquals(LaunchState.Idle, controller.state.value, "state should return to Idle after exit code 0")
-        assertIs<LaunchLogEvent.SessionStarted>(
-            collected.firstOrNull(),
-            "first event must be SessionStarted; got ${collected.firstOrNull()}",
-        )
-        assertTrue(
-            collected.any { it is LaunchLogEvent.AuthSucceeded && it.uuid == "after-login" },
-            "expected AuthSucceeded(after-login); got $collected",
-        )
-        assertTrue(
-            collected.any { it is LaunchLogEvent.Launching },
-            "expected Launching event; got $collected",
-        )
-
-        coVerify(exactly = 1) { authService.login("tester", "pw", "test") }
-        coVerify(exactly = 1) {
-            launcherService.launchClientWithLogs(any(), any(), any(), any(), any(), any())
-        }
-
-        collectorJob.cancel()
-    }
 
     @Test
     fun `a refresh that never reached the server is classified Unreachable`() = runTest {
@@ -277,133 +181,24 @@ class LauncherControllerTest {
     }
 
     /**
-     * Runs a launch whose pre-spawn refresh throws [thrown] and returns the
-     * resulting [LaunchLogEvent.AuthFailed]. The launch continues past the
-     * failed refresh -- that is the behaviour under test -- so the spawn path
-     * is stubbed through to a clean exit.
+     * Runs an SC-bound pack launch whose pre-spawn refresh throws [thrown] and
+     * returns the resulting [LaunchLogEvent.AuthFailed]. The launch continues
+     * past the failed refresh -- that is the behaviour under test -- so the
+     * spawn path is stubbed through to a clean exit.
      */
     private suspend fun TestScope.authFailureFor(thrown: Exception): LaunchLogEvent.AuthFailed? {
-        every { settingsService.getSettings() } returns SettingsData()
+        credentialsManager.saveAccount(
+            SessionData(playerName = "tester", uuid = "u", accessToken = "stale", cachedPassword = "pw"),
+            "smartycraft",
+        )
         coEvery { authService.login(any(), any(), any()) } throws thrown
-        coJustRun {
-            downloadService.processSession(
-                session = any(),
-                serverId = any(),
-                targetDir = any(),
-                extraCheckSum = any(),
-                ignoredFiles = any(),
-                messageUI = any(),
-                progressUI = any(),
-                verifyUI = any(),
-                injectModJar = any(),
-                strictModCheck = any(),
-                helperKeepGlobs = any(),
-            )
-        }
-        val handle = mockk<LaunchHandle>()
-        coEvery { handle.awaitExit() } returns 0
-        every { handle.terminate() } just runs
-        coEvery {
-            launcherService.launchClientWithLogs(any(), any(), any(), any(), any(), any())
-        } returns SpawnResult.Started(handle)
-
-        val controller = newController(this)
-        val collected = mutableListOf<LaunchLogEvent>()
-        val collectorJob = launch { controller.events.toList(collected) }
-
-        controller.launch(
-            currentSession = SessionData(
-                playerName = "tester",
-                accessToken = "stale-token",
-                cachedPassword = "pw",
-                fileManifest = FileManifest(),
-            ),
-            server = server,
+        val events = mutableListOf<LaunchLogEvent>()
+        capturePackSession(
+            SessionData(playerName = "tester", uuid = "u", accessToken = "stale", cachedPassword = "pw"),
+            packInstance = scBoundPackInstance(),
+            events = events,
         )
-        advanceUntilIdle()
-        collectorJob.cancel()
-
-        return collected.filterIsInstance<LaunchLogEvent.AuthFailed>().firstOrNull()
-    }
-
-    @Test
-    fun `offline without installed client lands in Error(OfflineNoClient)`() = runTest {
-        every { settingsService.getSettings() } returns SettingsData(isOfflineMode = true)
-
-        val controller = newController(this)
-        controller.launch(
-            currentSession = SessionData(playerName = "tester"),
-            server = server,
-        )
-        advanceUntilIdle()
-
-        val state = controller.state.value
-        assertIs<LaunchState.Error>(state)
-        assertEquals(LaunchError.OfflineNoClient, state.reason)
-
-        coVerify(exactly = 0) {
-            downloadService.processSession(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
-        }
-    }
-
-    @Test
-    fun `swap on with Smarty in manifest but no helper blocks the launch`() = runTest {
-        every { settingsService.getSettings() } returns SettingsData()  // useOpenSmrtHelper = true
-        // Manifest ships the proprietary Smarty jar; the planner's default glob
-        // matches it, and the resolver (newController stubs resolveHelper = null)
-        // yields no helper, with none on disk -> launch must be blocked.
-        every { manifestProcessor.flattenManifest(any()) } returns
-            mapOf("mods/Smarty-1.7.10.jar" to hivens.core.data.FileData("x", 1))
-
-        val session = SessionData(
-            playerName = "tester",
-            cachedPassword = "pw",
-            fileManifest = FileManifest(),
-        )
-        coEvery { authService.login("tester", "pw", "test") } returns
-            session.copy(fileManifest = FileManifest())
-
-        val controller = newController(this)
-        controller.launch(session, server, onSessionRefreshed = null)
-        advanceUntilIdle()
-
-        val state = controller.state.value
-        assertIs<LaunchState.Error>(state)
-        assertEquals(LaunchError.HelperUnavailable("1.7.10"), state.reason)
-        coVerify(exactly = 0) {
-            downloadService.processSession(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
-        }
-    }
-
-    @Test
-    fun `2FA without cached manifest lands in Error(TwoFactorExpired)`() = runTest {
-        every { settingsService.getSettings() } returns SettingsData()
-        coEvery {
-            authService.login(any(), any(), any())
-        } throws TwoFactorRequiredException(uid = "uid-stub", login = "tester")
-        // Real ManifestCache.loadManifest() returns null when the per-server
-        // file does not exist, which is exactly the "no cached manifest"
-        // branch -- no stubbing needed.
-
-        val controller = newController(this)
-        val collected = mutableListOf<LaunchLogEvent>()
-        val collectorJob = launch { controller.events.toList(collected) }
-
-        controller.launch(
-            currentSession = SessionData(playerName = "tester", cachedPassword = "pw"),
-            server = server,
-        )
-        advanceUntilIdle()
-
-        val state = controller.state.value
-        assertIs<LaunchState.Error>(state)
-        assertEquals(LaunchError.TwoFactorExpired, state.reason)
-        assertTrue(
-            collected.any { it is LaunchLogEvent.Error && it.reason == LaunchError.TwoFactorExpired },
-            "expected LaunchLogEvent.Error(TwoFactorExpired); got $collected",
-        )
-
-        collectorJob.cancel()
+        return events.filterIsInstance<LaunchLogEvent.AuthFailed>().firstOrNull()
     }
 
     @Test
@@ -463,7 +258,7 @@ class LauncherControllerTest {
         // instance arrived pre-populated.
         val puts = mutableListOf<hivens.core.data.PackInstance>()
         coJustRun { packRepository.put(capture(puts)) }
-        coEvery { packRepository.get(any()) } answers { puts.lastOrNull() }
+        coEvery { packRepository.get(any()) } answers { puts.lastOrNull() ?: instance }
 
         val controller = newController(this)
         controller.launchPackInstance(
@@ -563,6 +358,46 @@ class LauncherControllerTest {
         ),
     )
 
+    /** Launches [pack] with the service reporting [resolved] as the loader version it used. */
+    private suspend fun TestScope.launchResolving(pack: PackInstance, resolved: String): List<PackInstance> {
+        every { settingsService.getSettings() } returns SettingsData()
+        Files.createDirectories(sandbox.resolve("instances").resolve(pack.instanceDirName))
+        val puts = mutableListOf<PackInstance>()
+        coJustRun { packRepository.put(capture(puts)) }
+        coEvery { packRepository.get(pack.id) } answers { puts.lastOrNull() ?: pack }
+        val handle = mockk<LaunchHandle>()
+        coEvery { handle.awaitExit() } returns 0
+        coEvery {
+            launcherService.launchPackClient(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+        } returns SpawnResult.Started(handle, resolvedLoaderVersion = resolved)
+        newController(this).launchPackInstance(SessionData(playerName = "tester", uuid = "u", accessToken = "tok"), pack)
+        advanceUntilIdle()
+        return puts
+    }
+
+    /**
+     * A blank version was "the latest" asked again on every launch: it moved under the
+     * pack, reran a Forge installer at each new promotion, and needed the network.
+     */
+    @Test
+    fun `a pack that named no loader version is pinned to the one its launch resolved`() = runTest {
+        val blank = packInstance("i-blank").let { it.copy(cachedManifest = it.cachedManifest!!.copy(loaderName = "fabric", loaderVersion = "")) }
+
+        val puts = launchResolving(blank, resolved = "0.16.14")
+
+        assertEquals("0.16.14", puts.last().cachedManifest?.loaderVersion)
+    }
+
+    /** Legacy Forge substitutes a published build for one that never was; the pack keeps what it names. */
+    @Test
+    fun `a named loader version is left as the pack names it`() = runTest {
+        val named = packInstance("i-named")
+
+        val puts = launchResolving(named, resolved = "14.23.5.2864")
+
+        assertTrue(puts.none { it.cachedManifest?.loaderVersion == "14.23.5.2864" }, "got ${puts.map { it.cachedManifest?.loaderVersion }}")
+    }
+
     /**
      * A toggle owns one field and must write only that one.
      *
@@ -611,13 +446,43 @@ class LauncherControllerTest {
     }
 
     /**
-     * Stopping one pack and starting another immediately is allowed: abort sets Idle
-     * while the first launch is still parked in a wait that cancellation cannot
-     * interrupt. When it finally wakes -- after the second game is live -- everything
-     * its tail would clear belongs to the second one.
+     * The spawn wrote back the record captured before the click. Preparing a launch
+     * takes a sign-in and possibly a catch-up repair, and an update committed in that
+     * time was quietly reverted: pin, baseline and cached manifest back to the build
+     * the update had just left.
      */
     @Test
-    fun `an aborted launch waking up late does not clear the session that replaced it`() = runTest {
+    fun `the spawn does not write back the build an update just left`() = runTest {
+        every { settingsService.getSettings() } returns SettingsData()
+        coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/opt/jdk8/bin/java")
+        val clicked = packInstance("i-moved")
+        Files.createDirectories(sandbox.resolve("instances").resolve(clicked.instanceDirName))
+        val committed = clicked.copy(pinnedPackVersion = "2026.06.01.1")
+        coEvery { packRepository.get("i-moved") } returns committed
+        val puts = mutableListOf<PackInstance>()
+        coJustRun { packRepository.put(capture(puts)) }
+        val handle = mockk<LaunchHandle>()
+        coEvery { handle.awaitExit() } returns 0
+        coEvery {
+            launcherService.launchPackClient(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+        } returns SpawnResult.Started(handle)
+
+        newController(this).launchPackInstance(SessionData(playerName = "tester", uuid = "u", accessToken = "tok"), clicked)
+        advanceUntilIdle()
+
+        val stamped = puts.first()
+        assertEquals("2026.06.01.1", stamped.pinnedPackVersion, "the committed build stays")
+        assertTrue(stamped.lastPlayedEpochOrZero > 0, "and the one field the spawn owns is written")
+    }
+
+    /**
+     * A game told to stop has up to the termination grace left, and until it goes it
+     * is still writing its instance. Stop used to reopen Play at once, so a second
+     * launch could start beside it, and it cancelled the launch, which skipped the
+     * tail that records the session: a stopped game left no playtime at all.
+     */
+    @Test
+    fun `a stopped game holds the launcher until it exits, and its session is recorded`() = runTest {
         every { settingsService.getSettings() } returns SettingsData()
         coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/opt/jdk8/bin/java")
 
@@ -627,15 +492,15 @@ class LauncherControllerTest {
             Files.createDirectories(sandbox.resolve("instances").resolve(i.instanceDirName))
         }
         coEvery { packRepository.get(any()) } answers { if (firstArg<String>() == "first") first else second }
+        val puts = mutableListOf<PackInstance>()
+        coJustRun { packRepository.put(capture(puts)) }
 
-        // Uninterruptible, the way `Process.waitFor` is: cancelling the launch job
-        // does not free it, which is the whole premise of the race.
+        // Uninterruptible, the way `Process.waitFor` is.
         val firstExit = CompletableDeferred<Int>()
         val firstHandle = mockk<LaunchHandle>(relaxed = true)
         coEvery { firstHandle.awaitExit() } coAnswers { withContext(NonCancellable) { firstExit.await() } }
         val secondHandle = mockk<LaunchHandle>(relaxed = true)
-        val secondExit = CompletableDeferred<Int>()
-        coEvery { secondHandle.awaitExit() } coAnswers { withContext(NonCancellable) { secondExit.await() } }
+        coEvery { secondHandle.awaitExit() } returns 0
 
         val handles = ArrayDeque(listOf(firstHandle, secondHandle))
         coEvery {
@@ -655,18 +520,81 @@ class LauncherControllerTest {
         assertEquals("first", controller.runningPackInstanceId.value)
 
         controller.abort()
-        controller.launchPackInstance(session, second)
         advanceUntilIdle()
-        assertEquals("second", controller.runningPackInstanceId.value, "the second launch owns the controller now")
+        assertIs<LaunchState.Stopping>(controller.state.value, "stopping, not idle, while the process is alive")
+        coVerify(exactly = 1) { firstHandle.terminate() }
+        assertEquals(false, controller.launchPackInstance(session, second), "nothing starts beside a game still going")
+        assertEquals("first", controller.runningPackInstanceId.value, "its files are still in use")
 
-        // The first game finally dies, long after the second is live.
         firstExit.complete(143)
         advanceUntilIdle()
+        assertEquals(LaunchState.Idle, controller.state.value, "a stop is not a crash")
+        assertNull(controller.runningPackInstanceId.value)
+        assertTrue(puts.any { it.id == "first" && it.lastPlayedEpochOrZero == 0L }, "the exit wrote the session's playtime")
 
-        assertEquals("second", controller.runningPackInstanceId.value, "the first launch's tail cleared the second's session")
-        assertIs<LaunchState.GameRunning>(controller.state.value, "and overwrote the state it had no claim on")
+        assertTrue(controller.launchPackInstance(session, second), "and the launcher is free again")
+        advanceUntilIdle()
+    }
 
-        secondExit.complete(0)
+    /** A pack's own Stop names that pack; a control left over from an ended launch must not end another game. */
+    @Test
+    fun `stopping one pack does nothing to another pack's game`() = runTest {
+        every { settingsService.getSettings() } returns SettingsData()
+        coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/opt/jdk8/bin/java")
+        val playing = packInstance("playing")
+        Files.createDirectories(sandbox.resolve("instances").resolve(playing.instanceDirName))
+        coEvery { packRepository.get(any()) } returns playing
+        coJustRun { packRepository.put(any()) }
+        val exit = CompletableDeferred<Int>()
+        val handle = mockk<LaunchHandle>(relaxed = true)
+        coEvery { handle.awaitExit() } coAnswers { withContext(NonCancellable) { exit.await() } }
+        coEvery {
+            launcherService.launchPackClient(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+        } returns SpawnResult.Started(handle)
+
+        val controller = newController(this)
+        controller.launchPackInstance(SessionData(playerName = "tester", uuid = "u", accessToken = "tok"), playing)
+        advanceUntilIdle()
+
+        controller.abort("some-other-pack")
+        advanceUntilIdle()
+
+        assertIs<LaunchState.GameRunning>(controller.state.value)
+        coVerify(exactly = 0) { handle.terminate() }
+        exit.complete(0)
+        advanceUntilIdle()
+    }
+
+    /**
+     * Quitting the launcher and leaving the game running never reaches the launch's
+     * own tail, which was the only writer of playtime, so the session went unrecorded.
+     */
+    @Test
+    fun `a session left running on quit is recorded before the launcher goes`() = runTest {
+        every { settingsService.getSettings() } returns SettingsData()
+        coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/opt/jdk8/bin/java")
+        val playing = packInstance("left")
+        Files.createDirectories(sandbox.resolve("instances").resolve(playing.instanceDirName))
+        coEvery { packRepository.get(any()) } returns playing
+        val puts = mutableListOf<PackInstance>()
+        coJustRun { packRepository.put(capture(puts)) }
+        val exit = CompletableDeferred<Int>()
+        val handle = mockk<LaunchHandle>(relaxed = true)
+        coEvery { handle.awaitExit() } coAnswers { withContext(NonCancellable) { exit.await() } }
+        coEvery {
+            launcherService.launchPackClient(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+        } returns SpawnResult.Started(handle)
+
+        val controller = newController(this)
+        controller.launchPackInstance(SessionData(playerName = "tester", uuid = "u", accessToken = "tok"), playing)
+        advanceUntilIdle()
+        val beforeQuit = puts.size
+
+        controller.settleSessionForQuit()
+
+        assertEquals(beforeQuit + 1, puts.size, "the playtime so far is written before the process goes")
+        coVerify(exactly = 0) { handle.terminate() }
+        exit.complete(0)
         advanceUntilIdle()
     }
 
@@ -719,8 +647,9 @@ class LauncherControllerTest {
     fun `an instance behind its pack is brought in line instead of launching without a token`() = runTest {
         every { settingsService.getSettings() } returns SettingsData()
         coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/opt/jdk8/bin/java")
-        credentialsManager.save(
+        credentialsManager.saveAccount(
             SessionData(playerName = "tester", uuid = "u", accessToken = "stale-token", cachedPassword = "pw"),
+            "smartycraft",
         )
         coEvery { authService.login("tester", "pw", "Industrial") } returns
             SessionData(playerName = "tester", uuid = "u", accessToken = "fresh-token")
@@ -825,13 +754,14 @@ class LauncherControllerTest {
         // Pre-populate the on-disk credentials so launchPackInstance
         // resolves a cached password without round-tripping the
         // keyring (relaxed mockk -> AES file fallback).
-        credentialsManager.save(
+        credentialsManager.saveAccount(
             SessionData(
                 playerName     = "tester",
                 uuid           = "u",
                 accessToken    = "stale-token",
                 cachedPassword = "pw",
             ),
+            "smartycraft",
         )
 
         val refreshed = SessionData(
@@ -872,12 +802,36 @@ class LauncherControllerTest {
         coVerify(exactly = 1) { authService.login("tester", "pw", "Industrial") }
     }
 
+    /**
+     * A SmartyCraft login mints a new uid and retires the stored one, and a skin
+     * upload signs with what the store holds.
+     */
+    @Test
+    fun `the sign-in before a bound launch is recorded on the stored account`() = runTest {
+        credentialsManager.saveAccount(
+            SessionData(playerName = "tester", uuid = "u", uid = "old-uid", accessToken = "stale", cachedPassword = "pw"),
+            "smartycraft",
+        )
+        coEvery { authService.login("tester", "pw", "Industrial") } returns
+            SessionData(playerName = "tester", uuid = "u", uid = "new-uid", accessToken = "fresh", cachedPassword = "pw")
+
+        capturePackSession(
+            SessionData(playerName = "tester", uuid = "u", accessToken = "stale"),
+            packInstance = scBoundPackInstance(),
+        )
+
+        val stored = credentialsManager.accountFor(PackAuthRequirement.SmartyCraft.PROVIDER_KEY)
+        assertEquals("new-uid", stored?.uid)
+        assertEquals("fresh", stored?.accessToken)
+    }
+
     @Test
     fun `pack spawn failure surfaces the carried LaunchError, not Internal`() = runTest {
         every { settingsService.getSettings() } returns SettingsData()
         coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/opt/jdk8/bin/java")
-        credentialsManager.save(
+        credentialsManager.saveAccount(
             SessionData(playerName = "tester", uuid = "u", accessToken = "stale", cachedPassword = "pw"),
+            "smartycraft",
         )
         coEvery { authService.login("tester", "pw", "Industrial") } returns
             SessionData(playerName = "tester", uuid = "u", accessToken = "fresh")
@@ -910,7 +864,7 @@ class LauncherControllerTest {
     fun `pack with SC requirement and no cached password fails with MissingAuthProvider`() = runTest {
         every { settingsService.getSettings() } returns SettingsData()
 
-        // No credentialsManager.save() -- on-disk file does not
+        // No credentialsManager.saveAccount() -- on-disk file does not
         // exist, so load() returns null. The in-session also has no
         // cachedPassword. The precondition must fail.
 
@@ -934,78 +888,54 @@ class LauncherControllerTest {
         coVerify(exactly = 0) { authService.login(any(), any(), any()) }
     }
 
+    /**
+     * An SC-origin record used to derive a binding from its pack id. That binding
+     * reached the auth step and the redirect, while every guard a bound launch runs
+     * under read the manifest and stayed off: a live session for an unchecked game.
+     */
     @Test
-    fun `smartycraft-origin pack derives its SC requirement from the pack id`() = runTest {
-        every { settingsService.getSettings() } returns SettingsData()
-
-        // No authRequirement on the manifest; an SC-origin pack derives the
-        // binding from its packRef id (the mirror name table is gone -- mirror
-        // packs declare the binding in the manifest auth block instead).
-        // Same no-password setup, so the precondition surfaces.
-        val instance = scBoundPackInstance(
-            packId          = "Industrial",
-            displayName     = "Industrial",
-            authRequirement = null,
-            origin          = PackOrigin.Smartycraft,
-        )
-        val controller = newController(this)
-        controller.launchPackInstance(
-            currentSession = SessionData(playerName = "tester", uuid = "u", accessToken = "tok"),
-            packInstance   = instance,
-        )
-        advanceUntilIdle()
-
-        val state = controller.state.value
-        assertIs<LaunchState.Error>(state)
-        assertEquals(
-            LaunchError.MissingAuthProvider(PackAuthRequirement.SmartyCraft.PROVIDER_KEY),
-            state.reason,
-            "an id-derived requirement must drive the same precondition surface as an explicit one",
-        )
-    }
-
-    @Test
-    fun `derived SC requirement is forwarded to launchPackClient, not dropped`() = runTest {
-        // Guards the snapshot-forwarding bug: when the requirement is DERIVED by
-        // the router (manifest authRequirement = null, SC origin), the service
-        // must still receive it, or the SC-binding step (authlib swap) never runs.
+    fun `an smartycraft-origin record with no auth block launches unbound and offline`() = runTest {
         every { settingsService.getSettings() } returns SettingsData()
         coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/opt/jdk8/bin/java")
-        credentialsManager.save(
+        credentialsManager.saveAccount(
             SessionData(playerName = "tester", uuid = "u", accessToken = "stale", cachedPassword = "pw"),
+            "smartycraft",
         )
-        coEvery { authService.login("tester", "pw", "Industrial") } returns
-            SessionData(playerName = "tester", uuid = "u", accessToken = "fresh")
 
         val handle = mockk<LaunchHandle>()
         coEvery { handle.awaitExit() } returns 0
+        val sessionPassed = slot<SessionData>()
         val manifestPassed = slot<hivens.core.data.CachedManifestSnapshot>()
+        val redirect = slot<Boolean>()
+        val bound = slot<Boolean>()
         coEvery {
             launcherService.launchPackClient(
-                sessionData = any(), manifest = capture(manifestPassed), runtime = any(),
+                sessionData = capture(sessionPassed), manifest = capture(manifestPassed), runtime = any(),
                 clientRootPath = any(), javaPathOverride = any(),
-                adaptiveEnabled = any(), redirectAuthHost = any(), boundLaunch = any(), seal = any(), displayName = any(), onLog = any(),
+                adaptiveEnabled = any(), redirectAuthHost = capture(redirect), boundLaunch = capture(bound),
+                seal = any(), displayName = any(), onLog = any(),
             )
         } returns SpawnResult.Started(handle)
         coJustRun { packRepository.put(any()) }
 
-        val instance = scBoundPackInstance(
-            packId          = "Industrial",
-            displayName     = "Industrial",
-            authRequirement = null,
-            origin          = PackOrigin.Smartycraft,
-        )
         val controller = newController(this)
         controller.launchPackInstance(
-            currentSession = SessionData(playerName = "tester", uuid = "u", accessToken = "stale"),
-            packInstance   = instance,
+            currentSession = SessionData(playerName = "tester", uuid = "u", accessToken = "live"),
+            packInstance   = scBoundPackInstance(
+                packId          = "Industrial",
+                displayName     = "Industrial",
+                authRequirement = null,
+                origin          = PackOrigin.Smartycraft,
+            ),
         )
         advanceUntilIdle()
 
-        assertEquals(
-            PackAuthRequirement.SmartyCraft("Industrial"), manifestPassed.captured.authRequirement,
-            "the effective (derived) requirement must reach the service so SC-binding runs",
-        )
+        coVerify(exactly = 0) { authService.login(any(), any(), any()) }
+        assertNull(manifestPassed.captured.authRequirement, "no binding reaches the service")
+        assertEquals(false, redirect.captured, "and nothing is redirected to the SC host")
+        assertEquals(false, bound.captured)
+        assertEquals("", sessionPassed.captured.accessToken, "so the game gets no token")
+        assertEquals(true, sessionPassed.captured.offline)
     }
 
     @Test
@@ -1016,8 +946,9 @@ class LauncherControllerTest {
         every { settingsService.getSettings() } returns
             SettingsData(useNetworkAgent = false, useSmartycraftAuthLib = true)
         coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/opt/jdk8/bin/java")
-        credentialsManager.save(
+        credentialsManager.saveAccount(
             SessionData(playerName = "tester", uuid = "u", accessToken = "stale", cachedPassword = "pw"),
+            "smartycraft",
         )
         coEvery { authService.login("tester", "pw", "Industrial") } returns
             SessionData(playerName = "tester", uuid = "u", accessToken = "fresh")
@@ -1084,8 +1015,9 @@ class LauncherControllerTest {
     fun `an SC-bound pack still gets the auth host redirected`() = runTest {
         every { settingsService.getSettings() } returns SettingsData()
         coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/opt/jdk8/bin/java")
-        credentialsManager.save(
+        credentialsManager.saveAccount(
             SessionData(playerName = "tester", uuid = "u", accessToken = "stale", cachedPassword = "pw"),
+            "smartycraft",
         )
         coEvery { authService.login("tester", "pw", "Industrial") } returns
             SessionData(playerName = "tester", uuid = "u", accessToken = "fresh")
@@ -1114,18 +1046,123 @@ class LauncherControllerTest {
     }
 
     @Test
-    fun `a pack with no server binding is neither swept nor stripped of a token`() = runTest {
+    fun `a pack with no server binding is not swept, and gets no token`() = runTest {
         // The strictness exists because a bound pack is handed a session that logs
-        // into someone's server. A pack with no binding gets no token and has no
-        // server, so what its owner keeps in mods/ is their own game.
+        // into someone's server. A pack with no binding has no server, so what its
+        // owner keeps in mods/ is their own game. For the same reason it is not
+        // handed the session in hand, which would let that game use it.
         coEvery { packSyncService.enforceRoster(any(), any()) } returns RosterVerdict(verified = false)
+        val events = mutableListOf<LaunchLogEvent>()
 
-        capturePackSession(
-            SessionData(playerName = "tester", uuid = "u", accessToken = "live"),
+        val session = capturePackSession(
+            SessionData(playerName = "tester", uuid = "online-uuid", accessToken = "live-sc-token"),
             packInstance = scBoundPackInstance(authRequirement = null),
+            events = events,
         )
 
         coVerify(exactly = 0) { packSyncService.enforceRoster(any(), any()) }
+        assertEquals("", session?.accessToken, "the SmartyCraft token in hand must not reach an unbound game")
+        assertEquals(true, session?.offline)
+        assertTrue(events.any { it is LaunchLogEvent.UnboundOffline }, "and the console says why, got $events")
+    }
+
+    /** The one token an unbound launch may carry is the player's own licence. */
+    @Test
+    fun `an unbound pack carries the Microsoft session when that provider is signed in`() = runTest {
+        val msa = mockk<AuthProvider>()
+        every { msa.id } returns PackAuthRequirement.Microsoft.PROVIDER_KEY
+        credentialsManager.saveAccount(
+            SessionData(playerName = "licensed", uuid = "ms-u", accessToken = "ms-token", refreshToken = "r"),
+            PackAuthRequirement.Microsoft.PROVIDER_KEY,
+        )
+        every { settingsService.getSettings() } returns SettingsData()
+        coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/opt/jdk17/bin/java")
+        val handle = mockk<LaunchHandle>()
+        coEvery { handle.awaitExit() } returns 0
+        val captured = slot<SessionData>()
+        coEvery {
+            launcherService.launchPackClient(
+                sessionData = capture(captured), manifest = any(), runtime = any(), clientRootPath = any(),
+                javaPathOverride = any(), adaptiveEnabled = any(),
+                redirectAuthHost = any(), useNetworkAgent = any(),
+                useSmartycraftAuthLib = any(), boundLaunch = any(), seal = any(), displayName = any(), onLog = any(),
+            )
+        } returns SpawnResult.Started(handle)
+        coJustRun { packRepository.put(any()) }
+
+        val controller = newController(this, AuthProviderRegistry(listOf(authService, msa)))
+        controller.launchPackInstance(
+            currentSession = SessionData(playerName = "tester", uuid = "u", accessToken = "live-sc-token"),
+            packInstance   = scBoundPackInstance(authRequirement = null),
+        )
+        advanceUntilIdle()
+
+        assertEquals("ms-token", captured.captured.accessToken)
+        assertEquals("licensed", captured.captured.playerName)
+    }
+
+    /**
+     * Signed in to Microsoft or not, an unbound pack launches. The derived Microsoft
+     * requirement used to fail such a launch with MissingAuthProvider once the
+     * provider was registered, for a pack that had never asked for an account.
+     */
+    @Test
+    fun `an unbound pack is not refused when Microsoft is registered with no account`() = runTest {
+        val msa = mockk<AuthProvider>()
+        every { msa.id } returns PackAuthRequirement.Microsoft.PROVIDER_KEY
+        every { settingsService.getSettings() } returns SettingsData()
+        coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/opt/jdk17/bin/java")
+        val handle = mockk<LaunchHandle>()
+        coEvery { handle.awaitExit() } returns 0
+        val captured = slot<SessionData>()
+        coEvery {
+            launcherService.launchPackClient(
+                sessionData = capture(captured), manifest = any(), runtime = any(), clientRootPath = any(),
+                javaPathOverride = any(), adaptiveEnabled = any(),
+                redirectAuthHost = any(), useNetworkAgent = any(),
+                useSmartycraftAuthLib = any(), boundLaunch = any(), seal = any(), displayName = any(), onLog = any(),
+            )
+        } returns SpawnResult.Started(handle)
+        coJustRun { packRepository.put(any()) }
+
+        val controller = newController(this, AuthProviderRegistry(listOf(authService, msa)))
+        controller.launchPackInstance(
+            currentSession = SessionData(playerName = "tester", uuid = "u", accessToken = "live-sc-token"),
+            packInstance   = scBoundPackInstance(authRequirement = null),
+        )
+        advanceUntilIdle()
+
+        assertEquals(LaunchState.Idle, controller.state.value, "the launch goes ahead")
+        assertEquals("", captured.captured.accessToken, "offline, since there is no licence to carry")
+    }
+
+    /**
+     * What a held jar kept an earlier switch or update from doing is carried out
+     * here, and before the roster is read: the check has to see the instance as the
+     * player's choice left it, not with a switched-off mod still loading.
+     */
+    @Test
+    fun `a launch settles what a held file left owing before it checks the roster`() = runTest {
+        capturePackSession(
+            SessionData(playerName = "tester", uuid = "u", accessToken = "live-token"),
+            packInstance = scBoundPackInstance(),
+        )
+
+        coVerifyOrder {
+            packSyncService.settlePending(any())
+            packSyncService.enforceRoster(any(), any())
+        }
+    }
+
+    /** An unbound pack is not swept, and its owner's switches still take effect. */
+    @Test
+    fun `an unbound launch settles what a held file left owing too`() = runTest {
+        capturePackSession(
+            SessionData(playerName = "tester", uuid = "u", accessToken = "live-token"),
+            packInstance = scBoundPackInstance(authRequirement = null),
+        )
+
+        coVerify(exactly = 1) { packSyncService.settlePending(any()) }
     }
 
     @Test
@@ -1146,6 +1183,107 @@ class LauncherControllerTest {
     }
 
     @Test
+    fun `with reuse-session on, an SC launch carries the token in hand and does not re-login`() = runTest {
+        every { settingsService.getSettings() } returns SettingsData(experimentalReuseSession = true)
+        coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/opt/jdk8/bin/java")
+        val handle = mockk<LaunchHandle>()
+        coEvery { handle.awaitExit() } returns 0
+        val captured = slot<SessionData>()
+        coEvery {
+            launcherService.launchPackClient(
+                sessionData = capture(captured), manifest = any(), runtime = any(), clientRootPath = any(),
+                javaPathOverride = any(), adaptiveEnabled = any(),
+                redirectAuthHost = any(), useNetworkAgent = any(),
+                useSmartycraftAuthLib = any(), boundLaunch = any(), seal = any(), displayName = any(), onLog = any(),
+            )
+        } returns SpawnResult.Started(handle)
+        coJustRun { packRepository.put(any()) }
+
+        val controller = newController(this)
+        controller.launchPackInstance(
+            currentSession = SessionData(
+                playerName = "tester", uuid = "u", accessToken = "live", status = AuthStatus.OK,
+            ),
+            packInstance = scBoundPackInstance(),
+        )
+        advanceUntilIdle()
+
+        assertEquals("live", captured.captured.accessToken, "the token in hand is carried, not a re-minted one")
+        coVerify(exactly = 0) { authService.login(any(), any(), any()) }
+    }
+
+    @Test
+    fun `with reuse-session on, a session restored from the store (status null) is reused`() = runTest {
+        // The regression that shipped: a session loaded after a restart carries
+        // status = null, and requiring status == OK made the pack launch demand a
+        // code even though auto-login had just signed in without one. A token is
+        // the signal, not the status.
+        every { settingsService.getSettings() } returns SettingsData(experimentalReuseSession = true)
+        coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/opt/jdk8/bin/java")
+        val handle = mockk<LaunchHandle>()
+        coEvery { handle.awaitExit() } returns 0
+        val captured = slot<SessionData>()
+        coEvery {
+            launcherService.launchPackClient(
+                sessionData = capture(captured), manifest = any(), runtime = any(), clientRootPath = any(),
+                javaPathOverride = any(), adaptiveEnabled = any(),
+                redirectAuthHost = any(), useNetworkAgent = any(),
+                useSmartycraftAuthLib = any(), boundLaunch = any(), seal = any(), displayName = any(), onLog = any(),
+            )
+        } returns SpawnResult.Started(handle)
+        coJustRun { packRepository.put(any()) }
+
+        val controller = newController(this)
+        controller.launchPackInstance(
+            // status = null and twoFactor = true, mintedNow = false: exactly what
+            // CredentialsManager.loadSession produces for a restored 2FA account.
+            currentSession = SessionData(
+                playerName = "tester", uuid = "u", accessToken = "restored", status = null,
+                twoFactor = true, mintedNow = false,
+            ),
+            packInstance = scBoundPackInstance(),
+        )
+        advanceUntilIdle()
+
+        assertEquals("restored", captured.captured.accessToken, "the restored token is carried, no code demanded")
+        coVerify(exactly = 0) { authService.login(any(), any(), any()) }
+    }
+
+    @Test
+    fun `with reuse-session on, a two-factor account is not sent back for a code`() = runTest {
+        // The whole point: a 2FA session that is not minted-now would normally hit
+        // TwoFactorExpired and demand a code at pack launch. With reuse on, the saved
+        // token is trusted and the launch proceeds -- one code at sign-in, not per launch.
+        every { settingsService.getSettings() } returns SettingsData(experimentalReuseSession = true)
+        coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/opt/jdk8/bin/java")
+        val handle = mockk<LaunchHandle>()
+        coEvery { handle.awaitExit() } returns 0
+        val captured = slot<SessionData>()
+        coEvery {
+            launcherService.launchPackClient(
+                sessionData = capture(captured), manifest = any(), runtime = any(), clientRootPath = any(),
+                javaPathOverride = any(), adaptiveEnabled = any(),
+                redirectAuthHost = any(), useNetworkAgent = any(),
+                useSmartycraftAuthLib = any(), boundLaunch = any(), seal = any(), displayName = any(), onLog = any(),
+            )
+        } returns SpawnResult.Started(handle)
+        coJustRun { packRepository.put(any()) }
+
+        val controller = newController(this)
+        controller.launchPackInstance(
+            currentSession = SessionData(
+                playerName = "tester", uuid = "u", accessToken = "live", status = AuthStatus.OK,
+                twoFactor = true, mintedNow = false,
+            ),
+            packInstance = scBoundPackInstance(),
+        )
+        advanceUntilIdle()
+
+        assertEquals("live", captured.captured.accessToken, "the confirmed 2FA token is carried, no fresh code")
+        coVerify(exactly = 0) { authService.login(any(), any(), any()) }
+    }
+
+    @Test
     fun `a session minted for this launch is not sent back for another code`() {
         // The relaunch that answers a 2FA demand carries the session the code just
         // produced. Without telling it apart from a stored one, the same demand fires
@@ -1155,6 +1293,48 @@ class LauncherControllerTest {
 
         assertTrue(minted.twoFactor && minted.mintedNow, "the freshly unlocked session is marked")
         assertTrue(stored.twoFactor && !stored.mintedNow, "one restored from disk is not")
+    }
+
+    /**
+     * The relaunch after a code used to sign in again and lean on the provider's
+     * thirty-second cache to get the same session back. Preparation that outlasted
+     * the cache sent a real login, which kills the session the code unlocked.
+     */
+    @Test
+    fun `the relaunch that answers a code carries that session and does not sign in again`() = runTest {
+        credentialsManager.saveAccount(
+            SessionData(playerName = "tester", uuid = "u", accessToken = "stored", cachedPassword = "pw", twoFactor = true),
+            "smartycraft",
+        )
+
+        val session = capturePackSession(
+            SessionData(playerName = "tester", uuid = "u", accessToken = "unlocked", twoFactor = true, mintedNow = true),
+            packInstance = scBoundPackInstance(),
+            sessionMintedForLaunch = true,
+        )
+
+        assertEquals("unlocked", session?.accessToken)
+        assertEquals("Industrial", session?.serverId, "carried for the server this launch is for")
+        coVerify(exactly = 0) { authService.login(any(), any(), any()) }
+    }
+
+    /** Only the gate's relaunch says so. A session minted at sign-in and kept in the shell is not this. */
+    @Test
+    fun `a minted session that was not made for this launch still signs in`() = runTest {
+        credentialsManager.saveAccount(
+            SessionData(playerName = "tester", uuid = "u", accessToken = "stored", cachedPassword = "pw"),
+            "smartycraft",
+        )
+        coEvery { authService.login("tester", "pw", "Industrial") } returns
+            SessionData(playerName = "tester", uuid = "u", accessToken = "fresh")
+
+        val session = capturePackSession(
+            SessionData(playerName = "tester", uuid = "u", accessToken = "from-sign-in", mintedNow = true),
+            packInstance = scBoundPackInstance(),
+        )
+
+        assertEquals("fresh", session?.accessToken)
+        coVerify(exactly = 1) { authService.login("tester", "pw", "Industrial") }
     }
 
     @Test
@@ -1176,8 +1356,9 @@ class LauncherControllerTest {
 
     @Test
     fun `a refresh that could not reach the auth server drops to offline`() = runTest {
-        credentialsManager.save(
+        credentialsManager.saveAccount(
             SessionData(playerName = "tester", uuid = "u", accessToken = "stale", cachedPassword = "pw"),
+            "smartycraft",
         )
         coEvery { authService.login(any(), any(), any()) } throws
             AuthException(AuthStatus.INTERNAL_ERROR, "Network Error: connection reset", isNetworkError = true)
@@ -1196,6 +1377,7 @@ class LauncherControllerTest {
         currentSession: SessionData,
         packInstance: PackInstance = scBoundPackInstance(authRequirement = null),
         events: MutableList<LaunchLogEvent>? = null,
+        sessionMintedForLaunch: Boolean = false,
     ): SessionData? {
         every { settingsService.getSettings() } returns SettingsData()
         coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/opt/jdk8/bin/java")
@@ -1214,29 +1396,143 @@ class LauncherControllerTest {
 
         val controller = newController(this)
         val collectorJob = events?.let { sink -> launch { controller.events.toList(sink) } }
-        controller.launchPackInstance(currentSession = currentSession, packInstance = packInstance)
+        controller.launchPackInstance(
+            currentSession = currentSession,
+            packInstance = packInstance,
+            sessionMintedForLaunch = sessionMintedForLaunch,
+        )
         advanceUntilIdle()
         collectorJob?.cancel()
-        return captured.captured.takeIf { captured.isCaptured }
+        return if (captured.isCaptured) captured.captured else null
+    }
+
+    /**
+     * A stop pressed while the launch signs in is a stop. Caught with the other
+     * failures, it was narrated as a session that could not be refreshed, a sticky
+     * warning, and the launch went on offline towards the spawn.
+     */
+    @Test
+    fun `stopping a launch while it signs in is not a refresh failure`() = runTest {
+        credentialsManager.saveAccount(
+            SessionData(playerName = "tester", uuid = "u", accessToken = "stale", cachedPassword = "pw"),
+            "smartycraft",
+        )
+        coEvery { authService.login(any(), any(), any()) } coAnswers { awaitCancellation() }
+        every { settingsService.getSettings() } returns SettingsData()
+        val events = mutableListOf<LaunchLogEvent>()
+        val controller = newController(this)
+        val collector = launch { controller.events.toList(events) }
+
+        controller.launchPackInstance(
+            currentSession = SessionData(playerName = "tester", uuid = "u", accessToken = "stale", cachedPassword = "pw"),
+            packInstance = scBoundPackInstance(),
+        )
+        advanceUntilIdle()
+        controller.abort()
+        advanceUntilIdle()
+        collector.cancel()
+
+        assertTrue(events.none { it is LaunchLogEvent.AuthFailed || it is LaunchLogEvent.OfflineSkipAuth }, "got $events")
+        coVerify(exactly = 0) {
+            launcherService.launchPackClient(
+                sessionData = any(), manifest = any(), runtime = any(), clientRootPath = any(),
+                javaPathOverride = any(), adaptiveEnabled = any(),
+                redirectAuthHost = any(), useNetworkAgent = any(),
+                useSmartycraftAuthLib = any(), boundLaunch = any(), seal = any(), displayName = any(), onLog = any(),
+            )
+        }
+        assertEquals(LaunchState.Idle, controller.state.value)
+    }
+
+    /**
+     * A stop lands at the launch's next suspension point, and a sign-in that answers
+     * without suspending runs on to that answer. Its error went over the Idle the stop
+     * had just set.
+     */
+    @Test
+    fun `a launch stopped before its sign-in answers does not report the answer`() = runTest {
+        credentialsManager.saveAccount(
+            SessionData(playerName = "tester", uuid = "u", accessToken = "stale", cachedPassword = "pw"),
+            "smartycraft",
+        )
+        every { settingsService.getSettings() } returns SettingsData()
+        lateinit var controller: LauncherController
+        coEvery { authService.login(any(), any(), any()) } answers {
+            controller.abort()
+            throw TwoFactorRequiredException(uid = "uid-stub", login = "tester")
+        }
+        controller = newController(this)
+
+        controller.launchPackInstance(
+            currentSession = SessionData(playerName = "tester", uuid = "u", accessToken = "stale"),
+            packInstance   = scBoundPackInstance(),
+        )
+        advanceUntilIdle()
+
+        assertEquals(LaunchState.Idle, controller.state.value)
+        assertNull(controller.runningPackInstanceId.value)
+    }
+
+    /**
+     * The same stop with a launch started straight after it. The stale error landed
+     * on the new launch, and an error reads as Play: a third launch could be accepted
+     * while the second was still on its way to a game.
+     */
+    @Test
+    fun `a stopped launch does not report its failure over the launch that followed`() = runTest {
+        credentialsManager.saveAccount(
+            SessionData(playerName = "tester", uuid = "u", accessToken = "stale", cachedPassword = "pw"),
+            "smartycraft",
+        )
+        every { settingsService.getSettings() } returns SettingsData()
+        coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/opt/jdk8/bin/java")
+        val handle = mockk<LaunchHandle>()
+        coEvery { handle.awaitExit() } returns 0
+        coEvery {
+            launcherService.launchPackClient(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+        } returns SpawnResult.Started(handle)
+        coJustRun { packRepository.put(any()) }
+        val next = scBoundPackInstance(id = "i-next", authRequirement = null)
+        val session = SessionData(playerName = "tester", uuid = "u", accessToken = "stale")
+        lateinit var controller: LauncherController
+        var nextAccepted = false
+        coEvery { authService.login(any(), any(), any()) } answers {
+            controller.abort()
+            nextAccepted = controller.launchPackInstance(session, next)
+            throw TwoFactorRequiredException(uid = "uid-stub", login = "tester")
+        }
+        controller = newController(this)
+        val states = mutableListOf<LaunchState>()
+        val watcher = launch(UnconfinedTestDispatcher(testScheduler)) { controller.state.toList(states) }
+
+        controller.launchPackInstance(currentSession = session, packInstance = scBoundPackInstance())
+        advanceUntilIdle()
+        watcher.cancel()
+
+        assertTrue(nextAccepted, "the stop reopened the launcher")
+        assertTrue(states.none { it is LaunchState.Error }, "got $states")
+        assertEquals(LaunchState.Idle, controller.state.value, "and the launch that followed ran to its end")
+        coVerify(exactly = 1) {
+            launcherService.launchPackClient(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+        }
     }
 
     @Test
     fun `pack with SC requirement and 2FA without cached manifest fails with TwoFactorExpired`() = runTest {
         every { settingsService.getSettings() } returns SettingsData()
         coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/opt/jdk8/bin/java")
-        credentialsManager.save(
+        credentialsManager.saveAccount(
             SessionData(
                 playerName     = "tester",
                 uuid           = "u",
                 accessToken    = "stale-token",
                 cachedPassword = "pw",
             ),
+            "smartycraft",
         )
         coEvery {
             authService.login("tester", "pw", "Industrial")
         } throws TwoFactorRequiredException(uid = "uid-stub", login = "tester")
-        // Real ManifestCache returns null for "Industrial" since no
-        // file was saved -- exactly the "no cached manifest" branch.
 
         val instance = scBoundPackInstance()
         val controller = newController(this)
@@ -1257,25 +1553,26 @@ class LauncherControllerTest {
     @Test
     fun `non-zero exit code lands in Error(ExitCode)`() = runTest {
         every { settingsService.getSettings() } returns SettingsData()
-        coEvery { authService.login(any(), any(), any()) } returns SessionData(
-            playerName = "tester",
-            uuid = "u",
-            accessToken = "tok",
-            fileManifest = FileManifest(),
-        )
-        coJustRun {
-            downloadService.processSession(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
-        }
+        coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/opt/jdk8/bin/java")
 
         val handle = mockk<LaunchHandle>()
         coEvery { handle.awaitExit() } returns 137 // SIGKILL exit code
         every { handle.terminate() } just runs
         coEvery {
-            launcherService.launchClientWithLogs(any(), any(), any(), any(), any(), any())
+            launcherService.launchPackClient(
+                sessionData = any(), manifest = any(), runtime = any(), clientRootPath = any(),
+                javaPathOverride = any(), adaptiveEnabled = any(),
+                redirectAuthHost = any(), useNetworkAgent = any(),
+                useSmartycraftAuthLib = any(), boundLaunch = any(), seal = any(), displayName = any(), onLog = any(),
+            )
         } returns SpawnResult.Started(handle)
+        coJustRun { packRepository.put(any()) }
 
         val controller = newController(this)
-        controller.launch(SessionData(playerName = "tester", cachedPassword = "pw"), server)
+        controller.launchPackInstance(
+            currentSession = SessionData(playerName = "tester", uuid = "u", accessToken = "tok"),
+            packInstance   = scBoundPackInstance(authRequirement = null),
+        )
         advanceUntilIdle()
 
         val state = controller.state.value
@@ -1283,11 +1580,77 @@ class LauncherControllerTest {
         assertEquals(LaunchError.ExitCode(137), state.reason)
     }
 
+    /**
+     * The launch controls already refuse this, but a launch can also arrive from a
+     * notification's relaunch or the second-factor retry. Started over an update, the
+     * game read a mix of two builds.
+     */
+    @Test
+    fun `a pack whose files are being rewritten is refused, and says why`() = runTest {
+        every { settingsService.getSettings() } returns SettingsData()
+        val release = CompletableDeferred<Unit>()
+        launch { work.during("i-sc", InstanceWork.Update) { release.await() } }
+        advanceUntilIdle()
+
+        val controller = newController(this)
+        controller.launchPackInstance(
+            currentSession = SessionData(playerName = "tester", uuid = "u", accessToken = "tok"),
+            packInstance   = scBoundPackInstance(authRequirement = null),
+        )
+        advanceUntilIdle()
+
+        val state = controller.state.value
+        assertIs<LaunchState.Error>(state)
+        assertEquals(LaunchError.InstanceBusy(InstanceWork.Update), state.reason)
+        assertNull(controller.runningPackInstanceId.value, "a refused launch holds nothing")
+        coVerify(exactly = 0) {
+            launcherService.launchPackClient(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+        }
+        release.complete(Unit)
+    }
+
+    /**
+     * Preparing a launch already reads the instance, so it is in use from the moment
+     * the launch is accepted. Named only once the game spawned, an update started in
+     * between swapped files under the check that had just vouched for them.
+     */
+    @Test
+    fun `the pack is named as in use while its launch is still preparing`() = runTest {
+        every { settingsService.getSettings() } returns SettingsData()
+        coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/opt/jdk8/bin/java")
+        val spawnMay = CompletableDeferred<Unit>()
+        lateinit var controller: LauncherController
+        var namedBeforeSpawn: String? = null
+        val handle = mockk<LaunchHandle>()
+        coEvery { handle.awaitExit() } returns 0
+        coEvery {
+            launcherService.launchPackClient(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+        } coAnswers {
+            namedBeforeSpawn = controller.runningPackInstanceId.value
+            spawnMay.await()
+            SpawnResult.Started(handle)
+        }
+        coJustRun { packRepository.put(any()) }
+
+        controller = newController(this)
+        controller.launchPackInstance(
+            currentSession = SessionData(playerName = "tester", uuid = "u", accessToken = "tok"),
+            packInstance   = scBoundPackInstance(authRequirement = null),
+        )
+        assertEquals("i-sc", controller.runningPackInstanceId.value, "claimed as soon as the launch is accepted")
+        advanceUntilIdle()
+        assertEquals("i-sc", namedBeforeSpawn)
+
+        spawnMay.complete(Unit)
+        advanceUntilIdle()
+        assertNull(controller.runningPackInstanceId.value)
+    }
+
     @Test
     fun `Microsoft-routed pack launches without firing the auth gate`() = runTest {
         // A Modrinth-origin pack with no explicit requirement routes to Microsoft,
         // which has no registered provider this phase -- so the gate is advisory:
-        // the pack launches with the current session and authService is never hit.
+        // the pack launches offline and authService is never hit.
         every { settingsService.getSettings() } returns SettingsData()
         coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/opt/jdk17/bin/java")
 

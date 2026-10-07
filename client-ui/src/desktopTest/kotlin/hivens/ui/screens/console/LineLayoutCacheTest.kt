@@ -11,11 +11,21 @@ import androidx.compose.ui.unit.sp
 import hivens.ui.screens.ConsolePalette
 import hivens.ui.utils.LogEntry
 import hivens.ui.utils.LogType
+import androidx.compose.ui.ImageComposeScene
+import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertSame
 
 class LineLayoutCacheTest {
+
+    // A text measurer needs the platform's text implementation, which a Compose
+    // scene registers when it starts. Run alone this class had none and failed, and
+    // in the suite it passed only when a scene test happened to run first.
+    @BeforeTest
+    fun registerText() {
+        ImageComposeScene(1, 1) {}.close()
+    }
 
     private fun measurer() = TextMeasurer(
         defaultFontFamilyResolver = createFontFamilyResolver(),

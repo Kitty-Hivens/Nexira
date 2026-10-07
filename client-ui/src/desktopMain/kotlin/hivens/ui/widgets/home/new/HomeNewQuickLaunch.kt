@@ -17,16 +17,19 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.theme.NxTheme
+import hivens.ui.nx.PlayGround
+import hivens.ui.nx.PlayLayout
 import hivens.widget.api.rememberProps
 import hivens.widget.model.PropLabel
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 import kotlinx.serialization.Serializable
+import hivens.ui.theme.NxInk
 
 @Serializable
 data class QuickLaunchProps(
     @PropLabel("widget.home.new.quicklaunch.buttonLabel") val buttonLabel: String = "",
+    @PropLabel("widget.home.new.quicklaunch.playLayout") val playLayout: PlayLayout = PlayLayout.Plate,
 )
 
 // Quick-launch target = most recently played, falling back to most
@@ -35,15 +38,16 @@ data class QuickLaunchProps(
 // in that state and two empty cards would be noisy.
 @Widget(
     id = "home.new.quicklaunch",
+    enter = "rise",
     displayName = "widget.home.new.quicklaunch",
     propsClass = QuickLaunchProps::class,
-    surface = """{"fill":"base","opacity":0.45,"padding":{"top":12.0}}""",
+    surface = """{"fill":"panel","padding":{"top":12.0}}""",
 )
 @Composable
 fun HomeNewQuickLaunch(instance: WidgetInstance) {
     val p = instance.rememberProps<QuickLaunchProps>()
     val s = LocalStrings.current
-    val quickLaunch = rememberQuickLaunchTarget() ?: return
+    val quickLaunch = rememberQuickLaunchTarget(p.buttonLabel.ifBlank { s.homeQuickButton }) ?: return
     val target = quickLaunch.target
 
     val label = if (target.lastPlayedEpochOrZero > 0L) s.homeQuickContinue else s.homeQuickStart
@@ -57,7 +61,7 @@ fun HomeNewQuickLaunch(instance: WidgetInstance) {
         Text(
             text       = label,
             style      = MaterialTheme.typography.labelLarge,
-            color      = NxTheme.colors.textSecondary,
+            color      = NxInk.quiet,
             fontWeight = FontWeight.Medium,
         )
         Row(
@@ -69,17 +73,17 @@ fun HomeNewQuickLaunch(instance: WidgetInstance) {
                 Text(
                     text       = target.displayName,
                     style      = MaterialTheme.typography.titleMedium,
-                    color      = NxTheme.colors.textPrimary,
+                    color      = NxInk.main,
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
                     text  = target.packRef.id,
                     style = MaterialTheme.typography.bodySmall,
-                    color = NxTheme.colors.textSecondary,
+                    color = NxInk.quiet,
                 )
             }
             Spacer(Modifier.width(12.dp))
-            QuickLaunchButton(quickLaunch = quickLaunch, defaultLabel = p.buttonLabel.ifBlank { s.homeQuickButton })
+            QuickLaunchButton(quickLaunch = quickLaunch, ground = PlayGround.Surface, layout = p.playLayout)
         }
     }
 }

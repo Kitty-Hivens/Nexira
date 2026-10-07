@@ -16,8 +16,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.Symbol
-import hivens.ui.theme.NxTheme
 import hivens.ui.theme.Spacing
+import hivens.ui.theme.NxInk
 
 /**
  * One label(+ optional [description] / [icon]) and an [NxSwitch], as a single
@@ -49,14 +49,14 @@ fun NxToggle(
                 // A semantic toggle (accent set) lights its icon with the accent while
                 // checked; the row stays neutral otherwise -- accent as a row state, not
                 // a whole-row wash.
-                val iconTint = if (accent != null && checked) accent else NxTheme.colors.textSecondary
+                val iconTint = if (accent != null && checked) accent else NxInk.quiet
                 Symbol(icon, null, tint = iconTint.copy(alpha = alpha), size = 22.dp)
                 Spacer(Modifier.width(Spacing.s12))
             }
             Column {
                 Text(
                     text       = label,
-                    color      = NxTheme.colors.textPrimary.copy(alpha = alpha),
+                    color      = NxInk.main.copy(alpha = alpha),
                     fontWeight = FontWeight.Medium,
                     maxLines   = 1,
                     overflow   = TextOverflow.Ellipsis,
@@ -65,7 +65,7 @@ fun NxToggle(
                     Text(
                         text     = description,
                         style    = MaterialTheme.typography.bodySmall,
-                        color    = NxTheme.colors.textSecondary.copy(alpha = alpha),
+                        color    = NxInk.quiet.copy(alpha = alpha),
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )

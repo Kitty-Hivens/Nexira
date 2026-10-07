@@ -1,5 +1,6 @@
 package hivens.launcher.imports
 
+import hivens.launcher.instance.instanceDirName
 import hivens.core.api.interfaces.IJavaManager
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.CachedManifestSnapshot
@@ -8,6 +9,7 @@ import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
 import hivens.core.data.PackReference
 import hivens.launcher.runtime.RuntimeProvisioner
+import hivens.launcher.runtime.RuntimeSeed
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -31,12 +33,12 @@ import java.util.UUID
  *  - **Instance content** (mods / config / saves / resource+shader packs / loose
  *    files) is COPIED. The new instance owns it; the foreign launcher keeps its
  *    own copy, and an edit on one side must not bleed into the other.
- *  - **The shared runtime** (vanilla assets + libraries) is HARDLINKED into
- *    Nexira's shared roots when the source carries a vanilla-layout tree (the
- *    Mojang launcher / TLauncher `.minecraft`). Those files are immutable and
- *    content-addressed, so sharing the inode is safe and skips a multi-GB
- *    re-download -- "migrate the game itself". [RuntimeProvisioner.ensureRuntime]
- *    then fills only the gaps, since it is idempotent on already-present files.
+ *  - **The shared runtime** (vanilla assets + libraries + client jar) is OFFERED
+ *    to [RuntimeProvisioner.ensureRuntime] when the source carries a
+ *    vanilla-layout tree (the Mojang launcher / TLauncher `.minecraft`). The
+ *    provisioner hardlinks a file in only when its sha1 is the one Mojang's
+ *    manifest gives for that path, and downloads the rest, so a multi-GB
+ *    re-download is skipped without trusting foreign bytes. See [RuntimeSeed].
  *
  * The MC version must be known ([DiscoveredInstance.mcVersion]); FTB and Prism
  * carry it, so those import today. Sources that cannot report it yet (a bare
@@ -48,8 +50,6 @@ class ForeignInstanceImporter(
     private val javaManager: IJavaManager,
     private val repository: IPackRepository,
     private val dataDir: Path,
-    private val librariesDir: Path,
-    private val assetsDir: Path,
 ) {
     private val log = LoggerFactory.getLogger(ForeignInstanceImporter::class.java)
 
@@ -63,9 +63,20 @@ class ForeignInstanceImporter(
                 "Cannot import '${instance.displayName}' from ${instance.launcher.displayName}: " +
                     "its Minecraft version could not be determined.",
             )
+        // A named loader with no version would resolve to that loader's newest build
+        // rather than the one the pack was put together on, which is a crash on
+        // launch instead of a refusal here.
+        if (!instance.loader.isNullOrBlank() && !instance.loader.equals("vanilla", ignoreCase = true) &&
+            instance.loaderVersion.isNullOrBlank()
+        ) {
+            throw IOException(
+                "Cannot import '${instance.displayName}' from ${instance.launcher.displayName}: " +
+                    "the version of its ${instance.loader} loader could not be determined.",
+            )
+        }
         val displayName = instance.displayName.ifBlank { instance.gameDir.fileName.toString() }
         val instanceId = UUID.randomUUID().toString()
-        val instanceDirName = sanitize("$displayName-$instanceId")
+        val instanceDirName = instanceDirName(displayName, instanceId)
         val clientDir = dataDir.resolve("instances").resolve(instanceDirName)
         onReserveDir(clientDir)
         Files.createDirectories(clientDir)
@@ -73,8 +84,11 @@ class ForeignInstanceImporter(
             displayName, instance.launcher, instance.loader ?: "vanilla", instance.loaderVersion, mc, clientDir)
 
         copyInstanceContent(instance.gameDir, clientDir, progress)
-        seedSharedRuntime(instance.gameDir, mc, progress)
-        runtimeProvisioner.ensureRuntime(mc, instance.loader, instance.loaderVersion.orEmpty(), progress)
+        val resolved = runtimeProvisioner.ensureRuntime(
+            mc, instance.loader, instance.loaderVersion.orEmpty(),
+            seed = runtimeSeedOf(instance.gameDir, mc),
+            progress = progress,
+        )
 
         val packInstance = PackInstance(
             id = instanceId,
@@ -87,7 +101,8 @@ class ForeignInstanceImporter(
             cachedManifest = CachedManifestSnapshot(
                 minecraftVersion = mc,
                 loaderName = instance.loader ?: "vanilla",
-                loaderVersion = instance.loaderVersion.orEmpty(),
+                // What was resolved, which is what the source named when it named one.
+                loaderVersion = resolved.loaderVersion ?: instance.loaderVersion.orEmpty(),
                 javaMajor = javaManager.detectJavaVersion(mc),
             ),
         )
@@ -136,63 +151,17 @@ class ForeignInstanceImporter(
     }
 
     /**
-     * Hardlink a vanilla-layout runtime under [src] into the shared roots. No-op
-     * unless [src] actually carries `assets/objects` (so FTB/Prism instances,
-     * whose runtime lives in the launcher's own cache, simply fall through to
-     * ensureRuntime). Existing shared-root files are left untouched.
+     * The vanilla-layout runtime under [src], if it carries one, for the
+     * provisioner to take what matches from. Null when there is none, so an FTB
+     * or Prism instance, whose runtime lives in the launcher's own cache, simply
+     * downloads.
      */
-    private suspend fun seedSharedRuntime(
-        src: Path,
-        mc: String,
-        progress: (Int, Int, String) -> Unit,
-    ) = withContext(Dispatchers.IO) {
-        val srcAssets = src.resolve("assets")
-        val srcLibs = src.resolve("libraries")
-        if (!Files.isDirectory(srcAssets.resolve("objects")) && !Files.isDirectory(srcLibs)) return@withContext
-
-        var linked = 0
-        if (Files.isDirectory(srcAssets)) linked += mirrorTree(srcAssets, assetsDir) { progress(it, 0, "assets") }
-        if (Files.isDirectory(srcLibs)) linked += mirrorTree(srcLibs, librariesDir) { progress(it, 0, "libraries") }
-        // The vanilla client jar lives at versions/<mc>/<mc>.jar in the source but
-        // at the maven coordinate net.minecraft:minecraft:<mc> in the shared roots.
-        val srcClient = src.resolve("versions").resolve(mc).resolve("$mc.jar")
-        val destClient = librariesDir.resolve("net/minecraft/minecraft/$mc/minecraft-$mc.jar")
-        if (Files.isRegularFile(srcClient) && !Files.exists(destClient)) {
-            Files.createDirectories(destClient.parent)
-            linkOrCopy(srcClient, destClient)
-            linked++
-        }
-        log.info("import: seeded {} runtime files into the shared roots from {}", linked, src)
-    }
-
-    /** Hardlink-or-copy every regular file under [from] into [to], skipping ones already present. */
-    private suspend fun mirrorTree(from: Path, to: Path, onProgress: (Int) -> Unit): Int = withContext(Dispatchers.IO) {
-        var n = 0
-        Files.walk(from).use { tree ->
-            for (path in tree) {
-                currentCoroutineContext().ensureActive()
-                if (!Files.isRegularFile(path) || Files.isSymbolicLink(path)) continue
-                val target = to.resolve(from.relativize(path).toString())
-                if (Files.exists(target)) continue
-                Files.createDirectories(target.parent)
-                linkOrCopy(path, target)
-                if (++n % 200 == 0) onProgress(n)
-            }
-        }
-        n
-    }
-
-    /** Prefer a hardlink (shared inode, zero extra bytes); fall back to a copy across filesystems. */
-    private fun linkOrCopy(src: Path, dest: Path) {
-        try {
-            Files.createLink(dest, src)
-        } catch (_: UnsupportedOperationException) {
-            Files.copy(src, dest, StandardCopyOption.REPLACE_EXISTING)
-        } catch (_: java.nio.file.FileSystemException) {
-            // Cross-device link (EXDEV) or a filesystem without hardlinks -> copy.
-            runCatching { Files.copy(src, dest, StandardCopyOption.REPLACE_EXISTING) }
-                .onFailure { log.warn("import: could not seed {}", dest, it) }
-        }
+    private fun runtimeSeedOf(src: Path, mc: String): RuntimeSeed? {
+        val assets = src.resolve("assets").takeIf { Files.isDirectory(it.resolve("objects")) }
+        val libraries = src.resolve("libraries").takeIf { Files.isDirectory(it) }
+        val client = src.resolve("versions").resolve(mc).resolve("$mc.jar").takeIf { Files.isRegularFile(it) }
+        if (assets == null && libraries == null && client == null) return null
+        return RuntimeSeed(librariesDir = libraries, assetsDir = assets, clientJar = client)
     }
 
     private fun sanitize(raw: String): String = raw.replace(Regex("[^A-Za-z0-9._-]"), "_").take(96)

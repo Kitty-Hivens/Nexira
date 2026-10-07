@@ -141,7 +141,7 @@ class RedactorTest {
     @Test
     fun `a login response body leaks neither the uid nor the session`() {
         // The shape a decode failure used to put in the log, trimmed from the wire
-        // fixture. uid signs spawn, twoauth and the skin uploads; session is what the
+        // fixture. uid signs twoauth and the skin uploads; session is what the
         // game token is derived from.
         val uid = "a921e0baf5d4c4454774b09586a32d94"
         val session = "vRfeed1IvnNZPZFJ6c02h1qkxBru+PXd3KJA6OLWy18="
@@ -212,6 +212,34 @@ class RedactorTest {
             val once  = Redactor.redact("SignedJWT: $token --uuid 5074c8d34ed2424d91e4cc37f3ba9404")
             val twice = Redactor.redact(once)
             assertEquals(once, twice)
+        } finally {
+            Redactor.forgetSecrets()
+        }
+    }
+
+    @Test
+    fun `a released secret is no longer masked`() {
+        val token = "k4j3h2g1f0e9d8c7b6a5z4y3x2w1v0u9"
+        try {
+            Redactor.registerSecret(token).close()
+            assertEquals("echo $token", Redactor.redact("echo $token"))
+        } finally {
+            Redactor.forgetSecrets()
+        }
+    }
+
+    @Test
+    fun `a secret two launches registered stays masked until both release it`() {
+        val token = "m1n2b3v4c5x6z7l8k9j0h1g2f3d4s5a6"
+        try {
+            val first = Redactor.registerSecret(token)
+            val second = Redactor.registerSecret(token)
+            first.close()
+            // Closing the same handle twice must not spend the other one's hold.
+            first.close()
+            assertFalse(Redactor.redact("echo $token").contains(token))
+            second.close()
+            assertEquals("echo $token", Redactor.redact("echo $token"))
         } finally {
             Redactor.forgetSecrets()
         }

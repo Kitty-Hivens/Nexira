@@ -1,5 +1,6 @@
 package hivens.launcher.protocol
 
+import hivens.core.io.AtomicFiles
 import hivens.config.Protocol
 import hivens.config.Storage
 import hivens.core.api.HttpClientProvider
@@ -115,7 +116,7 @@ class LauncherHashCache(
     private fun saveCache(hash: String) {
         runCatching {
             cacheFile.parentFile?.mkdirs()
-            cacheFile.writeText(hash)
+            AtomicFiles.writeString(cacheFile.toPath(), hash)
         }.onFailure { logger.warn("Could not persist launcher hash cache to {}", cacheFile, it) }
     }
 

@@ -4,6 +4,7 @@ import hivens.core.data.FileData
 import hivens.core.data.FileManifest
 import hivens.core.data.fileManifestOf
 import hivens.core.data.flatten
+import hivens.core.io.AtomicFiles
 import java.nio.file.Files
 import java.nio.file.Path
 import java.security.MessageDigest
@@ -49,7 +50,7 @@ object LayoutManifest {
 
     fun write(file: Path, manifest: FileManifest) {
         Files.createDirectories(file.parent)
-        Files.writeString(file, json.encodeToString(manifest))
+        AtomicFiles.writeString(file, json.encodeToString(manifest))
     }
 
     /** SHA-256 of [file], for the post-download / post-patch integrity gate. */

@@ -16,8 +16,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
-import hivens.ui.theme.NxTheme
 import hivens.ui.theme.Motion
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.NxInk
 
 /**
  * The toggle primitive. Its track and thumb are sized here; colours come from
@@ -36,16 +37,24 @@ fun NxSwitch(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     /** Checked-track colour override for semantic toggles (e.g. a red offline switch).
-     *  Null = the palette accent. */
+     *  Null = the theme's lead colour. */
     accent: Color? = null,
 ) {
-    val colors = NxTheme.colors
     val alpha = if (enabled) 1f else 0.4f
+    val onTrack = accent ?: NxColor.lead()
+    val offTrack = NxColor.wash(NxInk.quiet, 0.45f)
+    val trackTarget = if (checked) onTrack else offTrack
     val trackColor by animateColorAsState(
-        targetValue = if (checked) (accent ?: colors.primary).copy(alpha = alpha)
-                      else colors.outline.copy(alpha = 0.5f * alpha),
+        targetValue = trackTarget.copy(alpha = alpha),
         animationSpec = Motion.colorShift.of(),
         label = "nxSwitchTrack",
+    )
+    // The thumb is whichever ink reads on the track it is sitting in. It used to be
+    // white always, which is about 2:1 on a pale accent and 1.5:1 on a light page.
+    val thumbColor by animateColorAsState(
+        targetValue = NxColor.on(trackTarget).copy(alpha = alpha),
+        animationSpec = Motion.colorShift.of(),
+        label = "nxSwitchThumb",
     )
     val pad = (trackHeight - thumbSize) / 2
     val thumbX by animateDpAsState(
@@ -69,7 +78,7 @@ fun NxSwitch(
                 .offset(x = thumbX)
                 .size(thumbSize)
                 .clip(RoundedCornerShape(thumbCorner))
-                .background(Color.White.copy(alpha = alpha)),
+                .background(thumbColor),
         )
     }
 }

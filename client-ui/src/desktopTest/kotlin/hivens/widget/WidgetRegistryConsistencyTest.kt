@@ -17,8 +17,10 @@ class WidgetRegistryConsistencyTest {
     @Test
     fun `every default-layout widget kind exists in the generated registry`() {
         val graph = DefaultLayout.load()
+        // Every family, not just the general one: a kind that only the project-view
+        // rail names is just as capable of being renamed out from under the layout.
         val referenced = graph.surfaces.values
-            .flatMap { it.slots.values }
+            .flatMap { it.allSlots().toList() }
             .flatMap { it.widgets }
             .map { it.kind }
             .toSet()
@@ -36,11 +38,21 @@ class WidgetRegistryConsistencyTest {
     fun `registry exposes the kernel-3 + editor sample widget kinds`() {
         val expected = setOf(
             // kernel-3 surface widgets
-            "home.classic.content",
             "home.new.welcome",
             "home.new.recent",
             "home.new.quicklaunch",
             "home.new.hero",
+            // what moved since you last looked: a launcher build, a pack's waiting build
+            "home.new.whatsnew",
+            // the type-led Home: the pack to go back to set large, and the library as a list
+            "home.new.continue",
+            "home.new.packlist",
+            // the library as spines on a shelf, one opened out
+            "home.new.spines",
+            // the time as the largest thing on the surface
+            "home.new.time",
+            // decor: a field of particles, for the backdrop under the content pane
+            "decor.particles",
             "library.header",
             "library.body",
             "appshell.rightrail.compactnews",
@@ -52,6 +64,8 @@ class WidgetRegistryConsistencyTest {
             "appshell.region.top",
             "appshell.region.body",
             "appshell.topbar.breadcrumb",
+            // the running games, for a title bar lane
+            "appshell.topbar.sessions",
             // floating activity account over the content column
             "appshell.activity.pill",
             // editor-2 sample widgets
@@ -59,8 +73,6 @@ class WidgetRegistryConsistencyTest {
             "home.new.spacer",
             "home.new.progress",
             "home.new.launchbutton",
-            // editor-3.7 music
-            "home.new.music",
             // the cover-led player, first of the new player kinds
             "home.new.player.cover",
             // the same artwork leading a differently: the card takes the cover's colour
@@ -69,10 +81,23 @@ class WidgetRegistryConsistencyTest {
             "home.new.player.readout",
             // no bar at all: the filled part of the card IS the position
             "home.new.player.timeline",
+            // no artwork either: the track's own envelope is the picture and the measure
+            "home.new.player.wave",
+            // both of the file's own pictures at once: the cover blurred into a ground, the envelope on it
+            "home.new.player.ground",
+            // one square and no words: the cover is a disc and the envelope rings it
+            "home.new.player.record",
+            // portrait, for the rail every landscape card was wrong in
+            "home.new.player.column",
+            // nothing but the artwork until the pointer arrives
+            "home.new.player.tile",
+            // the smallest presence that still plays: a ring, a glyph, a tooltip
+            "home.new.player.token",
             // inline video player (URL prop, expand-to-full)
             "home.new.video",
             // unified configurable nav rail item
             "nav.entry",
+            "nav.screen",
             // Phase A.3 container sample
             "container.group",
             // tab container
@@ -98,16 +123,13 @@ class WidgetRegistryConsistencyTest {
             "bg.fx.vignette",
             "bg.fx.animspeed",
             "bg.loop.mode",
+            "bg.audio",
             "bg.tint",
             "bg.reset",
             "profile.nav",
             "profile.skin.section",
             "profile.account.section",
             "profile.signin",
-            "server.details.title",
-            "server.details.tagbar",
-            "server.details.description",
-            "server.details.banner",
             "theme.picker.grid",
             "theme.picker.preview",
             // persistent notification history
@@ -115,6 +137,13 @@ class WidgetRegistryConsistencyTest {
             // per-instance persisted state widgets
             "notes.scratch",
             "checklist",
+            // The project page's metadata blocks, which live in the right rail's
+            // project-view family rather than in the page.
+            "mod.compatibility",
+            "mod.links",
+            "mod.tags",
+            "mod.creators",
+            "mod.details",
         )
         val actual = GeneratedWidgetRegistry.all().keys.map { it.value }.toSet()
         assertEquals(expected, actual, "registry drift -- expected exactly these widgets")
@@ -162,14 +191,32 @@ class WidgetRegistryConsistencyTest {
         }
     }
 
+    /**
+     * Nothing declares a service contract, and that is the state rather than a
+     * regression.
+     *
+     * The registry's one real contract was the music player: ten widgets provided
+     * it, one read it, and that reader fell back to the same engine every provider
+     * wrapped. It is app-provided through the container now, so no widget reads it
+     * out of the registry and none provides it, which leaves the check above with
+     * nothing to check.
+     *
+     * That vacuity is what this says out loud, and it is a tripwire rather than a
+     * headstone. It fails the moment a declaration appears, because the pair is
+     * live again at that point and somebody has to decide whether the registry is
+     * where the new contract belongs or whether it follows the player into the
+     * container.
+     */
     @Test
-    fun `the service annotations reach the registry at all`() {
-        // The pair that exists today. If this ever goes empty the processor has
-        // stopped reading the annotations, and the check above passes vacuously.
-        val descriptors = GeneratedWidgetRegistry.all().values
-        assertTrue(
-            descriptors.any { it.provides.isNotEmpty() } && descriptors.any { it.injects.isNotEmpty() },
-            "no widget declares a service contract -- either the annotations are gone or KSP is not reading them",
+    fun `no widget declares a service contract, so the check above is vacuous`() {
+        val declaring = GeneratedWidgetRegistry.all().values
+            .filter { it.provides.isNotEmpty() || it.injects.isNotEmpty() }
+            .map { it.kind.value }
+        assertEquals(
+            emptyList(),
+            declaring,
+            "a widget declares a service contract again, so the unmet-contract check above is live once " +
+                "more. Decide whether the registry is the right home for it before relying on that check.",
         )
     }
 
@@ -207,15 +254,24 @@ class WidgetRegistryConsistencyTest {
             "home.new.progress",
             "home.new.welcome",
             "home.new.launchbutton",
-            "home.new.music",
             "home.new.player.cover",
             "home.new.player.seeded",
             "home.new.player.readout",
             "home.new.player.timeline",
+            "home.new.player.wave",
+            "home.new.player.ground",
+            "home.new.player.record",
+            "home.new.player.column",
+            "home.new.player.tile",
+            "home.new.player.token",
             "home.new.video",
             "home.new.recent",
             "home.new.quicklaunch",
             "home.new.hero",
+            "home.new.continue",
+            "home.new.packlist",
+            "decor.particles",
+            "home.new.time",
             // About surface (title overrides)
             "about.logo",
             "about.system.card",
@@ -228,7 +284,6 @@ class WidgetRegistryConsistencyTest {
             // right-rail compact news (show-title prop)
             "appshell.rightrail.compactnews",
             // expressive knobs on otherwise data-driven sections
-            "server.details.banner",
             "profile.skin.section",
             // tab container (tabCount + labels)
             "container.tabs",
@@ -240,6 +295,7 @@ class WidgetRegistryConsistencyTest {
             "appshell.region.top",
             // unified nav rail item (target prop)
             "nav.entry",
+            "nav.screen",
             // persistent notification history (expand-direction + clock props)
             "notifications.history",
             // per-instance state widgets (props alongside their runtime state)

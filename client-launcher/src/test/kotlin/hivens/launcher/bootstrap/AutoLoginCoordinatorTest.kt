@@ -15,6 +15,7 @@ import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
@@ -28,7 +29,6 @@ class AutoLoginCoordinatorTest {
         AutoLoginCoordinator.resolveSession(
             settings = settings,
             saved = saved,
-            lastServerId = null,
             authService = authService,
             msaProvider = msa,
         )
@@ -86,6 +86,28 @@ class AutoLoginCoordinatorTest {
         assertIs<Resolution.NoCredentials>(resolve(SettingsData(), saved = null))
     }
 
+    /**
+     * An offline identity is not an account in the store, since it has no secret. So
+     * the chosen name is the only record of it, and without reading it here a player
+     * who signed in offline was signed out by every restart.
+     */
+    @Test
+    fun `a chosen offline name comes back with no saved account and offline mode off`() = runTest {
+        val session = session(resolve(SettingsData(offlinePlayerName = "Steve"), saved = null))
+        assertTrue(session.offline)
+        assertEquals("Steve", session.playerName)
+        assertEquals(OfflineIdentity.dashlessUuidFor("Steve"), session.uuid)
+        assertEquals("", session.accessToken)
+    }
+
+    @Test
+    fun `a saved account still wins over a remembered offline name`() = runTest {
+        coEvery { authService.login("ScUser", "hunter2", any()) } returns scSaved.copy(accessToken = "fresh-token")
+        val session = session(resolve(SettingsData(offlinePlayerName = "Steve"), saved = scSaved))
+        assertEquals("ScUser", session.playerName)
+        assertEquals("fresh-token", session.accessToken)
+    }
+
     @Test
     fun `active Microsoft account silent-refreshes to a fresh token`() = runTest {
         val msa: MsaAuthProvider = mockk()
@@ -122,6 +144,45 @@ class AutoLoginCoordinatorTest {
     fun `an ordinary account is still signed in`() = runTest {
         coEvery { authService.login("ScUser", "hunter2", any()) } returns scSaved.copy(accessToken = "fresh-token")
         assertEquals("fresh-token", session(resolve(SettingsData(), saved = scSaved)).accessToken)
+    }
+
+    @Test
+    fun `only a session minted by a sign-in here is marked for the store`() = runTest {
+        coEvery { authService.login("ScUser", "hunter2", any()) } returns scSaved.copy(accessToken = "fresh-token")
+        val signedIn = resolve(SettingsData(), saved = scSaved)
+        assertIs<Resolution.Success>(signedIn)
+        assertTrue(signedIn.signedIn, "the caller writes the minted uid back only when told")
+
+        val carried = resolve(SettingsData(), saved = scSaved.copy(twoFactor = true))
+        assertIs<Resolution.Success>(carried)
+        assertFalse(carried.signedIn, "the stored session is not a fresh one")
+    }
+
+    @Test
+    fun `with reuse-session on, a saved SC account opens on its token without signing in`() = runTest {
+        // The re-login is destructive on SC, so with reuse on the coordinator must
+        // make no request and hand back the token in hand. A strict authService
+        // mock also asserts login is never called.
+        val resolution = resolve(
+            SettingsData(experimentalReuseSession = true),
+            saved = scSaved,
+        )
+        assertEquals("sc-token", session(resolution).accessToken, "the saved token is carried as-is")
+        coVerify(exactly = 0) { authService.login(any(), any(), any()) }
+    }
+
+    @Test
+    fun `with reuse-session on, a Microsoft account still silent-refreshes`() = runTest {
+        // Reuse is for the SC shape; a refresh token means Microsoft, which has a
+        // real silent refresh and must not be short-circuited.
+        val msa = mockk<MsaAuthProvider>()
+        coEvery { msa.refresh("rt-old") } returns msSaved.copy(accessToken = "fresh-mc", refreshToken = "rt-new")
+        val resolution = resolve(
+            SettingsData(experimentalReuseSession = true),
+            saved = msSaved,
+            msa = msa,
+        )
+        assertEquals("fresh-mc", session(resolution).accessToken)
     }
 
     @Test

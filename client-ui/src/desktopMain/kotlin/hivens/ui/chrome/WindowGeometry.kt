@@ -12,7 +12,7 @@ import java.awt.Rectangle
  * render, never the frame geometry -- so these are comparable to a work-area
  * rectangle without conversion.
  */
-const val MIN_WINDOW_WIDTH_DP = 960
+const val MIN_WINDOW_WIDTH_DP = 800
 const val MIN_WINDOW_HEIGHT_DP = 600
 
 /**

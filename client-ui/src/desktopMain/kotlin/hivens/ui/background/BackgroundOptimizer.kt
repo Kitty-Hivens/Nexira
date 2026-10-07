@@ -253,9 +253,20 @@ internal fun physicalScreenHeight(): Int = runCatching {
  */
 internal fun scaleRgba(src: ByteArray, sw: Int, sh: Int, dw: Int, dh: Int): ByteArray {
     if (sw == dw && sh == dh) return src
+    // Each native object is owned by a try from the moment it exists. Both were made
+    // before the try, so a throw from the allocation beside the first leaked it.
     val srcImage = Image.makeRaster(ImageInfo(sw, sh, ColorType.RGBA_8888, ColorAlphaType.UNPREMUL), src, sw * 4)
-    val dst = Bitmap().apply { allocPixels(ImageInfo(dw, dh, ColorType.RGBA_8888, ColorAlphaType.UNPREMUL)) }
     try {
+        return scaleInto(srcImage, sw, sh, dw, dh)
+    } finally {
+        srcImage.close()
+    }
+}
+
+private fun scaleInto(srcImage: Image, sw: Int, sh: Int, dw: Int, dh: Int): ByteArray {
+    val dst = Bitmap()
+    try {
+        dst.allocPixels(ImageInfo(dw, dh, ColorType.RGBA_8888, ColorAlphaType.UNPREMUL))
         Canvas(dst).use { canvas ->
             canvas.drawImageRect(
                 srcImage,
@@ -268,7 +279,6 @@ internal fun scaleRgba(src: ByteArray, sw: Int, sh: Int, dw: Int, dh: Int): Byte
         }
         return dst.readPixels() ?: ByteArray(dw * dh * 4)
     } finally {
-        srcImage.close()
         dst.close()
     }
 }

@@ -14,6 +14,7 @@ import kotlinx.serialization.json.Json
 import jetbrains.exodus.env.Environment
 import jetbrains.exodus.env.EnvironmentConfig
 import jetbrains.exodus.env.Environments
+import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -33,34 +34,45 @@ class CacheFactory(
     // One Xodus environment for every cache namespace (each namespace is a named
     // store) under <cache>/xodus -- one transactional log-structured DB instead of a
     // JSON file per key. Pure-JVM (no JNA/JNI), so it fits the no-native-in-launcher
-    // policy. Opened on first use; closed on JVM shutdown (and the OS releases the
-    // dir lock on process death even if that hook is skipped).
+    // policy. Opened on the first read or write, not when a cache is built; closed on
+    // JVM shutdown (and the OS releases the dir lock on process death even if that
+    // hook is skipped).
+    //
+    // Null when it cannot be opened. Xodus locks the directory for one process, and
+    // a second Nexira process on the same data dir used to fail while its dependency
+    // graph was being built. Everything here is a cache, so it carries on from memory
+    // for the session instead, and says so once.
     private var shutdownHook: Thread? = null
-    private val env: Environment by lazy {
-        val dir = rootDir.resolve("xodus")
-        Files.createDirectories(dir)
-        // Management off: Xodus registers a reflection-only Standard MBean we never
-        // consume, and a classpath shrinker that strips its by-name MBean interface
-        // (as the old release ProGuard pass did) makes registration throw
-        // NotCompliantMBeanException before the shell starts. Disabling it sidesteps both.
-        val config = EnvironmentConfig().setManagementEnabled(false)
-        Environments.newInstance(dir.toFile(), config).also { e ->
-            val hook = Thread { runCatching { e.close() } }
-            shutdownHook = hook
-            Runtime.getRuntime().addShutdownHook(hook)
-        }
+    private val env: Environment? by lazy {
+        runCatching {
+            val dir = rootDir.resolve("xodus")
+            Files.createDirectories(dir)
+            // Management off: Xodus registers a reflection-only Standard MBean we never
+            // consume, and a classpath shrinker that strips its by-name MBean interface
+            // (as the old release ProGuard pass did) makes registration throw
+            // NotCompliantMBeanException before the shell starts. Disabling it sidesteps both.
+            val config = EnvironmentConfig().setManagementEnabled(false)
+            Environments.newInstance(dir.toFile(), config).also { e ->
+                val hook = Thread { runCatching { e.close() } }
+                shutdownHook = hook
+                Runtime.getRuntime().addShutdownHook(hook)
+            }
+        }.onFailure {
+            LoggerFactory.getLogger(CacheFactory::class.java)
+                .warn("cache database unavailable, caches keep to memory this session: {}", it.message)
+        }.getOrNull()
     }
 
     /** Closes the cache environment and drops its shutdown hook. No-op if it was never opened. */
     fun close() {
         val hook = shutdownHook ?: return
         runCatching { Runtime.getRuntime().removeShutdownHook(hook) }
-        runCatching { env.close() }
+        runCatching { env?.close() }
         shutdownHook = null
     }
 
     fun <V> create(namespace: String, serializer: KSerializer<V>, config: CacheConfig<V>): Cache<V> {
-        val disk = XodusDiskStore(env, namespace, serializer, json)
+        val disk = XodusDiskStore({ env }, namespace, serializer, json)
         return DefaultCache(disk, config, scope, clock, namespace, ioDispatcher)
     }
 
@@ -68,6 +80,9 @@ class CacheFactory(
     fun <V> createInMemory(namespace: String, config: CacheConfig<V>): Cache<V> =
         DefaultCache(NoOpDiskStore(), config, scope, clock, namespace, ioDispatcher)
 
-    /** The shared cache environment, for a caller that needs a bespoke store (e.g. the content-scan cache). */
-    fun environment(): Environment = env
+    /**
+     * The shared cache environment, for a caller that needs a bespoke store (e.g. the
+     * content-scan cache). Opens it, and is null when it cannot be opened.
+     */
+    fun environment(): Environment? = env
 }

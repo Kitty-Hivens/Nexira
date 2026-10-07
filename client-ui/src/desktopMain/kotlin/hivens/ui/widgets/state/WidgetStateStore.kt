@@ -8,6 +8,8 @@ import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -68,6 +70,16 @@ class WidgetStateStore(
         }
     }
 
+    private val _refused = MutableStateFlow<Set<String>>(emptySet())
+
+    /**
+     * Refused by the cap in [store], until a state that fits arrives or the instance
+     * goes. A refusal used to be a log line only: the widget kept the text on screen,
+     * nothing said it was not kept, and the next start brought back the last state
+     * under the cap.
+     */
+    override val refused: StateFlow<Set<String>> = _refused.asStateFlow()
+
     override fun load(instanceId: String): JsonObject? = entries.value[instanceId]
 
     override fun store(instanceId: String, value: JsonObject) {
@@ -76,8 +88,10 @@ class WidgetStateStore(
         val encoded = json.encodeToString(JsonObject.serializer(), value)
         if (encoded.length > maxEntryBytes) {
             log.warn("Widget state for '{}' is {} chars (> {} cap) -- not persisted", instanceId, encoded.length, maxEntryBytes)
+            _refused.update { it + instanceId }
             return
         }
+        _refused.update { it - instanceId }
         entries.update { it + (instanceId to value) }
         dirty = true
         writeRequests.tryEmit(Unit)
@@ -85,6 +99,7 @@ class WidgetStateStore(
 
     /** Drops one instance's state. Called by the GC collector, not by widgets. */
     fun remove(instanceId: String) {
+        _refused.update { it - instanceId }
         if (instanceId !in entries.value) return
         entries.update { it - instanceId }
         dirty = true
@@ -93,6 +108,7 @@ class WidgetStateStore(
 
     /** Prunes state for instanceIds no longer present in the layout graph. */
     fun retain(liveIds: Set<String>) {
+        _refused.update { ids -> ids.filterTo(HashSet()) { it in liveIds } }
         if (entries.value.keys.all { it in liveIds }) return
         entries.update { current -> current.filterKeys { it in liveIds } }
         dirty = true

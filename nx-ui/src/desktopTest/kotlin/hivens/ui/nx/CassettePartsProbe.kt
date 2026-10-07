@@ -51,6 +51,7 @@ import kotlin.math.hypot
 import kotlin.math.sin
 import kotlin.math.sqrt
 import kotlin.test.Test
+import hivens.ui.theme.NxColor
 
 /** How the paper on the face of the shell is laid out. */
 enum class LabelKind(val caption: String) {
@@ -120,9 +121,9 @@ class CassettePartsProbe {
     private fun sheet(name: String, wDp: Int, hDp: Int, body: @Composable () -> Unit) {
         val d = 2f
         val scene = ImageComposeScene((wDp * d).toInt(), (hDp * d).toInt(), density = Density(d)) {
-            NxTheme(useDarkTheme = true) {
+            NxTheme(dark = true) {
                 Box(
-                    Modifier.fillMaxSize().background(NxTheme.colors.background).padding(Spacing.s16),
+                    Modifier.fillMaxSize().background(NxColor.page).padding(Spacing.s16),
                     contentAlignment = Alignment.Center,
                 ) { body() }
             }
@@ -135,7 +136,7 @@ class CassettePartsProbe {
 
     @Composable
     private fun Label(kind: LabelKind) {
-        val c = NxTheme.colors
+        val c = probeInks()
         val sideInset = if (kind == LabelKind.Inset) 26.dp else 11.dp
         val h = if (kind == LabelKind.Inset) 86.dp else 93.dp
         val shape = RoundedCornerShape(2.dp)
@@ -167,12 +168,12 @@ class CassettePartsProbe {
                     Spacer(Modifier.width(8.dp))
                     Column(Modifier.weight(1f).fillMaxHeight()) {
                         Box(
-                            Modifier.fillMaxWidth().height(26.dp).background(c.primary)
+                            Modifier.fillMaxWidth().height(26.dp).background(c.lead)
                                 .padding(horizontal = 8.dp),
                             contentAlignment = Alignment.CenterStart,
                         ) {
                             Text(
-                                title, style = MaterialTheme.typography.titleSmall, color = c.onPrimary,
+                                title, style = MaterialTheme.typography.titleSmall, color = c.onLead,
                                 fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis,
                             )
                         }
@@ -208,7 +209,7 @@ class CassettePartsProbe {
                             maxLines = 1, overflow = TextOverflow.Ellipsis,
                         )
                         Spacer(Modifier.height(6.dp))
-                        Box(Modifier.width(28.dp).height(2.dp).background(c.primary))
+                        Box(Modifier.width(28.dp).height(2.dp).background(c.lead))
                         Spacer(Modifier.height(6.dp))
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
@@ -320,8 +321,8 @@ class CassettePartsProbe {
 
     @Composable
     private fun Cassette(look: Look) {
-        val c = NxTheme.colors
-        val shell = lerp(c.surfaceContainerHigh, Color.Black, 0.45f)
+        val c = probeInks()
+        val shell = lerp(c.top, Color.Black, 0.45f)
         Box(Modifier.width(bodyW.dp).height(bodyH.dp)) {
             Canvas(Modifier.fillMaxSize().clip(RoundedCornerShape(look.shell.corner.dp))) {
                 val d = 2f
@@ -396,7 +397,7 @@ class CassettePartsProbe {
 
     @Composable
     private fun Grid(cells: List<Pair<String, Look>>) {
-        val c = NxTheme.colors
+        val c = probeInks()
         Column(verticalArrangement = Arrangement.spacedBy(Spacing.s20)) {
             cells.chunked(2).forEach { row ->
                 Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s20)) {
@@ -406,7 +407,7 @@ class CassettePartsProbe {
                             Spacer(Modifier.height(Spacing.s8))
                             Text(
                                 caption, style = MaterialTheme.typography.labelMedium,
-                                color = c.textSecondary,
+                                color = c.quiet,
                             )
                         }
                     }

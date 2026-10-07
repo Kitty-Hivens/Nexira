@@ -10,20 +10,25 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.zIndex
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.theme.NxTheme
 import kotlin.math.*
 import kotlin.random.Random
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.Status
+import hivens.ui.surface.NxSurface
+import hivens.ui.surface.SurfaceKind
 
 // ─── Root wrapper ─────────────────────────────────────────────────────────────
 
@@ -56,6 +61,11 @@ fun AprilFoolsWrapper(
     }
 
     val scope = rememberCoroutineScope()
+    // Read through the latest composition. Captured by value, the engine kept the
+    // size of the composition that started it, which comes before the first layout
+    // reports one: zero for the whole session, so every event placed by position
+    // resolved to a corner and a range coerced against it threw.
+    val currentWindowSize by rememberUpdatedState(windowSize)
 
     // The engine owns its own child scope (cancelled in stop()); start it and
     // tear it down on dispose from one effect so the lifecycle is explicit and
@@ -64,7 +74,7 @@ fun AprilFoolsWrapper(
         AprilFoolsEngine.start(
             parent      = scope,
             cursorState = { pixelCursorState.value },
-            windowSize  = { windowSize },
+            windowSize  = { currentWindowSize },
         )
         onDispose { AprilFoolsEngine.stop() }
     }
@@ -146,6 +156,10 @@ private fun EscapedButtonRenderer(btn: FloatingButton, isGhost: Boolean) {
     val rot   = btn.overlayRot.value
     val scale = btn.overlayScale.value
     val alpha = btn.overlayAlpha.value
+    // The overlay places the clone in window pixels, and the size it records is in
+    // pixels too, so it is converted here. Used as dp, the clone came out at the
+    // wrong size beside the control it stands in for at any scale other than one.
+    val (width, height) = with(LocalDensity.current) { btn.widthPx.toDp() to btn.heightPx.toDp() }
 
     Box(
         Modifier
@@ -162,14 +176,14 @@ private fun EscapedButtonRenderer(btn: FloatingButton, isGhost: Boolean) {
             Button(
                 onClick = { if (!isGhost) btn.onClick() },
                 modifier = Modifier
-                    .width(btn.widthPx.dp)
-                    .height(btn.heightPx.dp),
+                    .width(width)
+                    .height(height),
                 shape = MaterialTheme.shapes.small,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = if (isGhost)
-                        NxTheme.colors.primary.copy(alpha = 0.38f)
+                        NxColor.lead().copy(alpha = 0.38f)
                     else
-                        NxTheme.colors.primary,
+                        NxColor.lead(),
                 ),
                 // A flat surface does not lift, so the chaos button does not
                 // cast a shadow either.
@@ -177,9 +191,10 @@ private fun EscapedButtonRenderer(btn: FloatingButton, isGhost: Boolean) {
                     defaultElevation = if (isGhost || AprilFools.useFlatSurface) 0.dp else 4.dp
                 ),
             ) {
+                val ink = NxColor.on(NxColor.lead())
                 Text(
                     text       = btn.label,
-                    color      = if (isGhost) Color.White.copy(alpha = 0.5f) else Color.White,
+                    color      = if (isGhost) ink.copy(alpha = 0.5f) else ink,
                     fontWeight = FontWeight.Bold,
                     fontSize   = 13.sp,
                 )
@@ -187,7 +202,7 @@ private fun EscapedButtonRenderer(btn: FloatingButton, isGhost: Boolean) {
 
             // ── Walking legs (only when LEGS_WALKING phase) ───────────────────
             if (btn.hasLegs && !isGhost) {
-                LegsCanvas(widthPx = btn.widthPx, cycle = btn.legCycle)
+                LegsCanvas(width = width, cycle = btn.legCycle)
             }
         }
     }
@@ -200,15 +215,15 @@ private fun EscapedButtonRenderer(btn: FloatingButton, isGhost: Boolean) {
  * Each leg is a line + a horizontal "foot" at the bottom.
  * The legs alternate between forward and backward step using a sine wave on [cycle].
  *
- * @param widthPx Button width in layout pixels (used to position legs under button).
- * @param cycle   Walking cycle 0..1 -- updated by the engine each frame.
+ * @param width Button width (used to position legs under button).
+ * @param cycle Walking cycle 0..1 -- updated by the engine each frame.
  */
 @Composable
-private fun LegsCanvas(widthPx: Float, cycle: Float) {
-    val legColor  = NxTheme.colors.textPrimary.copy(alpha = 0.9f)
+private fun LegsCanvas(width: Dp, cycle: Float) {
+    val legColor  = NxInk.main.copy(alpha = 0.9f)
     Canvas(
         modifier = Modifier
-            .width(widthPx.dp)
+            .width(width)
             .height(26.dp)
     ) {
         val strokeW   = 2.8f
@@ -275,11 +290,10 @@ fun AprilFoolsCloseDialog(
 
     // Non-dismissible dialog -- clicking outside does nothing
     Dialog(onDismissRequest = { /* intentionally empty */ }) {
-        Surface(
-            modifier       = Modifier.width(440.dp).wrapContentHeight(),
-            shape          = MaterialTheme.shapes.large,
-            color          = NxTheme.colors.surface,
-            tonalElevation = if (AprilFools.useFlatSurface) 0.dp else 10.dp,
+        NxSurface(
+            kind     = SurfaceKind.Dialog,
+            modifier = Modifier.width(440.dp).wrapContentHeight(),
+            shape    = MaterialTheme.shapes.large,
         ) {
             Column(
                 modifier            = Modifier.padding(28.dp),
@@ -292,13 +306,13 @@ fun AprilFoolsCloseDialog(
                     text       = s.aprilCloseTitle(escapes),
                     style      = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
-                    color      = NxTheme.colors.textPrimary,
+                    color      = NxInk.main,
                     textAlign  = TextAlign.Center,
                 )
 
                 Text(
                     text  = s.aprilCloseBody(escapes),
-                    color = NxTheme.colors.textSecondary,
+                    color = NxInk.quiet,
                     textAlign = TextAlign.Center,
                     style = MaterialTheme.typography.bodyMedium,
                 )
@@ -329,22 +343,26 @@ fun AprilFoolsCloseDialog(
                     // as the chaos AprilFoolsButton -- no extra
                     // Modifier.hoverable on top of Button.interactionSource,
                     // otherwise hover paints twice.
+                    //
+                    // Enabled throughout and only drawn as refusing. A disabled
+                    // clickable emits no hover, and hover is the one thing that
+                    // advances the count it would be waiting on, so a button
+                    // disabled until it surrendered never surrendered, and with
+                    // no tray the launcher could not be quit at all.
                     Button(
                         onClick  = { if (surrendered) onConfirmClose() },
-                        enabled  = surrendered,
                         modifier = Modifier
                             .align(Alignment.CenterEnd)
                             .offset { IntOffset(animCloseX.toInt(), animCloseY.toInt()) },
                         colors = ButtonDefaults.buttonColors(
-                            containerColor         = NxTheme.colors.error,
-                            disabledContainerColor = NxTheme.colors.error.copy(alpha = 0.75f),
+                            containerColor = NxColor.status(Status.Error).copy(alpha = if (surrendered) 1f else 0.75f),
                         ),
                         interactionSource = closeBtnInteraction,
                         shape             = MaterialTheme.shapes.small,
                     ) {
                         Text(
                             text  = if (surrendered) s.aprilCloseSurrender else s.aprilCloseClose,
-                            color = Color.White,
+                            color = NxColor.on(NxColor.status(Status.Error)),
                         )
                     }
                 }
@@ -354,7 +372,7 @@ fun AprilFoolsCloseDialog(
                     Text(
                         text  = s.aprilCloseEscapeCount(escapes, surrenderAfter),
                         style = MaterialTheme.typography.labelSmall,
-                        color = NxTheme.colors.textSecondary.copy(alpha = 0.45f),
+                        color = NxInk.off,
                     )
                 }
             }

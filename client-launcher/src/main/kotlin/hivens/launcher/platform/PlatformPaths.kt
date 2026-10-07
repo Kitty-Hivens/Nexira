@@ -46,6 +46,11 @@ class PlatformPaths(
     val logsDir: Path get() = dataDir.resolve("logs")
     val crashDir: Path get() = dataDir.resolve("crash-reports")
     val skinCacheDir: Path get() = dataDir.resolve("skin-cache")
+    /**
+      * What the retired server path wrote. Nothing fills it any more; the default
+      * skins still read it so somebody upgrading keeps them until a pack is
+      * installed.
+      */
     val clientsDir: Path get() = dataDir.resolve("clients")
 
     /**
@@ -57,16 +62,6 @@ class PlatformPaths(
      */
     val librariesDir: Path get() = dataDir.resolve("libraries")
     val assetsDir: Path get() = dataDir.resolve("assets")
-
-    /**
-     * @throws IllegalArgumentException when [assetDir] contains
-     *         path-separator or traversal characters. Allowed charset
-     *         is ASCII alnum + `._-`; anything else is treated as a
-     *         hostile or malformed manifest and refused before
-     *         [Path.resolve].
-     */
-    fun clientDir(assetDir: String): Path =
-        clientsDir.resolve(ServerNameValidator.require(assetDir))
 
     /**
      * Historical data directories in priority order, walked by the

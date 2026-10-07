@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -32,8 +33,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -42,25 +41,40 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.theme.Motion
-import hivens.ui.theme.NxTheme
-import hivens.ui.surface.bodyFloor
+import hivens.ui.surface.NxSurface
+import hivens.ui.surface.SurfaceKind
+import hivens.ui.surface.defaultOpacity
+import hivens.ui.widgets.kind
 import hivens.ui.widgets.customization.LabeledSlider
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.LocalWidgetRegistry
 import hivens.widget.api.resolveSurface
+import hivens.widget.api.resolveEntrance
+import hivens.widget.api.readableProps
+import hivens.widget.model.Entrance
+import hivens.widget.model.WidgetMotion
+import hivens.ui.i18n.AppStrings
+import hivens.ui.nx.NxSelect
+import hivens.ui.widgets.MAX_DELAY_MS
+import hivens.ui.widgets.autoEntranceDelayMs
 import hivens.widget.api.WidgetDescriptor
 import hivens.widget.model.PropHidden
 import hivens.widget.model.FillSource
 import hivens.widget.model.PropLabel
 import hivens.widget.model.SlotPath
 import hivens.widget.model.SurfaceCorners
+import hivens.widget.model.SurfaceInsets
 import hivens.widget.model.SurfaceSpec
+import hivens.widget.model.propsWith
 import hivens.widget.model.parseFill
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.traverse
 import kotlin.math.roundToInt
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.JsonObject
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.Status
 
 // Right-edge prop editor. Opened by a widget's "tune" chrome affordance,
 // which sets the host's prop target (path + instanceId). Resolves the
@@ -143,23 +157,29 @@ private fun PropPanelBody(
     val s = LocalStrings.current
     val sd = serializer?.descriptor
     // Effective values: the encoded default baseline overlaid with the
-    // instance's stored overrides. Every key is present, so each field's
-    // current value is non-null.
-    val effective: JsonObject = remember(descriptor.defaultPropsJson, instance.props) {
-        JsonObject(descriptor.defaultPropsJson + instance.props)
+    // instance's stored overrides, the ones the widget can read. Every key is
+    // present, so each field's current value is non-null. A stored value the
+    // widget cannot read is left out here as it is when the widget decodes, so
+    // the row shows the default the widget is drawing with and says why.
+    val readable: JsonObject = remember(serializer, instance.props) {
+        serializer?.let { readableProps(it, instance.props) } ?: instance.props
+    }
+    val effective: JsonObject = remember(descriptor.defaultPropsJson, readable) {
+        JsonObject(descriptor.defaultPropsJson + readable)
     }
 
-    Column(
+    NxSurface(
+        // A popup: solid and above everything, so a settings panel stays readable
+        // and does not composite with the layers it floats over.
+        kind     = SurfaceKind.Popup,
+        shape    = MaterialTheme.shapes.large,
+        shadowDp = PANEL_SHADOW_DP,
         modifier = Modifier
             .width(320.dp)
             .fillMaxHeight()
-            .padding(top = 64.dp, bottom = 96.dp, end = 16.dp)
-            .shadow(elevation = 18.dp, shape = MaterialTheme.shapes.large)
-            .clip(MaterialTheme.shapes.large)
-            // Solid surface, no glass: a settings panel must stay readable and
-            // not composite with the layers it floats over.
-            .background(NxTheme.colors.surface),
+            .padding(top = 64.dp, bottom = 96.dp, end = 16.dp),
     ) {
+    Column(Modifier.fillMaxSize()) {
         Row(
             verticalAlignment     = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -170,21 +190,21 @@ private fun PropPanelBody(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Symbol(icon = NxIcon.Tune,
                     contentDescription = null,
-                    tint               = NxTheme.colors.primary,
+                    tint               = NxColor.lead(),
                     modifier           = Modifier.size(18.dp),
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
                     text       = s.widgetLabel(descriptor.displayName),
                     style      = MaterialTheme.typography.titleSmall,
-                    color      = NxTheme.colors.textPrimary,
+                    color      = NxInk.main,
                     fontWeight = FontWeight.SemiBold,
                 )
             }
             IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
                 Symbol(icon = NxIcon.Close,
                     contentDescription = s.editorClose,
-                    tint               = NxTheme.colors.textSecondary,
+                    tint               = NxInk.quiet,
                     modifier           = Modifier.size(16.dp),
                 )
             }
@@ -205,18 +225,59 @@ private fun PropPanelBody(
                     val name = sd.getElementName(i)
                     val cur = effective[name] ?: continue
                     val label = s.widgetLabel(anns.filterIsInstance<PropLabel>().firstOrNull()?.value ?: name)
+                    if (name in instance.props && name !in readable) {
+                        Text(
+                            text  = s.editorPropUnreadable,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = NxColor.status(Status.Warning, text = true),
+                        )
+                    }
                     PropFieldRow(
                         label       = label,
                         element     = sd.getElementDescriptor(i),
                         annotations = anns,
                         current     = cur,
                         onChange    = { newValue ->
-                            controller.updateProps(path, instanceId, JsonObject(effective + (name to newValue)))
+                            // What differs from the declaration, not the whole
+                            // effective object.
+                            //
+                            // Writing everything froze every other field at the
+                            // default of the day, so a later release that moved
+                            // one could no longer move this instance, and the
+                            // frozen value read exactly like a choice the user
+                            // had made. A field put back to its default drops
+                            // out of the record again and follows the
+                            // declaration, which is the same rule read by
+                            // [effective] one screen up.
+                            controller.updatePropsFrom(path, instanceId, historyKey = name) { stored ->
+                                propsWith(descriptor.defaultPropsJson, stored, name, newValue)
+                            }
                         },
                     )
                 }
                 Spacer(Modifier.size(8.dp))
             }
+
+            // Outer spacing, read off the placement so every widget carries it, the
+            // players (which paint their own plane and reach no backing rows) included.
+            // Above Backing because it frames the widget rather than describing its plane.
+            PaddingSection(
+                padding = instance.placement?.padding ?: SurfaceInsets(),
+                write   = { controller.setWidgetPadding(path, instanceId, it) },
+            )
+            Spacer(Modifier.size(8.dp))
+
+            // How it arrives, on every widget: the character it declares or one of
+            // its own, and the delay its place in the slot gives it or one pinned.
+            val order = LocalLayoutGraph.current.traverse(path)?.widgets
+                ?.indexOfFirst { it.instanceId == instanceId }?.coerceAtLeast(0) ?: 0
+            MotionSection(
+                entrance = descriptor.resolveEntrance(instance),
+                delayMs  = instance.motion?.delayMs ?: autoEntranceDelayMs(order),
+                motion   = instance.motion ?: WidgetMotion(),
+                write    = { controller.updateMotion(path, instanceId, it) },
+            )
+            Spacer(Modifier.size(8.dp))
 
             // The widget's own surface, as the seven values it is. Available on
             // every widget, propless included. Each row writes one field and leaves
@@ -224,7 +285,7 @@ private fun PropPanelBody(
             Text(
                 text       = s.editorBackingTitle,
                 style      = MaterialTheme.typography.labelMedium,
-                color      = NxTheme.colors.textSecondary,
+                color      = NxInk.quiet,
                 fontWeight = FontWeight.SemiBold,
             )
             // Seeded through the same resolution the renderer uses, so the sliders
@@ -238,15 +299,15 @@ private fun PropPanelBody(
                 Text(
                     text  = s.editorSurfaceOwn,
                     style = MaterialTheme.typography.bodySmall,
-                    color = NxTheme.colors.textSecondary.copy(alpha = 0.7f),
+                    color = NxInk.quiet.copy(alpha = 0.7f),
                 )
             } else if (resolved == null) {
                 Text(
                     text  = s.editorSurfaceNone,
                     style = MaterialTheme.typography.bodySmall,
-                    color = NxTheme.colors.textSecondary.copy(alpha = 0.7f),
+                    color = NxInk.quiet.copy(alpha = 0.7f),
                 )
-                TextButton(onClick = { write(SurfaceSpec(fill = "base", opacity = 0.5f)) }) {
+                TextButton(onClick = { write(SurfaceSpec(fill = "panel", opacity = 0.5f)) }) {
                     Symbol(NxIcon.Add, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(6.dp))
                     Text(s.editorSurfaceAdd, style = MaterialTheme.typography.labelMedium)
@@ -260,6 +321,7 @@ private fun PropPanelBody(
             onClick  = {
                 if (sd != null) controller.updateProps(path, instanceId, JsonObject(emptyMap()))
                 controller.updateSurface(path, instanceId, null)
+                controller.updateMotion(path, instanceId, null)
             },
             modifier = Modifier.padding(start = 8.dp, end = 8.dp, bottom = 8.dp),
         ) {
@@ -268,22 +330,19 @@ private fun PropPanelBody(
             Text(s.editorResetToDefault, style = MaterialTheme.typography.labelMedium)
         }
     }
+    }
 }
 
 /**
- * Whether the body a spec resolves to is dark, which is what decides the opacity a
- * surface that names none draws at.
+ * How far the editor's docked panels stand off the page.
  *
- * A rung follows the palette and every rung of one palette sits on the same side of
- * mid grey, so the page's own tone answers for all of them; a literal colour answers
- * for itself.
+ * One number across the three of them, because they are one kind of thing and
+ * were three hand-rolled planes that happened to agree.
  */
-@Composable
-private fun surfaceBodyIsDark(spec: SurfaceSpec): Boolean =
-    when (val fill = parseFill(spec.fill)) {
-        is FillSource.Literal -> Color(fill.argb).luminance() < 0.5f
-        else -> NxTheme.colors.surface.luminance() < 0.5f
-    }
+internal const val PANEL_SHADOW_DP = 18f
+
+/** The opacity the renderer draws a spec's plane at when the spec names none. */
+private fun defaultOpacityOf(spec: SurfaceSpec): Float = parseFill(spec.fill).kind().defaultOpacity()
 
 /**
  * The seven values a plane has, one row each.
@@ -297,23 +356,23 @@ private fun SurfaceRows(surface: SurfaceSpec, write: (SurfaceSpec) -> Unit) {
     val s = LocalStrings.current
     val corner = 12f
 
-    // One field, a value or a name. Blank follows the theme, a rung name
-    // tracks the palette, a literal does not; a typo falls back to the theme
-    // rather than to black, so a mistake never looks deliberate.
+    // One field, a value or a name. Blank follows the theme, a surface word
+    // follows it relative to what holds the widget, a literal does not. A typo
+    // falls back to the theme rather than to black, so a mistake never looks
+    // deliberate.
     StringRow(s.editorSurfaceFill, surface.fill) { write(surface.copy(fill = it)) }
     Text(
         text  = s.editorSurfaceFillHint,
         style = MaterialTheme.typography.bodySmall,
-        color = NxTheme.colors.textSecondary.copy(alpha = 0.7f),
+        color = NxInk.quiet.copy(alpha = 0.7f),
     )
     // Both open on what the plane DRAWS at, not on a zero. A value the record
-    // does not name is filled in by the style or by the theme, so a slider
-    // reading its own null reported no blur under a style that blurs at 18dp
-    // and full opacity under a body that draws at 0.92. Moving either one
+    // does not name is filled in by the surface's kind, so a slider reading its
+    // own null would report a number the renderer never used. Moving either one
     // writes it down, which is what makes the number true from then on.
     LabeledSlider(
         label         = s.editorSurfaceOpacity,
-        value         = (surface.opacity ?: bodyFloor(surfaceBodyIsDark(surface))) * 100f,
+        value         = (surface.opacity ?: defaultOpacityOf(surface)) * 100f,
         range         = 0f..100f,
         format        = "%.0f%%",
         keyStep       = 1f,
@@ -344,14 +403,6 @@ private fun SurfaceRows(surface: SurfaceSpec, write: (SurfaceSpec) -> Unit) {
             write(surface.copy(shape = surface.shape.copy(corners = surface.shape.corners.copy(all = it))))
         },
     )
-    LabeledSlider(
-        label         = s.editorBackingPadding,
-        value         = surface.padding.all ?: 0f,
-        range         = 0f..32f,
-        format        = "%.0f",
-        keyStep       = 1f,
-        onValueChange = { write(surface.copy(padding = surface.padding.copy(all = it))) },
-    )
 
     // Everything past this point is a refinement of one of the rows above.
     // Shown on request rather than always: the panel had eleven rows for a
@@ -374,7 +425,7 @@ private fun SurfaceRows(surface: SurfaceSpec, write: (SurfaceSpec) -> Unit) {
           Text(
               text  = s.editorSurfaceShapeKindHint,
               style = MaterialTheme.typography.bodySmall,
-              color = NxTheme.colors.textSecondary.copy(alpha = 0.7f),
+              color = NxInk.quiet.copy(alpha = 0.7f),
           )
           LabeledSlider(
               label         = s.editorSurfaceSmoothing,
@@ -458,20 +509,93 @@ private fun SurfaceRows(surface: SurfaceSpec, write: (SurfaceSpec) -> Unit) {
               keyStep       = 1f,
               onValueChange = { write(surface.copy(shadowDp = it)) },
           )
-          // Per-side padding. Each opens at the uniform value and, once moved,
-          // pins that side independently of it.
-          CornerRow(s.editorBackingPaddingTop, surface.padding.top(0f)) {
-              write(surface.copy(padding = surface.padding.copy(top = it)))
-          }
-          CornerRow(s.editorBackingPaddingEnd, surface.padding.end(0f)) {
-              write(surface.copy(padding = surface.padding.copy(end = it)))
-          }
-          CornerRow(s.editorBackingPaddingBottom, surface.padding.bottom(0f)) {
-              write(surface.copy(padding = surface.padding.copy(bottom = it)))
-          }
-          CornerRow(s.editorBackingPaddingStart, surface.padding.start(0f)) {
-              write(surface.copy(padding = surface.padding.copy(start = it)))
-          }
       }
+    }
+}
+
+/**
+ * How the widget arrives when its surface opens.
+ *
+ * The character is chosen from the closed set by name, never as a duration, so
+ * every choice here is one the motion scale already draws well. The delay opens on
+ * what the widget waits now, its place in the slot unless it pins one, and moving
+ * it pins that number.
+ */
+@Composable
+private fun MotionSection(entrance: Entrance, delayMs: Int, motion: WidgetMotion, write: (WidgetMotion) -> Unit) {
+    val s = LocalStrings.current
+    Text(
+        text       = s.editorMotionTitle,
+        style      = MaterialTheme.typography.labelMedium,
+        color      = NxInk.quiet,
+        fontWeight = FontWeight.SemiBold,
+    )
+    PanelRow(s.editorMotionEnter) {
+        NxSelect(
+            options  = Entrance.entries,
+            selected = entrance,
+            onSelect = { write(motion.copy(enter = it.id)) },
+            label    = { it.label(s) },
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+    LabeledSlider(
+        label         = s.editorMotionDelay,
+        value         = delayMs.toFloat(),
+        range         = 0f..MAX_DELAY_MS.toFloat(),
+        format        = "%.0f",
+        keyStep       = 10f,
+        onValueChange = { write(motion.copy(delayMs = it.roundToInt())) },
+    )
+}
+
+private fun Entrance.label(s: AppStrings): String = when (this) {
+    Entrance.None -> s.entranceNone
+    Entrance.Fade -> s.entranceFade
+    Entrance.Rise -> s.entranceRise
+    Entrance.Settle -> s.entranceSettle
+}
+
+/**
+ * The widget's outer spacing, from [Placement.padding] rather than the plane.
+ *
+ * Universal, drawsOwnSurface included: it is the one spacing control a widget that
+ * paints its own plane can carry, because it reserves room around the widget
+ * instead of insetting a surface the widget never asked the kernel to draw. An
+ * all-sides slider, with the four sides under the same disclosure the backing
+ * section uses.
+ */
+@Composable
+private fun PaddingSection(padding: SurfaceInsets, write: (SurfaceInsets) -> Unit) {
+    val s = LocalStrings.current
+    Text(
+        text       = s.editorPaddingTitle,
+        style      = MaterialTheme.typography.labelMedium,
+        color      = NxInk.quiet,
+        fontWeight = FontWeight.SemiBold,
+    )
+    LabeledSlider(
+        label         = s.editorBackingPadding,
+        value         = padding.all ?: 0f,
+        range         = 0f..64f,
+        format        = "%.0f",
+        keyStep       = 1f,
+        onValueChange = { write(padding.copy(all = it)) },
+    )
+    var showMore by remember { mutableStateOf(false) }
+    DisclosureRow(s.editorSurfaceMore, showMore) { showMore = !showMore }
+    AnimatedVisibility(
+        visible = showMore,
+        enter = Motion.reveal.enter,
+        exit = Motion.reveal.exit,
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            // Each side opens at the uniform value and, once moved, pins that side
+            // independently of it.
+            CornerRow(s.editorBackingPaddingTop, padding.top(0f)) { write(padding.copy(top = it)) }
+            CornerRow(s.editorBackingPaddingEnd, padding.end(0f)) { write(padding.copy(end = it)) }
+            CornerRow(s.editorBackingPaddingBottom, padding.bottom(0f)) { write(padding.copy(bottom = it)) }
+            CornerRow(s.editorBackingPaddingStart, padding.start(0f)) { write(padding.copy(start = it)) }
+        }
     }
 }

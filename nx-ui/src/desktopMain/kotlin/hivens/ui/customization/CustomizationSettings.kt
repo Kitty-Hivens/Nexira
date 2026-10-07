@@ -1,5 +1,6 @@
 package hivens.ui.customization
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
@@ -9,8 +10,11 @@ import kotlinx.serialization.Serializable
  * Default state is a no-op -- every field is null / 1.0 / false so an
  * unconfigured user sees the same UI as before customization existed.
  *
- * [accentOverride] re-seeds the primary accent, the remaining fields decide
- * whether surfaces blur and how the nav-rail selection is drawn.
+ * The fields decide whether surfaces blur and how the nav-rail selection is drawn.
+ *
+ * An accent override used to live here too, pasting a hex over the theme's colour
+ * after the theme was built. Nothing wrote it, and the theme now owns its colours
+ * outright, so there is no later step for it to paste into.
  *
  * A glass-intensity multiplier used to live here too. It scaled the tint helper
  * every screen mixed its own planes with -- so it moved thirty places and none of
@@ -28,8 +32,6 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 data class CustomizationSettings(
-    val accentOverride: String? = null,
-
     /**
      * Whether a surface blurs what is behind it at all.
      *
@@ -42,16 +44,26 @@ data class CustomizationSettings(
     val surfaceBlur: Boolean = true,
 
     /**
+     * Whether the interface keeps decorative movement to itself.
+     *
+     * On, widgets are where they belong when a surface opens instead of arriving, and
+     * a field of particles holds still on its first frame instead of drifting. It is
+     * one switch for the movement nothing depends on, and it leaves the motion that
+     * says something alone: a press still answers, a panel still opens.
+     */
+    val reduceMotion: Boolean = false,
+
+    /**
      * How the active item in the left navigation rail is highlighted.
      * [NavSelectionStyle.Pill] (default) keeps the original Material capsule
      * behind the icon; the other variants change only the selection
      * decoration, never the rail's geometry or spacing.
      */
-    val navSelectionStyle: NavSelectionStyle = NavSelectionStyle.Pill,
+    @SerialName("navSelectionStyle")
+    val navSelectionStyleWire: String = NavSelectionStyle.Pill.name,
     /**
      * Optional hex color for the nav selection decoration and the active
-     * icon. Null keeps the theme accent (primary), so it tracks the palette
-     * and [accentOverride] by default.
+     * icon. Null keeps the theme's lead colour, so it tracks the theme by default.
      */
     val navSelectionAccent: String? = null,
     /**
@@ -67,7 +79,29 @@ data class CustomizationSettings(
      * fit for the minimal LeftBar / Dot / None selections.
      */
     val navHoverHighlight: Boolean = true,
-)
+) {
+    /**
+     * The selection this build understands, or the default when the file names
+     * one it does not.
+     *
+     * Stored as a string rather than the enum for the reason the layout format
+     * already gives about itself: a constant a newer build added has to either
+     * throw here or be guessed at, and both cost the user the choice they made.
+     * Throwing reset the whole record and the first toggle wrote the reset back;
+     * coercing kept the record and replaced the field. A string is carried
+     * through verbatim, so the value survives a launch of a build that predates
+     * it.
+     */
+    val navSelectionStyle: NavSelectionStyle get() = parseNavSelectionStyle(navSelectionStyleWire)
+
+    fun withNavSelectionStyle(style: NavSelectionStyle): CustomizationSettings =
+        copy(navSelectionStyleWire = style.name)
+}
+
+/** Case and surrounding space are forgiven: this file is editable by hand. */
+fun parseNavSelectionStyle(value: String): NavSelectionStyle =
+    NavSelectionStyle.entries.firstOrNull { it.name.equals(value.trim(), ignoreCase = true) }
+        ?: NavSelectionStyle.Pill
 
 /**
  * Decoration drawn behind / around the active left-rail icon. Shape-only --

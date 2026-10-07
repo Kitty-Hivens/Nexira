@@ -21,9 +21,8 @@ import hivens.launcher.protocol.LauncherHashCache
 import hivens.launcher.protocol.SmartycraftV1Protocol
 import hivens.core.api.HttpClientProvider
 import hivens.core.net.TransferEngine
-import hivens.core.api.PlayerRepository
-import hivens.core.api.ServerRepository
 import hivens.core.api.SkinRepository
+import hivens.core.api.interfaces.ISettingsService
 import hivens.core.api.interfaces.*
 import dev.hivens.libvault.SecretVault
 import dev.hivens.libvault.Vault
@@ -31,10 +30,11 @@ import dev.hivens.libvault.VaultConfig
 import dev.hivens.libvault.VaultTier
 import hivens.auth.LazySecretVault
 import hivens.launcher.*
-import hivens.launcher.component.ClasspathProvider
+import hivens.launcher.component.EarlyLoadingScreen
 import hivens.launcher.component.EnvironmentPreparer
 import hivens.launcher.component.GameCommandBuilder
 import hivens.launcher.component.ProcessLogHandler
+import hivens.core.launch.InstanceWorkRegistry
 import hivens.launcher.launch.LauncherController
 import hivens.launcher.launch.RunningPackSource
 import hivens.launcher.mrpack.MrpackInstaller
@@ -44,6 +44,7 @@ import hivens.launcher.platform.PlatformPaths
 import hivens.launcher.runtime.RuntimeProvisioner
 import hivens.launcher.runtime.loader.CleanroomResolver
 import hivens.launcher.runtime.loader.FabricLikeResolver
+import hivens.launcher.runtime.loader.LiteLoaderResolver
 import hivens.launcher.runtime.loader.ForgeLegacyResolver
 import hivens.launcher.runtime.loader.Lwjgl3ifyResolver
 import hivens.launcher.runtime.loader.ForgeResolver
@@ -58,7 +59,9 @@ import hivens.core.api.dto.smrt.SmrtPackManifest
 import hivens.core.api.dto.smrt.SmrtPackSummary
 import hivens.core.cache.Cache
 import hivens.core.cache.CacheConfig
-import hivens.core.data.DashboardData
+import hivens.core.cache.read
+import hivens.core.cache.StaleMode
+import hivens.core.data.NewsItem
 import hivens.core.data.NewsPage
 import hivens.core.data.ModuleId
 import hivens.core.time.Clock
@@ -71,6 +74,8 @@ import hivens.launcher.PackOperationService
 import hivens.launcher.imports.ForeignInstanceImporter
 import hivens.launcher.imports.FtbAppSource
 import hivens.launcher.imports.LocalPackCreator
+import hivens.launcher.legacy.RetiredClientAdopter
+import hivens.launcher.legacy.RetiredClientScanner
 import hivens.launcher.imports.LauncherImportService
 import hivens.launcher.imports.LauncherRootLocator
 import hivens.launcher.imports.MinecraftLauncherSource
@@ -78,6 +83,9 @@ import hivens.launcher.imports.ModrinthAppSource
 import hivens.launcher.imports.PrismLauncherSource
 import hivens.launcher.curseforge.CurseForgeZipInstaller
 import hivens.launcher.cache.ModrinthCaches
+import hivens.launcher.cache.ModIconCaches
+import hivens.launcher.cache.ModIconLookups
+import kotlinx.serialization.builtins.serializer
 import hivens.core.api.dto.smrt.SmrtManifestVersions
 import hivens.launcher.cache.SmrtPackCaches
 import hivens.core.io.IconProcessor
@@ -86,11 +94,15 @@ import hivens.core.data.PackOrigin
 import hivens.core.update.PackUpdater
 import hivens.core.update.PackUpdateStatusHub
 import hivens.launcher.instance.ContentScanCache
+import hivens.launcher.instance.InstanceContentManager
 import hivens.launcher.instance.InstanceContentScanner
+import hivens.launcher.instance.InstanceContentUpdater
+import hivens.launcher.instance.ModInstaller
 import hivens.launcher.instance.InstanceSizeService
 import hivens.launcher.instance.PackInstanceService
 import hivens.launcher.news.CuratedNewsFeed
 import hivens.launcher.news.SmartyCraftNewsFeed
+import hivens.launcher.news.toNewsItem
 import hivens.launcher.news.SyndicationNewsFeed
 import hivens.launcher.catalogue.MirrorPackCatalogue
 import hivens.launcher.catalogue.ModrinthPackCatalogue
@@ -99,8 +111,6 @@ import hivens.launcher.catalogue.CachedPackCatalogue
 import hivens.core.api.catalogue.CataloguePack
 import hivens.launcher.catalogue.PackCatalogueRegistry
 import hivens.launcher.modrinth.ModrinthClient
-import hivens.launcher.smrt.OpenSmrtHelperResolver
-import hivens.launcher.smrt.SmartyModPlanner
 import hivens.launcher.smrt.SmrtAuthlibSwapper
 import hivens.launcher.smrt.SmrtPackClient
 import hivens.launcher.smrt.SmrtSyncService
@@ -150,6 +160,7 @@ import javax.net.ssl.X509TrustManager
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import org.slf4j.LoggerFactory
@@ -174,7 +185,7 @@ val networkModule = module {
             // Coerce unknown enum values to the field's default instead
             // of throwing. Without this, downgrading the launcher to a
             // build that does not yet declare a recently-added enum
-            // variant (e.g. HomeView.New written by a newer build, read
+            // variant (e.g. a ThemeMode written by a newer build, read
             // by an older one) blows up SettingsService.reload() and
             // SilentlyResetsEverything to defaults -- the user loses
             // every other setting because of one unknown value.
@@ -203,10 +214,11 @@ val networkModule = module {
 
     /**
      * Smartycraft bypass client. Backs the explicit "connect anyway" user
-     * flow; requested by `named("insecure")` or handed out by the default
-     * [HttpClientProvider] once a grant exists, so a caller that has just
-     * granted a bypass can stay on the regular `authService` and reach the
-     * same transport.
+     * flow by being what the default [HttpClientProvider] and the Coil
+     * [Call.Factory] below hand out once a grant exists, so a caller that has
+     * just granted a bypass stays on the regular `authService` and reaches this
+     * transport on its next request. Only the registrations below, and the
+     * tests of this graph, ask for it by name.
      *
      * It is NOT a trust-nothing client: see [buildBypassScopedSsl]. Skipping
      * verification is scoped to a host the user granted, so this client
@@ -291,8 +303,14 @@ val networkModule = module {
      * granted for the smartycraft host -- see routing notes in
      * [HttpClientProvider].
      */
+    //
+    // Redirects are left to Ktor here. OkHttp follows them on its own unless told
+    // not to, https to plaintext http included, and Ktor's handling, which refuses
+    // that downgrade, then never sees one. This channel fetches whatever a pack
+    // manifest names, so a redirect is one more address it did not choose. The
+    // OkHttp client itself keeps following them for Coil, which asks it directly.
     single<HttpClientProvider>(named("direct")) {
-        val direct = buildHttpClient(get<OkHttpClient>(named("direct")), get())
+        val direct = buildHttpClient(withoutOwnRedirects(get<OkHttpClient>(named("direct"))), get())
         HttpClientProvider { direct }
     }
 
@@ -347,16 +365,11 @@ val networkModule = module {
 
     // ── Conduit (network refactor) ──────────────────────────────────────────
     // IServerProtocol abstracts all `*.smartycraft.ru` traffic so repositories
-    // don't know URL paths or `action=` strings. The default binding follows
-    // the bypass-aware provider; the `named("insecure")` one is pinned to the
-    // trust-all client for the explicit "connect anyway" login retry.
+    // don't know URL paths or `action=` strings. It follows the bypass-aware
+    // provider, so the "connect anyway" login retry needs no protocol of its
+    // own: the grant is recorded before the retry runs.
     //
     // Wire spec lives in docs/dev/smartycraft-v1-protocol.md.
-
-    single<HttpClientProvider>(named("insecure")) {
-        val insecure = buildHttpClient(get<OkHttpClient>(named("insecure")), get())
-        HttpClientProvider { insecure }
-    }
 
     // ServerProtocolConfig -- Conduit Phase 3. Loads from
     // <dataDir>/server-config.json with smartycraft.ru defaults if absent.
@@ -383,19 +396,9 @@ val networkModule = module {
     single<IServerProtocol> {
         SmartycraftV1Protocol(get<HttpClientProvider>(), get(), get<LauncherHashCache>(), get<ServerProtocolConfig>())
     }
-    single<IServerProtocol>(named("insecure")) {
-        SmartycraftV1Protocol(
-            get<HttpClientProvider>(named("insecure")),
-            get(),
-            get<LauncherHashCache>(),
-            get<ServerProtocolConfig>(),
-        )
-    }
 
     // Repositories -- thin adapters over IServerProtocol.
-    single { ServerRepository(get<IServerProtocol>()) }
     single { SkinRepository(get<IServerProtocol>()) }
-    single { PlayerRepository(get<IServerProtocol>()) }
 }
 
 // ── App composition modules ─────────────────────────────────────────────────
@@ -407,8 +410,7 @@ val networkModule = module {
 
 /**
  * Auth + credential storage seam. The load-bearing target of the client-auth
- * extraction: keyring, credential manager, and the SmartyCraft auth provider
- * (secure + insecure-bypass variants).
+ * extraction: keyring, credential manager, and the SmartyCraft auth provider.
  */
 val authModule = module {
     // Secret storage via libvault: OS keyring (Secret Service / Credential
@@ -447,16 +449,12 @@ val authModule = module {
     single<ICredentialStore> { get<CredentialsManager>() }
     single<AccountStore> { get<CredentialsManager>() }
 
+    // One instance, whatever channel it reaches the host on. It holds the session
+    // cache and the pending second-factor state, and a second instance for the
+    // bypassed channel kept its own copy of both: a code completed through one was
+    // unknown to the other, which the launch asked next. The channel is the
+    // protocol's choice per request, so the bypass never needed a provider.
     single<AuthProvider> { SmartyCraftAuthProvider(get<IServerProtocol>()) }
-
-    /**
-     * Insecure [AuthProvider] -- used exclusively for the SSL bypass login retry.
-     * Always connects without certificate verification (via the insecure-channel
-     * IServerProtocol variant bound above in coreModule).
-     */
-    single<AuthProvider>(named("insecure")) {
-        SmartyCraftAuthProvider(get<IServerProtocol>(named("insecure")))
-    }
 
     // Offline-play provider + the Microsoft provider + the registry the content
     // router and launch gate consult. Microsoft is always constructible but only
@@ -488,7 +486,10 @@ val cacheModule = module {
     // Content-scan cache (Xodus-backed) + the scanner that reads it, so re-opening a
     // pack's Content tab reads parsed mod metadata from the DB instead of re-cracking
     // every jar. Keyed by canonical path, validated by size+mtime.
-    single { ContentScanCache(get<CacheFactory>().environment(), "content-scan", get()) }
+    single {
+        val caches: CacheFactory = get()
+        ContentScanCache({ caches.environment() }, "content-scan", get())
+    }
     // Icon processor is bound by the UI module (ImageIO lives outside the
     // headless engine); a GUI-less assembly scans without one.
     single { InstanceContentScanner(get(), getOrNull<IconProcessor>()) }
@@ -508,17 +509,28 @@ val mirrorModule = module {
     single { SmrtPackClient(get(named("direct")), caches = get()) }
     single<IMirrorPackClient> { get<SmrtPackClient>() }
     single { ModrinthClient(get(named("direct")), get(), caches = get()) }
+    // Per-file updates for an instance's own folders: checks Modrinth by hash and
+    // swaps jars in place. App-scoped, so a batch of forty survives leaving the tab
+    // that started it.
+    single { InstanceContentUpdater(modrinth = get(), manager = InstanceContentManager(), scope = get(), work = get()) }
+    // Installing a mod means installing what it cannot run without: the browser
+    // used to fetch the one jar that was clicked and leave the player to meet the
+    // missing dependency on the loading screen.
+    single { ModInstaller(modrinth = get(), scanner = get()) }
     single { SmrtSyncService(get(), get()) }
 
     // Pack-catalogue read side: one provider per browsable source, indexed by
     // origin so the Browse UI stays source-agnostic.
-    single { MirrorPackCatalogue(get()) }
+    single {
+        val settings = get<ISettingsService>()
+        MirrorPackCatalogue(get(), language = { settings.getSettings().locale })
+    }
     single { ModrinthPackCatalogue(get()) }
     single {
         val searches = catalogueSearchCache()
         PackCatalogueRegistry(
             listOf(
-                CachedPackCatalogue(get<MirrorPackCatalogue>(), searches),
+                get<MirrorPackCatalogue>(),
                 CachedPackCatalogue(get<ModrinthPackCatalogue>(), searches),
             ),
         )
@@ -566,41 +578,55 @@ val mirrorModule = module {
             javaManager = get(),
             repository = get(),
             dataDir = get(),
-            librariesDir = get<PlatformPaths>().librariesDir,
-            assetsDir = get<PlatformPaths>().assetsDir,
         )
     }
     // Create an empty local pack from scratch (name + MC + loader); the Content
     // tab's Modrinth browser + local-jar add fill it in.
     single { LocalPackCreator(runtimeProvisioner = get(), javaManager = get(), repository = get(), dataDir = get()) }
+
+    // What the retired SmartyCraft server path left under clients/. The scanner
+    // reads it, the adopter turns one tree into a Local pack by hardlinking its
+    // content, and the sweeper removes what the player chose to let go. None of
+    // the three runs on its own; the surface above them asks first.
+    single { RetiredClientScanner(get<PlatformPaths>().clientsDir) }
+    single {
+        val provisioner: RuntimeProvisioner = get()
+        RetiredClientAdopter(
+            ensureRuntime = { mc, loader, progress -> provisioner.ensureRuntime(mc, loader, "", progress).loaderVersion },
+            javaManager = get(),
+            repository = get(),
+            dataDir = get(),
+            assetsDir = get<PlatformPaths>().assetsDir,
+        )
+    }
     single<IPackSyncService> { get<SmrtSyncService>() }
 
-    // Smarty -> open-smrt-network swap. Direct channel: GitHub releases +
-    // raw.githubusercontent.com keep strict TLS. The planner is what both
-    // sync paths (LauncherController, AutoSyncService) consult.
-    single { OpenSmrtHelperResolver(get(named("direct")), get(), get(), get()) }
-    single { SmartyModPlanner(get<OpenSmrtHelperResolver>()::resolve, get()) }
     // SC-bound pack authlib swap. Default (smartycraft) channel: the patched jar
-    // is pulled from the SC client distribution, same source as the server-list sync.
+    // is pulled from the SC client distribution, the same source the pack's own
+    // sync reads.
     single { SmrtAuthlibSwapper(get(named("smartycraft")), get<ServerProtocolConfig>(), get()) }
     single { PackInstaller(syncService = get(), runtimeProvisioner = get(), repository = get(), dataDir = get()) }
     // Instance-level mutations that reach past the registry (full delete, detach).
-    single { PackInstanceService(repository = get(), dataDir = get()) }
+    single { PackInstanceService(repository = get(), dataDir = get(), running = get(), work = get(), snapshots = get(), journal = get(), sizes = get()) }
     // On-disk size of an instance, measured on the app scope and shared, so a
     // surface that asks again does not re-walk a tree the size of a world save.
     single { InstanceSizeService(dataDir = get(), scope = get(), clock = get()) }
     // App-scoped owner of the operations that rewrite an installed instance
     // (an update apply, a repair): one per instance, outliving the surface that
     // started it -- see PackOperationService.
-    single { PackOperationService(scope = get(), sizes = get()) }
+    single { PackOperationService(scope = get(), sizes = get(), work = get()) }
     // Update write side: moves an installed mirror instance to another build
     // (forward update or version switch) via the reconcile engine. Concrete
     // SmrtPackClient for the summary/version-list poll the interface slice lacks.
     single { PackSnapshotService(dataDir = get(), json = get()) }
+    // What each instance is busy with, for the launch controls and the controller
+    // that must not start a game over files being rewritten.
+    single { InstanceWorkRegistry() }
     single { ApplyJournal(dataDir = get(), json = get()) }
     // Startup rollback for updates a hard crash interrupted (journal + snapshot).
-    single { ApplyRecovery(snapshotService = get(), repository = get(), journal = get(), dataDir = get()) }
+    single { ApplyRecovery(snapshotService = get(), repository = get(), journal = get(), dataDir = get(), work = get()) }
     single {
+        val settings = get<ISettingsService>()
         PackUpdateService(
             client = get<SmrtPackClient>(),
             syncService = get(),
@@ -608,6 +634,7 @@ val mirrorModule = module {
             snapshotService = get(),
             journal = get(),
             dataDir = get(),
+            language = { settings.getSettings().locale },
         )
     }
     single {
@@ -616,6 +643,7 @@ val mirrorModule = module {
             installer = get(),
             repository = get(),
             snapshotService = get(),
+            journal = get(),
             dataDir = get(),
         )
     }
@@ -636,10 +664,13 @@ val mirrorModule = module {
     // status hub so UI badges and manual flows share one state.
     single {
         val settings = get<ISettingsService>()
+        val running = get<RunningPackSource>()
         PackAutoUpdateService(
             repository = get(),
             updater = get<PackUpdater>(),
             settingsProvider = { settings.getSettings() },
+            work = get(),
+            runningPackId = { running.runningPackInstanceId.value },
         )
     } bind PackUpdateStatusHub::class
     single {
@@ -659,9 +690,15 @@ val mirrorModule = module {
     // resolver instance.
     single {
         val client: ModrinthClient = get()
+        val lookups = ModIconLookups(
+            caches        = modIconCaches(),
+            versionByHash = { sha1 -> client.versionByHash(sha1) },
+            projectIcon   = { projectId -> client.resolveProject(projectId).iconUrl },
+        )
         ModIconResolver(
-            resolveProjectIcon = { projectId -> client.resolveProject(projectId).iconUrl },
-            resolveIconByHash  = { sha1 -> client.versionByHash(sha1)?.let { client.resolveProject(it.projectId).iconUrl } },
+            resolveProjectIcon = lookups::iconForProject,
+            resolveIconByHash  = lookups::iconForHash,
+            hashFile           = lookups::sha1,
         )
     }
 }
@@ -676,15 +713,14 @@ val runtimeModule = module {
     single<IJavaManager> { JavaManagerService(get(), get()) }
 
     // Direct channel -- Maven Central LWJGL/JInput natives keep strict TLS.
-    single { EnvironmentPreparer(get()) }
-    single { ClasspathProvider(get()) }
+    single { EnvironmentPreparer() }
     single { GameCommandBuilder(get()) }
     single { ProcessLogHandler() }
 
     // Canonical runtime provisioner -- vanilla + loader libraries from the
     // official Mojang/Forge CDNs into the shared roots. Direct channel: these
     // CDNs keep strict TLS (same rationale as JavaManagerService).
-    single { ForgeLegacyResolver(get(named("direct")), get(), get()) }
+    single { ForgeLegacyResolver(get(named("direct")), get(), get(), cacheDir = get<Path>().resolve("loader-cache")) }
     single { loaderRegistry() }
     single {
         RuntimeProvisioner(
@@ -704,28 +740,13 @@ val runtimeModule = module {
 }
 
 /**
- * The launch flow: the orchestrator [LauncherController], the [ILauncherService]
- * that spawns the process, the file-download + manifest + profile collaborators
- * it drives, and the background AutoSyncService.
+ * The launch flow: the orchestrator [LauncherController] and the
+ * [ILauncherService] that spawns the process.
  */
 val launchPipelineModule = module {
-    single {
-        val dataDir: Path = get()
-        ManifestCache(dataDir.resolve("manifest-cache"), get())
-    }
-    single<IManifestStore> { get<ManifestCache>() }
-    single<IFileDownloadService> {
-        FileDownloadService(get(named("smartycraft")), get(), get(), get<ServerProtocolConfig>())
-    }
-    single<IManifestProcessorService> { ManifestProcessorService() }
-    single { ProfileManager(get(), get()) }
-    single<IInstanceProfileStore> { get<ProfileManager>() }
-
     /**
-     * Launch-flow orchestrator. Consumes client-core interfaces, the shared
-     * coroutine scope, and SmartyModPlanner -- the one concrete collaborator
-     * left, since its nested Plan return type resists a clean interface. No UI
-     * types (i18n strings, console service) leak in.
+     * Launch-flow orchestrator. Consumes client-core interfaces and the shared
+     * coroutine scope; no UI types (i18n strings, console service) leak in.
      */
     singleOf(::LauncherController)
 
@@ -739,10 +760,8 @@ val launchPipelineModule = module {
      */
     single<ILauncherService> {
         LauncherService(
-            profileManager     = get(),
             javaManager        = get(),
             envPreparer        = get(),
-            classpathProvider  = get(),
             commandBuilder     = get(),
             logHandler         = get(),
             runtimeProvisioner = get(),
@@ -751,26 +770,7 @@ val launchPipelineModule = module {
             authlibSwapper     = get(),
             sharedAssetsDir    = get<PlatformPaths>().assetsDir,
             sharedLibrariesDir = get<PlatformPaths>().librariesDir,
-        )
-    }
-
-    single {
-        val dataDir: Path = get()
-        val profiles: ProfileManager = get()
-        val credentials: ICredentialStore = get()
-        val settings: ISettingsService = get()
-        AutoSyncService(
-            authService = get(),
-            downloadService = get(),
-            manifestProcessor = get(),
-            manifestCache = get(),
-            dataDirectory = dataDir,
-            credentialsProvider = { credentials.load() },
-            optionalModsStateProvider = { serverId ->
-                profiles.getProfile(serverId).optionalModsState
-            },
-            smartyPlanner = get(),
-            settingsProvider = { settings.getSettings() },
+            contentScanner     = get(),
         )
     }
 }
@@ -871,24 +871,14 @@ val appModule = module {
     // the hook can be tested independently if needed.
     single(createdAtStart = true) { AppCoroutineScopeHook(get()) }
 
-    single {
-        val dataDir: Path = get()
-        ProtectedPaths(dataDir.resolve(Storage.PROTECTED_PATHS_FILE), get())
-    }
-
-    // Cache feeds the tray menu's first published DBusMenu layout before
-    // the live fetch returns -- see [ServerListCacheStore] KDoc for the
-    // "(No servers)" placeholder bug it fixes.
-    single<ServerListCacheStore> {
-        val dataDir: Path = get()
-        JsonServerListCacheStore(
-            file = dataDir.resolve(Storage.SERVERS_CACHE_FILE),
-            json = get(),
-        )
-    }
-
-    single<IServerListService> {
-        SmartyCraftServerListService(get(), get(), get(), dashboardCache(), get())
+    // Puts back any fml.toml a session left changed because the launcher closed
+    // before its game did. Once per start, off the boot path.
+    single(createdAtStart = true, qualifier = named("earlyScreenRestore")) {
+        val instances = get<Path>().resolve("instances")
+        get<CoroutineScope>().launch {
+            val n = EarlyLoadingScreen.restoreAll(instances)
+            if (n > 0) LoggerFactory.getLogger("EarlyLoadingScreen").info("Put back fml.toml in {} instance(s)", n)
+        }
     }
 
     // The news archive, read from the site's paginated index rather than from the
@@ -896,10 +886,17 @@ val appModule = module {
     // for twenty showed three. Same channel as the rest of the smartycraft
     // traffic; the dashboard stays the floor when the site cannot be read.
     single<INewsFeed> {
+        val protocol: IServerProtocol = get()
+        val config: ServerProtocolConfig = get()
+        val floor = dashboardNewsCache()
         SmartyCraftNewsFeed(
             clientProvider = get<HttpClientProvider>(),
-            config = get(),
-            dashboard = get(),
+            config = config,
+            dashboardNews = {
+                floor.read("dashboard", forceRefresh = false) {
+                    protocol.loader().news.map { it.toNewsItem(config.baseUrl) }
+                }
+            },
             cache = newsCache(),
         )
     }
@@ -926,24 +923,34 @@ val appModule = module {
     // Pack registry on Xodus (<dataDir>/db): installed PackInstances persisted one
     // entry per id so a mutation is an O(1) put, not a full-file rewrite. Migrates a
     // legacy packs.json on first open (renamed to *.migrated). Empty -> empty list.
-    single<IPackRepository> {
-        val dataDir: Path = get()
-        XodusPackRepository(
-            dbDir = dataDir.resolve("db"),
-            legacyPacksFile = dataDir.resolve(Storage.PACKS_FILE),
-            json = get(),
-        )
-    }
+    single<IPackRepository> { packRegistry(get(), get(), holdOpen = true) }
 
 }
+
+/**
+ * The pack registry for a short-lived process: it opens the database for each
+ * operation and closes it after, so its lock is held for milliseconds. Loaded after
+ * the launcher's modules, it replaces their registry. See [XodusPackRepository].
+ */
+val transientPackRegistryModule = module {
+    single<IPackRepository> { packRegistry(get(), get(), holdOpen = false) }
+}
+
+private fun packRegistry(dataDir: Path, json: Json, holdOpen: Boolean): IPackRepository =
+    XodusPackRepository(
+        dbDir = dataDir.resolve("db"),
+        legacyPacksFile = dataDir.resolve(Storage.PACKS_FILE),
+        json = json,
+        holdOpen = holdOpen,
+    )
 
 // ── Module factories ────────────────────────────────────────────────────────
 
 /**
- * Pack-metadata cache namespaces. Browse listing + per-pack summary change
- * occasionally (serve stale for a day on outage); manifests change on a pack
- * release but pinned-version manifests are immutable (a week stale); Modrinth
- * project / version metadata rarely changes (a version is immutable).
+ * Pack-metadata cache namespaces. The Browse listing is kept for a month and
+ * polled while Browse is open. The per-pack summary changes occasionally and is
+ * served stale for a day on an outage. Manifests change on a pack release, but
+ * pinned-version manifests are immutable and are served stale for a week.
  */
 private fun Scope.smrtPackCaches(): SmrtPackCaches {
     val f: CacheFactory = get()
@@ -952,12 +959,15 @@ private fun Scope.smrtPackCaches(): SmrtPackCaches {
     val day = 24 * hour
     return SmrtPackCaches(
         // An empty listing is not stored. This one is on disk, so a mirror that
-        // answered once with nothing would otherwise serve that nothing for a day,
-        // across restarts -- the case shouldStore is documented for.
+        // answered once with nothing would otherwise serve that nothing for weeks,
+        // across restarts -- the case shouldStore is documented for. Kept long
+        // because it is what Browse draws while it asks: an open Browse polls the
+        // mirror itself (MirrorPackCatalogue), so the TTL is only when an ambient
+        // read considers the copy worth asking about again.
         listing = f.create(
             "pack-listing",
             SmrtPackListing.serializer(),
-            CacheConfig(ttlMs = 5 * min, staleTtlMs = day, shouldStore = { it.packs.isNotEmpty() }),
+            CacheConfig(ttlMs = 5 * min, staleTtlMs = 30 * day, shouldStore = { it.packs.isNotEmpty() }),
         ),
         summary = f.create("pack-summary", SmrtPackSummary.serializer(), CacheConfig(ttlMs = 10 * min, staleTtlMs = day)),
         manifest = f.create("pack-manifest", SmrtPackManifest.serializer(), CacheConfig(ttlMs = 10 * min, staleTtlMs = 7 * day)),
@@ -966,8 +976,21 @@ private fun Scope.smrtPackCaches(): SmrtPackCaches {
 }
 
 /**
- * Modrinth metadata caches. A published project version is immutable, so the
- * version cache keeps a long stale window; project metadata changes rarely.
+ * Modrinth metadata caches, with the two kinds told apart.
+ *
+ * A PUBLISHED VERSION is immutable: its id names one set of files and those files
+ * never change, so it is cached for a month and asked for again only when it falls
+ * out. The catalogue's own launcher says the same thing about the same records and
+ * keeps them effectively forever.
+ *
+ * A PROJECT is not. Its download count, its updated date and its description are
+ * read as current, and this used to hand back an hour-old entry and then anything
+ * up to a week old while a refresh ran behind it. A caller reads once, so the week
+ * old numbers were what the page showed for the whole visit: a mod with two
+ * hundred million downloads reported zero, because the entry predated the field.
+ * Thirty minutes is the catalogue launcher's own figure for the same record. The
+ * long window stays as a fallback for a machine with no network, which is the one
+ * case where an old answer beats no answer.
  */
 private fun Scope.modrinthCaches(): ModrinthCaches {
     val f: CacheFactory = get()
@@ -975,8 +998,32 @@ private fun Scope.modrinthCaches(): ModrinthCaches {
     val hour = 60 * min
     val day = 24 * hour
     return ModrinthCaches(
-        project = f.create("modrinth-project", ModrinthProject.serializer(), CacheConfig(ttlMs = hour, staleTtlMs = 7 * day)),
-        version = f.create("modrinth-version", ModrinthVersion.serializer(), CacheConfig(ttlMs = 7 * day, staleTtlMs = 30 * day)),
+        project = f.create(
+            "modrinth-project",
+            ModrinthProject.serializer(),
+            CacheConfig(ttlMs = 30 * min, staleTtlMs = 7 * day, staleMode = StaleMode.FallbackOnFailure),
+        ),
+        version = f.create(
+            "modrinth-version",
+            ModrinthVersion.serializer(),
+            CacheConfig(ttlMs = 30 * day, staleTtlMs = 90 * day),
+        ),
+    )
+}
+
+/**
+ * Mod icon namespaces, kept on disk so a launch asks the network only about what
+ * is new. A hash names one published file forever and a file is itself for as long
+ * as its path, size and time are, so both are kept for a year. A project's icon can
+ * change, so it is kept for a week and the old one is shown while it is asked again.
+ */
+private fun Scope.modIconCaches(): ModIconCaches {
+    val f: CacheFactory = get()
+    val day = 24 * 60 * 60_000L
+    return ModIconCaches(
+        byHash = f.create("mod-icon-by-hash", String.serializer(), CacheConfig(ttlMs = 7 * day, maxEntries = 2048)),
+        byProject = f.create("mod-icon-by-project", String.serializer(), CacheConfig(ttlMs = 7 * day, maxEntries = 2048)),
+        fileHash = f.create("file-sha1", String.serializer(), CacheConfig(ttlMs = 365 * day, maxEntries = 4096)),
     )
 }
 
@@ -1033,18 +1080,19 @@ private fun Scope.altNewsCache() =
     )
 
 /**
- * In-memory dashboard cache (single-flight + 10-min SWR). The disk seed for the
- * tray stays in ServerListCacheStore (servers-only, read synchronously before
- * any coroutine); empty results don't get stored.
+ * The dashboard payload's news, cached (single-flight + 10-min SWR) so the
+ * archive's floor is not a fresh upstream call every time a page fails to
+ * parse. Empty results are not stored -- an outage must not become the answer
+ * for the next ten minutes.
  */
-private fun Scope.dashboardCache() =
-    get<CacheFactory>().createInMemory<DashboardData>(
-        "dashboard",
+private fun Scope.dashboardNewsCache() =
+    get<CacheFactory>().createInMemory<List<NewsItem>>(
+        "dashboard-news",
         CacheConfig(
             ttlMs = 10 * 60_000L,
             staleTtlMs = Long.MAX_VALUE,
             maxEntries = 4,
-            shouldStore = { it.servers.isNotEmpty() },
+            shouldStore = { it.isNotEmpty() },
         ),
     )
 
@@ -1062,10 +1110,12 @@ private fun Scope.loaderRegistry(): LoaderRegistry {
                 modern = ModernInstallerResolver.forge(get(named("direct")), get(), get(), get(), loaderCacheDir),
             ),
             ModernInstallerResolver.neoforge(get(named("direct")), get(), get(), get(), loaderCacheDir),
-            FabricLikeResolver(get(named("direct")), get(), "fabric", FabricLikeResolver.FABRIC_META),
-            FabricLikeResolver(get(named("direct")), get(), "quilt", FabricLikeResolver.QUILT_META),
-            CleanroomResolver(get(named("direct")), get(), get()),
-            Lwjgl3ifyResolver(get(named("direct")), get()),
+            FabricLikeResolver(get(named("direct")), get(), "fabric", FabricLikeResolver.FABRIC_META, loaderCacheDir),
+            FabricLikeResolver(get(named("direct")), get(), "quilt", FabricLikeResolver.QUILT_META, loaderCacheDir),
+            FabricLikeResolver(get(named("direct")), get(), "legacy-fabric", FabricLikeResolver.LEGACY_FABRIC_META, loaderCacheDir),
+            CleanroomResolver(get(named("direct")), get(), get(), cacheDir = loaderCacheDir),
+            Lwjgl3ifyResolver(get(named("direct")), get(), cacheDir = loaderCacheDir),
+            LiteLoaderResolver(get(named("direct")), get(), cacheDir = loaderCacheDir),
         ),
     )
 }
@@ -1073,6 +1123,13 @@ private fun Scope.loaderRegistry(): LoaderRegistry {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 /** Wraps the given [OkHttpClient] in a Ktor [HttpClient] with our shared timeouts, headers, and JSON content-negotiation. */
+/**
+ * [client] with OkHttp's own redirect following off, so the Ktor client built on
+ * it handles redirects itself. Shares [client]'s pool and dispatcher.
+ */
+internal fun withoutOwnRedirects(client: OkHttpClient): OkHttpClient =
+    client.newBuilder().followRedirects(false).followSslRedirects(false).build()
+
 private fun buildHttpClient(okHttpInstance: OkHttpClient, json: Json): HttpClient =
     HttpClient(OkHttp) {
         engine { preconfigured = okHttpInstance }

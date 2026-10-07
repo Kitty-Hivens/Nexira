@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory
 import java.io.BufferedReader
 import java.io.InputStream
 import java.io.InputStreamReader
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.concurrent.thread
 
 /**
@@ -21,6 +22,7 @@ import kotlin.concurrent.thread
 internal class ProcessLogHandler {
 
     private val gameLog = LoggerFactory.getLogger("hivens.launcher.game")
+    private val log = LoggerFactory.getLogger(ProcessLogHandler::class.java)
 
     /**
      * Connects listeners to process threads.
@@ -29,38 +31,64 @@ internal class ProcessLogHandler {
      *
      * @param process The target process.
      * @param onLog Log line handler function.
+     * @param onDrained Runs once, after both streams have ended and every line
+     *   they carried has gone through [onLog].
      */
-    fun attach(process: Process, onLog: (String, LauncherLogType) -> Unit) {
-        pipeOutput(process.inputStream, LauncherLogType.INFO, onLog)
-        pipeOutput(process.errorStream, LauncherLogType.ERROR, onLog)
+    fun attach(process: Process, onLog: (String, LauncherLogType) -> Unit, onDrained: () -> Unit = {}) {
+        attachStreams(process.inputStream, process.errorStream, onLog, onDrained)
     }
 
-    private fun pipeOutput(stream: InputStream, type: LauncherLogType, onLog: (String, LauncherLogType) -> Unit) {
+    internal fun attachStreams(
+        stdout: InputStream,
+        stderr: InputStream,
+        onLog: (String, LauncherLogType) -> Unit,
+        onDrained: () -> Unit,
+    ) {
+        val open = AtomicInteger(2)
+        val ended = {
+            if (open.decrementAndGet() == 0) {
+                runCatching(onDrained).onFailure { log.warn("Post-drain hook failed", it) }
+            }
+        }
+        pipeOutput(stdout, LauncherLogType.INFO, onLog, ended)
+        pipeOutput(stderr, LauncherLogType.ERROR, onLog, ended)
+    }
+
+    private fun pipeOutput(
+        stream: InputStream,
+        type: LauncherLogType,
+        onLog: (String, LauncherLogType) -> Unit,
+        ended: () -> Unit,
+    ) {
         thread(isDaemon = true) {
-            // `.use { }` guarantees the underlying stream handle is released
-            // when the loop exits (EOF, exception, or process kill). Without
-            // it the reader stayed referenced until GC.
-            BufferedReader(InputStreamReader(stream)).use { reader ->
-                val assembler = LineAssembler(MAX_LINE) { raw -> emit(raw, type, onLog) }
-                val buf = CharArray(READ_CHUNK)
-                try {
-                    // Read raw chunks and split into lines ourselves rather than
-                    // BufferedReader.readLine(): a game whose stdout has no newlines
-                    // (a console layout whose `%n` sits inside an unresolved pattern
-                    // converter never emits one) would otherwise buffer the entire
-                    // run into a single line, delivered at EOF -- no live output, and
-                    // one monster line to render. The assembler falls back to the
-                    // record header and then to a length cap, so such a stream still
-                    // arrives live, per record, and stays renderable.
-                    while (true) {
-                        val n = reader.read(buf)
-                        if (n < 0) break
-                        assembler.feed(buf, n)
+            try {
+                // `.use { }` guarantees the underlying stream handle is released
+                // when the loop exits (EOF, exception, or process kill). Without
+                // it the reader stayed referenced until GC.
+                BufferedReader(InputStreamReader(stream)).use { reader ->
+                    val assembler = LineAssembler(MAX_LINE) { raw -> emit(raw, type, onLog) }
+                    val buf = CharArray(READ_CHUNK)
+                    try {
+                        // Read raw chunks and split into lines ourselves rather than
+                        // BufferedReader.readLine(): a game whose stdout has no newlines
+                        // (a console layout whose `%n` sits inside an unresolved pattern
+                        // converter never emits one) would otherwise buffer the entire
+                        // run into a single line, delivered at EOF -- no live output, and
+                        // one monster line to render. The assembler falls back to the
+                        // record header and then to a length cap, so such a stream still
+                        // arrives live, per record, and stays renderable.
+                        while (true) {
+                            val n = reader.read(buf)
+                            if (n < 0) break
+                            assembler.feed(buf, n)
+                        }
+                        assembler.finish()
+                    } catch (_: Exception) {
+                        // Ignore EOF when terminating the process
                     }
-                    assembler.finish()
-                } catch (_: Exception) {
-                    // Ignore EOF when terminating the process
                 }
+            } finally {
+                ended()
             }
         }
     }

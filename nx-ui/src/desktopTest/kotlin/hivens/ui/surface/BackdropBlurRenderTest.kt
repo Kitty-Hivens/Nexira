@@ -19,8 +19,6 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import hivens.ui.customization.CustomizationSettings
 import hivens.ui.customization.LocalCustomization
-import hivens.ui.theme.DarkColorPalette
-import hivens.ui.theme.LocalNxColors
 import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
@@ -28,6 +26,8 @@ import kotlin.math.abs
 import kotlin.math.sqrt
 import kotlin.test.Test
 import kotlin.test.assertTrue
+import hivens.ui.theme.NxTheme
+import hivens.ui.theme.Themes
 
 /**
  * The [Backdrop] layer has to blur what is actually beneath the surface.
@@ -92,18 +92,14 @@ class BackdropBlurRenderTest {
     }
 
     /**
-     * What a surface that names nothing gets: the form token's radius, without a
-     * switch at the call site to keep in step with it.
-     *
-     * This used to assert both directions by handing the composition a style with
-     * no blur. There is one set of form tokens now and no local to swap, so the
-     * negative half has no expressible input -- what is left is that the default
-     * reaches the pixels at all, which is the half that can actually regress.
+     * What glass that names nothing gets: its kind's own radius, without a switch at
+     * the call site to keep in step with it. A body that names nothing gets none, since
+     * nothing can see through it.
      */
     @Test
-    fun `a surface that names no radius takes the form token's`() {
+    fun `glass that names no radius takes its kind's`() {
         val inherited = scanline(blurDp = null)
-        assertTrue(inherited.spread < 10, "the default radius did not reach the surface: ${inherited.spread}")
+        assertTrue(inherited.spread < 10, "the default radius did not reach the glass: ${inherited.spread}")
     }
 
     private data class Sample(val spread: Double, val red: Int, val green: Int) {
@@ -117,15 +113,14 @@ class BackdropBlurRenderTest {
         blurEnabled: Boolean = true,
     ): Sample {
         val scene = ImageComposeScene(width = W, height = H, density = Density(1f)) {
-            CompositionLocalProvider(
-                LocalNxColors provides DarkColorPalette,
-                LocalCustomization provides CustomizationSettings(surfaceBlur = blurEnabled),
-            ) {
+            NxTheme(Themes.Celestia, dark = true) {
+                CompositionLocalProvider(LocalCustomization provides CustomizationSettings(surfaceBlur = blurEnabled)) {
                 Box(Modifier.fillMaxSize().drawBehind { stripes() }) {
                     if (plate != null) {
                         Box(Modifier.fillMaxSize().drawBehind { drawRect(plate) })
                     }
                     Plate(blurDp)
+                }
                 }
             }
         }
@@ -155,7 +150,9 @@ class BackdropBlurRenderTest {
     @Composable
     private fun Plate(blurDp: Float?) {
         NxSurface(
-            level = NxSurfaceLevel.Base,
+            // Glass when the radius is left to the kind, a body when it is named, so
+            // both halves of the default are under test.
+            kind = if (blurDp == null) SurfaceKind.Chrome else SurfaceKind.Panel,
             modifier = Modifier.offset(SX.dp, SY.dp).size(SW.dp, SH.dp),
             shape = RoundedCornerShape(12.dp),
             blurDp = blurDp,

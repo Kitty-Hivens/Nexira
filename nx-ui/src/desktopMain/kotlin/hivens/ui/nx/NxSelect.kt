@@ -51,10 +51,11 @@ import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.surface.NxSurface
-import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.theme.Motion
-import hivens.ui.theme.NxTheme
 import hivens.ui.theme.Spacing
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.NxInk
+import hivens.ui.surface.SurfaceKind
 
 /** Narrower than this a list of answers is unreadable, whatever the trigger measures. */
 private val SELECT_MIN_WIDTH = 160.dp
@@ -94,7 +95,8 @@ fun <T> NxSelect(
     val density = LocalDensity.current
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
-    val palette = NxTheme.colors
+    val lead = NxColor.lead()
+    val line = NxInk.line
 
     // The caret turns over rather than swapping to a second glyph: one object
     // moving says "this opened" where two glyphs say "something changed".
@@ -105,20 +107,18 @@ fun <T> NxSelect(
     )
     val edge by animateColorAsState(
         targetValue = when {
-            !enabled -> palette.outline.copy(alpha = 0.18f)
-            expanded -> palette.primary
-            hovered  -> palette.primary.copy(alpha = 0.55f)
-            else     -> palette.outline.copy(alpha = 0.35f)
+            !enabled -> line.copy(alpha = 0.5f)
+            expanded -> lead
+            hovered  -> lead.copy(alpha = 0.55f)
+            else     -> line
         },
         animationSpec = Motion.colorShift.of(),
         label = "selectEdge",
     )
-    val ink = if (enabled) palette.textPrimary else palette.textSecondary.copy(alpha = 0.5f)
 
     Box(modifier) {
         NxSurface(
-            level             = NxSurfaceLevel.Sunken,
-            blurDp            = 0f,
+            kind              = SurfaceKind.Field,
             shape             = MaterialTheme.shapes.small,
             borderColor       = edge,
             interactionSource = interaction,
@@ -133,6 +133,8 @@ fun <T> NxSelect(
                     onClick           = { expanded = !expanded },
                 ),
         ) {
+            // Inside the field, so the inks are the ones that read on it.
+            val ink = if (enabled) NxInk.main else NxInk.off
             Row(
                 modifier          = Modifier.fillMaxWidth().padding(horizontal = Spacing.s10, vertical = Spacing.s8),
                 verticalAlignment = Alignment.CenterVertically,
@@ -144,7 +146,7 @@ fun <T> NxSelect(
                 Text(
                     text     = selected?.let(label) ?: placeholder,
                     style    = MaterialTheme.typography.bodySmall,
-                    color    = if (selected == null) palette.textSecondary.copy(alpha = 0.7f) else ink,
+                    color    = if (selected == null) NxInk.quiet else ink,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
@@ -153,7 +155,7 @@ fun <T> NxSelect(
                 Symbol(
                     icon               = NxIcon.ArrowDropDown,
                     contentDescription = null,
-                    tint               = if (expanded) palette.primary else palette.textSecondary,
+                    tint               = if (expanded) NxColor.lead() else NxInk.quiet,
                     size               = 18.dp,
                     modifier           = Modifier.graphicsLayer { rotationZ = caret },
                 )
@@ -205,9 +207,7 @@ private fun <T> SelectList(
     LaunchedEffect(active) { listState.revealItem(active) }
 
     NxSurface(
-        level    = NxSurfaceLevel.Floating,
-        blurDp   = 0f,
-        opacity  = 1f,
+        kind     = SurfaceKind.Popup,
         shape    = MaterialTheme.shapes.medium,
         modifier = Modifier
             .widthIn(min = SELECT_MIN_WIDTH)

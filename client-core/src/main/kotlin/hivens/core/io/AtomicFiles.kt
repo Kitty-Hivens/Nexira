@@ -10,7 +10,7 @@ import java.nio.file.StandardOpenOption
 /**
  * Atomic, crash-durable file writes via the tmp-then-fsync-then-rename pattern,
  * extracted from the four places that had it copy-pasted (JsonPackRepository,
- * LayoutGraphRepository, JsonServerListCacheStore, ManifestCache).
+ * LayoutGraphRepository, ProfilerProfileStore).
  *
  * Sequence: write `<file>.tmp`, fsync its bytes to stable storage, then
  * `Files.move(ATOMIC_MOVE)`, then fsync the parent directory so the rename
@@ -54,6 +54,19 @@ object AtomicFiles {
 
     fun writeBytes(file: Path, content: ByteArray) {
         write(file) { tmp -> Files.write(tmp, content) }
+    }
+
+    /**
+     * [writeString] with the temp file made by [createTmp] before any byte lands, so
+     * the attributes it is created with are the ones the published file carries. The
+     * rename keeps the inode, and with it whatever mode the temp file was given.
+     */
+    internal fun writeStringCreatedBy(file: Path, content: String, createTmp: (Path) -> Unit) {
+        write(file) { tmp ->
+            Files.deleteIfExists(tmp)
+            createTmp(tmp)
+            Files.writeString(tmp, content)
+        }
     }
 
     private inline fun write(file: Path, writeTmp: (Path) -> Unit) = synchronized(stripeFor(file)) {

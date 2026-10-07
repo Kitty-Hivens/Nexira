@@ -43,8 +43,8 @@ data class LoginRequest(
  *   Decrypt via key = first 16 chars of `MD5(uid + AUTH_SALT)`,
  *   `AES/ECB/PKCS5Padding`. We don't decrypt -- pass through to the
  *   game's `--accessToken` argument as-is.
- * - [client]: file manifest the launcher reconciles to local disk
- *   before launch ([hivens.launcher.FileDownloadService] consumes it).
+ * - [client]: the account's file manifest. Carries the patched authlib an
+ *   SC-bound pack launch sources from the SC distribution.
  */
 @Serializable
 data class LoginResponse(

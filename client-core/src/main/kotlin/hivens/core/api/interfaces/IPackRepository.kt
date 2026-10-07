@@ -53,6 +53,27 @@ interface IPackRepository {
      */
     suspend fun put(instance: PackInstance)
 
+    /**
+     * Rewrite the instance with [id] as [transform] returns it, from the record as
+     * it is at the moment of the write. Null when it is not installed or the write
+     * did not happen.
+     *
+     * For a writer that changes some fields and must not carry the rest back from
+     * an older read: playtime recorded at exit, a build committed by an update, an
+     * edit from pack settings. A [get] followed by a [put] loses whatever another
+     * writer stored between the two. This default does exactly that, so a store
+     * shared by concurrent writers overrides it to hold its own lock across both.
+     *
+     * [transform] may run more than once and must not change the id.
+     */
+    suspend fun update(id: String, transform: (PackInstance) -> PackInstance): PackInstance? {
+        val current = get(id) ?: return null
+        val next = transform(current)
+        require(next.id == id) { "update of $id returned ${next.id}" }
+        put(next)
+        return next
+    }
+
     /** Remove the instance with [id]. No-op when not present. */
     suspend fun delete(id: String)
 }

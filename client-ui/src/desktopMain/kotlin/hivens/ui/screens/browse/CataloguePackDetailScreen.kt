@@ -36,7 +36,7 @@ import hivens.ui.components.ImageGallery
 import hivens.ui.components.galleryMedia
 import hivens.ui.components.isPlayableVideoUrl
 import hivens.ui.surface.NxSurface
-import hivens.ui.surface.NxSurfaceLevel
+import hivens.ui.surface.SurfaceKind
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.nx.NxChoiceChip
 import hivens.ui.nx.NxMetaChip
@@ -49,10 +49,12 @@ import hivens.ui.render.openInBrowser
 import hivens.ui.screens.versions.PickerIntent
 import hivens.ui.screens.versions.PickerVersion
 import hivens.ui.screens.versions.VersionPickerWindow
-import hivens.ui.theme.NxTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.Status
 
 /**
  * Source-neutral catalogue detail page. Both the Hivens mirror and Modrinth flow
@@ -205,7 +207,7 @@ fun CataloguePackDetailScreen(
                 contentAlignment = Alignment.Center,
             ) {
                 CircularProgressIndicator(
-                    color       = NxTheme.colors.primary.copy(alpha = 0.55f),
+                    color       = NxColor.wash(NxColor.lead(), 0.55f),
                     strokeWidth = 2.dp,
                     modifier    = Modifier.size(28.dp),
                 )
@@ -265,7 +267,7 @@ fun CataloguePackDetailScreen(
         VersionPickerWindow(
             title = s.versionPickerInstallTitle,
             packName = d.title,
-            packIconUrl = d.iconUrl,
+            packIcon = d.iconUrl,
             versions = rows,
             intentFor = { PickerIntent.Install },
             busyVersionId = installing?.versionId,
@@ -299,7 +301,7 @@ private fun DetailBody(details: CataloguePackDetails, installError: String?) {
     // -- the hero above spans the window, so the block under it hung in the middle
     // with neither edge lining up with anything. One page, one measure.
     NxSurface(
-        level    = NxSurfaceLevel.Raised,
+        kind     = SurfaceKind.Panel,
         modifier = Modifier
             .fillMaxWidth()
             .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 20.dp),
@@ -367,13 +369,13 @@ private fun DetailBody(details: CataloguePackDetails, installError: String?) {
                     Text(
                         text  = s.browseDetailNoDescription,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = NxTheme.colors.textSecondary,
+                        color = NxInk.quiet,
                     )
                 }
             }
 
             if (installError != null) {
-                Text(installError, style = MaterialTheme.typography.bodySmall, color = NxTheme.colors.error)
+                Text(installError, style = MaterialTheme.typography.bodySmall, color = NxColor.status(Status.Error, text = true))
             }
             // No in-page progress block: the activity surface narrates the
             // install, and it survives leaving this page while a block bound to

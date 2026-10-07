@@ -15,14 +15,18 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import hivens.launcher.platform.DataDirMigration
 import hivens.ui.surface.NxCard
+import hivens.ui.surface.NxSurface
+import hivens.ui.surface.SurfaceKind
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.theme.NxTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.nio.file.Path
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.Status
 
 /**
  * Mandatory full-screen migration UI shown on first Nexira launch when
@@ -58,7 +62,7 @@ fun MigrationScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(NxTheme.colors.background),
+            .background(NxColor.page),
         contentAlignment = Alignment.Center,
     ) {
         NxCard(modifier = Modifier.widthIn(min = 480.dp, max = 640.dp)) {
@@ -113,30 +117,30 @@ private fun ReadyContent(
         text = s.migrationWelcome,
         style = MaterialTheme.typography.headlineSmall,
         fontWeight = FontWeight.Bold,
-        color = NxTheme.colors.textPrimary,
+        color = NxInk.main,
     )
     Text(
         text = s.migrationDescription,
         style = MaterialTheme.typography.bodyMedium,
-        color = NxTheme.colors.textSecondary,
+        color = NxInk.quiet,
         textAlign = TextAlign.Center,
     )
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(MaterialTheme.shapes.medium)
-            .background(NxTheme.colors.surface.copy(alpha = 0.4f))
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        PathRow(label = s.migrationFromHeader, path = source.path.toString())
-        PathRow(label = s.migrationToHeader, path = target.toString())
-        Spacer(Modifier.height(4.dp))
-        Text(
-            text = s.migrationSize(megabytes = (source.totalBytes / 1_048_576L).toInt(), files = source.fileCount),
-            style = MaterialTheme.typography.bodySmall,
-            color = NxTheme.colors.textSecondary,
-        )
+    NxSurface(SurfaceKind.Field, Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            PathRow(label = s.migrationFromHeader, path = source.path.toString())
+            PathRow(label = s.migrationToHeader, path = target.toString())
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = s.migrationSize(megabytes = (source.totalBytes / 1_048_576L).toInt(), files = source.fileCount),
+                style = MaterialTheme.typography.bodySmall,
+                color = NxInk.quiet,
+            )
+        }
     }
     NxButton(
         label = s.migrationStart,
@@ -159,13 +163,13 @@ private fun ProgressContent(source: DataDirMigration.Source, state: UiState.InPr
         text = s.migrationInProgress,
         style = MaterialTheme.typography.headlineSmall,
         fontWeight = FontWeight.Bold,
-        color = NxTheme.colors.textPrimary,
+        color = NxInk.main,
     )
     if (state.currentFile != null) {
         Text(
             text = s.migrationCurrentFile(state.currentFile),
             style = MaterialTheme.typography.bodySmall,
-            color = NxTheme.colors.textSecondary,
+            color = NxInk.quiet,
             fontFamily = LocalMonoFamily.current,
             textAlign = TextAlign.Center,
         )
@@ -176,15 +180,15 @@ private fun ProgressContent(source: DataDirMigration.Source, state: UiState.InPr
             .fillMaxWidth()
             .height(8.dp)
             .clip(RoundedCornerShape(4.dp)),
-        color = NxTheme.colors.primary,
-        trackColor = NxTheme.colors.surface,
+        color = NxColor.lead(),
+        trackColor = NxColor.wash(NxInk.quiet, 0.25f),
         gapSize = 0.dp,
         drawStopIndicator = {},
     )
     Text(
         text = s.migrationProgressBytes(doneMb = doneMb, totalMb = totalMb),
         style = MaterialTheme.typography.bodySmall,
-        color = NxTheme.colors.textSecondary,
+        color = NxInk.quiet,
         fontWeight = FontWeight.Bold,
     )
 }
@@ -196,12 +200,12 @@ private fun CompletedContent(onQuit: () -> Unit) {
         text = s.migrationCompletedTitle,
         style = MaterialTheme.typography.headlineSmall,
         fontWeight = FontWeight.Bold,
-        color = NxTheme.colors.success,
+        color = NxColor.status(Status.Success, text = true),
     )
     Text(
         text = s.migrationCompletedBody,
         style = MaterialTheme.typography.bodyMedium,
-        color = NxTheme.colors.textSecondary,
+        color = NxInk.quiet,
         textAlign = TextAlign.Center,
     )
     NxButton(
@@ -219,12 +223,12 @@ private fun FailedContent(error: String, onRetry: () -> Unit, onQuit: () -> Unit
         text = s.migrationFailedTitle,
         style = MaterialTheme.typography.headlineSmall,
         fontWeight = FontWeight.Bold,
-        color = NxTheme.colors.error,
+        color = NxColor.status(Status.Error, text = true),
     )
     Text(
         text = s.migrationFailedBody(error),
         style = MaterialTheme.typography.bodyMedium,
-        color = NxTheme.colors.textSecondary,
+        color = NxInk.quiet,
         textAlign = TextAlign.Center,
     )
     Row(
@@ -253,13 +257,13 @@ private fun PathRow(label: String, path: String) {
             text = "$label:",
             style = MaterialTheme.typography.bodySmall,
             fontWeight = FontWeight.Bold,
-            color = NxTheme.colors.textSecondary,
+            color = NxInk.quiet,
             modifier = Modifier.width(64.dp),
         )
         Text(
             text = path,
             style = MaterialTheme.typography.bodySmall,
-            color = NxTheme.colors.textPrimary,
+            color = NxInk.main,
             fontFamily = LocalMonoFamily.current,
         )
     }

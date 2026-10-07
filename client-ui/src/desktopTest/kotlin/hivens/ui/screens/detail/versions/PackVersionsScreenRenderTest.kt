@@ -1,6 +1,7 @@
 package hivens.ui.screens.detail.versions
 
 import androidx.compose.foundation.background
+import hivens.core.launch.InstanceWorkRegistry
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.ImageComposeScene
@@ -55,6 +56,7 @@ import java.nio.file.Path
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertTrue
+import hivens.ui.settle
 
 /**
  * Off-screen render smoke of the pack versions screen with a scripted mirror:
@@ -187,13 +189,13 @@ class PackVersionsScreenRenderTest {
                 // The screen narrates whatever operation the instance is running,
                 // its own switch included, so it reaches for the app-scoped owner.
                 single { InstanceSizeService(dataDir = Path.of("/tmp/render"), scope = scope) }
-                single { PackOperationService(scope = scope, sizes = get()) }
+                single { PackOperationService(scope = scope, sizes = get(), work = InstanceWorkRegistry()) }
             })
         }
         val out = Path.of("build/render", name)
         Files.createDirectories(out.parent)
         val scene = ImageComposeScene(width, height, density = Density(1f)) {
-            NxTheme(useDarkTheme = true) {
+            NxTheme(dark = true) {
                 Box(Modifier.fillMaxSize().background(Color(BACKDROP))) {
                     PackVersionsScreen(instanceId = "1", onBack = {})
                 }
@@ -204,12 +206,7 @@ class PackVersionsScreenRenderTest {
             // Pump frames so the screen's suspend loads (build list, preview, diff)
             // land before the captured frame -- a single render would freeze the
             // initial spinner. Wall-clock sleeps let the IO-dispatched fakes hop back.
-            var frameNanos = 0L
-            repeat(40) {
-                scene.render(frameNanos)
-                frameNanos += 16_000_000L
-                Thread.sleep(10)
-            }
+            val frameNanos = scene.settle(frames = 40, sleepMs = 10)
             val frame = scene.render(frameNanos)
             Files.write(out, frame.encodeToData(EncodedImageFormat.PNG)?.bytes ?: error("PNG encode failed"))
             painted = paintedFraction(frame)

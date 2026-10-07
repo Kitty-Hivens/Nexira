@@ -1,6 +1,8 @@
 package hivens.ui.editor.palette
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.border
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -8,6 +10,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -29,6 +34,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
@@ -45,13 +51,21 @@ import hivens.ui.editor.windowPointToSlotDp
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.theme.NxTheme
+import hivens.ui.surface.NxSurface
+import hivens.ui.surface.SurfaceKind
+import hivens.ui.theme.OnFill
 import hivens.ui.theme.LocalMonoFamily
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.WidgetDescriptor
-import hivens.widget.model.SlotOrientation
-import hivens.widget.model.seededCanvasPlacement
+import hivens.widget.model.FlowSpec
+import hivens.widget.model.ViewportMode
+import hivens.widget.model.latticeTransposed
+import hivens.widget.model.viewportMode
+import hivens.widget.model.seedPlacement
+import hivens.widget.model.WidgetSizing
 import hivens.widget.model.traverse
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
 
 // Palette row. Click + drag from the row drops the widget into the
 // hit-tested slot under the cursor. The ghost is a labeled chip rather
@@ -66,6 +80,7 @@ fun PaletteItem(
     controller: DragController,
     registry: DropTargetRegistry,
     editController: EditModeController,
+    previews: WidgetPreviewHost,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val isHovered by interaction.collectIsHoveredAsState()
@@ -74,7 +89,7 @@ fun PaletteItem(
     // restarts -- its pointerInput is keyed on the payload, which is the same
     // value for the row's whole life -- so a plain read here would freeze the
     // graph at the first drag from this row. Every drop after that resolved the
-    // target slot's orientation and widget count from a layout that had since
+    // target slot's mode and widget count from a layout that had since
     // moved on: three widgets from one row into a canvas all seeded from the same
     // count and landed on top of each other.
     val graph by rememberUpdatedState(LocalLayoutGraph.current)
@@ -83,11 +98,11 @@ fun PaletteItem(
     val label = s.widgetLabel(descriptor.displayName)
     val density = LocalDensity.current.density
 
-    val background = if (isHovered) NxTheme.colors.primary.copy(alpha = 0.12f)
+    val background = if (isHovered) NxColor.wash(NxColor.lead(), 0.12f)
                      else Color.Transparent
 
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
+    val preview = rememberWidgetPreview(previews, descriptor.kind)
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .hoverable(interaction)
@@ -98,122 +113,283 @@ fun PaletteItem(
                 controller            = controller,
                 payload               = DragPayload.PaletteWidget(descriptor.kind),
                 widgetBoundsProvider  = { rowBounds },
-                ghost                 = { PaletteGhost(displayName = label) },
+                // The picture the tile is showing, carried out under the pointer.
+                // A ghost that is the widget answers "what am I placing" in the
+                // same breath as "how much room does it take".
+                ghost                 = {
+                    PaletteGhost(displayName = label, sizing = descriptor.sizing, preview = preview)
+                },
                 onDragEnd             = { pointer ->
                     val targetPath = registry.slotForPoint(pointer) ?: return@dragSource
                     val target = graph.traverse(targetPath)
-                    if (target?.orientation == SlotOrientation.Canvas) {
-                        // Free placement: drop at the release point (pointer ->
-                        // slot-local dp via the slot's reported window origin).
-                        // Fall back to a staggered seed if the slot has not
-                        // reported bounds. seed carries the default size/z.
-                        val seed = seededCanvasPlacement(target.widgets.size)
-                        val origin = registry.slotOrigin(targetPath)
-                        val placement = if (origin != null) {
-                            val (xDp, yDp) = windowPointToSlotDp(pointer.x, pointer.y, origin.x, origin.y, density)
-                            seed.copy(x = xDp.coerceAtLeast(0f), y = yDp.coerceAtLeast(0f))
+                    if (target != null && target.flow == null) {
+                        // A placement slot needs the widget to arrive somewhere, and
+                        // where depends on what it measures in. A free slot takes the
+                        // release point, converted from the window through the slot's
+                        // reported origin. A lattice takes the first free cell instead:
+                        // the pointer names a dp, and turning that into a cell needs
+                        // geometry this row does not have and the model already knows.
+                        val seed = seedPlacement(target.widgets.size, target.grid, target.widgets, target.latticeTransposed)
+                        // The whole slot rather than the part on screen: on a page that
+                        // has been scrolled, the slot's origin is above the window, and a
+                        // drop converted against the visible top would land a scroll
+                        // short of where it was let go.
+                        val slotRect = registry.slotContentRect(targetPath)
+                        // A map has no edges, so a drop anywhere on it lands where it was let
+                        // go, left of the origin and above it included.
+                        val onMap = target.viewportMode == ViewportMode.Map
+                        val placement = if (onMap && slotRect != null) {
+                            val (xDp, yDp) = windowPointToSlotDp(pointer.x, pointer.y, slotRect.left, slotRect.top, density)
+                            seed.copy(x = xDp, y = yDp)
+                        } else if (target.grid == 0 && slotRect != null) {
+                            val (xDp, yDp) = windowPointToSlotDp(
+                                pointer.x, pointer.y, slotRect.left, slotRect.top, density,
+                            )
+                            // Released near the far edge, a widget born at the raw
+                            // point starts there and hangs out of the slot, with only
+                            // the renderer's own grab margin keeping any of it
+                            // reachable. The floor at zero was the only bound there
+                            // was. A ceiling as well, so a drop anywhere inside the
+                            // slot puts the whole widget inside the slot.
+                            // Position only. Seeding the declared size as a claim
+                            // as well looked tidy and was not: a claim is a
+                            // maximum, and a widget whose height grows with a
+                            // setting was then clipped by the size it arrived at.
+                            // The resize handle does not need it either, it reads
+                            // the measured bounds when there is no claim.
+                            seed.copy(
+                                x = xDp.coerceIn(0f, ((slotRect.width / density) - DROP_INSET_DP).coerceAtLeast(0f)),
+                                y = yDp.coerceIn(0f, ((slotRect.height / density) - DROP_INSET_DP).coerceAtLeast(0f)),
+                            )
                         } else {
                             seed
                         }
                         editController.addWidget(
                             targetPath, descriptor.kind, descriptor.slots,
-                            index   = target.widgets.size,
-                            canvas  = placement,
-                            surface = descriptor.defaultSurface,
+                            index     = target.widgets.size,
+                            placement = placement,
                         )
                     } else {
-                        val orientation = target?.orientation ?: SlotOrientation.Column
-                        val index = registry.insertionIndexInSlot(targetPath, pointer, orientation)
-                        editController.addWidget(targetPath, descriptor.kind, descriptor.slots, index, surface = descriptor.defaultSurface)
+                        val flow = target?.flow ?: FlowSpec.Column
+                        val index = registry.insertionIndexInSlot(targetPath, pointer, flow)
+                        // No plane copied onto the new instance: resolveSurface reads the
+                        // declaration whenever the instance names none, the same as for a
+                        // widget the bundled layout places. A copy froze today's declaration
+                        // into it and drifted the first time the widget's own changed.
+                        editController.addWidget(targetPath, descriptor.kind, descriptor.slots, index)
                     }
                 },
             )
-            .padding(horizontal = 10.dp, vertical = 8.dp),
+            .padding(6.dp),
     ) {
-        // Tiny icon block -- first letter of displayName as a kind of
-        // visual anchor. When Phase 5 widget-supplied previews land,
-        // this slot becomes the real widget thumbnail.
-        Box(
-            modifier = Modifier
-                .size(32.dp)
-                .clip(RoundedCornerShape(6.dp))
-                .background(NxTheme.colors.primary.copy(alpha = 0.20f)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text       = label.firstOrNull()?.uppercase() ?: "?",
-                style      = MaterialTheme.typography.titleMedium,
-                color      = NxTheme.colors.primary,
-                fontWeight = FontWeight.SemiBold,
-            )
-        }
-        Spacer(Modifier.width(10.dp))
-        Column(Modifier.weight(1f)) {
-            Text(
-                text       = label,
-                style      = MaterialTheme.typography.bodyMedium,
-                color      = NxTheme.colors.textPrimary,
-                fontWeight = FontWeight.Medium,
-                maxLines   = 1,
-                overflow   = TextOverflow.Ellipsis,
-            )
-            Text(
-                text       = descriptor.kind.value,
-                style      = MaterialTheme.typography.labelSmall,
-                color      = NxTheme.colors.textSecondary,
-                fontFamily = LocalMonoFamily.current,
-                maxLines   = 1,
-                overflow   = TextOverflow.Ellipsis,
-            )
-        }
-        Symbol(icon = NxIcon.DragIndicator,
-            contentDescription = null,
-            tint               = NxTheme.colors.textSecondary.copy(alpha = if (isHovered) 0.9f else 0.45f),
-            modifier           = Modifier.size(18.dp),
+        WidgetThumbnail(preview = preview, label = label, sizing = descriptor.sizing)
+        Spacer(Modifier.height(5.dp))
+        Text(
+            text       = label,
+            style      = MaterialTheme.typography.labelMedium,
+            color      = NxInk.main,
+            fontWeight = FontWeight.Medium,
+            maxLines   = 1,
+            overflow   = TextOverflow.Ellipsis,
+        )
+        Text(
+            // The footprint where the widget named one, its kind where it did not.
+            // Both are the same question asked of the tile: what is this, and how
+            // much of my surface is it about to take.
+            text       = descriptor.sizing.footprintLabel() ?: descriptor.kind.value,
+            style      = MaterialTheme.typography.labelSmall,
+            color      = NxInk.quiet,
+            fontFamily = LocalMonoFamily.current,
+            maxLines   = 1,
+            overflow   = TextOverflow.Ellipsis,
         )
     }
 }
 
+/** "200x230" for a widget that declared a preferred size, null for one that did not. */
+private fun WidgetSizing.footprintLabel(): String? =
+    if (prefWidth > 0 && prefHeight > 0) "${prefWidth}x$prefHeight" else null
+
+/**
+ * The picture on a tile.
+ *
+ * The widget itself once it has been drawn, letterboxed into the tile at its own
+ * proportions so a column reads as a column and a token as a token. Its letter
+ * until then, and for good if it declined to compose: a widget is free to need a
+ * context the palette cannot hand it, and a blank tile would say less than the
+ * letter the palette has always shown.
+ */
 @Composable
-private fun PaletteGhost(displayName: String) {
+private fun WidgetThumbnail(preview: WidgetPreview, label: String, sizing: WidgetSizing) {
+    NxSurface(
+        kind          = SurfaceKind.Card,
+        modifier      = Modifier
+            .fillMaxWidth()
+            .aspectRatio(thumbRatio(sizing)),
+        shape         = RoundedCornerShape(8.dp),
+        borderWidthDp = 0f,
+    ) {
+        when (preview) {
+            is WidgetPreview.Drawn -> Image(
+                bitmap             = preview.image,
+                contentDescription = label,
+                // Fit, not crop: the whole widget or nothing, because a cropped
+                // preview of a wide widget is a picture of its middle. The frame
+                // around it was already trimmed off when it was rendered.
+                contentScale       = ContentScale.Fit,
+                modifier           = Modifier.fillMaxSize().padding(4.dp),
+            )
+            else -> {
+                val tile = NxColor.wash(NxColor.lead(), 0.20f)
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .size(32.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(tile),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    OnFill(tile) {
+                        Text(
+                            text       = label.firstOrNull()?.uppercase() ?: "?",
+                            style      = MaterialTheme.typography.titleMedium,
+                            color      = NxColor.lead(text = true),
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * The shape of a tile, from what the widget declared rather than from its picture.
+ *
+ * The widget's own proportions, within what a tile can hold: a fixed box put a
+ * 340 by 48 control in the middle of two thirds of nothing, and a clock at 200 by
+ * 230 into a letterbox. The floor keeps a tall widget from taking a whole panel
+ * of height for itself, the ceiling keeps a long thin one from flattening the row
+ * it shares.
+ *
+ * Read from the declaration and not from the bitmap, because the bitmap is not
+ * there yet. A tile that took its shape from its preview held a guessed shape
+ * until the preview landed and then changed height under a reader who was
+ * scrolling, one tile at a time, in whatever order the renders finished. The
+ * declaration is the same frame the preview is drawn into, so the picture fits
+ * the shape it finds and the shape never moves.
+ *
+ * A widget that declares nothing gets the frame [frameFor] draws it in, which is
+ * a stable answer rather than a right one. Its picture is letterboxed inside.
+ */
+internal fun thumbRatio(sizing: WidgetSizing): Float {
+    val frame = frameFor(sizing)
+    return (frame.width / frame.height).coerceIn(MIN_THUMB_RATIO, MAX_THUMB_RATIO)
+}
+
+private const val MIN_THUMB_RATIO = 0.85f
+private const val MAX_THUMB_RATIO = 2.6f
+
+/**
+ * What follows the pointer out of the palette.
+ *
+ * A label chip rather than the real widget: a @Composable exception cannot be
+ * caught mid-composition, so rendering a surface-context-dependent widget during
+ * a palette drag crashes every frame.
+ *
+ * Inside the footprint the widget declared, when it declares one. The chip alone
+ * said what was being added and nothing about how much room it takes, so the only
+ * way to find out was to drop it and look. A widget that declares no preferred
+ * size still gets the bare chip, because an invented rectangle would be worse
+ * than none.
+ */
+@Composable
+private fun PaletteGhost(displayName: String, sizing: WidgetSizing, preview: WidgetPreview) {
+    val w = sizing.prefWidth
+    val h = sizing.prefHeight
+    if (w <= 0 || h <= 0) {
+        PaletteGhostChip(displayName)
+        return
+    }
+    Box(
+        modifier = Modifier
+            .size(w.dp, h.dp)
+            .clip(RoundedCornerShape(10.dp))
+            // Translucent on purpose: the slot the ghost is over has to show through it.
+            .background(NxColor.lead().copy(alpha = 0.16f))
+            .border(2.dp, NxColor.lead().copy(alpha = 0.8f), RoundedCornerShape(10.dp)),
+        contentAlignment = Alignment.Center,
+    ) {
+        // The widget itself where the gallery has it, at the size it will land at,
+        // so what is under the pointer is what the slot is about to hold. Faded,
+        // because it is not there yet.
+        if (preview is WidgetPreview.Drawn) {
+            Image(
+                bitmap             = preview.image,
+                contentDescription = null,
+                contentScale       = ContentScale.Fit,
+                alpha              = 0.85f,
+                modifier           = Modifier.fillMaxSize().padding(2.dp),
+            )
+        } else {
+            PaletteGhostChip(displayName)
+        }
+    }
+}
+
+@Composable
+private fun PaletteGhostChip(displayName: String) {
+    val fill = NxColor.lead()
+    val ink = NxColor.on(fill)
     Surface(
-        color           = NxTheme.colors.primary,
-        contentColor    = Color.White,
+        color           = fill,
+        contentColor    = ink,
         shape           = RoundedCornerShape(10.dp),
         shadowElevation = 10.dp,
         modifier        = Modifier.shadow(elevation = 12.dp, shape = RoundedCornerShape(10.dp)),
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(24.dp)
-                    .clip(RoundedCornerShape(5.dp))
-                    .background(Color.White.copy(alpha = 0.18f)),
-                contentAlignment = Alignment.Center,
+        OnFill(fill) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
             ) {
+                Box(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .clip(RoundedCornerShape(5.dp))
+                        .background(NxColor.wash(ink, 0.18f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text       = displayName.firstOrNull()?.uppercase() ?: "?",
+                        style      = MaterialTheme.typography.labelLarge,
+                        color      = ink,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+                Spacer(Modifier.width(8.dp))
                 Text(
-                    text       = displayName.firstOrNull()?.uppercase() ?: "?",
-                    style      = MaterialTheme.typography.labelLarge,
-                    color      = Color.White,
+                    text       = displayName,
+                    style      = MaterialTheme.typography.bodyMedium,
+                    color      = ink,
                     fontWeight = FontWeight.SemiBold,
                 )
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    text  = "→ drop",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = NxColor.wash(ink, 0.75f),
+                )
             }
-            Spacer(Modifier.width(8.dp))
-            Text(
-                text       = displayName,
-                style      = MaterialTheme.typography.bodyMedium,
-                color      = Color.White,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Spacer(Modifier.width(10.dp))
-            Text(
-                text  = "→ drop",
-                style = MaterialTheme.typography.labelSmall,
-                color = Color.White.copy(alpha = 0.75f),
-            )
         }
     }
 }
+
+/**
+ * How far in from the far edge of a slot a palette drop can land.
+ *
+ * Not the widget's own size, which nothing knows before it is mounted, so this
+ * is the same floor a placed widget is held to: enough of it is inside that it
+ * can be seen and grabbed, and moving it the rest of the way is a drag.
+ */
+private const val DROP_INSET_DP = 48f

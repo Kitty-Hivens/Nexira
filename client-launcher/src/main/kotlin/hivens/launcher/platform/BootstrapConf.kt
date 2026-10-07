@@ -1,5 +1,6 @@
 package hivens.launcher.platform
 
+import hivens.core.io.AtomicFiles
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
@@ -27,16 +28,19 @@ import java.nio.file.Paths
  *   - `data-dir`                -- absolute path of user-chosen data dir
  *   - `data-dir-pending-source` -- set by UI when scheduling a move
  *   - `data-dir-pending-target` -- set by UI when scheduling a move
+ *   - `data-dir-stale-source`   -- the old data dir after a committed move,
+ *     until the next start manages to delete what this one could not
  *
  * Lines that don't match `key=value` are ignored on read; lines
  * starting with `#` are also dropped on read. The writer preserves
  * only known keys (no comment passthrough), so a hand-added `#`-line
  * survives until the next launcher-side write and then disappears.
  *
- * Concurrency: every operation is file-system-atomic (`Files.writeString`
- * is atomic on POSIX, atomic-on-rename on Windows). The launcher only
- * writes during user-initiated UI actions or at startup, so no
- * concurrent-writer scenario.
+ * Concurrency: a write goes through [AtomicFiles], so a reader sees the old file
+ * or the new one and never a torn one. It used to be a plain `Files.writeString`,
+ * which truncates first: a kill in between lost the `data-dir` override, and the
+ * launcher then came up on the default directory with none of the user's data
+ * in it. [update] reads, changes and writes under one lock.
  */
 object BootstrapConf {
     // Lazy logger -- BootstrapConf is touched during Main.kt's
@@ -47,6 +51,7 @@ object BootstrapConf {
     const val KEY_DATA_DIR = "data-dir"
     const val KEY_PENDING_SOURCE = "data-dir-pending-source"
     const val KEY_PENDING_TARGET = "data-dir-pending-target"
+    const val KEY_STALE_SOURCE = "data-dir-stale-source"
 
     /** Default location -- overridable in tests via [read] / [write] / [update] params. */
     fun defaultPath(): Path = Paths.get(System.getProperty("user.home", "."), ".nexira.conf")
@@ -84,13 +89,14 @@ object BootstrapConf {
                 .entries
                 .sortedBy { it.key }
                 .joinToString(separator = System.lineSeparator()) { (k, v) -> "$k=$v" }
-            Files.writeString(file, text + System.lineSeparator())
+            AtomicFiles.writeString(file, text + System.lineSeparator())
         } catch (e: Exception) {
             log.warn("Failed to write bootstrap conf {}: {}", file, e.message)
         }
     }
 
-    /** Read, mutate, write back. */
+    /** Read, mutate, write back, as one step. */
+    @Synchronized
     fun update(file: Path = defaultPath(), block: (MutableMap<String, String>) -> Unit) {
         val current = read(file).toMutableMap()
         block(current)

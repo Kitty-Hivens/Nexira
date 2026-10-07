@@ -19,7 +19,6 @@ import kotlin.test.assertTrue
 /**
  * End-to-end proof that the canvas virtualizes: rendering a 5000-line buffer into a
  * small viewport must measure only ~a viewport of lines, not the whole buffer.
- * This is the render-path counterpart to ConsolePerfBench's isolated numbers.
  */
 class LogCanvasRenderTest {
 
@@ -66,7 +65,7 @@ class LogCanvasRenderTest {
         }
         try {
             var f = 0L
-            repeat(6) { scene.render(f); f += 16_000_000L }
+            repeat(6) { scene.render(f).close(); f += 16_000_000L }
         } finally {
             scene.close()
         }

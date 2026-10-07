@@ -6,6 +6,7 @@ import hivens.core.update.FileAction
 import hivens.core.update.LauncherPatch
 import hivens.core.update.LauncherUpdatePlan
 import hivens.core.io.AtomicFiles
+import hivens.core.io.resolveWithinRoot
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
@@ -42,14 +43,23 @@ class UpdateStager(private val layout: InstallLayout, private val source: AssetS
 
     fun stage(plan: LauncherUpdatePlan, remote: FileManifest): StagedUpdate {
         val staging = layout.stagingDir
+        // The files an interrupted apply has yet to move are in staging, and a
+        // resume reads a missing one as already moved. Clearing it now would have
+        // the resume record a version whose files never arrived.
+        check(!Files.exists(layout.applyMarker)) {
+            "an interrupted update has not been finished yet; staging still holds its files"
+        }
         cleanStaging(staging)
         Files.createDirectories(staging)
         val remoteFlat = remote.flatten()
         val staged = LinkedHashMap<String, Path>()
 
+        // Every path below comes from the remote manifest, so each is held inside the
+        // directory it is meant for: a `..` in a release document must not reach
+        // outside staging or read a file from outside the install.
         for (action in plan.actions) when (action) {
             is FileAction.Download -> {
-                val dest = staging.resolve(action.path)
+                val dest = resolveWithinRoot(staging, action.path)
                 dest.parent?.let { Files.createDirectories(it) }
                 source.fetchFile(action.path, dest)
                 verify(dest, remoteFlat[action.path]?.sha256, action.path)
@@ -57,12 +67,12 @@ class UpdateStager(private val layout: InstallLayout, private val source: AssetS
             }
 
             is FileAction.Patch -> {
-                val patchTmp = staging.resolve(action.path + ".patch")
+                val patchTmp = resolveWithinRoot(staging, action.path + ".patch", action.path)
                 patchTmp.parent?.let { Files.createDirectories(it) }
                 source.fetchPatch(action.patch, patchTmp)
-                val dest = staging.resolve(action.path)
+                val dest = resolveWithinRoot(staging, action.path)
                 // Patch the CURRENTLY installed file into the target.
-                BinaryPatch.apply(layout.root.resolve(action.path), patchTmp, dest)
+                BinaryPatch.apply(resolveWithinRoot(layout.root, action.path), patchTmp, dest)
                 Files.deleteIfExists(patchTmp)
                 // Verify the RESULT, not the patch -- a wrong patch cannot slip through.
                 verify(dest, remoteFlat[action.path]?.sha256, action.path)
@@ -106,14 +116,18 @@ internal data class ApplyCommit(
 class LayoutApplier(private val layout: InstallLayout) {
     private val log = LoggerFactory.getLogger(LayoutApplier::class.java)
     private val json = Json { encodeDefaults = true }
-    private val marker: Path get() = layout.stagingDir.resolve(".commit.json")
+    private val marker: Path get() = layout.applyMarker
+
+    /** An apply started moving files and has not committed; [recover] finishes it. */
+    val hasPendingApply: Boolean get() = Files.exists(marker)
 
     fun apply(staged: StagedUpdate, newManifest: FileManifest, newVersion: String) {
+        val pending = ApplyCommit(newVersion, staged.staged.keys.toList(), staged.deletes)
+        // Before the marker, so a path that would leave the install refuses the
+        // whole apply while nothing has moved yet.
+        targetsOf(pending)
         Files.createDirectories(layout.stagingDir)
-        AtomicFiles.writeString(marker, json.encodeToString(
-            ApplyCommit.serializer(),
-            ApplyCommit(newVersion, staged.staged.keys.toList(), staged.deletes),
-        ))
+        AtomicFiles.writeString(marker, json.encodeToString(ApplyCommit.serializer(), pending))
         commit(newManifest)
     }
 
@@ -126,8 +140,11 @@ class LayoutApplier(private val layout: InstallLayout) {
         }
         val manifest = remoteManifestFor(commit.version)
         if (manifest == null) {
-            log.warn("apply recovery: no manifest for {}, abandoning marker", commit.version)
-            Files.deleteIfExists(m); return
+            // Kept for the next start. Dropping it left the layout half applied with
+            // the old manifest recorded, and every delta after that patched files
+            // that were already new and failed verification for good.
+            log.warn("apply recovery: no manifest for {} yet, keeping the marker for the next attempt", commit.version)
+            return
         }
         log.info("resuming interrupted apply to {}", commit.version)
         commitFrom(commit, manifest)
@@ -141,19 +158,30 @@ class LayoutApplier(private val layout: InstallLayout) {
         commitFrom(commit, newManifest)
     }
 
+    /**
+     * Every path [commit] touches, resolved and held inside its directory. Throws
+     * on the first one that leaves it, before anything is moved.
+     */
+    private fun targetsOf(commit: ApplyCommit): Pair<List<Pair<Path, Path>>, List<Path>> {
+        val moves = commit.moves.map { rel ->
+            resolveWithinRoot(layout.stagingDir, rel) to resolveWithinRoot(layout.root, rel)
+        }
+        val deletes = commit.deletes.map { rel -> resolveWithinRoot(layout.root, rel) }
+        return moves to deletes
+    }
+
     private fun commitFrom(commit: ApplyCommit, newManifest: FileManifest) {
+        val (moves, deletes) = targetsOf(commit)
         // Moves: a staged file still present is moved in; one already moved (resumed
         // run) is simply absent from staging and skipped.
-        for (rel in commit.moves) {
-            val from = layout.stagingDir.resolve(rel)
+        for ((from, to) in moves) {
             if (!Files.exists(from)) continue
-            val to = layout.root.resolve(rel)
             to.parent?.let { Files.createDirectories(it) }
             moveInto(from, to)
         }
-        for (rel in commit.deletes) {
-            runCatching { Files.deleteIfExists(layout.root.resolve(rel)) }
-                .onFailure { log.warn("apply: failed to delete {}", rel, it) }
+        for (target in deletes) {
+            runCatching { Files.deleteIfExists(target) }
+                .onFailure { log.warn("apply: failed to delete {}", target, it) }
         }
         // The Leyden AOT cache is built against the app jar's exact bytes. If this apply
         // changed the jar, the shipped cache is stale -- drop it so startup regenerates a

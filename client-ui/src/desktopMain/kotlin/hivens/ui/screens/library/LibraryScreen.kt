@@ -13,7 +13,6 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -37,7 +36,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
@@ -54,7 +52,6 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
-import hivens.ui.nx.NxChoiceChip
 import hivens.ui.nx.NxContextMenu
 import hivens.ui.nx.NxField
 import hivens.ui.nx.NxMenuAlign
@@ -64,9 +61,8 @@ import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetField
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.surface.NxSurface
-import hivens.ui.surface.NxSurfaceLevel
+import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.Motion
-import hivens.ui.theme.NxTheme
 import hivens.ui.theme.Dimens
 import hivens.ui.utils.pickFile
 import hivens.ui.utils.rememberFileDialogSettings
@@ -82,6 +78,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 import java.nio.file.Path
+import java.util.UUID
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.Status
 
 /**
  * Library = user's collection of installed packs. The bottom-right action opens
@@ -171,8 +171,12 @@ fun LibraryScreen(
                 settings = importDialogSettings,
             )
             val file = Path.of(picked?.path ?: return@launch)
+            // Keyed on the whole path, for the reason a create gets its own key: keyed
+            // on the name, a second `pack.mrpack` from another folder, picked while the
+            // first was still unpacking, was dropped without a word. The same file
+            // picked twice is still one import.
             importKey = installService.run(
-                key   = "import:${file.fileName}",
+                key   = "import:${file.toAbsolutePath().normalize()}",
                 title = file.fileName.toString(),
             ) { reserve, progress -> importService.import(file, reserve, progress) }
         }
@@ -180,7 +184,9 @@ fun LibraryScreen(
 
     fun startCreate(name: String, mc: String, loader: String?, loaderVersion: String) {
         showCreate = false
-        createKey = installService.run(key = "create:$name", title = name) { reserve, progress ->
+        // Its own key per create: keyed on the name, a second pack of the same name
+        // started while the first ran was a silent no-op after the dialog had closed.
+        createKey = installService.run(key = "create:${UUID.randomUUID()}", title = name) { reserve, progress ->
             creator.create(name, mc, loader, loaderVersion, reserve, progress)
         }
     }
@@ -210,7 +216,7 @@ fun LibraryScreen(
                 Text(
                     text = err,
                     style = MaterialTheme.typography.bodySmall,
-                    color = NxTheme.colors.error,
+                    color = NxColor.status(Status.Error, text = true),
                     modifier = Modifier.align(Alignment.BottomStart)
                         .padding(start = 24.dp, end = 96.dp, bottom = 34.dp)
                         .clickable {
@@ -226,13 +232,15 @@ fun LibraryScreen(
             }
 
             Box(Modifier.align(Alignment.BottomEnd).padding(24.dp)) {
+                val lead = NxColor.lead()
+                val onLead = NxColor.on(lead)
                 FloatingActionButton(
                     onClick = { menuOpen = true },
-                    containerColor = NxTheme.colors.primary,
-                    contentColor = Color.White,
+                    containerColor = lead,
+                    contentColor = onLead,
                 ) {
                     if (importing || creating) {
-                        CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
+                        CircularProgressIndicator(color = onLead, strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
                     } else {
                         Symbol(NxIcon.Add, contentDescription = s.libraryAddAction)
                     }
@@ -267,16 +275,19 @@ private fun NewLocalPackDialog(
     var showSnapshots by remember { mutableStateOf(false) }
     var loaderVersion by remember { mutableStateOf("") }
     var versions by remember { mutableStateOf<List<String>>(emptyList()) }
-    val loaders = remember { listOf("Vanilla" to null, "Fabric" to "fabric", "Forge" to "forge", "NeoForge" to "neoforge", "Quilt" to "quilt") }
-    var loaderSel by remember { mutableStateOf(0) }
+    var loaderId by remember { mutableStateOf<String?>(null) }
+    // Cleanroom and lwjgl3ify publish their builds as release pages with no index to
+    // ask for the latest, so they need a version named.
+    val versionRequired = loaderNeedsVersion(loaderId)
 
     // Smart default name from the loader + version ("Fabric 1.20.1"); the name
     // field is optional and falls back to it.
-    val defaultName = remember(loaderSel, mc) {
-        listOf(loaders[loaderSel].first, mc.trim()).filter { it.isNotBlank() }.joinToString(" ")
+    val defaultName = remember(loaderId, mc) {
+        val loaderLabel = LOADER_CHOICES.first { it.second == loaderId }.first
+        listOf(loaderLabel, mc.trim()).filter { it.isNotBlank() }.joinToString(" ")
     }
     val effectiveName = name.ifBlank { defaultName }
-    val canCreate = mc.isNotBlank()
+    val canCreate = mc.isNotBlank() && (!versionRequired || loaderVersion.isNotBlank())
 
     LaunchedEffect(Unit) {
         versions = runCatching { withContext(Dispatchers.IO) { provisioner.availableMinecraftVersions() } }.getOrDefault(emptyList())
@@ -297,7 +308,7 @@ private fun NewLocalPackDialog(
 
     Popup(alignment = Alignment.Center, onDismissRequest = onDismiss, properties = PopupProperties(focusable = true)) {
         Box(
-            Modifier.fillMaxSize().background(Color.Black.copy(alpha = scrimAlpha))
+            Modifier.fillMaxSize().background(NxColor.page.copy(alpha = scrimAlpha))
                 .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onDismiss),
             contentAlignment = Alignment.Center,
         ) {
@@ -307,19 +318,15 @@ private fun NewLocalPackDialog(
               exit  = Motion.emphasis.exit,
           ) {
             NxSurface(
-                level = NxSurfaceLevel.Floating,
-                // A modal sits over a dark scrim, so there is nothing behind it
-                // worth blurring: the filter would cost a frame to produce a flat
-                // muddy panel.
-                blurDp = 0f,
+                kind = SurfaceKind.Dialog,
                 shape = MaterialTheme.shapes.large,
                 modifier = Modifier.widthIn(max = 460.dp).fillMaxWidth(0.9f)
                     .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = {}),
             ) {
                 Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Symbol(NxIcon.Inventory2, contentDescription = null, tint = NxTheme.colors.primary, size = 22.dp)
-                        Text(s.libraryNewLocalPack, style = MaterialTheme.typography.titleMedium, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
+                        Symbol(NxIcon.Inventory2, contentDescription = null, tint = NxColor.lead(), size = 22.dp)
+                        Text(s.libraryNewLocalPack, style = MaterialTheme.typography.titleMedium, color = NxInk.main, fontWeight = FontWeight.Bold)
                     }
 
                     FieldLabel(s.createPackName)
@@ -365,29 +372,29 @@ private fun NewLocalPackDialog(
                     PuppetField("createPack.mc", mc) { mc = it; mcMenuOpen = true }
 
                     FieldLabel(s.createPackLoader)
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        loaders.forEachIndexed { i, (label, _) ->
-                            NxChoiceChip(label = label, selected = loaderSel == i) { loaderSel = i }
-                        }
-                    }
-
-                    if (loaders[loaderSel].second != null) {
-                        FieldLabel(s.createPackLoaderVersion)
-                        NxField(value = loaderVersion, onValueChange = { loaderVersion = it }, placeholder = s.createPackLoaderVersion, modifier = Modifier.fillMaxWidth())
-                    }
+                    LoaderPicker(
+                        mcVersion       = mc.trim(),
+                        mcKnown         = mc.trim() in versions,
+                        loaderId        = loaderId,
+                        onLoader        = { loaderId = it },
+                        loaderVersion   = loaderVersion,
+                        onLoaderVersion = { loaderVersion = it },
+                        puppetKey       = "createPack.loaderVersion",
+                        label           = { FieldLabel(it) },
+                    )
 
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End)) {
                         NxButton(label = s.createPackCancel, onClick = onDismiss, style = NxButtonStyle.Tertiary, compact = true)
                         NxButton(
                             label = s.createPackConfirm,
-                            onClick = { onCreate(effectiveName.trim(), mc.trim(), loaders[loaderSel].second, loaderVersion.trim()) },
+                            onClick = { onCreate(effectiveName.trim(), mc.trim(), loaderId, loaderVersion.trim().takeIf { loaderId != null }.orEmpty()) },
                             style = NxButtonStyle.Primary,
                             icon = NxIcon.Add,
                             enabled = canCreate,
                             compact = true,
                         )
                         PuppetClick("createPack.create", enabled = canCreate) {
-                            onCreate(effectiveName.trim(), mc.trim(), loaders[loaderSel].second, loaderVersion.trim())
+                            onCreate(effectiveName.trim(), mc.trim(), loaderId, loaderVersion.trim().takeIf { loaderId != null }.orEmpty())
                         }
                     }
                 }
@@ -399,7 +406,7 @@ private fun NewLocalPackDialog(
 
 @Composable
 private fun FieldLabel(text: String) {
-    Text(text, style = MaterialTheme.typography.labelMedium, color = NxTheme.colors.textSecondary)
+    Text(text, style = MaterialTheme.typography.labelMedium, color = NxInk.quiet)
 }
 
 private const val SURFACE = "library"

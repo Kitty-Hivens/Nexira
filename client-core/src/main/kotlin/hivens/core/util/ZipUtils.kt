@@ -13,9 +13,8 @@ object ZipUtils {
     /**
      * Unzips [zipFile] into [destDir]. Returns the relative paths of
      * every file (forward slashes), in archive order. Callers that
-     * ignore the return value are unaffected; the list powers extra.zip
-     * orphan-pruning in `FileDownloadService` -- snapshot the previous
-     * unpack, diff the next, remove what the upstream modpack dropped.
+     * ignore the return value are unaffected; the list is what an
+     * orphan-pruning caller diffs against the previous unpack.
      *
      * [limits] caps what the archive may become on disk; the default suits
      * pack content. Overridable so a test can drive the cap without producing

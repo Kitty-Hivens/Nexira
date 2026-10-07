@@ -1,6 +1,9 @@
 package hivens.ui.i18n
 
 import hivens.core.data.PackAuthRequirement
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 object GermanStrings : AppStrings {
@@ -31,34 +34,21 @@ object GermanStrings : AppStrings {
     override val navForward  = "Vorwärts"
 
     // Dashboard
-    override fun dashboardWelcome(name: String) = "WILLKOMMEN ZURÜCK, $name"
-    override val dashboardServers              = "VERFÜGBARE SERVER"
-    override val dashboardServersEmpty         = "Keine Server gefunden"
-    override val dashboardLoginRequiredTitle   = "Anmelden, um Server zu sehen"
-    override val dashboardLoginRequiredHint    = "Die SmartyCraft-Serverliste ist nur nach Anmeldung verfügbar. Anmeldung im Bereich Profil."
+    override fun homeWelcomeGreeting(name: String) = "Willkommen zurück, $name"
+    override val homeWelcomeSubtitle = "Mach dort weiter, wo du aufgehört hast."
 
     // Launch Control
-    override val launchReady       = "Bereit zum Spielen"
-    override val launchButton      = "Spielen"
-    override val launchAbort       = "Abbrechen"
     override val launchRunning     = "Spiel läuft"
-    override val launchStop        = "Beenden"
     override val launchDownloading = "Herunterladen:"
     override val launchPreparing   = "Vorbereitung"
     override val launchFailed      = "Start fehlgeschlagen"
 
     // Launcher States
-    override val stateInit        = "Initialisierung..."
-    override val stateAuth        = "Authentifizierung..."
     override val stateAuthFail    = "Authentifizierungsfehler (Offline?)"
     override val stateNoPassword  = "Kein Passwort gefunden, aktuelle Sitzung wird verwendet."
-    override val stateSync        = "Dateien synchronisieren..."
-    override val stateJvm         = "JVM vorbereiten..."
     override val stateLaunching   = "Prozess starten..."
     override fun stateExitCode(code: Int)  = "Spiel mit Code $code beendet"
     override fun stateError(msg: String)   = "Fehler: $msg"
-    override fun stateHelperUnavailable(mcVersion: String) =
-        "Kein open-smrt-Helfer für Minecraft $mcVersion. Start blockiert, damit der proprietäre Smarty-Mod nicht läuft; deaktiviere den Helfer-Tausch in den Einstellungen, um damit zu spielen."
     override fun stateAuthlibUnavailable(mcVersion: String) =
         "SmartyCraft-authlib für Minecraft $mcVersion nicht erhalten. Start blockiert: der Beitritt würde abgelehnt. Prüfe Verbindung und SmartyCraft-Anmeldung und versuche es erneut."
     override fun stateMissingAuthProvider(providerKey: String) = when (providerKey) {
@@ -96,10 +86,10 @@ object GermanStrings : AppStrings {
     override val settingsThemeModeSystem            = "System"
     override val settingsThemeModeWallpaper         = "Hintergrund"
     override val settingsThemeModeSystemUnavailable = "Systemschema ist in dieser Umgebung nicht verfügbar"
-    override val settingsPaletteFromWallpaper       = "Farben aus dem Bild"
-    override val settingsPaletteFromWallpaperDesc   = "Aus: Design behält eigene Farben"
     override val settingsSurfaceBlur                = "Unschärfe hinter Flächen"
     override val settingsSurfaceBlurDesc            = "Kostet pro Bild etwas; ohne sie behalten Flächen Form und Deckkraft"
+    override val settingsReduceMotion               = "Weniger Bewegung"
+    override val settingsReduceMotionDesc           = "Widgets stehen beim Öffnen sofort an ihrem Platz, Partikel halten still"
     override val settingsCustomChrome               = "Eigene Titelleiste"
     override val settingsCustomChromeDesc           = "Ersetzt die Titelleiste des Fensters durch die eigene obere Leiste. Wirkt ab dem nächsten Start."
     override val settingsCustomChromeTiling         = "Dein Fenstermanager zeichnet keine Titelleiste, hier ändert das nichts."
@@ -113,13 +103,8 @@ object GermanStrings : AppStrings {
     override val themePickerApply           = "Anwenden"
     override val themePickerPreview         = "Vorschau"
     override val themePickerSelected        = "Ausgewählt"
-    override val themePickerColorPrimary    = "Primär"
-    override val themePickerColorSecondary  = "Sekundär"
-    override val themePickerColorBackground = "Hintergrund"
-    override val themePickerColorSurface    = "Oberfläche"
-    override val themePickerColorAccent     = "Akzent"
-    override val themePickerColorSuccess    = "Erfolg"
-    override val themePickerColorError      = "Fehler"
+    override val themePickerDarkOnly        = "Nur dunkel"
+    override val themeFromWallpaper         = "Aus dem Hintergrundbild"
     override val themePickerBtnSample       = "Beispiel-Schaltfläche"
     override val themePickerBtnOutlined     = "Umrandete Schaltfläche"
 
@@ -145,33 +130,14 @@ object GermanStrings : AppStrings {
     override val paginationNext         = "Nächste Seite"
 
     // Server Detail
-    override val serverDetailTitle         = "SERVER-INFORMATIONEN"
-    override val serverDetailNoImage       = "Kein Bild"
-    override val serverDetailNoImageHint   = "banner.png"
-    override val serverDetailMissingTitle  = "Informationen fehlen"
-    override fun serverDetailMissingPath(file: String) = "Erstelle $file in:"
 
     // Server Settings
-    override val serverSettingsSubtitle        = "Starteinstellungen"
-    override val serverSettingsSectionSystem   = "System"
-    override val serverSettingsSectionMods     = "Modifikationen"
-    override val serverSettingsRam             = "RAM"
-    override fun serverSettingsRamValue(mb: Int) = "RAM: $mb MB"
-    override val serverSettingsJava            = "Java-Version"
-    override fun serverSettingsJavaAuto(version: String) = "Automatisch ($version)"
-    override val serverSettingsJavaHint        = "Leer lassen für das integrierte Java"
     override val serverSettingsOpenFolder      = "Ordner öffnen"
-    override val serverSettingsReset           = "Client zurücksetzen"
 
-    override val serverSettingsResetConfirmTitle = "Client zurücksetzen?"
-    override val serverSettingsResetConfirmBody  = "Alle heruntergeladenen Dateien des Clients dieses Servers werden unwiderruflich gelöscht."
     override val backgroundResetConfirmTitle     = "Hintergrund zurücksetzen?"
     override val backgroundResetConfirmBody      = "Die gesamte Konfiguration des eigenen Hintergrunds kehrt auf die Standardwerte zurück."
     override val logoutConfirmTitle              = "Abmelden?"
     override val logoutConfirmBody               = "Deine gespeicherte Anmeldung wird von diesem Gerät entfernt. Zum erneuten Anmelden musst du deine Zugangsdaten wieder eingeben."
-
-    override val serverSettingsNoMods          = "Keine optionalen Mods"
-    override val serverSettingsPickJava        = "Java auswählen"
 
     // Update
     override val updateTitle           = "Update verfügbar"
@@ -259,33 +225,32 @@ object GermanStrings : AppStrings {
 
     // --- Launcher States: Offline ---
     override val stateOfflineSkipAuth      = "Offlinemodus — Authentifizierung übersprungen"
+    override val stateUnboundOffline       = "Dieses Paket ist an keinen Server gebunden, läuft daher offline und erhält kein Sitzungstoken"
     override val stateOfflineSkipSync      = "Offlinemodus — Dateisynchronisierung übersprungen, lokale Dateien werden verwendet"
     override fun stateForeignContentRemoved(count: Int, names: String) =
         "$count Datei(en) entfernt, die nicht zum Paket gehoeren: $names"
     override val stateContentChanged       = "Das Modpack wurde verändert, der Start wurde abgebrochen. Bitte ändern Sie die Dateien eines Modpacks nicht."
     override val stateOfflineNoClient      = "Client-Dateien nicht gefunden. Zuerst online herunterladen."
-    override val stateOfflineNoManifest    = "Kein zwischengespeichertes Manifest für diesen Server. Mindestens einmal online anmelden, bevor offline gestartet wird."
 
     // --- Server Settings: Extended ---
-    override val serverSettingsJvmArgs     = "JVM-Argumente"
-    override val serverSettingsJvmArgsHint = "-XX:+UseZGC -Dfoo=bar"
-    override val serverSettingsJvmBuildArgs = "Bauen"
-    override val serverSettingsResolution  = "Fenstergröße"
-    override val serverSettingsWidth       = "Breite"
-    override val serverSettingsHeight      = "Höhe"
-    override val serverSettingsFullscreen  = "Vollbild"
-    override val serverSettingsAutoConnect = "Automatisch mit Server verbinden"
 
     // --- Server Settings: Icon Upload ---
-    override val serverSettingsPickIcon    = "Server-Icon auswählen"
 
     // =========================================================================
     // RAM Selector
     // =========================================================================
-    override val ramCustomInputLabel = "Eigener Wert:"
     override fun ramSystemHint(systemRam: String, recommended: String) =
         "System: $systemRam • Empfohlen max: $recommended"
-    override fun ramAutoLabel(resolved: String) = "Auto · ~$resolved"
+    override val ramModeTitle = "Speichermenge"
+    override val ramModeAuto = "Auto"
+    override val ramModeOwn = "Eigener Wert"
+    override fun ramAutoDetail(resolved: String) = "Passend zu diesem System und diesem Pack. Gerade sind das $resolved."
+    override val ramOwnDetail = "So viel bekommt das Spiel bei jedem Start."
+    override val ramAllocated = "Zugewiesen"
+    override val ramUnitGb = "GB"
+    override val ramUnitMb = "MB"
+    override fun ramOutOfRange(min: String, max: String) = "Zwischen $min und $max"
+    override fun ramAboveRecommended(recommended: String) = "Über $recommended kann dem System und dem Spiel außerhalb des Heaps der Speicher ausgehen"
 
     // =========================================================================
     // Mod cards
@@ -296,7 +261,6 @@ object GermanStrings : AppStrings {
     // =========================================================================
     // Server grid
     // =========================================================================
-    override val serversFavorites = "★ FAVORITEN"
 
     // =========================================================================
     // Custom Background
@@ -374,12 +338,6 @@ object GermanStrings : AppStrings {
     override val techSkiaDesc    = "Grafik-Renderer"
     override val techCoilDesc    = "Bildladen"
 
-    // --- Spawn Reset ---
-    override val spawnResetButton  = "Zum Spawn zurückkehren"
-    override val spawnResetLoading = "Zurücksetzen..."
-    override val spawnResetSuccess = "Fertig! Neu einloggen"
-    override val spawnResetError   = "Serverfehler"
-
     // --- Tray ---
     override val trayStatusIdle    = "Wartend"
     override val trayStatusRunning = "Spiel läuft"
@@ -395,8 +353,6 @@ object GermanStrings : AppStrings {
     override val settingsPreReleasesDesc     = "Beta-Builds erhalten, bevor sie stabil werden."
     override val settingsMandatoryUpdates       = "Pflicht-Updates"
     override val settingsMandatoryUpdatesDesc   = "Den Start blockieren, bis kritische Updates installiert sind, wenn die Upstream-Protokoll-Kompatibilität bricht. Standardmäßig aus: die Untergrenze kann auch den eigenen Start blockieren, sie zu befolgen ist deshalb eine bewusste Entscheidung."
-    override val settingsAutoSyncAllPacks       = "SmartyCraft-Clients beim Start automatisch synchronisieren"
-    override val settingsAutoSyncAllPacksDesc   = "Synchronisiert beim Launcher-Start jeden bereits installierten SmartyCraft-Client im Hintergrund neu. Mit Zwei-Faktor-Anmeldung wird überhaupt nicht angemeldet — eine Anmeldung würde die per Code bestätigte Sitzung entwerten —, deshalb läuft die Synchronisierung nur gegen ein Manifest aus einer früheren manuellen Anmeldung, und ein Server ohne dieses Manifest wird übersprungen. Der SmartyCraft-Serverweg entfällt ab 2.5.0 und seine Fehler werden nicht mehr behoben; unterstützt ist der Weg über ein Mirror-Pack. Kostet Bandbreite."
     override val settingsAutoUpdatePacks        = "Installierte Instanzen automatisch aktualisieren"
     override val settingsAutoUpdatePacksDesc    = "Hält installierte Pack-Instanzen auf dem neuesten Build. Sichere Updates laufen im Hintergrund; eine Minecraft- oder Loader-Änderung folgt der Regel darunter. Ausschalten, um sie von Hand zu aktualisieren."
     override val settingsAmberPolicy            = "Wenn ein Build Minecraft oder den Loader ändert"
@@ -411,9 +367,6 @@ object GermanStrings : AppStrings {
     override val settingsMimicVersion           = "Launcher-Version-Override"
     override val settingsMimicVersionDesc       = "Fixiert den Versions-String, der an den Upstream im Handshake und User-Agent gesendet wird. Leer lassen für den eingebauten Standard — nur setzen, wenn der Upstream seine Versions-Anforderung schneller anhebt als Nexiras Release-Zyklus. Wirkt beim nächsten Protokoll-Aufruf nach Speichern, kein Neustart nötig."
     override fun settingsMimicVersionPlaceholder(default: String) = "Standard: $default"
-    override fun dashboardAutoSyncProgress(serverName: String, current: Int, total: Int) =
-        "Synchronisiere $serverName ($current/$total)"
-    override fun dashboardAutoSyncBytes(readMB: Long, totalMB: Long) = "$readMB / $totalMB MB"
     override val widgetProgressTitle = "Hintergrundaktivität"
     override val widgetProgressIdle = "Momentan wird nichts heruntergeladen."
     override fun widgetTabDefaultLabel(index: Int) = "Tab $index"
@@ -471,16 +424,13 @@ object GermanStrings : AppStrings {
     override val sslBypassRevoke        = "Widerrufen"
     override fun sslBypassExpiresAt(formatted: String) = "Läuft ab: $formatted"
 
-
     override val settingsSectionSmarty           = "Smarty-Server"
-    override val settingsOpenSmrtHelperTitle      = "Alternativen smrt-Netzwerk-Helfer verwenden"
-    override val settingsOpenSmrtHelperDesc       = "Ersetzt den originalen Smarty-Mod auf Smarty-Servern durch unseren quelloffenen Helfer. Dieselben Netzwerkfunktionen, aber ohne Überwachung. Gibt es für die Spielversion keinen Ersatz, wird der Start blockiert statt den Original-Mod auszuführen."
-    override val settingsStrictModCheckTitle      = "Genaue Mod-Prüfung"
-    override val settingsStrictModCheckDesc       = "Löscht nach der Synchronisierung alles im Mods-Ordner, was der Server nicht angefordert hat. Hält die Installation sauber, entfernt aber auch von Hand hinzugefügte Mods."
     override val settingsNetworkAgentTitle        = "Netzwerk-Agent verwenden"
     override val settingsNetworkAgentDesc         = "Richtet die Anmeldung des Spiels beim Start auf SmartyCraft aus: den Server-Beitritt und die Skin-Prüfung. Der Beitritt läuft dann über SmartyCraft und Skins werden weiterhin geladen, ohne SmartyCrafts gepatchte Anmelde-Bibliothek einzuspielen. Nötig, um SmartyCraft-Servern beizutreten."
     override val settingsSmartyAuthLibTitle       = "SmartyCrafts Anmelde-Bibliothek verwenden"
     override val settingsSmartyAuthLibDesc        = "Der ältere Weg: SmartyCrafts gepatchte Anmelde-Bibliothek aus dessen Client nehmen und statt der originalen in die Sammlung legen. Durch den Netzwerk-Agenten oben ersetzt und als Reserve behalten. Lässt sich die Datei nicht beziehen, wird der Start blockiert. Standardmäßig aus."
+    override val settingsReuseSessionTitle        = "Eine Sitzung behalten (experimentell)"
+    override val settingsReuseSessionDesc         = "Meldet sich nicht vor jedem Start neu an. Eine Anmeldung hält lange, daher wird der Zwei-Faktor-Code einmal abgefragt statt bei jedem Start. Beendet der Server die Sitzung, verlangt der nächste Start eine erneute Anmeldung. Standardmäßig aus."
 
     override val settingsSectionDataDir       = "Datenverzeichnis"
     override val settingsDataDirCurrent       = "Aktueller Pfad:"
@@ -602,12 +552,6 @@ object GermanStrings : AppStrings {
     override val navLibrary = "Bibliothek"
     override val navBrowse  = "Durchsuchen"
 
-    override val settingsHomeViewTitle   = "Startansicht"
-    override val settingsHomeViewSub     = "Der moderne Startbildschirm ist die Vorgabe. Das klassische Dashboard bleibt jederzeit umschaltbar."
-    override val settingsHomeViewClassic = "Klassisch"
-    override val settingsHomeViewNew     = "Modern"
-
-
     // --- Auswahlstil der linken Leiste ---
     override val navSelectionTitle        = "Stil des aktiven Eintrags"
     override val navSelectionSub          = "Wie der aktive Eintrag in der linken Leiste hervorgehoben wird"
@@ -685,11 +629,17 @@ object GermanStrings : AppStrings {
     override val backgroundLoopForever   = "Endlos"
     override val backgroundLoopOnce      = "Einmal"
 
+    override val backgroundAudio         = "Ton"
+    override val backgroundAudioDesc     = "Die eigene Tonspur des Hintergrunds abspielen. Die Animationsgeschwindigkeit ändert auch ihr Tempo."
+    override val backgroundAudioVolume   = "Lautstärke"
+    override val backgroundAudioStill   = "Ein unbewegtes Hintergrundbild hat weder Ton noch Abspielposition."
+    override val backgroundLink   = "Über die Player steuern"
+    override val backgroundLinkDesc   = "Player-Widgets und die Medientasten sprechen den Hintergrund an. Pause hält auch das Bild an."
+
     override val customizationAccentClear     = "Überschreibung löschen"
     override val customizationSectionVisual   = "Visuell"
     override val customizationSectionColors   = "FARBÜBERSCHREIBUNGEN"
     override val customizationHexInvalid      = "Ungültiger Hex"
-    override val themePickerAccentOverride    = "Akzent überschreiben (sofort)"
 
     override val browseTitle             = "Katalog"
     override val browseSearchPlaceholder = "Packs suchen"
@@ -700,7 +650,11 @@ object GermanStrings : AppStrings {
     override val createPackName          = "Name"
     override val createPackMc            = "Minecraft-Version"
     override val createPackLoader        = "Loader"
-    override val createPackLoaderVersion = "Loader-Version (optional)"
+    override val createPackLoaderVersion = "Loader-Version"
+    override val createPackLoaderVersionLatest = "Leer für die neueste"
+    override val createPackLoaderVersionRequired = "Für diesen Loader erforderlich"
+    override val createPackLoaderRecommended = "empfohlen"
+    override val createPackLoaderPreRelease = "Vorabversion"
     override val createPackConfirm       = "Erstellen"
     override val createPackCancel        = "Abbrechen"
     override val createPackShowSnapshots = "Snapshots anzeigen"
@@ -779,9 +733,109 @@ object GermanStrings : AppStrings {
     override val selectionClear                 = "Aufheben"
     override fun selectionBlockedByPack(count: Int) = "$count davon gehören zum Pack. Instanz lösen, um sie zu verwalten."
     override val contentActionDetails           = "Details"
+    override val contentLockedTitle             = "Teil des Packs"
+    override val contentLockedBody              = "Das Pack installiert und aktualisiert diesen Mod, deshalb lässt er sich hier nicht abschalten, entfernen oder auf eine andere Version stellen: das nächste Update würde es rückgängig machen. Um ihn selbst zu verwalten, löse das Pack in seinen Einstellungen, dann bekommt es keine Updates mehr."
+    override val contentLockedOptionalBody      = "Ein optionaler Mod des Packs: du kannst ihn abschalten, aber nicht entfernen oder seine Version wechseln, solange das Pack ihn aktualisiert."
+    override val contentLockedOpenSettings      = "Pack-Einstellungen"
     override val contentActionOpenPage          = "Seite öffnen"
+    override val contentUpdateCheck             = "Nach Updates suchen"
+    override fun contentUpdateAll(count: Int)   = "Alle aktualisieren ($count)"
+    override fun contentUpdateRunning(done: Int, total: Int) = "Aktualisiere $done von $total"
+    override val contentUpdateUpToDate          = "Alles ist aktuell"
+    override val contentUpdateCheckFailed       = "Prüfung fehlgeschlagen"
+    override val contentUpdateConfirmTitle      = "Projekte aktualisieren?"
+    override fun contentUpdateConfirmBody(count: Int) =
+        "$count ${twoFormPlural(count, "Datei", "Dateien")} wird durch neuere Builds von Modrinth ersetzt."
+    override val contentUpdateConfirmAction     = "Aktualisieren"
+    override fun contentUpdateTo(version: String) = "Auf $version aktualisieren"
+    override val contentActionVersions          = "Versionen"
+    override val contentVersionsTitle           = "Version wählen"
+    override val contentVersionsUnknown         = "Modrinth kennt diese Datei nicht"
+    override val contentVersionsLoadFailed      = "Versionsliste konnte nicht geladen werden"
     override val contentDetailAuthors           = "Autoren"
     override val contentDetailSize              = "Größe"
+    override val modPageTabDescription = "Beschreibung"
+    override val modPageTabVersions = "Versionen"
+    override val modPageTabChangelog = "Änderungen"
+    override val modPageTabGallery = "Galerie"
+    override val modPageBodyEmpty = "Der Autor hat nichts über dieses Projekt geschrieben."
+    override val modPageBodyUnknown = "Die Beschreibung steht auf der Projektseite, und Modrinth kennt diese Datei nicht."
+    override val modPageStatDownloads = "Downloads"
+    override val modPageStatFollowers = "Abonnenten"
+    override val modPageLocalFile = "Lokale Datei"
+    override val modPageFindInCatalogue = "Auf Modrinth suchen"
+    override val modPageHomepage = "Projektseite"
+    override val modPageOpenInCatalogue = "Auf Modrinth öffnen"
+    override val modPageCopyLink = "Link kopieren"
+    override fun modPageInstallInto(pack: String) = "In $pack installieren"
+    override fun modPageInstalledIn(pack: String) = "Bereits in $pack"
+    override val modPageInstalling = "Wird installiert"
+    override val modPageInstallFailed = "Installation nicht abgeschlossen"
+    override val modPageInstallRetry = "Erneut versuchen"
+    override fun modPageInstallMissing(count: Int) = "Fehlende Abhängigkeiten: $count"
+    override val modPageInstallShort = "Installieren"
+    override fun modPageNoBuildFor(target: String) = "Kein Build für $target"
+    override val modPageNoBuildAny = "Kein passender Build"
+    override val versionsIncompatibleHint = "Dieser Build ist für einen anderen Loader oder eine andere Spielversion"
+    override val versionsColumnVersion = "Version"
+    override val versionsColumnGameVersion = "Spielversion"
+    override val versionsColumnPlatform = "Plattform"
+    override val versionsColumnPublished = "Veröffentlicht"
+    override val versionsColumnDownloads = "Downloads"
+    override val modPageVersionsFailed = "Die Build-Liste konnte nicht geladen werden"
+    override val modPageVersionsFailedBody = "Der Katalog hat nicht geantwortet. Prüfe die Verbindung und versuche es erneut."
+    override val modPageVersionsNoEntry = "Modrinth kennt diese Datei nicht, daher gibt es keine Build-Liste"
+    override val versionsFilterChannel = "Kanal"
+    override val versionsFilterGameVersion = "Spielversion"
+    override val versionsFilterPlatform = "Plattform"
+    override val versionsFilterReset = "Zurücksetzen"
+    override fun versionsFilterShown(shown: Int, total: Int) = "$shown von $total angezeigt"
+    override val versionsFilterNoMatch = "Kein Build passt zu diesen Filtern"
+    override fun modPageInstalledVersion(version: String) = "Installiert: $version"
+
+    override val modVersionRequires = "Benötigt"
+    override val modVersionOptional = "Funktioniert mit"
+    override val modVersionIncompatible = "Funktioniert nicht mit"
+    override val modVersionFiles = "Dateien"
+    override val modVersionPinnedBuild = "ein festgelegter Build"
+    override val modVersionPrimaryFile = "Hauptdatei"
+    override val modVersionFailed = "Dieser Build wurde nicht geladen"
+    override val modRailCompatibility = "Kompatibilität"
+    override val modRailGame = "Minecraft"
+    override val modRailPlatforms = "Plattformen"
+    override val modRailEnvironment = "Umgebung"
+    override val modRailLinks = "Links"
+    override val modRailTags = "Tags"
+    override val modRailCreators = "Urheber"
+    override val modRailDetails = "Angaben"
+    override val modRailUnknownValue = "?"
+    override val modEnvClientOnly = "Nur Client"
+    override val modEnvServerOnly = "Nur Server"
+    override val modEnvBoth = "Client und Server"
+    override val modEnvEither = "Client oder Server"
+    override val modLinkIssues = "Problem melden"
+    override val modLinkSource = "Quellcode"
+    override val modLinkWiki = "Wiki"
+    override val modLinkDiscord = "Discord"
+    override val modLinkDonate = "Autor unterstützen"
+    override val modLicenseUnknown = "Keine Lizenz angegeben"
+    override val modLicenseAllRights = "Alle Rechte vorbehalten"
+    override fun modPublishedOn(date: String) = "Veröffentlicht $date"
+    override fun modUpdatedOn(date: String) = "Aktualisiert $date"
+    override val modPublishedUnknown = "Veröffentlichungsdatum unbekannt"
+    override val modUpdatedUnknown = "Aktualisierungsdatum unbekannt"
+    override val modDisclosureTelemetryOptIn = "Telemetrie, muss von Hand eingeschaltet werden"
+    override val modDisclosureTelemetryOptOut = "Telemetrie, muss von Hand abgeschaltet werden"
+    override val modDisclosureTelemetryAlways = "Telemetrie, nicht abschaltbar"
+    override val modDisclosureTelemetry = "Telemetrie"
+    override val modDisclosureAds = "Enthält Werbung"
+    override val modDisclosurePaid = "Enthält kostenpflichtige Funktionen"
+    override val modDisclosureAiContent = "Enthält KI-erzeugtes Material"
+    override val modDisclosureAiFunctionality = "Ruft ein generatives Modell auf"
+    override val modDisclosureSystem = "Greift auf das System außerhalb des Spiels zu"
+    override val modDisclosureEpilepsy = "Warnung vor Lichtblitzen"
+    override fun compactMillions(value: String) = "$value Mio."
+    override fun compactThousands(value: String) = "$value Tsd."
     override val contentTabFetchErrorTitle      = "Pack-Inhalt konnte nicht geladen werden"
     override val contentTabFetchErrorGeneric    = "Das Mirror-Manifest konnte nicht geladen werden."
     override val contentTabRetry                = "Erneut versuchen"
@@ -812,7 +866,6 @@ object GermanStrings : AppStrings {
         if (count == 0) "einzige Option" else "$count ${twoFormPlural(count, "Alternative", "Alternativen")}"
     override val contentTabRoleAlternativesHeader = "Alternativen in diesem Pack"
     override val contentTabModNoDescription     = "Noch keine Beschreibung im Manifest."
-    override fun contentTabModLicensePrefix(license: String) = "Lizenz: $license"
     override val contentTabModUrlLabel          = "Mod-Seite"
     override fun contentTabModSizeLabel(kb: Long) = "$kb KB"
     override fun contentTabModDependencies(count: Int) = "Abhängigkeiten ($count)"
@@ -877,6 +930,9 @@ object GermanStrings : AppStrings {
     override fun versionPickerCount(n: Int)     = if (n == 1) "1 Version" else "$n Versionen"
     override val versionPickerEmpty             = "Keine Version ausgewählt"
     override val versionPickerNoChangelog       = "Diese Version hat keine Änderungsliste"
+    override val versionPickerIncompatible      = "Passt nicht zu dieser Instanz"
+    override fun versionPickerShowIncompatible(count: Int) = "Nicht passende anzeigen ($count)"
+    override val versionPickerHideIncompatible  = "Nicht passende ausblenden"
     override val versionPickerWarning           = "Ein Versionswechsel überschreibt die Dateien des Packs. Vorher wird ein Wiederherstellungspunkt angelegt."
     override fun versionPickerInstall(version: String)  = "$version installieren"
     override fun versionPickerUpgrade(version: String)  = "Auf $version aktualisieren"
@@ -919,6 +975,25 @@ object GermanStrings : AppStrings {
 
     override val packSettingsTitle              = "Pack-Einstellungen"
     override val packSettingsClose              = "Schließen"
+    override val packSettingsExpand             = "Erweitern"
+    override val packSettingsCollapse           = "Verkleinern"
+    override fun packSettingsRuntimeLine(loader: String, mc: String) = "$loader auf $mc"
+    override fun packSettingsRuntimeVanilla(mc: String) = "Minecraft $mc"
+    override val packSettingsLoader             = "Loader"
+    override val packSettingsJavaPickOwn        = "Eigene angeben"
+    override val packSettingsOptionalCoToggle   = "Ein Mod schaltet ein, was er braucht, und aus, womit er nicht laufen kann."
+    override val packLoaderInstalled = "Aktuell"
+    override val packLoaderNextLaunch = "Gilt ab dem nächsten Start, der den Loader installiert."
+    override val packLoaderModsStay = "Die Mods bleiben im Ordner, wie sie sind. Mods für einen anderen Loader werden nicht geladen."
+    override val packLoaderApply = "Übernehmen"
+    override val packLoaderRevert = "Zurücksetzen"
+    override fun optionalConflictsWith(name: String) = "Verträgt sich nicht mit $name"
+    override fun optionalNeedsOff(name: String) = "Braucht $name, der aus ist"
+    override fun optionalNeededBy(name: String) = "Aus, aber $name braucht es"
+    override fun contentBehindPin(neededBy: String, version: String) = "$neededBy braucht $version oder neuer"
+    override fun contentDependencyMissing(id: String) = "Braucht $id, das fehlt oder aus ist"
+    override fun contentDependencyVersion(name: String, wanted: String, installed: String) = "Braucht $name $wanted, installiert ist $installed"
+    override val packVersionCheckTitle          = "Updates"
     override val packSettingsCategoryGeneral    = "Allgemein"
     override val packSettingsCategoryRuntime    = "Start"
     override val packSettingsCategoryVersion    = "Version"
@@ -933,9 +1008,10 @@ object GermanStrings : AppStrings {
     override fun packSettingsForkedFrom(name: String) = "Abgeleitet von $name"
     override val packSettingsPackId             = "Pack-ID"
     override val packSettingsMemory             = "Arbeitsspeicher"
+    override fun packSettingsMemoryFromArgs(flags: String) = "In den JVM-Argumenten festgelegt ($flags), diese Einstellung gilt daher nicht"
     override val packSettingsEnvironment        = "Umgebung"
     override val packSettingsJava               = "Java"
-    override fun packSettingsJavaManaged(major: Int) = "Verwaltet -- Java $major"
+    override fun packSettingsJavaManaged(major: Int) = "Vom Launcher verwaltet: Java $major"
     override val packSettingsJavaCustom         = "Eigener Java-Pfad"
     override val packSettingsJavaPathPlaceholder = "/pfad/zu/bin/java"
     override val packSettingsJavaReset          = "Verwaltet nutzen"
@@ -948,6 +1024,10 @@ object GermanStrings : AppStrings {
     override val packSettingsWidth              = "Breite"
     override val packSettingsHeight             = "Höhe"
     override val packSettingsFullscreen         = "Vollbild"
+    override val packSettingsEarlyScreen        = "Mod-Ladebildschirm"
+    override val packSettingsEarlyScreenDesc    = "Ein Fenster mit dem Ladebalken der Mods, bis das Spiel sein eigenes öffnet"
+    override val packSettingsEarlyScreenWayland = "Unter Wayland aus: wer beim Laden der Mods den Arbeitsbereich wechselt, bringt den Start zum Scheitern"
+    override val packSettingsEarlyScreenReset   = "Standard nutzen"
     override val packSettingsOptional           = "Optionaler Inhalt"
     override val packSettingsOptionalNone       = "Dieses Pack hat keine Optionen"
     override val packContentPresenceClient      = "Nur Client"
@@ -964,7 +1044,7 @@ object GermanStrings : AppStrings {
     override val packSettingsOpenFolder         = "Öffnen"
     override val packSettingsSizeComputing      = "Größe wird berechnet"
     override val packSettingsDetach             = "In lokale Kopie lösen"
-    override val packSettingsDetachDesc         = "Werde deine eigene Kopie; Herkunft bleibt erhalten"
+    override val packSettingsDetachDesc         = "Wird deine eigene Kopie. Keine Updates und keine Anmeldung am Server des Packs mehr, die Herkunft bleibt erhalten"
     override val packSettingsDetachAction       = "Lösen"
     override val packSettingsRepair             = "Dateien prüfen und reparieren"
     override val packSettingsRepairDesc         = "Alle Dateien prüfen und nur die beschädigten wiederherstellen"
@@ -981,6 +1061,7 @@ object GermanStrings : AppStrings {
     override val packSettingsDangerZone         = "Gefahrenzone"
     override val packSettingsDelete             = "Pack löschen"
     override val packSettingsDeleteDesc         = "Die Instanzdateien werden endgültig gelöscht"
+    override val packDeleteBlockedRunning       = "Zum Löschen zuerst das Spiel beenden"
     override val packVersionSnapshots           = "Wiederherstellungspunkte"
     override val packVersionRestore             = "Wiederherstellen"
     override val packVersionSnapshotsHint       = "Ein Snapshot bewahrt deine Änderungen; wird vor einem strukturellen Update erstellt"
@@ -991,6 +1072,19 @@ object GermanStrings : AppStrings {
     override fun packDetailInstanceDirHint(dirName: String) = "Instanz-Ordner: instances/$dirName"
     override val packDetailPlay                 = "Spielen"
     override val packDetailPlayLoginRequired    = "Anmelden zum Spielen"
+    override val launchBlockUpdating            = "Wird aktualisiert…"
+    override val launchBlockRepairing           = "Dateien werden geprüft…"
+    override val launchBlockRecovering          = "Wird wiederhergestellt…"
+    override val launchBlockDeleting            = "Wird gelöscht…"
+    override val launchBlockUpdatingContent     = "Mods werden aktualisiert…"
+    override val launchBlockMissing             = "Dateien nicht gefunden"
+    override val launchBlockOtherRunning        = "Ein anderes Spiel läuft"
+    override val launchStopping                 = "Wird beendet…"
+    override val quitGameTitle                  = "Ein Spiel läuft"
+    override fun quitGameBody(packName: String) = "„$packName“ läuft noch. Sie können es weiterlaufen lassen oder vor dem Beenden stoppen. Die Spielzeit wird in beiden Fällen gespeichert."
+    override val quitLeaveGame                  = "Weiterlaufen lassen und beenden"
+    override val quitStopGame                   = "Spiel stoppen und beenden"
+    override val notifReasonInstanceBusy        = "Das Paket wird gerade aktualisiert oder geprüft und wurde daher nicht gestartet. Starten Sie es erneut, sobald das abgeschlossen ist."
     override val packPlayWait                   = "Bitte warten"
     override val packPlayExit                   = "Beenden"
     override val packDetailNotFoundTitle        = "Instanz nicht gefunden"
@@ -1007,11 +1101,7 @@ object GermanStrings : AppStrings {
     override fun notifGroupCount(count: Int) = "×$count"
     override fun notifCountTitle(count: Int) = if (count == 1) "$count Nachricht" else "$count Nachrichten"
     override fun notificationShowMore(count: Int)               = "+$count weitere"
-    override fun notificationAbsoluteTime(instant: java.time.Instant): String =
-        java.time.format.DateTimeFormatter
-            .ofPattern("d. MMMM yyyy, HH:mm:ss", java.util.Locale.GERMAN)
-            .withZone(java.time.ZoneId.systemDefault())
-            .format(instant)
+    override fun notificationAbsoluteTime(instant: Instant): String = germanNotificationTime.format(instant)
 
     override fun notifPackPreparing(packName: String)   = "Vorbereitung: $packName"
     override fun notifPackStage(stage: String)          = "Phase: $stage"
@@ -1033,6 +1123,8 @@ object GermanStrings : AppStrings {
     override fun notifInstallCancelled(packName: String) = "Installation von $packName abgebrochen"
     override val editorSurfOverlay                      = "Schwebende Ebene"
     override val editorSurfShortOverlay                 = "Schwebend"
+    override val editorSurfBackdrop                     = "Hintergrundebene"
+    override val editorSurfShortBackdrop                = "Hintergrund"
 
     override val activityPillExpand                     = "Alle zeigen"
     override fun activityPillMore(count: Int)           = "+$count"
@@ -1052,7 +1144,6 @@ object GermanStrings : AppStrings {
     override val notifReasonAuthFail                    = "Anmeldung fehlgeschlagen"
     override fun notifReasonAuthFailDetail(detail: String) = detail
     override val notifReasonOfflineNoClient             = "Pack-Dateien fehlen auf der Platte"
-    override val notifReasonOfflineNoManifest           = "Kein Manifest im Cache; einmal online gehen, um zu synchronisieren"
     override val notifReasonTwoFactorExpired            = "Bitte erneut anmelden, um die Anmeldedaten zu aktualisieren"
     override val notifSessionStaleTitle                 = "Sitzung wurde nicht erneuert"
     override val notifSessionStaleRejected              = "Der Anmeldeserver hat die Anmeldung abgelehnt. Das Spiel startet mit der alten Sitzung, der Serverbeitritt wird aber sehr wahrscheinlich fehlschlagen: bitte erneut anmelden."
@@ -1072,18 +1163,34 @@ object GermanStrings : AppStrings {
     override fun notifTimeMinutes(minutes: Long)        = "$minutes min"
     override fun notifTimeHours(hours: Long)            = "$hours h"
     override fun notifTimeDays(days: Long)              = "$days T"
+    override val notBuiltYetTitle = "Hallo! Du hast eine noch nicht gebaute Funktion gefunden"
+    override val notBuiltYetBody = "Glückwunsch. Jetzt heißt es warten."
+    override val ageJustNow = "gerade eben"
+    override fun ageMinutes(minutes: Long) = "vor $minutes Min."
+    override fun ageHours(hours: Long) = "vor $hours Std."
+    override fun ageDays(days: Long) = "vor $days T."
+    override fun ageMonths(months: Long) = "vor $months Mon."
+    override fun ageYears(years: Long) = "vor $years J."
 
     // --- Home (new) + launch tiles ---
     override val homeRecentTitle    = "Deine Modpacks"
     override val homeNoPacksTitle   = "Noch keine Modpacks"
+    override val homeWhatsNewTitle = "Neuigkeiten"
+    override fun homeWhatsNewLauncher(app: String, version: String) = "$app $version ist da"
+    override val homeWhatsNewLauncherHint = "Änderungen ansehen und installieren"
+    override fun homeWhatsNewPackReady(version: String) = "Build $version wartet"
+    override fun homeWhatsNewPackRollback(version: String) = "Die Quelle ist zu $version zurückgekehrt"
+    override fun homeWhatsNewPackUpdated(version: String) = "Auf $version aktualisiert"
     override val homeNoPacksBody    = "Installiere etwas über Browse, dann erscheinen deine Modpacks hier."
     override val browseOpen         = "Browse öffnen"
     override val homeQuickContinue  = "Fortsetzen"
     override val homeQuickStart     = "Starten"
     override val homeQuickButton    = "Spielen"
     override fun homeHeroPlaytime(hours: Long) = "$hours Std. gespielt"
+    override fun homeFactHours(hours: Long) = "$hours Std."
+    override val homeFactPlaytime = "gespielt"
+    override val homeFactLastSession = "zuletzt gespielt"
     override val launchTileReady    = "Starten"
-    override val launchTileBlocked  = "Noch nicht spielbar"
 
     // --- Library widgets ---
     override val libraryEmptyTitle     = "Noch leer"
@@ -1096,6 +1203,36 @@ object GermanStrings : AppStrings {
     // --- Layout editor: common actions ---
     override val editorClose   = "Schließen"
     override val editorEnterLayout          = "Layout bearbeiten"
+    override val retiredTitle = "Dateien vom alten Serverpfad"
+    override fun retiredNoticeBody(count: Int) = "Von der SmartyCraft-Serverliste sind $count Ordner übrig. Niemand liest sie mehr."
+    override val retiredNoticeAction = "Aufräumen"
+    override val retiredIntro = "Die SmartyCraft-Serverliste ist weg, diese Ordner sind davon übrig. Sie gehören dir: Welten, Konfigurationen und die Mods, die du installiert hast. Behalte einen Ordner als lokales Pack oder lösche ihn und hole dir den Platz zurück."
+    override fun retiredFound(count: Int, size: String) = "$count Ordner, $size"
+    override val retiredColumnClient = "Ordner"
+    override val retiredColumnSize = "Größe"
+    override val retiredColumnRuntime = "Minecraft und Loader"
+    override val retiredColumnChoice = "Was tun"
+    override fun retiredMods(count: Int) = "$count Mods"
+    override val retiredChoiceKeep = "So lassen"
+    override val retiredChoiceAdopt = "Als Pack behalten"
+    override val retiredChoiceDelete = "Löschen"
+    override val retiredNoVersion = "keine Minecraft-Version im Ordner"
+    override val retiredDetected = "Aus dem Ordner gelesen. Korrigiere es, wenn es falsch ist."
+    override val retiredLoaderVanilla = "keiner"
+    override val retiredApply = "Ausführen"
+    override val retiredClose = "Schließen"
+    override val retiredBusy = "Arbeite..."
+    override val retiredWarning = "Löschen ist endgültig. Der Launcher hat keine Kopie dieser Ordner."
+    override val retiredAdopted = "Als Pack behalten"
+    override val retiredAdoptedSourceKept = "Als Pack behalten; der alte Ordner bleibt, weil einige Dateien nicht übertragen wurden"
+    override val retiredDeleted = "Gelöscht"
+    override val retiredFailed = "Hat nicht geklappt"
+    override val retiredRemoveFailed = "Konnte nicht gelöscht werden; etwas hält die Dateien"
+    override fun retiredDone(reclaimed: String) = "Fertig. $reclaimed frei."
+    override val retiredDoneNothing = "Fertig."
+    override val retiredNeedsVersion = "Gib die Minecraft-Version dieses Ordners an, dann kann er ein Pack werden."
+    override fun retiredBlockedBy(folders: String) = "Braucht eine Minecraft-Version: $folders"
+    override val retiredPartlyDeleted = "Teilweise gelöscht; einige Dateien blieben zurück"
     override val editorCancel  = "Abbrechen"
     override val editorDelete  = "Löschen"
     override val editorReset   = "Zurücksetzen"
@@ -1126,6 +1263,7 @@ object GermanStrings : AppStrings {
         "widget.appshell.region.top" to "Titelleiste",
         "widget.appshell.region.body" to "Hauptbereich",
         "widget.appshell.topbar.breadcrumb" to "Brotkrümel",
+        "widget.appshell.topbar.sessions" to "Laufende Spiele",
         "widget.appshell.topbar.heightDp" to "Höhe",
         "widget.appshell.topbar.cornerStyle" to "Eckenstil",
         "widget.appshell.topbar.groupStyle" to "Gruppierung",
@@ -1134,12 +1272,18 @@ object GermanStrings : AppStrings {
         "widget.appshell.topbar.controls" to "Fenstertasten",
         "widget.appshell.region.right" to "Rechte Leiste",
         "widget.appshell.region.showDivider" to "Trennlinie",
-        "widget.appshell.region.widthDp" to "Breite (0 = flexibel)",
+        "widget.appshell.region.widthDp" to "Breite (0 = automatisch)",
+        "widget.mod.tags" to "Projekt-Tags",
+        "widget.mod.creators" to "Projekt-Urheber",
+        "widget.mod.compatibility" to "Projektkompatibilität",
+        "widget.mod.links" to "Projektlinks",
+        "widget.mod.details" to "Projektangaben",
         "widget.appshell.rightrail.compactnews" to "Neuigkeiten",
         "widget.appshell.rightrail.compactnews.maxItems" to "Max. Einträge (0 = alle)",
         "widget.appshell.rightrail.compactnews.showTitle" to "Titel anzeigen",
         "widget.appshell.rightrail.compactnews.imageSource" to "Bildquelle",
         "widget.appshell.rightrail.compactnews.channel" to "Kanal",
+        "widget.bg.audio" to "Hintergrundton",
         "widget.bg.enable.toggle" to "Hintergrund an/aus",
         "widget.bg.fx.animspeed" to "Animationstempo",
         "widget.bg.fx.blur" to "Unschärfe",
@@ -1167,7 +1311,6 @@ object GermanStrings : AppStrings {
         "widget.container.tabs.label2" to "Tab 2",
         "widget.container.tabs.label3" to "Tab 3",
         "widget.container.tabs.tabCount" to "Tabs",
-        "widget.home.classic.content" to "Klassisches Dashboard",
         "widget.home.new.clock" to "Uhr",
         "widget.home.new.clock.accent" to "Akzentfarbe",
         "widget.home.new.clock.faceSize" to "Zifferblattgröße",
@@ -1178,10 +1321,9 @@ object GermanStrings : AppStrings {
         "widget.home.new.hero" to "Pack-Hero-Karte",
         "widget.home.new.hero.height" to "Höhe",
         "widget.home.new.hero.showMeta" to "Metadaten",
+        "widget.home.new.hero.playLayout" to "Knopfaufbau",
         "widget.home.new.launchbutton" to "Startknopf",
         "widget.home.new.launchbutton.label" to "Beschriftung",
-        "widget.home.new.music" to "Musikplayer",
-        "widget.home.new.music.title" to "Überschrift",
         "widget.home.new.playback.mini" to "Mini-Player",
         "widget.home.new.player.timeline" to "Player: die Karte ist die Zeitachse",
         "widget.home.new.player.timeline.fill" to "Abgespielter Anteil",
@@ -1192,13 +1334,47 @@ object GermanStrings : AppStrings {
         "widget.home.new.player.seeded.tint" to "Cover-Anteil",
         "widget.home.new.player.cover" to "Cover-Player",
         "widget.home.new.player.cover.showAlbum" to "Album anzeigen",
+        "widget.home.new.player.wave" to "Player: der Klang ist das Bild",
+        "widget.home.new.player.wave.showTimes" to "Zeiten anzeigen",
+        "widget.home.new.player.ground" to "Player: das Cover ist der Grund",
+        "widget.home.new.player.ground.dim" to "Abdunklung",
+        "widget.home.new.player.record" to "Player: die Schallplatte",
+        "widget.home.new.player.record.showCaption" to "Titel unter der Scheibe",
+        "widget.home.new.player.record.size" to "Größte Breite",
+        "widget.home.new.player.column" to "Player: die Spalte",
+        "widget.home.new.player.column.showCover" to "Cover anzeigen",
+        "widget.home.new.player.column.size" to "Größte Breite",
+        "widget.home.new.player.tile" to "Player: die Cover-Kachel",
+        "widget.home.new.player.tile.showCaption" to "Titel im Ruhezustand",
+        "widget.home.new.player.tile.size" to "Größte Breite",
+        "widget.home.new.player.token" to "Player: das Abzeichen",
+        "widget.home.new.player.token.showCover" to "Cover in der Mitte",
+        "widget.home.new.player.token.size" to "Größte Breite",
         "widget.home.new.progress" to "Hintergrundaktivität",
         "widget.home.new.progress.idleText" to "Leerlauftext",
         "widget.home.new.progress.title" to "Überschrift",
         "widget.home.new.quicklaunch" to "Schnellstart",
         "widget.home.new.quicklaunch.buttonLabel" to "Knopfbeschriftung",
+        "widget.home.new.quicklaunch.playLayout" to "Knopfaufbau",
         "widget.home.new.recent" to "Pack-Kacheln",
-        "widget.home.new.recent.maxTiles" to "Anzahl Kacheln",
+        "widget.home.new.whatsnew" to "Neuigkeiten",
+        "widget.decor.particles" to "Partikel",
+        "widget.decor.particles.field" to "Art",
+        "widget.decor.particles.density" to "Dichte",
+        "widget.home.new.continue" to "Weiterspielen, groß",
+        "widget.home.new.continue.showFacts" to "Fakten",
+        "widget.home.new.packlist" to "Modpack-Liste",
+        "widget.home.new.spines" to "Modpack-Rücken",
+        "widget.home.new.time" to "Uhrzeit, groß",
+        "widget.home.new.time.showDate" to "Datum",
+        "widget.home.new.hero.fillHeight" to "Höhe füllen",
+        "widget.home.new.packlist.title" to "Titel",
+        "widget.home.new.packlist.maxRows" to "Zeilen (0: alle)",
+        "widget.home.new.packlist.skipContinued" to "Weitergespieltes Modpack auslassen",
+        "widget.home.new.hero.followWidth" to "Mit der Breite wachsen",
+        "widget.home.new.recent.rows" to "Reihen",
+        "widget.home.new.recent.tileWidth" to "Minimale Kachelbreite",
+        "widget.home.new.recent.maxTiles" to "Kachelgrenze (0: so viele wie passen)",
         "widget.home.new.recent.title" to "Überschrift",
         "widget.home.new.spacer" to "Abstand",
         "widget.home.new.spacer.height" to "Höhe",
@@ -1215,6 +1391,7 @@ object GermanStrings : AppStrings {
         "widget.library.header.title" to "Überschrift",
         "widget.library.header.show" to "Kopf anzeigen",
         "widget.nav.entry" to "Navigationspunkt",
+        "widget.nav.screen" to "Bildschirm-Link",
         "widget.notes.scratch" to "Notizen",
         "widget.notes.scratch.placeholder" to "Schreib etwas...",
         "widget.notes.scratch.title" to "Titel",
@@ -1232,11 +1409,6 @@ object GermanStrings : AppStrings {
         "widget.profile.nav" to "Profilnavigation",
         "widget.profile.skin.section" to "Skin",
         "widget.profile.skin.section.previewHeight" to "Vorschauhöhe",
-        "widget.server.details.banner" to "Server-Banner",
-        "widget.server.details.banner.cornerRadius" to "Eckenrundung",
-        "widget.server.details.description" to "Serverbeschreibung",
-        "widget.server.details.tagbar" to "Server-Tags",
-        "widget.server.details.title" to "Servertitel",
         "widget.theme.picker.grid" to "Themen-Raster",
         "widget.theme.picker.preview" to "Themen-Vorschau",
     )
@@ -1272,6 +1444,11 @@ object GermanStrings : AppStrings {
     override val thresholdErrorTitle     = "start fehlgeschlagen"
     override val thresholdOpenLogs       = "log-ordner öffnen"
     override val thresholdQuit           = "beenden"
+    override val widgetStateTooLong = "Zu lang zum Speichern"
+    override val editorPropUnreadable = "Der gespeicherte Wert ist nicht lesbar, daher gilt der Standardwert"
+    override val thresholdRecovery = "neustart in wiederherstellung"
+    override val thresholdRecoveryArmed = "die wiederherstellung öffnet beim nächsten start"
+    override val thresholdRecoveryHint = "die wiederherstellung öffnet auch, wenn der launcher mit --recovery oder NEXIRA_RECOVERY=1 gestartet wird"
     override val recoveryReloadedNotice = "Oberfläche nach einem Fehler neu geladen"
     override val editorSave    = "Speichern"
     override val editorApply   = "Anwenden"
@@ -1283,7 +1460,39 @@ object GermanStrings : AppStrings {
     override val editorSlotRow    = "Reihe"
     override val editorSlotGrid   = "Raster"
     override val editorSlotCanvas = "Leinwand"
-    override val editorSlotCubeGrid = "Würfel"
+    override val editorSlotViewportTitle = "Scrollen"
+    override val editorViewportStatic = "Keins"
+    override val editorViewportDown = "Nach unten"
+    override val editorViewportRight = "Zur Seite"
+    override val editorViewportScrollbar = "Bildlaufleiste"
+    override val editorViewportMap = "Karte"
+    override val editorViewportPaged = "Seitenweise"
+    override val editorPin = "Festhalten"
+    override val editorUnpin = "Loslassen"
+    override val modulesTitle = "Widget-Module"
+    override val modulesChip = "Module"
+    override val modulesEmpty = "Keine Module. Lege eine .jar in den Ordner und lies ihn neu ein."
+    override val modulesReload = "Ordner neu einlesen"
+    override val modulesOpenFolder = "Ordner öffnen"
+    override fun moduleWidgets(n: Int) = "Widgets: $n"
+    override val moduleOff = "Ausgeschaltet"
+    override fun moduleOffAfterCrash(failure: String) = "Nach einem Absturz ausgeschaltet: $failure"
+    override fun moduleRefused(reason: String) = "Nicht geladen: $reason"
+    override val moduleGone = "Die Datei ist weg. Ihre Widgets bleiben erhalten, bis du sie vergisst."
+    override val moduleForget = "Vergessen"
+    override fun moduleCrashedTitle(name: String) = "Widget-Modul „$name“ ist abgestürzt"
+    override fun moduleCrashedBody(failure: String) = "Es wurde ausgeschaltet, damit der Launcher weiterläuft ($failure). Im Editor unter „Module“ lässt es sich wieder einschalten."
+    override val mapGoHome = "Zurück zum Inhalt"
+    override val editorAnchorTitle = "Anker"
+    override val editorAnchorTopStart = "Oben links"
+    override val editorAnchorTopCenter = "Oben"
+    override val editorAnchorTopEnd = "Oben rechts"
+    override val editorAnchorCenterStart = "Links"
+    override val editorAnchorCenter = "Mitte"
+    override val editorAnchorCenterEnd = "Rechts"
+    override val editorAnchorBottomStart = "Unten links"
+    override val editorAnchorBottomCenter = "Unten"
+    override val editorAnchorBottomEnd = "Unten rechts"
     override val editorSlotLayoutMenuTitle     = "Layout"
     override val editorSlotGridColumns         = "Spalten"
     override val editorSlotGridColumnsDecrease = "Weniger Spalten"
@@ -1293,6 +1502,14 @@ object GermanStrings : AppStrings {
     // --- Layout editor: prop panel ---
     override val editorResetToDefault = "Auf Standard zurücksetzen"
     override val editorBackingTitle   = "Hintergrund"
+    override val editorPaddingTitle   = "Abstand"
+    override val editorMotionTitle = "Auftritt"
+    override val editorMotionEnter = "Wie es erscheint"
+    override val editorMotionDelay = "Verzögerung, ms"
+    override val entranceNone = "Ohne"
+    override val entranceFade = "Einblenden"
+    override val entranceRise = "Aufsteigen"
+    override val entranceSettle = "Landen"
     override val editorSurfaceNone    = "Dieses Widget zeichnet keine Fläche. Wird eine hinzugefügt, liegt dahinter eine Oberfläche, die sich gestalten lässt."
     override val editorSurfaceAdd     = "Fläche hinzufügen"
     override val editorSurfaceOwn     = "Dieses Widget zeichnet seine Fläche selbst, hier gibt es also nichts einzustellen. Ihre Form ändert sich mit dem, was es tut, und das kann ein gespeicherter Datensatz nicht beschreiben."
@@ -1310,7 +1527,7 @@ object GermanStrings : AppStrings {
     override val editorSurfaceBlur    = "Unschärfe"
     override val editorSurfaceBorder  = "Rand"
     override val editorSurfaceShadow  = "Schatten"
-    override val editorSurfaceFillHint = "Leer folgt dem Design; ein Stufenname (base, raised, floating, sunken) folgt der Palette; #RRGGBB oder #AARRGGBB nicht."
+    override val editorSurfaceFillHint = "Leer folgt dem Design. Ein Flächenwort (panel, card, field, popup, chrome) folgt ebenfalls dem Design, relativ zu dem, was das Widget hält. #RRGGBB oder #AARRGGBB nicht."
     override val editorSurfaceShapeKind        = "Form"
     override val editorSurfaceSmoothing        = "Glättung"
     override val editorSurfaceCornerTopStart   = "Ecke, oben Anfang"
@@ -1331,6 +1548,24 @@ object GermanStrings : AppStrings {
     override val editorPresetNamePlaceholder = "Preset-Name..."
     override fun editorPresetsSaved(count: Int) = "Gespeichert ($count)"
     override val editorPresetsEmpty          = "Leer. Speichere das aktuelle Layout als erstes Preset."
+    override val editorPresetWriteFailed     = "Der Preset-Ordner konnte nicht beschrieben werden. Prüfe, ob auf dem Datenträger Platz ist und der Ordner beschreibbar ist."
+    override val editorPresetsBuiltIn          = "Vorlagen"
+    override fun bundledPresetName(id: String) = when (id) {
+        "home-type" -> "Startseite: Typografie"
+        "home-column" -> "Startseite: Spalte"
+        "home-spines" -> "Startseite: Buchrücken"
+        "home-dock" -> "Startseite: Dock"
+        "home-bento" -> "Startseite: Bento"
+        else -> id
+    }
+    override fun bundledPresetDescription(id: String) = when (id) {
+        "home-type" -> "Das Modpack zum Weiterspielen groß, die Bibliothek als Liste"
+        "home-column" -> "Eine hohe Karte links, die Modpacks als Raster daneben"
+        "home-spines" -> "Jedes Modpack ein Streifen im Regal, eines aufgeklappt"
+        "home-dock" -> "Oben die Uhrzeit, unten die Modpacks in einer Reihe"
+        "home-bento" -> "Zellen nach Gewicht, das Modpack zum Weiterspielen am größten"
+        else -> ""
+    }
 
     // --- Layout editor: palette ---
     override val editorPaletteHide  = "Palette ausblenden"
@@ -1352,9 +1587,27 @@ object GermanStrings : AppStrings {
     override val editorResetSurfaceTitle = "Oberfläche auf Standard zurücksetzen?"
     override fun editorResetSurfaceBody(name: String) =
         "\"$name\" kehrt zur Widget-Anordnung aus dem eingebauten Standard-Layout zurück. Alle lokalen Änderungen auf dieser Oberfläche (hinzugefügte Widgets, Umsortierungen, Löschungen) gehen verloren. Andere Oberflächen bleiben unberührt."
+    override val editorResetAllTitle = "Alle Oberflächen auf Standard zurücksetzen?"
+    override val editorResetAllBody = "Jede Oberfläche kehrt zur Anordnung aus dem eingebauten Standard-Layout zurück, und alle lokalen Änderungen auf allen Oberflächen gehen verloren. Selbst erstellte Bildschirme bleiben erhalten."
     override val editorPreview           = "Vorschau"
     override val editorPreviewHidden     = "Ausgeblendet"
     override val editorPaletteToggleHide = "Ausblenden"
+    override val editorRegionProps       = "Dieser Bereich"
+    override fun editorSurfaceFolded(name: String) = "$name, eingeklappt"
+    override val editorNewScreen = "Neuer Bildschirm"
+    override val editorMountRefused = "Diese Fläche ist weiter oben schon geöffnet und wird hier nicht noch einmal geöffnet"
+    override val screenMissing = "Diesen Bildschirm gibt es nicht mehr"
+    override val screenUntitled = "Ohne Namen"
+    override fun screenDefaultTitle(n: Int) = "Bildschirm $n"
+    override val screenSettingsTitle = "Bildschirm"
+    override val screenTitleLabel = "Name"
+    override val screenIconLabel = "Symbol"
+    override val screenDelete = "Bildschirm löschen"
+    override fun screenDeleteBody(title: String) = "„$title“ und alles darauf werden gelöscht, zusammen mit seinem Knopf in der Leiste."
+    override fun screenDeletedTitle(title: String) = "Bildschirm „$title“ gelöscht"
+    override val screenRestore = "Wiederherstellen"
+    override val editorUndo              = "Rückgängig"
+    override val editorRedo              = "Wiederholen"
     override val editorEscHint           = "Esc zum Beenden"
     override val editorFabEdit           = "Layout bearbeiten"
     override val editorFabDone           = "Bearbeitung beenden"
@@ -1367,14 +1620,12 @@ object GermanStrings : AppStrings {
     override val editorSurfShortAbout     = "Über"
     override val editorSurfShortBg        = "Hintergrund"
     override val editorSurfShortProfile   = "Profil"
-    override val editorSurfShortServer    = "Server"
     override val editorSurfShortTheme     = "Themes"
     override val editorSurfShortShell     = "Hülle"
     override val editorSurfShortTopBar    = "Oben"
     override val editorSurfShortBody      = "Bereich"
 
     // --- Layout editor: surface long names ---
-    override val editorSurfHomeClassic = "Start (klassisch)"
     override val editorSurfHomeNew     = "Start (neu)"
     override val editorSurfLibrary     = "Bibliothek"
     override val editorSurfLeftRail    = "Seitenleiste"
@@ -1382,7 +1633,6 @@ object GermanStrings : AppStrings {
     override val editorSurfAbout       = "Über"
     override val editorSurfBg          = "Hintergrund-Einstellungen"
     override val editorSurfProfile     = "Profil"
-    override val editorSurfServer      = "Server-Details"
     override val editorSurfTheme       = "Themenauswahl"
     override val editorSurfShell        = "App-Hülle"
     override val editorSurfTopBar       = "Obere Leiste"
@@ -1402,6 +1652,7 @@ object GermanStrings : AppStrings {
     override val audioRepeatQueue      = "Ganze Warteschlange"
     override val audioPlaybackOptions  = "Wiedergabe"
     override val audioSkipNext         = "Nächster Titel"
+    override val audioQueue = "Warteschlange"
     override val audioSkipPrevious     = "Vorheriger Titel"
     override val audioNoFile           = "Keine Datei"
     override val audioStatusReady      = "Bereit"
@@ -1431,8 +1682,16 @@ object GermanStrings : AppStrings {
     override fun readOnlyDataBody(stores: String) =
         "Von einem neueren Build des Launchers geschrieben: $stores. Schreibgeschützt geöffnet — diese Sitzung kann " +
             "nichts zurückschreiben, alle Änderungen gehen beim Beenden verloren. Aktualisieren Sie, um wieder zu bearbeiten."
+    override fun readOnlyDataBodyOldFormat(stores: String) =
+        "In einer Form geschrieben, die dieser Build nicht getreu lesen kann: $stores. Unverändert belassen " +
+            "und schreibgeschützt geöffnet, Änderungen gehen beim Beenden verloren. Ein älterer Build liest sie noch."
+    override fun readOnlyDataBodyDamaged(stores: String) =
+        "Konnte diesmal nicht gelesen werden: $stores. Unverändert belassen und schreibgeschützt geöffnet, " +
+            "Änderungen gehen beim Beenden verloren. Der nächste Start liest sie erneut, und wenn das nicht gelingt, lässt sie sich im Wiederherstellungsmodus zurücksetzen."
     override val readOnlyDataLibrary  = "die Pack-Sammlung"
     override val readOnlyDataLayout   = "das Layout"
+    override val readOnlyDataTheme    = "das Design"
+    override val readOnlyDataAccounts = "die gespeicherten Konten"
     override val videoFetchingTool    = "Downloader wird geholt"
     override val videoResolvingPage   = "Seite wird gelesen"
     override val videoDownloading     = "Wird heruntergeladen"
@@ -1457,3 +1716,7 @@ object GermanStrings : AppStrings {
     override val sessionsActiveTitle = "Aktive Sitzungen"
     override val aboutLogoDesc       = "App-Logo"
 }
+
+/** Built once, as the other catalogues do, rather than on every notification's tooltip. */
+private val germanNotificationTime: DateTimeFormatter =
+    DateTimeFormatter.ofPattern("d. MMMM yyyy, HH:mm:ss", Locale.GERMAN).withZone(ZoneId.systemDefault())

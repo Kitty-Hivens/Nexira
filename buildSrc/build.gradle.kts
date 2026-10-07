@@ -7,7 +7,7 @@
 //     custom DefaultTask subclass can use Property<T>, @Input / @Output
 //     annotations, etc., without explicit dependency declarations.
 //   - Java 17+ source/target by default, which lines up with the project's
-//     JDK 26 toolchain (buildSrc runs under the daemon's JDK, not the
+//     JDK 27 toolchain (buildSrc runs under the daemon's JDK, not the
 //     subprojects' toolchain pin).
 //
 // Why buildSrc/ rather than `:build-logic` composite-included module:
@@ -28,6 +28,13 @@ plugins {
 repositories {
     gradlePluginPortal()
     mavenCentral()
+}
+
+// Kotlin compiles this to JVM 26, the newest target it knows, while the Java side
+// follows the daemon's JDK 27. There are no Java sources here, so the Java target
+// is held to Kotlin's, which is what the plugin checks the two against.
+java {
+    targetCompatibility = JavaVersion.VERSION_26
 }
 
 // Convention plugins declared here become consumable from project

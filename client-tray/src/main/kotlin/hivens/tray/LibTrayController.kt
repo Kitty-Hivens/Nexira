@@ -29,10 +29,21 @@ class LibTrayController : TrayController {
     @Volatile
     private var state: State = State.NOT_STARTED
 
-    private var tray: Tray? = null
-    private var strings: TrayStrings? = null
-    private var appName: String = "Nexira"
-    private var unsubscribe: (() -> Unit)? = null
+    // Written by init on an IO thread and by the shell on the UI thread, read by
+    // both, so each is published like the state above.
+    @Volatile private var tray: Tray? = null
+    @Volatile private var strings: TrayStrings? = null
+    @Volatile private var appName: String = "Nexira"
+    @Volatile private var unsubscribe: (() -> Unit)? = null
+
+    /**
+     * Installing a tray and taking it down happen under this, and [generation] says
+     * whether the install still stands. Creating the tray takes seconds and runs
+     * outside it, so a shutdown can land in the middle: it used to clear a handle
+     * that init then assigned, leaving the icon registered with nothing to remove it.
+     */
+    private val lifecycle = Any()
+    private var generation = 0
 
     @Volatile private var gameRunning: Boolean = false
     @Volatile private var gameServerName: String? = null
@@ -53,9 +64,11 @@ class LibTrayController : TrayController {
     override fun init(iconStream: InputStream, strings: TrayStrings, appName: String) {
         this.strings = strings
         this.appName = appName
-        if (state != State.NOT_STARTED) return
-
-        state = State.INITIALIZING
+        val mine = synchronized(lifecycle) {
+            if (state != State.NOT_STARTED) return
+            state = State.INITIALIZING
+            generation
+        }
         try {
             val iconBytes = iconStream.readAllBytes()
             val builder = TrayBuilder(
@@ -66,22 +79,29 @@ class LibTrayController : TrayController {
             )
             val t = Tray.create(builder) ?: run {
                 logger.warn("libtray Tray.create returned null -- no tray host reachable on this session")
-                state = State.FAILED
+                synchronized(lifecycle) { if (generation == mine) state = State.FAILED }
                 return
             }
-            tray = t
-            unsubscribe = t.onEvent { event ->
-                when (event) {
-                    // Left click -> restore window. Standard tray-icon behaviour.
-                    is TrayEvent.Activated -> onShowWindow?.invoke()
-                    is TrayEvent.MenuItemSelected -> dispatchMenu(event.id)
-                    else -> Unit
+            synchronized(lifecycle) {
+                if (generation != mine) {
+                    // Shut down while the host was being reached: this tray is nobody's.
+                    runCatching { t.close() }
+                    return
                 }
+                tray = t
+                unsubscribe = t.onEvent { event ->
+                    when (event) {
+                        // Left click -> restore window. Standard tray-icon behaviour.
+                        is TrayEvent.Activated -> onShowWindow?.invoke()
+                        is TrayEvent.MenuItemSelected -> dispatchMenu(event.id)
+                        else -> Unit
+                    }
+                }
+                state = State.READY
             }
-            state = State.READY
             logger.info("Tray initialized via libtray (title='{}')", appName)
         } catch (t: Throwable) {
-            state = State.FAILED
+            synchronized(lifecycle) { if (generation == mine) state = State.FAILED }
             logger.error("Failed to initialize the tray", t)
         }
     }
@@ -133,12 +153,15 @@ class LibTrayController : TrayController {
     )
 
     override fun shutdown() {
-        runCatching { unsubscribe?.invoke() }
-        runCatching { tray?.close() }
-        tray = null
-        unsubscribe = null
-        gameRunning = false
-        gameServerName = null
-        state = State.NOT_STARTED
+        synchronized(lifecycle) {
+            generation++
+            runCatching { unsubscribe?.invoke() }
+            runCatching { tray?.close() }
+            tray = null
+            unsubscribe = null
+            gameRunning = false
+            gameServerName = null
+            state = State.NOT_STARTED
+        }
     }
 }

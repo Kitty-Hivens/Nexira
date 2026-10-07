@@ -4,27 +4,18 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import hivens.core.api.model.ServerProfile
-import hivens.core.data.HomeView
 import hivens.core.data.SessionData
 import hivens.core.data.ThemeMode
 import hivens.core.security.SslBypassStore
 import hivens.launcher.network.ServerProtocolConfig
-import hivens.ui.widgets.shell.RAIL_DEFAULT_WIDTH
 import hivens.ui.background.BackgroundSettings
 import hivens.ui.background.hasUsableImage
 import hivens.ui.customization.CustomizationSettings
 import hivens.ui.editor.EditorSurfaceHost
 import hivens.ui.i18n.AppLocale
-import hivens.ui.icons.NxIcon
-import hivens.ui.nx.NxButton
-import hivens.ui.nx.NxButtonStyle
-import hivens.ui.icons.Symbol
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import hivens.ui.nx.NxSwap
 import hivens.ui.puppet.PuppetClick
@@ -35,23 +26,34 @@ import hivens.ui.screens.detail.settings.PackSettingsCategory
 import hivens.ui.screens.detail.versions.PackVersionsScreen
 import hivens.ui.screens.library.LibraryScreen
 import hivens.ui.screens.settings.SettingsScreen
-import hivens.ui.theme.NxTheme
-import hivens.ui.theme.CustomTheme
+import hivens.ui.theme.ThemeLibrary
+import hivens.ui.theme.Plane
+import hivens.ui.theme.Backdrop
+import hivens.ui.theme.LocalPlane
 import hivens.ui.utils.GameConsoleService
 import hivens.ui.widgets.about.AboutSurface
 import hivens.ui.widgets.bgsettings.BgSettingsSurface
 import hivens.ui.widgets.profile.ProfileSurface
 import hivens.ui.widgets.wardrobe.WardrobeSurface
-import hivens.ui.widgets.serverdetails.ServerDetailsSurface
 import hivens.ui.widgets.shell.LeftRailContext
 import hivens.ui.widgets.shell.LocalLeftRailContext
 import hivens.ui.widgets.shell.LocalShellContext
 import hivens.ui.widgets.shell.ShellContext
 import hivens.ui.widgets.themepicker.ThemePickerSurface
+import hivens.ui.screens.mod.LocalLinkFollower
+import hivens.ui.screens.mod.ModDetailScreen
+import hivens.ui.screens.mod.rememberNavigatingLinkFollower
+import hivens.ui.screens.mod.ModVersionScreen
+import hivens.ui.screens.custom.CustomScreen
+import hivens.ui.widgets.home.new.HomeNewContext
+import hivens.ui.widgets.home.new.LocalHomeNewContext
+import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.SlotRenderer
 import hivens.widget.model.SlotId
 import hivens.widget.model.SurfaceId
 import org.koin.compose.koinInject
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
 
 // ─── Layout ──────────────────────────────────────────────────────────────────
 
@@ -75,31 +77,29 @@ fun AppLayout(
     themeMode: ThemeMode = ThemeMode.Manual,
     onThemeModeChanged: (ThemeMode) -> Unit = {},
     systemThemeAvailable: Boolean = false,
-    paletteFromWallpaper: Boolean = true,
-    onPaletteFromWallpaperChanged: (Boolean) -> Unit = {},
-    customTheme: CustomTheme,
-    onCustomThemeChanged: (CustomTheme) -> Unit,
+    themeLibrary: ThemeLibrary,
+    onThemeSelected: (String) -> Unit,
     currentLocale: AppLocale,
     onLocaleChanged: (AppLocale) -> Unit,
-    homeView: HomeView,
-    onHomeViewChanged: (HomeView) -> Unit,
     backgroundSettings: BackgroundSettings = BackgroundSettings(),
-    onBackgroundSettingsChanged: (BackgroundSettings) -> Unit = {},
+    onBackgroundSettingsChanged: (BackgroundSettings.() -> BackgroundSettings) -> Unit = {},
     customization: CustomizationSettings = CustomizationSettings(),
     onCustomizationChanged: (CustomizationSettings) -> Unit = {},
 ) {
     val protocolConfig: ServerProtocolConfig = koinInject()
 
-    // Session can be refreshed by DashboardScreen on auth-retry
-    var currentSession by remember(appState) {
-        mutableStateOf((appState as? AppState.Authenticated)?.session)
-    }
-    var selectedServer by remember { mutableStateOf<ServerProfile?>(null) }
+    // Whoever signs in reports it upward, and the shell's own state is what comes
+    // back down here -- so this is derived rather than held. It used to be a var
+    // the classic home wrote into on an SC re-auth, which meant a refresh survived
+    // exactly until the next appState change discarded it.
+    val currentSession = (appState as? AppState.Authenticated)?.session
 
-    // Go transparent only when the wallpaper can actually be drawn -- a deleted
-    // image left the row transparent over a blank white window.
-    val rowBackground = if (backgroundSettings.hasUsableImage()) Color.Transparent
-    else NxTheme.colors.background
+    // Go transparent only when the wallpaper can actually be drawn: a deleted image
+    // left the row transparent over a blank white window. Everything inside is told
+    // which of the two it sits on, so a plane over a picture knows it is over one.
+    val overWallpaper = backgroundSettings.hasUsableImage()
+    val rowBackground = if (overWallpaper) Color.Transparent else NxColor.page
+    val page = Plane(step = 0, color = NxColor.page, over = if (overWallpaper) Backdrop.Wallpaper else Backdrop.Page)
 
     val bypassHost = protocolConfig.sslBypassHost
     val bypassStore: SslBypassStore = koinInject()
@@ -108,7 +108,7 @@ fun AppLayout(
 
     // The center region's screen router. Defined here (not in the layout graph)
     // because navigation is not yet a widget surface; the center region widget
-    // invokes it. Reads currentSession/selectedServer live on each recompose.
+    // invokes it. Reads currentSession live on each recompose.
     val centerBody: @Composable () -> Unit = {
         // Screens are disposed when they are swapped out, so everything a reader had
         // arranged -- a scroll position, an open tab, a chosen category -- died with
@@ -122,39 +122,10 @@ fun AppLayout(
         ) { screen ->
             retention.SaveableStateProvider(screen.retentionKey) {
                 when (screen) {
-                    Screen.Home -> {
-                        val session = currentSession
-                        when (homeView) {
-                            // The classic dashboard IS the SmartyCraft server list, so it
-                            // is genuinely gated on auth. `Loading` is the brief window
-                            // between startup and resolved credentials -- spinner is
-                            // appropriate; `Unauthenticated` is a stable state waiting on
-                            // user input, so it gets the explicit sign-in copy + route.
-                            HomeView.Classic -> when {
-                                session != null -> DashboardScreen(
-                                    session               = session,
-                                    initialSelectedServer = selectedServer,
-                                    onServerSelected      = { selectedServer = it },
-                                    onSessionUpdated      = { currentSession = it },
-                                    onOpenServerSettings  = { onScreenChange(Screen.ServerSettings(it.assetDir)) },
-                                    onOpenDetails         = { onScreenChange(Screen.ServerDetails(it.assetDir)) }
-                                )
-                                appState is AppState.Loading -> ContentLoadingPlaceholder()
-                                else -> ContentLoginRequiredPlaceholder(
-                                    onSignIn = { onScreenChange(Screen.Profile) },
-                                )
-                            }
-                            // The pack-centric variant runs on LOCAL data (pack repo,
-                            // layout graph) and renders signed-out; its launch
-                            // affordances degrade per-widget (offline / sign-in)
-                            // instead of gating the whole page on an SC session.
-                            HomeView.New -> NewHomeScreen(
-                                appState         = appState,
-                                onScreenChange   = onScreenChange,
-                                onSessionUpdated = { currentSession = it },
-                            )
-                        }
-                    }
+                    // One home. The classic dashboard WAS the SmartyCraft server
+                    // list, and SmartyCraft arrives as mirror packs now, so the
+                    // screen it lived on went with the path it was a front for.
+                    Screen.Home -> NewHomeScreen()
 
                     Screen.Profile ->
                         ProfileSurface(
@@ -174,17 +145,16 @@ fun AppLayout(
                             onOpenThemePicker            = { onScreenChange(Screen.ThemePicker) },
                             currentLocale                = currentLocale,
                             onLocaleChanged              = onLocaleChanged,
-                            homeView                     = homeView,
-                            onHomeViewChanged            = onHomeViewChanged,
                             onOpenBackgroundSettings     = { onScreenChange(Screen.BackgroundSettings) },
                             onOpenAbout                  = { onScreenChange(Screen.About) },
                         )
 
                     Screen.ThemePicker ->
                         ThemePickerSurface(
-                            currentTheme    = customTheme,
-                            onThemeSelected = { newTheme ->
-                                onCustomThemeChanged(newTheme)
+                            library         = themeLibrary,
+                            isDarkTheme     = isDarkTheme,
+                            onThemeSelected = { id ->
+                                onThemeSelected(id)
                                 onBack()
                             },
                             onBack          = onBack,
@@ -203,28 +173,13 @@ fun AppLayout(
                             themeMode = themeMode,
                             onThemeModeChanged = onThemeModeChanged,
                             systemThemeAvailable = systemThemeAvailable,
-                            paletteFromWallpaper = paletteFromWallpaper,
-                            onPaletteFromWallpaperChanged = onPaletteFromWallpaperChanged,
+                            activeTheme       = themeLibrary.active,
                             surfaceBlur       = customization.surfaceBlur,
                             onSurfaceBlurChanged = { onCustomizationChanged(customization.copy(surfaceBlur = it)) },
+                            reduceMotion      = customization.reduceMotion,
+                            onReduceMotionChanged = { onCustomizationChanged(customization.copy(reduceMotion = it)) },
                             onOpenThemePicker = { onScreenChange(Screen.ThemePicker) },
                         )
-
-                    is Screen.ServerSettings ->
-                        WithServer(screen.serverId, onBack) { server ->
-                            ServerSettingsScreen(
-                                server = server,
-                                onBack = onBack
-                            )
-                        }
-
-                    is Screen.ServerDetails ->
-                        WithServer(screen.serverId, onBack) { server ->
-                            ServerDetailsSurface(
-                                server = server,
-                                onBack = onBack,
-                            )
-                        }
 
                     Screen.Library -> LibraryScreen(
                         appState       = appState,
@@ -270,6 +225,7 @@ fun AppLayout(
                                 }
                                 onScreenChange(Screen.PackVersions(screen.instanceId))
                             },
+                            onOpenProject          = { onScreenChange(Screen.ModDetail(it)) },
                         )
 
                     is Screen.PackVersions ->
@@ -277,6 +233,20 @@ fun AppLayout(
                             instanceId = screen.instanceId,
                             onBack     = onBack,
                         )
+
+                    is Screen.ModDetail -> ModDetailScreen(
+                        target = screen.target,
+                        onOpenVersion = { id, number ->
+                            onScreenChange(Screen.ModVersion(screen.target, id, number))
+                        },
+                    )
+
+                    is Screen.ModVersion -> ModVersionScreen(
+                        target = screen.target,
+                        versionId = screen.versionId,
+                    )
+
+                    is Screen.Custom -> CustomScreen(screen.id)
                 }
             }
         }
@@ -301,21 +271,32 @@ fun AppLayout(
     )
 
     // The editor host wraps the WHOLE shell (rails included) so its decorators
-    // reach rail widgets; the insets keep the chrome over the center pane (past
-    // the 64dp rail + 264dp panel, each plus a 1dp divider). The shell itself is
-    // now a widget surface: appshell.root lays its three region widgets in a Row.
+    // reach rail widgets; it puts its own chrome back over the content pane from
+    // what the centre region reports. The shell itself is a widget surface:
+    // appshell.root lays its three region widgets in a Row.
+    // What Home's widgets read, provided around the whole shell rather than by the
+    // Home screen alone. Both halves are the shell's anyway, and provided only on
+    // Home they pinned every one of those widgets there: dropped on a screen
+    // somebody made, they read a context nobody had provided and took the shell down.
+    val homeCtx = remember(appState, onScreenChange) {
+        HomeNewContext(appState = appState, onScreenChange = onScreenChange)
+    }
+
     EditorSurfaceHost(
         currentScreen          = currentScreen,
-        homeView               = homeView,
         customization          = customization,
         onCustomizationChanged = onCustomizationChanged,
-        centerStartInset       = 65.dp,
-        // The rail's own default, not a copy of the number it happens to be. A
-        // rail widened in the editor used to leave this behind, and the overlay
-        // then sat over the rail it was meant to stop short of.
-        centerEndInset         = RAIL_DEFAULT_WIDTH,
+        onOpenScreen           = onSwitchTab,
     ) {
-        CompositionLocalProvider(LocalShellContext provides shellCtx) {
+        // Links that point at a project the launcher can draw stop going out to a
+        // browser from here down. Provided at the shell rather than per surface, so
+        // a markdown body and a rail widget follow the same rule.
+        CompositionLocalProvider(
+            LocalShellContext provides shellCtx,
+            LocalHomeNewContext provides homeCtx,
+            LocalLinkFollower provides rememberNavigatingLinkFollower(),
+            LocalPlane provides page,
+        ) {
             SlotRenderer(
                 surface  = SurfaceId("appshell.root"),
                 slot     = SlotId("regions"),
@@ -355,6 +336,10 @@ fun AppSidebar(
     if (isAuthenticated) {
         PuppetClick("nav.logout") { onLogout() }
     }
+    // A made screen has no fixed entry above, so it is driven by its id.
+    LocalLayoutGraph.current.screens.forEach { spec ->
+        key(spec.id) { PuppetClick("nav.screen.${spec.id}") { onSwitchTab(Screen.Custom(spec.id)) } }
+    }
 
     val ctx = remember(currentScreen, isAuthenticated, onScreenChange, onSwitchTab, onLogout) {
         LeftRailContext(
@@ -371,7 +356,7 @@ fun AppSidebar(
             // Transparent: the rail's NxSurface wrapper (ShellLeftRegion) owns the
             // background now, so its own opacity and blur drive the matte.
             containerColor = Color.Transparent,
-            contentColor   = NxTheme.colors.textSecondary
+            contentColor   = NxInk.quiet
         ) {
             // Items sit flush (spacing 0) so the rail is one contiguous column
             // of clickable slots with no dead gap between buttons. Each NavSlot
@@ -388,73 +373,3 @@ fun AppSidebar(
 }
 
 private const val SIDEBAR_SURFACE = "appshell.leftrail"
-
-/**
- * Renders [content] once the roster entry behind a server-scoped route resolves.
- *
- * A server that is no longer on the roster leaves rather than paints a screen
- * built on an entry nothing serves any more -- the same exit the version manager
- * takes when its instance is deleted underneath it.
- */
-@Composable
-private fun WithServer(
-    serverId: String,
-    onBack: () -> Unit,
-    content: @Composable (ServerProfile) -> Unit,
-) {
-    when (val resolution = rememberServerResolution(serverId)) {
-        ServerResolution.Loading -> ContentLoadingPlaceholder()
-        ServerResolution.NotFound -> {
-            LaunchedEffect(serverId) { onBack() }
-            ContentLoadingPlaceholder()
-        }
-        is ServerResolution.Ready -> content(resolution.server)
-    }
-}
-
-// ─── Loading placeholder ──────────────────────────────────────────────────────
-
-@Composable
-private fun ContentLoadingPlaceholder() {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        CircularProgressIndicator(
-            color       = NxTheme.colors.primary.copy(alpha = 0.35f),
-            modifier    = Modifier.size(28.dp),
-            strokeWidth = 2.dp
-        )
-    }
-}
-
-@Composable
-private fun ContentLoginRequiredPlaceholder(onSignIn: () -> Unit) {
-    val s = hivens.ui.i18n.LocalStrings.current
-    Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Symbol(icon = NxIcon.Person,
-                contentDescription = null,
-                tint = NxTheme.colors.primary.copy(alpha = 0.45f),
-                modifier = Modifier.size(48.dp)
-            )
-            Text(
-                text = s.dashboardLoginRequiredTitle,
-                style = MaterialTheme.typography.titleMedium,
-                color = NxTheme.colors.textPrimary
-            )
-            Text(
-                text = s.dashboardLoginRequiredHint,
-                style = MaterialTheme.typography.bodySmall,
-                color = NxTheme.colors.textSecondary,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.widthIn(max = 360.dp)
-            )
-            NxButton(
-                label   = s.loginButton,
-                onClick = onSignIn,
-                style   = NxButtonStyle.Primary,
-            )
-        }
-    }
-}

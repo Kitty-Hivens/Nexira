@@ -20,7 +20,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  JAVA_VERSION: '26'
+  JAVA_VERSION: '27'
   JAVA_DISTRIBUTION: 'liberica'
   # Every setup-java step below uses `cache: 'gradle'` -- reuses
   # ~/.gradle/caches + ~/.gradle/wrapper across runs (keyed on *.gradle*,
@@ -211,8 +211,9 @@ jobs:
           :client-cli:test :client-media:test :client-tray:test
           :client-ui:desktopTest :client-i18n:desktopTest :client-render3d:desktopTest
           :client-easter:desktopTest :nx-ui:desktopTest
-          :widget-api:test :widget-model:test :widget-processor:test
+          :widget-api:test :widget-model:test :widget-processor:test :widget-loader:test
           :authlib-agent:test :profiler-agent:test
+          :experimental:client-boot:test :examples:widget-pixelplayer:test
           --continue
 
       # Gradle's daemon keeps the .lock files under ~/.gradle/caches open for as
@@ -243,9 +244,11 @@ jobs:
     name: Extract Changelog
     runs-on: ubuntu-latest
     needs: test   # tests must pass before we touch artefacts
+    # The notes travel as an artifact of two files rather than as job outputs.
+    # An output reaches a later step as an environment variable, and Linux
+    # refuses to start a process with one variable past 128 KiB, which the
+    # engineering log of a release passes on its own.
     outputs:
-      notes: ${{ steps.extract.outputs.notes }}
-      player_notes: ${{ steps.extract.outputs.player_notes }}
       version: ${{ steps.version.outputs.value }}
     steps:
       # Full history + tags: a tag with no CHANGELOG section of its own derives
@@ -280,8 +283,10 @@ jobs:
         env:
           VERSION: ${{ steps.version.outputs.value }}
         run: |
+          mkdir -p release-notes
           if [ ! -f CHANGELOG.md ]; then
-            echo "notes=No CHANGELOG.md found — see commit history." >> "$GITHUB_OUTPUT"
+            printf '%s' "No CHANGELOG.md found, see the commit history." > release-notes/engineering.md
+            : > release-notes/player.md
             exit 0
           fi
 
@@ -344,15 +349,13 @@ jobs:
             ' CHANGELOG_EN.md | sed '/./,$!d' | sed 's/[[:space:]]*$//')
           fi
 
-          EOF_DELIM=$(openssl rand -hex 8)
-          {
-            echo "notes<<$EOF_DELIM"
-            echo "$NOTES"
-            echo "$EOF_DELIM"
-            echo "player_notes<<$EOF_DELIM"
-            echo "$PLAYER_NOTES"
-            echo "$EOF_DELIM"
-          } >> "$GITHUB_OUTPUT"
+          printf '%s' "$NOTES" > release-notes/engineering.md
+          printf '%s' "$PLAYER_NOTES" > release-notes/player.md
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-notes
+          path: release-notes/
 
   # ─────────────────────────────────────────────────────────────────────────
   # WINDOWS — Inno Setup EXE + Portable ZIP
@@ -506,14 +509,19 @@ jobs:
         run: ./scripts/inject-metainfo-release.sh "$APP_VERSION"
 
       - name: Build AppImage
+        id: appimage
         run: |
           JAR=$(ls client-ui/build/compose/jars/*-release*.jar | head -1)
           ./scripts/build-appimage.sh "$APP_VERSION" "$JAR"
 
+      # Both names come from the script, which picks them by channel. zsync is
+      # empty for anything but a release, and an empty line is skipped.
       - uses: actions/upload-artifact@v7
         with:
           name: linux-artifacts
-          path: Nexira-${{ env.APP_VERSION }}-x86_64.AppImage
+          path: |
+            ${{ steps.appimage.outputs.path }}
+            ${{ steps.appimage.outputs.zsync }}
 
   # ─────────────────────────────────────────────────────────────────────────
   # MACOS — DMG (Apple Silicon only in the release pipeline)
@@ -621,6 +629,13 @@ jobs:
           merge-multiple: true
           path: dist/
 
+      # Beside dist/ rather than in it: everything in dist/ is uploaded to the
+      # release and listed in its checksums.
+      - uses: actions/download-artifact@v8
+        with:
+          name: release-notes
+          path: release-notes/
+
       # The redirection creates SHA256SUMS.txt before find enumerates the
       # directory, so without the exclusion find hashed the file while it was
       # still empty and shipped a self-entry of e3b0c442... -- the digest of no
@@ -634,16 +649,14 @@ jobs:
 
       - name: Generate release-manifest.json
         working-directory: dist
-        env:
-          PLAYER_NOTES: ${{ needs.changelog.outputs.player_notes }}
         run: |
           # The player notes as written, not a slice of the engineering log. The
           # launcher prefers the reader's own language off `stable` and uses this
           # only when that file cannot be read, so what it carries has to stand
           # on its own.
           # Verbatim, blank lines and all: the notes are a paragraph, a heading
-          # and a list, and the dialog renders them as markdown.
-          HIGHLIGHTS="$PLAYER_NOTES"
+          # and a list, and the dialog renders them as markdown. Read with
+          # --rawfile, since an argument has the same size limit as a variable.
 
           ASSETS_JSON='[]'
           while IFS= read -r line; do
@@ -658,6 +671,7 @@ jobs:
               *Setup.exe)             plat=windows; kind=installer ;;
               *Windows-Portable.zip)  plat=windows; kind=portable  ;;
               *.AppImage)             plat=linux;   kind=appimage  ;;
+              *.AppImage.zsync)       plat=linux;   kind=zsync     ;;
               *aarch64.dmg)           plat=macos;   kind=dmg-arm64 ;;
               *x86_64.dmg)            plat=macos;   kind=dmg-intel ;;
               *.dmg)                  plat=macos;   kind=dmg       ;;
@@ -675,7 +689,7 @@ jobs:
           jq -n \
             --arg ver "$APP_VERSION" \
             --arg pub "$PUBLISHED_AT" \
-            --arg hl "$HIGHLIGHTS" \
+            --rawfile hl ../release-notes/player.md \
             --argjson assets "$ASSETS_JSON" \
             '{
               schemaVersion: 1,
@@ -685,23 +699,19 @@ jobs:
               assets: $assets
             }' > release-manifest.json
 
+      # A file end to end. The action's `body` input reaches it as an
+      # environment variable too, with the same limit.
       - name: Compose release body
-        id: body
         env:
-          CHANGELOG_NOTES: ${{ needs.changelog.outputs.notes }}
-          PLAYER_NOTES: ${{ needs.changelog.outputs.player_notes }}
-        run: |
-          EOF_DELIM=$(openssl rand -hex 8)
-          {
-            echo "body<<$EOF_DELIM"
-            ./scripts/compose-release-body.sh
-            echo "$EOF_DELIM"
-          } >> "$GITHUB_OUTPUT"
+          CHANGELOG_NOTES_FILE: release-notes/engineering.md
+          PLAYER_NOTES_FILE: release-notes/player.md
+          CHECKSUMS_FILE: dist/SHA256SUMS.txt
+        run: ./scripts/compose-release-body.sh > release-body.md
 
       - uses: softprops/action-gh-release@v3
         with:
           name: Nexira v${{ env.APP_VERSION }}
-          body: ${{ steps.body.outputs.body }}
+          body_path: release-body.md
           files: dist/*
           draft: false
           # generate_release_notes intentionally OFF: GitHub's auto section is also

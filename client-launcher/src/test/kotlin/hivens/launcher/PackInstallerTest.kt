@@ -118,7 +118,7 @@ class PackInstallerTest {
         // The runtime is Mojang's CDN and a shared directory, neither of which this
         // is about. Stubbed so the test stays about which build reached the instance.
         val provisioner = mockk<RuntimeProvisioner>()
-        coEvery { provisioner.ensureRuntime(any(), any(), any(), any()) } returns mockk(relaxed = true)
+        coEvery { provisioner.ensureRuntime(any(), any(), any(), any(), any()) } returns mockk(relaxed = true)
         return PackInstaller(sync, provisioner, repository, dataDir)
     }
 
