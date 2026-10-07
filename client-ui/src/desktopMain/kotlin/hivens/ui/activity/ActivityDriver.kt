@@ -13,6 +13,7 @@ import hivens.launcher.instance.InstanceContentUpdater
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Bridges the services that already publish their own progress into the single
@@ -50,13 +51,34 @@ class ActivityDriver(
      * failure the user dismissed came straight back on the next tick of an
      * unrelated job -- and a settled entry had its eviction timer restarted ten
      * times a second, which meant it never left at all.
+     *
+     * A key its source has let go of is forgotten here too, as the install
+     * notification driver forgets its own. Kept, an import dismissed after it
+     * failed and retried into the same failure matched the remembered phase and
+     * said nothing on the second try. Concurrent, because the three sources are
+     * collected on the app scope, whose threads are many.
      */
-    private val reported = HashMap<String, ActivityPhase>()
+    private val reported = ConcurrentHashMap<String, ActivityPhase>()
 
     fun start() {
-        appScope.launch { installs.collect { it.values.forEach(::onInstall) } }
+        appScope.launch {
+            installs.collect { snapshots ->
+                forgetGone(INSTALL, snapshots.values.mapTo(HashSet()) { it.key })
+                snapshots.values.forEach(::onInstall)
+            }
+        }
         appScope.launch { updates.collect(::onUpdates) }
-        appScope.launch { contentUpdates.collect { runs -> runs.forEach { (key, run) -> onContentUpdate(key, run) } } }
+        appScope.launch {
+            contentUpdates.collect { runs ->
+                forgetGone(CONTENT, runs.keys)
+                runs.forEach { (key, run) -> onContentUpdate(key, run) }
+            }
+        }
+    }
+
+    /** Drops the remembered phase of every [prefix] key whose source no longer lists it. */
+    private fun forgetGone(prefix: String, live: Set<String>) {
+        reported.keys.removeIf { it.startsWith(prefix) && it.removePrefix(prefix) !in live }
     }
 
     /** Report only what changed. Returns false when the registry already has this. */
@@ -79,7 +101,7 @@ class ActivityDriver(
             is InstallPhase.Failed    -> ActivityPhase.Failed(p.message)
             InstallPhase.Cancelled    -> ActivityPhase.Cancelled
         }
-        val key = "install:${snapshot.key}"
+        val key = "$INSTALL${snapshot.key}"
         if (!changed(key, phase)) return
         registry.report(
             key     = key,
@@ -146,7 +168,7 @@ class ActivityDriver(
             run.failed.isEmpty() -> ActivityPhase.Succeeded
             else                 -> ActivityPhase.Failed(run.failed.joinToString(", "))
         }
-        val activityKey = "content:$key"
+        val activityKey = "$CONTENT$key"
         if (!changed(activityKey, phase)) return
         registry.report(
             key   = activityKey,
@@ -154,5 +176,10 @@ class ActivityDriver(
             title = run.title,
             phase = phase,
         )
+    }
+
+    private companion object {
+        const val INSTALL = "install:"
+        const val CONTENT = "content:"
     }
 }

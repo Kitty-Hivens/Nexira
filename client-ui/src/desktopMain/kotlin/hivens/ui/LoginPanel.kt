@@ -108,6 +108,10 @@ fun LoginPanel(
     )
 
     fun doLogin() {
+        // The button and the automation hook are both off while one is in flight, and
+        // Enter in the password field was not: a second sign-in started beside the
+        // first, and on SmartyCraft each login retires the uid the one before it got.
+        if (isLoading) return
         if (login.isBlank() || password.isBlank()) { errorMessage = s.loginErrorEmpty; return }
         focusManager.clearFocus()
         isLoading             = true

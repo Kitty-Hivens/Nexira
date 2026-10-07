@@ -7,6 +7,9 @@ import hivens.core.data.PackInstance
 import hivens.core.time.Clock
 import hivens.core.update.PackUpdateStatus
 import hivens.core.update.PackUpdateStatusHub
+import hivens.core.data.PackOrigin
+import hivens.launcher.InstallPhase
+import hivens.launcher.InstallSnapshot
 import hivens.launcher.instance.InstanceContentUpdater
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -136,6 +139,29 @@ class ActivityDriverStaleTest {
         )
     }
 
+    /**
+     * The install service drops a key when the screen that started it dismisses it.
+     * Remembered past that, an import retried into the same failure matched the
+     * old phase and the surface said nothing the second time.
+     */
+    @Test
+    fun `a retried install that fails the same way is said again`() = runTest {
+        val reg = ActivityRegistry(scope = this, clock = Clock { 0L }, terminalHoldMs = 60_000)
+        val installs = MutableStateFlow<Map<String, InstallSnapshot>>(emptyMap())
+        driver(reg, FakeHub(), installs = installs).start()
+        val failed = InstallSnapshot("import:a", PackOrigin.Mirror, "a", "", "a.mrpack", null, InstallPhase.Failed("bad archive"))
+
+        installs.value = mapOf(failed.key to failed)
+        runCurrent()
+        reg.dismiss("install:import:a")
+        installs.value = emptyMap()
+        runCurrent()
+
+        installs.value = mapOf(failed.key to failed)
+        runCurrent()
+        assertEquals(listOf("install:import:a"), keys(reg), "the second failure went unsaid")
+    }
+
     private fun run(
         total: Int,
         done: Int,
@@ -155,9 +181,10 @@ class ActivityDriverStaleTest {
         reg: ActivityRegistry,
         hub: FakeHub,
         content: StateFlow<Map<String, InstanceContentUpdater.Run>> = MutableStateFlow(emptyMap()),
+        installs: StateFlow<Map<String, InstallSnapshot>> = MutableStateFlow(emptyMap()),
     ) = ActivityDriver(
         registry = reg,
-        installs = MutableStateFlow(emptyMap()),
+        installs = installs,
         updates = hub.statuses,
         contentUpdates = content,
         repository = FakeRepo(),

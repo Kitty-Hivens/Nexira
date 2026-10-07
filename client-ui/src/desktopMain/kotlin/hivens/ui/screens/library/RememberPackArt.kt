@@ -37,10 +37,11 @@ fun rememberPackArt(instance: PackInstance): PackArt {
         key2         = instance.iconUrl,
         key3         = instance.bannerUrl,
     ) {
-        if (known != null) {
-            value = known
-            return@produceState
-        }
+        // Re-applied whatever it is, the placeholder included. Only a known cover
+        // was put back before, so moving to a pack with none yet kept the previous
+        // pack's cover on screen until the network answered for this one.
+        value = known ?: PackArt.NONE
+        if (known != null) return@produceState
         value = withContext(Dispatchers.IO) { resolver.resolve(instance) }
     }
     return art

@@ -136,16 +136,21 @@ data class MojangOs(
  * version json expresses "allow everywhere, disallow on osx" and the reverse.
  * No rules at all means the library is unconditional.
  *
+ * [arm64] says the host is one, for the rules that name an architecture.
+ *
  * Anyone reading a version json has to apply this, not just the classpath
  * builder: a mac-only entry like `ca.weblite:java-objc-bridge` is absent from a
  * Windows install by design, and treating its absence as a failed install
  * blocks the pack over a file that must not be there.
  */
-fun libraryRulesAllow(rules: List<MojangRule>, mojangOs: String): Boolean {
+fun libraryRulesAllow(rules: List<MojangRule>, mojangOs: String, arm64: Boolean = false): Boolean {
     if (rules.isEmpty()) return true
     var allowed = false
     for (rule in rules) {
-        val matches = rule.os?.name?.let { it == mojangOs } ?: true
+        // An os name with the architecture after it (`osx-arm64`) is how a loader's
+        // own json names an Apple Silicon build. Mojang's manifests never do, so it
+        // matches only a host that says it is one.
+        val matches = rule.os?.name?.let { it == mojangOs || (arm64 && it == "$mojangOs-arm64") } ?: true
         if (matches) allowed = rule.action == "allow"
     }
     return allowed

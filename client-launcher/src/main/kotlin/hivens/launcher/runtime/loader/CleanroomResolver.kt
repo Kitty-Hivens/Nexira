@@ -4,8 +4,11 @@ import hivens.core.api.HttpClientProvider
 import hivens.core.net.SkipIfPresent
 import hivens.core.net.Transfer
 import hivens.core.net.TransferEngine
+import hivens.core.platform.Arch
+import hivens.core.platform.OS
 import hivens.launcher.runtime.MavenCoord
 import hivens.launcher.runtime.MojangLibrary
+import hivens.launcher.runtime.libraryRulesAllow
 import io.ktor.client.request.prepareGet
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.http.isSuccess
@@ -55,6 +58,9 @@ class CleanroomResolver(
     private val releasesApi: String = CLEANROOM_RELEASES_API,
     /** Where a version's installer is kept, so a relaunch downloads nothing. */
     cacheDir: Path? = null,
+    /** The host's rules name and whether it is arm64, read off the machine unless a test names them. */
+    private val mojangOs: String = OS.platform.mojang,
+    private val arm64: Boolean = OS.arch == Arch.ARM64,
 ) : LoaderResolver {
 
     override val loaderId: String = "cleanroom"
@@ -101,7 +107,7 @@ class CleanroomResolver(
             buildProfile(
                 version.mainClass,
                 version.minecraftArguments,
-                version.libraries.map { toSpec(it, zip) },
+                hostLibraries(version.libraries).map { toSpec(it, zip) },
             ).copy(version = loaderVersion)
         }
 
@@ -140,6 +146,20 @@ class CleanroomResolver(
             javaMajor = CLEANROOM_JAVA_MAJOR,
         )
     }
+
+    /**
+     * The libraries this host runs, by their rules, as the modern installer path
+     * reads them. The json lists every platform's: two text2speech builds, one for
+     * Apple Silicon and one for everything else, and without the rules the merge
+     * kept whichever came last and put the Apple Silicon one on every machine.
+     *
+     * The natives are left for the provisioner, which keeps this host's by their
+     * classifier, so the override still describes every platform.
+     */
+    internal fun hostLibraries(libraries: List<MojangLibrary>): List<MojangLibrary> =
+        libraries.filter { lib ->
+            MavenCoord.parse(lib.name).nativeClassifier != null || libraryRulesAllow(lib.rules, mojangOs, arm64)
+        }
 
     /** A version.json library as a download spec: a Maven-Central url when the
      *  entry carries one, else the bytes bundled in the installer's `maven/`
