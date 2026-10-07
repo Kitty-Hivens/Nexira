@@ -10,6 +10,8 @@ nicht gelesen werden, um eine Version zu verstehen.
 
 ## [Unreleased]
 
+## [2.4.6] - 2026-10-07
+
 Es gibt jetzt zehn Player-Widgets statt vier, und du wählst den, der zu seinem Platz passt. Neben der Karte mit dem Cover als Hauptsache, der, die die Farbe der gerade laufenden Platte annimmt, der schlichten Anzeige und der, die sich mit dem Stück füllt, gibt es eine Kachel, auf der nichts als das Cover steht, bis der Zeiger darauf liegt, eine Schallplatte, ein Token in der Größe einer einzelnen Zelle und mehrere, die um die Form des Stücks selbst herum gebaut sind. Die bisherige Musikkarte auf der Startseite wird durch die Cover-Karte ersetzt und behält ihren Platz auf dem Bildschirm.
 
 Vier davon zeichnen das Stück. Der Launcher liest die Datei einmal und ermittelt ihre Form, sodass du die Umrisse genau dieser Musik siehst und nicht einen Balken, der sich füllt, und der bereits gespielte Teil ist eingefärbt. Das dauert etwa eine Sekunde pro Datei, einmalig, im Hintergrund, und eine Datei, die sich nicht vermessen lässt, bleibt einfach flach und hinterlässt kein Loch.

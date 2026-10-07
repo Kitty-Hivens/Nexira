@@ -18,6 +18,8 @@ verbatim and a hand-wrapped line becomes a staircase of breaks.
 
 ## [Unreleased]
 
+## [2.4.6] - 2026-10-07
+
 There are ten player widgets now instead of four, and you pick the one that suits the place you put it. Beside the card led by the cover, the one that takes on the colour of the record it is playing, the plain readout and the one that fills up as the track plays, there is a tile that is nothing but the cover until you point at it, a disc, a token the size of a single cell, and several built around the shape of the track itself. The music card Home had before is replaced by the cover-led card and keeps its place on your screen.
 
 Four of them draw the track. The launcher reads the file once and works out its shape, so what you see is the outline of that actual piece of music rather than a bar filling up, and the part already played is inked. It takes about a second per file, once, in the background, and a file it cannot measure simply stays flat instead of leaving a hole.

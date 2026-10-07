@@ -25,6 +25,8 @@ verbatim, where a hand-wrapped line would render as a <br> staircase.
 
 ## [Unreleased]
 
+## [2.4.6] - 2026-10-07
+
 ### Added
 - `appshell.topbar.sessions`, the running games as a title-bar widget: one compact entry per game with the pack name, the uptime and the console and stop actions, nothing while no game runs. It replaces `ActiveSessionsSection`, which was never mounted. Available from the palette, not placed by default.
 - What the retired SmartyCraft server path left under `clients/` is now named and offered rather than left silent. `RetiredClientScanner` answers two separate questions: whether anything is there, which costs one directory listing and runs at every start, and what exactly is there, which walks gigabytes and runs once when somebody opens the surface. A sticky notice carries the first; `RetiredClientsHost` shows the second as one row per folder with its size, its mod count, and the Minecraft version and loader read out of the tree.
@@ -273,6 +275,8 @@ verbatim, where a hand-wrapped line would render as a <br> staircase.
 - The editor bar in `EditorSurfaceHost` measures its labelled form and composes the icon-only one only when that is too wide, instead of switching at a window width. The threshold was right for one set of chips: on a 1366 window the labelled bar ran past the edge and the exit hint was squeezed into a staircase five rows tall.
 - The severity colour rows in `ConsoleSection` pin their label at 64dp. `NxColorField` fills its row, so a label weighted to take the remainder was measured at zero and broke into one letter per line. The colour field in a highlight rule card is weighted so the bold chip after it is measured first.
 - Switching pack page tabs is one fade. A tab body that fills itself in after its first frame showed as several cuts: the worlds tab drew a frame of bare wallpaper while it scanned and then its panel, and the files tab drew two empty panes before the tree. `WorldsTabPane` draws its panel from the first frame with the scan inside and fades between its states, and `PackDetailScreen` fades the body being left out quickly and the next one in after it.
+- The release workflow hands its notes over as files. `build_release.yml` passed both notes from the changelog job as job outputs, which reach a step as environment variables, and the release body reached `softprops/action-gh-release` as an input, which is one too. Linux refuses to start a process with a single variable past 128 KiB, and this release's engineering log is 176 KB, so publishing would have failed after every build had finished. The changelog job now uploads `engineering.md` and `player.md` as the `release-notes` artifact, the manifest reads the player notes through `jq --rawfile`, `compose-release-body.sh` takes file paths, and the body goes to the action through `body_path`. GitHub also refuses a release body past 125000 characters, so the script measures what it composed and, when it is over, puts a link to `CHANGELOG.md` at the tag in place of the What's Changed text rather than cutting the log mid entry.
+- The release's test job runs `:widget-loader:test`, `:experimental:client-boot:test` and `:examples:widget-pixelplayer:test` again. It had drifted from `tests.yml`, so the run that gates a tag checked less than a pull request does.
 
 ## [2.4.5] - 2026-09-15
 
