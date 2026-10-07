@@ -20,6 +20,8 @@ verbatim and a hand-wrapped line becomes a staircase of breaks.
 
 ## [2.4.6] - 2026-10-07
 
+### Music
+
 There are ten player widgets now instead of four, and you pick the one that suits the place you put it. Beside the card led by the cover, the one that takes on the colour of the record it is playing, the plain readout and the one that fills up as the track plays, there is a tile that is nothing but the cover until you point at it, a disc, a token the size of a single cell, and several built around the shape of the track itself. The music card Home had before is replaced by the cover-led card and keeps its place on your screen.
 
 Four of them draw the track. The launcher reads the file once and works out its shape, so what you see is the outline of that actual piece of music rather than a bar filling up, and the part already played is inked. It takes about a second per file, once, in the background, and a file it cannot measure simply stays flat instead of leaving a hole.
@@ -31,6 +33,8 @@ Your desktop now knows what is playing. Media keys work, the media widget shows 
 Every measure answers a press and follows a drag, wherever it appears: a bar, the shape of the track, the same shape stood on end, the ring around a disc, or the whole body of a card.
 
 And a long list of smaller things. A click on a measure lands every time instead of roughly half the time. Dragging around the disc keeps following your hand instead of stopping when it strays past the edge. Changing tracks no longer leaves the scrubber working from the previous track's length, so a click halfway along a short track stops jumping to the end of it. The clock and the bar agree with each other. A track with no tags keeps one name instead of renaming itself while it loads. The play button on the cover card is legible on the dark theme. An empty player opens a file wherever you click it, including at widths where its artwork square is not drawn.
+
+### Packs and playing
 
 A pack that is not tied to a server now always starts offline. Before, it could receive the session of the account you were signed in with, and a mod in that pack could take it. Signing in offline from your profile now works and is still there after a restart.
 
@@ -44,6 +48,8 @@ NeoForge installs on Minecraft 1.20.1 and on the new 26.x releases, where it fai
 
 You cannot delete a pack while its game is running or while it is being updated. The delete button says why. Deleting a pack also clears the backups kept for rolling it back, which used to stay on disk for good.
 
+A pack you delete while the launcher is updating packs in the background stays deleted. Before, the update could write the whole pack back to disk, where it took up space without showing in the Library.
+
 Detaching a pack to local makes it fully yours: mods you add to it stay, where before the next Play removed them.
 
 The Content tab shows a mod once even if both its on and off copies are in the folder, turning a mod on no longer brings back an old copy of it, and a file whose copying was interrupted is not left half-written in your mods folder.
@@ -56,9 +62,11 @@ Quitting the launcher while a game is running now asks whether to leave the game
 
 Stopping a game from the launcher waits for it to actually close before Play comes back, so you cannot start a second copy on top of one still saving, and the time you played is counted.
 
+Stopping a launch while it is still getting ready no longer leaves an error on the Play button or lets a second game start beside the first.
+
 An update that is interrupted, whether you cancel it, the launcher closes or the power goes, puts the pack back exactly as it was instead of leaving it half updated.
 
-On Linux, a launcher update that crashes shortly after it starts is undone, and the previous version comes back on its own. Before, the old version was deleted two seconds after the new one started, so a build that opened its window and then died left nothing to go back to.
+### Accounts and sign-in
 
 Accounts with two-factor sign-in ask for the code once. If getting a pack ready took longer than half a minute, the launcher signed in again after you had typed the code, which cancelled that code and asked for another. A slow connection also no longer sends you a second code, and no longer reports a correct code as wrong.
 
@@ -72,19 +80,21 @@ Opening the launcher after using a newer version no longer rewrites your saved a
 
 Signing out of everything really signs you out: the next start no longer signs you back in offline under your old offline name. The profile no longer freezes while the system keyring is slow to answer.
 
+### Privacy
+
 Crash reports and diagnostic bundles no longer include your account name, and the launcher lets go of the login it handed a game once that game has closed. A pack can no longer make the launcher download from an unencrypted address. A mod update that arrives damaged is downloaded again rather than failing.
+
+The command-line launcher no longer prints your login token, and a crash report no longer puts your account name into the address of the page it opens. On macOS, a launcher update that fails while copying no longer leaves you without a launcher.
+
+### Everything else
+
+On Linux, a launcher update that crashes shortly after it starts is undone, and the previous version comes back on its own. Before, the old version was deleted two seconds after the new one started, so a build that opened its window and then died left nothing to go back to.
 
 A run of small things that worked in one place and not in the next now work in both. A mod you install finishes with everything it needs even if you leave the page, and a skin you apply in the wardrobe still lands if you leave before it answers. Uploading a skin also works right after the launcher signs you in on its own. Loading a saved layout keeps the screens you made yourself, and it can be undone. A drag in the editor cut short with Esc no longer leaves the mouse pointer hidden, and a damaged layout file no longer sends the launcher into a restart loop. A layout file that cannot be read is kept as it is instead of being replaced by the default the first time you edit something, and the launcher tells you so.
 
 A YouTube or Vimeo video no longer plays a fragment of itself in place of the whole thing, and scrubbing a video no longer ends it with an error. Lists of loader versions and news that stall now give up after twenty seconds instead of spinning for ten minutes. A module you switch off in recovery mode stays off, and stopping a game also stops anything it started.
 
-The command-line launcher no longer prints your login token, and a crash report no longer puts your account name into the address of the page it opens. On macOS, a launcher update that fails while copying no longer leaves you without a launcher.
-
 Changing the theme, the language or the launcher's settings no longer holds the window still while the change is saved to disk.
-
-Stopping a launch while it is still getting ready no longer leaves an error on the Play button or lets a second game start beside the first.
-
-A pack you delete while the launcher is updating packs in the background stays deleted. Before, the update could write the whole pack back to disk, where it took up space without showing in the Library.
 
 ## [2.4.5] - 2026-09-15
 

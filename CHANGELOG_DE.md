@@ -12,6 +12,8 @@ nicht gelesen werden, um eine Version zu verstehen.
 
 ## [2.4.6] - 2026-10-07
 
+### Musik
+
 Es gibt jetzt zehn Player-Widgets statt vier, und du wählst den, der zu seinem Platz passt. Neben der Karte mit dem Cover als Hauptsache, der, die die Farbe der gerade laufenden Platte annimmt, der schlichten Anzeige und der, die sich mit dem Stück füllt, gibt es eine Kachel, auf der nichts als das Cover steht, bis der Zeiger darauf liegt, eine Schallplatte, ein Token in der Größe einer einzelnen Zelle und mehrere, die um die Form des Stücks selbst herum gebaut sind. Die bisherige Musikkarte auf der Startseite wird durch die Cover-Karte ersetzt und behält ihren Platz auf dem Bildschirm.
 
 Vier davon zeichnen das Stück. Der Launcher liest die Datei einmal und ermittelt ihre Form, sodass du die Umrisse genau dieser Musik siehst und nicht einen Balken, der sich füllt, und der bereits gespielte Teil ist eingefärbt. Das dauert etwa eine Sekunde pro Datei, einmalig, im Hintergrund, und eine Datei, die sich nicht vermessen lässt, bleibt einfach flach und hinterlässt kein Loch.
@@ -23,6 +25,8 @@ Dein Desktop weiß jetzt, was läuft. Medientasten funktionieren, das Medien-Wid
 Jede Fortschrittsanzeige reagiert auf einen Druck und folgt einem Ziehen, wo immer sie steht: ein Balken, die Form des Stücks, dieselbe Form hochkant, der Ring um eine Schallplatte oder der ganze Körper einer Karte.
 
 Und eine lange Liste von Kleinigkeiten. Ein Klick auf eine Anzeige trifft jedes Mal statt etwa in der Hälfte der Fälle. Das Ziehen um die Schallplatte folgt weiter der Hand, statt stehen zu bleiben, sobald sie über den Rand gerät. Ein Titelwechsel lässt die Suchleiste nicht mehr mit der Länge des vorherigen Titels rechnen, sodass ein Klick auf die Mitte eines kurzen Stücks nicht mehr an dessen Ende springt. Uhr und Balken stimmen überein. Ein Titel ohne Tags behält einen Namen und benennt sich beim Laden nicht mehr um. Der Wiedergabeknopf auf der Cover-Karte ist im dunklen Erscheinungsbild lesbar. Ein leerer Player öffnet eine Datei überall, wo du ihn anklickst, auch bei Breiten, in denen sein Cover-Quadrat nicht gezeichnet wird.
+
+### Packs und Spielen
 
 Ein Pack, das an keinen Server gebunden ist, startet jetzt immer offline. Bisher konnte es die Sitzung des Kontos erhalten, mit dem du angemeldet warst, und eine Mod in diesem Pack konnte sie an sich nehmen. Die Offline-Anmeldung im Profil funktioniert jetzt und bleibt nach einem Neustart erhalten.
 
@@ -36,6 +40,8 @@ NeoForge lässt sich auf Minecraft 1.20.1 und den neuen 26.x-Versionen installie
 
 Ein Pack lässt sich nicht löschen, solange sein Spiel läuft oder es aktualisiert wird, und die Löschen-Schaltfläche sagt warum. Beim Löschen verschwinden auch die Sicherungen für ein Zurücksetzen, die vorher für immer auf der Platte blieben.
 
+Ein Pack, das du löschst, während der Launcher im Hintergrund Packs aktualisiert, bleibt gelöscht. Vorher konnte das Update das ganze Pack wieder auf die Festplatte schreiben, wo es Platz belegte, ohne in der Bibliothek aufzutauchen.
+
 Ein in eine lokale Kopie gelöstes Pack gehört jetzt ganz dir: Mods, die du hinzufügst, bleiben, wo sie vorher beim nächsten Start entfernt wurden.
 
 Der Inhalts-Tab zeigt einen Mod nur einmal, auch wenn seine aktive und deaktivierte Kopie beide im Ordner liegen. Das Aktivieren eines Mods holt keine alte Kopie mehr zurück, und eine Datei, deren Kopieren abgebrochen wurde, bleibt nicht halb geschrieben im Mod-Ordner liegen.
@@ -48,9 +54,11 @@ Wird der Launcher bei laufendem Spiel beendet, fragt er, ob das Spiel weiterlauf
 
 Ein Spiel aus dem Launcher zu stoppen wartet, bis es wirklich geschlossen ist, bevor „Spielen“ zurückkommt. So lässt sich keine zweite Kopie über eine noch speichernde starten, und die gespielte Zeit wird gezählt.
 
+Stoppst du einen Start, während das Spiel noch vorbereitet wird, bleibt kein Fehler mehr auf dem Knopf „Spielen“ stehen, und ein zweites Spiel kann nicht neben dem ersten starten.
+
 Ein unterbrochenes Update, ob abgebrochen, durch das Schließen des Launchers oder einen Stromausfall, stellt das Pack genau so wieder her, wie es war, statt es halb aktualisiert zu lassen.
 
-Unter Linux wird ein Launcher-Update, das kurz nach dem Start abstürzt, rückgängig gemacht, und die vorherige Version kommt von selbst zurück. Vorher wurde die alte Version zwei Sekunden nach dem Start der neuen gelöscht, sodass eine Version, die ihr Fenster öffnete und dann abstürzte, nichts zum Zurückkehren übrig ließ.
+### Konten und Anmeldung
 
 Konten mit Zwei-Faktor-Anmeldung fragen den Code einmal ab. Dauerte die Vorbereitung eines Packs länger als eine halbe Minute, meldete sich der Launcher nach deiner Codeeingabe erneut an, was den Code ungültig machte und einen neuen verlangte. Eine langsame Verbindung schickt dir außerdem keinen zweiten Code mehr und meldet einen richtigen Code nicht mehr als falsch.
 
@@ -64,19 +72,21 @@ Den Launcher nach einer neueren Version zu öffnen, schreibt deine gespeicherten
 
 Von allem abmelden meldet dich wirklich ab: Der nächste Start meldet dich nicht mehr offline unter deinem alten Offline-Namen an. Das Profil friert nicht mehr ein, während der System-Schlüsselbund langsam antwortet.
 
+### Privatsphäre
+
 Absturzberichte und Diagnosepakete enthalten deinen Kontonamen nicht mehr, und der Launcher lässt die Anmeldung los, die er einem Spiel übergeben hat, sobald es geschlossen ist. Ein Pack kann den Launcher nicht mehr von einer unverschlüsselten Adresse laden lassen. Ein Mod-Update, das beschädigt ankommt, wird erneut heruntergeladen, statt fehlzuschlagen.
+
+Der Kommandozeilen-Launcher gibt dein Anmeldetoken nicht mehr aus, und ein Absturzbericht setzt deinen Kontonamen nicht mehr in die Adresse der Seite, die er öffnet. Unter macOS lässt dich ein Launcher-Update, das beim Kopieren scheitert, nicht mehr ohne Launcher zurück.
+
+### Alles andere
+
+Unter Linux wird ein Launcher-Update, das kurz nach dem Start abstürzt, rückgängig gemacht, und die vorherige Version kommt von selbst zurück. Vorher wurde die alte Version zwei Sekunden nach dem Start der neuen gelöscht, sodass eine Version, die ihr Fenster öffnete und dann abstürzte, nichts zum Zurückkehren übrig ließ.
 
 Eine Reihe kleiner Dinge, die an einer Stelle funktionierten und an der nächsten nicht, funktionieren jetzt an beiden. Ein Mod, den du installierst, wird samt allem, was er braucht, fertig installiert, auch wenn du die Seite verlässt, und ein Skin, den du in der Garderobe anwendest, kommt an, auch wenn du vor der Antwort weggehst. Das Hochladen eines Skins funktioniert auch direkt, nachdem der Launcher dich von selbst angemeldet hat. Ein gespeichertes Layout zu laden behält die Bildschirme, die du selbst angelegt hast, und lässt sich rückgängig machen. Ein Ziehen im Editor, das du mit Esc abbrichst, lässt den Mauszeiger nicht mehr versteckt zurück, und eine beschädigte Layout-Datei schickt den Launcher nicht mehr in eine Neustart-Schleife. Eine Layout-Datei, die sich nicht lesen lässt, bleibt erhalten, statt bei der ersten Änderung durch das Standard-Layout ersetzt zu werden, und der Launcher sagt dir das.
 
 Ein Video von YouTube oder Vimeo spielt nicht mehr ein Bruchstück von sich statt des ganzen Videos, und das Spulen in einem Video endet nicht mehr mit einem Fehler. Listen mit Loader-Versionen und Neuigkeiten, die hängen, geben jetzt nach zwanzig Sekunden auf, statt zehn Minuten zu laden. Ein Modul, das du im Wiederherstellungsmodus abschaltest, bleibt aus, und ein gestopptes Spiel beendet auch alles, was es gestartet hat.
 
-Der Kommandozeilen-Launcher gibt dein Anmeldetoken nicht mehr aus, und ein Absturzbericht setzt deinen Kontonamen nicht mehr in die Adresse der Seite, die er öffnet. Unter macOS lässt dich ein Launcher-Update, das beim Kopieren scheitert, nicht mehr ohne Launcher zurück.
-
 Wenn du das Design, die Sprache oder die Einstellungen des Launchers änderst, steht das Fenster nicht mehr still, während die Änderung gespeichert wird.
-
-Stoppst du einen Start, während das Spiel noch vorbereitet wird, bleibt kein Fehler mehr auf dem Knopf „Spielen“ stehen, und ein zweites Spiel kann nicht neben dem ersten starten.
-
-Ein Pack, das du löschst, während der Launcher im Hintergrund Packs aktualisiert, bleibt gelöscht. Vorher konnte das Update das ganze Pack wieder auf die Festplatte schreiben, wo es Platz belegte, ohne in der Bibliothek aufzutauchen.
 
 ## [2.4.5] - 2026-09-15
 
