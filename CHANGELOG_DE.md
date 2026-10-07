@@ -64,6 +64,12 @@ Von allem abmelden meldet dich wirklich ab: Der nächste Start meldet dich nicht
 
 Absturzberichte und Diagnosepakete enthalten deinen Kontonamen nicht mehr, und die Anmeldung eines Spiels wird vergessen, sobald es geschlossen ist. Ein Pack kann den Launcher nicht mehr von einer unverschlüsselten Adresse laden lassen. Ein Mod-Update, das beschädigt ankommt, wird erneut heruntergeladen, statt fehlzuschlagen.
 
+Eine Reihe kleiner Dinge, die an einer Stelle funktionierten und an der nächsten nicht, funktionieren jetzt an beiden. Ein Mod, den du installierst, wird samt allem, was er braucht, fertig installiert, auch wenn du die Seite verlässt, und ein Skin, den du in der Garderobe anwendest, kommt an, auch wenn du vor der Antwort weggehst. Das Hochladen eines Skins funktioniert auch direkt, nachdem der Launcher dich von selbst angemeldet hat. Ein gespeichertes Layout zu laden behält die Bildschirme, die du selbst angelegt hast, und lässt sich rückgängig machen. Ein Ziehen im Editor, das du mit Esc abbrichst, lässt den Mauszeiger nicht mehr versteckt zurück, und eine beschädigte Layout-Datei schickt den Launcher nicht mehr in eine Neustart-Schleife.
+
+Ein Video von YouTube oder Vimeo spielt nicht mehr ein Bruchstück von sich statt des ganzen Videos, und das Spulen in einem Video endet nicht mehr mit einem Fehler. Listen mit Loader-Versionen und Neuigkeiten, die hängen, geben jetzt nach zwanzig Sekunden auf, statt zehn Minuten zu laden. Ein Modul, das du im Wiederherstellungsmodus abschaltest, bleibt aus, und ein gestopptes Spiel beendet auch alles, was es gestartet hat.
+
+Der Kommandozeilen-Launcher gibt dein Anmeldetoken nicht mehr aus, und ein Absturzbericht setzt deinen Kontonamen nicht mehr in die Adresse der Seite, die er öffnet. Unter macOS lässt dich ein Launcher-Update, das beim Kopieren scheitert, nicht mehr ohne Launcher zurück.
+
 ## [2.4.5] - 2026-09-15
 
 Ein Pack, das zurückgefallen ist, holt sich beim Klick auf Spielen selbst wieder ein. Bisher bemerkte der Launcher, dass die Dateien nicht die des Packs sind, sagte auf dem Bildschirm nichts, hielt die Anmeldung still zurück und startete das Spiel trotzdem, sodass der Server einen ohne jede Erklärung abwies. Hineinzugeraten war leicht: Konnte eine Launcher-Version einige Mods eines Packs nicht installieren und die nächste konnte es, lagen die alten Dateien weiterhin da. Jetzt wird das Fehlende zuerst geladen. Ist der Spiegel nicht erreichbar, läuft der Start genau so ab wie zuvor.

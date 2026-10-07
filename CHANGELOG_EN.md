@@ -72,6 +72,12 @@ Signing out of everything really signs you out: the next start no longer signs y
 
 Crash reports and diagnostic bundles no longer include your account name, and a game's login is forgotten once the game has closed. A pack can no longer make the launcher download from an unencrypted address. A mod update that arrives damaged is downloaded again rather than failing.
 
+A run of small things that worked in one place and not in the next now work in both. A mod you install finishes with everything it needs even if you leave the page, and a skin you apply in the wardrobe still lands if you leave before it answers. Uploading a skin also works right after the launcher signs you in on its own. Loading a saved layout keeps the screens you made yourself, and it can be undone. A drag in the editor cut short with Esc no longer leaves the mouse pointer hidden, and a damaged layout file no longer sends the launcher into a restart loop.
+
+A YouTube or Vimeo video no longer plays a fragment of itself in place of the whole thing, and scrubbing a video no longer ends it with an error. Lists of loader versions and news that stall now give up after twenty seconds instead of spinning for ten minutes. A module you switch off in recovery mode stays off, and stopping a game also stops anything it started.
+
+The command-line launcher no longer prints your login token, and a crash report no longer puts your account name into the address of the page it opens. On macOS, a launcher update that fails while copying no longer leaves you without a launcher.
+
 ## [2.4.5] - 2026-09-15
 
 A pack that has fallen behind catches itself up when you press Play. Until now the launcher noticed that the files were not the pack's, said nothing on screen, quietly withheld your login and let the game start anyway, so the server turned you away with no explanation anywhere. This was easy to walk into: if a version of the launcher could not install some of a pack's mods and the next one could, the old files were still sitting there. Now the missing pieces are fetched first and the launch goes ahead properly. If the mirror cannot be reached, the launch still happens exactly as it did before.
