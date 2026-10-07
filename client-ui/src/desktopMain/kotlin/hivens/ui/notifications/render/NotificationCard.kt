@@ -10,7 +10,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -34,6 +33,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -44,7 +44,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
@@ -86,8 +88,11 @@ fun NotificationCard(
     // Read here, not inside the drag coroutine: a role needs composition.
     val swipeSpec = Motion.panelSlide.of<Float>()
     val accentStatus = severityStatus(group.severity, group.kind)
-    // Critical pulses; everything else holds a steady accent.
-    val accentAlpha = if (group.severity == Severity.Critical) criticalPulse() else 1f
+    // Critical pulses; everything else holds a steady accent. A State, read only in
+    // the stripe's draw below, as NxSurface and NxRow hold theirs: read here it
+    // recomposed the whole card every frame for as long as a critical toast, which
+    // stays until it is dismissed, was on screen.
+    val accentAlpha: State<Float> = if (group.severity == Severity.Critical) criticalPulse() else rememberUpdatedState(1f)
 
     val scope = rememberCoroutineScope()
     val offsetX = remember(group.sourceKey) { Animatable(0f) }
@@ -143,13 +148,17 @@ fun NotificationCard(
     ) {
         // Asked for inside the card so the accent is fitted to the card it marks.
         val accentColor = accentStatus?.let { NxColor.status(it) } ?: Color.Transparent
+        // The two ends of the wash, taken in composition where the plane is known; the
+        // draw mixes between them, which is the same colour wash gives at that amount.
+        val accentGround = NxColor.wash(accentColor, 0f)
+        val accentFull = NxColor.wash(accentColor, 1f)
         Row(modifier = Modifier.fillMaxWidth()) {
             if (accentColor != Color.Transparent) {
                 Box(
                     modifier = Modifier
                         .width(if (group.severity == Severity.Critical) 4.dp else 3.dp)
                         .fillMaxHeight()
-                        .background(NxColor.wash(accentColor, accentAlpha))
+                        .drawBehind { drawRect(lerp(accentGround, accentFull, accentAlpha.value)) }
                 )
             }
 
@@ -338,10 +347,10 @@ private fun HistoryRow(event: NotificationEvent, now: Instant) {
 }
 
 @Composable
-private fun criticalPulse(): Float {
+private fun criticalPulse(): State<Float> {
     val pulseRhythm = Motion.ownRhythm(CRITICAL_PULSE_MS)
     val transition = rememberInfiniteTransition(label = "critical-pulse")
-    val v by transition.animateFloat(
+    return transition.animateFloat(
         initialValue = 0.55f,
         targetValue  = 1.0f,
         animationSpec = infiniteRepeatable(
@@ -350,7 +359,6 @@ private fun criticalPulse(): Float {
         ),
         label = "critical-pulse-alpha",
     )
-    return v
 }
 
 // Routes (Severity, Kind) onto a status. Severity drives the color band.
