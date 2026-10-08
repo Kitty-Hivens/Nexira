@@ -1,11 +1,9 @@
 package hivens.ui.screens.mod
 
 import kotlinx.coroutines.Dispatchers
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -13,10 +11,8 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -32,25 +28,27 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalUriHandler
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import coil3.compose.AsyncImage
 import hivens.core.api.interfaces.IPackRepository
 import hivens.launcher.instance.InstanceContentScanner
+import hivens.ui.screens.browse.InstallChooser
+import hivens.ui.screens.browse.InstallSubject
+import hivens.ui.screens.browse.InstallProblem
+import hivens.ui.screens.browse.ProjectTag
+import hivens.ui.screens.browse.tagSearch
+import hivens.ui.screens.browse.label
+import hivens.ui.screens.browse.reason
+import hivens.launcher.instance.ModInstaller
 import hivens.launcher.modrinth.ModrinthClient
+import hivens.launcher.smrt.SmrtPackClient
 import hivens.ui.RIGHT_RAIL_SURFACE
 import hivens.ui.RailFamily
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
-import hivens.ui.icons.Symbol
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxKebabButton
@@ -64,8 +62,6 @@ import hivens.ui.components.modrinthGalleryMedia
 import hivens.ui.render.MarkdownHtml
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
-import hivens.ui.theme.decorativeColor
-import hivens.ui.theme.familyForText
 import hivens.widget.api.LocalSurfaceFamilies
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -107,11 +103,16 @@ fun ModDetailScreen(
     val openProject: OpenProjectState = koinInject()
     val dataDir: Path = koinInject()
     val appScope: CoroutineScope = koinInject()
+    val installer: ModInstaller = koinInject()
+    val mirrorClient: SmrtPackClient = koinInject()
     val families = LocalSurfaceFamilies.current
     val s = LocalStrings.current
 
     val state = remember(target) {
-        ModDetailState(target, modrinth, repo, dataDir, scanner, openProject, strings = s, installScope = appScope)
+        ModDetailState(
+            target, modrinth, repo, dataDir, scanner, openProject,
+            strings = s, installScope = appScope, installer = installer, mirrorLookup = mirrorClient.asMirrorLookup(),
+        )
     }
     var reloadTick by remember(state) { mutableStateOf(0) }
     // Saveable, not remembered. The only way to a build's page is the Versions
@@ -137,6 +138,7 @@ fun ModDetailScreen(
     // link, a crash recovery remount -- puts the rail back the same way.
     DisposableEffect(state) {
         families.switch(RIGHT_RAIL_SURFACE, RailFamily.PROJECT_VIEW)
+        state.claim()
         onDispose {
             families.reset(RIGHT_RAIL_SURFACE)
             state.clear()
@@ -265,125 +267,89 @@ internal fun Header(state: ModDetailState) {
     val project = state.project
     val installed = state.installed
 
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        // Top, not centre. With a two-line tagline and a row of counts under it,
-        // centring hangs the 96dp icon halfway down the block and the title stops
-        // sitting on the same line as anything.
-        verticalAlignment = Alignment.Top,
-    ) {
-        ProjectIcon(project?.iconUrl, state.title)
-
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-          Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(
-                state.title,
-                style = MaterialTheme.typography.headlineSmall,
-                color = NxInk.main,
-                // Semibold and tight, the way the reference sets it. Bold at this
-                // size reads as a banner rather than as a name.
-                fontWeight = FontWeight.SemiBold,
-                lineHeight = TITLE_SIZE,
-                fontFamily = familyForText(state.title),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            state.description?.let {
-                Text(
-                    it,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = NxInk.quiet,
-                    // The tagline is set to a reading measure rather than to the
-                    // column: run across a wide window it becomes one long line
-                    // nobody tracks back from.
-                    modifier = Modifier.widthIn(max = SUMMARY_MEASURE),
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
+    ProjectHeader(
+        title = state.title,
+        description = state.description,
+        iconUrl = project?.iconUrl ?: state.mirror?.iconUrl,
+        facts = {
+            if (project != null) {
+                // Metrics are separate facts and want air between them; the
+                // chips are one list and want to read as one.
+                HeaderStat(NxIcon.Download, compactCount(project.downloads, s), s.modPageStatDownloads)
+                HeaderStat(NxIcon.Favorite, compactCount(project.followers, s), s.modPageStatFollowers)
+                // All of them, not the first three. The reference shows the whole
+                // set here AND again as a block in the rail; taking three was my
+                // own edit, and it silently said a project has three tags.
+                if (project.categories.isNotEmpty()) {
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        project.categories.forEach { name ->
+                            NxMetaChip(
+                                s.modrinthCategory(name),
+                                tone = NxMetaChipTone.Surface,
+                                onClick = tagSearch(project.projectType, state.packId, ProjectTag.Category(name)),
+                            )
+                        }
+                    }
+                }
+            } else {
+                // Counts belong to a catalogue. A file found on disk has none,
+                // and inventing a zero would read as an answer. One the mirror
+                // knows says who publishes it instead, or that the mirror does.
+                val mirror = state.mirror
+                NxMetaChip(
+                    if (mirror != null) mirror.publishedOn ?: MIRROR_NAME else s.modPageLocalFile,
+                    tone = NxMetaChipTone.Surface,
                 )
+                installed?.version?.let { NxMetaChip(it, tone = NxMetaChipTone.Surface) }
             }
-          }
-            // 26 across between facts, 8 down when they wrap. Measured: the counts
-            // are separate statements and want real air, the categories are one
-            // list and want none.
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(26.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                itemVerticalAlignment = Alignment.CenterVertically,
-            ) {
-                if (project != null) {
-                    // Metrics are separate facts and want air between them; the
-                    // chips are one list and want to read as one.
-                    Stat(NxIcon.Download, compactCount(project.downloads, s), s.modPageStatDownloads)
-                    Stat(NxIcon.Favorite, compactCount(project.followers, s), s.modPageStatFollowers)
-                    // All of them, not the first three. The reference shows the whole
-                    // set here AND again as a block in the rail; taking three was my
-                    // own edit, and it silently said a project has three tags.
-                    if (project.categories.isNotEmpty()) {
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            verticalArrangement = Arrangement.spacedBy(4.dp),
-                        ) {
-                            project.categories.forEach { NxMetaChip(it, tone = NxMetaChipTone.Surface) }
+        },
+        actions = {
+            // No "open page" button. The reference has none, and for a good
+            // reason: on a project page that action is the page you are already
+            // standing on. Ours is worth having because the catalogue's copy is
+            // somewhere else, but it is not what a reader came here to do, so it
+            // goes in the overflow the way every other secondary route does.
+            //
+            // Whether an install is possible at all is known from the route.
+            // WHAT goes in the slot needs the pack read off disk, and until it
+            // lands [InstallAction.None] draws nothing, so this reserves the
+            // fact rather than the width: the button still appears a moment in.
+            // Reserving the width would mean knowing the label, and the label
+            // names the pack.
+            if (state.installPossible) {
+                Box(contentAlignment = Alignment.Center) { InstallButton(state, installScope) }
+            }
+            val pageUrl = project?.let { "https://modrinth.com/${it.projectType}/${it.slug}" }
+            val homepage = installed?.homepageUrl?.takeIf { it.isNotBlank() }
+            if (pageUrl != null || homepage != null) {
+                NxKebabButton(contentDescription = s.contentActionDetails) { dismiss ->
+                    if (pageUrl != null) {
+                        NxMenuItem(label = s.modPageOpenInCatalogue, icon = NxIcon.OpenInNew) {
+                            uriHandler.openUri(pageUrl)
+                            dismiss()
+                        }
+                        NxMenuItem(label = s.modPageCopyLink, icon = NxIcon.ContentCopy) {
+                            // The write suspends now, so it rides the composition's
+                            // scope: the menu dismisses on this frame and the
+                            // clipboard lands on its own, which is what the console's
+                            // copy actions already do.
+                            scope.launch { clipboard.setClipEntry(ClipEntry(StringSelection(pageUrl))) }
+                            dismiss()
                         }
                     }
-                } else {
-                    // Counts belong to a catalogue. A file found on disk has none,
-                    // and inventing a zero would read as an answer.
-                    NxMetaChip(s.modPageLocalFile, tone = NxMetaChipTone.Surface)
-                    installed?.version?.let { NxMetaChip(it, tone = NxMetaChipTone.Surface) }
-                }
-            }
-        }
-
-        Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                // No "open page" button. The reference has none, and for a good
-                // reason: on a project page that action is the page you are already
-                // standing on. Ours is worth having because the catalogue's copy is
-                // somewhere else, but it is not what a reader came here to do, so it
-                // goes in the overflow the way every other secondary route does.
-                //
-                // Whether an install is possible at all is known from the route.
-                // WHAT goes in the slot needs the pack read off disk, and until it
-                // lands [InstallAction.None] draws nothing, so this reserves the
-                // fact rather than the width: the button still appears a moment in.
-                // Reserving the width would mean knowing the label, and the label
-                // names the pack.
-                if (state.installPossible) {
-                    Box(contentAlignment = Alignment.Center) { InstallButton(state, installScope) }
-                }
-                val pageUrl = project?.let { "https://modrinth.com/${it.projectType}/${it.slug}" }
-                val homepage = installed?.homepageUrl?.takeIf { it.isNotBlank() }
-                if (pageUrl != null || homepage != null) {
-                    NxKebabButton(contentDescription = s.contentActionDetails) { dismiss ->
-                        if (pageUrl != null) {
-                            NxMenuItem(label = s.modPageOpenInCatalogue, icon = NxIcon.OpenInNew) {
-                                uriHandler.openUri(pageUrl)
-                                dismiss()
-                            }
-                            NxMenuItem(label = s.modPageCopyLink, icon = NxIcon.ContentCopy) {
-                                // The write suspends now, so it rides the composition's
-                                // scope: the menu dismisses on this frame and the
-                                // clipboard lands on its own, which is what the console's
-                                // copy actions already do.
-                                scope.launch { clipboard.setClipEntry(ClipEntry(StringSelection(pageUrl))) }
-                                dismiss()
-                            }
-                        }
-                        if (homepage != null) {
-                            NxMenuItem(label = s.modPageHomepage, icon = NxIcon.Language) {
-                                uriHandler.openUri(homepage)
-                                dismiss()
-                            }
+                    if (homepage != null) {
+                        NxMenuItem(label = s.modPageHomepage, icon = NxIcon.Language) {
+                            uriHandler.openUri(homepage)
+                            dismiss()
                         }
                     }
                 }
             }
+        },
+        notes = {
             installed?.version?.let {
                 Text(
                     s.modPageInstalledVersion(it),
@@ -399,7 +365,7 @@ internal fun Header(state: ModDetailState) {
                 // the unknown placeholder produced "no build for Unknown / Unknown",
                 // which is a sentence about our own ignorance rather than about
                 // the pack.
-                val target = listOf(state.packMcVersion, state.packLoaders.firstOrNull().orEmpty())
+                val target = listOf(state.packMcVersion, state.packLoader.takeIf { it.isNotBlank() }?.let(::loaderLabel).orEmpty())
                     .filter { it.isNotBlank() }
                     .joinToString(" / ")
                 Text(
@@ -418,18 +384,38 @@ internal fun Header(state: ModDetailState) {
                     color = NxColor.status(Status.Warning, text = true),
                 )
             }
-        }
-    }
-    // The rule under the header, which the reference draws: it parts the project
-    // from the tabs that lead into it.
-    HorizontalDivider(color = NxInk.line)
-    }
+            // Each one by name and why, because the count alone sends the reader
+            // looking for what it means. A long list stops at a few; the rest is a
+            // count, since a column of twenty reasons under a button is not read.
+            state.installLeftOut.take(MAX_LEFT_OUT_LINES).forEach { left ->
+                Text(
+                    s.installSkipLine(left.title, left.skip.reason(s)),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = NxInk.quiet,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.widthIn(max = LEFT_OUT_MEASURE),
+                )
+            }
+            // Why nothing ran, said where the click was. A refused install and a
+            // broken one are different things to do something about.
+            state.installRefusal?.let { refusal ->
+                Text(
+                    InstallProblem.Refused(refusal).label(s),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = NxColor.status(Status.Warning, text = true),
+                )
+            }
+        },
+    )
 }
 
-/** Measured off the reference: a 24 title set tight, a 704 reading measure, a 96 mark. */
-private val TITLE_SIZE = 24.sp
-private val SUMMARY_MEASURE = 704.dp
-private val ICON_SIZE = 96.dp
+/** The mirror by its own name, which is a brand and the same in every language. */
+private const val MIRROR_NAME = "Hivens"
+
+/** How many left-out projects are named under the button before the rest is only counted. */
+private const val MAX_LEFT_OUT_LINES = 3
+private val LEFT_OUT_MEASURE = 320.dp
 
 /**
  * The page's primary action, and nothing where there is none.
@@ -444,6 +430,7 @@ private fun InstallButton(state: ModDetailState, scope: CoroutineScope) {
     val s = LocalStrings.current
     when (val action = state.install) {
         InstallAction.None -> Unit
+        InstallAction.Choose -> state.project?.let { InstallChooser(InstallSubject(it.id, it.title, it.iconUrl)) }
         is InstallAction.Present -> NxButton(
             label = s.modPageInstalledIn(action.packName),
             onClick = {},
@@ -467,42 +454,6 @@ private fun InstallButton(state: ModDetailState, scope: CoroutineScope) {
     }
 }
 
-@Composable
-private fun ProjectIcon(url: String?, title: String) {
-    val shape = RoundedCornerShape(18.dp)
-    // 96, as the reference sets it. 84 was mine and left the header looking like a
-    // list row that had been enlarged rather than like the top of a page.
-    if (url != null) {
-        AsyncImage(
-            model = url,
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.size(ICON_SIZE).clip(shape),
-        )
-    } else {
-        val tile = decorativeColor(title)
-        Box(
-            Modifier.size(ICON_SIZE).clip(shape).background(tile),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                title.firstOrNull()?.uppercase() ?: "?",
-                style = MaterialTheme.typography.headlineMedium,
-                color = NxColor.on(tile),
-                fontWeight = FontWeight.Bold,
-            )
-        }
-    }
-}
-
-@Composable
-private fun Stat(icon: IconKey, value: String, label: String) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-        Symbol(icon, contentDescription = null, tint = NxInk.quiet, size = 15.dp)
-        Text(value, style = MaterialTheme.typography.labelLarge, color = NxInk.main, fontWeight = FontWeight.SemiBold)
-        Text(label, style = MaterialTheme.typography.labelSmall, color = NxInk.quiet)
-    }
-}
 
 /**
  * The page's tabs.

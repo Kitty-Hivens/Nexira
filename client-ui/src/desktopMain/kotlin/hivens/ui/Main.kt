@@ -90,7 +90,10 @@ import hivens.widget.api.WidgetRegistry
 import hivens.widget.api.WidgetServiceRegistry
 import hivens.widget.api.command
 import hivens.ui.debug.DebugOverlayState
+import hivens.ui.screens.browse.BrowseController
 import hivens.ui.screens.browse.BrowseSession
+import hivens.ui.screens.browse.ProjectBrowseSession
+import hivens.ui.screens.browse.BrowseTags
 import hivens.widget.api.flowSource
 import hivens.widget.api.suspendCommand
 import hivens.widget.generated.GeneratedWidgetRegistry
@@ -171,6 +174,15 @@ val uiModule = module {
     // What Browse last showed per source and query, so flipping sources or
     // stepping out of the screen comes back to the list instead of a spinner.
     single { BrowseSession() }
+    single { ProjectBrowseSession() }
+
+    // What Browse is searching and where its installs go. Shared by the screen's
+    // own widgets and the rail's browse family, which have no composition in
+    // common, and kept so a trip to a project page comes back to the same search.
+    single { BrowseController() }
+
+    // The catalogue's own lists the filter rail is built from, read once a run.
+    single { BrowseTags(get(), get()) }
 
     // System tray (client-tray seam): one libtray-backed impl. A plain single, so
     // client-cli -- which never injects it -- never loads libtray's natives.

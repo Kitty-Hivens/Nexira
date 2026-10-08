@@ -1,77 +1,113 @@
 package hivens.ui.screens.browse
 
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.hoverable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsHoveredAsState
-import androidx.compose.foundation.rememberScrollbarAdapter
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.dp
+import hivens.auth.AuthProviderRegistry
+import hivens.core.api.catalogue.CatalogueGalleryItem
+import hivens.core.api.catalogue.CatalogueLinkKind
 import hivens.core.api.catalogue.CataloguePack
 import hivens.core.api.catalogue.CataloguePackDetails
 import hivens.core.api.catalogue.CataloguePackVersion
+import hivens.core.api.dto.modrinth.ModrinthGameVersion
 import hivens.core.data.PackOrigin
 import hivens.launcher.InstallPhase
 import hivens.launcher.PackInstallService
 import hivens.launcher.catalogue.PackCatalogueRegistry
+import hivens.ui.RIGHT_RAIL_SURFACE
+import hivens.ui.RailFamily
 import hivens.ui.components.FullscreenVideo
 import hivens.ui.components.ImageGallery
+import hivens.ui.components.formatBuildTimestamp
 import hivens.ui.components.galleryMedia
 import hivens.ui.components.isPlayableVideoUrl
-import hivens.ui.surface.NxSurface
-import hivens.ui.surface.SurfaceKind
+import hivens.ui.components.relativeAge
+import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.nx.NxChoiceChip
+import hivens.ui.icons.NxIcon
+import hivens.ui.nx.CenteredProgress
+import hivens.ui.nx.NxButton
+import hivens.ui.nx.NxIconButton
+import hivens.ui.nx.NxKebabButton
+import hivens.ui.nx.NxMenuItem
 import hivens.ui.nx.NxMetaChip
-import hivens.ui.nx.NxVerticalScrollbar
 import hivens.ui.nx.NxMetaChipTone
+import hivens.ui.nx.NxTabRow
 import hivens.ui.nx.RetryStateBlock
 import hivens.ui.puppet.PuppetClick
+import hivens.ui.puppet.PuppetScreen
 import hivens.ui.render.MarkdownHtml
-import hivens.ui.render.openInBrowser
-import hivens.ui.screens.versions.PickerIntent
-import hivens.ui.screens.versions.PickerVersion
-import hivens.ui.screens.versions.VersionPickerWindow
+import hivens.ui.screens.mod.BuildsTable
+import hivens.ui.screens.mod.ChangelogList
+import hivens.ui.screens.mod.GameVersionGroup
+import hivens.ui.screens.mod.HeaderStat
+import hivens.ui.screens.mod.OpenProject
+import hivens.ui.screens.mod.OpenProjectState
+import hivens.ui.screens.mod.ProjectCreator
+import hivens.ui.screens.mod.ProjectHeader
+import hivens.ui.screens.mod.ProjectLink
+import hivens.ui.screens.mod.ProjectLinkKind
+import hivens.ui.screens.mod.ProjectSource
+import hivens.ui.screens.mod.compactCount
+import hivens.ui.screens.mod.groupGameVersions
+import hivens.ui.screens.mod.rememberLinkFollower
+import hivens.ui.screens.mod.toBuild
+import hivens.ui.surface.NxSurface
+import hivens.ui.surface.SurfaceKind
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.Status
+import hivens.widget.api.LocalSurfaceFamilies
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
-import hivens.ui.theme.NxInk
-import hivens.ui.theme.NxColor
-import hivens.ui.theme.Status
+import java.awt.datatransfer.StringSelection
 
 /**
- * Source-neutral catalogue detail page. Both the Hivens mirror and Modrinth flow
- * through the SAME screen: the read side comes off [PackCatalogueRegistry] and the
- * write side off [PackInstallService], so the only thing that varies per source
- * is which provider the registry hands back. The install glyph in the hero installs
- * the single version directly (the mirror serves one) or opens a version picker when
- * the source publishes several (Modrinth).
+ * A pack's page in the catalogue, whichever source lists it.
  *
- * The install itself runs on [PackInstallService]'s app scope, so progress is read
- * back from the service rather than owned here: leaving this screen no longer
- * cancels the download, and re-entering while it runs re-attaches to the live
- * progress instead of showing an idle button.
+ * Built from the project page's own parts, because a reader moving between a mod
+ * and the pack it sits in should not meet two pages: the same header, the same
+ * tabs, the same table of builds and the same changelog, and the facts in the
+ * right rail's project view, which reads what this page publishes. A source fills
+ * what it has. The catalogue counts downloads and credits a team; the mirror names
+ * the runtime, the sign-in and the mods a build holds; what neither says is left
+ * out rather than shown empty.
  *
- * Tags and what the pack runs on render in the flow of the description. The
- * column that used to hold the latter is gone: it cost a column's width down the
- * whole page to say three things, and a line says them without one.
+ * The install runs on [PackInstallService]'s app scope, so progress is read back
+ * from the service rather than owned here: leaving this screen does not cancel
+ * the download, and coming back re-attaches to it.
  */
 @Composable
 fun CataloguePackDetailScreen(
@@ -84,9 +120,13 @@ fun CataloguePackDetailScreen(
     val registry: PackCatalogueRegistry = koinInject()
     val installService: PackInstallService = koinInject()
     val session: BrowseSession = koinInject()
+    val openProject: OpenProjectState = koinInject()
+    val browseTags: BrowseTags = koinInject()
+    val authProviders: AuthProviderRegistry = koinInject()
+    val families = LocalSurfaceFamilies.current
 
-    // Back is the top-bar breadcrumb's job now (no hero arrow), but automation
-    // still needs a handle on it.
+    PuppetScreen("CataloguePack.$packId")
+    // Back is the top-bar breadcrumb's job, but automation still needs a handle on it.
     PuppetClick("catalogue.detail.back") { onBack() }
 
     // Opens on the page as it was last read, not on a spinner. The details are the
@@ -99,20 +139,17 @@ fun CataloguePackDetailScreen(
         )
     }
     var retryTick by remember(origin, packId) { mutableIntStateOf(0) }
-    var showPicker by remember(origin, packId) { mutableStateOf(false) }
 
     // Install state is owned by the app-scoped service, not this composition.
     // Match on (origin, packId) so a return to this screen re-attaches to an
     // install started before we navigated away.
     val installs by installService.installs.collectAsState()
     val active = installs.values.firstOrNull { it.origin == origin && it.packId == packId }
-    val installing = active?.let { snap ->
-        (snap.phase as? InstallPhase.Running)?.let { InstallProgress(snap.versionId) }
-    }
+    val installingVersion = (active?.phase as? InstallPhase.Running)?.let { active.versionId }
     val installError = (active?.phase as? InstallPhase.Failed)?.message
 
-    // Success navigates to the installed instance (unchanged behaviour), then
-    // evicts the terminal snapshot so a later reinstall starts clean.
+    // Success navigates to the installed instance, then evicts the terminal
+    // snapshot so a later reinstall starts clean.
     LaunchedEffect(active?.key, active?.phase) {
         val snap = active
         val phase = snap?.phase
@@ -149,7 +186,7 @@ fun CataloguePackDetailScreen(
                 session.putDetails(origin, packId, details)
                 DetailState.Loaded(details)
             }
-        } catch (e: kotlinx.coroutines.CancellationException) {
+        } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             // A source that failed while a page of its own is on screen keeps
@@ -158,268 +195,335 @@ fun CataloguePackDetailScreen(
         }
     }
 
-    // A bar to take hold of. A page this long is otherwise reachable only by the
-    // wheel: there is nothing to drag, and nothing showing how far down it goes.
-    //
-    // Revealed while scrolling, and by the cursor reaching the edge it lives on
-    // -- not by the cursor being anywhere on the page. The other lists in the app
-    // put this on a pane with something beside it, so leaving the pane hides the
-    // bar; here the pane is the whole window, and hover over all of it means the
-    // bar never idles away at all.
-    val scroll = rememberScrollState()
-    val hover = remember { MutableInteractionSource() }
-    val hovered by hover.collectIsHoveredAsState()
-    Box(Modifier.fillMaxSize()) {
-    Column(Modifier.fillMaxSize().verticalScroll(scroll)) {
-        val loaded = state as? DetailState.Loaded
-        CatalogueHero(
-            // Same floated-card rounding as the Library detail hero.
-            modifier  = Modifier
-                .padding(start = 16.dp, top = 8.dp, end = 16.dp)
-                .clip(MaterialTheme.shapes.medium),
-            title     = loaded?.details?.title ?: packId,
-            tagline   = loaded?.details?.tagline.orEmpty(),
-            iconUrl   = loaded?.details?.iconUrl,
-            bannerUrl = loaded?.details?.bannerUrl,
-            seed      = packId,
-            // Back lives in the top-bar breadcrumb now -- no duplicate hero arrow.
-            onBack    = null,
-            action    = loaded?.let { ld ->
-                {
-                    InstallGlyphButton(
-                        onClick = {
-                            val versions = ld.details.versions
-                            when {
-                                versions.size > 1 -> showPicker = true
-                                else              -> versions.firstOrNull()?.let { install(ld.details, it) }
-                            }
-                        },
-                        enabled = installing == null && ld.details.versions.isNotEmpty(),
-                        busy    = installing != null,
-                    )
-                }
-            },
-        )
-
-        when (val st = state) {
-            DetailState.Loading -> Box(
-                Modifier.fillMaxWidth().height(280.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                CircularProgressIndicator(
-                    color       = NxColor.wash(NxColor.lead(), 0.55f),
-                    strokeWidth = 2.dp,
-                    modifier    = Modifier.size(28.dp),
-                )
-            }
-            is DetailState.Error -> RetryStateBlock(
-                title      = s.browseDetailErrorTitle,
-                message    = st.message,
-                retryLabel = s.browseRetry,
-                onRetry    = { retryTick++ },
-                modifier   = Modifier.fillMaxWidth().padding(32.dp),
-            )
-            is DetailState.Loaded -> DetailBody(details = st.details, installError = installError)
+    // The rail follows the page for exactly as long as the page is mounted, the
+    // way the project page holds it, and reads what the page publishes.
+    val targetKey = catalogueTargetKey(origin, packId)
+    // This visit, as the rail's owner: a page arriving over this one takes the rail
+    // and what this one still publishes on its way out is dropped.
+    val railOwner = remember(targetKey) { Any() }
+    DisposableEffect(railOwner) {
+        families.switch(RIGHT_RAIL_SURFACE, RailFamily.PROJECT_VIEW)
+        openProject.claim(railOwner)
+        onDispose {
+            families.reset(RIGHT_RAIL_SURFACE)
+            openProject.release(railOwner)
         }
     }
-        Box(
-            modifier         = Modifier
-                .align(Alignment.CenterEnd)
-                .width(SCROLLBAR_GUTTER)
-                .fillMaxHeight()
-                .hoverable(hover),
-            contentAlignment = Alignment.CenterEnd,
-        ) {
-            NxVerticalScrollbar(
-                adapter  = rememberScrollbarAdapter(scroll),
-                revealed = hovered || scroll.isScrollInProgress,
-                modifier = Modifier.fillMaxHeight().padding(vertical = 4.dp),
-            )
-        }
-    }
-
-    (state as? DetailState.Loaded)?.let { ld ->
-        PuppetClick("catalogue.detail.install", enabled = installing == null && ld.details.versions.isNotEmpty()) {
-            val versions = ld.details.versions
-            if (versions.size > 1) showPicker = true else versions.firstOrNull()?.let { install(ld.details, it) }
-        }
-    }
-
-    val pickerTarget = state as? DetailState.Loaded
-    if (showPicker && pickerTarget != null) {
-        val d = pickerTarget.details
-        // The listing arrives newest-first from every source, so the head is the
-        // latest build; nothing here is "installed" yet, that flag belongs to the
-        // instance host.
-        val rows = remember(d.versions) {
-            d.versions.mapIndexed { index, v ->
-                PickerVersion(
-                    id = v.id,
-                    label = v.versionNumber,
-                    channel = v.channel,
-                    publishedAt = v.publishedAt,
-                    changelog = v.changelog,
-                    runtimeLine = runtimeLineOf(v),
-                    latest = index == 0,
-                )
-            }
-        }
-        VersionPickerWindow(
-            title = s.versionPickerInstallTitle,
-            packName = d.title,
-            packIcon = d.iconUrl,
-            versions = rows,
-            intentFor = { PickerIntent.Install },
-            busyVersionId = installing?.versionId,
-            onConfirm = { picked ->
-                d.versions.firstOrNull { it.id == picked.id }?.let { install(d, it) }
-                showPicker = false
-            },
-            onDismiss = { showPicker = false },
-        )
-    }
-}
-
-/** "Minecraft 1.12.2  Forge", skipping whichever half the source did not declare. */
-private fun runtimeLineOf(v: CataloguePackVersion): String? = listOfNotNull(
-    v.mcVersions.firstOrNull()?.let { "Minecraft $it" },
-    v.loaders.firstOrNull()?.replaceFirstChar(Char::uppercase),
-).joinToString("  ").takeIf { it.isNotBlank() }
-
-@Composable
-private fun DetailBody(details: CataloguePackDetails, installError: String?) {
-    val s = LocalStrings.current
-    // A body link to a video (direct file or a service page) opens in-app; the
-    // rest go to the browser as before.
-    var videoLink by remember { mutableStateOf<String?>(null) }
-    val hasGallery = details.gallery.isNotEmpty()
-    var tab by remember(details.origin, details.id) { mutableStateOf(DetailTab.Description) }
-    // Full width, sharing the hero's edges. It was briefly centred under a ceiling,
-    // which was not a decision about this page: the side column had been removed
-    // twenty minutes earlier, the description was left running edge to edge, and the
-    // ceiling went in to compensate for that. What it actually did was split the page
-    // -- the hero above spans the window, so the block under it hung in the middle
-    // with neither edge lining up with anything. One page, one measure.
-    NxSurface(
-        kind     = SurfaceKind.Panel,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 20.dp),
-    ) {
-        Column(
-            modifier            = Modifier.fillMaxWidth().padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            val facts = remember(details) { compatFacts(details) }
-            if (facts.isNotEmpty()) {
-                // What the pack runs on, in the flow of the page. It used to be a
-                // column of label-and-value rows beside the description, which
-                // reserved a column's width down the whole page to say three
-                // things and pushed the reading of it into a narrower measure than
-                // it deserved. Three facts are a line, not a panel.
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalArrangement   = Arrangement.spacedBy(6.dp),
-                ) { facts.forEach { NxMetaChip(it, tone = NxMetaChipTone.Surface) } }
-            }
-            if (details.tags.isNotEmpty()) {
-                // In the flow of the page rather than in a column of their own. The
-                // side column this used to share was carrying one short block down
-                // the height of a long description, and reserving that width did
-                // more damage to the reading of the page than the block was worth.
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalArrangement   = Arrangement.spacedBy(6.dp),
-                ) { details.tags.forEach { NxMetaChip(it, tone = NxMetaChipTone.Surface) } }
-            }
-            // The gallery is a place of its own, not a strip at the head of the
-            // description. Screenshots and prose want opposite widths, and a grid
-            // of them above the text pushes the text off the first screen of a
-            // page whose text is the point. The tab is offered only when there
-            // are shots -- a lone tab is not a choice, it is a label.
-            if (hasGallery) {
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    NxChoiceChip(s.browseDetailTabDescription, selected = tab == DetailTab.Description) {
-                        tab = DetailTab.Description
-                    }
-                    NxChoiceChip(s.browseDetailTabGallery, selected = tab == DetailTab.Gallery) {
-                        tab = DetailTab.Gallery
-                    }
-                }
-                PuppetClick("catalogue.detail.tab.description") { tab = DetailTab.Description }
-                PuppetClick("catalogue.detail.tab.gallery") { tab = DetailTab.Gallery }
-            }
-            val body = details.bodyMarkdown
+    val tags by browseTags.tags.collectAsState()
+    LaunchedEffect(Unit) { browseTags.ensure() }
+    LaunchedEffect(state, tags, s) {
+        val current = state
+        val loaded = (current as? DetailState.Loaded)?.details
+        openProject.publish(
+            railOwner,
             when {
-                hasGallery && tab == DetailTab.Gallery -> ImageGallery(media = remember(details) { galleryMedia(details.gallery) })
-                !body.isNullOrBlank() -> MarkdownHtml(
-                    markdown = body,
-                    modifier = Modifier.fillMaxWidth(),
-                    onLink   = { url -> if (isPlayableVideoUrl(url)) videoLink = url else openInBrowser(url) },
-                )
-                // A source that says nothing about its pack used to end the card at
-                // the tag row, so the page was two thin bars over the wallpaper and
-                // read as a page that had failed to load rather than as a pack with
-                // nothing written about it. A blank string did the same through a
-                // markdown block with no content in it.
-                else -> Box(
-                    modifier         = Modifier.fillMaxWidth().heightIn(min = 120.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        text  = s.browseDetailNoDescription,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = NxInk.quiet,
-                    )
-                }
-            }
+                loaded != null -> openPackOf(targetKey, loaded, tags?.gameVersions.orEmpty(), s) { key -> authProviders[key]?.displayName ?: key }
+                // A page that could not be read has no facts to wait for. Pending
+                // here left the rail's blocks empty for as long as the page stayed.
+                current is DetailState.Error -> null
+                else -> OpenProject(targetKey = targetKey, title = packId, slug = packId, source = ProjectSource.Catalogue, pending = true)
+            },
+        )
+        loaded?.let { openProject.name(targetKey, it.title) }
+    }
 
-            if (installError != null) {
-                Text(installError, style = MaterialTheme.typography.bodySmall, color = NxColor.status(Status.Error, text = true))
+    var tab by rememberSaveable(origin, packId, stateSaver = Saver(save = { it.name }, restore = { PackTab.valueOf(it) })) {
+        mutableStateOf(PackTab.Description)
+    }
+    val loaded = (state as? DetailState.Loaded)?.details
+    val tabs = remember(loaded) { loaded?.let(::tabsOf) ?: listOf(PackTab.Description) }
+    LaunchedEffect(tabs) { if (tab !in tabs) tab = PackTab.Description }
+
+    Column(Modifier.fillMaxSize()) {
+        // The header and the tabs on a panel of their own, like the body under them,
+        // the way the project page sets them.
+        NxSurface(
+            kind = SurfaceKind.Panel,
+            modifier = Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 14.dp),
+        ) {
+            Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp)) {
+                PackHeader(
+                    packId = packId,
+                    details = loaded,
+                    installingVersion = installingVersion,
+                    installError = installError,
+                    onInstall = { d, v -> install(d, v) },
+                )
+                NxTabRow(
+                    tabs = tabs.map { it.label(s) },
+                    selected = tabs.indexOf(tab).coerceAtLeast(0),
+                    onSelect = { tab = tabs[it] },
+                    modifier = Modifier.padding(top = 12.dp, bottom = 10.dp),
+                )
+                tabs.forEach { t -> PuppetClick("catalogue.detail.tab.${t.name.lowercase()}") { tab = t } }
             }
-            // No in-page progress block: the activity surface narrates the
-            // install, and it survives leaving this page while a block bound to
-            // the screen cannot. Two of them on one install was the state the
-            // surface was built to end.
+        }
+        NxSurface(
+            kind = SurfaceKind.Panel,
+            modifier = Modifier.weight(1f).fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 14.dp),
+        ) {
+            when (val st = state) {
+                DetailState.Loading -> CenteredProgress(Modifier.fillMaxSize())
+                is DetailState.Error -> RetryStateBlock(
+                    title      = s.browseDetailErrorTitle,
+                    message    = st.message,
+                    retryLabel = s.browseRetry,
+                    onRetry    = { retryTick++ },
+                    modifier   = Modifier.fillMaxWidth().padding(32.dp),
+                )
+                is DetailState.Loaded -> PackBody(
+                    details = st.details,
+                    tab = tab,
+                    gameVersionTags = tags?.gameVersions.orEmpty(),
+                    installingVersion = installingVersion,
+                    onInstall = { v -> install(st.details, v) },
+                )
+            }
         }
     }
-    videoLink?.let { url ->
-        FullscreenVideo(url = url, onDismiss = { videoLink = null })
+
+    loaded?.let { d ->
+        PuppetClick("catalogue.detail.install", enabled = installingVersion == null && d.versions.isNotEmpty()) {
+            latestOf(d)?.let { install(d, it) }
+        }
     }
 }
 
+/** What a catalogue pack's page is known by to the rail and the trail. */
+internal fun catalogueTargetKey(origin: PackOrigin, packId: String): String = "pack:${origin.name}:$packId"
+
+/** The pack's tabs, and only those it has something behind. */
+private enum class PackTab { Description, Versions, Changelog, Gallery }
+
+private fun PackTab.label(s: AppStrings): String = when (this) {
+    PackTab.Description -> s.modPageTabDescription
+    PackTab.Versions -> s.modPageTabVersions
+    PackTab.Changelog -> s.modPageTabChangelog
+    PackTab.Gallery -> s.modPageTabGallery
+}
+
+private fun tabsOf(d: CataloguePackDetails): List<PackTab> = buildList {
+    add(PackTab.Description)
+    if (d.versions.isNotEmpty()) add(PackTab.Versions)
+    if (d.versions.any { !it.changelog.isNullOrBlank() }) add(PackTab.Changelog)
+    if (galleryOf(d).isNotEmpty()) add(PackTab.Gallery)
+}
+
+/** The build an install with no choice made reaches for: the source's pointer, else the newest. */
+internal fun latestOf(d: CataloguePackDetails): CataloguePackVersion? =
+    d.versions.firstOrNull { it.id == d.latestVersionId } ?: d.versions.firstOrNull()
 
 /**
- * What the pack runs on, as short phrases, in the order a person asks for them:
- * the game first, then what loads the mods into it, then the runtime under both.
+ * The pack's shots, its banner first where the source keeps it apart from them.
  *
- * Read off the newest version rather than off the pack, because a pack does not
- * have a Minecraft version -- its builds do, and the newest is the one the
- * install button reaches for. A source silent on any of the three contributes
- * nothing rather than a placeholder: "Loader: unknown" is worse than a line that
- * does not mention loaders.
+ * The page has no banner of its own any more, the header is the project page's,
+ * and a picture a curator chose to lead with belongs at the head of the gallery
+ * rather than nowhere.
  */
-internal fun compatFacts(details: CataloguePackDetails): List<String> {
-    val newest = details.versions.firstOrNull()
-    return listOfNotNull(
-        newest?.mcVersions?.firstOrNull()?.takeIf { it.isNotBlank() }?.let { "Minecraft $it" },
-        newest?.loaders?.firstOrNull()?.takeIf { it.isNotBlank() }?.replaceFirstChar(Char::uppercase),
-        details.runtimeLabel?.takeIf { it.isNotBlank() },
+internal fun galleryOf(d: CataloguePackDetails): List<CatalogueGalleryItem> {
+    val banner = d.bannerUrl ?: return d.gallery
+    return if (d.gallery.any { it.full == banner || it.thumb == banner }) {
+        d.gallery
+    } else {
+        listOf(CatalogueGalleryItem(full = banner, thumb = banner)) + d.gallery
+    }
+}
+
+// ClipEntry is still experimental; the project page's copy action carries the same opt-in.
+@OptIn(ExperimentalComposeUiApi::class)
+@Composable
+private fun PackHeader(
+    packId: String,
+    details: CataloguePackDetails?,
+    installingVersion: String?,
+    installError: String?,
+    onInstall: (CataloguePackDetails, CataloguePackVersion) -> Unit,
+) {
+    val s = LocalStrings.current
+    val scope = rememberCoroutineScope()
+    val uriHandler = LocalUriHandler.current
+    val clipboard = LocalClipboard.current
+    ProjectHeader(
+        title = details?.title ?: packId,
+        // Mirror summaries sometimes ship a tagline that is the name again.
+        description = details?.tagline?.takeIf { it.isNotBlank() && !it.equals(details.title, ignoreCase = true) },
+        iconUrl = details?.iconUrl,
+        facts = {
+            if (details != null) {
+                details.downloads?.let { HeaderStat(NxIcon.Download, compactCount(it, s), s.modPageStatDownloads) }
+                details.followers?.let { HeaderStat(NxIcon.Favorite, compactCount(it, s), s.modPageStatFollowers) }
+                if (details.tags.isNotEmpty()) {
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        details.tags.forEach { tag ->
+                            NxMetaChip(
+                                s.modrinthCategory(tag),
+                                tone = NxMetaChipTone.Surface,
+                                onClick = tagSearch(details.projectType, null, ProjectTag.Category(tag)),
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        actions = {
+            if (details != null) {
+                val latest = latestOf(details)
+                // Labelled, as the project page's own button is. A bare glyph in a
+                // corner of a picture was the one action on the page and the one a
+                // reader had to guess at.
+                NxButton(
+                    label = if (installingVersion != null) s.modPageInstalling else s.browseDetailInstallButton,
+                    onClick = { latest?.let { onInstall(details, it) } },
+                    icon = NxIcon.Download,
+                    enabled = installingVersion == null && latest != null,
+                )
+                details.pageUrl?.let { url ->
+                    NxKebabButton(contentDescription = s.contentActionDetails) { dismiss ->
+                        NxMenuItem(label = s.modPageOpenInCatalogue, icon = NxIcon.OpenInNew) {
+                            uriHandler.openUri(url)
+                            dismiss()
+                        }
+                        NxMenuItem(label = s.modPageCopyLink, icon = NxIcon.ContentCopy) {
+                            scope.launch { clipboard.setClipEntry(ClipEntry(StringSelection(url))) }
+                            dismiss()
+                        }
+                    }
+                }
+            }
+        },
+        notes = {
+            installError?.let {
+                Text(
+                    it,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = NxColor.status(Status.Error, text = true),
+                    maxLines = 3,
+                    modifier = Modifier.widthIn(max = ERROR_MEASURE),
+                )
+            }
+        },
     )
 }
 
-/** How near the edge the cursor has to come to call the scrollbar up. */
-private val SCROLLBAR_GUTTER = 28.dp
+private val ERROR_MEASURE = 320.dp
 
-/** The two halves of a pack page: what it says about itself, and what it looks like. */
-private enum class DetailTab { Description, Gallery }
+@Composable
+private fun PackBody(
+    details: CataloguePackDetails,
+    tab: PackTab,
+    gameVersionTags: List<ModrinthGameVersion>,
+    installingVersion: String?,
+    onInstall: (CataloguePackVersion) -> Unit,
+) {
+    val s = LocalStrings.current
+    // A body link to a video (direct file or a service page) opens in-app; a link
+    // to a project opens its page here, and the rest go where links go.
+    val follow = rememberLinkFollower()
+    var videoLink by remember { mutableStateOf<String?>(null) }
+    val builds = remember(details) { details.versions.map { it.toBuild() } }
+    val byId = remember(details) { details.versions.associateBy { it.id } }
+    when (tab) {
+        PackTab.Description -> Column(
+            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+        ) {
+            val body = details.bodyMarkdown
+            if (!body.isNullOrBlank()) {
+                MarkdownHtml(
+                    markdown = body,
+                    modifier = Modifier.fillMaxWidth(),
+                    onLink   = { url -> if (isPlayableVideoUrl(url)) videoLink = url else follow(url) },
+                )
+            } else {
+                // A source that says nothing about its pack is not a page that
+                // failed to load, and must not read like one.
+                Box(Modifier.fillMaxWidth().heightIn(min = 120.dp), contentAlignment = Alignment.Center) {
+                    Text(s.browseDetailNoDescription, style = MaterialTheme.typography.bodyMedium, color = NxInk.quiet)
+                }
+            }
+        }
+        PackTab.Versions -> BuildsTable(
+            builds = builds,
+            gameVersionTags = gameVersionTags,
+            onOpenBuild = null,
+            // Any build, not only the newest: a pack is installed whole, so the row
+            // is where a reader picks an older one on purpose.
+            rowAction = { b ->
+                byId[b.id]?.let { v ->
+                    NxIconButton(
+                        icon = NxIcon.Download,
+                        contentDescription = s.modPageInstallShort,
+                        onClick = { onInstall(v) },
+                        enabled = installingVersion == null,
+                        tint = NxColor.lead(),
+                    )
+                }
+            },
+            modifier = Modifier.fillMaxSize(),
+        )
+        PackTab.Changelog -> ChangelogList(builds, Modifier.fillMaxSize())
+        PackTab.Gallery -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
+            ImageGallery(media = remember(details) { galleryMedia(galleryOf(details)) }, modifier = Modifier.fillMaxWidth())
+        }
+    }
+    videoLink?.let { url -> FullscreenVideo(url = url, onDismiss = { videoLink = null }) }
+}
 
-/**
- * Which version is being installed. Only the identity is read: the activity
- * surface narrates the progress, and the counters this used to carry were being
- * rebuilt every frame for a block that no longer exists.
- */
-private data class InstallProgress(val versionId: String)
+/** What the rail's project view draws for a pack, in the terms it draws a project in. */
+internal fun openPackOf(
+    targetKey: String,
+    d: CataloguePackDetails,
+    gameVersionTags: List<ModrinthGameVersion>,
+    s: AppStrings,
+    /**
+     * A sign-in provider's name by its registry id. The provider names itself; one
+     * this build has not registered goes by its id, the way the launch gate's own
+     * messages say it.
+     */
+    providerName: (String) -> String = { it },
+): OpenProject {
+    val latest = latestOf(d)
+    return OpenProject(
+        targetKey = targetKey,
+        title = d.title,
+        slug = d.slug ?: d.id,
+        source = ProjectSource.Catalogue,
+        projectType = d.projectType,
+        gameVersions = groupGameVersions(d.gameVersions, gameVersionTags)
+            .ifEmpty { d.gameVersions.map { GameVersionGroup(it, listOf(it)) } },
+        loaders = d.loaders,
+        categories = d.tags,
+        clientSide = d.clientSide,
+        serverSide = d.serverSide,
+        licenseId = d.licenseId,
+        licenseName = d.licenseName,
+        publishedAt = relativeAge(d.publishedAt, s).takeIf { it.isNotBlank() },
+        publishedExact = formatBuildTimestamp(d.publishedAt),
+        updatedAt = relativeAge(d.updatedAt, s).takeIf { it.isNotBlank() },
+        updatedExact = formatBuildTimestamp(d.updatedAt),
+        links = d.links.map { ProjectLink(linkKindOf(it.kind), it.url, it.label) },
+        creators = d.creators.map { ProjectCreator(it.name, it.role, it.avatarUrl, it.owner) },
+        sizeBytes = latest?.sizeBytes,
+        runtime = d.runtimeLabel,
+        signIn = d.auth?.providerKeys.orEmpty().map(providerName),
+        modsCount = latest?.modsCount,
+        // A source that names a licence or a first release names them always, so
+        // neither present means the source has no such field to fill.
+        answersLicence = d.licenseId != null || d.licenseName != null,
+        answersPublished = d.publishedAt != null,
+    )
+}
+
+private fun linkKindOf(kind: CatalogueLinkKind): ProjectLinkKind = when (kind) {
+    CatalogueLinkKind.Issues -> ProjectLinkKind.Issues
+    CatalogueLinkKind.Source -> ProjectLinkKind.Source
+    CatalogueLinkKind.Wiki -> ProjectLinkKind.Wiki
+    CatalogueLinkKind.Discord -> ProjectLinkKind.Discord
+    CatalogueLinkKind.Donate -> ProjectLinkKind.Donate
+}
+
 
 private sealed class DetailState {
     object Loading : DetailState()

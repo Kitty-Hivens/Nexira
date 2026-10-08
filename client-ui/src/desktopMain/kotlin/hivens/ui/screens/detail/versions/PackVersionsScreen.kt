@@ -75,6 +75,7 @@ import hivens.ui.components.DestructiveConfirmDialog
 import hivens.ui.components.ReleaseNotes
 import hivens.ui.components.formatBuildTime
 import hivens.ui.components.formatBuildTimestamp
+import hivens.ui.components.label
 import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
@@ -940,6 +941,13 @@ private fun StatusRow(operation: PackOperation?) {
             )
             is PackOperationPhase.Failed -> Text(
                 text     = s.packVersionsFailed(phase.message),
+                style    = MaterialTheme.typography.labelSmall,
+                color    = NxColor.status(Status.Error, text = true),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            is PackOperationPhase.Refused -> Text(
+                text     = s.packOperationRefused(phase.work.label(s)),
                 style    = MaterialTheme.typography.labelSmall,
                 color    = NxColor.status(Status.Error, text = true),
                 maxLines = 1,

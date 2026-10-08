@@ -9,7 +9,7 @@ import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -23,6 +23,7 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollbarAdapter
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -44,6 +45,7 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -57,26 +59,23 @@ import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
 import hivens.ui.surface.SurfaceKind
 
-/** Narrower than this a list of answers is unreadable, whatever the trigger measures. */
-private val SELECT_MIN_WIDTH = 160.dp
-
 /**
  * One choice out of a known set, as a field that opens the set beneath itself.
  *
- * The difference from [NxContextMenu] is that the options are DATA here, not an
+ * The difference from [NxChoiceMenu] is that the options are DATA here, not an
  * arbitrary column of rows, and everything a list can only do when it knows its
  * own contents follows from that: the list opens scrolled to the answer already in
- * force, the keyboard walks it, and every row carries a radio so the column reads
- * as one question rather than as a stack of unrelated commands.
+ * force and the keyboard walks it. The rows are [NxChoiceItem]s either way, so a
+ * select and a hand-built choice list read as the same control.
  *
- * It is the shape a settings row or a property editor wants. A menu of verbs is
- * the other shape and stays on [NxContextMenu]; several settings read together are
- * a third and belong in [NxPopoverPanel].
+ * It is the shape a settings row, a property editor or a sort control wants. A
+ * menu of verbs is another shape and stays on [NxContextMenu]. Several settings
+ * read together are a third and belong in [NxPopoverPanel].
  *
- * The list takes the trigger's own width and hangs off its leading edge, so it
- * reads as the field opening rather than as a menu that happens to be nearby, and
- * it unfolds from the field -- upward, from the field's bottom edge, when the
- * space below will not take it.
+ * The trigger names the answer in force in the strong ink, with [prefix] before it
+ * in the muted one when the question is not already named beside the control. The
+ * list hangs a little off the trigger, at least as wide as it, and unfolds from it,
+ * upward from its top edge when the space below will not take it.
  */
 @Composable
 fun <T> NxSelect(
@@ -88,9 +87,17 @@ fun <T> NxSelect(
     placeholder: String = "",
     enabled: Boolean = true,
     icon: (T) -> IconKey? = { null },
+    /** Muted words before the answer, naming the question: "Sort by". */
+    prefix: String? = null,
+    /** A muted word after an answer in the list, for what sets it apart. */
+    hint: (T) -> String? = { null },
     maxHeight: Dp = 320.dp,
+    /** A row under the list that changes what it holds, see [NxChoiceFooterItem]. */
+    footer: (@Composable () -> Unit)? = null,
 ) {
     var expanded by remember { mutableStateOf(false) }
+    // Up for as long as any of the list is on screen, see [NxMenuPopup].
+    var shown by remember { mutableStateOf(false) }
     var triggerWidth by remember { mutableStateOf(0.dp) }
     val density = LocalDensity.current
     val interaction = remember { MutableInteractionSource() }
@@ -109,7 +116,7 @@ fun <T> NxSelect(
         targetValue = when {
             !enabled -> line.copy(alpha = 0.5f)
             expanded -> lead
-            hovered  -> lead.copy(alpha = 0.55f)
+            hovered || shown -> lead.copy(alpha = 0.55f)
             else     -> line
         },
         animationSpec = Motion.colorShift.of(),
@@ -119,7 +126,7 @@ fun <T> NxSelect(
     Box(modifier) {
         NxSurface(
             kind              = SurfaceKind.Field,
-            shape             = MaterialTheme.shapes.small,
+            shape             = MaterialTheme.shapes.medium,
             borderColor       = edge,
             interactionSource = interaction,
             modifier          = Modifier
@@ -136,43 +143,52 @@ fun <T> NxSelect(
             // Inside the field, so the inks are the ones that read on it.
             val ink = if (enabled) NxInk.main else NxInk.off
             Row(
-                modifier          = Modifier.fillMaxWidth().padding(horizontal = Spacing.s10, vertical = Spacing.s8),
+                modifier          = Modifier.fillMaxWidth().padding(start = Spacing.s12, end = Spacing.s8, top = 9.dp, bottom = 9.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                prefix?.let {
+                    Text(it, style = MaterialTheme.typography.bodyMedium, color = NxInk.quiet, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                    Spacer(Modifier.width(Spacing.s6))
+                }
                 selected?.let(icon)?.let {
                     Symbol(it, contentDescription = null, tint = ink, size = 18.dp)
                     Spacer(Modifier.width(Spacing.s8))
                 }
                 Text(
-                    text     = selected?.let(label) ?: placeholder,
-                    style    = MaterialTheme.typography.bodySmall,
-                    color    = if (selected == null) NxInk.quiet else ink,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
+                    text       = selected?.let(label) ?: placeholder,
+                    style      = MaterialTheme.typography.bodyMedium,
+                    color      = if (selected == null) NxInk.quiet else ink,
+                    fontWeight = if (selected == null) FontWeight.Normal else FontWeight.SemiBold,
+                    maxLines   = 1,
+                    overflow   = TextOverflow.Ellipsis,
+                    // Filling, so the caret sits at the trigger's far edge however
+                    // short the answer is, where the eye looks for "this opens".
+                    modifier   = Modifier.weight(1f),
                 )
                 Spacer(Modifier.width(Spacing.s8))
                 Symbol(
-                    icon               = NxIcon.ArrowDropDown,
+                    icon               = NxIcon.ExpandMore,
                     contentDescription = null,
-                    tint               = if (expanded) NxColor.lead() else NxInk.quiet,
-                    size               = 18.dp,
+                    tint               = if (expanded) NxColor.lead(text = true) else NxInk.quiet,
+                    size               = 20.dp,
                     modifier           = Modifier.graphicsLayer { rotationZ = caret },
                 )
             }
         }
 
-        val gapPx = with(density) { 4.dp.roundToPx() }
+        val gapPx = with(density) { 8.dp.roundToPx() }
         val origin = remember { mutableStateOf(TransformOrigin(0f, 0f)) }
         val provider = remember(gapPx, origin) { MenuBelowAnchor(NxMenuAlign.Start, gapPx, origin) }
-        NxMenuPopup(provider, origin, expanded, { expanded = false }) {
+        NxMenuPopup(provider, origin, expanded, { expanded = false }, { shown = it }) {
             SelectList(
                 options   = options,
                 selected  = selected,
                 label     = label,
                 icon      = icon,
+                hint      = hint,
                 width     = triggerWidth,
                 maxHeight = maxHeight,
+                footer    = footer,
                 onPick    = { expanded = false; onSelect(it) },
                 onDismiss = { expanded = false },
             )
@@ -186,8 +202,10 @@ private fun <T> SelectList(
     selected: T?,
     label: (T) -> String,
     icon: (T) -> IconKey?,
+    hint: (T) -> String?,
     width: Dp,
     maxHeight: Dp,
+    footer: (@Composable () -> Unit)?,
     onPick: (T) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -198,9 +216,12 @@ private fun <T> SelectList(
     val selectedIndex = options.indexOfFirst { it == selected }
     // Where the keyboard is. Starts on the answer in force, so the first arrow key
     // steps off it rather than jumping to the top of a list the user is already in.
-    var active by remember { mutableStateOf(selectedIndex.coerceAtLeast(0)) }
+    // Keyed on the list: a footer that changes what the list holds (snapshots shown
+    // or hidden) does so under an open popup, and an index kept from the old list
+    // pointed past the end of the new one or at somebody else's row.
+    var active by remember(options) { mutableStateOf(selectedIndex.coerceAtLeast(0)) }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(options) {
         if (selectedIndex >= 0) listState.scrollToItem(selectedIndex)
         focus.requestFocus()
     }
@@ -208,10 +229,10 @@ private fun <T> SelectList(
 
     NxSurface(
         kind     = SurfaceKind.Popup,
-        shape    = MaterialTheme.shapes.medium,
+        shape    = MaterialTheme.shapes.large,
         modifier = Modifier
-            .widthIn(min = SELECT_MIN_WIDTH)
-            .width(if (width > 0.dp) width else SELECT_MIN_WIDTH)
+            .widthIn(min = CHOICE_MIN_WIDTH)
+            .width(if (width > 0.dp) width else CHOICE_MIN_WIDTH)
             .focusRequester(focus)
             .focusable()
             .onPreviewKeyEvent { event ->
@@ -230,34 +251,36 @@ private fun <T> SelectList(
                 }
             },
     ) {
-        Box(Modifier.hoverable(hoverSource)) {
-            LazyColumn(
-                state          = listState,
-                modifier       = Modifier.heightIn(max = maxHeight),
-                contentPadding = PaddingValues(Spacing.s6),
-            ) {
-                itemsIndexed(options) { index, option ->
-                    NxMenuItem(
-                        label       = label(option),
-                        icon        = icon(option),
-                        selected    = option == selected,
-                        mark        = NxMenuMark.Radio,
-                        highlighted = index == active,
-                        onClick     = { onPick(option) },
-                    )
+        Column {
+            Box(Modifier.hoverable(hoverSource)) {
+                LazyColumn(state = listState, modifier = Modifier.heightIn(max = maxHeight)) {
+                    itemsIndexed(options) { index, option ->
+                        NxChoiceItem(
+                            label       = label(option),
+                            selected    = option == selected,
+                            icon        = icon(option),
+                            hint        = hint(option),
+                            highlighted = index == active,
+                            onClick     = { onPick(option) },
+                        )
+                    }
+                }
+                if (listState.canScrollForward || listState.canScrollBackward) {
+                    // In a wrapper that matches the list rather than filling the box: a
+                    // popup arrives with an unbounded height constraint, so fillMaxHeight
+                    // on the bar itself asks for an infinite one.
+                    Box(Modifier.matchParentSize()) {
+                        NxVerticalScrollbar(
+                            adapter  = rememberScrollbarAdapter(listState),
+                            revealed = hovered || listState.isScrollInProgress,
+                            modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(vertical = Spacing.s6),
+                        )
+                    }
                 }
             }
-            if (listState.canScrollForward || listState.canScrollBackward) {
-                // In a wrapper that matches the list rather than filling the box: a
-                // popup arrives with an unbounded height constraint, so fillMaxHeight
-                // on the bar itself asks for an infinite one.
-                Box(Modifier.matchParentSize()) {
-                    NxVerticalScrollbar(
-                        adapter  = rememberScrollbarAdapter(listState),
-                        revealed = hovered || listState.isScrollInProgress,
-                        modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(vertical = Spacing.s6),
-                    )
-                }
+            footer?.let {
+                HorizontalDivider(color = NxInk.line)
+                it()
             }
         }
     }

@@ -70,6 +70,11 @@ import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.constrainHeight
+import androidx.compose.ui.unit.constrainWidth
+import androidx.compose.ui.unit.offset
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -268,15 +273,15 @@ private fun PinnedFlowFrame(
     val natural: Weigh = { _, _ -> Modifier }
     if (horizontal) {
         Row(outer, horizontalArrangement = Arrangement.spacedBy(spacing)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(spacing)) {
-                FlowWidgets(path.leafAddress, pinned, registry, decorator, unknownDecorator, natural)
+            Row(Modifier.withoutLeadingGap(spacing, horizontal = true)) {
+                FlowWidgets(path.leafAddress, pinned, registry, decorator, unknownDecorator, natural, Modifier.gapBefore(spacing, horizontal = true))
             }
             scrolled(Modifier.weight(1f).fillMaxHeight())
         }
     } else {
         Column(outer, verticalArrangement = Arrangement.spacedBy(spacing)) {
-            Column(verticalArrangement = Arrangement.spacedBy(spacing)) {
-                FlowWidgets(path.leafAddress, pinned, registry, decorator, unknownDecorator, natural)
+            Column(Modifier.withoutLeadingGap(spacing, horizontal = false)) {
+                FlowWidgets(path.leafAddress, pinned, registry, decorator, unknownDecorator, natural, Modifier.gapBefore(spacing, horizontal = false))
             }
             scrolled(Modifier.weight(1f).fillMaxWidth())
         }
@@ -713,16 +718,16 @@ private fun FlowSlot(
 
     if (lineLength == 0) {
         if (flow.horizontal) {
-            Row(outer, horizontalArrangement = Arrangement.spacedBy(spacing)) {
+            Row(outer.withoutLeadingGap(spacing, horizontal = true)) {
                 val weigh: Weigh = alongScroll(true)?.let { viewportShare(it, totalWeight(drawn)) }
                     ?: { w, _ -> Modifier.weight(w) }
-                FlowWidgets(address, items, registry, decorator, unknownDecorator, weigh)
+                FlowWidgets(address, items, registry, decorator, unknownDecorator, weigh, Modifier.gapBefore(spacing, horizontal = true))
             }
         } else {
-            Column(outer, verticalArrangement = Arrangement.spacedBy(spacing)) {
+            Column(outer.withoutLeadingGap(spacing, horizontal = false)) {
                 val weigh: Weigh = alongScroll(false)?.let { viewportShare(it, totalWeight(drawn)) }
                     ?: { w, _ -> Modifier.weight(w) }
-                FlowWidgets(address, items, registry, decorator, unknownDecorator, weigh)
+                FlowWidgets(address, items, registry, decorator, unknownDecorator, weigh, Modifier.gapBefore(spacing, horizontal = false))
             }
         }
         return
@@ -758,6 +763,49 @@ private fun FlowSlot(
     }
 }
 
+/**
+ * The gap of a flow line, given only before a widget that drew something.
+ *
+ * A widget can have nothing to show where it stands: a filter for a kind that is
+ * not being searched, a project block for a project that declares nothing. It keeps
+ * its place in the flow at no size, and a plain spacedBy still gave it the gap on
+ * either side, so the line grew a double gap wherever one stood. Here a widget of
+ * no size along the line takes no gap, and one that draws takes it before itself.
+ *
+ * Carried by the widgets rather than by the line's arrangement. An arrangement only
+ * places what the line has already measured, and the line had measured a gap for
+ * every widget, drawn or not, so a column of empty blocks still stood taller than
+ * what it drew. The line hands back the gap before its first widget, see
+ * [withoutLeadingGap].
+ */
+private fun Modifier.gapBefore(gap: Dp, horizontal: Boolean): Modifier = if (gap <= 0.dp) this else layout { measurable, constraints ->
+    val g = gap.roundToPx()
+    val placeable = measurable.measure(if (horizontal) constraints.offset(horizontal = -g) else constraints.offset(vertical = -g))
+    val along = if (horizontal) placeable.width else placeable.height
+    when {
+        along == 0 -> layout(placeable.width, placeable.height) { placeable.placeRelative(0, 0) }
+        horizontal -> layout(placeable.width + g, placeable.height) { placeable.placeRelative(g, 0) }
+        else -> layout(placeable.width, placeable.height + g) { placeable.placeRelative(0, g) }
+    }
+}
+
+/**
+ * A line of [gapBefore] widgets, less the gap before the first of them: the line is
+ * measured with that much more room, then reports that much less and is drawn back
+ * by it, so the first drawn widget meets the line's edge.
+ */
+private fun Modifier.withoutLeadingGap(gap: Dp, horizontal: Boolean): Modifier = if (gap <= 0.dp) this else layout { measurable, constraints ->
+    val g = gap.roundToPx()
+    val placeable = measurable.measure(if (horizontal) constraints.offset(horizontal = g) else constraints.offset(vertical = g))
+    if (horizontal) {
+        val width = constraints.constrainWidth((placeable.width - g).coerceAtLeast(0))
+        layout(width, placeable.height) { placeable.placeRelative(-g, 0) }
+    } else {
+        val height = constraints.constrainHeight((placeable.height - g).coerceAtLeast(0))
+        layout(placeable.width, height) { placeable.placeRelative(0, -g) }
+    }
+}
+
 @Composable
 private fun FlowWidgets(
     address: SlotAddress,
@@ -766,12 +814,14 @@ private fun FlowWidgets(
     decorator: WidgetDecorator,
     unknownDecorator: UnknownWidgetDecorator,
     weigh: Weigh,
+    /** What each widget wears for the line's gap, outside its own size. */
+    gap: Modifier,
 ) {
     widgets.forEach { (index, instance) ->
         key(instance.instanceId) {
             val descriptor = registry[instance.kind]
             if (descriptor == null) {
-                RenderUnknown(unknownDecorator, address, index, instance)
+                Box(gap) { RenderUnknown(unknownDecorator, address, index, instance) }
             } else {
                 val movable = rememberWidgetMovable(descriptor, instance, index)
                 // Outer spacing around the widget, from its placement so a flow
@@ -780,13 +830,13 @@ private fun FlowWidgets(
                 // Precedence lives on the model as flowPlacement(), so the rule is
                 // testable without a composition.
                 when (val placement = instance.flowPlacement()) {
-                    is FlowPlacement.Weighted -> Box(weigh(placement.weight, descriptor.sizing).then(pad)) {
+                    is FlowPlacement.Weighted -> Box(gap.then(weigh(placement.weight, descriptor.sizing)).then(pad)) {
                         decorator(address, index, descriptor, instance) { movable() }
                     }
-                    is FlowPlacement.Bounded -> Box(boundedModifier(placement, descriptor.sizing).then(pad)) {
+                    is FlowPlacement.Bounded -> Box(gap.then(boundedModifier(placement, descriptor.sizing)).then(pad)) {
                         decorator(address, index, descriptor, instance) { movable() }
                     }
-                    FlowPlacement.Natural -> Box(pad) {
+                    FlowPlacement.Natural -> Box(gap.then(pad)) {
                         decorator(address, index, descriptor, instance) { movable() }
                     }
                 }

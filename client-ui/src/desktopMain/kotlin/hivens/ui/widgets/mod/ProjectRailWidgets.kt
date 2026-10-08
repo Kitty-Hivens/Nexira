@@ -29,7 +29,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import hivens.ui.components.LoaderGlyph
 import hivens.ui.components.hasLoaderGlyph
 import hivens.ui.i18n.LocalStrings
@@ -48,6 +47,10 @@ import hivens.ui.screens.mod.disclosureIsWarning
 import hivens.ui.screens.mod.disclosuresInReadingOrder
 import hivens.ui.screens.mod.disclosureLine
 import hivens.ui.screens.mod.Environment
+import hivens.ui.screens.mod.OpenProject
+import hivens.ui.screens.browse.ProjectTag
+import hivens.ui.screens.browse.tagSearch
+import hivens.ui.puppet.PuppetClick
 import hivens.ui.screens.mod.ProjectSource
 import hivens.ui.screens.mod.environmentLabel
 import hivens.ui.screens.mod.environments
@@ -57,6 +60,9 @@ import hivens.ui.screens.mod.loaderDot
 import hivens.ui.screens.mod.loaderLabel
 import hivens.ui.theme.decorativeColor
 import hivens.ui.utils.humanSize
+import hivens.ui.widgets.RailBlock
+import hivens.ui.widgets.RailGroup
+import hivens.ui.widgets.RailLabel
 import hivens.ui.widgets.Sources
 import hivens.widget.api.rememberSource
 import hivens.widget.model.Widget
@@ -80,9 +86,15 @@ import hivens.ui.theme.Status
  * nothing anywhere has to know they are gone.
  */
 
-/** A file the catalogue cannot answer for still gets the question asked. */
+/**
+ * A file the catalogue cannot answer for still gets the question asked. While the
+ * page is still asking, the place holds an ellipsis instead.
+ */
 @Composable
-private fun unknown() = LocalStrings.current.modRailUnknownValue
+private fun unknown(p: OpenProject) = if (p.pending) PENDING else LocalStrings.current.modRailUnknownValue
+
+/** What a fact reads while the page has not heard back. */
+private const val PENDING = "…"
 
 @Widget(
     id = "mod.compatibility",
@@ -106,26 +118,40 @@ fun ProjectCompatibilityWidget(instance: WidgetInstance) {
     val p = project ?: return
     val s = LocalStrings.current
 
-    Section(s.modRailCompatibility) {
-        Group {
-        Label(s.modRailGame)
+    RailBlock(s.modRailCompatibility) {
+        RailGroup {
+        RailLabel(s.modRailGame)
         // A jar declares the loader it needs and usually the game version it was
         // built against, so those two survive the loss of the catalogue. What it
         // cannot tell us is the RANGE it also runs on, and a range guessed from
         // one build would be a lie with a confident shape.
-        Chips(p.gameVersionLabels.ifEmpty { listOf(unknown()) })
+        if (p.gameVersions.isEmpty()) {
+            Chips(listOf(unknown(p)))
+        } else {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                p.gameVersions.forEach { group ->
+                    val tag = ProjectTag.GameVersions(group.versions)
+                    NxMetaChip(group.label, tone = NxMetaChipTone.Surface, onClick = tagSearch(p.projectType, p.packId, tag))
+                    TagPuppet("mod.version.${group.label}", p, tag)
+                }
+            }
+        }
         }
 
-        Group {
-        Label(s.modRailPlatforms)
+        RailGroup {
+        RailLabel(s.modRailPlatforms)
         if (p.loaders.isEmpty()) {
-            Chips(listOf(unknown()))
+            Chips(listOf(unknown(p)))
         } else {
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 p.loaders.forEach { loader ->
+                    val tag = ProjectTag.Loader(loader)
                     // The project's own mark where there is one, and the colour
                     // swatch only where there is not: a launcher that lists what a
                     // mod runs on is naming the loaders, and a coloured square is a
@@ -138,7 +164,9 @@ fun ProjectCompatibilityWidget(instance: WidgetInstance) {
                         } else {
                             null
                         },
+                        onClick = tagSearch(p.projectType, p.packId, tag),
                     )
+                    TagPuppet("mod.loader.$loader", p, tag)
                 }
             }
         }
@@ -149,16 +177,17 @@ fun ProjectCompatibilityWidget(instance: WidgetInstance) {
         // server-capable, and a single word has to throw one of those away.
         val envs = environments(p.clientSide, p.serverSide)
         if (envs.isNotEmpty() || p.source == ProjectSource.Local) {
-            Group {
-            Label(s.modRailEnvironment)
+            RailGroup {
+            RailLabel(s.modRailEnvironment)
             if (envs.isEmpty()) {
-                Chips(listOf(unknown()))
+                Chips(listOf(unknown(p)))
             } else {
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     envs.forEach { env ->
+                        val tag = ProjectTag.Runs(env)
                         NxMetaChip(
                             environmentLabel(env, s),
                             tone = NxMetaChipTone.Surface,
@@ -170,7 +199,9 @@ fun ProjectCompatibilityWidget(instance: WidgetInstance) {
                                     size = 12.dp,
                                 )
                             },
+                            onClick = tagSearch(p.projectType, p.packId, tag),
                         )
+                        TagPuppet("mod.env.${env.name}", p, tag)
                     }
                 }
             }
@@ -216,12 +247,16 @@ fun ProjectTagsWidget(instance: WidgetInstance) {
     val s = LocalStrings.current
     if (p.categories.isEmpty()) return
 
-    Section(s.modRailTags) {
+    RailBlock(s.modRailTags) {
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(5.dp),
             verticalArrangement = Arrangement.spacedBy(5.dp),
         ) {
-            p.categories.forEach { NxMetaChip(it, tone = NxMetaChipTone.Surface) }
+            p.categories.forEach { name ->
+                val tag = ProjectTag.Category(name)
+                NxMetaChip(s.modrinthCategory(name), tone = NxMetaChipTone.Surface, onClick = tagSearch(p.projectType, p.packId, tag))
+                TagPuppet("mod.tag.$name", p, tag)
+            }
         }
     }
 }
@@ -250,7 +285,7 @@ fun ProjectLinksWidget(instance: WidgetInstance) {
     val follow = rememberLinkFollower()
     if (p.links.isEmpty()) return
 
-    Section(s.modRailLinks) {
+    RailBlock(s.modRailLinks) {
         val donations = p.links.count { it.kind == ProjectLinkKind.Donate }
         p.links.forEachIndexed { index, link ->
             // Where the author can be reached, then a rule, then where they can be
@@ -296,6 +331,7 @@ private fun linkIcon(kind: ProjectLinkKind): IconKey = when (kind) {
     ProjectLinkKind.Wiki -> NxIcon.Description
     ProjectLinkKind.Discord -> NxIcon.Language
     ProjectLinkKind.Donate -> NxIcon.Favorite
+    ProjectLinkKind.Page -> NxIcon.Public
 }
 
 /**
@@ -329,7 +365,7 @@ fun ProjectCreatorsWidget(instance: WidgetInstance) {
     val s = LocalStrings.current
     if (p.creators.isEmpty()) return
 
-    Section(s.modRailCreators) {
+    RailBlock(s.modRailCreators) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             p.creators.forEach { creator ->
                 Row(
@@ -419,7 +455,7 @@ fun ProjectDetailsWidget(instance: WidgetInstance) {
     val p = project ?: return
     val s = LocalStrings.current
 
-    Section(s.modRailDetails) {
+    RailBlock(s.modRailDetails) {
         // Declarations come FIRST and in plain text. Only the one that can
         // physically hurt someone gets a colour: the difference between informing
         // a reader and accusing an author.
@@ -449,19 +485,32 @@ fun ProjectDetailsWidget(instance: WidgetInstance) {
         // The jar carries its own licence; the dates belong to the catalogue
         // entry rather than to the file, so a local one says it does not know
         // instead of showing the file's mtime as if it meant something.
-        Fact(NxIcon.Shield, licenseLabel(p.licenseId, p.licenseName, s))
+        if (p.answersLicence) {
+            Fact(NxIcon.Shield, if (p.pending) PENDING else licenseLabel(p.licenseId, p.licenseName, s))
+        }
         // How long ago in the line, the exact moment on hover. A date column that
         // spells out the timestamp makes the reader do the arithmetic on every row.
-        DatedFact(
-            NxIcon.NewReleases,
-            p.publishedAt?.let { s.modPublishedOn(it) } ?: s.modPublishedUnknown,
-            p.publishedExact,
-        )
-        DatedFact(
-            NxIcon.Update,
-            p.updatedAt?.let { s.modUpdatedOn(it) } ?: s.modUpdatedUnknown,
-            p.updatedExact,
-        )
+        if (p.answersPublished) {
+            DatedFact(
+                NxIcon.NewReleases,
+                p.publishedAt?.let { s.modPublishedOn(it) } ?: if (p.pending) PENDING else s.modPublishedUnknown,
+                p.publishedExact,
+            )
+        }
+        if (p.answersUpdated) {
+            DatedFact(
+                NxIcon.Update,
+                p.updatedAt?.let { s.modUpdatedOn(it) } ?: if (p.pending) PENDING else s.modUpdatedUnknown,
+                p.updatedExact,
+            )
+        }
+
+        // What a pack asks of the machine and of the player, before what it holds.
+        // The sign-in comes first of the three: it is the one that stops a game
+        // from starting.
+        p.signIn.forEach { Fact(NxIcon.VpnKey, s.packRailSignIn(it)) }
+        p.runtime?.let { Fact(NxIcon.Memory, it) }
+        p.modsCount?.let { Fact(NxIcon.Widgets, "${s.packRailMods}: $it") }
 
         // What only the file can answer. These three were the whole of the
         // read-only dialog the page replaces, so they follow it here rather than
@@ -470,6 +519,16 @@ fun ProjectDetailsWidget(instance: WidgetInstance) {
         p.sizeBytes?.let { Fact(NxIcon.InsertDriveFile, "${s.contentDetailSize}: ${humanSize(it, s)}") }
         if (p.authors.isNotEmpty()) {
             Fact(NxIcon.Person, "${s.contentDetailAuthors}: ${p.authors.joinToString(", ")}")
+        }
+        if (p.usedBy.isNotEmpty()) {
+            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Fact(NxIcon.Inventory2, s.packRailUsedBy)
+                Text(
+                    p.usedBy.joinToString(", "),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = NxInk.quiet,
+                )
+            }
         }
         if (p.dependencies.isNotEmpty()) {
             Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
@@ -502,89 +561,24 @@ private fun disclosureIcon(type: String): IconKey = when (type) {
     else -> NxIcon.Info
 }
 
-// ── Shared block furniture ───────────────────────────────────────────────
+// ── Block furniture of its own ─────────────────────────────────────────
 
 @Composable
-private fun Section(title: String, content: @Composable ColumnScopeShim.() -> Unit) {
-    // Twelve between the title and the body, and between the sections inside it.
-    // The plane the kernel paints carries the sixteen of padding around all of it,
-    // so nothing here insets itself.
-    Column(
-        // The card's own inside. Sixteen, measured off the reference, and here
-        // rather than in the plane record for the reason spelled out on each
-        // widget's surface above.
-        Modifier.fillMaxWidth().padding(CARD_PADDING),
-        verticalArrangement = Arrangement.spacedBy(SECTION_GAP),
-    ) {
-        Text(
-            title,
-            style = MaterialTheme.typography.titleMedium,
-            fontSize = BLOCK_TITLE,
-            // The brightest ink there is. Both this and the group label under it
-            // were on textPrimary, which put an 18 semibold and a 16 normal within
-            // a hair of each other: on the sheet the block's name and the name of a
-            // group inside it read as the same rank. The reference uses two tones
-            // and so does the palette, so use them.
-            color = NxInk.main,
-            fontWeight = FontWeight.SemiBold,
-        )
-        ColumnScopeShim.content()
-    }
-}
-
-/**
- * The two sizes the reference uses in a sidebar block, measured rather than
- * guessed: the block's name, then the name of a group inside it.
- *
- * The first pass here used the app's small title and small label roles, 14 bold
- * and 11 secondary, which put the whole rail a step below the body text it sits
- * beside and made it read as a footnote to the page rather than as half of it.
- */
-private val BLOCK_TITLE = 18.sp
-private val GROUP_LABEL = 16.sp
-
-/**
- * Twelve between one group and the next, eight between a group's label and what it
- * labels.
- *
- * One number for both is what the first pass used, and it detaches every label
- * from its own content: "Platforms" sat exactly as far from the platform chips as
- * from the game-version chips above it, so the column read as alternating lines
- * rather than as three groups.
- */
-private val SECTION_GAP = 12.dp
-private val GROUP_GAP = 8.dp
-private val CARD_PADDING = 16.dp
-
-/** Lets a block's body call the helpers below without inheriting ColumnScope. */
-private object ColumnScopeShim
-
-/** A label and the thing it labels, held closer to each other than to the next group. */
-@Composable
-private fun ColumnScopeShim.Group(content: @Composable ColumnScopeShim.() -> Unit) {
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(GROUP_GAP)) {
-        ColumnScopeShim.content()
-    }
-}
-
-@Composable
-private fun ColumnScopeShim.Label(text: String) = Text(
-    text,
-    style = MaterialTheme.typography.bodyMedium,
-    fontSize = GROUP_LABEL,
-    color = NxInk.main,
-    fontWeight = FontWeight.Normal,
-)
-
-@Composable
-private fun ColumnScopeShim.Chips(values: List<String>) = FlowRow(
+private fun Chips(values: List<String>) = FlowRow(
     horizontalArrangement = Arrangement.spacedBy(4.dp),
     verticalArrangement = Arrangement.spacedBy(4.dp),
 ) { values.forEach { NxMetaChip(it, tone = NxMetaChipTone.Surface) } }
 
+/** A tag's search, reachable by a driver without a pointer. */
+@Composable
+private fun TagPuppet(id: String, p: OpenProject, tag: ProjectTag) {
+    val open = tagSearch(p.projectType, p.packId, tag) ?: return
+    PuppetClick(id) { open() }
+}
+
 /** A fact whose precise form is a hover away. */
 @Composable
-private fun ColumnScopeShim.DatedFact(icon: IconKey, text: String, exact: String?) {
+private fun DatedFact(icon: IconKey, text: String, exact: String?) {
     if (exact == null) {
         Fact(icon, text)
     } else {
@@ -593,7 +587,7 @@ private fun ColumnScopeShim.DatedFact(icon: IconKey, text: String, exact: String
 }
 
 @Composable
-private fun ColumnScopeShim.Fact(icon: IconKey, text: String) = Row(
+private fun Fact(icon: IconKey, text: String) = Row(
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(9.dp),
 ) {

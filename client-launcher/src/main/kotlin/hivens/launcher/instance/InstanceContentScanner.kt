@@ -103,6 +103,14 @@ class InstalledContent(
             (version?.hashCode() ?: 0)) * 31 + loaders.hashCode()) * 31 + gameVersions.hashCode()
 }
 
+/**
+ * A scan that also says what it could not read: archives in the content folders
+ * whose metadata did not parse, which [InstanceContentScanner.scan] logs and drops.
+ * The game still loads such a file, so a question about the whole folder, such as
+ * whether a project is already installed, is unanswerable while one is there.
+ */
+class ScanReport(val items: List<InstalledContent>, val unreadable: List<Path>)
+
 /** Where this item actually sits under [instanceDir], disabled suffix and all. */
 fun InstalledContent.pathIn(instanceDir: Path): Path =
     instanceDir.resolve(kind.folderName())
@@ -128,11 +136,15 @@ class InstanceContentScanner(
     private val log = LoggerFactory.getLogger(InstanceContentScanner::class.java)
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
-    suspend fun scan(instanceDir: Path): List<InstalledContent> = withContext(Dispatchers.IO) {
+    suspend fun scan(instanceDir: Path): List<InstalledContent> = scanReport(instanceDir).items
+
+    /** [scan], with the archives it skipped named rather than only logged. */
+    suspend fun scanReport(instanceDir: Path): ScanReport = withContext(Dispatchers.IO) {
+        val unreadable = mutableListOf<Path>()
         val items = buildList {
-            addAll(scanArchives(instanceDir.resolve("mods"), ContentKind.Mod))
-            addAll(scanArchives(instanceDir.resolve("resourcepacks"), ContentKind.ResourcePack))
-            addAll(scanArchives(instanceDir.resolve("shaderpacks"), ContentKind.ShaderPack))
+            addAll(scanArchives(instanceDir.resolve("mods"), ContentKind.Mod, unreadable))
+            addAll(scanArchives(instanceDir.resolve("resourcepacks"), ContentKind.ResourcePack, unreadable))
+            addAll(scanArchives(instanceDir.resolve("shaderpacks"), ContentKind.ShaderPack, unreadable))
         }.sortedBy { it.displayName.lowercase() }
         // Drop cache entries for files that disappeared since the last scan (a removed
         // mod). Edits overwrite in place (same key), so only deletions leave orphans.
@@ -142,7 +154,7 @@ class InstanceContentScanner(
             }
             c.retain(instanceDir.normalize().toString() + File.separator, current)
         }
-        items
+        ScanReport(items, unreadable)
     }
 
     /**
@@ -151,10 +163,15 @@ class InstanceContentScanner(
      * between archives, so a stopped launch does not finish reading the folder.
      */
     suspend fun scanMods(instanceDir: Path): List<InstalledContent> = withContext(Dispatchers.IO) {
-        scanArchives(instanceDir.resolve(ContentKind.Mod.folderName()), ContentKind.Mod) { ensureActive() }
+        scanArchives(instanceDir.resolve(ContentKind.Mod.folderName()), ContentKind.Mod, unreadable = null) { ensureActive() }
     }
 
-    private fun scanArchives(dir: Path, kind: ContentKind, beforeEach: () -> Unit = {}): List<InstalledContent> {
+    private fun scanArchives(
+        dir: Path,
+        kind: ContentKind,
+        unreadable: MutableList<Path>?,
+        beforeEach: () -> Unit = {},
+    ): List<InstalledContent> {
         if (!dir.isDirectory()) return emptyList()
         val files = Files.list(dir).use { stream ->
             stream.filter { it.isRegularFile() && isArchive(it.name) }.toList()
@@ -170,6 +187,7 @@ class InstanceContentScanner(
                 beforeEach()
                 runCatching { read(it, kind) }.getOrElse { e ->
                     log.warn("Skipping unreadable content at {}: {}", it, e.message)
+                    unreadable?.add(it)
                     null
                 }
             }

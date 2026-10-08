@@ -41,6 +41,8 @@ class DefaultLayoutTest {
                 "appshell.backdrop",
                 // kernel-3 originals
                 "home.new", "library",
+                // The catalogue: its search and its results
+                "browse",
                 "appshell.leftrail", "appshell.rightrail",
                 // Phase B.1 widgetized screens (incremental landing)
                 "about",
@@ -116,25 +118,30 @@ class DefaultLayoutTest {
 
         assertEquals(setOf("main"),           slots("home.new"))
         assertEquals(setOf("header", "body"), slots("library"))
+        assertEquals(setOf("header", "body"), slots("browse"))
         assertEquals(setOf("top", "bottom"),  slots("appshell.leftrail"))
         assertEquals(setOf("news", "bottom"),  slots("appshell.rightrail"))
     }
 
     /**
-     * The rail is the one surface with a second family, and [hivens.ui.RightPanel]
+     * The rail is the one surface with more than one family, and [hivens.ui.RightPanel]
      * branches on the name to pick which slots it lays out. A family renamed here
      * and not there does not fail to compile; it renders the rail's fallback and
-     * the reader's project-view arrangement goes quiet, so the pair is pinned.
+     * the reader's arrangement for that family goes quiet, so the names are pinned.
      */
     @Test
-    fun `the right rail declares a general family and a project view`() {
+    fun `the right rail declares a general family, a project view and a browse family`() {
         val graph = DefaultLayout.load()
         val rail = graph.surfaces[SurfaceId("appshell.rightrail")]!!
-        assertEquals(setOf("general", "projectView"), rail.families.keys.map { it.value }.toSet())
+        assertEquals(setOf("general", "projectView", "browse"), rail.families.keys.map { it.value }.toSet())
         assertEquals(
             setOf("modData", "authorData"),
             rail.slotsOf(FamilyId("projectView")).keys.map { it.value }.toSet(),
         )
+        assertEquals(setOf("controls"), rail.slotsOf(FamilyId("browse")).keys.map { it.value }.toSet())
+        val controls = rail.slotsOf(FamilyId("browse"))[SlotId("controls")]!!.widgets.map { it.kind.value }
+        assertEquals("browse.scope", controls.first(), "what is searched leads the rail")
+        assertTrue(controls.drop(1).all { it.startsWith("browse.filter.") }, "the rest of the rail is filters: $controls")
     }
 
     @Test

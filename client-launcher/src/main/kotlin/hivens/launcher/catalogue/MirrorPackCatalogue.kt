@@ -8,6 +8,7 @@ import hivens.core.api.dto.smrt.SmrtPackListing
 import hivens.core.api.dto.smrt.SmrtPackManifest
 import hivens.core.api.dto.smrt.SmrtPackSummary
 import hivens.core.api.dto.smrt.inLanguage
+import hivens.core.api.dto.smrt.toDomain
 import hivens.core.api.interfaces.IPackCatalogueService
 import hivens.core.data.PackOrigin
 import hivens.launcher.smrt.SmrtPackClient
@@ -128,26 +129,31 @@ class MirrorPackCatalogue(
 
     override suspend fun details(packId: String): CataloguePackDetails = coroutineScope {
         // Summary + manifest + build listing in parallel: the manifest carries
-        // loader + Java for the metadata block, the listing feeds the version
-        // picker (server order, newest first).
+        // loader, Java and the sign-in the pack needs, the listing feeds the
+        // versions (server order, newest first) and names the latest build.
         val summaryD = async { client.fetchSummary(packId) }
         val manifestD = async { client.fetchManifest(packId) }
-        val buildsD = async { runCatching { client.listBuilds(packId).builds }.getOrDefault(emptyList()) }
+        val listingD = async { runCatching { client.listBuilds(packId) }.getOrNull() }
         val s = summaryD.await()
         val m = manifestD.await()
+        val listing = listingD.await()
         val tag = language()
-        val versions = buildsD.await()
+        val versions = listing?.builds.orEmpty()
             .map { it.forLanguage(tag) }
             .map { b ->
                 CataloguePackVersion(
                     id = b.versionNumber,
                     name = b.versionNumber,
                     versionNumber = b.versionNumber,
-                    mcVersions = listOf(m.minecraft.version),
-                    loaders = listOf(m.loader.name),
+                    // A build that names its own runtime is read for it, so a pack
+                    // that moved loader or game version says which build did.
+                    mcVersions = listOf(b.minecraftVersion ?: m.minecraft.version),
+                    loaders = listOf(b.loaderName ?: m.loader.name),
                     channel = b.channel,
                     publishedAt = b.datePublished,
                     changelog = b.changelog,
+                    modsCount = b.modsCount,
+                    sizeBytes = b.sizeBytes,
                 )
             }
             .ifEmpty { listOf(versionOf(s, m)) }
@@ -165,6 +171,13 @@ class MirrorPackCatalogue(
             tags = s.tags,
             runtimeLabel = "Java ${m.java.major}",
             versions = versions,
+            gameVersions = versions.flatMap { it.mcVersions }.distinct(),
+            loaders = versions.flatMap { it.loaders }.distinct(),
+            updatedAt = s.latestBuiltAt,
+            // The pointer the mirror serves as current, which a curator may have
+            // left on a beta; the listing's newest is not necessarily it.
+            latestVersionId = listing?.latest ?: s.latestPackVersion,
+            auth = m.auth?.toDomain(),
         )
     }
 

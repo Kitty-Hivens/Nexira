@@ -17,11 +17,9 @@ import hivens.launcher.runtime.RuntimeProvisioner
 import hivens.launcher.runtime.loader.LoaderVersionOption
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.nx.NxChoiceChip
-import hivens.ui.nx.NxContextMenu
+import hivens.ui.nx.NxChoiceItem
+import hivens.ui.nx.NxChoiceMenu
 import hivens.ui.nx.NxField
-import hivens.ui.nx.NxMenuAlign
-import hivens.ui.nx.NxMenuItem
-import hivens.ui.nx.NxMenuMark
 import hivens.ui.puppet.PuppetField
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -106,15 +104,13 @@ internal fun LoaderPicker(
                 placeholder = if (loaderNeedsVersion(loaderId)) s.createPackLoaderVersionRequired else s.createPackLoaderVersionLatest,
                 modifier = Modifier.fillMaxWidth().onFocusChanged { if (it.isFocused) menuOpen = true },
             )
-            NxContextMenu(
+            NxChoiceMenu(
                 expanded         = menuOpen && matches.isNotEmpty(),
                 onDismissRequest = { menuOpen = false },
-                align            = NxMenuAlign.Start,
                 maxHeight        = 240.dp,
-                matchAnchorWidth = true,
             ) {
                 matches.forEach { option ->
-                    NxMenuItem(
+                    NxChoiceItem(
                         label = option.version,
                         hint = when {
                             option.recommended -> s.createPackLoaderRecommended
@@ -122,7 +118,6 @@ internal fun LoaderPicker(
                             else -> null
                         },
                         selected = option.version == loaderVersion,
-                        mark = NxMenuMark.Radio,
                     ) {
                         onLoaderVersion(option.version)
                         menuOpen = false

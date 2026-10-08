@@ -9,6 +9,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
@@ -45,12 +46,14 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import hivens.core.api.dto.modrinth.ModrinthGameVersion
 import hivens.core.api.dto.modrinth.ModrinthVersion
 import hivens.core.update.VersionChannel
 import hivens.ui.components.LoaderGlyph
 import hivens.ui.components.formatBuildTimestamp
 import hivens.ui.components.relativeAge
 import hivens.ui.components.hasLoaderGlyph
+import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.nx.CenteredProgress
 import hivens.ui.nx.NxButton
@@ -106,6 +109,8 @@ internal fun VersionsPane(
     // opened before it lands used to ask with nothing to ask about, give up
     // silently, and leave a spinner running for the rest of the visit.
     LaunchedEffect(state, state.project) { state.loadVersions() }
+    // A file the mirror answered for has its releases from there, folded the same way.
+    LaunchedEffect(state, state.mirror) { if (state.mirror != null) state.loadGameVersionTags() }
 
     val all = state.versions
 
@@ -139,6 +144,20 @@ internal fun VersionsPane(
         // list itself is in flight.
         state.loading || state.versionsLoading -> {
             CenteredProgress(modifier.fillMaxSize())
+            return
+        }
+        // The catalogue has no entry and the mirror has one: its releases, with
+        // nothing to install, since the mirror's files go in through its packs.
+        !state.knownToCatalogue && state.mirror != null -> {
+            val mirror = state.mirror
+            val builds = remember(mirror) { mirror?.builds().orEmpty() }
+            BuildsTable(
+                builds = builds,
+                gameVersionTags = state.gameVersionTags,
+                onOpenBuild = null,
+                rowAction = null,
+                modifier = modifier,
+            )
             return
         }
         // Looked, and there is no entry. A jar the catalogue has never seen has no
@@ -175,10 +194,73 @@ internal fun VersionsPane(
         }
         return
     }
+    val byId = remember(rows) { rows.associateBy { it.id } }
+    val table = remember(rows) { rows.map { it.toBuild() } }
+    // The action per row, which is the point of the table. Nothing where there is
+    // no pack to put it in.
+    val installable = state.install is InstallAction.Install || state.install is InstallAction.Present
+    BuildsTable(
+        builds = table,
+        gameVersionTags = state.gameVersionTags,
+        onOpenBuild = { b -> byId[b.id]?.let(onOpenVersion) },
+        rowAction = if (installable) {
+            { b -> byId[b.id]?.let { v -> InstallBuildButton(state, b, v, installScope) } }
+        } else {
+            null
+        },
+        modifier = modifier,
+    )
+}
 
-    var filters by remember(state) { mutableStateOf(VersionFilters()) }
-    val facets = remember(rows, state.gameVersionTags) { facetsOf(rows, state.gameVersionTags) }
-    val shown = remember(rows, filters) { rows.filter { filters.matches(it) } }
+/**
+ * The per-row install on a project page.
+ *
+ * Quiet and icon-only, the way the reference draws it. A filled button repeated
+ * down forty rows is forty invitations competing with the facts they sit beside,
+ * and the facts are what the table is for. The label lives in the tooltip.
+ *
+ * A build the pack cannot run is MARKED, not withheld: the header's one-click pick
+ * refuses rather than substitute, and this is where the reader overrules that on
+ * purpose. Orange and a tooltip say which way they are stepping; the click still
+ * works.
+ */
+@Composable
+private fun InstallBuildButton(state: ModDetailState, b: ProjectBuild, v: ModrinthVersion, scope: CoroutineScope) {
+    val s = LocalStrings.current
+    val fits = remember(b, state.packMcVersion, state.packLoaders) {
+        runsOn(b, state.packMcVersion, state.packLoaders)
+    }
+    NxIconButton(
+        icon = NxIcon.Download,
+        contentDescription = if (fits) s.modPageInstallShort else s.versionsIncompatibleHint,
+        onClick = { scope.launch(Dispatchers.Main) { state.installVersion(v) } },
+        enabled = !state.installing,
+        tint = if (fits) NxColor.lead() else NxColor.status(Status.Warning),
+    )
+}
+
+/**
+ * Every build as a table: what it is, what it runs on, when it shipped and how
+ * much it was taken, filterable on the three axes a reader narrows by.
+ *
+ * Shared by the project page and the pack page, which publish their builds in the
+ * same terms. [onOpenBuild] makes the name a way to the build's own page where
+ * there is one, [rowAction] fills the column at the end of each row, and a source
+ * that counts no downloads but names its mods gets that count in the same place.
+ */
+@Composable
+internal fun BuildsTable(
+    builds: List<ProjectBuild>,
+    gameVersionTags: List<ModrinthGameVersion>,
+    onOpenBuild: ((ProjectBuild) -> Unit)?,
+    rowAction: (@Composable (ProjectBuild) -> Unit)?,
+    modifier: Modifier = Modifier,
+) {
+    val s = LocalStrings.current
+    var filters by remember(builds) { mutableStateOf(VersionFilters()) }
+    val facets = remember(builds, gameVersionTags) { facetsOf(builds, gameVersionTags) }
+    val shown = remember(builds, filters) { builds.filter { filters.matches(it) } }
+    val count = remember(builds) { countColumnOf(builds) }
 
     val listState = rememberLazyListState()
     val hover = remember { MutableInteractionSource() }
@@ -188,17 +270,25 @@ internal fun VersionsPane(
     // rather than losing its right-hand end. ONE state for the header and every
     // row: two would let the headings slide out from over their own columns.
     val columns = rememberScrollState()
-    Column(modifier) {
+    BoxWithConstraints(modifier) {
+    // The name takes what the fixed columns leave, up to a ceiling. At its floor it
+    // cut every name a build carries its loader and game version in, while half the
+    // panel stood empty to the right of the table.
+    val action = if (rowAction != null) ACTION_COLUMN else 0.dp
+    val counted = if (count != null) COUNT_COLUMN + COLUMN_GAP else 0.dp
+    val fixed = CHANNEL_COLUMN + CHIP_COLUMN * 2 + DATE_COLUMN + counted + COLUMN_GAP * 5 + ROW_PADDING * 2 + action
+    val nameWidth = (maxWidth - fixed).coerceIn(NAME_COLUMN, NAME_COLUMN_MAX)
+    Column(Modifier.fillMaxSize()) {
         VersionFilterBar(
             facets = facets,
             filters = filters,
             onFilters = { filters = it },
             shownCount = shown.size,
-            totalCount = rows.size,
+            totalCount = builds.size,
             modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
         )
         HorizontalDivider(color = NxInk.line)
-        HeaderRow(columns)
+        HeaderRow(columns, nameWidth, count)
         HorizontalDivider(color = NxInk.line)
         if (shown.isEmpty()) {
             // Filtered to nothing, which is not the same as a project with no
@@ -215,19 +305,20 @@ internal fun VersionsPane(
         Box(Modifier.weight(1f).hoverable(hover)) {
             var expanded by remember(shown) { mutableStateOf<String?>(null) }
             LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
-                items(shown, key = { it.id }) { v ->
+                items(shown, key = { it.id }) { b ->
                     VersionTableRow(
                         columns = columns,
-                        v = v,
-                        state = state,
-                        scope = installScope,
+                        nameWidth = nameWidth,
+                        b = b,
+                        gameVersionTags = gameVersionTags,
+                        count = count,
                         filters = filters,
                         onFilters = { filters = it },
-                        expanded = expanded == v.id,
-                        onExpand = { expanded = if (expanded == v.id) null else v.id },
-                        onOpen = { onOpenVersion(v) },
+                        onExpand = if (b.files.isEmpty()) null else { { expanded = if (expanded == b.id) null else b.id } },
+                        onOpen = onOpenBuild?.let { open -> { open(b) } },
+                        action = rowAction,
                     )
-                    if (expanded == v.id) FilesRow(v, s)
+                    if (expanded == b.id) FilesRow(b, s)
                     HorizontalDivider(color = NxColor.wash(NxInk.line, 0.5f))
                 }
             }
@@ -238,6 +329,16 @@ internal fun VersionsPane(
             )
         }
     }
+    }
+}
+
+/** What the number at the end of a row counts: downloads where the source counts them, else mods. */
+internal enum class CountColumn { Downloads, Mods }
+
+internal fun countColumnOf(builds: List<ProjectBuild>): CountColumn? = when {
+    builds.any { it.downloads != null } -> CountColumn.Downloads
+    builds.any { it.modsCount != null } -> CountColumn.Mods
+    else -> null
 }
 
 /**
@@ -402,7 +503,7 @@ private fun FilterDropdown(
 }
 
 /** Not composable: it reads nothing from composition, only from the language it is handed. */
-private fun channelLabel(versionType: String, s: hivens.ui.i18n.AppStrings): String =
+private fun channelLabel(versionType: String, s: AppStrings): String =
     when (VersionChannel.of(versionType, "")) {
         VersionChannel.Release -> s.packVersionsChannelRelease
         VersionChannel.Beta -> s.packVersionsChannelBeta
@@ -414,6 +515,12 @@ private fun channelLabel(versionType: String, s: hivens.ui.i18n.AppStrings): Str
 // supporting thirty game versions cannot push the dates off the row.
 private val CHANNEL_COLUMN = 40.dp
 private val NAME_COLUMN = 180.dp
+private val NAME_COLUMN_MAX = 400.dp
+private val COLUMN_GAP = 10.dp
+private val ROW_PADDING = 14.dp
+
+/** Room kept at the end of a row for its install button. */
+private val ACTION_COLUMN = 48.dp
 private val CHIP_COLUMN = 192.dp
 private val DATE_COLUMN = 130.dp
 private val COUNT_COLUMN = 90.dp
@@ -423,19 +530,23 @@ private const val MAX_GAME_VERSION_CHIPS = 5
 private const val MAX_PLATFORM_CHIPS = 3
 
 @Composable
-private fun HeaderRow(columns: ScrollState) {
+private fun HeaderRow(columns: ScrollState, nameWidth: Dp, count: CountColumn?) {
     val s = LocalStrings.current
     Row(
-        Modifier.fillMaxWidth().horizontalScroll(columns).padding(horizontal = 14.dp, vertical = 10.dp),
+        Modifier.fillMaxWidth().horizontalScroll(columns).padding(horizontal = ROW_PADDING, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(COLUMN_GAP),
     ) {
         Box(Modifier.width(CHANNEL_COLUMN))
-        HeaderCell(s.versionsColumnVersion, NAME_COLUMN)
+        HeaderCell(s.versionsColumnVersion, nameWidth)
         HeaderCell(s.versionsColumnGameVersion, CHIP_COLUMN)
         HeaderCell(s.versionsColumnPlatform, CHIP_COLUMN)
         HeaderCell(s.versionsColumnPublished, DATE_COLUMN)
-        HeaderCell(s.versionsColumnDownloads, COUNT_COLUMN)
+        when (count) {
+            CountColumn.Downloads -> HeaderCell(s.versionsColumnDownloads, COUNT_COLUMN)
+            CountColumn.Mods -> HeaderCell(s.contentFilterMods, COUNT_COLUMN)
+            null -> Unit
+        }
         Box(Modifier.weight(1f))
     }
 }
@@ -453,32 +564,40 @@ private fun HeaderCell(label: String, width: Dp) = Text(
 @Composable
 private fun VersionTableRow(
     columns: ScrollState,
-    v: ModrinthVersion,
-    state: ModDetailState,
-    /** The app's scope, which the install runs on. */
-    scope: CoroutineScope,
+    nameWidth: Dp,
+    b: ProjectBuild,
+    gameVersionTags: List<ModrinthGameVersion>,
+    count: CountColumn?,
     filters: VersionFilters,
     onFilters: (VersionFilters) -> Unit,
-    expanded: Boolean,
-    onExpand: () -> Unit,
-    onOpen: () -> Unit,
+    /** Opens the build's files under the row; null for a build that lists none. */
+    onExpand: (() -> Unit)?,
+    /** Opens the build's own page; null where it has none. */
+    onOpen: (() -> Unit)?,
+    action: (@Composable (ProjectBuild) -> Unit)?,
 ) {
     val s = LocalStrings.current
-    val channel = remember(v) { VersionChannel.of(v.versionType, v.versionNumber) }
+    val channel = remember(b) { VersionChannel.of(b.versionType, b.versionNumber) }
     Row(
         Modifier.fillMaxWidth()
             .horizontalScroll(columns)
             // The row opens its files. The reference reveals them under the row it
             // belongs to for the same reason: which jar a build actually ships, and
             // how big it is, is a question about that build and nowhere else.
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = onExpand,
+            .then(
+                if (onExpand == null) {
+                    Modifier
+                } else {
+                    Modifier.clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = onExpand,
+                    )
+                },
             )
-            .padding(horizontal = 14.dp, vertical = 10.dp),
+            .padding(horizontal = ROW_PADDING, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(COLUMN_GAP),
     ) {
         // The channel as a mark, not a word. A column of "Release" repeated forty
         // times is a column that says nothing; the colour is read at a glance and
@@ -487,7 +606,7 @@ private fun VersionTableRow(
             Box(
                 Modifier.size(9.dp).clip(CircleShape)
                     .background(channelColor(channel))
-                    .clickable { onFilters(filters.toggleChannel(v.versionType)) },
+                    .clickable { onFilters(filters.toggleChannel(b.versionType)) },
             )
         }
 
@@ -497,25 +616,30 @@ private fun VersionTableRow(
         val nameHover = remember { MutableInteractionSource() }
         val nameHovered by nameHover.collectIsHoveredAsState()
         Text(
-            v.versionNumber.ifBlank { v.name },
+            b.label,
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.Medium,
             color = NxInk.main,
-            textDecoration = if (nameHovered) TextDecoration.Underline else null,
+            textDecoration = if (nameHovered && onOpen != null) TextDecoration.Underline else null,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.width(NAME_COLUMN)
-                .hoverable(nameHover)
-                .clickable(interactionSource = nameHover, indication = null, onClick = onOpen),
+            modifier = Modifier.width(nameWidth)
+                .then(
+                    if (onOpen == null) {
+                        Modifier
+                    } else {
+                        Modifier.hoverable(nameHover).clickable(interactionSource = nameHover, indication = null, onClick = onOpen)
+                    },
+                ),
         )
 
         // Every chip narrows the table to itself. That is the connective tissue
         // between a row and the filter panel: a reader who spots the platform they
         // run says "that one" by pointing at it, rather than opening a panel and
         // finding the same word in a list.
-        val groups = remember(v, state.gameVersionTags) {
-            groupGameVersions(v.gameVersions, state.gameVersionTags)
-                .ifEmpty { v.gameVersions.map { GameVersionGroup(it, listOf(it)) } }
+        val groups = remember(b, gameVersionTags) {
+            groupGameVersions(b.gameVersions, gameVersionTags)
+                .ifEmpty { b.gameVersions.map { GameVersionGroup(it, listOf(it)) } }
         }
         ChipColumn(
             title = s.versionsColumnGameVersion,
@@ -530,7 +654,7 @@ private fun VersionTableRow(
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                v.loaders.take(MAX_PLATFORM_CHIPS).forEach { loader ->
+                b.loaders.take(MAX_PLATFORM_CHIPS).forEach { loader ->
                     NxMetaChip(
                         loaderLabel(loader),
                         tone = if (loader in filters.loaders) NxMetaChipTone.Success else NxMetaChipTone.Surface,
@@ -544,10 +668,10 @@ private fun VersionTableRow(
                 }
                 // The rest, named rather than counted: "+2" with no way to see
                 // which two is a number that answers nothing.
-                if (v.loaders.size > MAX_PLATFORM_CHIPS) {
+                if (b.loaders.size > MAX_PLATFORM_CHIPS) {
                     OverflowChips(
                         title = s.versionsColumnPlatform,
-                        labels = v.loaders.drop(MAX_PLATFORM_CHIPS).map { loaderLabel(it) to it },
+                        labels = b.loaders.drop(MAX_PLATFORM_CHIPS).map { loaderLabel(it) to it },
                         selected = { it in filters.loaders },
                         onToggle = { onFilters(filters.toggleLoader(it)) },
                     )
@@ -558,9 +682,9 @@ private fun VersionTableRow(
         // Relative, with the exact moment behind it. A column of full timestamps is
         // a column nobody reads: what a reader wants from this is how long ago,
         // and the date itself only when they are checking something specific.
-        NxTooltip(text = formatBuildTimestamp(v.datePublished).orEmpty()) {
+        NxTooltip(text = formatBuildTimestamp(b.datePublished).orEmpty()) {
             Text(
-                relativeAge(v.datePublished, s),
+                relativeAge(b.datePublished, s),
                 style = MaterialTheme.typography.labelMedium,
                 color = NxInk.quiet,
                 maxLines = 1,
@@ -570,40 +694,25 @@ private fun VersionTableRow(
 
         // The compact number is what fits; the exact one is what a reader
         // occasionally actually wants, so it is a hover away rather than gone.
-        NxTooltip(text = v.downloads.toString()) {
-            Text(
-                compactCount(v.downloads, s),
-                style = MaterialTheme.typography.labelMedium,
-                color = NxInk.quiet,
-                maxLines = 1,
-                modifier = Modifier.width(COUNT_COLUMN),
-            )
+        val counted = when (count) {
+            CountColumn.Downloads -> b.downloads
+            CountColumn.Mods -> b.modsCount?.toLong()
+            null -> null
+        }
+        if (count != null) {
+            NxTooltip(text = counted?.toString().orEmpty()) {
+                Text(
+                    counted?.let { compactCount(it, s) }.orEmpty(),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = NxInk.quiet,
+                    maxLines = 1,
+                    modifier = Modifier.width(COUNT_COLUMN),
+                )
+            }
         }
 
         Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
-            // The action per row, which is the point of the table. Nothing where
-            // there is no pack to put it in.
-            if (state.install != InstallAction.None) {
-                // Quiet and icon-only, the way the reference draws it. A filled
-                // button repeated down forty rows is forty invitations competing
-                // with the facts they sit beside, and the facts are what the table
-                // is for. The label lives in the tooltip.
-                //
-                // A build the pack cannot run is MARKED, not withheld: the header's
-                // one-click pick refuses rather than substitute, and this is where
-                // the reader overrules that on purpose. Orange and a tooltip say
-                // which way they are stepping; the click still works.
-                val fits = remember(v, state.packMcVersion, state.packLoaders) {
-                    runsOn(v, state.packMcVersion, state.packLoaders)
-                }
-                NxIconButton(
-                    icon = NxIcon.Download,
-                    contentDescription = if (fits) s.modPageInstallShort else s.versionsIncompatibleHint,
-                    onClick = { scope.launch(Dispatchers.Main) { state.installVersion(v) } },
-                    enabled = !state.installing,
-                    tint = if (fits) NxColor.lead() else NxColor.status(Status.Warning),
-                )
-            }
+            action?.invoke(b)
         }
     }
 }
@@ -652,7 +761,7 @@ private fun ChipColumn(
  * what this row answers.
  */
 @Composable
-private fun FilesRow(v: ModrinthVersion, s: hivens.ui.i18n.AppStrings) {
+private fun FilesRow(v: ProjectBuild, s: AppStrings) {
     FlowRow(
         Modifier.fillMaxWidth().padding(start = 64.dp, end = 14.dp, bottom = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp),

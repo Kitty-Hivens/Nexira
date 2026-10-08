@@ -43,7 +43,9 @@ import hivens.core.api.dto.modrinth.ModrinthVersion
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.update.VersionChannel
 import hivens.launcher.instance.InstanceContentScanner
+import hivens.launcher.instance.ModInstaller
 import hivens.launcher.modrinth.ModrinthClient
+import hivens.launcher.smrt.SmrtPackClient
 import hivens.ui.RIGHT_RAIL_SURFACE
 import hivens.ui.RailFamily
 import hivens.ui.components.LoaderGlyph
@@ -60,6 +62,8 @@ import hivens.ui.nx.NxMetaChip
 import hivens.ui.nx.NxMetaChipTone
 import hivens.ui.nx.NxTooltip
 import hivens.ui.nx.RetryStateBlock
+import hivens.ui.screens.browse.ProjectTag
+import hivens.ui.screens.browse.tagSearch
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import hivens.ui.utils.humanSize
@@ -95,12 +99,17 @@ fun ModVersionScreen(
     val openProject: OpenProjectState = koinInject()
     val dataDir: Path = koinInject()
     val appScope: CoroutineScope = koinInject()
+    val installer: ModInstaller = koinInject()
+    val mirrorClient: SmrtPackClient = koinInject()
     val families = LocalSurfaceFamilies.current
     val s = LocalStrings.current
 
     // The project, for the rail and for where an install would go.
     val project = remember(target) {
-        ModDetailState(target, modrinth, repo, dataDir, scanner, openProject, strings = s, installScope = appScope)
+        ModDetailState(
+            target, modrinth, repo, dataDir, scanner, openProject,
+            strings = s, installScope = appScope, installer = installer, mirrorLookup = mirrorClient.asMirrorLookup(),
+        )
     }
     val build = remember(target, versionId) { ModVersionState(modrinth) }
     var reloadTick by remember(build) { mutableIntStateOf(0) }
@@ -117,6 +126,7 @@ fun ModVersionScreen(
 
     DisposableEffect(project) {
         families.switch(RIGHT_RAIL_SURFACE, RailFamily.PROJECT_VIEW)
+        project.claim()
         onDispose {
             families.reset(RIGHT_RAIL_SURFACE)
             project.clear()
@@ -239,6 +249,7 @@ private fun BuildHeader(v: ModrinthVersion, project: ModDetailState, scope: Coro
 @Composable
 private fun Compatibility(v: ModrinthVersion, project: ModDetailState) {
     val s = LocalStrings.current
+    val type = project.project?.projectType
     Section(s.modRailCompatibility) {
         Group(s.modRailGame) {
             // Folded against the catalogue's release order, the same as the rail's
@@ -248,7 +259,11 @@ private fun Compatibility(v: ModrinthVersion, project: ModDetailState) {
                 groupGameVersions(v.gameVersions, project.gameVersionTags)
                     .ifEmpty { v.gameVersions.map { GameVersionGroup(it, listOf(it)) } }
             }
-            Chips { groups.forEach { NxMetaChip(it.label, tone = NxMetaChipTone.Surface) } }
+            Chips {
+                groups.forEach {
+                    NxMetaChip(it.label, tone = NxMetaChipTone.Surface, onClick = tagSearch(type, project.packId, ProjectTag.GameVersions(it.versions)))
+                }
+            }
         }
         Group(s.modRailPlatforms) {
             Chips {
@@ -262,6 +277,7 @@ private fun Compatibility(v: ModrinthVersion, project: ModDetailState) {
                         } else {
                             null
                         },
+                        onClick = tagSearch(type, project.packId, ProjectTag.Loader(loader)),
                     )
                 }
             }

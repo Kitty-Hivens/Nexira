@@ -8,6 +8,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
 import kotlin.test.assertNull
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -53,6 +54,38 @@ class InstanceWorkTest {
 
         first.complete(Unit)
         advanceUntilIdle()
+        assertNull(registry.workOn("a"))
+    }
+
+    @Test
+    fun `a claim is refused while other work holds the instance, and names it`() = runTest {
+        val registry = InstanceWorkRegistry()
+        val release = CompletableDeferred<Unit>()
+        launch { registry.during("a", InstanceWork.Update) { release.await() } }
+        advanceUntilIdle()
+
+        assertEquals(InstanceWorkRegistry.Claim.Taken(InstanceWork.Update), registry.claim("a", InstanceWork.ContentInstall))
+        assertEquals(InstanceWork.Update, registry.workOn("a"), "a refused claim leaves no mark")
+
+        release.complete(Unit)
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun `a claim marks at once, shares with what it names, and releases once`() {
+        val registry = InstanceWorkRegistry()
+
+        val first = assertIs<InstanceWorkRegistry.Claim.Held>(registry.claim("a", InstanceWork.ContentInstall))
+        assertEquals(InstanceWork.ContentInstall, registry.workOn("a"), "marked before anything else can look")
+        assertIs<InstanceWorkRegistry.Claim.Taken>(registry.claim("a", InstanceWork.Update))
+        val second = assertIs<InstanceWorkRegistry.Claim.Held>(
+            registry.claim("a", InstanceWork.ContentInstall, alongside = setOf(InstanceWork.ContentInstall)),
+        )
+
+        first.mark.release()
+        first.mark.release()
+        assertEquals(InstanceWork.ContentInstall, registry.workOn("a"), "a second release does not take the other install's mark")
+        second.mark.release()
         assertNull(registry.workOn("a"))
     }
 

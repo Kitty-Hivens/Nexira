@@ -116,3 +116,5 @@ QueueMusic
 Shuffle
 Campaign
 Paid
+Block
+LockOpen

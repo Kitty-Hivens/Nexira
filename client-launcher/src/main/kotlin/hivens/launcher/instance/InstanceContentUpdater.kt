@@ -185,7 +185,7 @@ class InstanceContentUpdater(
             { it.second },
         )) {
             val (kind, askChannel) = group
-            val loaders = loadersFor(kind, loader)
+            val loaders = loadersFor(kind, loader, mcVersion)
             if (loaders.isEmpty()) continue
             var remaining = hashes.distinct()
             for (types in askChannel.rungs) {
@@ -308,6 +308,10 @@ class InstanceContentUpdater(
      * is already in flight -- pressing the button twice is one run, not two
      * racing over the same folder.
      *
+     * Also false while other work rewrites the instance. An install from the
+     * catalogue stages its downloads in the same folders under the same scratch
+     * names, and the sweep this batch starts with would delete them.
+     *
      * [onChanged] fires after each file lands, so the list on screen fills in as
      * the batch goes rather than all at once at the end.
      */
@@ -321,6 +325,10 @@ class InstanceContentUpdater(
         if (targets.isEmpty()) return false
         val key = keyOf(instanceDir)
         jobs[key]?.let { if (it.isActive) return false }
+        work.workOn(instanceId)?.let { busy ->
+            log.info("not updating {}: {} is in progress", title, busy)
+            return false
+        }
 
         _runs.update { it + (key to Run(title = title, total = targets.size, done = 0, current = null, failed = emptyList(), finished = false)) }
         // Marked for as long as files are being swapped, so a game is not started
@@ -342,7 +350,7 @@ class InstanceContentUpdater(
         // A download interrupted by the app closing leaves its scratch file
         // behind. The scanner ignores those, so nobody would ever see them
         // and nothing else would ever remove them.
-        sweepScratch(instanceDir, targets.map { it.update.ref.kind }.distinct())
+        sweepContentScratch(instanceDir, targets.map { it.update.ref.kind }.distinct())
         val gate = Semaphore(DOWNLOAD_CONCURRENCY)
         coroutineScope {
             targets.map { target ->
@@ -393,20 +401,6 @@ class InstanceContentUpdater(
      */
     private suspend fun applyOne(instanceDir: Path, target: Target): Boolean =
         swapIn(modrinth, manager, instanceDir, target)
-
-    /** Remove scratch files an interrupted batch left in the folders being touched. */
-    private suspend fun sweepScratch(instanceDir: Path, kinds: List<ContentKind>) = withContext(Dispatchers.IO) {
-        for (kind in kinds) {
-            val dir = instanceDir.resolve(kind.folderName())
-            runCatching {
-                if (!Files.isDirectory(dir)) return@runCatching
-                Files.list(dir).use { stream ->
-                    stream.filter { it.fileName.toString().startsWith(SCRATCH_PREFIX) }
-                        .forEach { runCatching { Files.deleteIfExists(it) } }
-                }
-            }
-        }
-    }
 
     private fun mark(key: String, edit: (Run) -> Run) {
         _runs.update { runs -> runs[key]?.let { runs + (key to edit(it)) } ?: runs }
@@ -460,15 +454,7 @@ internal suspend fun swapIn(
     target: InstanceContentUpdater.Target,
 ): Boolean {
     val update = target.update
-    val dir = instanceDir.resolve(update.ref.kind.folderName())
-    withContext(Dispatchers.IO) { Files.createDirectories(dir) }
-    val scratch = withContext(Dispatchers.IO) {
-        Files.createTempFile(dir, InstanceContentUpdater.SCRATCH_PREFIX, InstanceContentUpdater.SCRATCH_SUFFIX).also {
-            // The transfer skips a target that already exists, and
-            // createTempFile has just made one.
-            Files.deleteIfExists(it)
-        }
-    }
+    val scratch = newContentScratch(instanceDir.resolve(update.ref.kind.folderName()))
     return try {
         modrinth.downloadTo(update.url, scratch, update.sha1)
         manager.replace(
@@ -486,6 +472,38 @@ internal suspend fun swapIn(
         swapLog.warn("updating {} to {} failed: {}", update.ref.fileName, update.versionNumber, e.message)
         withContext(Dispatchers.IO) { runCatching { Files.deleteIfExists(scratch) } }
         false
+    }
+}
+
+/**
+ * Remove scratch files an interrupted download left in the [kinds] folders. The
+ * scanner ignores them, so nobody would ever see them and nothing else would ever
+ * remove them. Callers make sure no download of their own is in flight there.
+ */
+internal suspend fun sweepContentScratch(instanceDir: Path, kinds: List<ContentKind>) = withContext(Dispatchers.IO) {
+    for (kind in kinds) {
+        val dir = instanceDir.resolve(kind.folderName())
+        runCatching {
+            if (!Files.isDirectory(dir)) return@runCatching
+            Files.list(dir).use { stream ->
+                stream.filter { it.fileName.toString().startsWith(InstanceContentUpdater.SCRATCH_PREFIX) }
+                    .forEach { runCatching { Files.deleteIfExists(it) } }
+            }
+        }
+    }
+}
+
+/**
+ * A fresh scratch path in [dir] for a download that is swapped or placed in after
+ * it verifies. Named so the scanner does not read it as content and
+ * [sweepContentScratch] clears it if the download never finishes.
+ */
+internal suspend fun newContentScratch(dir: Path): Path = withContext(Dispatchers.IO) {
+    Files.createDirectories(dir)
+    Files.createTempFile(dir, InstanceContentUpdater.SCRATCH_PREFIX, InstanceContentUpdater.SCRATCH_SUFFIX).also {
+        // The transfer skips a target that already exists, and createTempFile has
+        // just made one.
+        Files.deleteIfExists(it)
     }
 }
 

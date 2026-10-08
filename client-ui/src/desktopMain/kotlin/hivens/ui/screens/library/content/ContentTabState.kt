@@ -696,29 +696,6 @@ internal class ContentTabState(
         }
     }
 
-    // -- browse ---------------------------------------------------------------
-
-    /**
-     * Picks up whatever the project browser downloaded.
-     *
-     * Whether the browser is OPEN is not kept here. This holder is rebuilt on every
-     * visit, so a reader who opened the browser, opened a project page from it and
-     * came back landed in the content list instead of the search they left. The
-     * flag lives beside the tab index now, which is saved for exactly that reason.
-     */
-    fun refreshAfterBrowse() {
-        // Asked again after the rescan: a mod installed from the browser can pin a
-        // newer build of a library the folder already had, and the check is what
-        // says so. The check's own cache is keyed on the file set, so an unchanged
-        // folder costs nothing.
-        scope.launch {
-            rescan()
-            // One at a time: the pane starts a check of its own when the list lands,
-            // and two finishing out of order left the older answer on screen.
-            if (!checkingUpdates) checkUpdates()
-        }
-    }
-
     // -- updates --------------------------------------------------------------
 
     /**

@@ -40,6 +40,13 @@ sealed interface PackOperationPhase {
         val failed: List<String> = emptyList(),
     ) : PackOperationPhase
     data class Failed(val message: String) : PackOperationPhase
+
+    /**
+     * Not started, because [work] holds the instance. Published rather than only
+     * returned: the buttons that start an operation cannot see other work, and a
+     * click that did nothing and said nothing read as a broken button.
+     */
+    data class Refused(val work: InstanceWork) : PackOperationPhase
 }
 
 /** Observable state of the one operation an instance may have in flight or just finished. */
@@ -95,13 +102,22 @@ class PackOperationService(
     ): Boolean {
         val id = instance.id
         jobs[id]?.let { if (it.isActive) return false }
+        // Other work on the instance, an install putting files in or content being
+        // updated, is a refusal too: an update applied under it plans against files
+        // that are about to change and leaves two builds of a mod behind. The mark is
+        // taken here, before the job, so nothing can start in between.
+        val mark = when (val claim = work.claim(id, kind.work)) {
+            is InstanceWorkRegistry.Claim.Held -> claim.mark
+            is InstanceWorkRegistry.Claim.Taken -> {
+                publish(id, kind, PackOperationPhase.Refused(claim.by))
+                return false
+            }
+        }
 
         publish(id, kind, PackOperationPhase.Running(0, 0, ""))
         val job = scope.launch {
             try {
-                val outcome = work.during(id, kind.work) {
-                    block { current, total, path -> publish(id, kind, PackOperationPhase.Running(current, total, path)) }
-                }
+                val outcome = block { current, total, path -> publish(id, kind, PackOperationPhase.Running(current, total, path)) }
                 publish(id, kind, outcome)
             } catch (e: CancellationException) {
                 // Only process shutdown cancels these. Drop the entry rather than
@@ -112,12 +128,15 @@ class PackOperationService(
                 log.warn("pack operation {} failed for {}", kind, id, e)
                 publish(id, kind, PackOperationPhase.Failed(e.message ?: e::class.simpleName.orEmpty()))
             } finally {
+                mark.release()
                 jobs.remove(id)
                 // Whatever the outcome, the files this walked over are not the ones
                 // the last size measurement saw.
                 sizes.measure(instance, force = true)
             }
         }
+        // A job cancelled before its body ran never reaches the finally above.
+        job.invokeOnCompletion { mark.release() }
         jobs[id] = job
         return true
     }

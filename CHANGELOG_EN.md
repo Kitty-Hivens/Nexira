@@ -18,6 +18,10 @@ verbatim and a hand-wrapped line becomes a staircase of breaks.
 
 ## [Unreleased]
 
+### Packs and playing
+
+Installing from a project page now takes the newest release that runs on your pack, not whichever build the catalogue happened to list first. Quilt packs take Fabric mods, and NeoForge 1.20.1 packs take Forge mods. While something is being installed, Play says so and waits, and nothing is installed into a pack whose game is running.
+
 ## [2.4.6] - 2026-10-07
 
 ### Music

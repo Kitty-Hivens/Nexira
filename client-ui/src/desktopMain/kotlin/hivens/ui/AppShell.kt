@@ -244,6 +244,14 @@ sealed class Screen {
     data class PackVersions  (val instanceId: String) : Screen()
 
     /**
+     * The launcher's browse opened from inside a pack: narrowed to what the pack
+     * runs, and every install goes into it. A screen of its own rather than a flag
+     * on [Browse], because Browse is a tab every rail entry switches to, and the
+     * pack it installs into has to ride in the back stack with it.
+     */
+    data class BrowseInto(val instanceId: String) : Screen()
+
+    /**
      * Catalogue-side detail target, source-neutral: carries the [origin] + that
      * source's local pack id. The one [hivens.ui.screens.browse.CataloguePackDetailScreen]
      * resolves both through [hivens.launcher.catalogue.PackCatalogueRegistry] +
@@ -307,6 +315,7 @@ sealed class Screen {
     val retentionKey: String get() = when (this) {
         is PackDetail          -> "PackDetail:$instanceId"
         is PackVersions        -> "PackVersions:$instanceId"
+        is BrowseInto          -> "BrowseInto:$instanceId"
         is CataloguePackDetail -> "CataloguePackDetail:$origin:$packId"
         is ModDetail           -> "ModDetail:${target.key}"
         is ModVersion          -> "ModVersion:${target.key}:$versionId"

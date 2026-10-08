@@ -124,7 +124,6 @@ object EnglishStrings : AppStrings {
     override val windowRestore          = "Restore"
     override val windowClose            = "Close"
     override val crumbHome              = "Home"
-    override val crumbLoading           = "Loading…"
     override val paginationPrev         = "Previous page"
     override val paginationNext         = "Next page"
 
@@ -673,6 +672,14 @@ object EnglishStrings : AppStrings {
         "optimization" -> "Optimization"
         "quests"       -> "Quests"
         "technology"   -> "Technology"
+        "worldgen"         -> "World Generation"
+        "vanilla-like"     -> "Vanilla-like"
+        "semi-realistic"   -> "Semi-realistic"
+        "gui"              -> "GUI"
+        "pbr"              -> "PBR"
+        "8x-"              -> "8x or lower"
+        "512x+"            -> "512x or higher"
+        "minigame"         -> "Minigame"
         else           -> humanizeCategory(id)
     }
 
@@ -752,6 +759,10 @@ object EnglishStrings : AppStrings {
     override val contentVersionsLoadFailed      = "Could not load the version list"
     override val contentDetailAuthors           = "Authors"
     override val contentDetailSize              = "Size"
+    override val packRailMods                   = "Mods"
+    override fun packRailSignIn(provider: String) = "Asks for a $provider sign-in"
+    override val packRailUsedBy                 = "In packs"
+    override val modLinkPage                    = "Project page"
     override val modPageTabDescription = "Description"
     override val modPageTabVersions = "Versions"
     override val modPageTabChangelog = "Changelog"
@@ -771,6 +782,77 @@ object EnglishStrings : AppStrings {
     override val modPageInstallFailed = "Install did not land"
     override val modPageInstallRetry = "Try again"
     override fun modPageInstallMissing(count: Int) = "Missing dependencies: $count"
+
+    // Browse by kind, and the pack an install from it goes into
+    override val browseKindPacks           = "Packs"
+    override val installPickerNoPacks      = "No packs to install into yet"
+    override val installPickerFailed       = "Could not read this project's versions"
+    override val installTargetNoBuild      = "No build for this game version and loader"
+    override val installTargetNotTaken     = "The pack's source decides what goes in"
+    override val installTargetUnknown      = "Could not read this pack"
+    override val installRefusedGameRunning = "The game is running"
+    override val installRefusedBusy        = "The pack is busy"
+    override val installInstalled          = "Installed"
+    override fun installSkipLine(project: String, reason: String) = "$project: $reason"
+    override val installSkipLookupFailed = "Could not be looked up"
+    override val installSkipNotPlaceable = "Has no place in a pack"
+    override val installSkipNameTaken    = "Another file already has its name"
+    override val installSkipNotAttempted = "Not tried, the main download failed"
+    override val installSkipTooDeep      = "Too far down the chain to fetch"
+    override val installSkipPackOwned    = "The pack's own file, an update would put it back"
+    override val browseRailFind        = "What to find"
+    override val browseRailSource      = "Source"
+    override val browseSearchMods      = "Search mods"
+    override val browseSearchResourcePacks = "Search resource packs"
+    override val browseSearchShaders   = "Search shaders"
+    override val browseFilterVersion     = "Game version"
+    override val browseFilterLoader      = "Loader"
+    override val browseFilterCategories  = "Categories"
+    override val browseFilterFeatures    = "Features"
+    override val browseFilterResolutions = "Resolution"
+    override val browseFilterPerformance = "Performance impact"
+    override val browseFilterEnvironment = "Environment"
+    override val browseFilterLicense     = "License"
+    override val browseFilterExclusions  = "Leave out"
+    override val browseFilterClient      = "Client"
+    override val browseFilterServer      = "Server"
+    override val browseFilterOpenSource  = "Open source"
+    override val browseFilterArchived    = "Archived"
+    override val browseFilterShowMore    = "Show more"
+    override val browseFilterShowLess    = "Show fewer"
+    override val browseFilterAllVersions = "Show snapshots"
+    override val browseFilterExclude     = "Leave out"
+    override val browseFilterUnlockHint  = "Unlocked, it also finds what will not run on this pack"
+    override val browseFilterUnlock      = "Unlock filter"
+    override val browseFilterRelock      = "Back to the pack's"
+    override val browseHideInstalled     = "Hide installed"
+    override val browseFiltersClearAll   = "Clear all"
+    override val browseInstallingInto    = "Installing into"
+    override val browseLeaveTarget       = "Stop installing into this pack"
+    override val browseBackToPack        = "Back to the pack"
+    override val installDialogTitle      = "Install project"
+    override val installDialogClose      = "Close"
+    override val installDialogExisting   = "Existing pack"
+    override val installDialogNew        = "New pack"
+    override val installDialogSearch     = "Search packs"
+    override val installDialogShowUnfit  = "Show packs that do not fit"
+    override val installDialogHideUnfit  = "Hide packs that do not fit"
+    override val installDialogCreate     = "Create and install"
+    override val installDialogCreating   = "Setting up the pack"
+    override val installDialogOpenPack   = "Open the pack"
+    override fun browseFilterLockedBy(pack: String) = "As the pack \"$pack\" runs"
+    override fun installDialogFitCount(count: Int) = if (count == 1) "1 pack fits" else "$count packs fit"
+    override fun installDialogDone(pack: String) = "Installed into \"$pack\""
+    override val browseSortLabel       = "Sort by"
+    override val browseSortRelevance   = "Relevance"
+    override val browseSortDownloads   = "Downloads"
+    override val browseSortFollows     = "Follows"
+    override val browseSortNewest      = "Newest"
+    override val browseSortUpdated     = "Updated"
+    override val modPageInstallChoose  = "Install into…"
+    override val editorSurfBrowse      = "Browse"
+    override val editorSurfShortBrowse = "Browse"
+    override fun browseByAuthor(name: String) = "by $name"
     override val modPageInstallShort = "Install"
     override fun modPageNoBuildFor(target: String) = "No build for $target"
     override val modPageNoBuildAny = "No matching build"
@@ -968,6 +1050,7 @@ object EnglishStrings : AppStrings {
     override fun packVersionsApplying(current: Int, total: Int, name: String) = "Applying $current/$total: $name"
     override fun packVersionsApplied(version: String) = "Done: now on build $version"
     override fun packVersionsFailed(reason: String) = "Failed: $reason"
+    override fun packOperationRefused(work: String) = "Not now, the pack is busy. $work"
     override val packVersionsRetry              = "Retry"
     override val packVersionsLoadError          = "Mirror unreachable, the version list did not load"
 
@@ -1075,6 +1158,7 @@ object EnglishStrings : AppStrings {
     override val launchBlockRecovering          = "Recovering…"
     override val launchBlockDeleting            = "Deleting…"
     override val launchBlockUpdatingContent     = "Updating mods…"
+    override val launchBlockInstallingContent   = "Installing content…"
     override val launchBlockMissing             = "Files not found"
     override val launchBlockOtherRunning        = "Another game is running"
     override val launchStopping                 = "Stopping…"
@@ -1383,6 +1467,21 @@ object EnglishStrings : AppStrings {
         "widget.home.new.welcome.customGreeting" to "Custom greeting text",
         "widget.home.new.welcome.showSubtitle" to "Show subtitle",
         "widget.library.body" to "Library body",
+        "widget.browse.search" to "Browse search",
+        "widget.browse.results" to "Browse results",
+        "widget.browse.scope" to "What to find",
+        "widget.browse.installing" to "Pack being installed into",
+        "widget.browse.chips" to "Filters in force",
+        "widget.browse.filter.version" to "Filter: game version",
+        "widget.browse.filter.loader" to "Filter: loader",
+        "widget.browse.filter.categories" to "Filter: categories",
+        "widget.browse.filter.features" to "Filter: features",
+        "widget.browse.filter.resolutions" to "Filter: resolution",
+        "widget.browse.filter.performance" to "Filter: performance impact",
+        "widget.browse.filter.environment" to "Filter: environment",
+        "widget.browse.filter.license" to "Filter: license",
+        "widget.browse.filter.exclusions" to "Filter: leave out",
+        "widget.browse.filter.installed" to "Hide installed",
         "widget.library.body.emptyText" to "Empty-state text",
         "widget.library.body.emptyTitle" to "Empty-state title",
         "widget.library.header" to "Library header",

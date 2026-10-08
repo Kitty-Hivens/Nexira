@@ -1,5 +1,6 @@
 package hivens.core.api.catalogue
 
+import hivens.core.data.PackAuthRequirement
 import hivens.core.data.PackOrigin
 import hivens.core.update.VersionChannel
 
@@ -43,7 +44,30 @@ data class CatalogueGalleryItem(
     val description: String? = null,
 )
 
-/** Full pack page: hero + long body + gallery + installable versions. */
+/** One of the author's own addresses, named by what it is rather than by its host. */
+enum class CatalogueLinkKind { Issues, Source, Wiki, Discord, Donate }
+
+/** [label] is the destination's own name where it has one: Patreon and Ko-fi rather than "donate" twice. */
+data class CatalogueLink(val kind: CatalogueLinkKind, val url: String, val label: String? = null)
+
+/** One person credited on a pack, and what the source calls their part in it. */
+data class CatalogueCreator(
+    val name: String,
+    val role: String,
+    val avatarUrl: String? = null,
+    val owner: Boolean = false,
+)
+
+/**
+ * Full pack page: who it is, what it says about itself, what it runs on, and every
+ * build that can be installed.
+ *
+ * Past the first few fields everything is optional, and optional on purpose. The
+ * two sources answer different questions: the catalogue counts downloads and
+ * credits a team, the mirror names the runtime and the sign-in a pack needs. A
+ * field a source leaves empty is one the page leaves out, rather than one it fills
+ * with a placeholder that reads as an answer.
+ */
 data class CataloguePackDetails(
     val origin: PackOrigin,
     val id: String,
@@ -65,6 +89,39 @@ data class CataloguePackDetails(
      * the selected [CataloguePackVersion].
      */
     val runtimeLabel: String? = null,
+    /** The source's own short name for the pack, for its address. */
+    val slug: String? = null,
+    /** The pack's page at the source, for "open in browser" and "copy link". Null where there is none to give. */
+    val pageUrl: String? = null,
+    /**
+     * The catalogue project type the pack is filed under where tags can be searched
+     * by it (`modpack`). Null for a source whose tags are its own vocabulary.
+     */
+    val projectType: String? = null,
+    val downloads: Long? = null,
+    val followers: Long? = null,
+    /** Every game version a build of the pack targets. */
+    val gameVersions: List<String> = emptyList(),
+    /** Every loader a build of the pack runs on. */
+    val loaders: List<String> = emptyList(),
+    /** `required` / `optional` / `unsupported` / `unknown`, read as a pair; null where the source does not say. */
+    val clientSide: String? = null,
+    val serverSide: String? = null,
+    val licenseId: String? = null,
+    val licenseName: String? = null,
+    /** RFC 3339 instants. */
+    val publishedAt: String? = null,
+    val updatedAt: String? = null,
+    val links: List<CatalogueLink> = emptyList(),
+    val creators: List<CatalogueCreator> = emptyList(),
+    /**
+     * The build an install with no choice made reaches for. The mirror names it,
+     * and it may well be a beta: a mirror build is a beta unless its curator said
+     * release. Null leaves it to the reader of [versions].
+     */
+    val latestVersionId: String? = null,
+    /** The sign-in the pack asks for before the game starts; null when it asks for none. */
+    val auth: PackAuthRequirement? = null,
 )
 
 /**
@@ -101,4 +158,9 @@ data class CataloguePackVersion(
     val publishedAt: String? = null,
     /** The curator's notes for this build; null when the source carries none. */
     val changelog: String? = null,
+    /** How many times this build was taken, where the source counts. */
+    val downloads: Long? = null,
+    /** How many mods the build lists, and what it costs to fetch, where the source says. */
+    val modsCount: Int? = null,
+    val sizeBytes: Long? = null,
 )

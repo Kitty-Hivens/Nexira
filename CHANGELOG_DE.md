@@ -10,6 +10,10 @@ nicht gelesen werden, um eine Version zu verstehen.
 
 ## [Unreleased]
 
+### Packs und Spielen
+
+Eine Installation von einer Projektseite nimmt jetzt das neueste Release, das auf deinem Pack läuft, und nicht den Build, den der Katalog zufällig zuerst aufgelistet hat. Packs mit Quilt nehmen Fabric-Mods, Packs mit NeoForge 1.20.1 nehmen Forge-Mods. Während etwas installiert wird, sagt „Spielen“ das und wartet, und in ein Pack, dessen Spiel läuft, wird nichts installiert.
+
 ## [2.4.6] - 2026-10-07
 
 ### Musik

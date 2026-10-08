@@ -11,14 +11,20 @@ import hivens.widget.model.SurfaceId
 import hivens.widget.model.SurfaceLayout
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.int
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class LayoutReconcileTest {
+
+    private val layoutJson = Json { ignoreUnknownKeys = true; encodeDefaults = true; coerceInputValues = true }
 
     private fun widget(kind: String, id: String) =
         WidgetInstance(WidgetKind(kind), id, JsonObject(emptyMap()))
@@ -107,6 +113,33 @@ class LayoutReconcileTest {
 
         val out = ok(LayoutReconcile.reconcile(LayoutReconcile.CURRENT_SCHEMA, user, default))
         assertTrue(SlotId("authorData") in out.surfaces[SurfaceId("rail")]!!.slotsOf(project))
+    }
+
+    @Test
+    fun `a graph from the last release gains the catalogue and its rail family whole and keeps everything else`() {
+        // The catalogue's surface and the rail's browse family arrived after the
+        // release this fixture was saved from, on the same schema, with no step on
+        // the ladder, so seeding is the whole of how a released file gets them.
+        // Equality with the bundle, not presence: a family that seeded with its
+        // slots but not its widgets would be a blank rail.
+        val text = javaClass.getResourceAsStream("/layout/default-layout-2.4.6.json")!!
+            .bufferedReader(Charsets.UTF_8).use { it.readText() }
+        val envelope = Json.parseToJsonElement(text).jsonObject
+        val schema = envelope["schema_version"]!!.jsonPrimitive.int
+        val released = layoutJson.decodeFromJsonElement(LayoutGraph.serializer(), envelope["graph"]!!)
+        val default = DefaultLayout.load()
+
+        val out = ok(LayoutReconcile.reconcile(schema, released, default))
+
+        val browse = SurfaceId("browse")
+        val rail = SurfaceId("appshell.rightrail")
+        val family = FamilyId("browse")
+        assertEquals(default.surfaces[browse], out.surfaces[browse])
+        assertEquals(default.surfaces[rail]!!.family(family), out.surfaces[rail]!!.family(family))
+        released.surfaces.forEach { (id, layout) ->
+            val now = out.surfaces[id]!!
+            layout.families.forEach { (fid, f) -> assertEquals(f, now.family(fid), "${id.value}/${fid.value} changed") }
+        }
     }
 
     @Test

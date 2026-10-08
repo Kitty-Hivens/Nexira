@@ -3,12 +3,15 @@ package hivens.launcher
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
 import hivens.core.data.PackReference
+import hivens.core.launch.InstanceWork
+import hivens.core.launch.InstanceWorkRegistry
 import hivens.launcher.instance.InstanceSizeService
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import java.io.IOException
 import java.nio.file.Files
@@ -145,7 +148,7 @@ class PackOperationServiceTest {
     @Test
     fun `the instance is measured again once the operation is done`() = runTest {
         val sizes = sizes()
-        val service = PackOperationService(scope = this, sizes = sizes, work = hivens.core.launch.InstanceWorkRegistry())
+        val service = PackOperationService(scope = this, sizes = sizes, work = InstanceWorkRegistry())
 
         service.start(instance, PackOperationKind.Repair) { PackOperationPhase.Repaired(1, 0) }
         advanceUntilIdle()
@@ -159,5 +162,39 @@ class PackOperationServiceTest {
         ioDispatcher = StandardTestDispatcher(testScheduler),
     )
 
-    private fun TestScope.service() = PackOperationService(scope = this, sizes = sizes(), work = hivens.core.launch.InstanceWorkRegistry())
+    @Test
+    fun `other work on the instance refuses an operation`() = runTest {
+        val work = InstanceWorkRegistry()
+        val release = CompletableDeferred<Unit>()
+        val install = launch { work.during(instance.id, InstanceWork.ContentInstall) { release.await() } }
+        advanceUntilIdle()
+        val service = service(work)
+
+        val started = service.start(instance, PackOperationKind.Update) { PackOperationPhase.Updated("6") }
+
+        assertFalse(started, "an update under an install plans against files that are about to change")
+        assertEquals(
+            PackOperationPhase.Refused(InstanceWork.ContentInstall),
+            service.operations.value[instance.id]?.phase,
+            "the button that asked says why nothing happened",
+        )
+        assertFalse(service.operations.value[instance.id]?.isRunning ?: true)
+        release.complete(Unit)
+        install.join()
+    }
+
+    @Test
+    fun `the instance is marked when the operation is accepted, not when its job first runs`() = runTest {
+        val work = InstanceWorkRegistry()
+        val service = service(work)
+
+        service.start(instance, PackOperationKind.Repair) { PackOperationPhase.Repaired(1, 0) }
+
+        assertEquals(InstanceWork.Repair, work.workOn(instance.id), "nothing may start between the answer and the mark")
+        advanceUntilIdle()
+        assertNull(work.workOn(instance.id))
+    }
+
+    private fun TestScope.service(work: InstanceWorkRegistry = InstanceWorkRegistry()) =
+        PackOperationService(scope = this, sizes = sizes(), work = work)
 }

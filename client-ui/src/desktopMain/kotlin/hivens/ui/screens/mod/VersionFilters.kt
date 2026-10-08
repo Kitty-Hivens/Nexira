@@ -1,7 +1,6 @@
 package hivens.ui.screens.mod
 
 import hivens.core.api.dto.modrinth.ModrinthGameVersion
-import hivens.core.api.dto.modrinth.ModrinthVersion
 
 /**
  * What the versions table is narrowed by.
@@ -28,7 +27,7 @@ data class VersionFilters(
     val isEmpty: Boolean get() = activeCount == 0
 
     /** Within an axis the members are alternatives; across axes they all have to hold. */
-    fun matches(v: ModrinthVersion): Boolean =
+    fun matches(v: ProjectBuild): Boolean =
         (channels.isEmpty() || v.versionType in channels) &&
             (gameVersions.isEmpty() || v.gameVersions.any { it in gameVersions }) &&
             (loaders.isEmpty() || v.loaders.any { it in loaders })
@@ -74,7 +73,7 @@ data class VersionFacets(
     val loaders: List<String>,
 )
 
-fun facetsOf(versions: List<ModrinthVersion>, tags: List<ModrinthGameVersion>): VersionFacets {
+fun facetsOf(versions: List<ProjectBuild>, tags: List<ModrinthGameVersion>): VersionFacets {
     val channels = versions.map { it.versionType }.distinct()
     val loaders = versions.flatMap { it.loaders }.distinct().sorted()
     val supported = versions.flatMap { it.gameVersions }.distinct()
@@ -93,6 +92,6 @@ fun facetsOf(versions: List<ModrinthVersion>, tags: List<ModrinthGameVersion>): 
  * table that marked every row orange because it did not know the game version
  * would be worse than one that marked none.
  */
-internal fun runsOn(v: ModrinthVersion, mcVersion: String, loaders: List<String>): Boolean =
+internal fun runsOn(v: ProjectBuild, mcVersion: String, loaders: List<String>): Boolean =
     (mcVersion.isBlank() || v.gameVersions.contains(mcVersion)) &&
         (loaders.isEmpty() || v.loaders.any { it in loaders })

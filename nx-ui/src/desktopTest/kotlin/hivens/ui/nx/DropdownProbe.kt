@@ -25,6 +25,7 @@ import hivens.ui.theme.NxTheme
 import hivens.ui.theme.Spacing
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
+import javax.swing.SwingUtilities
 import kotlin.test.Test
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxColor
@@ -50,6 +51,26 @@ class DropdownProbe {
         hover: Offset? = null,
         click: Offset? = null,
         frames: Int = 45,
+        body: @Composable BoxScope.() -> Unit,
+    ) {
+        // On the event thread, the one the global snapshot pump already runs on. Driven
+        // from the test thread, a select's own effects (its focus request, its scroll to
+        // the answer) were resumed by that pump while the test drew the next frame, and
+        // the scene saw two threads in one draw.
+        var outcome: Result<Unit>? = null
+        SwingUtilities.invokeAndWait { outcome = runCatching { render(name, wDp, hDp, dark, hover, click, frames, body) } }
+        outcome!!.getOrThrow()
+    }
+
+    @OptIn(ExperimentalComposeUiApi::class)
+    private fun render(
+        name: String,
+        wDp: Int,
+        hDp: Int,
+        dark: Boolean,
+        hover: Offset?,
+        click: Offset?,
+        frames: Int,
         body: @Composable BoxScope.() -> Unit,
     ) {
         val scene = ImageComposeScene(
@@ -129,18 +150,44 @@ class DropdownProbe {
             }
         }
 
-        // A list of answers: every row carries a radio, so the column reads as one
-        // question before the pointer moves.
+        // A list of answers: full-width rows, the answer in force filled with the
+        // accent, nothing in front of the words.
         for (dark in listOf(true, false)) {
-            sheet("choice-${if (dark) "dark" else "light"}", 300, 240, dark = dark) {
+            sheet("choice-${if (dark) "dark" else "light"}", 300, 280, dark = dark) {
                 Box(Modifier.align(Alignment.TopEnd)) {
                     Trigger()
-                    NxContextMenu(expanded = true, onDismissRequest = {}, align = NxMenuAlign.End) {
-                        NxMenuSection("Language")
+                    NxChoiceMenu(expanded = true, onDismissRequest = {}, align = NxMenuAlign.End) {
                         listOf("English", "Русский", "Deutsch", "日本語 (alpha)").forEachIndexed { i, name ->
-                            NxMenuItem(label = name, selected = i == 1, mark = NxMenuMark.Radio) {}
+                            NxChoiceItem(label = name, selected = i == 1) {}
                         }
                     }
+                }
+            }
+        }
+
+        // The pointer on an answer that is not in force, and a divider between groups.
+        sheet("choice-hover", 300, 300, hover = Offset(150f, 166f)) {
+            Box(Modifier.align(Alignment.TopEnd)) {
+                Trigger()
+                NxChoiceMenu(expanded = true, onDismissRequest = {}, align = NxMenuAlign.End) {
+                    NxChoiceItem(label = "General", selected = true) {}
+                    NxChoiceDivider()
+                    listOf("latest.log", "2026-10-08-1.log", "crash-2026-10-07.txt").forEach {
+                        NxChoiceItem(label = it, selected = false) {}
+                    }
+                }
+            }
+        }
+
+        // Loader builds with the hints that set some of them apart.
+        sheet("choice-hints", 360, 300) {
+            Box(Modifier.align(Alignment.TopStart)) {
+                Trigger(width = 300, height = 34)
+                NxChoiceMenu(expanded = true, onDismissRequest = {}) {
+                    NxChoiceItem(label = "21.1.209", selected = false, hint = "beta") {}
+                    NxChoiceItem(label = "21.1.206", selected = true, hint = "recommended") {}
+                    NxChoiceItem(label = "21.1.200", selected = false) {}
+                    NxChoiceItem(label = "21.1.190", selected = false) {}
                 }
             }
         }
@@ -228,6 +275,35 @@ class DropdownProbe {
             }
         }
 
+        // The catalogue's sort: the question named inside the trigger.
+        sheet("select-prefix", 360, 300, click = Offset(126f, 46f)) {
+            NxSelect(
+                options  = listOf("Relevance", "Downloads", "Follows", "Date published", "Date updated"),
+                selected = "Downloads",
+                onSelect = {},
+                label    = { it },
+                prefix   = "Sort by",
+                modifier = Modifier.width(240.dp),
+            )
+        }
+
+        // Versions with the snapshots switch under the list, out of its scroll.
+        sheet("select-footer", 320, 380, click = Offset(126f, 64f)) {
+            Column {
+                Text("Minecraft", color = NxInk.quiet)
+                Spacer(Modifier.height(Spacing.s6))
+                NxSelect(
+                    options   = (0 until 40).map { "1.$it.1" },
+                    selected  = "1.31.1",
+                    onSelect  = {},
+                    label     = { it },
+                    maxHeight = 220.dp,
+                    modifier  = Modifier.width(260.dp),
+                    footer    = { NxChoiceFooterItem(label = "Show snapshots", icon = NxIcon.Visibility) {} },
+                )
+            }
+        }
+
         // A select whose list is longer than its cap: it has to open scrolled to the
         // answer rather than to the top of the list.
         sheet("select-long", 320, 340, click = Offset(126f, 64f)) {
@@ -281,7 +357,7 @@ class DropdownProbe {
                     maxHeight = 180.dp,
                 ) {
                     listOf("1.20.1", "1.20.4", "1.21", "1.21.1").forEach {
-                        NxMenuItem(label = it, selected = it == "1.21", mark = NxMenuMark.Radio) {}
+                        NxMenuItem(label = it, selected = it == "1.21") {}
                     }
                 }
             }

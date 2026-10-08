@@ -6,8 +6,10 @@ import hivens.core.net.DigestAlgorithm
 import hivens.core.net.SkipIfPresent
 import hivens.core.net.Transfer
 import hivens.core.net.TransferEngine
+import hivens.core.api.dto.modrinth.ModrinthCategoryTag
 import hivens.core.api.dto.modrinth.ModrinthDisclosures
 import hivens.core.api.dto.modrinth.ModrinthGameVersion
+import hivens.core.api.dto.modrinth.ModrinthLoaderTag
 import hivens.core.api.dto.modrinth.ModrinthTeamMember
 import hivens.core.api.dto.modrinth.ModrinthProject
 import hivens.core.api.dto.modrinth.ModrinthSearchResponse
@@ -15,6 +17,7 @@ import hivens.core.api.dto.modrinth.ModrinthHashQuery
 import hivens.core.api.dto.modrinth.ModrinthUpdateQuery
 import hivens.core.api.dto.modrinth.ModrinthVersion
 import hivens.launcher.cache.ModrinthCaches
+import hivens.launcher.instance.ContentKind
 import hivens.core.net.metadataTimeout
 import io.ktor.client.request.get
 import io.ktor.client.request.post
@@ -98,13 +101,13 @@ class ModrinthClient(
 
     /**
      * Search the catalogue, restricted to modpacks via a project-type facet.
-     * Uncached: a query is dynamic, and the UI searches on submit (not per
-     * keystroke) so API traffic stays modest.
+     * Cached briefly by its URL, see [ModrinthCaches.search].
      */
     suspend fun searchModpacks(query: String, offset: Int = 0, limit: Int = 40): ModrinthSearchResponse {
         val q = URLEncoder.encode(query, StandardCharsets.UTF_8)
         val facets = URLEncoder.encode("""[["project_type:modpack"]]""", StandardCharsets.UTF_8)
-        return getJson("$API_BASE/v2/search?query=$q&facets=$facets&offset=$offset&limit=$limit")
+        val url = "$API_BASE/v2/search?query=$q&facets=$facets&offset=$offset&limit=$limit"
+        return caches.search.get(url) { getJson(url) }
     }
 
     /**
@@ -133,19 +136,65 @@ class ModrinthClient(
         getJson("$API_BASE/v2/project/$projectId/version")
 
     /**
-     * Search installable MODS compatible with an instance, via project-type +
-     * game-version + loader facets. Blank [mcVersion]/[loader] drop their facet
-     * (broader search). Backs the Content tab's "Find projects" browser.
+     * The catalogue's categories, each with the group it is filed under and its mark.
+     * A tag list: the same for every search, so a caller asks once.
      */
-    suspend fun searchMods(query: String, mcVersion: String, loader: String, offset: Int = 0, limit: Int = 40): ModrinthSearchResponse {
-        val q = URLEncoder.encode(query, StandardCharsets.UTF_8)
-        val facetList = buildList {
-            add("""["project_type:mod"]""")
-            if (mcVersion.isNotBlank()) add("""["versions:$mcVersion"]""")
-            if (loader.isNotBlank()) add("""["categories:$loader"]""")
+    suspend fun categoryTags(): List<ModrinthCategoryTag> =
+        getJson("$API_BASE/v2/tag/category")
+
+    /** The catalogue's loaders and the project types each publishes. */
+    suspend fun loaderTags(): List<ModrinthLoaderTag> =
+        getJson("$API_BASE/v2/tag/loader")
+
+    /**
+     * Search the catalogue for projects of one [kind], narrowed to what runs on a
+     * pack when one is named, and by [filters] on top.
+     *
+     * A blank [mcVersion] drops the game-version narrowing. For mods, [loader]
+     * narrows to every loader whose builds the pack runs, see [acceptedLoaders], so a
+     * Quilt pack is shown Fabric mods as well, and a blank one drops it. Resource
+     * packs and shaders are published for the game rather than for a mod loader, so
+     * the loader never narrows them.
+     */
+    suspend fun searchProjects(
+        kind: ContentKind,
+        query: String,
+        mcVersion: String = "",
+        loader: String = "",
+        offset: Int = 0,
+        limit: Int = 40,
+        /** The catalogue's order: `relevance`, `downloads`, `follows`, `newest` or `updated`. */
+        index: String = "relevance",
+        filters: Collection<SearchFilter> = emptyList(),
+    ): ModrinthSearchResponse {
+        val pack = buildList {
+            if (mcVersion.isNotBlank()) add(SearchFilter(FilterField.GameVersion, mcVersion))
+            if (kind == ContentKind.Mod && loader.isNotBlank()) {
+                acceptedLoaders(loader, mcVersion).forEach { add(SearchFilter(FilterField.Loader, it)) }
+            }
         }
-        val facets = URLEncoder.encode("[${facetList.joinToString(",")}]", StandardCharsets.UTF_8)
-        return getJson("$API_BASE/v2/search?query=$q&facets=$facets&offset=$offset&limit=$limit")
+        return search(projectTypeOf(kind), query, pack + filters, offset, limit, index)
+    }
+
+    /**
+     * Search the catalogue for [projectType] narrowed by [filters], see
+     * [searchExpression] for how they combine. Cached briefly by its URL, see
+     * [ModrinthCaches.search]: a page asked again within minutes, which is every
+     * return to a search, is the same page.
+     */
+    suspend fun search(
+        projectType: String,
+        query: String,
+        filters: Collection<SearchFilter> = emptyList(),
+        offset: Int = 0,
+        limit: Int = 40,
+        index: String = "relevance",
+    ): ModrinthSearchResponse {
+        val q = URLEncoder.encode(query, StandardCharsets.UTF_8)
+        val expression = URLEncoder.encode(searchExpression(projectType, filters), StandardCharsets.UTF_8)
+        val order = URLEncoder.encode(index, StandardCharsets.UTF_8)
+        val url = "$API_BASE/v2/search?query=$q&new_filters=$expression&index=$order&offset=$offset&limit=$limit"
+        return caches.search.get(url) { getJson(url) }
     }
 
     /**
@@ -212,7 +261,8 @@ class ModrinthClient(
     }
 
     /**
-     * The newest build of [projectId] that actually runs on this pack, or null.
+     * The build of [projectId] this pack should take, or null when none runs on it.
+     * The rule is [chooseBuild].
      *
      * Null MEANS there is none. It used to fall back on the newest build overall,
      * which every caller then read as "here is the one for you" and installed: a
@@ -220,15 +270,9 @@ class ModrinthClient(
      * a word. All three callers already treat null as "this project does not
      * support this pack", so the fallback was contradicting the only readings of
      * its own result.
-     *
-     * A blank axis is not a constraint, which is how a pack with no recorded
-     * loader still gets an answer.
      */
     suspend fun newestMatchingVersion(projectId: String, mcVersion: String, loader: String): ModrinthVersion? =
-        listVersions(projectId).firstOrNull { v ->
-            (mcVersion.isBlank() || v.gameVersions.contains(mcVersion)) &&
-                (loader.isBlank() || v.loaders.contains(loader))
-        }
+        chooseBuild(listVersions(projectId), mcVersion, loader)
 
     /**
      * Fetch a file to [target]; a file already there is left alone.
@@ -304,6 +348,13 @@ class ModrinthClient(
     }
 
     companion object {
+        /** The catalogue's project type for what lands in a [kind] folder. */
+        fun projectTypeOf(kind: ContentKind): String = when (kind) {
+            ContentKind.Mod -> "mod"
+            ContentKind.ResourcePack -> "resourcepack"
+            ContentKind.ShaderPack -> "shader"
+        }
+
         const val API_BASE = "https://api.modrinth.com"
         private const val USER_AGENT = "Nexira-modrinth-client"
 

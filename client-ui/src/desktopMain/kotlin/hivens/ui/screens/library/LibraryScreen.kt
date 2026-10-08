@@ -52,11 +52,12 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
+import hivens.ui.nx.NxChoiceFooterItem
+import hivens.ui.nx.NxChoiceItem
+import hivens.ui.nx.NxChoiceMenu
 import hivens.ui.nx.NxContextMenu
 import hivens.ui.nx.NxField
-import hivens.ui.nx.NxMenuAlign
 import hivens.ui.nx.NxMenuItem
-import hivens.ui.nx.NxMenuMark
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetField
 import hivens.ui.puppet.PuppetScreen
@@ -345,24 +346,22 @@ private fun NewLocalPackDialog(
                             modifier = Modifier.fillMaxWidth().onFocusChanged { if (it.isFocused) mcMenuOpen = true },
                         )
                         // The list hangs off the field's leading edge and takes its
-                        // width, because it belongs to that field; the menu owns the
-                        // height cap and the scroll, and the snapshots switch is a
-                        // footer so it stays reachable with sixty versions listed.
-                        NxContextMenu(
+                        // width, because it belongs to that field. It owns the height
+                        // cap and the scroll, and the snapshots switch is a footer so
+                        // it stays reachable with sixty versions listed.
+                        NxChoiceMenu(
                             expanded         = mcMenuOpen && versions.isNotEmpty(),
                             onDismissRequest = { mcMenuOpen = false },
-                            align            = NxMenuAlign.Start,
                             maxHeight        = 240.dp,
-                            matchAnchorWidth = true,
                             footer           = {
-                                NxMenuItem(
+                                NxChoiceFooterItem(
                                     label = if (showSnapshots) s.createPackHideSnapshots else s.createPackShowSnapshots,
-                                    icon = if (showSnapshots) NxIcon.VisibilityOff else NxIcon.Visibility,
+                                    icon  = if (showSnapshots) NxIcon.VisibilityOff else NxIcon.Visibility,
                                 ) { showSnapshots = !showSnapshots }
                             },
                         ) {
                             matches.forEach { v ->
-                                NxMenuItem(label = v, selected = v == mc, mark = NxMenuMark.Radio) {
+                                NxChoiceItem(label = v, selected = v == mc) {
                                     mc = v
                                     mcMenuOpen = false
                                 }

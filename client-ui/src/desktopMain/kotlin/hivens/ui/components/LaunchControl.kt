@@ -219,6 +219,7 @@ internal fun InstanceWork.label(s: AppStrings): String = when (this) {
     InstanceWork.Repair -> s.launchBlockRepairing
     InstanceWork.Recovery -> s.launchBlockRecovering
     InstanceWork.ContentUpdate -> s.launchBlockUpdatingContent
+    InstanceWork.ContentInstall -> s.launchBlockInstallingContent
     InstanceWork.Delete -> s.launchBlockDeleting
 }
 
@@ -228,6 +229,7 @@ private fun LaunchBlock.icon(): IconKey = when (this) {
         InstanceWork.Repair -> NxIcon.Build
         InstanceWork.Recovery -> NxIcon.History
         InstanceWork.ContentUpdate -> NxIcon.Sync
+        InstanceWork.ContentInstall -> NxIcon.Download
         InstanceWork.Delete -> NxIcon.Delete
     }
     LaunchBlock.Missing -> NxIcon.Warning

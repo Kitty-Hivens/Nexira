@@ -7,6 +7,7 @@ import hivens.core.cache.Cache
 import hivens.core.cache.CacheValue
 import hivens.core.cache.Freshness
 import hivens.core.cache.PassthroughCache
+import hivens.core.data.PackAuthRequirement
 import hivens.launcher.cache.SmrtPackCaches
 import hivens.launcher.smrt.SmrtPackClient
 import io.ktor.client.HttpClient
@@ -136,5 +137,49 @@ class MirrorPackCatalogueTest {
     fun `the mirror answers its whole listing, so it does not page`() {
         val (client, _) = mirror(listing("a"))
         assertFalse(MirrorPackCatalogue(client).paged)
+    }
+
+    /** Answers by path, for a read that asks several endpoints at once. */
+    private fun routed(vararg routes: Pair<String, String>): SmrtPackClient {
+        val client = HttpClient(MockEngine) {
+            engine {
+                addHandler { req ->
+                    val body = routes.firstOrNull { req.url.encodedPath == it.first }?.second
+                    if (body == null) {
+                        respond(ByteReadChannel("missing"), HttpStatusCode.NotFound)
+                    } else {
+                        respond(ByteReadChannel(body.toByteArray()), HttpStatusCode.OK, headersOf("Content-Type", "application/json"))
+                    }
+                }
+            }
+        }
+        return SmrtPackClient(HttpClientProvider { client }, "https://mirror.test")
+    }
+
+    @Test
+    fun `a pack page carries the runtime, the sign-in and the pointer the mirror names`() = runBlocking {
+        val client = routed(
+            "/v1/packs/Industrial" to """{"pack_id":"Industrial","display_name":"Industrial","tagline":"t",
+                "minecraft_version":"1.12.2","latest_pack_version":"0.3.1","tags":["tech"],
+                "latest_built_at":"2026-10-01T10:00:00Z"}""",
+            "/v1/packs/Industrial/manifest" to """{"schema_version":2,"pack_id":"Industrial","pack_version":"0.3.1",
+                "generated_at":"2026-10-01T10:00:00Z","minecraft":{"version":"1.12.2"},
+                "loader":{"name":"cleanroom","version":"0.3.1"},"java":{"major":21},
+                "auth":{"kind":"smartycraft","server_id":"Industrial"}}""",
+            "/v1/packs/Industrial/manifest/versions" to """{"latest":"0.3.1","builds":[
+                {"version_number":"0.4.0","version_type":"beta","minecraft_version":"1.12.2",
+                 "loader":{"name":"cleanroom","version":"0.3.2"},"mods_count":180,"size_bytes":900},
+                {"version_number":"0.3.1","version_type":"release","minecraft_version":"1.12.2",
+                 "loader":{"name":"forge","version":"14.23.5"},"mods_count":175}]}""",
+        )
+        val d = MirrorPackCatalogue(client).details("Industrial")
+        assertEquals("0.3.1", d.latestVersionId, "the mirror's pointer, not the newest build")
+        assertEquals(listOf("cleanroom", "forge"), d.loaders, "each build says what it ran on")
+        assertEquals(listOf("1.12.2"), d.gameVersions)
+        assertEquals("Java 21", d.runtimeLabel)
+        assertEquals(PackAuthRequirement.SmartyCraft("Industrial"), d.auth)
+        assertEquals("2026-10-01T10:00:00Z", d.updatedAt)
+        assertEquals(listOf(180, 175), d.versions.map { it.modsCount })
+        assertEquals(900L, d.versions.first().sizeBytes)
     }
 }

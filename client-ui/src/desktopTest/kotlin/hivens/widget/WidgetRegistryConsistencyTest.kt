@@ -144,6 +144,21 @@ class WidgetRegistryConsistencyTest {
             "mod.tags",
             "mod.creators",
             "mod.details",
+            "browse.search",
+            "browse.results",
+            "browse.scope",
+            "browse.installing",
+            "browse.chips",
+            "browse.filter.installed",
+            "browse.filter.version",
+            "browse.filter.loader",
+            "browse.filter.categories",
+            "browse.filter.features",
+            "browse.filter.resolutions",
+            "browse.filter.performance",
+            "browse.filter.environment",
+            "browse.filter.license",
+            "browse.filter.exclusions",
         )
         val actual = GeneratedWidgetRegistry.all().keys.map { it.value }.toSet()
         assertEquals(expected, actual, "registry drift -- expected exactly these widgets")

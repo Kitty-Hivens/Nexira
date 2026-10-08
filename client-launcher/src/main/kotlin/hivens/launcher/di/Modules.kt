@@ -53,6 +53,7 @@ import hivens.launcher.runtime.loader.ModernInstallerResolver
 import hivens.launcher.security.KeyringStorageFactory
 import hivens.core.smrt.ModIconResolver
 import hivens.core.api.dto.modrinth.ModrinthProject
+import hivens.core.api.dto.modrinth.ModrinthSearchResponse
 import hivens.core.api.dto.modrinth.ModrinthVersion
 import hivens.core.api.dto.smrt.SmrtPackListing
 import hivens.core.api.dto.smrt.SmrtPackManifest
@@ -93,7 +94,10 @@ import hivens.core.security.SslBypassStore
 import hivens.core.data.PackOrigin
 import hivens.core.update.PackUpdater
 import hivens.core.update.PackUpdateStatusHub
+import hivens.launcher.instance.ContentInstaller
 import hivens.launcher.instance.ContentScanCache
+import hivens.launcher.instance.InstalledIndex
+import hivens.launcher.instance.InstallTargets
 import hivens.launcher.instance.InstanceContentManager
 import hivens.launcher.instance.InstanceContentScanner
 import hivens.launcher.instance.InstanceContentUpdater
@@ -513,10 +517,16 @@ val mirrorModule = module {
     // swaps jars in place. App-scoped, so a batch of forty survives leaving the tab
     // that started it.
     single { InstanceContentUpdater(modrinth = get(), manager = InstanceContentManager(), scope = get(), work = get()) }
+    // What an instance holds by catalogue project, over the file-hash cache the
+    // icon lookups keep, so a folder that has not changed is not hashed again.
+    single { InstalledIndex(scanner = get(), modrinth = get(), hashOf = get<ModIconLookups>()::sha1) }
     // Installing a mod means installing what it cannot run without: the browser
     // used to fetch the one jar that was clicked and leave the player to meet the
     // missing dependency on the loading screen.
-    single { ModInstaller(modrinth = get(), scanner = get()) }
+    single { ContentInstaller(modrinth = get(), index = get(), manager = InstanceContentManager(), work = get(), running = get()) }
+    single { ModInstaller(core = get(), index = get(), repository = get(), dataDir = get()) }
+    // Which packs a project found outside any pack could go into, for the install that asks.
+    single { InstallTargets(modrinth = get(), index = get(), repository = get(), dataDir = get()) }
     single { SmrtSyncService(get(), get()) }
 
     // Pack-catalogue read side: one provider per browsable source, indexed by
@@ -690,11 +700,14 @@ val mirrorModule = module {
     // resolver instance.
     single {
         val client: ModrinthClient = get()
-        val lookups = ModIconLookups(
+        ModIconLookups(
             caches        = modIconCaches(),
             versionByHash = { sha1 -> client.versionByHash(sha1) },
             projectIcon   = { projectId -> client.resolveProject(projectId).iconUrl },
         )
+    }
+    single {
+        val lookups: ModIconLookups = get()
         ModIconResolver(
             resolveProjectIcon = lookups::iconForProject,
             resolveIconByHash  = lookups::iconForHash,
@@ -1007,6 +1020,14 @@ private fun Scope.modrinthCaches(): ModrinthCaches {
             "modrinth-version",
             ModrinthVersion.serializer(),
             CacheConfig(ttlMs = 30 * day, staleTtlMs = 90 * day),
+        ),
+        // A page is current for minutes: counts and order move, and a search the
+        // reader repeats later should see that. Within them it is the same page,
+        // and offline the last one beats an error.
+        search = f.create(
+            "modrinth-search",
+            ModrinthSearchResponse.serializer(),
+            CacheConfig(ttlMs = 5 * min, staleTtlMs = day, staleMode = StaleMode.FallbackOnFailure, maxEntries = 128),
         ),
     )
 }

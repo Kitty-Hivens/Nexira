@@ -148,7 +148,6 @@ interface AppStrings {
 
     // --- Top-bar breadcrumb ---
     val crumbHome: String
-    val crumbLoading: String
 
     // --- Pagination ---
     val paginationPrev: String
@@ -838,6 +837,14 @@ interface AppStrings {
     val contentVersionsLoadFailed: String
     val contentDetailAuthors: String
     val contentDetailSize: String
+    /** A pack's mod count in the rail's details, before the number: "Mods: 212". */
+    val packRailMods: String
+    /** The sign-in a pack asks for before the game starts, named by its provider. */
+    fun packRailSignIn(provider: String): String
+    /** Before the packs that ship a mod, in the rail's details: "In packs: Industrial 0.1.37". */
+    val packRailUsedBy: String
+    /** A link to the project's own page where the source names no better word for it. */
+    val modLinkPage: String
     // ── The project page ─────────────────────────────────────────────────────
     // The page carries the header, the tabs and the body; the blocks below it
     // names live in the right rail's project-view family. A page drawn for a jar
@@ -882,6 +889,85 @@ interface AppStrings {
     val modPageInstallRetry: String
     /** Required dependencies the pack's game version and loader have no build for. */
     fun modPageInstallMissing(count: Int): String
+
+    // Browse by kind, and the pack an install from it goes into
+    val browseKindPacks: String
+    val installPickerNoPacks: String
+    val installPickerFailed: String
+    val installTargetNoBuild: String
+    val installTargetNotTaken: String
+    val installTargetUnknown: String
+    val installRefusedGameRunning: String
+    val installRefusedBusy: String
+    val installInstalled: String
+    fun installSkipLine(project: String, reason: String): String
+    val installSkipLookupFailed: String
+    val installSkipNotPlaceable: String
+    val installSkipNameTaken: String
+    val installSkipNotAttempted: String
+
+    /** A dependency further down the chain than an install follows. */
+    val installSkipTooDeep: String
+
+    /** The build would replace a file the pack itself put there. */
+    val installSkipPackOwned: String
+    val browseRailFind: String
+    val browseRailSource: String
+    val browseSearchMods: String
+    val browseSearchResourcePacks: String
+    val browseSearchShaders: String
+    // The filter rail, after the catalogue's own sidebar
+    val browseFilterVersion: String
+    val browseFilterLoader: String
+    val browseFilterCategories: String
+    val browseFilterFeatures: String
+    val browseFilterResolutions: String
+    val browseFilterPerformance: String
+    val browseFilterEnvironment: String
+    val browseFilterLicense: String
+    val browseFilterExclusions: String
+    val browseFilterClient: String
+    val browseFilterServer: String
+    val browseFilterOpenSource: String
+    val browseFilterArchived: String
+    val browseFilterShowMore: String
+    val browseFilterShowLess: String
+    val browseFilterAllVersions: String
+    val browseFilterExclude: String
+    /** A filter the chosen pack decides, named by the pack. */
+    fun browseFilterLockedBy(pack: String): String
+    val browseFilterUnlockHint: String
+    val browseFilterUnlock: String
+    val browseFilterRelock: String
+    val browseHideInstalled: String
+    val browseFiltersClearAll: String
+    /** The header over the search while the catalogue installs into one pack. */
+    val browseInstallingInto: String
+    val browseLeaveTarget: String
+    val browseBackToPack: String
+    // Where a project goes, asked when no pack is behind the install
+    val installDialogTitle: String
+    val installDialogClose: String
+    val installDialogExisting: String
+    val installDialogNew: String
+    val installDialogSearch: String
+    val installDialogShowUnfit: String
+    val installDialogHideUnfit: String
+    fun installDialogFitCount(count: Int): String
+    val installDialogCreate: String
+    val installDialogCreating: String
+    fun installDialogDone(pack: String): String
+    val installDialogOpenPack: String
+    val browseSortLabel: String
+    val browseSortRelevance: String
+    val browseSortDownloads: String
+    val browseSortFollows: String
+    val browseSortNewest: String
+    val browseSortUpdated: String
+    fun browseByAuthor(name: String): String
+    val modPageInstallChoose: String
+    val editorSurfBrowse: String
+    val editorSurfShortBrowse: String
     /** The same action on a table row, where the row already names the build. */
     val modPageInstallShort: String
 
@@ -1122,6 +1208,9 @@ interface AppStrings {
     fun packVersionsApplying(current: Int, total: Int, name: String): String
     fun packVersionsApplied(version: String): String
     fun packVersionsFailed(reason: String): String
+
+    /** An update, repair or restore that did not start because [work], already named, holds the pack. */
+    fun packOperationRefused(work: String): String
     val packVersionsRetry: String
     val packVersionsLoadError: String
 
@@ -1259,6 +1348,7 @@ interface AppStrings {
     val launchBlockRecovering: String
     val launchBlockDeleting: String
     val launchBlockUpdatingContent: String
+    val launchBlockInstallingContent: String
     /** The launch control of a pack whose instance folder is gone. */
     val launchBlockMissing: String
     /** The launch control while another pack's launch or game holds the launcher. */

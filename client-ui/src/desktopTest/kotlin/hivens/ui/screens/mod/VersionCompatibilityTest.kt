@@ -25,7 +25,7 @@ class VersionCompatibilityTest {
         files = listOf(
             ModrinthFile(hashes = ModrinthHashes(sha1 = "0"), url = "u", filename = "f.jar", size = 1),
         ),
-    )
+    ).toBuild()
 
     @Test
     fun `a build matching both axes runs`() {

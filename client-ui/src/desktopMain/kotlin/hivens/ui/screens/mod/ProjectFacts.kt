@@ -197,4 +197,5 @@ private fun linkLabel(kind: ProjectLinkKind, s: AppStrings): String = when (kind
     ProjectLinkKind.Wiki -> s.modLinkWiki
     ProjectLinkKind.Discord -> s.modLinkDiscord
     ProjectLinkKind.Donate -> s.modLinkDonate
+    ProjectLinkKind.Page -> s.modLinkPage
 }

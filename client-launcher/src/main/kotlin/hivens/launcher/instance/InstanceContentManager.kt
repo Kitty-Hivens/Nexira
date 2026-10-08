@@ -116,6 +116,52 @@ class InstanceContentManager {
     }
 
     /**
+     * Move [source] into the [kind] folder as [fileName], on or off as [enabled]
+     * says. True when it landed.
+     *
+     * A new file only. A name already on disk under either state is somebody
+     * else's file, and it is left alone and the move refused rather than put over
+     * it: [replace] is the operation for a file that is meant to go. The name comes
+     * from a catalogue's answer, so it has to be a bare file name, not a path. A
+     * refused or failed move takes [source] down with it.
+     */
+    suspend fun place(
+        instanceDir: Path,
+        kind: ContentKind,
+        source: Path,
+        fileName: String,
+        enabled: Boolean,
+    ): Boolean = withContext(Dispatchers.IO) {
+        InstanceMutationLock.withLock(instanceDir) {
+            val dir = instanceDir.resolve(kind.folderName())
+            val target = runCatching {
+                require(isBareFileName(fileName)) { "not a bare file name" }
+                resolveWithinRoot(dir, if (enabled) fileName else fileName + DISABLED_SUFFIX)
+            }.getOrElse {
+                log.warn("Refusing to place {}: {}", fileName, it.message)
+                runCatching { Files.deleteIfExists(source) }
+                return@withLock false
+            }
+            if (Files.exists(dir.resolve(fileName)) || Files.exists(dir.resolve(fileName + DISABLED_SUFFIX))) {
+                log.warn("Refusing to place {}: the name is taken", fileName)
+                runCatching { Files.deleteIfExists(source) }
+                return@withLock false
+            }
+            runCatching {
+                Files.createDirectories(dir)
+                fileOpRetry("place $fileName") {
+                    Files.move(source, target, StandardCopyOption.ATOMIC_MOVE)
+                }
+                true
+            }.getOrElse {
+                log.warn("Placing {} failed: {}", fileName, it.message)
+                runCatching { Files.deleteIfExists(source) }
+                false
+            }
+        }
+    }
+
+    /**
      * Copy [sources] into the instance's [kind] folder, skipping a name that
      * already exists so an accidental re-add never clobbers an installed file.
      * Returns how many landed.
@@ -157,3 +203,7 @@ class InstanceContentManager {
         const val STAGING_SUFFIX = ".nexira-adding"
     }
 }
+
+/** A name that stays in the folder it is resolved against: no separator, and not `.` or `..`. */
+internal fun isBareFileName(name: String): Boolean =
+    name.isNotBlank() && name != "." && name != ".." && '/' !in name && '\\' !in name

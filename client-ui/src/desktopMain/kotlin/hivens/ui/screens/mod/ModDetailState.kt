@@ -15,6 +15,7 @@ import hivens.launcher.instance.DISABLED_SUFFIX
 import hivens.launcher.instance.InstalledContent
 import hivens.launcher.instance.ContentKind
 import hivens.launcher.instance.InstanceContentScanner
+import hivens.launcher.instance.ContentInstaller
 import hivens.launcher.instance.ModInstaller
 import hivens.launcher.instance.folderName
 import hivens.launcher.instance.loadersFor
@@ -61,9 +62,16 @@ class ModDetailState(
      * page still renders with no application behind it.
      */
     val installScope: CoroutineScope,
-    // Composed from the two the state already holds, so a caller that has those
-    // has this. Koin binds the same pair.
-    private val installer: ModInstaller = ModInstaller(modrinth, scanner),
+    /**
+     * What puts a build into the pack, from the app's graph. Null on a page stood up
+     * without an application behind it, which then offers no install.
+     */
+    private val installer: ModInstaller? = null,
+    /**
+     * Who to ask about a file the catalogue cannot name. Null on a page stood up
+     * without an application behind it, which then keeps the archive's own word.
+     */
+    private val mirrorLookup: MirrorLookup? = null,
 ) {
     /**
      * Written by [load] and read by the page.
@@ -117,6 +125,20 @@ class ModDetailState(
         private set
 
     /**
+     * What the last install left out, by name and why, for the lines under the
+     * button. A count told the reader something was wrong and nothing about what.
+     */
+    var installLeftOut by mutableStateOf<List<LeftOut>>(emptyList())
+        private set
+
+    /** Why the last install did not run at all, when it did not. */
+    var installRefusal by mutableStateOf<ContentInstaller.Refusal?>(null)
+        private set
+
+    /** One project an install left out: its name, and the reason. */
+    class LeftOut(val title: String, val skip: ContentInstaller.Skip)
+
+    /**
      * The project exists and has nothing that runs on this pack.
      *
      * Kept apart from [installFailed], which means the attempt broke. This one is
@@ -154,16 +176,29 @@ class ModDetailState(
     var versionsLoading by mutableStateOf(false)
         internal set
 
+    /**
+     * The mirror's registry page for the file, when the catalogue had none and the
+     * mirror did. A jar a pack took from CurseForge or GitHub gets its name, its
+     * releases and what it requires from here rather than question marks.
+     */
+    var mirror by mutableStateOf<MirrorMod?>(null)
+        internal set
+
     /** The archive on disk, for a page opened on an installed file. */
     var installed by mutableStateOf<InstalledContent?>(null)
         internal set
 
     val source: ProjectSource
-        get() = if (project != null) ProjectSource.Catalogue else ProjectSource.Local
+        get() = when {
+            project != null -> ProjectSource.Catalogue
+            mirror != null -> ProjectSource.Mirror
+            else -> ProjectSource.Local
+        }
 
     /** The title the header shows, from whichever side can answer. */
     val title: String
         get() = project?.title
+            ?: mirror?.detail?.name
             ?: installed?.displayName
             ?: when (val t = target) {
                 is ModTarget.Catalogue -> t.projectId
@@ -206,7 +241,16 @@ class ModDetailState(
             // retry and no effect whose key had changed to run again.
             loading = false
         }
-        publish()
+        // Nothing read is nothing to show. A catalogue entry that could not be
+        // fetched published as a file of its own, so the rail beside the retry said
+        // "no licence stated" and "?" about a project the page never saw. A file on
+        // disk still has its own facts when only the catalogue failed.
+        if (failed && installed == null) open.publish(this, null) else publish()
+    }
+
+    /** Makes this page the one the rail describes. Called as the page comes on screen. */
+    fun claim() {
+        open.claim(this)
     }
 
     /**
@@ -217,11 +261,14 @@ class ModDetailState(
      * a value, not a navigation.
      */
     fun clear() {
-        open.clearIf(target.key)
+        open.release(this)
     }
 
     private suspend fun loadCatalogue(projectId: String) {
         project = withContext(Dispatchers.IO) { modrinth.resolveProject(projectId) }
+        // The rail fills with the header rather than seconds after it, behind the
+        // team and the declarations, which arrive in their own time.
+        publish()
         disclosures = fetchDisclosures(projectId)
         creators = fetchCreators(projectId)
         install = resolveInstall(projectId)
@@ -237,7 +284,8 @@ class ModDetailState(
      * a no-op download.
      */
     private suspend fun resolveInstall(projectId: String): InstallAction {
-        val pack = resolveDestination() ?: return InstallAction.None
+        val installer = installer ?: return InstallAction.None
+        val pack = resolveDestination() ?: return if (target is ModTarget.Catalogue) InstallAction.Choose else InstallAction.None
         val present = withContext(Dispatchers.IO) {
             runCatching { installer.presentProjects(pack.dir) }
                 .onFailure { log.debug("Project page: could not read what {} holds", pack.name, it) }
@@ -255,10 +303,7 @@ class ModDetailState(
      */
     private suspend fun resolveDestination(): Destination? {
         destination?.let { return it }
-        val id = when (val t = target) {
-            is ModTarget.Catalogue -> t.intoInstanceId
-            is ModTarget.Installed -> t.instanceId
-        } ?: return null
+        val id = packId ?: return null
         val pack = repo.get(id) ?: return null
         val resolved = Destination(
             name = pack.displayName,
@@ -305,8 +350,18 @@ class ModDetailState(
 
     /** The pack's runtime, for marking which builds can actually run. */
     val packMcVersion: String get() = destination?.mc.orEmpty()
-    val packLoaders: List<String> get() = destination?.loader
-        ?.let { loadersFor(ContentKind.Mod, it) }
+
+    /** The pack's own loader as the catalogue names it, blank for none. */
+    val packLoader: String get() = destination?.loader.orEmpty()
+
+    /**
+     * Every loader a build may be published for and still have a place in the
+     * pack: its mods, and the resource packs and shaders any pack takes. A
+     * resource pack is published for `minecraft`, and marking it as not running on
+     * a NeoForge pack would be the table telling the reader something untrue.
+     */
+    val packLoaders: List<String> get() = destination
+        ?.let { d -> ContentKind.entries.flatMap { loadersFor(it, d.loader, d.mc) } }
         .orEmpty()
 
     /**
@@ -350,7 +405,14 @@ class ModDetailState(
      * the first frame instead of growing one under the reader's hands.
      */
     val installPossible: Boolean
-        get() = (target as? ModTarget.Catalogue)?.intoInstanceId != null
+        get() = target is ModTarget.Catalogue && installer != null
+
+    /** The pack behind the page: the one the reader came from, or the one the file sits in. */
+    val packId: String?
+        get() = when (val t = target) {
+            is ModTarget.Catalogue -> t.intoInstanceId
+            is ModTarget.Installed -> t.instanceId
+        }
 
     /** Whether the catalogue has an entry at all, once the page has finished looking. */
     val knownToCatalogue: Boolean get() = project != null
@@ -365,21 +427,19 @@ class ModDetailState(
      */
     suspend fun installVersion(version: ModrinthVersion) {
         if (installing) return
+        val installer = installer ?: return
         val pack = resolveDestination() ?: return
         installing = true
         installFailed = false
         installNoBuild = false
         installMissing = emptyList()
+        installLeftOut = emptyList()
+        installRefusal = null
         try {
             val outcome = withContext(Dispatchers.IO) {
                 installer.install(pack.dir, version, pack.mc, pack.loader)
             }
-            if (outcome.ok) {
-                install = InstallAction.Present(pack.name)
-                installMissing = outcome.missing
-            } else {
-                installFailed = true
-            }
+            record(outcome)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -402,11 +462,14 @@ class ModDetailState(
         val action = install
         if (action !is InstallAction.Install || installing) return
         val projectId = project?.id ?: return
+        val installer = installer ?: return
 
         installing = true
         installFailed = false
         installNoBuild = false
         installMissing = emptyList()
+        installLeftOut = emptyList()
+        installRefusal = null
         try {
             val pack = resolveDestination() ?: return
             val version = withContext(Dispatchers.IO) {
@@ -423,12 +486,7 @@ class ModDetailState(
             val outcome = withContext(Dispatchers.IO) {
                 installer.install(pack.dir, version, pack.mc, pack.loader)
             }
-            if (outcome.ok) {
-                install = InstallAction.Present(pack.name)
-                installMissing = outcome.missing
-            } else {
-                installFailed = true
-            }
+            record(outcome)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -439,6 +497,41 @@ class ModDetailState(
         }
     }
 
+    /**
+     * What an install's outcome means for the page. The pack name rides on the
+     * destination, which every caller has resolved by the time it gets here.
+     */
+    private suspend fun record(outcome: ModInstaller.Outcome) {
+        val pack = destination ?: return
+        installRefusal = outcome.refusal
+        val headId = project?.id
+        // The build asked for, left out for a reason the install could name. That is
+        // an answer and reads as one under the button: offering Retry for a file the
+        // pack itself owns repeats a click that can never land.
+        val headReason = outcome.headLeftOut
+        when {
+            outcome.ok -> {
+                install = InstallAction.Present(pack.name)
+                installMissing = outcome.missing
+            }
+            headReason != null && outcome.refusal == null -> Unit
+            else -> installFailed = true
+        }
+        installLeftOut = outcome.skips
+            .filter { it !is ContentInstaller.Skip.Present && it !is ContentInstaller.Skip.AlreadyInstalled && (it.projectId != headId || it === headReason) }
+            .map { skip -> LeftOut(if (skip === headReason) title else titleOf(skip.projectId), skip) }
+    }
+
+    /** A project's name for a sentence, its id when the catalogue cannot say. */
+    private suspend fun titleOf(projectId: String?): String {
+        val id = projectId ?: return "?"
+        return withContext(Dispatchers.IO) {
+            runCatching { modrinth.resolveProject(id).title }
+                .onFailure { if (it is CancellationException) throw it }
+                .getOrNull()
+        }?.takeIf { it.isNotBlank() } ?: id
+    }
+
     private suspend fun loadInstalled(t: ModTarget.Installed) {
         val pack = repo.get(t.instanceId)
         val dir = pack?.let { dataDir.resolve(INSTANCES_DIR).resolve(it.instanceDirName) }
@@ -446,18 +539,42 @@ class ModDetailState(
 
         if (file != null) {
             installed = withContext(Dispatchers.IO) { runCatching { scanner.read(file, t.kind) }.getOrNull() }
+            publish()
             // The catalogue half is allowed to fail loudly, and [load] turns that
             // into the page's retry. Caught here it produced the worst reading the
             // page has: a file drawn as one the catalogue has never seen, with a
             // versions tab saying so, because a request had timed out.
+            val sha1 = withContext(Dispatchers.IO) { sha1Of(file) }
             val found = withContext(Dispatchers.IO) {
-                modrinth.versionByHash(sha1Of(file))?.let { modrinth.resolveProject(it.projectId) }
+                modrinth.versionByHash(sha1)?.let { modrinth.resolveProject(it.projectId) }
             }
             project = found
             if (found != null) {
+                publish()
                 disclosures = fetchDisclosures(found.id)
                 creators = fetchCreators(found.id)
+            } else if (t.kind == ContentKind.Mod) {
+                // The registry indexes mod jars. A resource or shader pack is never
+                // in it, and asking would only cost a request per page.
+                mirror = askMirror(sha1)
             }
+        }
+    }
+
+    /**
+     * The mirror's answer for a file the catalogue did not know, and no answer when
+     * it cannot be asked. Its failure is not the page's: the archive's own word is
+     * still a page, so a mirror that is down costs the reader the extra facts only.
+     */
+    private suspend fun askMirror(sha1: String): MirrorMod? {
+        val lookup = mirrorLookup ?: return null
+        return try {
+            withContext(Dispatchers.IO) { lookup.byFile(sha1) }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            log.debug("Project page: the mirror could not be asked about {}", sha1, e)
+            null
         }
     }
 
@@ -530,21 +647,30 @@ class ModDetailState(
         // is not. A jar names the loader it needs and usually the game version it
         // was built against, and saying "unknown" over the top of that is throwing
         // away a fact the file had already handed us.
+        val m = mirror
         val folded = when {
-            p != null -> foldGameVersions(p.gameVersions, versionTags())
-            else -> local?.gameVersions.orEmpty().filter { it.isNotBlank() }
+            p != null -> groupGameVersions(p.gameVersions, versionTags())
+            m != null -> groupGameVersions(m.detail.mcVersions, versionTags())
+                .ifEmpty { m.detail.mcVersions.map { GameVersionGroup(it, listOf(it)) } }
+            else -> local?.gameVersions.orEmpty().filter { it.isNotBlank() }.map { GameVersionGroup(it, listOf(it)) }
         }
         open.publish(
+            this,
             OpenProject(
                 targetKey = target.key,
                 title = title,
                 slug = p?.slug ?: (target as? ModTarget.Installed)?.fileName.orEmpty(),
                 source = source,
-                gameVersionLabels = folded,
-                loaders = p?.loaders ?: local?.loaders.orEmpty(),
+                pending = loading && p == null && m == null && local == null,
+                projectType = p?.projectType,
+                packId = packId,
+                gameVersions = folded,
+                loaders = p?.loaders
+                    ?: m?.detail?.loaders?.filter { it != "any" }?.takeIf { it.isNotEmpty() }
+                    ?: local?.loaders.orEmpty(),
                 categories = p?.let { it.categories + it.additionalCategories } ?: emptyList(),
-                clientSide = p?.clientSide,
-                serverSide = p?.serverSide,
+                clientSide = p?.clientSide ?: m?.detail?.clientSide,
+                serverSide = p?.serverSide ?: m?.detail?.serverSide,
                 licenseId = p?.license?.id ?: local?.license,
                 licenseName = p?.license?.name,
                 // Formatted here, because the rail renders what it is given and a
@@ -558,14 +684,22 @@ class ModDetailState(
                 publishedExact = formatBuildTimestamp(p?.published),
                 updatedAt = relativeAge(p?.updated, strings).takeIf { it.isNotBlank() },
                 updatedExact = formatBuildTimestamp(p?.updated),
-                links = p?.let(::linksOf) ?: emptyList(),
+                links = p?.let(::linksOf) ?: m?.links.orEmpty(),
                 creators = creators,
                 disclosures = disclosures,
-                authors = local?.authors.orEmpty(),
-                dependencies = local?.dependencies.orEmpty(),
+                authors = local?.authors.orEmpty().ifEmpty { m?.authors.orEmpty() },
+                dependencies = local?.dependencies.orEmpty().ifEmpty { m?.requires.orEmpty() },
+                usedBy = m?.usedBy.orEmpty(),
+                // The registry dates nothing, so a page it answers for says nothing
+                // about when the project appeared rather than that it is unknown.
+                answersPublished = p != null || m == null,
+                answersUpdated = p != null || m == null,
                 sizeBytes = local?.sizeBytes,
             ),
         )
+        // Only an answer is a name. Before the catalogue or the file has spoken, the
+        // title is the route's own id, which the trail already falls back to.
+        if (p != null || m != null || local != null) open.name(target.key, title)
     }
 
     private fun linksOf(p: ModrinthProject): List<ProjectLink> = buildList {

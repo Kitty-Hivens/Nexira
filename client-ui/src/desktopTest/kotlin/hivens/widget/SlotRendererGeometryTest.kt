@@ -2,6 +2,7 @@ package hivens.widget
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -289,6 +290,43 @@ class SlotRendererGeometryTest {
         assertEquals(PAGE, frame.at(150, 125), "the short line is padded, not stretched")
     }
 
+    @Test
+    fun `a widget that draws nothing takes no gap and the slot is only as tall as what it drew`() {
+        // A filter for a kind not being searched stands in the rail at no size. The
+        // line used to measure a gap for it anyway, so a column of such blocks left a
+        // band of nothing under what it drew, and whatever came after sat lower.
+        val frame = renderGapped(
+            SlotContent(
+                widgets = listOf(
+                    box("a", null),
+                    box("e1", null, kind = "empty"),
+                    box("b", null, kind = "b"),
+                    box("e2", null, kind = "empty"),
+                    box("e3", null, kind = "empty"),
+                ),
+                flow = FlowSpec.Column,
+            ),
+            gap = 10,
+        )
+        assertEquals(A, frame.at(100, 20))
+        assertEquals(PAGE, frame.at(100, 45), "one gap between the two that drew")
+        assertEquals(B, frame.at(100, 70))
+        assertEquals(C, frame.at(100, 95), "what follows the slot starts where its last drawing ends")
+    }
+
+    @Test
+    fun `a slot whose first widget draws nothing starts with the first that does`() {
+        val frame = renderGapped(
+            SlotContent(
+                widgets = listOf(box("e1", null, kind = "empty"), box("a", null)),
+                flow = FlowSpec.Column,
+            ),
+            gap = 10,
+        )
+        assertEquals(A, frame.at(100, 5), "no gap before the first drawn widget")
+        assertEquals(C, frame.at(100, 45))
+    }
+
     // ── Harness ───────────────────────────────────────────────────────
 
     private fun box(id: String, placement: Placement?, kind: String = "a") =
@@ -311,6 +349,46 @@ class SlotRendererGeometryTest {
             val sized = if (heightDp > 0) Modifier.fillMaxWidth().height(heightDp.dp) else Modifier.fillMaxSize()
             Box(sized.background(colour))
         }
+    }
+
+    /** A widget with nothing to show where it stands. */
+    private class EmptyWidget : WidgetDescriptor {
+        override val kind: WidgetKind = WidgetKind("empty")
+        override val displayName: String get() = kind.value
+        override val removable: Boolean get() = true
+
+        @Composable
+        override fun Render(instance: WidgetInstance) = Unit
+    }
+
+    /**
+     * A vertical flow of 40-high widgets with [gap] between them, sized by what it
+     * draws, and a strip of C right after it.
+     */
+    @OptIn(ExperimentalComposeUiApi::class)
+    private fun renderGapped(content: SlotContent, gap: Int): Frame {
+        val graph = LayoutGraph(surfaces = mapOf(surface to SurfaceLayout(slots = mapOf(slot to content))))
+        val registry = Registry(
+            mapOf(
+                WidgetKind("a") to ColourWidget(WidgetKind("a"), RED, 40),
+                WidgetKind("b") to ColourWidget(WidgetKind("b"), GREEN, 40),
+                WidgetKind("empty") to EmptyWidget(),
+            ),
+        )
+        val scene = ImageComposeScene(width = SIDE, height = SIDE, density = Density(1f)) {
+            CompositionLocalProvider(LocalLayoutGraph provides graph, LocalWidgetRegistry provides registry) {
+                Column(Modifier.fillMaxSize().background(PAGE_COLOUR)) {
+                    SlotRenderer(surface, slot, Modifier.fillMaxWidth(), spacing = gap.dp)
+                    Box(Modifier.fillMaxWidth().height(40.dp).background(BLUE))
+                }
+            }
+        }
+        val image = try {
+            scene.render()
+        } finally {
+            scene.close()
+        }
+        return Frame(Bitmap.makeFromImage(image))
     }
 
     private class Registry(private val kinds: Map<WidgetKind, WidgetDescriptor>) : WidgetRegistry {

@@ -3,6 +3,7 @@ package hivens.launcher.smrt
 import hivens.core.api.HttpClientProvider
 import hivens.core.api.dto.smrt.SmrtBuildDiff
 import hivens.core.api.dto.smrt.SmrtManifestVersions
+import hivens.core.api.dto.smrt.SmrtModDetail
 import hivens.core.api.dto.smrt.SmrtPackListing
 import hivens.core.api.dto.smrt.SmrtPackManifest
 import hivens.core.api.dto.smrt.SmrtPackSummary
@@ -13,6 +14,7 @@ import hivens.core.net.metadataTimeout
 import io.ktor.client.request.get
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
+import io.ktor.http.HttpStatusCode
 import io.ktor.http.encodeURLParameter
 import io.ktor.http.isSuccess
 import kotlinx.coroutines.Dispatchers
@@ -145,6 +147,33 @@ class SmrtPackClient(
         val url = "$mirrorBase/v1/packs/$packId/diff?from=${from.encodeURLParameter()}&to=${to.encodeURLParameter()}"
         return getJson(url)
     }
+
+    /**
+     * The registry's page for the mod a jar with [sha1] belongs to, or null where
+     * the mirror has never seen the file.
+     *
+     * Uncached: asked once per visit to a file's page, and only for a file the
+     * catalogue could not name, so a cache would hold answers nobody asks twice.
+     */
+    suspend fun modByFile(sha1: String): SmrtModDetail? {
+        val url = "$mirrorBase/v1/mods/sha1:${sha1.encodeURLParameter()}"
+        val resp: HttpResponse = withContext(Dispatchers.IO) {
+            httpProvider.current.get(url) {
+                headers.append("User-Agent", USER_AGENT)
+                headers.append("Accept", "application/json")
+                metadataTimeout()
+            }
+        }
+        if (resp.status == HttpStatusCode.NotFound) return null
+        if (!resp.status.isSuccess()) {
+            val body = runCatching { resp.bodyAsText() }.getOrDefault("")
+            throw IOException("GET $url failed: ${resp.status} body=$body")
+        }
+        return withContext(Dispatchers.IO) { json.decodeFromString<SmrtModDetail>(resp.bodyAsText()) }
+    }
+
+    /** The icon the mirror reads out of a jar it holds, by the jar's [sha1]. Answers 404 where the jar carries none. */
+    fun jarIconUrl(sha1: String): String = "$mirrorBase/v1/cache/icon/$sha1"
 
     // On IO, request and decode both, so a caller may ask from the UI thread. A
     // settings pane or a crumb asking straight out of a composition decoded a whole

@@ -34,7 +34,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import hivens.core.api.dto.modrinth.ModrinthVersion
 import hivens.core.update.VersionChannel
 import hivens.ui.components.ChannelChip
 import hivens.ui.components.ReleaseNotes
@@ -72,7 +71,6 @@ internal fun ChangelogPane(
     LaunchedEffect(state, state.project) { state.loadVersions() }
 
     val all = state.versions
-    val entries = remember(all) { changelogEntries(all.orEmpty()) }
 
     // The same three refusals the versions tab makes, because both panes read the
     // same fetch. Without them a listing that failed left [all] null forever and
@@ -104,6 +102,13 @@ internal fun ChangelogPane(
         CenteredProgress(modifier.fillMaxSize())
         return
     }
+    // The mirror keeps releases and no notes for them: a log with nothing in it,
+    // said as such, rather than "the catalogue has no entry" over a file that has
+    // a page.
+    if (!state.knownToCatalogue && state.mirror != null) {
+        ChangelogList(emptyList(), modifier)
+        return
+    }
     if (!state.knownToCatalogue) {
         Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text(
@@ -118,6 +123,18 @@ internal fun ChangelogPane(
         CenteredProgress(modifier.fillMaxSize())
         return
     }
+    val builds = remember(all) { all.map { it.toBuild() } }
+    ChangelogList(builds, modifier)
+}
+
+/**
+ * Every build's notes in one column, newest first, the text of a repeat said once.
+ * Shared by the project page and the pack page.
+ */
+@Composable
+internal fun ChangelogList(builds: List<ProjectBuild>, modifier: Modifier = Modifier) {
+    val s = LocalStrings.current
+    val entries = remember(builds) { changelogEntries(builds) }
     if (entries.isEmpty()) {
         Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text(
@@ -139,7 +156,7 @@ internal fun ChangelogPane(
             contentPadding = PaddingValues(vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            items(entries, key = { it.version.id }) { entry -> ChangelogRow(entry) }
+            items(entries, key = { it.build.id }) { entry -> ChangelogRow(entry) }
         }
         NxVerticalScrollbar(
             adapter = rememberScrollbarAdapter(listState),
@@ -159,19 +176,19 @@ internal fun ChangelogPane(
  * of headers is followed by the thing they all say.
  */
 internal data class ChangelogEntry(
-    val version: ModrinthVersion,
+    val build: ProjectBuild,
     val channel: VersionChannel,
     val repeated: Boolean,
 )
 
 /** Builds with notes, newest first, each marked if an older one repeats it. */
-internal fun changelogEntries(versions: List<ModrinthVersion>): List<ChangelogEntry> {
+internal fun changelogEntries(versions: List<ProjectBuild>): List<ChangelogEntry> {
     val ordered = versions
         .filter { !it.changelog.isNullOrBlank() }
         .sortedByDescending { it.datePublished }
     return ordered.mapIndexed { index, v ->
         ChangelogEntry(
-            version = v,
+            build = v,
             channel = VersionChannel.of(v.versionType, v.versionNumber),
             repeated = ordered.drop(index + 1).any { it.changelog == v.changelog },
         )
@@ -180,7 +197,7 @@ internal fun changelogEntries(versions: List<ModrinthVersion>): List<ChangelogEn
 
 @Composable
 private fun ChangelogRow(entry: ChangelogEntry) {
-    val v = entry.version
+    val v = entry.build
     // Height from the tallest child, so the rule beside the notes can be as tall as
     // they are. Inside a lazy item the row's own max height is infinite, and
     // fillMaxHeight against infinity is zero: the rule was there all along and drew

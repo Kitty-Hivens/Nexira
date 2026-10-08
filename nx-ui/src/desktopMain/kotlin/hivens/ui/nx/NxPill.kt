@@ -1,5 +1,15 @@
 package hivens.ui.nx
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.style.TextDecoration
+import hivens.ui.theme.Motion
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -63,13 +73,29 @@ internal fun NxPill(
     onClick: (() -> Unit)? = null,
 ) {
     val shape = RoundedCornerShape(pillCorner)
+    val interaction = remember { MutableInteractionSource() }
+    val hovered by interaction.collectIsHoveredAsState()
+    val pressed by interaction.collectIsPressedAsState()
+    // A tag that leads somewhere says so the way a link does, with the underline
+    // under the pointer, and gives a little under the press the way the catalogue's
+    // own tag does. No ripple: a square wash over a pill this small is a smear.
+    val give by animateFloatAsState(if (pressed && onClick != null) PRESSED_SCALE else 1f, animationSpec = Motion.tap, label = "pillPress")
     Row(
         modifier = modifier
+            // The target outside the scale, so the press does not shrink the area
+            // it is measured against and a press at the edge is not lost to it.
+            .then(
+                if (onClick != null) {
+                    Modifier.hoverable(interaction).clickable(interactionSource = interaction, indication = null, onClick = onClick)
+                } else {
+                    Modifier
+                },
+            )
+            .graphicsLayer { scaleX = give; scaleY = give }
             .height(pillHeight)
             .clip(shape)
             .background(container)
             .then(if (border.alpha > 0f) Modifier.border(pillBorder, border, shape) else Modifier)
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(horizontal = pillPadding),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(pillGap),
@@ -84,6 +110,7 @@ internal fun NxPill(
             style      = MaterialTheme.typography.bodyMedium,
             color      = label,
             fontWeight = fontWeight,
+            textDecoration = if (hovered && onClick != null) TextDecoration.Underline else null,
             maxLines   = 1,
             // A caller that caps the shell's width means the label to yield, and a
             // hard clip yields by cutting a glyph in half. This says so instead.
@@ -109,3 +136,4 @@ private val pillPadding = 8.dp
 private val pillGap = 4.dp
 private val pillBorder = 1.dp
 private val dotSize = 7.dp
+private const val PRESSED_SCALE = 0.95f

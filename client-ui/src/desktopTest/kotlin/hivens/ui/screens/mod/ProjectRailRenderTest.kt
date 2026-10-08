@@ -90,7 +90,7 @@ class ProjectRailRenderTest {
             title = p.title,
             slug = p.slug,
             source = ProjectSource.Catalogue,
-            gameVersionLabels = foldGameVersions(p.gameVersions, gameVersions),
+            gameVersions = groupGameVersions(p.gameVersions, gameVersions),
             loaders = p.loaders,
             categories = p.categories + p.additionalCategories,
             clientSide = p.clientSide,

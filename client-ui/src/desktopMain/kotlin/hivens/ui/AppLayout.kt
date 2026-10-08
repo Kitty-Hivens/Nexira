@@ -20,7 +20,11 @@ import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import hivens.ui.nx.NxSwap
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.screens.*
+import hivens.ui.screens.browse.BrowseController
 import hivens.ui.screens.browse.BrowseScreen
+import hivens.ui.screens.browse.CataloguePackDetailScreen
+import hivens.ui.screens.browse.LocalCatalogueSearch
+import hivens.ui.screens.browse.rememberShellCatalogueSearch
 import hivens.ui.screens.detail.PackDetailScreen
 import hivens.ui.screens.detail.settings.PackSettingsCategory
 import hivens.ui.screens.detail.versions.PackVersionsScreen
@@ -31,6 +35,7 @@ import hivens.ui.theme.Plane
 import hivens.ui.theme.Backdrop
 import hivens.ui.theme.LocalPlane
 import hivens.ui.utils.GameConsoleService
+import hivens.ui.utils.releaseFocusOnPress
 import hivens.ui.widgets.about.AboutSurface
 import hivens.ui.widgets.bgsettings.BgSettingsSurface
 import hivens.ui.widgets.profile.ProfileSurface
@@ -87,6 +92,7 @@ fun AppLayout(
     onCustomizationChanged: (CustomizationSettings) -> Unit = {},
 ) {
     val protocolConfig: ServerProtocolConfig = koinInject()
+    val browse: BrowseController = koinInject()
 
     // Whoever signs in reports it upward, and the shell's own state is what comes
     // back down here -- so this is derived rather than held. It used to be a var
@@ -190,10 +196,19 @@ fun AppLayout(
                         onOpenPack = { pack ->
                             onScreenChange(Screen.CataloguePackDetail(pack.origin, pack.id))
                         },
+                        onOpenProject = { onScreenChange(Screen.ModDetail(it)) },
+                    )
+
+                    is Screen.BrowseInto -> BrowseScreen(
+                        onOpenPack = { pack ->
+                            onScreenChange(Screen.CataloguePackDetail(pack.origin, pack.id))
+                        },
+                        onOpenProject = { onScreenChange(Screen.ModDetail(it)) },
+                        intoInstanceId = screen.instanceId,
                     )
 
                     is Screen.CataloguePackDetail ->
-                        hivens.ui.screens.browse.CataloguePackDetailScreen(
+                        CataloguePackDetailScreen(
                             origin      = screen.origin,
                             packId      = screen.packId,
                             onBack      = onBack,
@@ -226,6 +241,10 @@ fun AppLayout(
                                 onScreenChange(Screen.PackVersions(screen.instanceId))
                             },
                             onOpenProject          = { onScreenChange(Screen.ModDetail(it)) },
+                            onFindProjects         = {
+                                browse.aimAt(screen.instanceId)
+                                onScreenChange(Screen.BrowseInto(screen.instanceId))
+                            },
                         )
 
                     is Screen.PackVersions ->
@@ -289,18 +308,20 @@ fun AppLayout(
         onOpenScreen           = onSwitchTab,
     ) {
         // Links that point at a project the launcher can draw stop going out to a
-        // browser from here down. Provided at the shell rather than per surface, so
-        // a markdown body and a rail widget follow the same rule.
+        // browser from here down, and a project's tags open the catalogue. Provided
+        // at the shell rather than per surface, so a markdown body, a page header and
+        // a rail widget follow the same rule.
         CompositionLocalProvider(
             LocalShellContext provides shellCtx,
             LocalHomeNewContext provides homeCtx,
             LocalLinkFollower provides rememberNavigatingLinkFollower(),
+            LocalCatalogueSearch provides rememberShellCatalogueSearch(onScreenChange),
             LocalPlane provides page,
         ) {
             SlotRenderer(
                 surface  = SurfaceId("appshell.root"),
                 slot     = SlotId("regions"),
-                modifier = Modifier.fillMaxSize().background(rowBackground),
+                modifier = Modifier.fillMaxSize().background(rowBackground).releaseFocusOnPress(),
             )
         }
     }
