@@ -18,9 +18,31 @@ verbatim and a hand-wrapped line becomes a staircase of breaks.
 
 ## [Unreleased]
 
-### Packs and playing
+### Browse
 
-Installing from a project page now takes the newest release that runs on your pack, not whichever build the catalogue happened to list first. Quilt packs take Fabric mods, and NeoForge 1.20.1 packs take Forge mods. While something is being installed, Play says so and waits, and nothing is installed into a pack whose game is running.
+Browse now finds mods, resource packs and shaders from Modrinth, not only packs.
+
+- **Filters** on the right work the way Modrinth's own do: game version, loader, categories, environment, licence, and, you know, all the rest of what's there. Chosen versions fold under the search into ranges like "1.20.x".
+- **Installing into a pack.** Pick a pack and its game version and loader become filters. What it already has can be hidden, and the button on a card installs straight into it. Find projects on the Content tab opens Browse already aimed at that pack.
+- **With no pack picked**, installing asks where to, shows for every pack whether it fits, and can make a new one for the project.
+- **Tags are clickable.** A category, loader or version on a project page opens Browse with that filter.
+
+### Installing mods
+
+Installing takes the newest release that runs on your pack, not whichever build the catalogue happened to list first. Quilt packs take Fabric mods, and NeoForge 1.20.1 packs take Forge mods.
+
+Required dependencies come along on their own, resource packs and shaders land in their own folders, and a new version of a mod replaces the old one instead of sitting next to it. If something didn't go in, the install says what and why, rather than pretending everything is fine. Files the pack put there itself are left alone: a pack update would only put them back.
+
+While something is being installed, Play says so and waits, and nothing is installed into a pack whose game is running.
+
+### Pages
+
+- A pack's page in Browse now works like a mod's: the same tabs, a versions table you can install any of them from, the changelog and the gallery, with the details in the right panel.
+- A mod Modrinth doesn't know gets its page from the Hivens mirror's registry: name, authors, dependencies and the packs it's in.
+
+### Small things
+
+Dropdowns across the launcher are redone: bigger rows, the current choice highlighted, and the button stays lit while its list is open. A small thing, but a nice one. For us, anyway.
 
 ## [2.4.6] - 2026-10-07
 
