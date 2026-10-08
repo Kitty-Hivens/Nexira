@@ -192,6 +192,12 @@ internal fun PackBrowse(
     origin: PackOrigin,
     query: String,
     onOpenPack: (CataloguePack) -> Unit,
+    /**
+     * Which of the listed packs are drawn, for a choice the source does not answer
+     * itself. The list underneath is kept whole, so taking the choice back shows
+     * what it hid without asking the source again.
+     */
+    shown: (CataloguePack) -> Boolean = { true },
 ) {
     val s = LocalStrings.current
     val registry: PackCatalogueRegistry = koinInject()
@@ -461,7 +467,16 @@ internal fun PackBrowse(
         BrowseState.Loading -> BrowseLoading()
         BrowseState.Empty   -> BrowseEmpty(onRetry = { retryTick++ })
         is BrowseState.Error -> BrowseError(message = st.message, onRetry = { retryTick++ })
-        is BrowseState.Loaded -> BrowseList(packs = st.packs, listState = listState, onOpenPack = onOpenPack)
+        is BrowseState.Loaded -> {
+            val visible = st.packs.filter(shown)
+            if (visible.isEmpty()) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(s.contentEmpty, style = MaterialTheme.typography.bodyMedium, color = NxInk.quiet)
+                }
+            } else {
+                BrowseList(packs = visible, listState = listState, onOpenPack = onOpenPack)
+            }
+        }
     }
 }
 

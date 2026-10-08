@@ -446,6 +446,19 @@ data class SmrtPackSummary(
     @SerialName("latest_channel") val latestChannel: String? = null,
     /** Curation tier (`official` / `community`). */
     val tier: String? = null,
+    /** The pack this one was forked from, by id, where it is a fork. */
+    @SerialName("fork_of") val forkOf: String? = null,
+)
+
+/**
+ * Wire shape of one entry of `GET /v1/community`: a published community pack and
+ * the login of the member who owns it, for the byline. The mirror resolves the
+ * login from the owner's account, so it is never the launcher's to look up.
+ */
+@Serializable
+data class SmrtCommunityPack(
+    val summary: SmrtPackSummary,
+    @SerialName("owner_login") val ownerLogin: String,
 )
 
 @Serializable

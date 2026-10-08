@@ -14,6 +14,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -44,6 +47,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import hivens.core.data.PackOrigin
 import hivens.launcher.catalogue.PackCatalogueRegistry
 import hivens.launcher.modrinth.FilterField
 import hivens.launcher.modrinth.SearchFilter
@@ -68,12 +72,14 @@ import hivens.ui.screens.browse.activeOrigin
 import hivens.ui.screens.browse.catalogueTypeOf
 import hivens.ui.screens.browse.choicesFor
 import hivens.ui.screens.browse.filterLabel
+import hivens.ui.screens.browse.originLabel
 import hivens.ui.screens.browse.title
 import hivens.ui.screens.mod.loaderLabel
 import hivens.ui.theme.Motion
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.Status
+import hivens.ui.widgets.RailBlock
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 import org.jetbrains.compose.resources.decodeToSvgPainter
@@ -144,6 +150,48 @@ fun BrowseInstalledFilterWidget(instance: WidgetInstance) {
     ) {
         Text(s.browseHideInstalled, style = MaterialTheme.typography.bodyMedium, color = NxInk.main, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
         NxSwitch(checked = c.hideInstalled, onCheckedChange = { c.hideInstalled = it })
+    }
+}
+
+/**
+ * Whose mirror packs are listed: the mirror's own, its community's, or both. Only
+ * there while packs are listed from the mirror, the one source with a community.
+ */
+@Widget(id = "browse.filter.builtBy", displayName = "widget.browse.filter.builtBy", surface = CARD)
+@Composable
+fun BrowseBuiltByFilterWidget(instance: WidgetInstance) {
+    val c: BrowseController = koinInject()
+    val registry: PackCatalogueRegistry = koinInject()
+    val s = LocalStrings.current
+    if (c.kind != null || activeOrigin(c.origin, registry.origins) != PackOrigin.Mirror) return
+    PuppetClick("browse.filter.builtBy.own") { c.mirrorOwn = !c.mirrorOwn }
+    PuppetClick("browse.filter.builtBy.community") { c.mirrorCommunity = !c.mirrorCommunity }
+    // Two tiles switched on and off rather than two switches: the same plane as the
+    // kind tiles above, so the rail reads as one set of controls, with the mark
+    // filling in for what is listed.
+    RailBlock(s.browseFilterBuiltBy) {
+        Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(TILE_GAP)) {
+            Box(Modifier.weight(1f).fillMaxHeight()) {
+                KindTile(
+                    label = originLabel(PackOrigin.Mirror),
+                    icon = NxIcon.Verified,
+                    selected = c.mirrorOwn,
+                    dimmed = false,
+                    onClick = { c.mirrorOwn = !c.mirrorOwn },
+                    glyphFill = true,
+                )
+            }
+            Box(Modifier.weight(1f).fillMaxHeight()) {
+                KindTile(
+                    label = s.browseFilterCommunity,
+                    icon = NxIcon.Groups,
+                    selected = c.mirrorCommunity,
+                    dimmed = false,
+                    onClick = { c.mirrorCommunity = !c.mirrorCommunity },
+                    glyphFill = true,
+                )
+            }
+        }
     }
 }
 

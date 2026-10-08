@@ -23,6 +23,13 @@ data class CataloguePack(
     val tags: List<String> = emptyList(),
     /** Target MC version when the source exposes one on a card (mirror); null otherwise. */
     val mcVersion: String? = null,
+    /**
+     * Built by a member of the source's community rather than by the source itself,
+     * listed beside its own packs. The mirror's community packs are the case.
+     */
+    val community: Boolean = false,
+    /** Who built it, for a byline on the card. Null where the source itself did. */
+    val author: String? = null,
 )
 
 /**

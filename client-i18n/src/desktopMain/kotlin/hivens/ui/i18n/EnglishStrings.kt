@@ -826,6 +826,8 @@ object EnglishStrings : AppStrings {
     override val browseFilterUnlock      = "Unlock filter"
     override val browseFilterRelock      = "Back to the pack's"
     override val browseHideInstalled     = "Hide installed"
+    override val browseFilterBuiltBy     = "Built by"
+    override val browseFilterCommunity   = "Community"
     override val browseFiltersClearAll   = "Clear all"
     override val browseInstallingInto    = "Installing into"
     override val browseLeaveTarget       = "Stop installing into this pack"
@@ -1482,6 +1484,7 @@ object EnglishStrings : AppStrings {
         "widget.browse.filter.license" to "Filter: license",
         "widget.browse.filter.exclusions" to "Filter: leave out",
         "widget.browse.filter.installed" to "Hide installed",
+        "widget.browse.filter.builtBy" to "Filter: built by",
         "widget.library.body.emptyText" to "Empty-state text",
         "widget.library.body.emptyTitle" to "Empty-state title",
         "widget.library.header" to "Library header",

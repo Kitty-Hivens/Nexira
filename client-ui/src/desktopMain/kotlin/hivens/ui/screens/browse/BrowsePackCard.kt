@@ -105,6 +105,16 @@ fun BrowsePackCard(
                         overflow   = TextOverflow.Ellipsis,
                         modifier   = Modifier.weight(1f, fill = false),
                     )
+                    // A community pack says whose it is, the way a project card does.
+                    pack.author?.let { author ->
+                        Text(
+                            text     = s.browseByAuthor(author),
+                            style    = MaterialTheme.typography.bodySmall,
+                            color    = Color.White.copy(alpha = 0.75f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                     SourceBadge(pack.origin)
                 }
                 // Mirror summaries sometimes ship tagline == name; don't echo the title.

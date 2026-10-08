@@ -208,7 +208,7 @@ fun BrowseResultsWidget(instance: WidgetInstance) {
     ) { (kind, from) ->
         val type = catalogueTypeOf(kind, from)
         if (type == null) {
-            PackBrowse(from, c.query, ctx.onOpenPack)
+            PackBrowse(from, c.query, ctx.onOpenPack, shown = c::shows)
         } else {
             ProjectResults(
                 type          = type,
@@ -442,7 +442,7 @@ fun BrowseScopeWidget(instance: WidgetInstance) {
     }
 }
 
-private val TILE_GAP = 6.dp
+internal val TILE_GAP = 6.dp
 
 private fun kindIcon(kind: ContentKind?): IconKey = when (kind) {
     null -> NxIcon.Inventory2
@@ -459,14 +459,19 @@ private fun originIcon(origin: PackOrigin): IconKey = when (origin) {
     PackOrigin.Unknown -> NxIcon.Language
 }
 
-/** One kind as a tile: its mark over its name, filled with the accent while chosen. */
+/**
+ * One choice as a tile: its mark over its name, filled with the accent while chosen.
+ * With [glyphFill] the mark fills in as it is chosen, for a tile that is switched on
+ * and off rather than picked from a set.
+ */
 @Composable
-private fun KindTile(
+internal fun KindTile(
     label: String,
     icon: IconKey,
     selected: Boolean,
     dimmed: Boolean,
     onClick: () -> Unit,
+    glyphFill: Boolean = false,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
@@ -496,6 +501,7 @@ private fun KindTile(
     // The chosen tile's mark rises a little, which is the one motion that says
     // "this one" without a second colour.
     val lift by animateFloatAsState(if (selected) 1f else 0f, animationSpec = Motion.emphasis, label = "tileLift")
+    val solid by animateFloatAsState(if (selected && glyphFill) 1f else 0f, animationSpec = Motion.emphasis, label = "tileGlyphFill")
     val shape = MaterialTheme.shapes.medium
     Column(
         Modifier
@@ -512,7 +518,7 @@ private fun KindTile(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(5.dp, Alignment.CenterVertically),
     ) {
-        Symbol(icon, contentDescription = null, tint = ink, size = 22.dp, modifier = Modifier.offset(y = (-2).dp * lift))
+        Symbol(icon, contentDescription = null, tint = ink, fill = solid, size = 22.dp, modifier = Modifier.offset(y = (-2).dp * lift))
         Text(
             label,
             style = MaterialTheme.typography.labelLarge,

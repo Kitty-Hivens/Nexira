@@ -55,6 +55,7 @@ import hivens.core.smrt.ModIconResolver
 import hivens.core.api.dto.modrinth.ModrinthProject
 import hivens.core.api.dto.modrinth.ModrinthSearchResponse
 import hivens.core.api.dto.modrinth.ModrinthVersion
+import hivens.core.api.dto.smrt.SmrtCommunityPack
 import hivens.core.api.dto.smrt.SmrtPackListing
 import hivens.core.api.dto.smrt.SmrtPackManifest
 import hivens.core.api.dto.smrt.SmrtPackSummary
@@ -86,6 +87,7 @@ import hivens.launcher.curseforge.CurseForgeZipInstaller
 import hivens.launcher.cache.ModrinthCaches
 import hivens.launcher.cache.ModIconCaches
 import hivens.launcher.cache.ModIconLookups
+import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
 import hivens.core.api.dto.smrt.SmrtManifestVersions
 import hivens.launcher.cache.SmrtPackCaches
@@ -985,6 +987,13 @@ private fun Scope.smrtPackCaches(): SmrtPackCaches {
         summary = f.create("pack-summary", SmrtPackSummary.serializer(), CacheConfig(ttlMs = 10 * min, staleTtlMs = day)),
         manifest = f.create("pack-manifest", SmrtPackManifest.serializer(), CacheConfig(ttlMs = 10 * min, staleTtlMs = 7 * day)),
         versions = f.create("pack-versions", SmrtManifestVersions.serializer(), CacheConfig(ttlMs = 5 * min, staleTtlMs = day)),
+        // Stored even when empty: unlike the official listing, a mirror with no
+        // community packs yet is the ordinary answer and not a glitch to wait out.
+        community = f.create(
+            "pack-community",
+            ListSerializer(SmrtCommunityPack.serializer()),
+            CacheConfig(ttlMs = 5 * min, staleTtlMs = 30 * day),
+        ),
     )
 }
 

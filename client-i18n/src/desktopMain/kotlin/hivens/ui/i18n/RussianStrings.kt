@@ -869,6 +869,8 @@ object RussianStrings : AppStrings {
     override val browseFilterUnlock      = "Открыть фильтр"
     override val browseFilterRelock      = "Вернуть как у пака"
     override val browseHideInstalled     = "Скрыть установленное"
+    override val browseFilterBuiltBy     = "Кто собрал"
+    override val browseFilterCommunity   = "Сообщество"
     override val browseFiltersClearAll   = "Сбросить всё"
     override val browseInstallingInto    = "Ставим в"
     override val browseLeaveTarget       = "Не ставить в этот пак"
@@ -1537,6 +1539,7 @@ object RussianStrings : AppStrings {
         "widget.browse.filter.license" to "Фильтр: лицензия",
         "widget.browse.filter.exclusions" to "Фильтр: исключения",
         "widget.browse.filter.installed" to "Скрыть установленное",
+        "widget.browse.filter.builtBy" to "Фильтр: кто собрал",
         "widget.library.body.emptyText" to "Текст пустого состояния",
         "widget.library.body.emptyTitle" to "Заголовок пустого состояния",
         "widget.library.header" to "Шапка библиотеки",

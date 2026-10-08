@@ -2,6 +2,7 @@ package hivens.launcher.smrt
 
 import hivens.core.api.HttpClientProvider
 import hivens.core.api.dto.smrt.SmrtBuildDiff
+import hivens.core.api.dto.smrt.SmrtCommunityPack
 import hivens.core.api.dto.smrt.SmrtManifestVersions
 import hivens.core.api.dto.smrt.SmrtModDetail
 import hivens.core.api.dto.smrt.SmrtPackListing
@@ -61,7 +62,7 @@ class SmrtPackClient(
      * screen opening turns into an unconditional round trip.
      */
     suspend fun fetchManifest(packId: String, forceRefresh: Boolean): SmrtPackManifest {
-        val url = "$mirrorBase/v1/packs/$packId/manifest"
+        val url = "${packUrl(packId)}/manifest"
         return caches.manifest.read(url, forceRefresh) { getJson(url) }
     }
 
@@ -77,7 +78,7 @@ class SmrtPackClient(
     override suspend fun fetchManifestVersion(packId: String, version: String): SmrtPackManifest {
         // Same cache as the latest endpoint, keyed by the version-pinned URL; a
         // pinned historical manifest is immutable so it stays a warm cache hit.
-        val url = "$mirrorBase/v1/packs/$packId/manifest/$version"
+        val url = "${packUrl(packId)}/manifest/${version.encodeURLParameter()}"
         return caches.manifest.get(url) { getJson(url) }
     }
 
@@ -86,7 +87,7 @@ class SmrtPackClient(
 
     /** The pack summary. See [fetchManifest] for what [forceRefresh] costs. */
     suspend fun fetchSummary(packId: String, forceRefresh: Boolean): SmrtPackSummary {
-        val url = "$mirrorBase/v1/packs/$packId"
+        val url = packUrl(packId)
         return caches.summary.read(url, forceRefresh) { getJson(url) }
     }
 
@@ -107,12 +108,27 @@ class SmrtPackClient(
     }
 
     /**
+     * The published community packs, each with its owner's login. Listed apart from
+     * [listPacks], which is the official catalogue alone.
+     */
+    suspend fun listCommunity(forceRefresh: Boolean = false): List<SmrtCommunityPack> {
+        val url = "$mirrorBase/v1/community"
+        return caches.community.read(url, forceRefresh) { getJson(url) }
+    }
+
+    /** Stale-then-fresh view of [listCommunity], as [packsStream] is of [listPacks]. */
+    fun communityStream(): Flow<List<SmrtCommunityPack>> {
+        val url = "$mirrorBase/v1/community"
+        return caches.community.flow(url) { getJson(url) }.map { it.value }
+    }
+
+    /**
      * The per-build listing the mirror retains for a pack, newest first. The
      * server order is canonical (publish-date across channels); callers must
      * not re-sort by version tuples.
      */
     suspend fun listBuilds(packId: String, forceRefresh: Boolean = false): SmrtManifestVersions {
-        val url = "$mirrorBase/v1/packs/$packId/manifest/versions"
+        val url = "${packUrl(packId)}/manifest/versions"
         return caches.versions.read(url, forceRefresh) { getJson(url) }
     }
 
@@ -123,7 +139,7 @@ class SmrtPackClient(
      * version screen ends up missing the newest builds until it is reopened.
      */
     fun buildsStream(packId: String): Flow<SmrtManifestVersions> {
-        val url = "$mirrorBase/v1/packs/$packId/manifest/versions"
+        val url = "${packUrl(packId)}/manifest/versions"
         return caches.versions.flow(url) { getJson(url) }.map { it.value }
     }
 
@@ -133,9 +149,10 @@ class SmrtPackClient(
      * manifest. Version-pinned manifests are immutable and stay cached.
      */
     suspend fun invalidatePack(packId: String) {
-        caches.summary.invalidate("$mirrorBase/v1/packs/$packId")
-        caches.versions.invalidate("$mirrorBase/v1/packs/$packId/manifest/versions")
-        caches.manifest.invalidate("$mirrorBase/v1/packs/$packId/manifest")
+        val pack = packUrl(packId)
+        caches.summary.invalidate(pack)
+        caches.versions.invalidate("$pack/manifest/versions")
+        caches.manifest.invalidate("$pack/manifest")
     }
 
     /**
@@ -144,7 +161,7 @@ class SmrtPackClient(
      * (from, to) pair is immutable but the pair space is wide and reads are rare.
      */
     override suspend fun fetchDiff(packId: String, from: String, to: String): SmrtBuildDiff {
-        val url = "$mirrorBase/v1/packs/$packId/diff?from=${from.encodeURLParameter()}&to=${to.encodeURLParameter()}"
+        val url = "${packUrl(packId)}/diff?from=${from.encodeURLParameter()}&to=${to.encodeURLParameter()}"
         return getJson(url)
     }
 
@@ -171,6 +188,14 @@ class SmrtPackClient(
         }
         return withContext(Dispatchers.IO) { json.decodeFromString<SmrtModDetail>(resp.bodyAsText()) }
     }
+
+    /**
+     * Where [packId]'s reads start. The id is one path segment and is encoded as
+     * one: a community pack's id is namespaced by its owner, `u/<uid>/<name>`, and
+     * its slashes taken as path separators asked the mirror for a route it does
+     * not have.
+     */
+    private fun packUrl(packId: String): String = "$mirrorBase/v1/packs/${packId.encodeURLParameter()}"
 
     /** The icon the mirror reads out of a jar it holds, by the jar's [sha1]. Answers 404 where the jar carries none. */
     fun jarIconUrl(sha1: String): String = "$mirrorBase/v1/cache/icon/$sha1"

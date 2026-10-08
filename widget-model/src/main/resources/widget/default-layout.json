@@ -454,6 +454,10 @@
                       "instance_id": "browse-scope-default"
                     },
                     {
+                      "kind": "browse.filter.builtBy",
+                      "instance_id": "browse-filter-builtby-default"
+                    },
+                    {
                       "kind": "browse.filter.installed",
                       "instance_id": "browse-filter-installed-default"
                     },

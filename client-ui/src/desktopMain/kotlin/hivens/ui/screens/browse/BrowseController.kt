@@ -169,6 +169,23 @@ class BrowseController {
     /** Leaves out what the target pack already holds. */
     var hideInstalled by mutableStateOf(false)
 
+    /** Lists the mirror's own packs. See [shows]. */
+    var mirrorOwn by mutableStateOf(true)
+
+    /** Lists the packs the mirror's community built. See [shows]. */
+    var mirrorCommunity by mutableStateOf(true)
+
+    /**
+     * Whether a pack is listed under the reader's choice of who built it. The choice
+     * is the mirror's, the one source that lists a community beside its own packs,
+     * so a pack from any other source is always listed.
+     */
+    internal fun shows(pack: CataloguePack): Boolean = when {
+        pack.origin != PackOrigin.Mirror -> true
+        pack.community -> mirrorCommunity
+        else -> mirrorOwn
+    }
+
     /**
      * Fields the reader has taken out of the target pack's hands. Cleared whenever
      * the target changes, because an unlocked game version is a decision about one

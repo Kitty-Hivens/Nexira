@@ -154,6 +154,24 @@ class BrowseRenderTest {
         }
     }
 
+    @Test
+    fun `mirror pack cards, its own and its community's`() {
+        sheet("browse-pack-cards-mirror", width = 900, height = 340) {
+            Caption("свой пак зеркала и пак сообщества с подписью владельца")
+            BrowsePackCard(
+                CataloguePack(PackOrigin.Mirror, "industrial", "Industrial", "Тяжёлая промышленность.", tags = listOf("tech"), mcVersion = "1.12.2"),
+                onClick = {},
+            )
+            BrowsePackCard(
+                CataloguePack(
+                    PackOrigin.Mirror, "u/7/cozy", "Cozy Valley", "Фермы, уют и ни одного крипера.",
+                    tags = listOf("farming"), mcVersion = "1.21.1", community = true, author = "alex",
+                ),
+                onClick = {},
+            )
+        }
+    }
+
     // ── The rail ─────────────────────────────────────────────────────
 
     private val local = PackInstance(
@@ -273,7 +291,8 @@ class BrowseRenderTest {
             "browse-rail-mods-into" to { controller.kind = ContentKind.Mod; controller.targetId = local.id; controller.resolved = target },
             "browse-rail-resourcepacks" to { controller.kind = ContentKind.ResourcePack; controller.targetId = null; controller.resolved = null },
             "browse-rail-packs-mirror" to { controller.kind = null; controller.origin = PackOrigin.Mirror },
-            "browse-rail-packs-modrinth" to { controller.kind = null; controller.origin = PackOrigin.Modrinth },
+            "browse-rail-packs-mirror-own" to { controller.mirrorCommunity = false },
+            "browse-rail-packs-modrinth" to { controller.kind = null; controller.origin = PackOrigin.Modrinth; controller.mirrorCommunity = true },
         ).forEach { (name, arrange) ->
             arrange()
             sheet(name, width = 340, height = 1200, padded = false) { Rail() }

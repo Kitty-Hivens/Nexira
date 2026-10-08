@@ -150,6 +150,7 @@ class WidgetRegistryConsistencyTest {
             "browse.installing",
             "browse.chips",
             "browse.filter.installed",
+            "browse.filter.builtBy",
             "browse.filter.version",
             "browse.filter.loader",
             "browse.filter.categories",

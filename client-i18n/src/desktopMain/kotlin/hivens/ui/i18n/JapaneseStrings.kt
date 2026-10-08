@@ -878,6 +878,8 @@ object JapaneseStrings : AppStrings {
     override val browseFilterUnlock      = "フィルターを解除"
     override val browseFilterRelock      = "パックに合わせる"
     override val browseHideInstalled     = "インストール済みを隠す"
+    override val browseFilterBuiltBy     = "作成者"
+    override val browseFilterCommunity   = "コミュニティ"
     override val browseFiltersClearAll   = "すべてクリア"
     override val browseInstallingInto    = "インストール先"
     override val browseLeaveTarget       = "このパックへのインストールをやめる"
@@ -1530,6 +1532,7 @@ object JapaneseStrings : AppStrings {
         "widget.browse.filter.license" to "フィルター: ライセンス",
         "widget.browse.filter.exclusions" to "フィルター: 除外",
         "widget.browse.filter.installed" to "インストール済みを隠す",
+        "widget.browse.filter.builtBy" to "フィルター: 作成者",
         "widget.library.body.emptyText" to "空のときの文",
         "widget.library.body.emptyTitle" to "空のときの見出し",
         "widget.library.header" to "ライブラリの見出し",

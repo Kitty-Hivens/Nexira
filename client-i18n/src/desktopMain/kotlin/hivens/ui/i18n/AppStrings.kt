@@ -940,6 +940,10 @@ interface AppStrings {
     val browseFilterUnlock: String
     val browseFilterRelock: String
     val browseHideInstalled: String
+
+    /** The rail block that picks whose mirror packs are listed: the mirror's own, its community's, or both. */
+    val browseFilterBuiltBy: String
+    val browseFilterCommunity: String
     val browseFiltersClearAll: String
     /** The header over the search while the catalogue installs into one pack. */
     val browseInstallingInto: String
