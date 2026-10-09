@@ -5,6 +5,8 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import hivens.ui.nx.NxIconButton
 import androidx.compose.foundation.layout.Arrangement
@@ -520,6 +522,7 @@ internal fun SearchField(
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
     var focused by remember { mutableStateOf(false) }
+    val field = remember { FocusRequester() }
     val edge by animateColorAsState(
         when {
             focused -> NxColor.lead()
@@ -551,7 +554,7 @@ internal fun SearchField(
                 singleLine    = true,
                 textStyle     = MaterialTheme.typography.bodyLarge.copy(color = NxInk.main),
                 cursorBrush   = SolidColor(NxColor.lead()),
-                modifier      = Modifier.weight(1f).hoverable(interaction).onFocusChanged { focused = it.isFocused },
+                modifier      = Modifier.weight(1f).hoverable(interaction).focusRequester(field).onFocusChanged { focused = it.isFocused },
             ) { inner ->
                 Row(
                     modifier          = Modifier
@@ -579,9 +582,14 @@ internal fun SearchField(
                     }
                 }
             }
-            // Clearing is one click, the way the catalogue's own field does it.
+            // Clearing is one click, the way the catalogue's own field does it, and
+            // the caret goes back to the field: the press handed focus to a button
+            // that the clear then removes, and the next keys went nowhere.
             AnimatedVisibility(visible = value.isNotEmpty(), enter = Motion.tap.enter, exit = Motion.tap.exit) {
-                NxIconButton(icon = NxIcon.Close, contentDescription = null, onClick = { onValueChange("") })
+                NxIconButton(icon = NxIcon.Close, contentDescription = null, onClick = {
+                    onValueChange("")
+                    field.requestFocus()
+                })
             }
             trailing?.let {
                 Spacer(Modifier.width(8.dp))
