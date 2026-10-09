@@ -7,7 +7,10 @@ import hivens.launcher.modrinth.ENV_CLIENT
 import hivens.launcher.modrinth.ENV_SERVER
 import hivens.launcher.modrinth.FilterField
 import hivens.launcher.modrinth.SearchFilter
+import hivens.ui.Screen
 import hivens.ui.feature.catalogue.project.Environment
+import hivens.ui.feature.catalogue.project.ModTarget
+import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -116,5 +119,40 @@ class CatalogueSearchTest {
         c.searchFor("mod", setOf(SearchFilter(FilterField.Category, "magic")), packId = null)
         assertNull(c.targetId, "a page with no pack behind it aims at none")
         assertTrue(c.unlocked.isEmpty())
+    }
+
+    /** The lists can take seconds, and the search waits on the shell's scope, not the page's. */
+    @Test
+    fun `a tag search does not take the reader away from where they went while it waited`() = runBlocking {
+        val c = BrowseController()
+        c.query = "sodium"
+        var screen: Screen = Screen.ModDetail(ModTarget.Catalogue("sodium"))
+        val opened = mutableListOf<Screen>()
+
+        searchFromTag(
+            c, "mod", ProjectTag.Category("optimization"), packId = null,
+            known = { screen = Screen.Library; tags },
+            currentScreen = { screen },
+            onScreenChange = { opened += it },
+        )
+
+        assertEquals(emptyList(), opened)
+        assertEquals("sodium", c.query, "Browse's own question is left as it was")
+    }
+
+    @Test
+    fun `a tag search opens Browse when the reader is still on the page`() = runBlocking {
+        val c = BrowseController()
+        val opened = mutableListOf<Screen>()
+
+        searchFromTag(
+            c, "mod", ProjectTag.Category("optimization"), packId = null,
+            known = { tags },
+            currentScreen = { Screen.ModDetail(ModTarget.Catalogue("sodium")) },
+            onScreenChange = { opened += it },
+        )
+
+        assertEquals(listOf<Screen>(Screen.Browse), opened)
+        assertEquals(setOf(SearchFilter(FilterField.Category, "optimization")), c.chosenFor("mod"))
     }
 }

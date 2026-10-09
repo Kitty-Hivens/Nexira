@@ -5,6 +5,7 @@ import androidx.compose.runtime.ProvidableCompositionLocal
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import hivens.launcher.instance.ContentKind
 import hivens.launcher.modrinth.ENV_CLIENT
 import hivens.launcher.modrinth.ENV_SERVER
@@ -56,20 +57,46 @@ val LocalCatalogueSearch: ProvidableCompositionLocal<CatalogueSearch?> = composi
  * showed chosen in the wrong group.
  */
 @Composable
-fun rememberShellCatalogueSearch(onScreenChange: (Screen) -> Unit): CatalogueSearch {
+fun rememberShellCatalogueSearch(currentScreen: Screen, onScreenChange: (Screen) -> Unit): CatalogueSearch {
     val c: BrowseController = koinInject()
     val tags: BrowseTags = koinInject()
     val scope = rememberCoroutineScope()
+    val screen = rememberUpdatedState(currentScreen)
     return remember(c, tags, onScreenChange, scope) {
         CatalogueSearch { type, tag, packId ->
             scope.launch {
-                val known = if (tag is ProjectTag.Category) tags.await(TAGS_PATIENCE) else tags.tags.value
-                val filters = filtersFor(tag, type, known) ?: return@launch
-                c.searchFor(type, filters, packId)
-                onScreenChange(Screen.Browse)
+                searchFromTag(
+                    c, type, tag, packId,
+                    known = { if (it is ProjectTag.Category) tags.await(TAGS_PATIENCE) else tags.tags.value },
+                    currentScreen = { screen.value },
+                    onScreenChange = onScreenChange,
+                )
             }
         }
     }
+}
+
+/**
+ * Turns a clicked [tag] into Browse's question and opens Browse on it, unless the
+ * reader has gone somewhere else while the lists were on their way. The wait runs
+ * on the shell's scope, which outlives the page, and a search that landed seconds
+ * later took the reader away from wherever they had gone since.
+ */
+internal suspend fun searchFromTag(
+    c: BrowseController,
+    type: String,
+    tag: ProjectTag,
+    packId: String?,
+    known: suspend (ProjectTag) -> BrowseTags.Tags?,
+    currentScreen: () -> Screen,
+    onScreenChange: (Screen) -> Unit,
+) {
+    val from = currentScreen()
+    val tags = known(tag)
+    if (currentScreen() != from) return
+    val filters = filtersFor(tag, type, tags) ?: return
+    c.searchFor(type, filters, packId)
+    onScreenChange(Screen.Browse)
 }
 
 /** How long a tag waits for the catalogue's lists before it searches without them. */

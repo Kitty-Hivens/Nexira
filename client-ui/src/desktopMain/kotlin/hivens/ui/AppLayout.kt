@@ -315,7 +315,7 @@ fun AppLayout(
             LocalShellContext provides shellCtx,
             LocalHomeNewContext provides homeCtx,
             LocalLinkFollower provides rememberNavigatingLinkFollower(),
-            LocalCatalogueSearch provides rememberShellCatalogueSearch(onScreenChange),
+            LocalCatalogueSearch provides rememberShellCatalogueSearch(currentScreen, onScreenChange),
             LocalPlane provides page,
         ) {
             SlotRenderer(
