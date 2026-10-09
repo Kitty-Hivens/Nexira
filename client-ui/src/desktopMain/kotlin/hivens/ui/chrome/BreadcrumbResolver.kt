@@ -12,6 +12,7 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.feature.catalogue.browse.BrowseSession
 import hivens.ui.feature.catalogue.browse.catalogueTargetKey
 import hivens.ui.feature.catalogue.project.ModTarget
+import hivens.ui.feature.catalogue.project.OpenProject
 import hivens.ui.feature.catalogue.project.OpenProjectState
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.model.screen
@@ -106,10 +107,18 @@ private fun modCrumb(target: ModTarget): String {
     val state: OpenProjectState = koinInject()
     val open by state.open.collectAsState()
     val names by state.names.collectAsState()
-    return open?.takeIf { it.targetKey == target.key }?.title
+    return modCrumbLabel(target, open, names)
+}
+
+/**
+ * Only an answer is a name. A page still waiting publishes the route's own id as
+ * its title, and taken from there it covered the name a visit before had left in
+ * [names] until the page had heard back.
+ */
+internal fun modCrumbLabel(target: ModTarget, open: OpenProject?, names: Map<String, String>): String =
+    open?.takeIf { it.targetKey == target.key && !it.pending }?.title
         ?: names[target.key]
         ?: modFallbackLabel(target)
-}
 
 /**
  * A catalogue pack's title, from what its page published or last read, the way a
