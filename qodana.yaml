@@ -37,20 +37,15 @@ exclude:
   # pragmatic floor.
   - name: AssignedValueIsNeverRead
   #
-  # Kotlin flow analysis in the 2025.2 linter regressed against the Kotlin 2.4.0
-  # toolchain (0a22579): KotlinUnreachableCode flagged ordinary control flow -- a
-  # `?: return`, an if/else assignment, a `when` over an enum -- as unreachable,
-  # and KotlinConstantConditions called a platform-typed comparison "always
-  # false". Spot-checked the flagged sites (WorldScanner, SkinRepository,
-  # RuntimeProvisioner's offline asset-index reuse, ConsoleWindow's severity
-  # `when`); every one is reachable and correct.
-  #
-  # Both exclusions predate the 2026.2 linter and have NOT been re-evaluated
-  # against it -- the reason to lift them is a clean report from the new
-  # analysis, not the version bump on its own. Whoever reads the first 2026.2
-  # report should drop these and see what comes back.
-  - name: KotlinUnreachableCode
-  - name: KotlinConstantConditions
+  # Kotlin 2.5's move to name-based destructuring. Every short form `val (a, b)`
+  # whose names are not the component properties is reported, which here is a
+  # couple of hundred sites (Pair, IndexedValue, Map.Entry, our own data classes)
+  # that all destructure in the order their names say. Each was traced to its
+  # producer and none is a swap. The compiler's own name mismatch check is off by
+  # default, and the language version that turns it on fails this build on every
+  # site at once through allWarningsAsErrors, so leaving these out hides nothing.
+  - name: DestructingShortFormNameMismatch
+  - name: CustomComponentDestructuringMigration
   #
   # Historically also excluded: UnusedAssignment, UnusedSymbol,
   # HasPlatformType. Removed 2026-05-17 -- they were muted because an
@@ -67,8 +62,17 @@ exclude:
 # so we point the project (and thus Gradle's JVM) at the mounted 27 to resolve toolchain(27) locally.
 projectJDK: /root/.jdks/jdk
 
-#Execute shell command before Qodana execution (Applied in CI/CD pipeline)
-#bootstrap: sh ./prepare-qodana.sh
+# Generated sources the analysis reads but the Gradle import does not produce:
+# the Compose resource accessors of client-ui and nx-ui (`Res`), client-ui's
+# BuildConfig and the widget registry KSP writes. Without them every file that
+# names one is analysed around unresolved references, which the report lists as
+# sanity problems. A failure here is not allowed to fail the scan: the comment the
+# scan posts is what the release workflow's review gate reads.
+bootstrap: >-
+  JAVA_HOME=/root/.jdks/jdk ./gradlew --no-daemon -q
+  :client-ui:prepareKotlinIdeaImport :nx-ui:prepareKotlinIdeaImport
+  :client-ui:generateDesktopMainBuildConfigClasses :client-ui:kspKotlinDesktop
+  || echo "qodana bootstrap: generated sources not produced, analysing without them"
 
 #Install IDE plugins before Qodana execution (Applied in CI/CD pipeline)
 #plugins:
