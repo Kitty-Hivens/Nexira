@@ -132,9 +132,11 @@ fun ModDetailScreen(
     // A tab with nothing behind it is not drawn, which is what the reference does:
     // a project with no shots has no gallery to open, and a tab that leads to an
     // empty pane is a click that tells the reader nothing they could not have been
-    // told by its absence.
-    LaunchedEffect(gallery, tab) {
-        if (gallery.isEmpty() && tab == ModPageTab.Gallery) tab = ModPageTab.Description
+    // told by its absence. Asked once the page has loaded: before that every page
+    // has no shots, and a Gallery tab restored on the way back was reset to
+    // Description on the first frame.
+    LaunchedEffect(gallery, tab, state.loading) {
+        if (!state.loading && gallery.isEmpty() && tab == ModPageTab.Gallery) tab = ModPageTab.Description
     }
     LaunchedEffect(state, reloadTick) { state.load() }
 

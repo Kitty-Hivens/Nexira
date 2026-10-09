@@ -663,7 +663,10 @@ class ModDetailState(
         // away a fact the file had already handed us.
         val m = mirror
         val folded = when {
+            // Unfolded rather than unknown when the catalogue's version list could not
+            // be read: the project still names the versions it runs on.
             p != null -> groupGameVersions(p.gameVersions, versionTags())
+                .ifEmpty { p.gameVersions.map { GameVersionGroup(it, listOf(it)) } }
             m != null -> groupGameVersions(m.detail.mcVersions, versionTags())
                 .ifEmpty { m.detail.mcVersions.map { GameVersionGroup(it, listOf(it)) } }
             else -> local?.gameVersions.orEmpty().filter { it.isNotBlank() }.map { GameVersionGroup(it, listOf(it)) }
