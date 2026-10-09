@@ -160,9 +160,8 @@ internal fun ModVersionBody(
     val s = LocalStrings.current
     val installScope = project.installScope
     NxSurface(SurfaceKind.Panel, modifier = modifier) {
-        val v = build.version
-        when {
-            project.failed || build.failed -> RetryStateBlock(
+        when (buildPageView(project, build)) {
+            BuildPageView.Failed -> RetryStateBlock(
                 title = s.modVersionFailed,
                 message = s.modPageVersionsFailedBody,
                 retryLabel = s.contentTabRetry,
@@ -170,26 +169,41 @@ internal fun ModVersionBody(
                 modifier = Modifier.fillMaxSize().padding(20.dp),
                 titleStyle = MaterialTheme.typography.titleMedium,
             )
-            // Loaded, and nothing to ask about: the file the page was opened on has
-            // gone since (updated, removed), or the catalogue has no entry for it.
-            // Without this the page waited for a build nobody would ever ask for.
-            !project.loading && project.project == null -> Box(Modifier.fillMaxSize().padding(20.dp), contentAlignment = Alignment.Center) {
+            BuildPageView.NoEntry -> Box(Modifier.fillMaxSize().padding(20.dp), contentAlignment = Alignment.Center) {
                 Text(s.modPageVersionsNoEntry, style = MaterialTheme.typography.bodyMedium, color = NxInk.quiet)
             }
-            project.loading || build.loading || v == null -> CenteredProgress(Modifier.fillMaxSize())
-            else -> Column(
-                modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(SECTION_GAP),
-            ) {
-                BuildHeader(v, project, installScope)
-                HorizontalDivider(color = NxColor.wash(NxInk.line, 0.25f))
-                Compatibility(v, project)
-                Dependencies(build, project.packId)
-                Changes(v)
-                Files(v)
+            BuildPageView.Loading -> CenteredProgress(Modifier.fillMaxSize())
+            BuildPageView.Ready -> build.version?.let { v ->
+                Column(
+                    modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(SECTION_GAP),
+                ) {
+                    BuildHeader(v, project, installScope)
+                    HorizontalDivider(color = NxColor.wash(NxInk.line, 0.25f))
+                    Compatibility(v, project)
+                    Dependencies(build, project.packId)
+                    Changes(v)
+                    Files(v)
+                }
             }
         }
     }
+}
+
+/** What a build's page shows: a retry, that there is nothing to ask about, a spinner, or the build. */
+internal enum class BuildPageView { Failed, NoEntry, Loading, Ready }
+
+/**
+ * Which of the four the page is in. A page whose project has loaded with no
+ * catalogue entry has no build to ask for: the file it was opened on has gone since,
+ * or the catalogue never knew it. Before this was its own state, the page waited
+ * on a spinner for a build nobody would ever ask for.
+ */
+internal fun buildPageView(project: ModDetailState, build: ModVersionState): BuildPageView = when {
+    project.failed || build.failed -> BuildPageView.Failed
+    !project.loading && project.project == null -> BuildPageView.NoEntry
+    project.loading || build.loading || build.version == null -> BuildPageView.Loading
+    else -> BuildPageView.Ready
 }
 
 /**
@@ -292,8 +306,7 @@ private fun Compatibility(v: ModrinthVersion, project: ModDetailState) {
             // own block: a build listing eleven minors says `1.21.x` there and must
             // not spell all eleven out here.
             val groups = remember(v, project.gameVersionTags) {
-                groupGameVersions(v.gameVersions, project.gameVersionTags)
-                    .ifEmpty { v.gameVersions.map { GameVersionGroup(it, listOf(it)) } }
+                gameVersionChips(v.gameVersions, project.gameVersionTags)
             }
             Chips {
                 groups.forEach {

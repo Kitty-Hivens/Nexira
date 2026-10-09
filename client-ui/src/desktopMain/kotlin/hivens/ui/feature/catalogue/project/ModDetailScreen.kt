@@ -136,7 +136,7 @@ fun ModDetailScreen(
     // has no shots, and a Gallery tab restored on the way back was reset to
     // Description on the first frame.
     LaunchedEffect(gallery, tab, state.loading) {
-        if (!state.loading && gallery.isEmpty() && tab == ModPageTab.Gallery) tab = ModPageTab.Description
+        tab = tabOnceLoaded(tab, state.loading, noGallery = gallery.isEmpty())
     }
     LaunchedEffect(state, reloadTick) { state.load() }
 
@@ -231,6 +231,14 @@ internal fun ProjectPageBody(page: ProjectPage, modifier: Modifier = Modifier) {
 
 /** Which pane the page is showing. */
 internal enum class ModPageTab { Description, Versions, Changelog, Gallery }
+
+/**
+ * The tab to show once the page knows what it has: a Gallery tab on a project with
+ * no shots goes back to Description. Asked only after loading, because until then
+ * every project has no shots and a Gallery tab restored on the way back was lost.
+ */
+internal fun tabOnceLoaded(tab: ModPageTab, loading: Boolean, noGallery: Boolean): ModPageTab =
+    if (!loading && noGallery && tab == ModPageTab.Gallery) ModPageTab.Description else tab
 
 @Composable
 internal fun Body(state: ModDetailState, onRetry: () -> Unit) {

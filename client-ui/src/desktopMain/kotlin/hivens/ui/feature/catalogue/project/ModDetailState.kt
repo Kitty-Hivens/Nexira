@@ -66,12 +66,14 @@ class ModDetailState(
      * What puts a build into the pack, from the app's graph. Null on a page stood up
      * without an application behind it, which then offers no install.
      */
-    private val installer: ModInstaller? = null,
+    installer: ModInstaller? = null,
     /**
      * Who to ask about a file the catalogue cannot name. Null on a page stood up
      * without an application behind it, which then keeps the archive's own word.
      */
     private val mirrorLookup: MirrorLookup? = null,
+    /** How the page installs and asks what a pack holds, [installer] unless a test stands in for it. */
+    private val pageInstall: PageInstall? = installer?.let(::InstallerPageInstall),
 ) {
     /**
      * Written by [load] and read by the page.
@@ -141,6 +143,19 @@ class ModDetailState(
      * fits, and a retry through it put a different build in than the one that failed.
      */
     private var chosenBuild: ModrinthVersion? = null
+
+    /** What the page needs of an installer: put a build into a pack, and say what a pack holds. */
+    interface PageInstall {
+        suspend fun install(dir: Path, version: ModrinthVersion, mc: String, loader: String): ModInstaller.Outcome
+        suspend fun presentProjects(dir: Path): Set<String>
+    }
+
+    private class InstallerPageInstall(private val installer: ModInstaller) : PageInstall {
+        override suspend fun install(dir: Path, version: ModrinthVersion, mc: String, loader: String) =
+            installer.install(dir, version, mc, loader)
+
+        override suspend fun presentProjects(dir: Path) = installer.presentProjects(dir)
+    }
 
     /** One project an install left out: its name, and the reason. */
     class LeftOut(val title: String, val skip: ContentInstaller.Skip)
@@ -291,7 +306,7 @@ class ModDetailState(
      * a no-op download.
      */
     private suspend fun resolveInstall(projectId: String): InstallAction {
-        val installer = installer ?: return InstallAction.None
+        val installer = pageInstall ?: return InstallAction.None
         val pack = resolveDestination() ?: return if (target is ModTarget.Catalogue) InstallAction.Choose else InstallAction.None
         val present = withContext(Dispatchers.IO) {
             runCatching { installer.presentProjects(pack.dir) }
@@ -412,7 +427,7 @@ class ModDetailState(
      * the first frame instead of growing one under the reader's hands.
      */
     val installPossible: Boolean
-        get() = target is ModTarget.Catalogue && installer != null
+        get() = target is ModTarget.Catalogue && pageInstall != null
 
     /** The pack behind the page: the one the reader came from, or the one the file sits in. */
     val packId: String?
@@ -434,7 +449,7 @@ class ModDetailState(
      */
     suspend fun installVersion(version: ModrinthVersion) {
         if (installing) return
-        val installer = installer ?: return
+        val installer = pageInstall ?: return
         val pack = resolveDestination() ?: return
         chosenBuild = version
         installing = true
@@ -470,7 +485,7 @@ class ModDetailState(
         val action = install
         if (action !is InstallAction.Install || installing) return
         val projectId = project?.id ?: return
-        val installer = installer ?: return
+        val installer = pageInstall ?: return
 
         chosenBuild = null
         installing = true
@@ -665,10 +680,8 @@ class ModDetailState(
         val folded = when {
             // Unfolded rather than unknown when the catalogue's version list could not
             // be read: the project still names the versions it runs on.
-            p != null -> groupGameVersions(p.gameVersions, versionTags())
-                .ifEmpty { p.gameVersions.map { GameVersionGroup(it, listOf(it)) } }
-            m != null -> groupGameVersions(m.detail.mcVersions, versionTags())
-                .ifEmpty { m.detail.mcVersions.map { GameVersionGroup(it, listOf(it)) } }
+            p != null -> gameVersionChips(p.gameVersions, versionTags())
+            m != null -> gameVersionChips(m.detail.mcVersions, versionTags())
             else -> local?.gameVersions.orEmpty().filter { it.isNotBlank() }.map { GameVersionGroup(it, listOf(it)) }
         }
         open.publish(

@@ -72,7 +72,6 @@ import hivens.ui.puppet.PuppetScreen
 import hivens.ui.render.MarkdownHtml
 import hivens.ui.feature.catalogue.project.BuildsTable
 import hivens.ui.feature.catalogue.project.ChangelogList
-import hivens.ui.feature.catalogue.project.GameVersionGroup
 import hivens.ui.feature.catalogue.project.HeaderStat
 import hivens.ui.feature.catalogue.project.OpenProject
 import hivens.ui.feature.catalogue.project.OpenProjectState
@@ -82,7 +81,7 @@ import hivens.ui.feature.catalogue.project.ProjectLink
 import hivens.ui.feature.catalogue.project.ProjectLinkKind
 import hivens.ui.feature.catalogue.project.ProjectSource
 import hivens.ui.feature.catalogue.project.compactCount
-import hivens.ui.feature.catalogue.project.groupGameVersions
+import hivens.ui.feature.catalogue.project.gameVersionChips
 import hivens.ui.feature.catalogue.project.rememberLinkFollower
 import hivens.ui.feature.catalogue.project.toBuild
 import hivens.ui.surface.NxSurface
@@ -564,8 +563,7 @@ internal fun openPackOf(
         slug = d.slug ?: d.id,
         source = ProjectSource.Catalogue,
         projectType = d.projectType,
-        gameVersions = groupGameVersions(d.gameVersions, gameVersionTags)
-            .ifEmpty { d.gameVersions.map { GameVersionGroup(it, listOf(it)) } },
+        gameVersions = gameVersionChips(d.gameVersions, gameVersionTags),
         loaders = d.loaders,
         categories = d.tags,
         clientSide = d.clientSide,

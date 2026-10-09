@@ -637,8 +637,7 @@ private fun VersionTableRow(
         // run says "that one" by pointing at it, rather than opening a panel and
         // finding the same word in a list.
         val groups = remember(b, gameVersionTags) {
-            groupGameVersions(b.gameVersions, gameVersionTags)
-                .ifEmpty { b.gameVersions.map { GameVersionGroup(it, listOf(it)) } }
+            gameVersionChips(b.gameVersions, gameVersionTags)
         }
         ChipColumn(
             title = s.versionsColumnGameVersion,

@@ -42,6 +42,15 @@ data class GameVersionGroup(val label: String, val versions: List<String>)
 fun foldGameVersions(supported: List<String>, all: List<ModrinthGameVersion>): List<String> =
     groupGameVersions(supported, all).map { it.label }
 
+/**
+ * [groupGameVersions], or each version a chip of its own when [all] is not to hand.
+ * Folding needs the catalogue's list for the order only, and a project whose list
+ * could not be read still names the versions it runs on: an empty block there said
+ * it runs on none.
+ */
+fun gameVersionChips(supported: List<String>, all: List<ModrinthGameVersion>): List<GameVersionGroup> =
+    groupGameVersions(supported, all).ifEmpty { supported.map { GameVersionGroup(it, listOf(it)) } }
+
 fun groupGameVersions(supported: List<String>, all: List<ModrinthGameVersion>): List<GameVersionGroup> {
     if (supported.isEmpty() || all.isEmpty()) return emptyList()
 
