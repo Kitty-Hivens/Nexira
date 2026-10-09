@@ -33,43 +33,40 @@ class SurfaceFamilies {
     fun activeIn(surface: SurfaceId): FamilyId = active[surface] ?: FamilyId.GENERAL
 
     /**
-     * How many screens currently want [surface] off its general family.
+     * Which screens currently want [surface] on which family, oldest first.
      *
-     * Not snapshot-backed: nothing renders from it, it only decides when [active]
-     * may be cleared. Written from composition effects, which run on one thread.
+     * Not snapshot-backed: nothing renders from it, it only decides what [active]
+     * holds. Written from composition effects, which run on one thread.
      */
-    private val claims = mutableMapOf<SurfaceId, Int>()
+    private val claims = mutableMapOf<SurfaceId, LinkedHashMap<Any, FamilyId>>()
 
     /**
-     * Shows [family] on [surface], until as many [reset] calls come back.
+     * Shows [family] on [surface] for [owner], until [owner] gives it up.
      *
-     * Counted, because two screens that want the same family OVERLAP: the shell
-     * animates between them, so the arriving one switches before the leaving one
-     * is disposed. An unconditional reset then took the family down a frame after
-     * it had been put up, and the rail beside an open project page fell back to
-     * showing the news.
+     * Per owner, because two screens OVERLAP: the shell animates between them, so
+     * the arriving one switches before the leaving one is disposed. A Back taken
+     * inside that fade keeps the screen it returns to and never runs its effects
+     * again, so the leaving one's reset has to hand [surface] back to the family of
+     * whoever is still mounted rather than to the general one or to its own.
      */
-    fun switch(surface: SurfaceId, family: FamilyId) {
-        if (family == FamilyId.GENERAL) {
-            reset(surface)
-            return
-        }
-        active[surface] = family
-        claims[surface] = (claims[surface] ?: 0) + 1
+    fun switch(surface: SurfaceId, family: FamilyId, owner: Any) {
+        val held = claims.getOrPut(surface) { LinkedHashMap() }
+        held.remove(owner)
+        held[owner] = family
+        show(surface, held)
     }
 
-    /**
-     * Gives up one claim, and puts [surface] back to its general family with the
-     * last of them.
-     */
-    fun reset(surface: SurfaceId) {
-        val remaining = (claims[surface] ?: 0) - 1
-        if (remaining > 0) {
-            claims[surface] = remaining
-            return
-        }
-        claims.remove(surface)
-        active.remove(surface)
+    /** Gives up [owner]'s claim on [surface], which then shows the newest claim left. */
+    fun reset(surface: SurfaceId, owner: Any) {
+        val held = claims[surface] ?: return
+        held.remove(owner)
+        if (held.isEmpty()) claims.remove(surface)
+        show(surface, held)
+    }
+
+    private fun show(surface: SurfaceId, held: Map<Any, FamilyId>) {
+        val family = held.values.lastOrNull()
+        if (family == null || family == FamilyId.GENERAL) active.remove(surface) else active[surface] = family
     }
 
     /** Every surface currently off its general family, for diagnostics and the editor. */

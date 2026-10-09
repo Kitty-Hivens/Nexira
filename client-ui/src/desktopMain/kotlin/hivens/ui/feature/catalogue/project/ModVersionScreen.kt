@@ -126,10 +126,10 @@ fun ModVersionScreen(
     }
 
     DisposableEffect(project) {
-        families.switch(RIGHT_RAIL_SURFACE, RailFamily.PROJECT_VIEW)
+        families.switch(RIGHT_RAIL_SURFACE, RailFamily.PROJECT_VIEW, project)
         project.claim()
         onDispose {
-            families.reset(RIGHT_RAIL_SURFACE)
+            families.reset(RIGHT_RAIL_SURFACE, project)
             project.clear()
         }
     }

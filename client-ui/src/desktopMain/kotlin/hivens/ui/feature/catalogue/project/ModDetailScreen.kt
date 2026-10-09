@@ -144,10 +144,10 @@ fun ModDetailScreen(
     // to the composition rather than to navigation so every way out -- Back, a
     // link, a crash recovery remount -- puts the rail back the same way.
     DisposableEffect(state) {
-        families.switch(RIGHT_RAIL_SURFACE, RailFamily.PROJECT_VIEW)
+        families.switch(RIGHT_RAIL_SURFACE, RailFamily.PROJECT_VIEW, state)
         state.claim()
         onDispose {
-            families.reset(RIGHT_RAIL_SURFACE)
+            families.reset(RIGHT_RAIL_SURFACE, state)
             state.clear()
         }
     }

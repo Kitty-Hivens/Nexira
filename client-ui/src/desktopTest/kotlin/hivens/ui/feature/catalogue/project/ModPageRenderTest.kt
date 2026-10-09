@@ -212,7 +212,7 @@ class ModPageRenderTest {
         val registry = WidgetDataRegistry().apply {
             register(Sources.OpenProject, flowSource(MutableStateFlow<OpenProject?>(railProject)))
         }
-        val families = SurfaceFamilies().apply { switch(rail, FamilyId("projectView")) }
+        val families = SurfaceFamilies().apply { switch(rail, FamilyId("projectView"), owner = Unit) }
 
         CompositionLocalProvider(
             LocalLayoutGraph provides DefaultLayout.load(),

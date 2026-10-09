@@ -116,9 +116,12 @@ fun BrowseScreen(
     val dataDir: Path = koinInject()
     val families = LocalSurfaceFamilies.current
 
-    DisposableEffect(Unit) {
-        families.switch(RIGHT_RAIL_SURFACE, RailFamily.BROWSE)
-        onDispose { families.reset(RIGHT_RAIL_SURFACE) }
+    // This visit, as the family's owner, so a page leaving over it hands the rail
+    // back to Browse rather than to whatever it showed itself.
+    val railOwner = remember { Any() }
+    DisposableEffect(railOwner) {
+        families.switch(RIGHT_RAIL_SURFACE, RailFamily.BROWSE, railOwner)
+        onDispose { families.reset(RIGHT_RAIL_SURFACE, railOwner) }
     }
 
     // The pack is the screen's own subject, so it is the target whenever the screen

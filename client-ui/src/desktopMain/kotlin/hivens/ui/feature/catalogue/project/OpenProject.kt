@@ -159,30 +159,44 @@ data class OpenProject(
  * animates between pages, so for a moment two are mounted, and the one leaving
  * still has loads in flight. Each answer it published used to land on the rail
  * the arriving page had just filled, and its clear on the way out wiped it. Only
- * the owner's [publish] and [release] are taken now. The owner is the page itself,
+ * the owner's [publish] reaches the rail now. The owner is the page itself,
  * compared by identity, so two visits to one project are two owners.
+ *
+ * Every page that claimed is remembered with what it last published, until it
+ * releases. A Back taken inside the fade keeps the page it returns to and never
+ * runs its effects again, so it cannot claim a second time: the page leaving
+ * hands the rail back to it on release instead of emptying it.
  */
 class OpenProjectState {
     private val _open = MutableStateFlow<OpenProject?>(null)
     val open: StateFlow<OpenProject?> = _open.asStateFlow()
 
-    private var owner: Any? = null
+    /** The pages mounted, oldest first, each with what it last published. The last one owns the rail. */
+    private val pages = LinkedHashMap<Any, OpenProject?>()
+
+    private val owner: Any? get() = pages.keys.lastOrNull()
 
     /** Makes [page] the one the rail describes. Called as the page comes on screen. */
     fun claim(page: Any) = synchronized(this) {
-        owner = page
+        val published = pages.remove(page)
+        pages[page] = published
     }
 
-    /** Shows [project] for [page], when [page] still owns the rail. */
+    /** Keeps [project] as [page]'s, and shows it when [page] owns the rail. */
     fun publish(page: Any, project: OpenProject?) = synchronized(this) {
+        if (page !in pages) return@synchronized
+        pages[page] = project
         if (owner === page) _open.value = project
     }
 
-    /** Takes the rail down on [page]'s way out, unless another page has claimed it since. */
+    /**
+     * Forgets [page] on its way out. The rail goes to the page still mounted under
+     * it when [page] owned it, and comes down when none is.
+     */
     fun release(page: Any) = synchronized(this) {
-        if (owner !== page) return@synchronized
-        owner = null
-        _open.value = null
+        val owned = owner === page
+        pages.remove(page)
+        if (owned) _open.value = owner?.let { pages[it] }
     }
 
     private val _names = MutableStateFlow<Map<String, String>>(emptyMap())

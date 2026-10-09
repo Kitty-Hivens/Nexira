@@ -209,10 +209,10 @@ fun CataloguePackDetailScreen(
     // and what this one still publishes on its way out is dropped.
     val railOwner = remember(targetKey) { Any() }
     DisposableEffect(railOwner) {
-        families.switch(RIGHT_RAIL_SURFACE, RailFamily.PROJECT_VIEW)
+        families.switch(RIGHT_RAIL_SURFACE, RailFamily.PROJECT_VIEW, railOwner)
         openProject.claim(railOwner)
         onDispose {
-            families.reset(RIGHT_RAIL_SURFACE)
+            families.reset(RIGHT_RAIL_SURFACE, railOwner)
             openProject.release(railOwner)
         }
     }

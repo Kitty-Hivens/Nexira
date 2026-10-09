@@ -130,7 +130,7 @@ class ProjectRailRenderTest {
         // and an unswitched holder answers "general" -- which has no modData slot,
         // so every block silently rendered nothing. Which is also exactly what the
         // rail does on screen for a family nobody switched to.
-        val families = SurfaceFamilies().apply { switch(surface, FamilyId("projectView")) }
+        val families = SurfaceFamilies().apply { switch(surface, FamilyId("projectView"), owner = Unit) }
         CompositionLocalProvider(
             LocalLayoutGraph provides DefaultLayout.load(),
             LocalWidgetRegistry provides GeneratedWidgetRegistry,

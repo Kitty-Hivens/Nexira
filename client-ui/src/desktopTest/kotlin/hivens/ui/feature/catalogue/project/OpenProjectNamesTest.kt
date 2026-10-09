@@ -41,6 +41,31 @@ class OpenProjectNamesTest {
         assertEquals("Iris", state.open.value?.title)
     }
 
+    /**
+     * Back inside the fade keeps the page it returns to, so that page never claims
+     * again. The one leaving used to take the rail down with it and leave the page
+     * on screen beside an empty rail.
+     */
+    @Test
+    fun `a page leaving over the one under it gives the rail back to that one`() {
+        val state = OpenProjectState()
+        val under = Any()
+        val over = Any()
+        state.claim(under)
+        state.publish(under, project("a", "Sodium"))
+        state.claim(over)
+        state.publish(over, project("b", "Iris"))
+        // Published while the other page held the rail: kept, not shown.
+        state.publish(under, project("a", "Sodium, loaded"))
+        assertEquals("Iris", state.open.value?.title)
+
+        state.release(over)
+
+        assertEquals("Sodium, loaded", state.open.value?.title)
+        state.release(under)
+        assertNull(state.open.value)
+    }
+
     @Test
     fun `two visits to one project are two owners`() {
         val state = OpenProjectState()
