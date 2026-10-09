@@ -293,6 +293,29 @@ class InstanceContentScanner(
     }
 
     /**
+     * The mod ids [file] declares for itself, from its own manifests, and not those
+     * of the jars nested in it. Empty for an archive with no manifest it can read.
+     *
+     * What tells a mod apart from another copy of it published elsewhere. The nested
+     * ids are left out on purpose: a mod that bundles a library is not that library,
+     * and reading it as one would turn down an install over a file it merely carries.
+     */
+    fun ownModIds(file: Path): Set<String> = runCatching {
+        openSharedZip(file).use { zip ->
+            val neoforge = zip.readEntry("META-INF/neoforge.mods.toml")
+            val forge = if (neoforge == null) zip.readEntry("META-INF/mods.toml") else null
+            listOfNotNull(
+                neoforge?.let { forgeIdentity(uncomment(it), "neoforge") { null }.first },
+                forge?.let { forgeIdentity(uncomment(it), "forge") { null }.first },
+                zip.readEntry("fabric.mod.json")?.let { runCatching { fabricIdentity(json.parseToJsonElement(it.decodeToString()).jsonObject).first }.getOrNull() },
+                zip.readEntry("quilt.mod.json")?.let { q ->
+                    runCatching { json.parseToJsonElement(q.decodeToString()).jsonObject["quilt_loader"]?.jsonObject?.let(::quiltIdentity)?.first }.getOrNull()
+                },
+            ).flatten().mapTo(HashSet()) { it.id.lowercase() }
+        }
+    }.getOrDefault(emptySet())
+
+    /**
      * The ids the jars nested one level inside [zip] provide: Fabric's
      * `META-INF/jars/` and Forge's `META-INF/jarjar/`. A nested jar that cannot be
      * read provides nothing rather than failing the archive around it.

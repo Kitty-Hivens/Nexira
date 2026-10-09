@@ -843,6 +843,7 @@ object RussianStrings : AppStrings {
     override val installSkipNotAttempted = "Не пробовали: основная загрузка не прошла"
     override val installSkipTooDeep      = "Слишком глубоко в цепочке зависимостей"
     override val installSkipPackOwned    = "Файл самого пака, обновление вернёт его"
+    override val installSkipSwitchedOff  = "Есть в паке, но выключен, включите его"
     override val browseRailFind        = "Что ищем"
     override val browseRailSource      = "Источник"
     override val browseSearchMods      = "Поиск модов"

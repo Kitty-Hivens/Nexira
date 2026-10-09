@@ -92,6 +92,9 @@ class ContentInstaller(
     /** One installs per instance at a time. A second click waits its turn instead of racing the first for a name. */
     private val turns = ConcurrentHashMap<String, Mutex>()
 
+    /** Reads a downloaded jar's own mod ids. No cache: a scratch file is not a row anyone lists. */
+    private val probe = InstanceContentScanner()
+
     /** A file to fetch and where it goes. [replaces] is the file of the same project it takes the place of. */
     data class Step(
         val version: ModrinthVersion,
@@ -148,6 +151,14 @@ class ContentInstaller(
          * the pack would hold two builds of one mod.
          */
         data class PackOwned(override val projectId: String, val ref: ContentRef) : Skip
+
+        /**
+         * A required dependency the pack carries only switched off, at [ref]. Counted
+         * as present, the mod went in beside a library no loader reads and failed at
+         * launch with nothing said. It is left as the player set it and named, since
+         * turning it on is their call.
+         */
+        data class SwitchedOff(override val projectId: String?, val ref: ContentRef) : Skip
     }
 
     /** What an install will do: the files in order, head first, and what it leaves out. */
@@ -157,6 +168,14 @@ class ContentInstaller(
         val skipped: List<Skip>,
         /** Projects the pack carried when the plan was made. */
         val present: Set<String>,
+        /**
+         * Every mod id the pack's files put in the game, lowercased, to a file that
+         * provides it, one that is on where there is one. What a downloaded dependency
+         * is held to before it is placed, see [apply].
+         */
+        val providers: Map<String, ContentRef> = emptyMap(),
+        /** The mod ids among [providers] that only a switched-off file provides. */
+        val providedOff: Set<String> = emptySet(),
     )
 
     /** One file that landed. */
@@ -227,7 +246,12 @@ class ContentInstaller(
         // record on disk, and a resource pack it ships comes back on its next sync
         // or repair however it was replaced.
         val packFiles = destination.packFiles ?: recorded
-        val present = snapshot.projects.toMutableSet()
+        // A dependency is present when a file of it is on. One only switched off is
+        // named rather than counted: the loader reads none of it.
+        val present = snapshot.entries.filter { it.enabled }.mapNotNullTo(HashSet()) { it.projectId }
+        val switchedOff = snapshot.entries
+            .filter { !it.enabled && it.projectId != null && it.projectId !in present }
+            .associateBy { it.projectId!! }
         val planned = mutableSetOf<String>()
         val steps = mutableListOf<Step>()
         val skipped = mutableListOf<Skip>()
@@ -260,6 +284,10 @@ class ContentInstaller(
                 }
                 val file = v.primaryFile()
                 val same = snapshot.withSha1(file.hashes.sha1)
+                if (same != null && !isHead && !same.enabled) {
+                    skipped += Skip.SwitchedOff(v.projectId, same.ref)
+                    continue
+                }
                 if (same != null) {
                     // Already there, under whatever name. Its dependencies are still
                     // walked: a mod put in by hand often came without them.
@@ -281,9 +309,14 @@ class ContentInstaller(
                 }
                 for (dep in v.dependencies) {
                     val id = dep.projectId ?: continue
-                    if (dep.dependencyType == "required" && (id in present || id in planned)) skipped += Skip.Present(id)
+                    if (dep.dependencyType != "required") continue
+                    val off = switchedOff[id]
+                    when {
+                        id in present || id in planned -> skipped += Skip.Present(id)
+                        off != null -> skipped += Skip.SwitchedOff(id, off.ref)
+                    }
                 }
-                for (dep in requiredDependencies(v, present + planned)) {
+                for (dep in requiredDependencies(v, present + planned + switchedOff.keys)) {
                     // The last level follows nothing further, so what it needs is
                     // named here instead of being asked about and then dropped.
                     if (level == depth) {
@@ -300,7 +333,14 @@ class ContentInstaller(
             frontier = next
             level++
         }
-        return Plan(destination, steps, skipped.distinct(), snapshot.projects)
+        val providers = HashMap<String, ContentRef>()
+        for (e in snapshot.entries.sortedByDescending { it.enabled }) for (id in e.provides) providers.putIfAbsent(id, e.ref)
+        val providedOn = snapshot.entries.filter { it.enabled }.flatMapTo(HashSet()) { it.provides }
+        return Plan(
+            destination, steps, skipped.distinct(), snapshot.projects,
+            providers = providers,
+            providedOff = providers.keys - providedOn,
+        )
     }
 
     private sealed interface Resolved {
@@ -334,14 +374,16 @@ class ContentInstaller(
         val landed = mutableListOf<Landed>()
         val skipped = plan.skipped.toMutableList()
         for ((i, step) in plan.steps.withIndex()) {
-            if (fetchAndPut(dir, step)) {
-                landed += Landed(step.projectId, ContentRef(step.kind, step.fileName))
-                continue
-            }
-            skipped += Skip.Failed(step.projectId, step.fileName)
-            if (step.head) {
-                plan.steps.drop(i + 1).forEach { skipped += Skip.NotAttempted(it.projectId) }
-                break
+            when (val put = fetchAndPut(dir, step, plan)) {
+                Put.Landed -> landed += Landed(step.projectId, ContentRef(step.kind, step.fileName))
+                is Put.AlreadyProvided -> skipped += put.skip
+                Put.Failed -> {
+                    skipped += Skip.Failed(step.projectId, step.fileName)
+                    if (step.head) {
+                        plan.steps.drop(i + 1).forEach { skipped += Skip.NotAttempted(it.projectId) }
+                        break
+                    }
+                }
             }
         }
         val present = plan.present + landed.map { it.projectId } +
@@ -352,7 +394,26 @@ class ContentInstaller(
         return Result.Done(landed, skipped.filterNot { it.projectId in landedIds }, present)
     }
 
-    private suspend fun fetchAndPut(dir: Path, step: Step): Boolean {
+    /** What one step came to. */
+    private sealed interface Put {
+        data object Landed : Put
+        data object Failed : Put
+
+        /** A dependency whose mod is already in the pack under another file, see [fetchAndPut]. */
+        data class AlreadyProvided(val skip: Skip) : Put
+    }
+
+    /**
+     * Fetches [step] to scratch and puts it in place.
+     *
+     * A dependency is held to the mod ids the pack's files already put in the game
+     * first. The catalogue identifies a file by its bytes, so the same library built
+     * elsewhere, a CurseForge copy or one put in by hand, read as absent, and a
+     * second copy went in beside it. Two files of one mod id and the loader refuses
+     * to start. The build asked for is not held to this: replacing what is there is
+     * what was asked.
+     */
+    private suspend fun fetchAndPut(dir: Path, step: Step, plan: Plan): Put {
         val file = step.version.primaryFile()
         // Inside the try: a folder that cannot take a scratch file (a full disk, a
         // file where the folder should be) is this step failing, and thrown out of
@@ -361,8 +422,20 @@ class ContentInstaller(
         return try {
             scratch = newContentScratch(dir.resolve(step.kind.folderName()))
             modrinth.downloadTo(file.url, scratch, file.hashes.sha1)
+            if (!step.head && step.kind == ContentKind.Mod) {
+                val own = withContext(Dispatchers.IO) { probe.ownModIds(scratch) }
+                val id = own.firstOrNull { it in plan.providers }
+                if (id != null) {
+                    withContext(Dispatchers.IO) { runCatching { Files.deleteIfExists(scratch) } }
+                    val by = plan.providers.getValue(id)
+                    log.info("not installing {}: {} already puts mod {} in the game", step.fileName, by.fileName, id)
+                    return Put.AlreadyProvided(
+                        if (id in plan.providedOff) Skip.SwitchedOff(step.projectId, by) else Skip.Present(step.projectId),
+                    )
+                }
+            }
             val old = step.replaces
-            when {
+            val placed = when {
                 old != null && old.ref.kind == step.kind ->
                     manager.replace(dir, step.kind, old.ref.fileName, scratch, step.fileName, enabled = old.enabled)
                 else -> {
@@ -374,13 +447,14 @@ class ContentInstaller(
                     placed
                 }
             }
+            if (placed) Put.Landed else Put.Failed
         } catch (e: CancellationException) {
             scratch?.let { s -> withContext(NonCancellable + Dispatchers.IO) { runCatching { Files.deleteIfExists(s) } } }
             throw e
         } catch (e: Exception) {
             log.warn("installing {} failed: {}", step.fileName, e.message)
             scratch?.let { s -> withContext(Dispatchers.IO) { runCatching { Files.deleteIfExists(s) } } }
-            false
+            Put.Failed
         }
     }
 

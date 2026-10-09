@@ -29,12 +29,17 @@ class InstalledIndex(
 ) {
     private val log = LoggerFactory.getLogger(InstalledIndex::class.java)
 
-    /** One file: where it is, its bytes by hash, the build it is when the catalogue knows, and whether it is on. */
+    /**
+     * One file: where it is, its bytes by hash, the build it is when the catalogue
+     * knows, whether it is on, and the mod ids it puts in the game, nested jars
+     * included, lowercased.
+     */
     data class Entry(
         val ref: ContentRef,
         val sha1: String,
         val version: ModrinthVersion?,
         val enabled: Boolean,
+        val provides: Set<String> = emptySet(),
     ) {
         val projectId: String? get() = version?.projectId
     }
@@ -99,7 +104,9 @@ class InstalledIndex(
     /** The instance's content files with their hashes, and whether every one was seen and hashed. */
     private class Hashed(val files: List<Pair<InstalledContent, String>>, val complete: Boolean) {
         fun snapshot(complete: Boolean, versionOf: (String) -> ModrinthVersion?) = Snapshot(
-            entries = files.map { (c, hash) -> Entry(ContentRef(c.kind, c.fileName), hash, versionOf(hash), c.enabled) },
+            entries = files.map { (c, hash) ->
+                Entry(ContentRef(c.kind, c.fileName), hash, versionOf(hash), c.enabled, c.provides.mapTo(HashSet()) { it.id.lowercase() })
+            },
             complete = complete,
         )
     }

@@ -282,6 +282,81 @@ class ModInstallerTest {
         assertEquals(listOf(head.primaryFile().url), c.fetched.toList(), "nothing but the clicked build is downloaded")
     }
 
+    /**
+     * Counted as present, the mod went in beside a library no loader reads and the
+     * game failed naming it, with nothing said at install.
+     */
+    @Test
+    fun `a dependency the pack carries only switched off is named, not fetched, and left as it is`() = runTest {
+        val c = Catalogue()
+        val curios = c.publish("curios", "curios-1")
+        val head = c.publish("ars", "ars-1", deps = listOf(requires("curios")))
+        val p = pack()
+        put(p, "mods", "curios-1.jar.disabled", c.body(curios))
+
+        val outcome = c.install(p, head)
+
+        assertTrue(outcome.ok)
+        assertEquals(listOf("curios"), outcome.missing, "the mod that needs it will not start, so it is reported")
+        assertTrue(outcome.skips.any { it is ContentInstaller.Skip.SwitchedOff && it.projectId == "curios" }, "${outcome.skips}")
+        assertEquals(setOf("ars-1.jar", "curios-1.jar.disabled"), files(p.dir), "the player's switch is theirs")
+        assertEquals(listOf(head.primaryFile().url), c.fetched.toList())
+    }
+
+    /** A jar that is a Fabric mod by its own manifest, for the checks that read one. */
+    private fun fabricJar(id: String, marker: String, nested: Pair<String, String>? = null): ByteArray {
+        val out = ByteArrayOutputStream()
+        ZipOutputStream(out).use { z ->
+            z.putNextEntry(ZipEntry("fabric.mod.json"))
+            z.write("""{"schemaVersion":1,"id":"$id","version":"1"}""".toByteArray())
+            z.closeEntry()
+            z.putNextEntry(ZipEntry("marker.txt"))
+            z.write(marker.toByteArray())
+            z.closeEntry()
+            nested?.let { (inner, innerId) ->
+                z.putNextEntry(ZipEntry("META-INF/jars/$inner"))
+                z.write(fabricJar(innerId, "nested"))
+                z.closeEntry()
+            }
+        }
+        return out.toByteArray()
+    }
+
+    /**
+     * The library is there as a build the catalogue does not know, a CurseForge
+     * copy or one put in by hand, so its bytes identify nothing. A second copy of the
+     * same mod id beside it is a game that refuses to start.
+     */
+    @Test
+    fun `a dependency already in the pack as another file of the same mod is not added twice`() = runTest {
+        val c = Catalogue()
+        c.publish("curios", "curios-2", body = fabricJar("curios", "modrinth build"))
+        val head = c.publish("ars", "ars-1", deps = listOf(requires("curios")))
+        val p = pack()
+        put(p, "mods", "curios-forge-edition.jar", fabricJar("curios", "curseforge build"))
+
+        val outcome = c.install(p, head)
+
+        assertTrue(outcome.ok)
+        assertEquals(setOf("ars-1.jar", "curios-forge-edition.jar"), files(p.dir))
+        assertTrue(outcome.missing.isEmpty(), "${outcome.missing}")
+        assertTrue(files(p.dir).none { it.startsWith(".nexira-update-") }, "the download is not left behind")
+    }
+
+    /** A mod that bundles a library is not that library. */
+    @Test
+    fun `a dependency that carries a library the pack has is still installed`() = runTest {
+        val c = Catalogue()
+        c.publish("tech-core", "core-1", body = fabricJar("techcore", "core", nested = "lib.jar" to "sharedlib"))
+        val head = c.publish("tech", "tech-1", deps = listOf(requires("tech-core")))
+        val p = pack()
+        put(p, "mods", "sharedlib.jar", fabricJar("sharedlib", "the pack's copy"))
+
+        val outcome = c.install(p, head)
+
+        assertEquals(listOf("tech-1.jar", "core-1.jar"), outcome.installed)
+    }
+
     @Test
     fun `a required dependency with no build for the pack is reported missing and the rest still lands`() = runTest {
         val c = Catalogue()

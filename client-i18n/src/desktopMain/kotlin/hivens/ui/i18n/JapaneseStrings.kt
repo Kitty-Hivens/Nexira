@@ -852,6 +852,7 @@ object JapaneseStrings : AppStrings {
     override val installSkipNotAttempted = "本体のダウンロードに失敗したため未実行"
     override val installSkipTooDeep      = "依存関係の階層が深すぎます"
     override val installSkipPackOwned    = "パック自身のファイルです。更新で元に戻ります"
+    override val installSkipSwitchedOff  = "パックにありますがオフです。オンにしてください"
     override val browseRailFind        = "検索対象"
     override val browseRailSource      = "ソース"
     override val browseSearchMods      = "Mod を検索"

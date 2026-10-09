@@ -843,6 +843,7 @@ object GermanStrings : AppStrings {
     override val installSkipNotAttempted = "Nicht versucht, der Hauptdownload ist fehlgeschlagen"
     override val installSkipTooDeep      = "Zu tief in der Abhängigkeitskette"
     override val installSkipPackOwned    = "Eine Datei des Packs, ein Update stellt sie wieder her"
+    override val installSkipSwitchedOff  = "Im Pack, aber ausgeschaltet, schalte es ein"
     override val browseRailFind        = "Was suchst du"
     override val browseRailSource      = "Quelle"
     override val browseSearchMods      = "Mods suchen"

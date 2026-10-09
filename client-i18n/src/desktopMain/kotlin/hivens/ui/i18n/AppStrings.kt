@@ -911,6 +911,9 @@ interface AppStrings {
 
     /** The build would replace a file the pack itself put there. */
     val installSkipPackOwned: String
+
+    /** A dependency the pack carries, switched off, so the mod that needs it will not start. */
+    val installSkipSwitchedOff: String
     val browseRailFind: String
     val browseRailSource: String
     val browseSearchMods: String

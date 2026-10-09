@@ -168,6 +168,7 @@ internal fun ContentInstaller.Skip.reason(s: AppStrings): String = when (this) {
     is ContentInstaller.Skip.NotAttempted -> s.installSkipNotAttempted
     is ContentInstaller.Skip.TooDeep -> s.installSkipTooDeep
     is ContentInstaller.Skip.PackOwned -> s.installSkipPackOwned
+    is ContentInstaller.Skip.SwitchedOff -> s.installSkipSwitchedOff
     is ContentInstaller.Skip.Present, is ContentInstaller.Skip.AlreadyInstalled -> ""
 }
 

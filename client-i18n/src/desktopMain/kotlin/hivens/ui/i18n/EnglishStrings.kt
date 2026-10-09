@@ -800,6 +800,7 @@ object EnglishStrings : AppStrings {
     override val installSkipNotAttempted = "Not tried, the main download failed"
     override val installSkipTooDeep      = "Too far down the chain to fetch"
     override val installSkipPackOwned    = "The pack's own file, an update would put it back"
+    override val installSkipSwitchedOff  = "In the pack but switched off, turn it on"
     override val browseRailFind        = "What to find"
     override val browseRailSource      = "Source"
     override val browseSearchMods      = "Search mods"
