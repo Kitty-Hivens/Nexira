@@ -5,6 +5,7 @@ import hivens.core.api.dto.modrinth.ModrinthDependency
 import hivens.core.api.dto.modrinth.ModrinthFile
 import hivens.core.api.dto.modrinth.ModrinthHashes
 import hivens.core.api.dto.modrinth.ModrinthVersion
+import hivens.core.launch.InstanceWork
 import hivens.core.launch.InstanceWorkRegistry
 import hivens.launcher.modrinth.ModrinthClient
 import hivens.test.testTransferEngine
@@ -16,7 +17,9 @@ import io.ktor.http.headersOf
 import io.ktor.utils.io.ByteReadChannel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.MapSerializer
@@ -84,6 +87,36 @@ class InstanceContentUpdaterTest {
         assertEquals(2, served)
         assertContentEquals(good, Files.readAllBytes(dir.resolve("mods/new.jar")))
         assertFalse(Files.exists(dir.resolve("mods/old.jar")))
+    }
+
+    /**
+     * The batch runs on another thread, and the pack used to be marked only once it
+     * did. A catalogue install claiming the pack in that gap ran beside the batch,
+     * whose first step sweeps the scratch files the install was downloading into.
+     */
+    @Test
+    fun `starting a batch marks the pack before its job has run, and a job that never runs lets go`() = runTest {
+        val dir = Files.createTempDirectory("content-update-claim").also { temps.add(it) }
+        val provider = HttpClientProvider { HttpClient(MockEngine { respond("", HttpStatusCode.NotFound) }) }
+        val modrinth = ModrinthClient(provider, testTransferEngine(provider), Json { ignoreUnknownKeys = true })
+        val work = InstanceWorkRegistry()
+        // A scope nothing drives, so the job is created and never dispatched.
+        val idle = CoroutineScope(StandardTestDispatcher(testScheduler) + SupervisorJob())
+        val updater = InstanceContentUpdater(modrinth, InstanceContentManager(), idle, work)
+        val update = ModUpdate(
+            ref = ContentRef(ContentKind.Mod, "old.jar"), installedVersion = "1.0", projectId = "p", versionId = "v",
+            versionNumber = "1.1", versionType = "release", fileName = "new.jar", url = "https://cdn.test/new.jar",
+            sha1 = "00", sizeBytes = 1,
+        )
+
+        assertTrue(updater.start("instance", dir, "Pack", listOf(InstanceContentUpdater.Target(update, enabled = true))))
+
+        assertEquals(InstanceWork.ContentUpdate, work.workOn("instance"))
+        assertEquals(InstanceWorkRegistry.Claim.Taken(InstanceWork.ContentUpdate), work.claim("instance", InstanceWork.ContentInstall))
+        idle.cancel()
+        // A job cancelled before it ran completes once its dispatcher gets to it.
+        testScheduler.runCurrent()
+        assertEquals(null, work.workOn("instance"), "cancelled before it ran, the mark is still let go")
     }
 
     /** A real archive, so the scan reads it as a mod. */

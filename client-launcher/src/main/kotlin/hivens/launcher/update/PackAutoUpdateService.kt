@@ -102,9 +102,33 @@ class PackAutoUpdateService(
             return
         }
         val instance = repository.get(id) ?: return
-        val status = when (work.during(id, InstanceWork.Update) { updater.applyUpdate(instance) }) {
-            is UpdateOutcome.Applied -> PackUpdateStatus.Updated(check.toVersion)
-            UpdateOutcome.AlreadyCurrent -> PackUpdateStatus.UpToDate
+        // Taken in one step and only now, with the build known. The look at the start
+        // of the pass is a seconds-old answer by here, after a network round trip:
+        // a Play or a catalogue install accepted in between found the pack free and
+        // ran beside this, and a launch's roster sweep against the old baseline could
+        // delete the jars the update had just put in. The running game is asked again
+        // after the mark is up, the order a launch asks the two in reversed, so one of
+        // the two always sees the other.
+        val mark = when (val c = work.claim(id, InstanceWork.Update)) {
+            is InstanceWorkRegistry.Claim.Held -> c.mark
+            is InstanceWorkRegistry.Claim.Taken -> {
+                log.info("auto-update: {} became busy ({}), left for the next pass", id, c.by)
+                setStatus(id, PackUpdateStatus.Pending(check.toVersion, check.direction, check.compat, held = false))
+                return
+            }
+        }
+        val status = try {
+            if (runningPackId() == id) {
+                log.info("auto-update: {} was launched meanwhile, left for the next pass", id)
+                PackUpdateStatus.Pending(check.toVersion, check.direction, check.compat, held = false)
+            } else {
+                when (updater.applyUpdate(instance)) {
+                    is UpdateOutcome.Applied -> PackUpdateStatus.Updated(check.toVersion)
+                    UpdateOutcome.AlreadyCurrent -> PackUpdateStatus.UpToDate
+                }
+            }
+        } finally {
+            mark.release()
         }
         setStatus(id, status)
     }

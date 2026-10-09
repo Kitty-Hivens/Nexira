@@ -168,6 +168,36 @@ class PackAutoUpdateServiceTest {
         assertEquals(null, work.workOn("green"))
     }
 
+    /**
+     * The check is a network round trip, and what the pass saw before it is old by
+     * the time it returns. An install claimed in that gap, or a Play accepted, used
+     * to find the update running beside it anyway.
+     */
+    @Test
+    fun `work or a launch that starts while the check is out leaves the update for the next pass`() = runTest {
+        val repo = FakeRepo(listOf(instance("installing"), instance("launched")))
+        val work = InstanceWorkRegistry()
+        var running: String? = null
+        val fake = FakeUpdater(mapOf("installing" to available(CompatChange.Same), "launched" to available(CompatChange.Same)))
+        val updater = object : PackUpdater by fake {
+            override suspend fun checkForUpdate(instance: PackInstance, forceRefresh: Boolean): UpdateCheck {
+                when (instance.id) {
+                    "installing" -> work.claim(instance.id, InstanceWork.ContentInstall)
+                    "launched" -> running = instance.id
+                }
+                return fake.checkForUpdate(instance, forceRefresh)
+            }
+        }
+        val service = PackAutoUpdateService(repo, updater, { settings() }, work, { running })
+
+        service.runOnce()
+
+        assertTrue(fake.applied.isEmpty(), "applied ${fake.applied}")
+        assertTrue(service.statuses.value["installing"] is PackUpdateStatus.Pending)
+        assertTrue(service.statuses.value["launched"] is PackUpdateStatus.Pending)
+        assertEquals(null, work.workOn("launched"), "the mark taken for the launched pack is let go")
+    }
+
     /** Deleted between the check and the apply: nothing failed, and there is no card left to badge. */
     @Test
     fun `a pack deleted during the pass is not reported as failed`() = runTest {

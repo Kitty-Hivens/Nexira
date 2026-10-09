@@ -65,9 +65,15 @@ class PackInstanceService(
      * and the running check is asked again once that mark is up.
      */
     suspend fun deleteCompletely(instance: PackInstance): DeleteOutcome = withContext(Dispatchers.IO) {
-        refusal(instance.id)?.let { return@withContext it }
-        work.during(instance.id, InstanceWork.Delete) {
-            if (running.runningPackInstanceId.value == instance.id) return@during DeleteOutcome.GameRunning
+        if (running.runningPackInstanceId.value == instance.id) return@withContext DeleteOutcome.GameRunning
+        // Checked and marked as one step: a catalogue install claiming the pack between
+        // a look and a mark went on writing into a tree being removed.
+        val mark = when (val c = work.claim(instance.id, InstanceWork.Delete)) {
+            is InstanceWorkRegistry.Claim.Held -> c.mark
+            is InstanceWorkRegistry.Claim.Taken -> return@withContext DeleteOutcome.Busy(c.by)
+        }
+        try {
+            if (running.runningPackInstanceId.value == instance.id) return@withContext DeleteOutcome.GameRunning
             val dir = instanceDirOf(instance)
             InstanceMutationLock.withLock(dir) {
                 if (deleteTree(dir)) {
@@ -83,12 +89,9 @@ class PackInstanceService(
                     DeleteOutcome.Incomplete
                 }
             }
+        } finally {
+            mark.release()
         }
-    }
-
-    private fun refusal(instanceId: String): DeleteOutcome? = when {
-        running.runningPackInstanceId.value == instanceId -> DeleteOutcome.GameRunning
-        else -> work.workOn(instanceId)?.let { DeleteOutcome.Busy(it) }
     }
 
     /**

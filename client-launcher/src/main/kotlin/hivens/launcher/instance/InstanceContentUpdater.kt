@@ -325,19 +325,34 @@ class InstanceContentUpdater(
         if (targets.isEmpty()) return false
         val key = keyOf(instanceDir)
         jobs[key]?.let { if (it.isActive) return false }
-        work.workOn(instanceId)?.let { busy ->
-            log.info("not updating {}: {} is in progress", title, busy)
-            return false
+        // Marked here, as one step with the check, rather than once the job runs on
+        // another thread: a catalogue install claiming the pack in between went on
+        // beside this batch, whose first step sweeps the scratch files that install
+        // was downloading into.
+        val mark = when (val c = work.claim(instanceId, InstanceWork.ContentUpdate)) {
+            is InstanceWorkRegistry.Claim.Held -> c.mark
+            is InstanceWorkRegistry.Claim.Taken -> {
+                log.info("not updating {}: {} is in progress", title, c.by)
+                return false
+            }
         }
 
         _runs.update { it + (key to Run(title = title, total = targets.size, done = 0, current = null, failed = emptyList(), finished = false)) }
-        // Marked for as long as files are being swapped, so a game is not started
-        // over a folder that is half the old mods and half the new ones.
+        // Held for as long as files are being swapped, so a game is not started over
+        // a folder that is half the old mods and half the new ones.
         val job = scope.launch {
-            work.during(instanceId, InstanceWork.ContentUpdate) { runBatch(key, instanceDir, targets, onChanged) }
+            try {
+                runBatch(key, instanceDir, targets, onChanged)
+            } finally {
+                mark.release()
+            }
         }
         jobs[key] = job
-        job.invokeOnCompletion { jobs.remove(key, job) }
+        // Also on completion: a job cancelled before it ever ran never reaches its finally.
+        job.invokeOnCompletion {
+            jobs.remove(key, job)
+            mark.release()
+        }
         return true
     }
 
