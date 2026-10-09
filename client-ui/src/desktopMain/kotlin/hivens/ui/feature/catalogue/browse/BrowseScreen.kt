@@ -136,30 +136,7 @@ fun BrowseScreen(
     }
     LaunchedEffect(c.targetId) {
         val id = c.targetId ?: return@LaunchedEffect run { c.resolved = null }
-        val pack = try {
-            withContext(Dispatchers.IO) { repo.get(id) }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            // Unreadable is not gone. The choice stays and the rows install into no
-            // pack until it can be read, rather than quietly forgetting it. The reading
-            // from before is dropped with it: kept, it answered for a pack whose game
-            // version may have moved since.
-            log.warn("reading the install target {} failed", id, e)
-            c.resolved = null
-            return@LaunchedEffect
-        }
-        if (pack == null) {
-            // Deleted while chosen. Nothing can go into it any more.
-            c.targetId = null
-            return@LaunchedEffect
-        }
-        val target = withContext(Dispatchers.IO) { browseDestination(pack, dataDir).let { BrowseTarget(it, kindsFor(it)) } }
-        c.resolved = target
-        if (c.aimingAt == id) {
-            if (!target.takes(c.kind)) target.kinds.firstOrNull()?.let { c.kind = it }
-            c.aimingAt = null
-        }
+        readTarget(c, id, repo, dataDir)
     }
 
     val ctx = remember(onOpenPack, onOpenProject) { BrowseContext(onOpenPack, onOpenProject) }
@@ -181,6 +158,37 @@ fun BrowseScreen(
 }
 
 private val log = LoggerFactory.getLogger("Browse")
+
+/**
+ * Reads the install target [id] off disk into [c], and moves the search to a kind
+ * the pack takes when the reader asked for this browse.
+ */
+internal suspend fun readTarget(c: BrowseController, id: String, repo: IPackRepository, dataDir: Path) {
+    val pack = try {
+        withContext(Dispatchers.IO) { repo.get(id) }
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        // Unreadable is not gone. The choice stays and the rows install into no
+        // pack until it can be read, rather than quietly forgetting it. The reading
+        // from before is dropped with it: kept, it answered for a pack whose game
+        // version may have moved since.
+        log.warn("reading the install target {} failed", id, e)
+        c.resolved = null
+        return
+    }
+    if (pack == null) {
+        // Deleted while chosen. Nothing can go into it any more.
+        c.targetId = null
+        return
+    }
+    val target = withContext(Dispatchers.IO) { browseDestination(pack, dataDir).let { BrowseTarget(it, kindsFor(it)) } }
+    c.resolved = target
+    if (c.aimingAt == id) {
+        if (!target.takes(c.kind)) target.kinds.firstOrNull()?.let { c.kind = it }
+        c.aimingAt = null
+    }
+}
 
 internal const val BROWSE_SURFACE = "browse"
 
