@@ -70,7 +70,7 @@ private fun locateOnDisk(root: Path, path: String): Path? {
 
 /**
  * Whether a file at [path] can be switched off by a `.disabled` name beside it: a
- * mod, or a resource or shader pack, see [SmrtAssetEntry.toggleable].
+ * mod, or a resource or shader pack, see [SmrtAssetEntry.isPackArchive].
  */
 internal fun hasOffName(path: String): Boolean =
-    path.startsWith("mods/") || SmrtAssetEntry.TOGGLEABLE_ASSET_DIRS.any { path.startsWith(it) }
+    path.startsWith("mods/") || SmrtAssetEntry.isPackArchive(path)

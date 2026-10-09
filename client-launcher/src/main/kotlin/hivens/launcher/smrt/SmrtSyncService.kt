@@ -329,7 +329,7 @@ class SmrtSyncService(
             val target = resolveSafe(clientDir, path, "prune $path")
             runCatching { fileOpRetry("update prune $path") { Files.deleteIfExists(target) } }
             // A retired mod or switchable asset may be sitting under its off name.
-            if (path.startsWith(MODS_PREFIX) || SmrtAssetEntry.TOGGLEABLE_ASSET_DIRS.any { path.startsWith(it) }) {
+            if (path.startsWith(MODS_PREFIX) || SmrtAssetEntry.isPackArchive(path)) {
                 val disabled = resolveSafe(clientDir, "$path.disabled", "prune $path")
                 runCatching { fileOpRetry("update prune $path disabled") { Files.deleteIfExists(disabled) } }
             }

@@ -226,7 +226,7 @@ data class SmrtAssetEntry(
      * guard. Every path that places it has to move it back.
      */
     val hasOffName: Boolean
-        get() = TOGGLEABLE_ASSET_DIRS.any { dest.startsWith(it) }
+        get() = isPackArchive(dest)
 
     /**
      * The key the player's choice about this asset is kept under, the way
@@ -240,6 +240,17 @@ data class SmrtAssetEntry(
     companion object {
         /** The folders an asset can be switched off in, see [toggleable]. */
         val TOGGLEABLE_ASSET_DIRS = listOf("resourcepacks/", "shaderpacks/")
+
+        /**
+         * Whether [dest] is a pack the game lists as one entry: a `.zip` directly in
+         * one of [TOGGLEABLE_ASSET_DIRS]. A file a level further down is part of a
+         * pack shipped unpacked, and a sibling such as OptiFine's `X.zip.txt` is the
+         * settings of one, so an off name on either breaks the pack it belongs to
+         * rather than switching anything off.
+         */
+        fun isPackArchive(dest: String): Boolean = TOGGLEABLE_ASSET_DIRS.any { dir ->
+            dest.startsWith(dir) && '/' !in dest.removePrefix(dir) && dest.endsWith(".zip", ignoreCase = true)
+        }
 
         /** What sets an asset's [stableKey] apart from a mod's. */
         const val ASSET_KEY_PREFIX = "asset:"

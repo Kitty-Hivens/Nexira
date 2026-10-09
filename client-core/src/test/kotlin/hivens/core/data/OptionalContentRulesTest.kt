@@ -349,6 +349,8 @@ class OptionalContentRulesTest {
         assertTrue(asset("shaderpacks/b.zip").toggleable)
         assertFalse(asset("resourcepacks/c.zip", required = true).toggleable, "the curator made it part of the pack")
         assertFalse(asset("config/d.json").toggleable, "the game reads a config by its path and has no off for it")
+        assertFalse(asset("resourcepacks/Unpacked/pack.mcmeta").toggleable, "a file of a pack shipped unpacked, not a pack")
+        assertFalse(asset("shaderpacks/BSL.zip.txt").toggleable, "a shader's settings, which an off name would only lose")
     }
 
     @Test
