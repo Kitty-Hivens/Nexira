@@ -87,9 +87,21 @@ fun placementFor(buildLoaders: List<String>, packLoader: String, mcVersion: Stri
     }
 }
 
-/** [placementFor] for one build. */
-fun ModrinthVersion.placementIn(packLoader: String, mcVersion: String): Placement =
-    placementFor(loaders, packLoader, mcVersion)
+/**
+ * [placementFor] for one build.
+ *
+ * A modpack is told apart by its file before its loaders. The catalogue's v2 API
+ * lists a modpack build under the loaders its pack runs rather than `mrpack`, so
+ * read by loaders alone a Fabric modpack is a Fabric mod and its `.mrpack` index
+ * lands in `mods/`, where no loader and no scan of the folder will ever read it.
+ */
+fun ModrinthVersion.placementIn(packLoader: String, mcVersion: String): Placement {
+    val file = files.firstOrNull { it.primary } ?: files.firstOrNull()
+    if (file != null && file.filename.endsWith(MODPACK_EXTENSION, ignoreCase = true)) {
+        return Placement.Refused(PlacementRefusal.Modpack)
+    }
+    return placementFor(loaders, packLoader, mcVersion)
+}
 
 /**
  * The build of a project a pack should take from [listing], or null when none
@@ -125,6 +137,7 @@ private const val NEOFORGE_FORK_VERSION = "1.20.1"
 private const val RESOURCE_PACK_LOADER = "minecraft"
 private const val DATAPACK_LOADER = "datapack"
 private const val MODPACK_LOADER = "mrpack"
+private const val MODPACK_EXTENSION = ".mrpack"
 private val SHADER_PACK_LOADERS = setOf("iris", "optifine")
 
 /** Shaders the game or Canvas reads out of a resource pack. */

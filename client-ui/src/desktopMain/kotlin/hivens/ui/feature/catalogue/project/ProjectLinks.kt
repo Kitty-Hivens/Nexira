@@ -6,6 +6,7 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.UriHandler
+import hivens.core.data.PackOrigin
 import hivens.ui.Screen
 import hivens.ui.navigation.NavRequests
 import hivens.ui.render.openInBrowser
@@ -22,23 +23,36 @@ import org.koin.compose.koinInject
 private val PROJECT_ROUTES = setOf("mod", "plugin", "datapack", "resourcepack", "shader", "modpack")
 
 /**
+ * A catalogue project a URL points at: its slug, and whether it is a modpack, which
+ * opens as a pack rather than as a project to install into one.
+ */
+data class ModrinthLink(val slug: String, val modpack: Boolean)
+
+/**
  * The project a catalogue URL points at, or null when it points at anything else.
  *
  * Deliberately tolerant about the shape of the address and strict about the host:
  * a link is followed into the app only when it is certain what it leads to, and
  * a guess that lands a reader on the wrong page is worse than a browser window.
  */
-fun modrinthProjectSlug(url: String): String? {
+fun modrinthProjectLink(url: String): ModrinthLink? {
     val withoutScheme = url.substringAfter("://", url)
     val host = withoutScheme.substringBefore('/').removePrefix("www.").lowercase()
     if (host != "modrinth.com") return null
     val path = withoutScheme.substringAfter('/', "").substringBefore('?').substringBefore('#')
     val parts = path.split('/').filter { it.isNotBlank() }
-    if (parts.size < 2 || parts[0].lowercase() !in PROJECT_ROUTES) return null
+    val route = parts.firstOrNull()?.lowercase()
+    if (parts.size < 2 || route !in PROJECT_ROUTES) return null
     // `/mod/sodium` and `/mod/sodium/versions` both name the same project; only
     // the slug decides where the reader lands.
-    return parts[1].takeIf { it.isNotBlank() }
+    val slug = parts[1].takeIf { it.isNotBlank() } ?: return null
+    return ModrinthLink(slug, modpack = route == MODPACK_ROUTE)
 }
+
+/** [modrinthProjectLink]'s slug alone. */
+fun modrinthProjectSlug(url: String): String? = modrinthProjectLink(url)?.slug
+
+private const val MODPACK_ROUTE = "modpack"
 
 /**
  * A project's own address in the catalogue.
@@ -75,8 +89,8 @@ val LocalLinkFollower: ProvidableCompositionLocal<(String) -> Unit> =
 fun rememberLinkFollower(): (String) -> Unit = LocalLinkFollower.current
 
 /**
- * The shell's own follower: a catalogue project becomes a navigation, anything
- * else goes out to the browser.
+ * The shell's own follower: a catalogue project becomes a navigation, a modpack to
+ * its pack page, and anything else goes out to the browser.
  */
 @Composable
 fun rememberNavigatingLinkFollower(): (String) -> Unit {
@@ -84,8 +98,12 @@ fun rememberNavigatingLinkFollower(): (String) -> Unit {
     val nav: NavRequests = koinInject()
     return remember(uriHandler, nav) {
         { url: String ->
-            val slug = modrinthProjectSlug(url)
-            if (slug != null) nav.open(Screen.ModDetail(ModTarget.Catalogue(slug))) else uriHandler.openUri(url)
+            val link = modrinthProjectLink(url)
+            when {
+                link == null -> uriHandler.openUri(url)
+                link.modpack -> nav.open(Screen.CataloguePackDetail(PackOrigin.Modrinth, link.slug))
+                else -> nav.open(Screen.ModDetail(ModTarget.Catalogue(link.slug)))
+            }
         }
     }
 }

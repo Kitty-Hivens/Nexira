@@ -1,5 +1,8 @@
 package hivens.launcher.modrinth
 
+import hivens.core.api.dto.modrinth.ModrinthFile
+import hivens.core.api.dto.modrinth.ModrinthHashes
+import hivens.core.api.dto.modrinth.ModrinthVersion
 import hivens.launcher.instance.ContentKind
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -41,6 +44,22 @@ class ModrinthPlacementTest {
         assertEquals(refused(PlacementRefusal.Modpack), placementFor(listOf("mrpack"), "neoforge", "1.21.1"))
         assertEquals(refused(PlacementRefusal.Plugin), placementFor(listOf("paper", "spigot"), "neoforge", "1.21.1"))
         assertEquals(refused(PlacementRefusal.Unknown), placementFor(emptyList(), "neoforge", "1.21.1"))
+    }
+
+    /**
+     * The catalogue's v2 API reports a modpack build under the loaders its pack runs,
+     * so read by loaders a Fabric modpack is a Fabric mod. Its file is what it is.
+     */
+    @Test
+    fun `a modpack build listed under its pack's loaders is still a modpack`() {
+        val build = ModrinthVersion(
+            id = "mp-1", projectId = "mp", name = "1", versionNumber = "1", versionType = "release",
+            gameVersions = listOf("1.21.1"), loaders = listOf("fabric"), datePublished = "2026-01-01T00:00:00Z",
+            files = listOf(ModrinthFile(ModrinthHashes("ab"), "https://cdn.test/mp.mrpack", "Pack 1.0.mrpack", primary = true, size = 1)),
+        )
+
+        assertEquals(refused(PlacementRefusal.Modpack), build.placementIn("fabric", "1.21.1"))
+        assertEquals(null, chooseBuild(listOf(build), "1.21.1", "fabric"), "nothing a pack could take")
     }
 
     @Test
