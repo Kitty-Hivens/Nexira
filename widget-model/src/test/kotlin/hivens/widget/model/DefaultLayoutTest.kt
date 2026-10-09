@@ -43,6 +43,8 @@ class DefaultLayoutTest {
                 "home.new", "library",
                 // The catalogue: its search and its results
                 "browse",
+                // The project page and a catalogue pack's page: header, tabs, pane
+                "project", "catalogue.pack",
                 "appshell.leftrail", "appshell.rightrail",
                 // Phase B.1 widgetized screens (incremental landing)
                 "about",
@@ -119,6 +121,8 @@ class DefaultLayoutTest {
         assertEquals(setOf("main"),           slots("home.new"))
         assertEquals(setOf("header", "body"), slots("library"))
         assertEquals(setOf("header", "body"), slots("browse"))
+        assertEquals(setOf("header", "body"), slots("project"))
+        assertEquals(setOf("header", "body"), slots("catalogue.pack"))
         assertEquals(setOf("top", "bottom"),  slots("appshell.leftrail"))
         assertEquals(setOf("news", "bottom"),  slots("appshell.rightrail"))
     }

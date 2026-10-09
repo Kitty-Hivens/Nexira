@@ -276,6 +276,86 @@
           }
         }
       },
+      "project": {
+        "families": {
+          "general": {
+            "slots": {
+              "header": {
+                "widgets": [
+                  {
+                    "kind": "project.header",
+                    "instance_id": "project-header-default"
+                  },
+                  {
+                    "kind": "project.tabs",
+                    "instance_id": "project-tabs-default"
+                  }
+                ],
+                "flow": {
+                  "direction": "vertical",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
+              },
+              "body": {
+                "widgets": [
+                  {
+                    "kind": "project.body",
+                    "instance_id": "project-body-default"
+                  }
+                ],
+                "flow": {
+                  "direction": "vertical",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
+              }
+            }
+          }
+        }
+      },
+      "catalogue.pack": {
+        "families": {
+          "general": {
+            "slots": {
+              "header": {
+                "widgets": [
+                  {
+                    "kind": "catalogue.pack.header",
+                    "instance_id": "catalogue-pack-header-default"
+                  },
+                  {
+                    "kind": "catalogue.pack.tabs",
+                    "instance_id": "catalogue-pack-tabs-default"
+                  }
+                ],
+                "flow": {
+                  "direction": "vertical",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
+              },
+              "body": {
+                "widgets": [
+                  {
+                    "kind": "catalogue.pack.body",
+                    "instance_id": "catalogue-pack-body-default"
+                  }
+                ],
+                "flow": {
+                  "direction": "vertical",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
+              }
+            }
+          }
+        }
+      },
       "appshell.leftrail": {
         "families": {
           "general": {

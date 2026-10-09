@@ -16,6 +16,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
@@ -222,22 +224,29 @@ class ModPageRenderTest {
                 // against the width it really gets.
                 Box(Modifier.width(56.dp).fillMaxHeight().background(NxColor.page.copy(alpha = 0.35f)))
 
-                Column(Modifier.weight(1f).fillMaxHeight()) {
-                    Header(pageState)
-                    Tabs(
-                        active = ModPageTab.Description,
-                        onSelect = {},
-                        modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 12.dp),
-                    )
-                    NxSurface(
-                        kind = SurfaceKind.Card,
-                        modifier = Modifier.weight(1f).fillMaxWidth()
-                            .padding(start = 14.dp, end = 14.dp, bottom = 14.dp),
-                    ) {
-                        Column(
-                            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+                // The page as the screen draws it: its surface's two slots on their
+                // panels, the widgets reading the page through its local.
+                val page = remember(pageState) {
+                    ProjectPage(pageState, mutableStateOf(ModPageTab.Description), emptyList(), onOpenVersion = {}, onReload = {})
+                }
+                CompositionLocalProvider(LocalProjectPage provides page) {
+                    Column(Modifier.weight(1f).fillMaxHeight()) {
+                        NxSurface(
+                            kind = SurfaceKind.Panel,
+                            modifier = Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 14.dp),
                         ) {
-                            Body(pageState, onRetry = {})
+                            SlotRenderer(
+                                SurfaceId(PROJECT_SURFACE),
+                                SlotId("header"),
+                                Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 16.dp),
+                            )
+                        }
+                        NxSurface(
+                            kind = SurfaceKind.Panel,
+                            modifier = Modifier.weight(1f).fillMaxWidth()
+                                .padding(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 14.dp),
+                        ) {
+                            SlotRenderer(SurfaceId(PROJECT_SURFACE), SlotId("body"), Modifier.fillMaxSize())
                         }
                     }
                 }

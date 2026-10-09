@@ -114,6 +114,24 @@ internal object EditorSurfaces {
             mountedOn = { screen -> screen == Screen.Browse || screen is Screen.BrowseInto },
             ownerRegion = "appshell.region.center",
         ),
+        // Both pages give their widgets a context of their own per visit, absent
+        // anywhere else, where the widgets draw nothing: no stub is needed.
+        EditorSurfaceSpec(
+            id        = SurfaceId("project"),
+            icon      = NxIcon.Description,
+            name      = { it.editorSurfProject },
+            shortName = { it.editorSurfShortProject },
+            mountedOn = { screen -> screen is Screen.ModDetail },
+            ownerRegion = "appshell.region.center",
+        ),
+        EditorSurfaceSpec(
+            id        = SurfaceId("catalogue.pack"),
+            icon      = NxIcon.Inventory2,
+            name      = { it.editorSurfCataloguePack },
+            shortName = { it.editorSurfShortCataloguePack },
+            mountedOn = { screen -> screen is Screen.CataloguePackDetail },
+            ownerRegion = "appshell.region.center",
+        ),
         EditorSurfaceSpec(
             id        = SurfaceId("about"),
             icon      = NxIcon.Home,

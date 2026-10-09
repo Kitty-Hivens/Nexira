@@ -897,6 +897,10 @@ object RussianStrings : AppStrings {
     override val modPageInstallChoose  = "Установить в…"
     override val editorSurfBrowse      = "Каталог"
     override val editorSurfShortBrowse = "Каталог"
+    override val editorSurfProject     = "Страница проекта"
+    override val editorSurfShortProject = "Проект"
+    override val editorSurfCataloguePack = "Страница пака из каталога"
+    override val editorSurfShortCataloguePack = "Пак"
     override fun browseByAuthor(name: String) = "от $name"
     override val modPageInstallShort = "Установить"
     override fun modPageNoBuildFor(target: String) = "Нет сборки под $target"
@@ -1526,6 +1530,12 @@ object RussianStrings : AppStrings {
         "widget.library.body" to "Тело библиотеки",
         "widget.browse.search" to "Поиск каталога",
         "widget.browse.results" to "Результаты каталога",
+        "widget.project.header" to "Шапка проекта",
+        "widget.project.tabs" to "Вкладки проекта",
+        "widget.project.body" to "Содержимое вкладки проекта",
+        "widget.catalogue.pack.header" to "Шапка пака из каталога",
+        "widget.catalogue.pack.tabs" to "Вкладки пака из каталога",
+        "widget.catalogue.pack.body" to "Содержимое вкладки пака",
         "widget.browse.scope" to "Что ищем",
         "widget.browse.installing" to "Пак, в который ставим",
         "widget.browse.chips" to "Выбранные фильтры",

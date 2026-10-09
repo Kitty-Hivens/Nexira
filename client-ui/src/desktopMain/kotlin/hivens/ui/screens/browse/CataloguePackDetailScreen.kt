@@ -14,6 +14,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.ProvidableCompositionLocal
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -87,6 +91,9 @@ import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.Status
 import hivens.widget.api.LocalSurfaceFamilies
+import hivens.widget.api.SlotRenderer
+import hivens.widget.model.SlotId
+import hivens.widget.model.SurfaceId
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -227,60 +234,48 @@ fun CataloguePackDetailScreen(
         loaded?.let { openProject.name(targetKey, it.title) }
     }
 
-    var tab by rememberSaveable(origin, packId, stateSaver = Saver(save = { it.name }, restore = { PackTab.valueOf(it) })) {
+    val tabState = rememberSaveable(origin, packId, stateSaver = Saver(save = { it.name }, restore = { PackTab.valueOf(it) })) {
         mutableStateOf(PackTab.Description)
     }
+    var tab by tabState
     val loaded = (state as? DetailState.Loaded)?.details
     val tabs = remember(loaded) { loaded?.let(::tabsOf) ?: listOf(PackTab.Description) }
     LaunchedEffect(tabs) { if (tab !in tabs) tab = PackTab.Description }
+    val page = CataloguePackPage(
+        packId = packId,
+        detail = state,
+        tab = tabState,
+        tabs = tabs,
+        gameVersionTags = tags?.gameVersions.orEmpty(),
+        installingVersion = installingVersion,
+        installError = installError,
+        onInstall = ::install,
+        onRetry = { retryTick++ },
+    )
 
-    Column(Modifier.fillMaxSize()) {
-        // The header and the tabs on a panel of their own, like the body under them,
-        // the way the project page sets them.
-        NxSurface(
-            kind = SurfaceKind.Panel,
-            modifier = Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 14.dp),
-        ) {
-            Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp)) {
-                PackHeader(
-                    packId = packId,
-                    details = loaded,
-                    installingVersion = installingVersion,
-                    installError = installError,
-                    onInstall = { d, v -> install(d, v) },
+    // A widget surface, the way the project page is: the header and the tabs in
+    // `header`, the tab's pane in `body`, each slot on the panel it always sat on.
+    CompositionLocalProvider(LocalCataloguePackPage provides page) {
+        Column(Modifier.fillMaxSize()) {
+            NxSurface(
+                kind = SurfaceKind.Panel,
+                modifier = Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 14.dp),
+            ) {
+                SlotRenderer(
+                    SurfaceId(CATALOGUE_PACK_SURFACE),
+                    SlotId("header"),
+                    Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 16.dp),
                 )
-                NxTabRow(
-                    tabs = tabs.map { it.label(s) },
-                    selected = tabs.indexOf(tab).coerceAtLeast(0),
-                    onSelect = { tab = tabs[it] },
-                    modifier = Modifier.padding(top = 12.dp, bottom = 10.dp),
-                )
-                tabs.forEach { t -> PuppetClick("catalogue.detail.tab.${t.name.lowercase()}") { tab = t } }
             }
-        }
-        NxSurface(
-            kind = SurfaceKind.Panel,
-            modifier = Modifier.weight(1f).fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 14.dp),
-        ) {
-            when (val st = state) {
-                DetailState.Loading -> CenteredProgress(Modifier.fillMaxSize())
-                is DetailState.Error -> RetryStateBlock(
-                    title      = s.browseDetailErrorTitle,
-                    message    = st.message,
-                    retryLabel = s.browseRetry,
-                    onRetry    = { retryTick++ },
-                    modifier   = Modifier.fillMaxWidth().padding(32.dp),
-                )
-                is DetailState.Loaded -> PackBody(
-                    details = st.details,
-                    tab = tab,
-                    gameVersionTags = tags?.gameVersions.orEmpty(),
-                    installingVersion = installingVersion,
-                    onInstall = { v -> install(st.details, v) },
-                )
+            NxSurface(
+                kind = SurfaceKind.Panel,
+                modifier = Modifier.weight(1f).fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 14.dp),
+            ) {
+                SlotRenderer(SurfaceId(CATALOGUE_PACK_SURFACE), SlotId("body"), Modifier.fillMaxSize())
             }
         }
     }
+    tabs.forEach { t -> PuppetClick("catalogue.detail.tab.${t.name.lowercase()}") { tab = t } }
 
     loaded?.let { d ->
         PuppetClick("catalogue.detail.install", enabled = installingVersion == null && d.versions.isNotEmpty()) {
@@ -292,8 +287,86 @@ fun CataloguePackDetailScreen(
 /** What a catalogue pack's page is known by to the rail and the trail. */
 internal fun catalogueTargetKey(origin: PackOrigin, packId: String): String = "pack:${origin.name}:$packId"
 
+/** The catalogue pack page's surface, see [CataloguePackPage]. */
+internal const val CATALOGUE_PACK_SURFACE = "catalogue.pack"
+
+/**
+ * What the catalogue pack page's widgets share: the page as read, the tab it
+ * shows, and the install it offers. Per visit, for the reason the project page's
+ * [hivens.ui.screens.mod.ProjectPage] is.
+ */
+internal class CataloguePackPage(
+    val packId: String,
+    val detail: DetailState,
+    tab: MutableState<PackTab>,
+    /** The tabs the pack has something behind. */
+    val tabs: List<PackTab>,
+    val gameVersionTags: List<ModrinthGameVersion>,
+    /** The build being installed, or null. */
+    val installingVersion: String?,
+    val installError: String?,
+    val onInstall: (CataloguePackDetails, CataloguePackVersion) -> Unit,
+    /** Reads the pack again after a read that failed. */
+    val onRetry: () -> Unit,
+) {
+    var tab: PackTab by tab
+
+    val details: CataloguePackDetails? get() = (detail as? DetailState.Loaded)?.details
+}
+
+/** The catalogue pack page the widgets are drawn for, or null on any other surface. */
+internal val LocalCataloguePackPage: ProvidableCompositionLocal<CataloguePackPage?> = compositionLocalOf { null }
+
+/** The page's header: the pack's mark, name, line, counts and tags, and its install. */
+@Composable
+internal fun CataloguePackPageHeader(page: CataloguePackPage) {
+    PackHeader(
+        packId = page.packId,
+        details = page.details,
+        installingVersion = page.installingVersion,
+        installError = page.installError,
+        onInstall = page.onInstall,
+    )
+}
+
+@Composable
+internal fun CataloguePackPageTabs(page: CataloguePackPage) {
+    val s = LocalStrings.current
+    NxTabRow(
+        tabs = page.tabs.map { it.label(s) },
+        selected = page.tabs.indexOf(page.tab).coerceAtLeast(0),
+        onSelect = { page.tab = page.tabs[it] },
+        modifier = Modifier.padding(top = 12.dp, bottom = 10.dp),
+    )
+}
+
+/** The tab's pane, or the page's loading and failure where the pack is not read yet. */
+@Composable
+internal fun CataloguePackPageBody(page: CataloguePackPage, modifier: Modifier = Modifier) {
+    val s = LocalStrings.current
+    Box(modifier) {
+        when (val st = page.detail) {
+            DetailState.Loading -> CenteredProgress(Modifier.fillMaxSize())
+            is DetailState.Error -> RetryStateBlock(
+                title      = s.browseDetailErrorTitle,
+                message    = st.message,
+                retryLabel = s.browseRetry,
+                onRetry    = page.onRetry,
+                modifier   = Modifier.fillMaxWidth().padding(32.dp),
+            )
+            is DetailState.Loaded -> PackBody(
+                details = st.details,
+                tab = page.tab,
+                gameVersionTags = page.gameVersionTags,
+                installingVersion = page.installingVersion,
+                onInstall = { v -> page.onInstall(st.details, v) },
+            )
+        }
+    }
+}
+
 /** The pack's tabs, and only those it has something behind. */
-private enum class PackTab { Description, Versions, Changelog, Gallery }
+internal enum class PackTab { Description, Versions, Changelog, Gallery }
 
 private fun PackTab.label(s: AppStrings): String = when (this) {
     PackTab.Description -> s.modPageTabDescription
@@ -525,7 +598,7 @@ private fun linkKindOf(kind: CatalogueLinkKind): ProjectLinkKind = when (kind) {
 }
 
 
-private sealed class DetailState {
+internal sealed class DetailState {
     object Loading : DetailState()
     data class Loaded(val details: CataloguePackDetails) : DetailState()
     data class Error(val message: String) : DetailState()

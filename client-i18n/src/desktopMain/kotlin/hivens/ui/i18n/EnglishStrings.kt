@@ -854,6 +854,10 @@ object EnglishStrings : AppStrings {
     override val modPageInstallChoose  = "Install into…"
     override val editorSurfBrowse      = "Browse"
     override val editorSurfShortBrowse = "Browse"
+    override val editorSurfProject     = "Project page"
+    override val editorSurfShortProject = "Project"
+    override val editorSurfCataloguePack = "Catalogue pack page"
+    override val editorSurfShortCataloguePack = "Pack"
     override fun browseByAuthor(name: String) = "by $name"
     override val modPageInstallShort = "Install"
     override fun modPageNoBuildFor(target: String) = "No build for $target"
@@ -1471,6 +1475,12 @@ object EnglishStrings : AppStrings {
         "widget.library.body" to "Library body",
         "widget.browse.search" to "Browse search",
         "widget.browse.results" to "Browse results",
+        "widget.project.header" to "Project header",
+        "widget.project.tabs" to "Project tabs",
+        "widget.project.body" to "Project tab pane",
+        "widget.catalogue.pack.header" to "Catalogue pack header",
+        "widget.catalogue.pack.tabs" to "Catalogue pack tabs",
+        "widget.catalogue.pack.body" to "Catalogue pack tab pane",
         "widget.browse.scope" to "What to find",
         "widget.browse.installing" to "Pack being installed into",
         "widget.browse.chips" to "Filters in force",

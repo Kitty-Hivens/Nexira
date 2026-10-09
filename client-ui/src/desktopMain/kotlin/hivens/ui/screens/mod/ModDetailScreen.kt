@@ -16,6 +16,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -63,6 +64,9 @@ import hivens.ui.render.MarkdownHtml
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import hivens.widget.api.LocalSurfaceFamilies
+import hivens.widget.api.SlotRenderer
+import hivens.widget.model.SlotId
+import hivens.widget.model.SurfaceId
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
@@ -119,10 +123,11 @@ fun ModDetailScreen(
     // tab, and the shell keeps a screen's saveable state across a visit -- so
     // without this, Back from a build always landed on Description, which is not
     // the tab anybody left from.
-    var tab by rememberSaveable(
+    val tabState = rememberSaveable(
         state,
         stateSaver = Saver(save = { it.name }, restore = { ModPageTab.valueOf(it) }),
     ) { mutableStateOf(ModPageTab.Description) }
+    var tab by tabState
     val gallery = remember(state.project) { modrinthGalleryMedia(state.project?.gallery.orEmpty()) }
     // A tab with nothing behind it is not drawn, which is what the reference does:
     // a project with no shots has no gallery to open, and a tab that leads to an
@@ -145,63 +150,78 @@ fun ModDetailScreen(
         }
     }
 
-    Column(modifier.fillMaxSize()) {
-        // The header and the tabs sit on a panel of their own, like the body under
-        // them. On the bare page they lay over whatever the wallpaper had there, and
-        // no ink the theme can pick reads on a picture it has never seen.
-        NxSurface(
-            kind = SurfaceKind.Panel,
-            modifier = Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 14.dp),
-        ) {
-            Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp)) {
-                Header(state)
-                // The tabs are page chrome, above the body and outside its scroll.
-                // They used to be the first thing inside it, so opening a long
-                // description and reading two screens down left no way back to
-                // Versions without scrolling to the top first, and nothing on
-                // screen said the tabs still existed.
-                Tabs(
-                    active = tab,
-                    onSelect = { tab = it },
-                    hasGallery = gallery.isNotEmpty(),
-                    modifier = Modifier.padding(top = 12.dp, bottom = 10.dp),
+    val page = remember(state, gallery, onOpenVersion) {
+        ProjectPage(
+            state = state,
+            tab = tabState,
+            gallery = gallery,
+            onOpenVersion = { v -> onOpenVersion(v.id, v.versionNumber.ifBlank { v.name }) },
+            onReload = { reloadTick++ },
+        )
+    }
+
+    // A widget surface: the header and the tabs in `header`, the tab's pane in
+    // `body`, each slot on the panel it always sat on.
+    CompositionLocalProvider(LocalProjectPage provides page) {
+        Column(modifier.fillMaxSize()) {
+            // The header and the tabs sit on a panel of their own, like the body under
+            // them. On the bare page they lay over whatever the wallpaper had there, and
+            // no ink the theme can pick reads on a picture it has never seen.
+            NxSurface(
+                kind = SurfaceKind.Panel,
+                modifier = Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 14.dp),
+            ) {
+                SlotRenderer(
+                    SurfaceId(PROJECT_SURFACE),
+                    SlotId("header"),
+                    Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 16.dp),
                 )
             }
+            NxSurface(
+                kind = SurfaceKind.Panel,
+                modifier = Modifier.weight(1f).fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 14.dp),
+            ) {
+                SlotRenderer(SurfaceId(PROJECT_SURFACE), SlotId("body"), Modifier.fillMaxSize())
+            }
         }
-        NxSurface(
-            kind = SurfaceKind.Panel,
-            modifier = Modifier.weight(1f).fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 14.dp),
-        ) {
-            when (tab) {
-                // Only the description scrolls as a page. The versions pane is a
-                // list beside its notes and does its own scrolling in two places,
-                // so wrapping it in a third would move the whole thing to reach the
-                // bottom of either.
-                ModPageTab.Description -> Column(
-                    modifier = Modifier.fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                        // Sixteen all round, the same as the rail's blocks. The body
-                        // and the sidebar are the same kind of card in the reference
-                        // and giving one of them a different inset is what makes a
-                        // page look assembled from parts.
-                        .padding(16.dp),
-                ) {
-                    Body(state) { reloadTick++ }
-                }
-                ModPageTab.Versions -> VersionsPane(
-                    state = state,
-                    onOpenVersion = { v -> onOpenVersion(v.id, v.versionNumber.ifBlank { v.name }) },
-                    onReload = { reloadTick++ },
-                    modifier = Modifier.fillMaxSize(),
-                )
-                ModPageTab.Changelog -> ChangelogPane(state, onReload = { reloadTick++ }, modifier = Modifier.fillMaxSize())
-                ModPageTab.Gallery -> Column(
-                    Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
-                ) {
-                    // The pack gallery's own component. One strip, one lightbox, one
-                    // answer to a shot with no caption.
-                    ImageGallery(gallery, Modifier.fillMaxWidth())
-                }
+    }
+}
+
+/**
+ * The pane the page's tab shows. Only the description scrolls as a page: the
+ * versions pane is a list beside its notes and does its own scrolling in two
+ * places, so wrapping it in a third would move the whole thing to reach the bottom
+ * of either.
+ */
+@Composable
+internal fun ProjectPageBody(page: ProjectPage, modifier: Modifier = Modifier) {
+    val state = page.state
+    Box(modifier) {
+        when (page.tab) {
+            ModPageTab.Description -> Column(
+                modifier = Modifier.fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    // Sixteen all round, the same as the rail's blocks. The body
+                    // and the sidebar are the same kind of card in the reference
+                    // and giving one of them a different inset is what makes a
+                    // page look assembled from parts.
+                    .padding(16.dp),
+            ) {
+                Body(state, page.onReload)
+            }
+            ModPageTab.Versions -> VersionsPane(
+                state = state,
+                onOpenVersion = page.onOpenVersion,
+                onReload = page.onReload,
+                modifier = Modifier.fillMaxSize(),
+            )
+            ModPageTab.Changelog -> ChangelogPane(state, onReload = page.onReload, modifier = Modifier.fillMaxSize())
+            ModPageTab.Gallery -> Column(
+                Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+            ) {
+                // The pack gallery's own component. One strip, one lightbox, one
+                // answer to a shot with no caption.
+                ImageGallery(page.gallery, Modifier.fillMaxWidth())
             }
         }
     }

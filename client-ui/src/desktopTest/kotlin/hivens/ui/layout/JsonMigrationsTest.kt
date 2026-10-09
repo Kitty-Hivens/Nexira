@@ -637,6 +637,9 @@ class JsonMigrationsTest {
             "appshell.backdrop",
             // the catalogue, once a screen with its controls hardcoded
             "browse",
+            // the project page and the catalogue pack page, once screens of their own
+            "project",
+            "catalogue.pack",
         )
 
         val SLOTS_ADDED_SINCE_FIXTURE = mapOf(

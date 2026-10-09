@@ -972,6 +972,10 @@ interface AppStrings {
     val modPageInstallChoose: String
     val editorSurfBrowse: String
     val editorSurfShortBrowse: String
+    val editorSurfProject: String
+    val editorSurfShortProject: String
+    val editorSurfCataloguePack: String
+    val editorSurfShortCataloguePack: String
     /** The same action on a table row, where the row already names the build. */
     val modPageInstallShort: String
 

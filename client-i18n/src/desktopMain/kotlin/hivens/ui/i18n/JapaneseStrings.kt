@@ -906,6 +906,10 @@ object JapaneseStrings : AppStrings {
     override val modPageInstallChoose  = "インストール先を選ぶ"
     override val editorSurfBrowse      = "探す"
     override val editorSurfShortBrowse = "探す"
+    override val editorSurfProject     = "プロジェクトページ"
+    override val editorSurfShortProject = "プロジェクト"
+    override val editorSurfCataloguePack = "カタログのパックページ"
+    override val editorSurfShortCataloguePack = "パック"
     override fun browseByAuthor(name: String) = "作者: $name"
     override val modPageInstallShort = "インストール"
     override fun modPageNoBuildFor(target: String) = "$target 向けのビルドはありません"
@@ -1519,6 +1523,12 @@ object JapaneseStrings : AppStrings {
         "widget.library.body" to "ライブラリ本体",
         "widget.browse.search" to "カタログ検索",
         "widget.browse.results" to "カタログの結果",
+        "widget.project.header" to "プロジェクトのヘッダー",
+        "widget.project.tabs" to "プロジェクトのタブ",
+        "widget.project.body" to "プロジェクトのタブ内容",
+        "widget.catalogue.pack.header" to "カタログパックのヘッダー",
+        "widget.catalogue.pack.tabs" to "カタログパックのタブ",
+        "widget.catalogue.pack.body" to "カタログパックのタブ内容",
         "widget.browse.scope" to "検索対象",
         "widget.browse.installing" to "インストール先のパック",
         "widget.browse.chips" to "適用中のフィルター",
