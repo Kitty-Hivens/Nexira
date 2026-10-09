@@ -379,57 +379,67 @@ internal fun Header(state: ModDetailState) {
                     color = NxInk.quiet,
                 )
             }
-            // Why nothing happened, under the button that was pressed, naming the
-            // two things that decided it. Without this the click did nothing and
-            // said nothing, which reads as the launcher having ignored it.
-            if (state.installNoBuild) {
-                // Names the axes that are actually KNOWN. Filling a blank one with
-                // the unknown placeholder produced "no build for Unknown / Unknown",
-                // which is a sentence about our own ignorance rather than about
-                // the pack.
-                val target = listOf(state.packMcVersion, state.packLoader.takeIf { it.isNotBlank() }?.let(::loaderLabel).orEmpty())
-                    .filter { it.isNotBlank() }
-                    .joinToString(" / ")
-                Text(
-                    if (target.isBlank()) s.modPageNoBuildAny else s.modPageNoBuildFor(target),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = NxColor.status(Status.Warning, text = true),
-                )
-            }
-            // Said under the button, where the click was. A mod that landed without
-            // something it requires is installed and will not run, and this is the
-            // only place on the page that would ever mention it.
-            if (state.installMissing.isNotEmpty()) {
-                Text(
-                    s.modPageInstallMissing(state.installMissing.size),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = NxColor.status(Status.Warning, text = true),
-                )
-            }
-            // Each one by name and why, because the count alone sends the reader
-            // looking for what it means. A long list stops at a few; the rest is a
-            // count, since a column of twenty reasons under a button is not read.
-            state.installLeftOut.take(MAX_LEFT_OUT_LINES).forEach { left ->
-                Text(
-                    s.installSkipLine(left.title, left.skip.reason(s)),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = NxInk.quiet,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.widthIn(max = LEFT_OUT_MEASURE),
-                )
-            }
-            // Why nothing ran, said where the click was. A refused install and a
-            // broken one are different things to do something about.
-            state.installRefusal?.let { refusal ->
-                Text(
-                    InstallProblem.Refused(refusal).label(s),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = NxColor.status(Status.Warning, text = true),
-                )
-            }
+            InstallNotes(state)
         },
     )
+}
+
+/**
+ * What the last install from this page came to, under the button that was pressed:
+ * the project page's header and a single build's page both draw it.
+ */
+@Composable
+internal fun InstallNotes(state: ModDetailState) {
+    val s = LocalStrings.current
+    // Why nothing happened, under the button that was pressed, naming the
+    // two things that decided it. Without this the click did nothing and
+    // said nothing, which reads as the launcher having ignored it.
+    if (state.installNoBuild) {
+        // Names the axes that are actually KNOWN. Filling a blank one with
+        // the unknown placeholder produced "no build for Unknown / Unknown",
+        // which is a sentence about our own ignorance rather than about
+        // the pack.
+        val target = listOf(state.packMcVersion, state.packLoader.takeIf { it.isNotBlank() }?.let(::loaderLabel).orEmpty())
+            .filter { it.isNotBlank() }
+            .joinToString(" / ")
+        Text(
+            if (target.isBlank()) s.modPageNoBuildAny else s.modPageNoBuildFor(target),
+            style = MaterialTheme.typography.labelSmall,
+            color = NxColor.status(Status.Warning, text = true),
+        )
+    }
+    // Said under the button, where the click was. A mod that landed without
+    // something it requires is installed and will not run, and this is the
+    // only place on the page that would ever mention it.
+    if (state.installMissing.isNotEmpty()) {
+        Text(
+            s.modPageInstallMissing(state.installMissing.size),
+            style = MaterialTheme.typography.labelSmall,
+            color = NxColor.status(Status.Warning, text = true),
+        )
+    }
+    // Each one by name and why, because the count alone sends the reader
+    // looking for what it means. A long list stops at a few; the rest is a
+    // count, since a column of twenty reasons under a button is not read.
+    state.installLeftOut.take(MAX_LEFT_OUT_LINES).forEach { left ->
+        Text(
+            s.installSkipLine(left.title, left.skip.reason(s)),
+            style = MaterialTheme.typography.labelSmall,
+            color = NxInk.quiet,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.widthIn(max = LEFT_OUT_MEASURE),
+        )
+    }
+    // Why nothing ran, said where the click was. A refused install and a
+    // broken one are different things to do something about.
+    state.installRefusal?.let { refusal ->
+        Text(
+            InstallProblem.Refused(refusal).label(s),
+            style = MaterialTheme.typography.labelSmall,
+            color = NxColor.status(Status.Warning, text = true),
+        )
+    }
 }
 
 /** The mirror by its own name, which is a brand and the same in every language. */

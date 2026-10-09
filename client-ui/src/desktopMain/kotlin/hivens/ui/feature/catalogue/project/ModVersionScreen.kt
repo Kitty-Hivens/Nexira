@@ -58,6 +58,7 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.nx.CenteredProgress
 import hivens.ui.nx.NxButton
+import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxMetaChip
 import hivens.ui.nx.NxMetaChipTone
 import hivens.ui.nx.NxTooltip
@@ -169,6 +170,12 @@ internal fun ModVersionBody(
                 modifier = Modifier.fillMaxSize().padding(20.dp),
                 titleStyle = MaterialTheme.typography.titleMedium,
             )
+            // Loaded, and nothing to ask about: the file the page was opened on has
+            // gone since (updated, removed), or the catalogue has no entry for it.
+            // Without this the page waited for a build nobody would ever ask for.
+            !project.loading && project.project == null -> Box(Modifier.fillMaxSize().padding(20.dp), contentAlignment = Alignment.Center) {
+                Text(s.modPageVersionsNoEntry, style = MaterialTheme.typography.bodyMedium, color = NxInk.quiet)
+            }
             project.loading || build.loading || v == null -> CenteredProgress(Modifier.fillMaxSize())
             else -> Column(
                 modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
@@ -235,13 +242,42 @@ private fun BuildHeader(v: ModrinthVersion, project: ModDetailState, scope: Coro
         // and a button repeating it read as "Установить 1.8.14-beta.1+1.21.1-neoforge"
         // beside a title saying exactly that -- while the one thing the button
         // decides, which pack the file lands in, went unsaid.
-        (project.install as? InstallAction.Install)?.let { action ->
-            NxButton(
-                label = if (project.installing) s.modPageInstalling else s.modPageInstallInto(action.packName),
-                onClick = { scope.launch(Dispatchers.Main) { project.installVersion(v) } },
-                icon = NxIcon.Download,
-                enabled = !project.installing,
-            )
+        //
+        // Marked the way the versions table marks the same build: one that does not
+        // run on the pack is still offered, since the reader came to take this one,
+        // and the line under it says which way they are stepping. What the install
+        // came to is said there too, as on the project page.
+        val fits = remember(v, project.packMcVersion, project.packLoaders) {
+            runsOn(v.toBuild(), project.packMcVersion, project.packLoaders)
+        }
+        when (val action = project.install) {
+            is InstallAction.Install -> Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                NxButton(
+                    label = when {
+                        project.installing -> s.modPageInstalling
+                        project.installFailed -> s.modPageInstallRetry
+                        else -> s.modPageInstallInto(action.packName)
+                    },
+                    onClick = { scope.launch(Dispatchers.Main) { project.installVersion(v) } },
+                    icon = if (project.installFailed) NxIcon.Refresh else NxIcon.Download,
+                    enabled = !project.installing,
+                )
+                if (!fits) {
+                    Text(s.versionsIncompatibleHint, style = MaterialTheme.typography.labelSmall, color = NxColor.status(Status.Warning, text = true))
+                }
+                InstallNotes(project)
+            }
+            is InstallAction.Present -> Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                NxButton(
+                    label = s.modPageInstalledIn(action.packName),
+                    onClick = {},
+                    icon = NxIcon.Check,
+                    enabled = false,
+                    style = NxButtonStyle.Secondary,
+                )
+                InstallNotes(project)
+            }
+            else -> Unit
         }
     }
 }
