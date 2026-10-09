@@ -39,12 +39,14 @@ internal class ProjectBrowseSession(private val clock: () -> Long = System::curr
         val hidden: Set<String>,
         /** What the target pack was read to hold. */
         val present: Set<String>,
+        /** What the pack's content folders looked like when [present] was read, see [contentStampOf]. */
+        val presentStamp: String? = null,
         val firstVisibleIndex: Int = 0,
         val firstVisibleOffset: Int = 0,
         val takenAt: Long,
     ) {
         fun scrolledTo(index: Int, offset: Int) =
-            Snapshot(results, this.offset, endReached, hidden, present, index, offset, takenAt)
+            Snapshot(results, this.offset, endReached, hidden, present, presentStamp, index, offset, takenAt)
     }
 
     private val byKey = object : LinkedHashMap<Key, Snapshot>(16, 0.75f, true) {

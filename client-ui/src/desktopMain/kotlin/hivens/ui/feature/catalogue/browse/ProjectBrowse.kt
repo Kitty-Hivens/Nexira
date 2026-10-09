@@ -37,6 +37,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
@@ -61,6 +62,7 @@ import hivens.launcher.instance.ContentInstaller
 import hivens.launcher.instance.ContentKind
 import hivens.launcher.instance.ModInstaller
 import hivens.launcher.instance.PackPlacedContent
+import hivens.launcher.instance.folderName
 import hivens.launcher.instance.takesFromPlayer
 import hivens.launcher.modrinth.ModrinthClient
 import hivens.launcher.modrinth.FilterField
@@ -109,6 +111,21 @@ internal class BrowseDestination(val pack: PackInstance, val target: ContentDest
 /** The destination for the pack [pack], its folder under [dataDir]. */
 internal fun browseDestination(pack: PackInstance, dataDir: Path) =
     BrowseDestination(pack, ContentDestination.Pack.of(pack, dataDir.resolve("instances")))
+
+/**
+ * What [instanceDir]'s content folders look like, as names, sizes and change times:
+ * a cheap local answer to whether anything was added, removed or replaced since the
+ * last look, without hashing a file or asking the catalogue. Null when the folders
+ * cannot be listed, which never matches a stamp taken before.
+ */
+internal fun contentStampOf(instanceDir: Path): String? = runCatching {
+    ContentKind.entries.joinToString("|") { kind ->
+        val dir = instanceDir.resolve(kind.folderName())
+        if (!Files.isDirectory(dir)) "" else Files.list(dir).use { files ->
+            files.map { "${it.fileName}:${Files.size(it)}:${Files.getLastModifiedTime(it).toMillis()}" }.sorted().toList().joinToString(",")
+        }
+    }
+}.getOrNull()
 
 /**
  * The kinds a pack takes from the player, in the order the rail lists them.
@@ -214,10 +231,26 @@ internal class ProjectBrowseState(
     private val hideInstalled: Boolean = false,
     private val session: ProjectBrowseSession? = null,
     private val keyOf: (query: String) -> ProjectBrowseSession.Key? = { null },
+    /**
+     * What the destination pack's content folders look like now, see [contentStampOf],
+     * or null where there is nothing to look at. Tells a kept search whether the pack
+     * changed under it, without reading every file again.
+     */
+    private val contentStamp: suspend () -> String? = { null },
 ) {
     /** Where the list was scrolled to when this search was last shown, for the list to start at. */
     var restoredScroll: Pair<Int, Int> = 0 to 0
         private set
+
+    /** The question whose answer [results] holds, which is what a scroll position belongs to. */
+    var shownQuery by mutableStateOf<String?>(null)
+        private set
+
+    /** [contentStamp] when [present] was read. */
+    private var presentStamp: String? = null
+
+    /** When this state last wrote its search into the session, so an older state cannot write over a newer one. */
+    private var keptAt = Long.MIN_VALUE
 
     /** Null while the first page is in flight. */
     var results by mutableStateOf<List<ModrinthSearchHit>?>(null)
@@ -261,18 +294,37 @@ internal class ProjectBrowseState(
 
     suspend fun loadPresent() {
         if (destination == null) return
-        presentRead = true
+        val stamp = contentStamp()
         // A row reading Install for something already there is a wasted click; a
         // browser that refuses to open over a folder it cannot read is worse.
         present = present + runCatching { presentProjects() }
             .onFailure { if (it is CancellationException) throw it else log.warn("reading what the pack holds failed", it) }
             .getOrDefault(emptySet())
+        // Marked only once the read is over. Marked before it, a search cancelled
+        // while it ran, which typing on does to the search before it, left the pack
+        // unread for the rest of this state: installed projects offered Install and
+        // hiding them hid nothing.
+        presentStamp = stamp
+        presentRead = true
     }
 
     suspend fun search(q: String) {
         val gen = ++generation
-        if (restore(q)) return
+        if (restore(q)) {
+            // The pack can have changed since the search was kept: a mod installed
+            // from a project page, one removed in the Content tab. Its folders are
+            // read again only when they did.
+            if (destination != null && contentStamp() != presentStamp) {
+                present = emptySet()
+                presentRead = false
+                loadPresent()
+                keep()
+            }
+            return
+        }
         asked = q
+        // A new question starts at the top of its answer, not where the last one was left.
+        restoredScroll = 0 to 0
         results = null
         searchFailed = false
         endReached = false
@@ -288,6 +340,7 @@ internal class ProjectBrowseState(
             return
         }
         results = first
+        shownQuery = q
         keep()
     }
 
@@ -304,26 +357,48 @@ internal class ProjectBrowseState(
         offset = snap.offset
         hidden = snap.hidden
         present = present + snap.present
+        presentStamp = snap.presentStamp
         presentRead = true
+        keptAt = snap.takenAt
         restoredScroll = snap.firstVisibleIndex to snap.firstVisibleOffset
         results = snap.results
+        shownQuery = q
         return true
     }
 
-    /** Writes where the search has got to into the session. */
+    /**
+     * Writes where the search has got to into the session, unless a newer state has
+     * since. An install started here runs on to its end after the reader has left,
+     * and its finish used to put this state's shorter list back over the one the
+     * screen they came back to had kept.
+     */
     private fun keep() {
         val q = asked ?: return
         val shown = results ?: return
         if (searchFailed) return
         val key = keyOf(q) ?: return
         val s = session ?: return
-        val scroll = s.get(key)?.let { it.firstVisibleIndex to it.firstVisibleOffset } ?: restoredScroll
-        s.put(key, ProjectBrowseSession.Snapshot(shown, offset, endReached, hidden, present, scroll.first, scroll.second, s.now()))
+        val kept = s.get(key)
+        if (kept != null && kept.takenAt > keptAt) return
+        val scroll = kept?.let { it.firstVisibleIndex to it.firstVisibleOffset } ?: restoredScroll
+        val now = s.now()
+        s.put(
+            key,
+            ProjectBrowseSession.Snapshot(
+                results = shown, offset = offset, endReached = endReached, hidden = hidden, present = present,
+                presentStamp = presentStamp, firstVisibleIndex = scroll.first, firstVisibleOffset = scroll.second, takenAt = now,
+            ),
+        )
+        keptAt = now
     }
 
-    /** Records where the reader has scrolled this search to, for a return to it. */
-    fun rememberScroll(index: Int, offset: Int) {
-        val key = asked?.let(keyOf) ?: return
+    /**
+     * Records where the reader has scrolled the answer to [query], for a return to it.
+     * Named by the caller, since by the time a list is taken down the state may
+     * already be asking the next question.
+     */
+    fun rememberScroll(query: String, index: Int, offset: Int) {
+        val key = keyOf(query) ?: return
         session?.scroll(key, index, offset)
     }
 
@@ -462,6 +537,7 @@ internal fun rememberProjectBrowseState(
             hideInstalled = hiding,
             session = session,
             keyOf = { q -> ProjectBrowseSession.Key(type, q, sort, filters, destination?.pack?.id, hiding) },
+            contentStamp = { target?.dir?.let { dir -> withContext(Dispatchers.IO) { contentStampOf(dir) } } },
         )
     }
 }
@@ -523,63 +599,69 @@ internal fun ProjectResults(
             // The catalogue's own break: a narrow column takes the small icon so the
             // title keeps its width.
             val icon = if (maxWidth >= WIDE_CARD) ICON_WIDE else ICON_NARROW
-            // Starts where the reader left this search, and says where they leave it.
-            val listState = rememberLazyListState(state.restoredScroll.first, state.restoredScroll.second)
-            DisposableEffect(listState, state) {
-                onDispose { state.rememberScroll(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset) }
-            }
-            LaunchedEffect(listState, state) {
-                snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1 }
-                    .collect { last -> if (last >= (state.results?.size ?: 0) - 3) state.more() }
-            }
-            LazyColumn(
-                state               = listState,
-                modifier            = Modifier.fillMaxSize(),
-                contentPadding      = PaddingValues(bottom = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(CARD_GAP),
-            ) {
-                items(items = results, key = { it.projectId }) { hit ->
-                    val id = hit.projectId
-                    val open = if (kind == null) {
-                        { onOpenPack(modpackOf(hit)) }
-                    } else {
-                        { onOpenProject(ModTarget.Catalogue(id, destination?.pack?.id)) }
-                    }
-                    val subject = InstallSubject(id, hit.title, hit.iconUrl, hit.author)
-                    val install = if (destination != null) {
-                        { installScope.launch(Dispatchers.Main) { state.install(hit) }; Unit }
-                    } else {
-                        { choosing = subject }
-                    }
-                    val problem = state.problems[id]
-                    PuppetClick("browse.project.$id") { open() }
-                    if (kind != null) PuppetClick("browse.install.$id") { install() }
-                    ProjectCard(
-                        hit      = hit,
-                        iconSize = icon,
-                        note     = problem?.label(s) ?: state.missing[id]?.let { s.modPageInstallMissing(it) },
-                        onOpen   = open,
-                        modifier = Modifier.animateItem(
-                            fadeInSpec    = Motion.fade,
-                            placementSpec = Motion.reveal.of<IntOffset>(),
-                            fadeOutSpec   = Motion.fade,
-                        ),
-                        action   = if (kind == null) {
-                            null
+            // One list per question: it starts where the reader left that question's
+            // answer, and says where they leave it under that question's name. Shared
+            // across questions, a kept answer shown in place of another kept the other's
+            // position, and a position was recorded under the question asked next.
+            val shownQuery = state.shownQuery
+            key(shownQuery) {
+                val listState = rememberLazyListState(state.restoredScroll.first, state.restoredScroll.second)
+                DisposableEffect(listState, state) {
+                    onDispose { shownQuery?.let { state.rememberScroll(it, listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset) } }
+                }
+                LaunchedEffect(listState, state) {
+                    snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1 }
+                        .collect { last -> if (last >= (state.results?.size ?: 0) - 3) state.more() }
+                }
+                LazyColumn(
+                    state               = listState,
+                    modifier            = Modifier.fillMaxSize(),
+                    contentPadding      = PaddingValues(bottom = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(CARD_GAP),
+                ) {
+                    items(items = results, key = { it.projectId }) { hit ->
+                        val id = hit.projectId
+                        val open = if (kind == null) {
+                            { onOpenPack(modpackOf(hit)) }
                         } else {
-                            {
-                                CardInstall(
-                                    phase = when {
-                                        id in state.present -> CardPhase.Installed
-                                        id in state.working -> CardPhase.Working
-                                        problem != null -> CardPhase.Failed
-                                        else -> CardPhase.Offered
-                                    },
-                                    onInstall = install,
-                                )
-                            }
-                        },
-                    )
+                            { onOpenProject(ModTarget.Catalogue(id, destination?.pack?.id)) }
+                        }
+                        val subject = InstallSubject(id, hit.title, hit.iconUrl, hit.author)
+                        val install = if (destination != null) {
+                            { installScope.launch(Dispatchers.Main) { state.install(hit) }; Unit }
+                        } else {
+                            { choosing = subject }
+                        }
+                        val problem = state.problems[id]
+                        PuppetClick("browse.project.$id") { open() }
+                        if (kind != null) PuppetClick("browse.install.$id") { install() }
+                        ProjectCard(
+                            hit      = hit,
+                            iconSize = icon,
+                            note     = problem?.label(s) ?: state.missing[id]?.let { s.modPageInstallMissing(it) },
+                            onOpen   = open,
+                            modifier = Modifier.animateItem(
+                                fadeInSpec    = Motion.fade,
+                                placementSpec = Motion.reveal.of<IntOffset>(),
+                                fadeOutSpec   = Motion.fade,
+                            ),
+                            action   = if (kind == null) {
+                                null
+                            } else {
+                                {
+                                    CardInstall(
+                                        phase = when {
+                                            id in state.present -> CardPhase.Installed
+                                            id in state.working -> CardPhase.Working
+                                            problem != null -> CardPhase.Failed
+                                            else -> CardPhase.Offered
+                                        },
+                                        onInstall = install,
+                                    )
+                                }
+                            },
+                        )
+                    }
                 }
             }
         }

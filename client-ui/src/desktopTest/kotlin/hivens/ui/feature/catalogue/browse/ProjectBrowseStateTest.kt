@@ -8,7 +8,10 @@ import hivens.core.launch.InstanceWork
 import hivens.launcher.instance.ContentInstaller
 import hivens.launcher.instance.ContentKind
 import hivens.launcher.instance.ModInstaller
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.yield
 import java.io.IOException
 import java.nio.file.Path
 import kotlin.test.Test
@@ -270,6 +273,7 @@ class ProjectBrowseStateTest {
     private fun keyed(
         session: ProjectBrowseSession,
         calls: MutableList<Pair<String, Int>>,
+        stamp: () -> String? = { null },
         present: suspend () -> Set<String> = { emptySet() },
     ) = ProjectBrowseState(
         ContentKind.Mod,
@@ -279,6 +283,7 @@ class ProjectBrowseStateTest {
         presentProjects = present,
         session = session,
         keyOf = { q -> ProjectBrowseSession.Key("mod", q, BrowseSort.Relevance, emptySet(), destination.pack.id, hiding = false) },
+        contentStamp = { stamp() },
     )
 
     @Test
@@ -290,7 +295,7 @@ class ProjectBrowseStateTest {
         val first = keyed(session, calls) { reads++; setOf("held") }
         first.search("j")
         first.more()
-        first.rememberScroll(12, 40)
+        first.rememberScroll("j", 12, 40)
 
         // The screen is composed again on the way back from a project page.
         val again = keyed(session, calls) { reads++; emptySet() }
@@ -340,5 +345,83 @@ class ProjectBrowseStateTest {
         again.search("j")
 
         assertTrue("j3" in again.present, "the row reads installed on the way back too")
+    }
+
+    /**
+     * Typing on cancels the search before it, and the pack was marked read before
+     * the read began: cancelled there, the pack stayed unread for the rest of the
+     * state, installed projects offering Install and hiding hiding nothing.
+     */
+    @Test
+    fun `a search cancelled while it read the pack reads it on the next one`() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        var reads = 0
+        val state = state(present = { reads++; if (reads == 1) gate.await(); setOf("held") })
+
+        val first = launch { state.search("a") }
+        yield()
+        first.cancel()
+        state.search("ab")
+
+        assertEquals(2, reads)
+        assertTrue("held" in state.present)
+    }
+
+    /** A mod installed from a project page, or removed in the Content tab, while the search was kept. */
+    @Test
+    fun `a kept search reads the pack again when its folders changed, and only then`() = runTest {
+        val session = ProjectBrowseSession { 0L }
+        val calls = mutableListOf<Pair<String, Int>>()
+        var stamp = "before"
+        keyed(session, calls, stamp = { stamp }) { setOf("removed-since") }.search("j")
+
+        val unchanged = keyed(session, calls, stamp = { stamp }) { error("the folders did not change") }
+        unchanged.search("j")
+        assertTrue("removed-since" in unchanged.present)
+
+        stamp = "after"
+        val changed = keyed(session, calls, stamp = { stamp }) { setOf("installed-since") }
+        changed.search("j")
+
+        assertEquals(setOf("installed-since"), changed.present)
+        assertEquals(listOf("j" to 0), calls, "the catalogue is still not asked again")
+    }
+
+    /** An install started here runs on after the reader left, and its finish used to write this state's list back. */
+    @Test
+    fun `a state left behind cannot write over the search the screen came back to`() = runTest {
+        val clock = Clock()
+        val session = ProjectBrowseSession { clock.now }
+        val calls = mutableListOf<Pair<String, Int>>()
+        val left = keyed(session, calls)
+        left.search("j")
+
+        clock.now = 10
+        val back = keyed(session, calls)
+        back.search("j")
+        back.more()
+
+        clock.now = 20
+        left.install(hit("j3"))
+
+        val key = ProjectBrowseSession.Key("mod", "j", BrowseSort.Relevance, emptySet(), destination.pack.id, hiding = false)
+        assertEquals(31, session.get(key)?.results?.size, "the longer list the screen came back to is kept")
+    }
+
+    @Test
+    fun `a new question starts at the top, whatever the last one was scrolled to`() = runTest {
+        val session = ProjectBrowseSession { 0L }
+        val calls = mutableListOf<Pair<String, Int>>()
+        val first = keyed(session, calls)
+        first.search("j")
+        first.rememberScroll("j", 12, 40)
+
+        val again = keyed(session, calls)
+        again.search("j")
+        assertEquals(12 to 40, again.restoredScroll)
+        again.search("k")
+
+        assertEquals(0 to 0, again.restoredScroll)
+        assertEquals("k", again.shownQuery)
     }
 }
