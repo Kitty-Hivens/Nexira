@@ -370,7 +370,7 @@ class PackUpdateService(
      */
     override suspend fun rollback(instance: PackInstance, snapshotId: String): PackInstance {
         val clientDir = clientDirOf(instance)
-        return InstanceMutationLock.withLock(clientDir) {
+        val rolled = InstanceMutationLock.withLock(clientDir) {
             withContext(Dispatchers.IO) {
                 val current = repository.get(instance.id) ?: throw InstanceRemovedException(instance)
                 val managed = managedRealPaths(null, current.installedManifest ?: FileManifest())
@@ -379,6 +379,40 @@ class PackUpdateService(
                 // just undid is not re-applied on the next startup.
                 repository.update(current.id) { it.withBuildOf(restored).copy(followLatest = false) }
                     ?: current.withBuildOf(restored).copy(followLatest = false)
+            }
+        }
+        relabelAfterRollback(clientDir, rolled)
+        return rolled
+    }
+
+    /**
+     * Puts the restored files under the names the record's choice gives them.
+     *
+     * A snapshot gives each file back under the name it had when it was taken, and
+     * the record keeps the choice as it is now, so a mod or a resource pack switched
+     * since came back under its old name: on in the record and off in the game, or
+     * the other way round. Which files are switchable at all is the restored build's
+     * manifest's to say, so without it (offline, a build the mirror retired) the
+     * names stay as restored and the next sync or update relabels them.
+     */
+    private suspend fun relabelAfterRollback(clientDir: Path, instance: PackInstance) {
+        val version = currentVersionOf(instance) ?: return
+        val manifest = try {
+            client.fetchManifestVersion(instance.packRef.id, version)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            log.warn("rollback: the manifest of {} {} is unavailable, names left as restored: {}", instance.packRef.id, version, e.toString())
+            return
+        }
+        InstanceMutationLock.withLock(clientDir) {
+            withContext(Dispatchers.IO) {
+                syncService.relabel(clientDir, manifest.mods, OptionalContentRules.enabledState(manifest.mods, instance.optionalContent))
+                syncService.relabelAssets(
+                    clientDir,
+                    manifest.assets,
+                    OptionalContentRules.assetState(manifest.assets, instance.optionalContent, OptionalContentRules.placedIn(clientDir)),
+                )
             }
         }
     }

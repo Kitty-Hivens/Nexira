@@ -404,6 +404,30 @@ class PackUpdateServiceTest {
         assertFalse(Files.exists(h.clientDir.resolve("config/new.cfg")))                   // added asset removed
     }
 
+    /**
+     * The snapshot gives each file back under the name it had when it was taken, and
+     * the record keeps the choice as it is now. Switched on after the update, the
+     * optional came back under its off name, on in the record and off in the game.
+     */
+    @Test
+    fun `a rollback puts the restored files under the names the current choice gives them`() = runTest {
+        val h = Harness()
+        val instance = h.installV1()
+        h.serveAmberV2()
+        assertTrue(h.service.applyUpdate(instance, null, null) is UpdateOutcome.Applied)
+        val snapshot = h.service.listSnapshots(instance).single()
+        // The player switches optB on after the update.
+        val v2 = h.client.fetchManifest("test")
+        val on = mapOf("req.jar" to true, "optB.jar" to true)
+        h.repo.put(h.repo.get("i1")!!.copy(optionalContent = OptionalContentRules.togglesFrom(v2.mods, on)))
+        h.sync.relabel(h.clientDir, v2.mods, on)
+
+        h.service.rollback(instance, snapshot.id)
+
+        assertEquals("OPTB-V1", readText(h.clientDir.resolve("mods/optB.jar")), "the restored bytes, under the name the choice gives them")
+        assertFalse(Files.exists(h.clientDir.resolve("mods/optB.jar.disabled")))
+    }
+
     @Test
     fun `a failed amber apply auto-reverts to the snapshot`() = runTest {
         val h = Harness()
