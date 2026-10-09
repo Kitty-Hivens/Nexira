@@ -136,9 +136,12 @@ fun BrowseScreen(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            // Unreadable is not gone. The choice stays and the rows offer nothing
-            // until the pack can be read, rather than quietly forgetting it.
+            // Unreadable is not gone. The choice stays and the rows install into no
+            // pack until it can be read, rather than quietly forgetting it. The reading
+            // from before is dropped with it: kept, it answered for a pack whose game
+            // version may have moved since.
             log.warn("reading the install target {} failed", id, e)
+            c.resolved = null
             return@LaunchedEffect
         }
         if (pack == null) {

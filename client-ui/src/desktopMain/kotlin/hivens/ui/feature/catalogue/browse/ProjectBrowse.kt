@@ -420,7 +420,12 @@ internal fun rememberProjectBrowseState(
     val installer: ModInstaller = koinInject()
     val session: ProjectBrowseSession = koinInject()
     val hiding = hideInstalled && destination != null
-    return remember(type, destination?.pack?.id, sort, filters, hiding) {
+    // Keyed on what the pack runs as well as which pack it is. The target is read off
+    // disk after the screen has drawn once, so the first frame of a return holds the
+    // previous visit's reading, and a pack updated since to another game version kept
+    // that reading for every install from the list, unlocked filters leaving nothing
+    // else to rebuild it.
+    return remember(type, destination?.target, sort, filters, hiding) {
         val target = destination?.target
         ProjectBrowseState(
             kind = kind,
