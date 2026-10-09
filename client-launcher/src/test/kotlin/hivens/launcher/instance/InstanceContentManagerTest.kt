@@ -71,6 +71,27 @@ class InstanceContentManagerTest {
         assertEquals("WHOLE", dir.resolve("mods/${src.fileName}").readText())
     }
 
+    /**
+     * An update takes the new file's name from the catalogue. Inside the folder is
+     * not enough: `1.12.2/x.jar` resolves under `mods/` and lands where Forge reads
+     * a second set of mods, beside the build it was meant to replace.
+     */
+    @Test
+    fun `a replacement whose name is a path is refused and the old file stays`() = runTest {
+        val dir = instance()
+        // Forge 1.12.2 makes this directory itself, so it is there to land in.
+        Files.createDirectories(dir.resolve("mods/1.12.2"))
+        Files.writeString(dir.resolve("mods/x.jar"), "OLD")
+        val scratch = Files.writeString(dir.resolve("mods/.nexira-update-1.part"), "NEW")
+
+        val landed = manager.replace(dir, ContentKind.Mod, "x.jar", scratch, "1.12.2/x.jar", enabled = true)
+
+        assertFalse(landed)
+        assertEquals("OLD", dir.resolve("mods/x.jar").readText())
+        assertFalse(Files.exists(dir.resolve("mods/1.12.2/x.jar")))
+        assertFalse(Files.exists(scratch), "the download goes with the refusal")
+    }
+
     /** Listed twice, the two rows carried one identity and Compose rejected the duplicate key. */
     @Test
     fun `an item on disk under both names is listed once, as the loadable one`() = runTest {

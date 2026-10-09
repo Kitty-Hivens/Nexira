@@ -86,13 +86,17 @@ class InstanceContentManager {
     ): Boolean = withContext(Dispatchers.IO) {
         InstanceMutationLock.withLock(instanceDir) {
             val dir = instanceDir.resolve(kind.folderName())
-            // The new name comes from a catalogue's answer: held inside the folder.
-            val target = runCatching { resolveWithinRoot(dir, if (enabled) newFileName else newFileName + DISABLED_SUFFIX) }
-                .getOrElse {
-                    log.warn("Refusing to place {}: {}", newFileName, it.message)
-                    runCatching { Files.deleteIfExists(source) }
-                    return@withLock false
-                }
+            // The new name comes from a catalogue's answer, so it is held to what
+            // [place] holds a name to: a bare file name, which a loader reads from
+            // this folder and from nowhere below it.
+            val target = runCatching {
+                require(isBareFileName(newFileName)) { "not a bare file name" }
+                resolveWithinRoot(dir, if (enabled) newFileName else newFileName + DISABLED_SUFFIX)
+            }.getOrElse {
+                log.warn("Refusing to replace {} with {}: {}", oldFileName, newFileName, it.message)
+                runCatching { Files.deleteIfExists(source) }
+                return@withLock false
+            }
             runCatching {
                 Files.createDirectories(dir)
                 fileOpRetry("install $newFileName") {
