@@ -64,3 +64,35 @@ private class ReleaseFocusNode : DelegatingNode(), PointerInputModifierNode, Com
 
     override fun onCancelPointerInput() = Unit
 }
+
+/**
+ * Gives the keyboard focus back through [restore] when a press inside this element
+ * leaves nothing in it holding the focus.
+ *
+ * For a pane whose keys only work while something in it is focused: the console
+ * reads its shortcuts at its root, and a press on its toolbar text or its status
+ * line, which take no focus of their own, let [releaseFocusOnPress] above it clear
+ * the focus and left every shortcut dead until the reader clicked the log again.
+ *
+ * Read on the last pass, after the shell's release and after whatever the press
+ * landed on has taken the focus for itself, and never consumed.
+ */
+fun Modifier.holdFocusOnPress(restore: () -> Unit): Modifier = this then HoldFocusElement(restore)
+
+private data class HoldFocusElement(val restore: () -> Unit) : ModifierNodeElement<HoldFocusNode>() {
+    override fun create() = HoldFocusNode(restore)
+    override fun update(node: HoldFocusNode) {
+        node.restore = restore
+    }
+}
+
+private class HoldFocusNode(var restore: () -> Unit) : DelegatingNode(), PointerInputModifierNode {
+    private val target = delegate(FocusTargetModifierNode(focusability = Focusability.Never))
+
+    override fun onPointerEvent(pointerEvent: PointerEvent, pass: PointerEventPass, bounds: IntSize) {
+        if (pass != PointerEventPass.Final || pointerEvent.type != PointerEventType.Press) return
+        if (target.getFocusedRect() == null) restore()
+    }
+
+    override fun onCancelPointerInput() = Unit
+}

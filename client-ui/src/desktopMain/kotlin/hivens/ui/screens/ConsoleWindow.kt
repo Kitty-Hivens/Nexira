@@ -58,6 +58,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
@@ -120,6 +121,7 @@ import hivens.ui.theme.LocalMonoFamily
 import hivens.ui.theme.nexiraBrailleFamily
 import hivens.ui.utils.ConsoleSettings
 import hivens.ui.utils.ConsoleSettingsStore
+import hivens.ui.utils.holdFocusOnPress
 import hivens.ui.utils.GameConsoleService
 import hivens.ui.utils.LogEntry
 import hivens.ui.utils.LogType
@@ -196,6 +198,9 @@ internal sealed interface ConsoleSource {
     data object Live : ConsoleSource
     data class FileBacked(val entries: List<LogEntry>) : ConsoleSource
 }
+
+/** The parts of the console that take the keyboard focus. */
+private enum class ConsoleFocus { Log, Search, Command }
 
 // ── Main composable ─────────────────────────────────────────────────────────
 
@@ -306,6 +311,10 @@ internal fun ConsoleContent(
     val selection       = remember { LogSelection() }
     val searchFocus     = remember { FocusRequester() }
     val logFocus        = remember { FocusRequester() }
+    val cmdFocus        = remember { FocusRequester() }
+    // Which of the three last held the focus, so a press that left none of them
+    // holding it gives it back there rather than always to the log.
+    var lastFocus       by remember { mutableStateOf(ConsoleFocus.Log) }
     val density         = LocalDensity.current
 
     // ── Buffer source ──────────────────────────────────────────────────────
@@ -541,6 +550,17 @@ internal fun ConsoleContent(
         runCatching { logFocus.requestFocus() }
     }
 
+    val commandRowShown = isLive && (gameConsole.canSendCommands || gameConsole.hasLocalCommands)
+
+    fun restoreFocus() {
+        val requester = when (lastFocus) {
+            ConsoleFocus.Search -> searchFocus.takeIf { searchOpen }
+            ConsoleFocus.Command -> cmdFocus.takeIf { commandRowShown }
+            ConsoleFocus.Log -> null
+        } ?: logFocus
+        runCatching { requester.requestFocus() }.onFailure { runCatching { logFocus.requestFocus() } }
+    }
+
     // ── Puppet hooks ────────────────────────────────────────────────────────
     // Public contract: existing ids preserved verbatim so older e2e drivers
     // do not break. New ids for search-open / next-prev added on top.
@@ -572,6 +592,10 @@ internal fun ConsoleContent(
     Column(
         Modifier
             .fillMaxSize()
+            // The keys below are read only while something in here holds the focus.
+            // Embedded in a pack's Logs tab, a press on the toolbar's text or the
+            // status line let the shell clear it, and every shortcut went dead.
+            .holdFocusOnPress { restoreFocus() }
             .onPreviewKeyEvent { ev ->
                 if (ev.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                 // Command input owns its own keyboard handling (Enter / Up /
@@ -697,7 +721,10 @@ internal fun ConsoleContent(
                         ),
                         onInteract      = { runCatching { logFocus.requestFocus() } },
                         onViewportWidth = { hostWidthPx = it },
-                        modifier        = Modifier.focusRequester(logFocus).focusable(),
+                        modifier        = Modifier
+                            .focusRequester(logFocus)
+                            .onFocusChanged { if (it.isFocused) lastFocus = ConsoleFocus.Log }
+                            .focusable(),
                     )
                 }
             }
@@ -776,7 +803,10 @@ internal fun ConsoleContent(
                 onToggleFilter = { searchAsFilter = !searchAsFilter },
                 onClose        = { closeSearch() },
                 focusRequester = searchFocus,
-                onFocusChanged = { searchHasFocus = it },
+                onFocusChanged = {
+                    searchHasFocus = it
+                    if (it) lastFocus = ConsoleFocus.Search
+                },
                 strings        = s,
                 onNext         = ::jumpNext,
                 onPrev         = ::jumpPrev,
@@ -789,7 +819,7 @@ internal fun ConsoleContent(
         // process's stdin via gameConsole.sendCommand, pushes it onto
         // cmdHistory, clears the input. Up / Down step through history
         // (most-recent first). Esc clears or blurs.
-        if (isLive && (gameConsole.canSendCommands || gameConsole.hasLocalCommands)) {
+        if (commandRowShown) {
             CommandInputRow(
                 value            = cmdInput,
                 onValueChange    = { cmdInput = it; cmdHistoryIdx = -1 },
@@ -833,7 +863,11 @@ internal fun ConsoleContent(
                         runCatching { logFocus.requestFocus() }
                     }
                 },
-                onFocusChanged   = { cmdHasFocus = it },
+                onFocusChanged   = {
+                    cmdHasFocus = it
+                    if (it) lastFocus = ConsoleFocus.Command
+                },
+                focusRequester   = cmdFocus,
                 strings          = s,
             )
         }
@@ -1175,6 +1209,9 @@ private fun SearchPrompt(
     }
 }
 
+// Never focusable: a press on one used to take the focus off the search field, and
+// the next letters typed were read as the log's shortcuts rather than as the query.
+//
 // Material3 TextButton injects a contentColor CompositionLocal that
 // overrides our explicit Text(color = ...) settings in this theme stack;
 // the regex / filter / prev / next labels on the SearchPrompt rendered
@@ -1189,6 +1226,7 @@ private fun PromptButton(
     Box(
         modifier = Modifier
             .clip(MaterialTheme.shapes.small)
+            .focusProperties { canFocus = false }
             .clickable { onClick() }
             .padding(horizontal = 6.dp, vertical = 3.dp),
         contentAlignment = Alignment.Center,
@@ -1208,6 +1246,7 @@ private fun CommandInputRow(
     onHistoryNext: () -> Unit,
     onEscape: () -> Unit,
     onFocusChanged: (Boolean) -> Unit,
+    focusRequester: FocusRequester,
     strings: AppStrings,
 ) {
     Row(
@@ -1239,6 +1278,7 @@ private fun CommandInputRow(
             cursorBrush   = SolidColor(NxInk.main),
             modifier      = Modifier
                 .weight(1f)
+                .focusRequester(focusRequester)
                 .onFocusChanged { onFocusChanged(it.isFocused) }
                 .onPreviewKeyEvent { ev ->
                     if (ev.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
