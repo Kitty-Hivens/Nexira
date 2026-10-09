@@ -394,4 +394,28 @@ class ContentTabRulesTest {
         )
         assertEquals(1, lockedCount(picked, userOwns = { false }, manifestMods = emptyMap(), manifestAssets = assets))
     }
+
+    /**
+     * Offline, or with a build the mirror retired, the manifest that says which of
+     * the pack's assets may be switched cannot be read, and every one of them read as
+     * the player's own: a required one had a raw switch and a delete.
+     */
+    @Test
+    fun `without its manifest a pack's own resource pack is locked, shown as it lies, and blocks an action`() {
+        val packs = content("faithful.zip", kind = ContentKind.ResourcePack, enabled = false)
+        val mine = content("mine.zip", kind = ContentKind.ResourcePack)
+
+        val rules = contentRowRules(packs, manifestEntry = null, userOwned = false, optionalEnabled = null, packFile = true)
+
+        assertFalse(rules.showToggle)
+        assertFalse(rules.canDelete, "the next sync would put it back")
+        assertFalse(rules.effectiveEnabled, "what is known is what is on disk")
+        assertEquals(
+            1,
+            lockedCount(
+                listOf(packs, mine), userOwns = { false }, manifestMods = emptyMap(),
+                packFiles = setOf(contentKey(ContentKind.ResourcePack, "faithful.zip")),
+            ),
+        )
+    }
 }

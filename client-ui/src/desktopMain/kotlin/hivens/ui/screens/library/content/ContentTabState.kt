@@ -19,6 +19,7 @@ import hivens.core.api.interfaces.IMirrorPackClient
 import hivens.core.data.OptionalContentRules
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
+import hivens.core.data.flatten
 import hivens.core.smrt.ModIconResolver
 import hivens.launcher.instance.ContentKind
 import hivens.launcher.instance.ContentRef
@@ -260,14 +261,18 @@ internal class ContentTabState(
     }
 
     /**
-     * Updates for rows that are still on disk under the name they were found by.
+     * Updates for rows that are still on disk under the name they were found by, and
+     * that the player may still replace.
      *
      * An applied update renames the file, so its entry here would otherwise keep
      * offering a version that is already installed until the next check came back.
+     * And a check can answer before the pack's manifest is read, about a row that
+     * turns out to be the pack's: applied, the next sync puts the pack's file back
+     * beside the replacement.
      */
     val liveUpdates: Map<ContentRef, ModUpdate> by derivedStateOf {
-        val present = items.orEmpty().mapTo(mutableSetOf()) { ContentRef(it.kind, it.fileName) }
-        updates.filterKeys { it in present }
+        val replaceable = items.orEmpty().filter { rulesFor(it).canDelete }.mapTo(mutableSetOf()) { ContentRef(it.kind, it.fileName) }
+        updates.filterKeys { it in replaceable }
     }
 
     /** Rows the player may actually have replaced, which is what "update all" means here. */
@@ -316,6 +321,20 @@ internal class ContentTabState(
         manifest?.assets.orEmpty().mapNotNull { a ->
             kindOfDest(a.dest)?.takeIf { it != ContentKind.Mod }?.let { contentKey(it, a.dest.substringAfterLast('/')) to a }
         }.toMap()
+    }
+
+    /**
+     * The resource and shader packs the installed build names, by selection key, read
+     * off the record rather than the manifest. The manifest is a fetch and can fail,
+     * and without it every one of the pack's assets read as the player's own: a
+     * required one could be switched off or deleted, and offered a catalogue update
+     * that the next sync would put back beside.
+     */
+    private val installedAssetKeys: Set<String> by derivedStateOf {
+        if (!isMirror) return@derivedStateOf emptySet()
+        instance.installedManifest?.flatten()?.keys.orEmpty().mapNotNullTo(HashSet()) { path ->
+            kindOfDest(path)?.takeIf { it != ContentKind.Mod }?.let { contentKey(it, path.substringAfterLast('/')) }
+        }
     }
 
     /** Filenames the pack lets the player turn off: its optional mods and its switchable assets. */
@@ -387,7 +406,7 @@ internal class ContentTabState(
      * action is the pack owning some of what was ticked, and naming the count is
      * the difference between a dead button and one that explains itself.
      */
-    val lockedCount: Int by derivedStateOf { lockedCount(picked, ::userOwns, manifestMods, manifestAssets) }
+    val lockedCount: Int by derivedStateOf { lockedCount(picked, ::userOwns, manifestMods, manifestAssets, installedAssetKeys) }
 
     // Cancelled and replaced whenever the list changes, so a rescan does not
     // leave a previous prefetch racing the new one over the same keys.
@@ -554,6 +573,7 @@ internal class ContentTabState(
             optionalEnabled = if (asset != null) assetState[asset.dest] else optionalState[content.fileName],
             problems        = packProblems[content.fileName].orEmpty(),
             assetEntry      = asset,
+            packFile        = content.selectionKey() in installedAssetKeys,
         )
     }
 
@@ -1037,8 +1057,14 @@ internal fun contentRowRules(
     optionalEnabled: Boolean?,
     problems: List<OptionalContentRules.Problem> = emptyList(),
     assetEntry: SmrtAssetEntry? = null,
+    /**
+     * The file is one the installed build names, known without its manifest. What
+     * locks a pack's resource or shader pack while the manifest that says which of
+     * them may be switched cannot be read: offline, or a build the mirror retired.
+     */
+    packFile: Boolean = false,
 ): ContentRowRules {
-    val freeEdit = userOwned || (content.kind != ContentKind.Mod && assetEntry == null)
+    val freeEdit = userOwned || (content.kind != ContentKind.Mod && assetEntry == null && !packFile)
     val optional = (manifestEntry != null && !manifestEntry.required) || assetEntry?.toggleable == true
     return ContentRowRules(
         effectiveEnabled = when {
@@ -1106,9 +1132,11 @@ internal fun lockedCount(
     userOwns: (InstalledContent) -> Boolean,
     manifestMods: Map<String, SmrtModEntry>,
     manifestAssets: Map<String, SmrtAssetEntry> = emptyMap(),
+    /** The pack's own files by selection key, known without its manifest, see [contentRowRules]. */
+    packFiles: Set<String> = emptySet(),
 ): Int = picked.count { c ->
     val asset = if (c.kind != ContentKind.Mod) manifestAssets[c.selectionKey()] else null
-    val freeEdit = userOwns(c) || (c.kind != ContentKind.Mod && asset == null)
+    val freeEdit = userOwns(c) || (c.kind != ContentKind.Mod && asset == null && c.selectionKey() !in packFiles)
     val optional = if (c.kind == ContentKind.Mod) manifestMods[c.fileName]?.required == false else asset?.toggleable == true
     !freeEdit && !optional
 }
