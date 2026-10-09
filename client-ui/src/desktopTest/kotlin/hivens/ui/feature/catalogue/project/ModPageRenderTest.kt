@@ -62,6 +62,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.serialization.json.Json
 import org.jetbrains.skia.EncodedImageFormat
+import org.jetbrains.skia.Data
+import javax.swing.SwingUtilities
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.Test
@@ -275,18 +277,32 @@ class ModPageRenderTest {
     private fun sheet(slug: String, name: String, local: Boolean = false) {
         val out = Path.of("build/render", name)
         Files.createDirectories(out.parent)
-        val scene = ImageComposeScene(1500, 1000, density = Density(1f)) {
+        val png = renderOnEdt(1500, 1000) {
             NxTheme(dark = true) { Screen(slug, local) }
-        }
-        val png = try {
-            var t = 0L
-            repeat(24) { scene.render(t).close(); t += 16_000_000L }
-            scene.render(t).encodeToData(EncodedImageFormat.PNG) ?: error("PNG encode failed")
-        } finally {
-            scene.close()
         }
         Files.write(out, png.bytes)
         assertTrue(png.bytes.size > 40_000, "$name drew almost nothing (${png.bytes.size} bytes)")
+    }
+
+    /**
+     * Builds and draws the scene on the AWT event thread, where Compose's global
+     * snapshot pump runs. Driven from the test's own thread the two raced over one
+     * composition, which surfaced now and then as a layout node missing from the
+     * hit-test list.
+     */
+    private fun renderOnEdt(width: Int, height: Int, content: @Composable () -> Unit): Data {
+        var png: Data? = null
+        SwingUtilities.invokeAndWait {
+            val scene = ImageComposeScene(width, height, density = Density(1f), content = content)
+            png = try {
+                var t = 0L
+                repeat(24) { scene.render(t).close(); t += 16_000_000L }
+                scene.render(t).encodeToData(EncodedImageFormat.PNG) ?: error("PNG encode failed")
+            } finally {
+                scene.close()
+            }
+        }
+        return checkNotNull(png)
     }
 
     /** Never consulted: the sheet loads nothing. */
@@ -341,7 +357,7 @@ class ModPageRenderTest {
             loader = "neoforge",
         )
 
-        val scene = ImageComposeScene(width, 700, density = Density(1f)) {
+        val png = renderOnEdt(width, 700) {
             NxTheme(dark = true) {
                 Box(Modifier.fillMaxSize().background(NxColor.page).padding(14.dp)) {
                     NxSurface(kind = SurfaceKind.Card, modifier = Modifier.fillMaxSize()) {
@@ -349,13 +365,6 @@ class ModPageRenderTest {
                     }
                 }
             }
-        }
-        val png = try {
-            var t = 0L
-            repeat(24) { scene.render(t).close(); t += 16_000_000L }
-            scene.render(t).encodeToData(EncodedImageFormat.PNG) ?: error("PNG encode failed")
-        } finally {
-            scene.close()
         }
         Files.write(out, png.bytes)
         assertTrue(png.bytes.size > 20_000, "$name drew almost nothing (${png.bytes.size} bytes)")
@@ -375,7 +384,7 @@ class ModPageRenderTest {
         val pageState = state("sodium")
         pageState.versions = json.decodeFromString<List<ModrinthVersion>>(resource("iris.versions.json"))
 
-        val scene = ImageComposeScene(900, 760, density = Density(1f)) {
+        val png = renderOnEdt(900, 760) {
             NxTheme(dark = true) {
                 Box(Modifier.fillMaxSize().background(NxColor.page).padding(14.dp)) {
                     NxSurface(kind = SurfaceKind.Card, modifier = Modifier.fillMaxSize()) {
@@ -383,13 +392,6 @@ class ModPageRenderTest {
                     }
                 }
             }
-        }
-        val png = try {
-            var t = 0L
-            repeat(24) { scene.render(t).close(); t += 16_000_000L }
-            scene.render(t).encodeToData(EncodedImageFormat.PNG) ?: error("PNG encode failed")
-        } finally {
-            scene.close()
         }
         Files.write(out, png.bytes)
         assertTrue(png.bytes.size > 20_000, "the changelog drew almost nothing (${png.bytes.size} bytes)")
@@ -409,7 +411,7 @@ class ModPageRenderTest {
         val media = modrinthGalleryMedia(project("essential").gallery)
         assertTrue(media.isNotEmpty(), "the fixture carries no gallery to draw")
 
-        val scene = ImageComposeScene(1000, 760, density = Density(1f)) {
+        val png = renderOnEdt(1000, 760) {
             NxTheme(dark = true) {
                 Box(Modifier.fillMaxSize().background(NxColor.page).padding(14.dp)) {
                     NxSurface(kind = SurfaceKind.Card, modifier = Modifier.fillMaxSize()) {
@@ -419,13 +421,6 @@ class ModPageRenderTest {
                     }
                 }
             }
-        }
-        val png = try {
-            var t = 0L
-            repeat(24) { scene.render(t).close(); t += 16_000_000L }
-            scene.render(t).encodeToData(EncodedImageFormat.PNG) ?: error("PNG encode failed")
-        } finally {
-            scene.close()
         }
         Files.write(out, png.bytes)
         assertTrue(png.bytes.size > 20_000, "the gallery drew almost nothing (${png.bytes.size} bytes)")
