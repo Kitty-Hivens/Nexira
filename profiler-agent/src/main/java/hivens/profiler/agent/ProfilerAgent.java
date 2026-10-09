@@ -98,7 +98,7 @@ public final class ProfilerAgent {
                 }
             }
 
-            @SuppressWarnings("AutoCloseableResource")
+            @SuppressWarnings("resource")
             ScheduledExecutorService flusher = Executors.newSingleThreadScheduledExecutor(r -> {
                 Thread t = new Thread(r, "nexira-profiler-flush");
                 t.setDaemon(true); // a profiler thread must never hold the game JVM open
