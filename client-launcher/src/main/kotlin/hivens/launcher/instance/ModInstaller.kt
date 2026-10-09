@@ -1,14 +1,10 @@
 package hivens.launcher.instance
 
 import hivens.core.api.dto.modrinth.ModrinthVersion
-import hivens.core.io.resolveWithinRoot
-import hivens.launcher.modrinth.ModrinthClient
-import hivens.launcher.util.sha1Of
-import kotlinx.coroutines.CancellationException
+import hivens.core.api.interfaces.IPackRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
-import java.nio.file.Files
 import java.nio.file.Path
 
 /**
@@ -21,16 +17,17 @@ import java.nio.file.Path
  * dependency -- and the reason "install" here means "install this, and what it
  * cannot run without".
  *
- * Only `required` dependencies are followed. Optional means the author suggests
- * it, and acting on a suggestion would quietly grow the folder by things the
- * player did not ask for. A dependency already present is left alone, whatever
- * version it is on: the pack is the player's, and a working older build is not
- * ours to replace behind their back. One older than the build the mod pinned is
- * named by the Content tab's update check, which offers the update.
+ * The work is [ContentInstaller]'s. This is its face for callers that address an
+ * instance by its folder and read a flat [Outcome], which is every caller there
+ * is today. It finds the pack that folder belongs to, since the install has to
+ * know where the pack came from and has to mark the pack busy while it runs.
  */
 class ModInstaller(
-    private val modrinth: ModrinthClient,
-    private val scanner: InstanceContentScanner,
+    private val core: ContentInstaller,
+    private val index: InstalledIndex,
+    private val repository: IPackRepository,
+    /** The launcher's data directory, whose `instances/` holds every pack's folder. */
+    private val dataDir: Path,
 ) {
 
     private val log = LoggerFactory.getLogger(ModInstaller::class.java)
@@ -38,125 +35,82 @@ class ModInstaller(
     /**
      * What an install did. [installed] is the file names that landed, head of the
      * list first; [skipped] and [missing] are PROJECT ids, the first for
-     * dependencies already present and the second for required ones with no build
-     * for this instance, which is the one case the caller has to show rather than
+     * dependencies already present and the second for required ones that did not
+     * come with it, which is the one case the caller has to show rather than
      * swallow.
+     *
+     * The build asked for counts as installed when the pack already holds its very
+     * bytes: what was asked for is what the pack has.
      *
      * [present] is every project the instance carries afterwards, the untouched
      * ninety of them included. A browser showing search results needs to know what
      * is already there and not merely what this call added: a dependency pulled in
      * behind the mod that was clicked is installed too, and so is everything the
      * player put in the folder last month.
+     *
+     * [skips] is every project the install left out with the reason, for a screen
+     * that names them rather than counting them. [refusal] says why nothing ran at
+     * all, and is null when the install ran. [headLeftOut] is why the build asked for
+     * was left out when the install could say why, a reason a retry does not change,
+     * and null when it landed, was already there, or its download broke.
      */
     data class Outcome(
         val installed: List<String> = emptyList(),
         val present: Set<String> = emptySet(),
         val skipped: List<String> = emptyList(),
         val missing: List<String> = emptyList(),
+        val skips: List<ContentInstaller.Skip> = emptyList(),
+        val refusal: ContentInstaller.Refusal? = null,
+        val headLeftOut: ContentInstaller.Skip? = null,
     ) {
         val ok: Boolean get() = installed.isNotEmpty()
     }
 
     /**
-     * Fetch [version] into the instance's mods folder along with its required
-     * dependencies, resolved breadth-first.
-     *
-     * [depth] bounds the walk. A dependency graph is a graph, not a tree: two
-     * mods can want the same API, and a malformed one can point at itself. The
-     * visited set covers the honest cases and the bound covers the rest.
+     * Fetch [version] into the instance at [instanceDir] along with its required
+     * dependencies, [depth] levels down. [mcVersion] and [loader] are what the
+     * caller read off the pack, and they decide what fits.
      */
     suspend fun install(
         instanceDir: Path,
         version: ModrinthVersion,
         mcVersion: String,
         loader: String,
-        depth: Int = MAX_DEPTH,
-    ): Outcome = withContext(Dispatchers.IO) {
-        val dir = instanceDir.resolve(ContentKind.Mod.folderName())
-        Files.createDirectories(dir)
-
-        // What the folder already holds, by project. Resolved by hash, so a jar
-        // renamed by hand still counts as installed.
-        val present = installedProjects(instanceDir).keys.toMutableSet()
-
-        val installed = mutableListOf<String>()
-        val skipped = mutableListOf<String>()
-        val missing = mutableListOf<String>()
-        val seen = mutableSetOf<String>()
-
-        var frontier = listOf(version)
-        var level = 0
-        while (frontier.isNotEmpty() && level <= depth) {
-            val next = mutableListOf<ModrinthVersion>()
-            for (v in frontier) {
-                if (!seen.add(v.id)) continue
-                if (level > 0 && v.projectId in present) {
-                    skipped += v.projectId
-                    continue
-                }
-                if (!fetch(dir, v)) continue
-                installed += v.primaryFile().filename
-                present += v.projectId
-
-                // Present already: kept as it is. One older than the build just
-                // fetched pinned is the Content tab's to name, from its update check.
-                skipped += v.dependencies
-                    .filter { it.dependencyType == "required" && it.projectId in present }
-                    .mapNotNull { it.projectId }
-                for (dep in requiredDependencies(v, present)) {
-                    val projectId = dep.projectId
-                    val resolved = resolveDependency(dep.versionId, projectId, mcVersion, loader)
-                    if (resolved == null) {
-                        // Named rather than dropped: a required dependency with no
-                        // build for this game version is why the pack will not
-                        // start, and the player has to hear it now.
-                        projectId?.let { missing += it }
-                        continue
-                    }
-                    next += resolved
-                }
-            }
-            frontier = next
-            level++
+        depth: Int = ContentInstaller.MAX_DEPTH,
+    ): Outcome {
+        val pack = destinationOf(instanceDir, mcVersion, loader) ?: run {
+            log.warn("not installing {}: no pack lives in {}", version.id, instanceDir)
+            return Outcome()
         }
-        Outcome(installed, present.toSet(), skipped.distinct(), missing.distinct())
+        return when (val result = core.install(pack, version, depth)) {
+            is ContentInstaller.Result.Refused -> {
+                log.info("not installing {} into {}: {}", version.id, instanceDir, result.reason)
+                Outcome(refusal = result.reason)
+            }
+            is ContentInstaller.Result.Done -> outcomeOf(result, version.projectId)
+        }
     }
 
     /** One project the instance carries: the row it is, the build it is, and whether it is on. */
     data class Installed(val ref: ContentRef, val version: ModrinthVersion, val enabled: Boolean)
 
     /**
-     * The mods the instance carries that Modrinth knows, by project id.
+     * The content the instance carries that Modrinth knows, by project id, from
+     * every content folder.
      *
      * A file Modrinth has never indexed is absent, see [presentProjects].
      */
-    suspend fun installedProjects(instanceDir: Path): Map<String, Installed> = withContext(Dispatchers.IO) {
-        val items = try {
-            scanner.scanMods(instanceDir)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            emptyList()
-        }
-        val hashed = items.mapNotNull { c -> runCatching { c to sha1Of(c.pathIn(instanceDir)) }.getOrNull() }
-        val versions = try {
-            modrinth.versionsForHashes(hashed.map { it.second })
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            emptyMap()
-        }
-        hashed.mapNotNull { (c, hash) ->
-            versions[hash]?.let { v -> v.projectId to Installed(ContentRef(c.kind, c.fileName), v, c.enabled) }
-        }.toMap()
-    }
+    suspend fun installedProjects(instanceDir: Path): Map<String, Installed> =
+        index.read(instanceDir).entries
+            .mapNotNull { e -> e.version?.let { v -> v.projectId to Installed(e.ref, v, e.enabled) } }
+            .toMap()
 
     /**
      * Project ids the instance already carries, resolved by file hash.
      *
      * Public because the browser asks the same question before a single install
      * has happened: a result it already has must not be offered as if it were
-     * new. One implementation, so the browser and the walk below cannot disagree
+     * new. One implementation, so the browser and the install cannot disagree
      * about what "already installed" means.
      *
      * A file Modrinth has never indexed -- anything from CurseForge, anything
@@ -164,54 +118,44 @@ class ModInstaller(
      * It is the honest answer to the question asked, and the reason a jar from
      * elsewhere still reads as installable.
      */
-    suspend fun presentProjects(instanceDir: Path): Set<String> = installedProjects(instanceDir).keys
+    suspend fun presentProjects(instanceDir: Path): Set<String> = index.read(instanceDir).projects
 
-    /**
-     * The exact build when the author pinned one, otherwise the newest that fits
-     * this instance. A pin is the author saying these two builds go together --
-     * ignoring it is how Iris ends up beside a Sodium it cannot read.
-     */
-    private suspend fun resolveDependency(
-        versionId: String?,
-        projectId: String?,
-        mcVersion: String,
-        loader: String,
-    ): ModrinthVersion? = try {
-        when {
-            versionId != null && projectId != null -> modrinth.resolveVersion(projectId, versionId)
-            projectId != null -> modrinth.newestMatchingVersion(projectId, mcVersion, loader)
-            else -> null
-        }
-    } catch (e: CancellationException) {
-        throw e
-    } catch (e: Exception) {
-        log.warn("resolving dependency {}/{} failed: {}", projectId, versionId, e.message)
-        null
+    /** The pack whose folder is [instanceDir], with the runtime the caller read off it. */
+    private suspend fun destinationOf(instanceDir: Path, mcVersion: String, loader: String): ContentDestination.Pack? {
+        val instancesDir = dataDir.resolve(INSTANCES_DIR)
+        val wanted = instanceDir.toAbsolutePath().normalize()
+        val instance = withContext(Dispatchers.IO) {
+            repository.list().firstOrNull { instancesDir.resolve(it.instanceDirName).toAbsolutePath().normalize() == wanted }
+        } ?: return null
+        return ContentDestination.Pack.of(instance, instancesDir).copy(mcVersion = mcVersion, loader = loader)
     }
 
-    /** Download one version's primary file; a name already in the folder is left alone. */
-    private suspend fun fetch(dir: Path, v: ModrinthVersion): Boolean {
-        val file = v.files.firstOrNull { it.primary } ?: v.files.firstOrNull() ?: return false
-        return try {
-            // The name comes from the catalogue's answer, so it is held inside the
-            // folder like every other path a server names: the hash comes from the
-            // same answer and does not guard where the file lands.
-            modrinth.downloadTo(file.url, resolveWithinRoot(dir, file.filename), file.hashes.sha1)
-            true
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            log.warn("downloading {} failed: {}", file.filename, e.message)
-            false
+    private fun outcomeOf(result: ContentInstaller.Result.Done, headProject: String): Outcome {
+        val alreadyThere = result.skipped.filterIsInstance<ContentInstaller.Skip.AlreadyInstalled>()
+            .filter { it.projectId == headProject }
+            .map { it.ref.fileName }
+        val notBrought = result.skipped.filter {
+            it.projectId != headProject && when (it) {
+                is ContentInstaller.Skip.Present, is ContentInstaller.Skip.AlreadyInstalled -> false
+                else -> true
+            }
         }
+        return Outcome(
+            installed = alreadyThere + result.landed.map { it.ref.fileName },
+            present = result.present,
+            skipped = result.skipped.filterIsInstance<ContentInstaller.Skip.Present>().map { it.projectId }.distinct(),
+            missing = notBrought.mapNotNull { it.projectId }.distinct(),
+            skips = result.skipped,
+            headLeftOut = result.skipped.firstOrNull {
+                it.projectId == headProject && when (it) {
+                    is ContentInstaller.Skip.Present, is ContentInstaller.Skip.AlreadyInstalled, is ContentInstaller.Skip.Failed -> false
+                    else -> true
+                }
+            },
+        )
     }
 
     private companion object {
-        /**
-         * How deep the walk goes. Three levels covers a mod wanting an API that
-         * wants a core library; past that a pack is describing something other
-         * than a dependency chain.
-         */
-        const val MAX_DEPTH = 3
+        const val INSTANCES_DIR = "instances"
     }
 }

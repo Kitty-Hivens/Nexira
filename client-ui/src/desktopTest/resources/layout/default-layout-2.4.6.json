@@ -1,0 +1,642 @@
+{
+  "schema_version": 15,
+  "graph": {
+    "surfaces": {
+      "appshell.backdrop": {
+        "families": {
+          "general": {
+            "slots": {
+              "layers": {
+                "widgets": [],
+                "flow": { "direction": "vertical", "wrap": 0, "uniform": false },
+                "grid": 0
+              }
+            }
+          }
+        }
+      },
+      "appshell.overlay": {
+        "families": {
+          "general": {
+            "slots": {
+              "bottom": {
+                "widgets": [
+                  {
+                    "kind": "appshell.activity.pill",
+                    "instance_id": "appshell-activity-pill-default"
+                  }
+                ],
+                "flow": {
+                  "direction": "vertical",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
+              }
+            }
+          }
+        }
+      },
+      "appshell.root": {
+        "families": {
+          "general": {
+            "slots": {
+              "regions": {
+                "widgets": [
+                  {
+                    "kind": "appshell.region.top",
+                    "instance_id": "appshell-region-top-default"
+                  },
+                  {
+                    "kind": "appshell.region.body",
+                    "instance_id": "appshell-region-body-default",
+                    "placement": {
+                      "anchor": "topStart",
+                      "x": 0.0,
+                      "y": 0.0,
+                      "width": 0.0,
+                      "height": 0.0,
+                      "z": 0,
+                      "weight": 1.0
+                    }
+                  }
+                ],
+                "flow": {
+                  "direction": "vertical",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
+              }
+            }
+          }
+        }
+      },
+      "appshell.body": {
+        "families": {
+          "general": {
+            "slots": {
+              "content": {
+                "widgets": [
+                  {
+                    "kind": "appshell.region.left",
+                    "instance_id": "appshell-region-left-default",
+                    "props": {
+                      "widthDp": 65
+                    }
+                  },
+                  {
+                    "kind": "appshell.region.center",
+                    "instance_id": "appshell-region-center-default",
+                    "placement": {
+                      "anchor": "topStart",
+                      "x": 0.0,
+                      "y": 0.0,
+                      "width": 0.0,
+                      "height": 0.0,
+                      "z": 0,
+                      "weight": 1.0
+                    }
+                  },
+                  {
+                    "kind": "appshell.region.right",
+                    "instance_id": "appshell-region-right-default",
+                    "props": {
+                      "widthDp": 265
+                    }
+                  }
+                ],
+                "flow": {
+                  "direction": "horizontal",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
+              }
+            }
+          }
+        }
+      },
+      "appshell.topbar": {
+        "families": {
+          "general": {
+            "slots": {
+              "left": {
+                "widgets": [
+                  {
+                    "kind": "appshell.topbar.breadcrumb",
+                    "instance_id": "appshell-topbar-breadcrumb-default"
+                  }
+                ],
+                "flow": {
+                  "direction": "horizontal",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
+              },
+              "center": {
+                "widgets": [],
+                "flow": {
+                  "direction": "horizontal",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
+              },
+              "right": {
+                "widgets": [],
+                "flow": {
+                  "direction": "horizontal",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
+              }
+            }
+          }
+        }
+      },
+      "home.new": {
+        "families": {
+          "general": {
+            "slots": {
+              "main": {
+                "widgets": [
+                  {
+                    "kind": "home.new.continue",
+                    "instance_id": "home-new-continue-default",
+                    "placement": {
+                      "padding": { "start": 24.0, "end": 24.0, "top": 20.0 }
+                    }
+                  },
+                  {
+                    "kind": "home.new.whatsnew",
+                    "instance_id": "home-new-whatsnew-default",
+                    "placement": {
+                      "padding": { "start": 24.0, "end": 24.0 }
+                    }
+                  },
+                  {
+                    "kind": "home.new.packlist",
+                    "instance_id": "home-new-packlist-default",
+                    "placement": {
+                      "padding": { "start": 24.0, "end": 24.0, "bottom": 20.0 }
+                    }
+                  }
+                ],
+                "flow": {
+                  "direction": "vertical",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
+              }
+            }
+          }
+        }
+      },
+      "library": {
+        "families": {
+          "general": {
+            "slots": {
+              "header": {
+                "widgets": [
+                  {
+                    "kind": "library.header",
+                    "instance_id": "library-header-default"
+                  }
+                ],
+                "flow": {
+                  "direction": "vertical",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
+              },
+              "body": {
+                "widgets": [
+                  {
+                    "kind": "library.body",
+                    "instance_id": "library-body-default"
+                  }
+                ],
+                "flow": {
+                  "direction": "vertical",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
+              }
+            }
+          }
+        }
+      },
+      "appshell.leftrail": {
+        "families": {
+          "general": {
+            "slots": {
+              "top": {
+                "widgets": [
+                  {
+                    "kind": "nav.entry",
+                    "instance_id": "appshell-leftrail-nav-home",
+                    "props": {
+                      "target": "Home"
+                    }
+                  },
+                  {
+                    "kind": "nav.entry",
+                    "instance_id": "appshell-leftrail-nav-library",
+                    "props": {
+                      "target": "Library"
+                    }
+                  },
+                  {
+                    "kind": "nav.entry",
+                    "instance_id": "appshell-leftrail-nav-browse",
+                    "props": {
+                      "target": "Browse"
+                    }
+                  },
+                  {
+                    "kind": "nav.entry",
+                    "instance_id": "appshell-leftrail-nav-profile",
+                    "props": {
+                      "target": "Profile"
+                    }
+                  },
+                  {
+                    "kind": "nav.entry",
+                    "instance_id": "appshell-leftrail-nav-wardrobe",
+                    "props": {
+                      "target": "Wardrobe"
+                    }
+                  },
+                  {
+                    "kind": "nav.entry",
+                    "instance_id": "appshell-leftrail-nav-settings",
+                    "props": {
+                      "target": "Settings"
+                    }
+                  },
+                  {
+                    "kind": "nav.entry",
+                    "instance_id": "appshell-leftrail-nav-about",
+                    "props": {
+                      "target": "About"
+                    }
+                  }
+                ],
+                "flow": {
+                  "direction": "vertical",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
+              },
+              "bottom": {
+                "widgets": [
+                  {
+                    "kind": "nav.entry",
+                    "instance_id": "appshell-leftrail-nav-console",
+                    "props": {
+                      "target": "Console"
+                    }
+                  },
+                  {
+                    "kind": "nav.entry",
+                    "instance_id": "appshell-leftrail-nav-logout",
+                    "props": {
+                      "target": "Logout"
+                    }
+                  }
+                ],
+                "flow": {
+                  "direction": "vertical",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
+              }
+            }
+          }
+        }
+      },
+      "appshell.rightrail": {
+        "families": {
+          "general": {
+            "slots": {
+              "news": {
+                "widgets": [
+                  {
+                    "kind": "appshell.rightrail.compactnews",
+                    "instance_id": "appshell-rightrail-compactnews-default"
+                  }
+                ],
+                "flow": {
+                  "direction": "vertical",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
+              },
+              "bottom": {
+                "widgets": [
+                  {
+                    "kind": "notifications.history",
+                    "instance_id": "appshell-rightrail-history-default"
+                  }
+                ],
+                "flow": {
+                  "direction": "vertical",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
+              }
+            }
+          },
+          "projectView": {
+            "slots": {
+              "modData": {
+                "widgets": [
+                  {
+                    "kind": "mod.compatibility",
+                    "instance_id": "mod-compatibility-default"
+                  },
+                  {
+                    "kind": "mod.links",
+                    "instance_id": "mod-links-default"
+                  },
+                  {
+                    "kind": "mod.tags",
+                    "instance_id": "mod-tags-default"
+                  }
+                ],
+                "flow": {
+                  "direction": "vertical",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
+              },
+              "authorData": {
+                "widgets": [
+                  {
+                    "kind": "mod.creators",
+                    "instance_id": "mod-creators-default"
+                  },
+                  {
+                    "kind": "mod.details",
+                    "instance_id": "mod-details-default"
+                  }
+                ],
+                "flow": {
+                  "direction": "vertical",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
+              }
+            }
+          }
+        }
+      },
+      "bg.settings": {
+        "families": {
+          "general": {
+            "slots": {
+              "controls": {
+                "widgets": [
+                  {
+                    "kind": "bg.enable.toggle",
+                    "instance_id": "bg-enable-toggle-default"
+                  },
+                  {
+                    "kind": "bg.image.picker",
+                    "instance_id": "bg-image-picker-default"
+                  },
+                  {
+                    "kind": "bg.scale.mode",
+                    "instance_id": "bg-scale-mode-default"
+                  },
+                  {
+                    "kind": "bg.position.x",
+                    "instance_id": "bg-position-x-default"
+                  },
+                  {
+                    "kind": "bg.position.y",
+                    "instance_id": "bg-position-y-default"
+                  },
+                  {
+                    "kind": "bg.fx.blur",
+                    "instance_id": "bg-fx-blur-default"
+                  },
+                  {
+                    "kind": "bg.fx.darken",
+                    "instance_id": "bg-fx-darken-default"
+                  },
+                  {
+                    "kind": "bg.fx.opacity",
+                    "instance_id": "bg-fx-opacity-default"
+                  },
+                  {
+                    "kind": "bg.fx.saturation",
+                    "instance_id": "bg-fx-saturation-default"
+                  },
+                  {
+                    "kind": "bg.fx.parallax",
+                    "instance_id": "bg-fx-parallax-default"
+                  },
+                  {
+                    "kind": "bg.fx.vignette",
+                    "instance_id": "bg-fx-vignette-default"
+                  },
+                  {
+                    "kind": "bg.fx.animspeed",
+                    "instance_id": "bg-fx-animspeed-default"
+                  },
+                  {
+                    "kind": "bg.loop.mode",
+                    "instance_id": "bg-loop-mode-default"
+                  },
+                  {
+                    "kind": "bg.audio",
+                    "instance_id": "bg-audio-default"
+                  },
+                  {
+                    "kind": "bg.tint",
+                    "instance_id": "bg-tint-default"
+                  },
+                  {
+                    "kind": "bg.reset",
+                    "instance_id": "bg-reset-default"
+                  }
+                ],
+                "flow": {
+                  "direction": "vertical",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0,
+                "viewport": {
+                  "kind": "scroll",
+                  "axis": "vertical"
+                }
+              }
+            }
+          }
+        }
+      },
+      "about": {
+        "families": {
+          "general": {
+            "slots": {
+              "left": {
+                "widgets": [
+                  {
+                    "kind": "about.logo",
+                    "instance_id": "about-logo-default"
+                  },
+                  {
+                    "kind": "about.credits",
+                    "instance_id": "about-credits-default"
+                  }
+                ],
+                "flow": {
+                  "direction": "vertical",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
+              },
+              "right": {
+                "widgets": [
+                  {
+                    "kind": "about.update.panel",
+                    "instance_id": "about-update-panel-default"
+                  },
+                  {
+                    "kind": "about.system.card",
+                    "instance_id": "about-system-card-default"
+                  },
+                  {
+                    "kind": "about.links.card",
+                    "instance_id": "about-links-card-default"
+                  }
+                ],
+                "flow": {
+                  "direction": "vertical",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
+              }
+            }
+          }
+        }
+      },
+      "profile": {
+        "families": {
+          "general": {
+            "slots": {
+              "nav": {
+                "widgets": [
+                  {
+                    "kind": "profile.nav",
+                    "instance_id": "profile-nav-default"
+                  }
+                ],
+                "flow": {
+                  "direction": "vertical",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
+              },
+              "skin": {
+                "widgets": [
+                  {
+                    "kind": "profile.skin.section",
+                    "instance_id": "profile-skin-section-default"
+                  }
+                ],
+                "flow": {
+                  "direction": "vertical",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
+              },
+              "account": {
+                "widgets": [
+                  {
+                    "kind": "profile.account.section",
+                    "instance_id": "profile-account-section-default"
+                  }
+                ],
+                "flow": {
+                  "direction": "vertical",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
+              },
+              "signin": {
+                "widgets": [
+                  {
+                    "kind": "profile.signin",
+                    "instance_id": "profile-signin-default"
+                  }
+                ],
+                "flow": {
+                  "direction": "vertical",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
+              }
+            }
+          }
+        }
+      },
+      "theme.picker": {
+        "families": {
+          "general": {
+            "slots": {
+              "grid": {
+                "widgets": [
+                  {
+                    "kind": "theme.picker.grid",
+                    "instance_id": "theme-picker-grid-default"
+                  }
+                ],
+                "flow": {
+                  "direction": "vertical",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
+              },
+              "preview": {
+                "widgets": [
+                  {
+                    "kind": "theme.picker.preview",
+                    "instance_id": "theme-picker-preview-default"
+                  }
+                ],
+                "flow": {
+                  "direction": "vertical",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

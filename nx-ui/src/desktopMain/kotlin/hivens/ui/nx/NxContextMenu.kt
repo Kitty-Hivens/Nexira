@@ -3,12 +3,10 @@ package hivens.ui.nx
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.MutableTransitionState
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
@@ -23,7 +21,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
@@ -33,10 +30,12 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,7 +43,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
@@ -84,11 +82,10 @@ enum class NxMenuAlign {
  * How a row says whether it is the chosen one.
  *
  * [Check] is the menu idiom: a mark appears on the row that is already in force
- * and nothing is drawn on the others. [Radio] is the choice idiom: every row
- * carries an indicator, so the set reads as one question with several answers
- * before the pointer moves. A menu of verbs takes neither.
+ * and nothing is drawn on the others. A menu of verbs takes none. One question
+ * with several answers is not a menu at all and goes on [NxChoiceMenu].
  */
-enum class NxMenuMark { None, Check, Radio }
+enum class NxMenuMark { None, Check }
 
 /** The gap between the trigger and the menu hanging off it. */
 private val MENU_GAP = 4.dp
@@ -140,6 +137,8 @@ fun NxContextMenu(
     maxHeight: Dp = MENU_MAX_HEIGHT,
     matchAnchorWidth: Boolean = false,
     footer: (@Composable () -> Unit)? = null,
+    /** See [NxMenuPopup]: whether the menu is on screen, its exit included, for the trigger's look. */
+    onShownChange: ((Boolean) -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
     val density = LocalDensity.current
@@ -150,7 +149,7 @@ fun NxContextMenu(
         MenuBelowAnchor(align, gapPx, origin, anchorWidth.takeIf { matchAnchorWidth })
     }
     val floor = if (matchAnchorWidth) with(density) { anchorWidth.value.toDp() } else 0.dp
-    NxMenuPopup(provider, origin, expanded, onDismissRequest) {
+    NxMenuPopup(provider, origin, expanded, onDismissRequest, onShownChange) {
         NxMenuSurface(modifier, maxOf(minWidth, floor), maxOf(maxWidth, floor), maxHeight, footer, content)
     }
 }
@@ -187,9 +186,10 @@ fun NxContextMenu(
  * The popup shell: mounted through the exit animation, unfolding from wherever
  * [origin] says the trigger is.
  *
- * Shared with [NxSelect], which supplies its own body -- a select's list is data
- * rather than an arbitrary column, so it lays itself out lazily and drives the
- * keyboard, but it hangs off its trigger and dismisses exactly like a menu.
+ * Shared with [NxChoiceMenu] and [NxSelect], which supply their own body: a list
+ * of answers has its own rows, and a select's list is data that lays itself out
+ * lazily and drives the keyboard. Both hang off their trigger and dismiss exactly
+ * like a menu.
  */
 @Composable
 internal fun NxMenuPopup(
@@ -197,13 +197,26 @@ internal fun NxMenuPopup(
     origin: MutableState<TransformOrigin>,
     expanded: Boolean,
     onDismissRequest: () -> Unit,
+    /**
+     * Whether any of the popup is on screen, its exit included.
+     *
+     * For the trigger's own look. While the popup is up it takes the pointer, so the
+     * trigger reads as not hovered, and the hover only comes back once the popup has
+     * gone and the pointer is asked again. A trigger lit by "open" alone went dark
+     * the moment it closed and lit again a moment later under a pointer that never
+     * moved. Lit for as long as this says true, it holds steady across the gap.
+     */
+    onShownChange: ((Boolean) -> Unit)? = null,
     body: @Composable () -> Unit,
 ) {
     val states = remember { MutableTransitionState(false) }
     states.targetState = expanded
+    val shown = states.currentState || states.targetState
+    val report by rememberUpdatedState(onShownChange)
+    LaunchedEffect(shown) { report?.invoke(shown) }
     // Stay mounted through the exit animation: render while either the live or
     // the target state is still "open".
-    if (!states.currentState && !states.targetState) return
+    if (!shown) return
 
     Popup(
         popupPositionProvider = provider,
@@ -294,9 +307,9 @@ private fun NxMenuSurface(
  * Hover fades in rather than snapping, because a menu is a list the pointer
  * crosses and an instant swap on every row it passes reads as flicker.
  *
- * [mark] chooses how the row reports selection: a trailing check for a menu, a
- * leading radio for a list of answers to one question. The leading [icon] and
- * label share the row's colour so a [destructive] row reads red at a glance.
+ * [mark] chooses whether the row reports selection with a trailing check. The
+ * leading [icon] and label share the row's colour so a [destructive] row reads
+ * red at a glance.
  *
  * [hint] trails the label in muted type -- for the keystroke that does the same
  * thing. A menu is where a shortcut is discovered: someone who reaches for the
@@ -350,10 +363,6 @@ fun NxMenuItem(
             .padding(horizontal = Spacing.s10, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (mark == NxMenuMark.Radio) {
-            RadioMark(selected = selected, color = if (selected) fitOn(lead, ground) else quiet)
-            Spacer(Modifier.width(Spacing.s10))
-        }
         if (icon != null) {
             Symbol(icon, contentDescription = null, tint = color, size = 18.dp)
             Spacer(Modifier.width(Spacing.s10))
@@ -388,30 +397,6 @@ fun NxMenuItem(
         if (trailingCheck) {
             Symbol(NxIcon.Check, contentDescription = null, tint = color, size = 18.dp)
         }
-    }
-}
-
-/**
- * The selection indicator for a list of answers, drawn rather than set in the icon
- * font: the dot has to grow out of the ring when the answer changes, and a glyph
- * swap cannot do that. Unselected it is an empty ring in the muted ink, so the
- * whole column reads as one question before anything is hovered.
- */
-@Composable
-internal fun RadioMark(selected: Boolean, color: Color, size: Dp = 16.dp) {
-    val fill by animateFloatAsState(
-        targetValue   = if (selected) 1f else 0f,
-        animationSpec = Motion.tap.of(),
-        label         = "radioMark",
-    )
-    Canvas(Modifier.size(size)) {
-        val ring = this.size.minDimension / 2f
-        drawCircle(
-            color  = color.copy(alpha = 0.45f + 0.55f * fill),
-            radius = ring - 0.75.dp.toPx(),
-            style  = Stroke(width = 1.5.dp.toPx()),
-        )
-        if (fill > 0f) drawCircle(color = color, radius = (ring - 4.dp.toPx()) * fill)
     }
 }
 

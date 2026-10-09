@@ -125,7 +125,6 @@ object RussianStrings : AppStrings {
     override val windowRestore          = "Восстановить"
     override val windowClose            = "Закрыть"
     override val crumbHome              = "Главная"
-    override val crumbLoading           = "Загрузка…"
     override val paginationPrev         = "Предыдущая страница"
     override val paginationNext         = "Следующая страница"
 
@@ -675,6 +674,55 @@ object RussianStrings : AppStrings {
         "optimization" -> "Оптимизация"
         "quests"       -> "Квесты"
         "technology"   -> "Технологии"
+        "cursed"           -> "Проклятое"
+        "decoration"       -> "Декор"
+        "economy"          -> "Экономика"
+        "equipment"        -> "Снаряжение"
+        "food"             -> "Еда"
+        "game-mechanics"   -> "Игровая механика"
+        "library"          -> "Библиотека"
+        "management"       -> "Управление"
+        "minigame"         -> "Мини-игры"
+        "mobs"             -> "Мобы"
+        "social"           -> "Общение"
+        "storage"          -> "Хранение"
+        "transportation"   -> "Транспорт"
+        "utility"          -> "Утилиты"
+        "worldgen"         -> "Генерация мира"
+        "modded"           -> "Для модов"
+        "realistic"        -> "Реализм"
+        "simplistic"       -> "Простота"
+        "themed"           -> "Тематика"
+        "tweaks"           -> "Твики"
+        "vanilla-like"     -> "Как ванилла"
+        "audio"            -> "Звуки"
+        "blocks"           -> "Блоки"
+        "core-shaders"     -> "Core-шейдеры"
+        "entities"         -> "Существа"
+        "environment"      -> "Окружение"
+        "fonts"            -> "Шрифты"
+        "gui"              -> "Интерфейс"
+        "items"            -> "Предметы"
+        "locale"           -> "Перевод"
+        "models"           -> "Модели"
+        "8x-"              -> "8x и меньше"
+        "512x+"            -> "512x и больше"
+        "cartoon"          -> "Мультяшные"
+        "fantasy"          -> "Фэнтези"
+        "semi-realistic"   -> "Полуреализм"
+        "atmosphere"       -> "Атмосфера"
+        "bloom"            -> "Свечение"
+        "colored-lighting" -> "Цветной свет"
+        "foliage"          -> "Листва"
+        "path-tracing"     -> "Трассировка путей"
+        "pbr"              -> "PBR"
+        "reflections"      -> "Отражения"
+        "shadows"          -> "Тени"
+        "potato"           -> "Картошка"
+        "low"              -> "Низкая"
+        "medium"           -> "Средняя"
+        "high"             -> "Высокая"
+        "screenshot"       -> "Для скриншотов"
         else           -> humanizeCategory(id)
     }
 
@@ -754,6 +802,10 @@ object RussianStrings : AppStrings {
     override val contentVersionsLoadFailed      = "Не удалось получить список версий"
     override val contentDetailAuthors           = "Авторы"
     override val contentDetailSize              = "Размер"
+    override val packRailMods                   = "Модов"
+    override fun packRailSignIn(provider: String) = "Нужен вход в $provider"
+    override val packRailUsedBy                 = "В сборках"
+    override val modLinkPage                    = "Страница проекта"
     override val modPageTabDescription = "Описание"
     override val modPageTabVersions = "Версии"
     override val modPageTabChangelog = "Изменения"
@@ -773,6 +825,83 @@ object RussianStrings : AppStrings {
     override val modPageInstallFailed = "Установить не вышло"
     override val modPageInstallRetry = "Повторить"
     override fun modPageInstallMissing(count: Int) = "Не хватает зависимостей: $count"
+
+    // Browse by kind, and the pack an install from it goes into
+    override val browseKindPacks           = "Паки"
+    override val installPickerNoPacks      = "Пока нет паков для установки"
+    override val installPickerFailed       = "Не удалось получить версии проекта"
+    override val installTargetNoBuild      = "Нет сборки под эту версию игры и загрузчик"
+    override val installTargetNotTaken     = "Что ставить в этот пак, решает его источник"
+    override val installTargetUnknown      = "Не удалось прочитать пак"
+    override val installRefusedGameRunning = "Игра запущена"
+    override val installRefusedBusy        = "Пак сейчас занят"
+    override val installInstalled          = "Установлено"
+    override fun installSkipLine(project: String, reason: String) = "$project: $reason"
+    override val installSkipLookupFailed = "Не удалось проверить"
+    override val installSkipNotPlaceable = "Не ставится в пак"
+    override val installSkipNameTaken    = "Это имя уже занято другим файлом"
+    override val installSkipNotAttempted = "Не пробовали: основная загрузка не прошла"
+    override val installSkipTooDeep      = "Слишком глубоко в цепочке зависимостей"
+    override val installSkipPackOwned    = "Файл самого пака, обновление вернёт его"
+    override val browseRailFind        = "Что ищем"
+    override val browseRailSource      = "Источник"
+    override val browseSearchMods      = "Поиск модов"
+    override val browseSearchResourcePacks = "Поиск ресурспаков"
+    override val browseSearchShaders   = "Поиск шейдеров"
+    override val browseFilterVersion     = "Версия игры"
+    override val browseFilterLoader      = "Загрузчик"
+    override val browseFilterCategories  = "Категории"
+    override val browseFilterFeatures    = "Особенности"
+    override val browseFilterResolutions = "Разрешение"
+    override val browseFilterPerformance = "Нагрузка"
+    override val browseFilterEnvironment = "Среда"
+    override val browseFilterLicense     = "Лицензия"
+    override val browseFilterExclusions  = "Исключить"
+    override val browseFilterClient      = "Клиент"
+    override val browseFilterServer      = "Сервер"
+    override val browseFilterOpenSource  = "Открытый исходный код"
+    override val browseFilterArchived    = "В архиве"
+    override val browseFilterShowMore    = "Показать ещё"
+    override val browseFilterShowLess    = "Свернуть"
+    override val browseFilterAllVersions = "Показать снапшоты"
+    override val browseFilterExclude     = "Исключить"
+    override val browseFilterUnlockHint  = "Если открыть, найдётся и то, что на этом паке не запустится"
+    override val browseFilterUnlock      = "Открыть фильтр"
+    override val browseFilterRelock      = "Вернуть как у пака"
+    override val browseHideInstalled     = "Скрыть установленное"
+    override val browseFilterBuiltBy     = "Кто собрал"
+    override val browseFilterCommunity   = "Сообщество"
+    override val browseFiltersClearAll   = "Сбросить всё"
+    override val browseInstallingInto    = "Ставим в"
+    override val browseLeaveTarget       = "Не ставить в этот пак"
+    override val browseBackToPack        = "К паку"
+    override val installDialogTitle      = "Установить проект"
+    override val installDialogClose      = "Закрыть"
+    override val installDialogExisting   = "Существующий пак"
+    override val installDialogNew        = "Новый пак"
+    override val installDialogSearch     = "Поиск пака"
+    override val installDialogShowUnfit  = "Показать неподходящие"
+    override val installDialogHideUnfit  = "Скрыть неподходящие"
+    override val installDialogCreate     = "Создать и установить"
+    override val installDialogCreating   = "Собираем пак"
+    override val installDialogOpenPack   = "Открыть пак"
+    override fun browseFilterLockedBy(pack: String) = "Как у пака «$pack»"
+    override fun installDialogFitCount(count: Int) = "Подходит паков: $count"
+    override fun installDialogDone(pack: String) = "Установлено в «$pack»"
+    override val browseSortLabel       = "Сортировка"
+    override val browseSortRelevance   = "По релевантности"
+    override val browseSortDownloads   = "По загрузкам"
+    override val browseSortFollows     = "По подписчикам"
+    override val browseSortNewest      = "Новые"
+    override val browseSortUpdated     = "Обновлённые"
+    override val modPageInstallChoose  = "Установить в…"
+    override val editorSurfBrowse      = "Каталог"
+    override val editorSurfShortBrowse = "Каталог"
+    override val editorSurfProject     = "Страница проекта"
+    override val editorSurfShortProject = "Проект"
+    override val editorSurfCataloguePack = "Страница пака из каталога"
+    override val editorSurfShortCataloguePack = "Пак"
+    override fun browseByAuthor(name: String) = "от $name"
     override val modPageInstallShort = "Установить"
     override fun modPageNoBuildFor(target: String) = "Нет сборки под $target"
     override val modPageNoBuildAny = "Подходящей сборки нет"
@@ -973,6 +1102,7 @@ object RussianStrings : AppStrings {
     override fun packVersionsApplying(current: Int, total: Int, name: String) = "Применение $current/$total: $name"
     override fun packVersionsApplied(version: String) = "Готово: установлен билд $version"
     override fun packVersionsFailed(reason: String) = "Не получилось: $reason"
+    override fun packOperationRefused(work: String) = "Сейчас нельзя, пак занят. $work"
     override val packVersionsRetry              = "Повторить"
     override val packVersionsLoadError          = "Зеркало недоступно, список версий не загрузился"
 
@@ -1080,6 +1210,7 @@ object RussianStrings : AppStrings {
     override val launchBlockRecovering          = "Восстановление…"
     override val launchBlockDeleting            = "Удаление…"
     override val launchBlockUpdatingContent     = "Обновляются моды…"
+    override val launchBlockInstallingContent   = "Устанавливается контент…"
     override val launchBlockMissing             = "Файлы не найдены"
     override val launchBlockOtherRunning        = "Запущена другая игра"
     override val launchStopping                 = "Останавливается…"
@@ -1397,6 +1528,28 @@ object RussianStrings : AppStrings {
         "widget.home.new.welcome.customGreeting" to "Свой текст приветствия",
         "widget.home.new.welcome.showSubtitle" to "Показывать подзаголовок",
         "widget.library.body" to "Тело библиотеки",
+        "widget.browse.search" to "Поиск каталога",
+        "widget.browse.results" to "Результаты каталога",
+        "widget.project.header" to "Шапка проекта",
+        "widget.project.tabs" to "Вкладки проекта",
+        "widget.project.body" to "Содержимое вкладки проекта",
+        "widget.catalogue.pack.header" to "Шапка пака из каталога",
+        "widget.catalogue.pack.tabs" to "Вкладки пака из каталога",
+        "widget.catalogue.pack.body" to "Содержимое вкладки пака",
+        "widget.browse.scope" to "Что ищем",
+        "widget.browse.installing" to "Пак, в который ставим",
+        "widget.browse.chips" to "Выбранные фильтры",
+        "widget.browse.filter.version" to "Фильтр: версия игры",
+        "widget.browse.filter.loader" to "Фильтр: загрузчик",
+        "widget.browse.filter.categories" to "Фильтр: категории",
+        "widget.browse.filter.features" to "Фильтр: особенности",
+        "widget.browse.filter.resolutions" to "Фильтр: разрешение",
+        "widget.browse.filter.performance" to "Фильтр: нагрузка",
+        "widget.browse.filter.environment" to "Фильтр: среда",
+        "widget.browse.filter.license" to "Фильтр: лицензия",
+        "widget.browse.filter.exclusions" to "Фильтр: исключения",
+        "widget.browse.filter.installed" to "Скрыть установленное",
+        "widget.browse.filter.builtBy" to "Фильтр: кто собрал",
         "widget.library.body.emptyText" to "Текст пустого состояния",
         "widget.library.body.emptyTitle" to "Заголовок пустого состояния",
         "widget.library.header" to "Шапка библиотеки",

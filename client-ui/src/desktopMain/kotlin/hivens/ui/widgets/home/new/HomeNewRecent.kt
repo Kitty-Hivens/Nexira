@@ -61,7 +61,7 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.screens.library.lastPlayedLabel
 import hivens.ui.screens.library.rememberPackArt
-import hivens.ui.screens.mod.loaderLabel
+import hivens.ui.feature.catalogue.project.loaderLabel
 import hivens.ui.theme.familyForText
 import hivens.ui.theme.decorativePair
 import hivens.widget.api.rememberProps

@@ -108,8 +108,8 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.theme.familyForText
 import hivens.ui.theme.decorativeColor
-import hivens.ui.screens.mod.ModTarget
-import hivens.ui.screens.mod.rememberLinkFollower
+import hivens.ui.feature.catalogue.project.ModTarget
+import hivens.ui.feature.catalogue.project.rememberLinkFollower
 import hivens.ui.screens.versions.pickerIntentFor
 import hivens.ui.screens.versions.pickerVersionsOf
 import hivens.ui.screens.versions.VersionPickerWindow
@@ -148,12 +148,8 @@ internal fun ContentTabPane(
      * blocks live in the shell's right rail and a dialog has no rail beside it.
      */
     onOpenProject: (ModTarget) -> Unit,
-    /**
-     * Whether the project browser is open, held by the screen so it survives a
-     * visit to a project page and back.
-     */
-    browsing: Boolean,
-    onBrowsing: (Boolean) -> Unit,
+    /** Opens the launcher's browse aimed at this pack. */
+    onFindProjects: () -> Unit,
     modifier: Modifier = Modifier,
     /** Opens the pack's settings where detaching lives, offered from a locked row's menu. */
     onOpenPackSettings: () -> Unit = {},
@@ -208,24 +204,6 @@ internal fun ContentTabPane(
         onDispose { selections.clearIf(published) }
     }
 
-    if (browsing) {
-        ModBrowser(
-            mcVersion = instance.cachedManifest?.minecraftVersion.orEmpty(),
-            loader    = instance.cachedManifest?.loaderName
-                ?.takeIf { it.isNotBlank() && !it.equals("vanilla", ignoreCase = true) }
-                ?.lowercase().orEmpty(),
-            modsDir   = state.instanceDir.resolve("mods"),
-            modifier  = modifier,
-            onBack    = {
-                onBrowsing(false)
-                state.refreshAfterBrowse()
-            },
-            instanceId = instance.id,
-            onOpenProject = onOpenProject,
-        )
-        return
-    }
-
     Column(
         modifier            = modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -242,14 +220,15 @@ internal fun ContentTabPane(
             shownCount     = state.visible.size,
             scannedCount   = state.scannedCount,
             // Adding mods is gated behind detach; resource / shader packs can be added
-            // any time (switch to their filter to target that folder). "Find projects"
-            // is the Modrinth MOD browser, so it stays mod-gated.
+            // any time (switch to their filter to target that folder).
             canAdd         = state.canAddContent ||
                 state.filter.kind == ContentKind.ResourcePack ||
                 state.filter.kind == ContentKind.ShaderPack,
-            canFindProjects = state.canAddContent,
+            // A mirror pack refuses the player's mods and still takes their resource
+            // packs and shaders, so the browse aimed at it opens on those.
+            canFindProjects = state.canAddContent || state.isMirror,
             onAddFiles     = { state.addFiles(addDialogSettings) },
-            onFindProjects = { onBrowsing(true) },
+            onFindProjects = onFindProjects,
             // Updating is offered wherever replacing a file is: on a tracked pack
             // the pack decides what its mods are, and a swap behind its back is
             // undone by the next sync.
@@ -422,7 +401,7 @@ internal fun ModVersionsWindow(
     onDismiss: () -> Unit,
 ) {
     val s = LocalStrings.current
-    val loaders = loadersFor(content.kind, loader)
+    val loaders = loadersFor(content.kind, loader, mcVersion)
     // Everything with a file, marked rather than filtered. Dropping the builds
     // that do not fit answered "is there one for me" by making it unaskable: an
     // absence read the same whether the project never shipped one or shipped one
@@ -1072,141 +1051,6 @@ private fun ContentIcon(state: ContentIconState?, seed: String, displayName: Str
             ContentIconState.None -> Plate(letter = true)
             // Still resolving: the bare plate, which is what it settles onto.
             null -> Plate(letter = false)
-        }
-    }
-}
-
-/**
- * "Find projects" browser: searches Modrinth for MODS compatible with the
- * instance's MC + loader and downloads the best-matching version straight into
- * `mods/`. Reachable only from an editable (detached) instance.
- */
-@Composable
-private fun ModBrowser(
-    mcVersion: String,
-    loader: String,
-    modsDir: Path,
-    modifier: Modifier,
-    onBack: () -> Unit,
-    /** Which pack a result opened from here would be installed into. */
-    instanceId: String,
-    onOpenProject: (ModTarget) -> Unit,
-) {
-    val s = LocalStrings.current
-    val state = rememberModBrowserState(mcVersion, loader, modsDir)
-    // Installs run on the app's scope: one fetches the clicked jar and then its
-    // dependencies, and leaving the browser between the two left a mod without them.
-    val installScope: CoroutineScope = koinInject()
-
-    // What the instance already holds, asked once when the browser opens. Without
-    // it every result offers an install, including the ninety already in the
-    // folder.
-    LaunchedEffect(state) { state.loadInstalled() }
-    // Debounce typing, then search on the settled query. The timer is a
-    // composition concern; both halves of the query live on the holder, so a
-    // rebuilt one cannot leave them disagreeing.
-    LaunchedEffect(state, state.query) { delay(350.milliseconds); state.submitted = state.query }
-    var retryTick by remember(state) { mutableIntStateOf(0) }
-    LaunchedEffect(state, state.submitted, retryTick) { state.runSearch(state.submitted) }
-
-    Column(
-        modifier            = modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Box(Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onBack).padding(6.dp)) {
-                Symbol(NxIcon.ArrowBack, contentDescription = null, tint = NxInk.main, size = 20.dp)
-            }
-            Text(s.contentFindProjects, style = MaterialTheme.typography.titleMedium, color = NxInk.main, fontWeight = FontWeight.Bold)
-        }
-        ContentSearch(state.query, { state.query = it }, s.contentSearchPlaceholder)
-
-        val r = state.results
-        when {
-            r == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = NxColor.wash(NxColor.lead(), 0.6f), strokeWidth = 2.dp, modifier = Modifier.size(26.dp))
-            }
-            state.searchFailed -> RetryStateBlock(
-                title      = s.modBrowserErrorTitle,
-                message    = s.modBrowserErrorMessage,
-                retryLabel = s.contentTabRetry,
-                onRetry    = { retryTick++ },
-                modifier   = Modifier.fillMaxSize().padding(20.dp),
-                titleStyle = MaterialTheme.typography.titleMedium,
-            )
-            r.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(s.contentEmpty, style = MaterialTheme.typography.bodyMedium, color = NxInk.quiet)
-            }
-            else -> {
-                val listState = rememberLazyListState()
-                val hover = remember { MutableInteractionSource() }
-                val hovered by hover.collectIsHoveredAsState()
-                Box(Modifier.fillMaxSize().hoverable(hover)) {
-                    LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        items(items = r, key = { it.projectId }) { hit ->
-                            ModResultRow(
-                                hit       = hit,
-                                installed = hit.projectId in state.installed,
-                                working   = hit.projectId in state.working,
-                                failed    = hit.projectId in state.failed,
-                                onInstall = { installScope.launch(Dispatchers.Main) { state.installMod(hit) } },
-                                // A result was a row that led nowhere: the only
-                                // thing a reader could do with it was install it
-                                // sight unseen. It opens the page now.
-                                onOpen    = { onOpenProject(ModTarget.Catalogue(hit.projectId, instanceId)) },
-                            )
-                        }
-                    }
-                    NxVerticalScrollbar(adapter = rememberScrollbarAdapter(listState), revealed = hovered || listState.isScrollInProgress, modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight())
-                }
-            }
-        }
-    }
-}
-
-@Composable
-internal fun ModResultRow(
-    hit: ModrinthSearchHit,
-    installed: Boolean,
-    working: Boolean,
-    failed: Boolean,
-    onInstall: () -> Unit,
-    onOpen: (() -> Unit)? = null,
-) {
-    val s = LocalStrings.current
-    val shape = RoundedCornerShape(7.dp)
-    NxSurface(SurfaceKind.Card, modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.small) {
-        Row(
-            modifier              = Modifier.fillMaxWidth()
-                .then(if (onOpen != null) Modifier.clickable(onClick = onOpen) else Modifier)
-                .padding(horizontal = 10.dp, vertical = 8.dp),
-            verticalAlignment     = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            if (hit.iconUrl != null) {
-                AsyncImage(model = hit.iconUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.size(36.dp).clip(shape))
-            } else {
-                Box(Modifier.size(36.dp).clip(shape).background(decorativeColor(hit.title)), contentAlignment = Alignment.Center) {
-                    Text(hit.title.firstOrNull()?.uppercase() ?: "?", style = MaterialTheme.typography.labelMedium, color = Color.White, fontWeight = FontWeight.Bold)
-                }
-            }
-            Column(Modifier.weight(1f)) {
-                Text(hit.title, style = MaterialTheme.typography.bodyMedium, color = NxInk.main, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                if (hit.description.isNotBlank()) {
-                    Text(hit.description, style = MaterialTheme.typography.labelSmall, color = NxInk.quiet, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                }
-            }
-            when {
-                installed -> Symbol(NxIcon.Check, contentDescription = null, tint = NxColor.lead(), size = 20.dp)
-                working   -> CircularProgressIndicator(color = NxColor.lead(), strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
-                // A download that did not land says so and offers the action again.
-                // Silence here reads as success, which is the failure this replaced.
-                failed    -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Symbol(NxIcon.Warning, contentDescription = s.contentInstallFailed, tint = NxColor.status(Status.Error), size = 18.dp)
-                    NxButton(label = s.contentInstallRetry, onClick = onInstall, style = NxButtonStyle.Secondary)
-                }
-                else      -> NxButton(label = s.browseDetailInstallButton, onClick = onInstall)
-            }
         }
     }
 }

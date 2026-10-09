@@ -57,7 +57,7 @@ import hivens.ui.nx.PlayLayout
 import hivens.ui.screens.library.PendingUpdateBadge
 import hivens.ui.screens.library.lastPlayedLabel
 import hivens.ui.screens.library.rememberPackArt
-import hivens.ui.screens.mod.loaderLabel
+import hivens.ui.feature.catalogue.project.loaderLabel
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.decorativePair
 import hivens.ui.theme.familyForText

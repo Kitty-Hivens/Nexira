@@ -31,7 +31,7 @@ import hivens.ui.i18n.AppLocale
 import hivens.ui.i18n.LocaleProvider
 import hivens.ui.navigation.NavRequests
 import hivens.ui.notifications.IndicationCenter
-import hivens.ui.screens.browse.BrowsePackCard
+import hivens.ui.feature.catalogue.browse.BrowsePackCard
 import hivens.ui.theme.NxTheme
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

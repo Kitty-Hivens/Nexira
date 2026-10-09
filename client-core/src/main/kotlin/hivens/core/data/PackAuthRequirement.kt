@@ -34,6 +34,14 @@ sealed interface PackAuthRequirement {
     val scServerId: String?
 
     /**
+     * The providers this content asks the player to be signed in with, by their
+     * registry id, for a screen that names them. The names are the providers' own,
+     * from the auth registry, so a requirement says which and never spells a brand
+     * itself.
+     */
+    val providerKeys: List<String>
+
+    /**
      * Pack joins a SmartyCraft game server identified by [serverId].
      * The launcher re-runs `authService.login(player, pass, serverId)`
      * before spawn, so the game is handed a session minted for that launch.
@@ -41,6 +49,7 @@ sealed interface PackAuthRequirement {
     @Serializable
     data class SmartyCraft(val serverId: String) : PackAuthRequirement {
         override val scServerId: String get() = serverId
+        override val providerKeys: List<String> get() = listOf(PROVIDER_KEY)
 
         companion object {
             /**
@@ -64,6 +73,7 @@ sealed interface PackAuthRequirement {
     @Serializable
     data object Microsoft : PackAuthRequirement {
         override val scServerId: String? get() = null
+        override val providerKeys: List<String> get() = listOf(PROVIDER_KEY)
 
         const val PROVIDER_KEY: String = "microsoft"
     }
@@ -76,5 +86,6 @@ sealed interface PackAuthRequirement {
     @Serializable
     data class Both(val serverId: String) : PackAuthRequirement {
         override val scServerId: String get() = serverId
+        override val providerKeys: List<String> get() = listOf(Microsoft.PROVIDER_KEY, SmartyCraft.PROVIDER_KEY)
     }
 }

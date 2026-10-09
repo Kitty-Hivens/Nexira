@@ -8,11 +8,12 @@ import hivens.ui.notifications.Kind
 import hivens.ui.notifications.NotifGlyph
 import hivens.ui.notifications.PersistedNotification
 import hivens.ui.notifications.Severity
-import hivens.ui.screens.mod.OpenProject
-import hivens.ui.screens.mod.ProjectCreator
-import hivens.ui.screens.mod.ProjectLink
-import hivens.ui.screens.mod.ProjectLinkKind
-import hivens.ui.screens.mod.ProjectSource
+import hivens.ui.feature.catalogue.project.GameVersionGroup
+import hivens.ui.feature.catalogue.project.OpenProject
+import hivens.ui.feature.catalogue.project.ProjectCreator
+import hivens.ui.feature.catalogue.project.ProjectLink
+import hivens.ui.feature.catalogue.project.ProjectLinkKind
+import hivens.ui.feature.catalogue.project.ProjectSource
 import hivens.ui.widgets.Sources
 import hivens.widget.api.WidgetDataRegistry
 import hivens.widget.api.flowSource
@@ -40,6 +41,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
  * exists to fix.
  *
  * Names here are roles rather than people, and the project is openly invented.
+ * It carries no project type, so its tags stay labels: a tile in the gallery is
+ * not a way into the catalogue.
  */
 internal fun previewDataRegistry(): WidgetDataRegistry = WidgetDataRegistry().apply {
     register(Sources.Activity, flowSource(MutableStateFlow(SAMPLE_ACTIVITY)))
@@ -110,7 +113,10 @@ private val SAMPLE_PROJECT = OpenProject(
     title = "Sample Mod",
     slug = "sample-mod",
     source = ProjectSource.Catalogue,
-    gameVersionLabels = listOf("1.20.1", "1.21 - 1.21.4"),
+    gameVersions = listOf(
+        GameVersionGroup("1.20.1", listOf("1.20.1")),
+        GameVersionGroup("1.21-1.21.4", listOf("1.21", "1.21.1", "1.21.2", "1.21.3", "1.21.4")),
+    ),
     loaders = listOf("fabric", "neoforge"),
     categories = listOf("technology", "storage", "utility"),
     clientSide = "optional",

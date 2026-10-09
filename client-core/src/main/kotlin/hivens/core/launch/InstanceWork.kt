@@ -4,6 +4,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Work that rewrites an instance's files, and during which it must not be launched.
@@ -27,6 +28,9 @@ enum class InstanceWork {
 
     /** Replacing individual mods or resource packs with newer builds. */
     ContentUpdate,
+
+    /** Putting a project from the catalogue into the instance, with what it requires. */
+    ContentInstall,
 
     /** Removing the instance and its files. */
     Delete,
@@ -56,9 +60,40 @@ class InstanceWorkRegistry {
         try {
             return block()
         } finally {
-            change(instanceId) { list -> list.toMutableList().also { it.removeAt(it.lastIndexOf(work)) } }
+            unmark(instanceId, work)
         }
     }
+
+    /**
+     * Marks [instanceId] as busy with [work] unless other work holds it, as one
+     * step. A look at [workOn] followed by [during] leaves a gap in which two pieces
+     * of work both find the instance free and both start. [alongside] is the work
+     * this one may share the instance with.
+     */
+    fun claim(instanceId: String, work: InstanceWork, alongside: Set<InstanceWork> = emptySet()): Claim =
+        synchronized(this) {
+            active.value[instanceId].orEmpty().lastOrNull { it !in alongside }?.let { return Claim.Taken(it) }
+            change(instanceId) { it + work }
+            Claim.Held(Mark(instanceId, work))
+        }
+
+    /** What [claim] got: the mark, or the work that holds the instance. */
+    sealed interface Claim {
+        class Held(val mark: Mark) : Claim
+        data class Taken(val by: InstanceWork) : Claim
+    }
+
+    /** A mark [claim] took. [release] clears it, and releasing it again does nothing. */
+    inner class Mark internal constructor(private val instanceId: String, private val work: InstanceWork) {
+        private val released = AtomicBoolean(false)
+
+        fun release() {
+            if (released.compareAndSet(false, true)) unmark(instanceId, work)
+        }
+    }
+
+    private fun unmark(instanceId: String, work: InstanceWork) =
+        change(instanceId) { list -> list.toMutableList().also { it.removeAt(it.lastIndexOf(work)) } }
 
     private fun change(instanceId: String, edit: (List<InstanceWork>) -> List<InstanceWork>) {
         synchronized(this) {

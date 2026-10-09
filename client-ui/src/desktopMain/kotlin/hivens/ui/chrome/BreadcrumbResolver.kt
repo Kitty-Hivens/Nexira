@@ -3,16 +3,16 @@ package hivens.ui.chrome
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackOrigin
-import hivens.launcher.catalogue.PackCatalogueRegistry
 import hivens.ui.Screen
 import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.screens.mod.ModTarget
-import hivens.ui.screens.mod.OpenProjectState
+import hivens.ui.feature.catalogue.browse.BrowseSession
+import hivens.ui.feature.catalogue.browse.catalogueTargetKey
+import hivens.ui.feature.catalogue.project.ModTarget
+import hivens.ui.feature.catalogue.project.OpenProjectState
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.model.screen
 import org.koin.compose.koinInject
@@ -34,6 +34,7 @@ fun staticCrumbLabel(screen: Screen, s: AppStrings): String? = when (screen) {
     Screen.About                  -> s.aboutTitle
     Screen.BackgroundSettings     -> s.backgroundTitle
     is Screen.PackVersions        -> s.packVersionsTitle
+    is Screen.BrowseInto          -> s.contentFindProjects
     // Resolved to a human name by the catalogue / repository / roster (see below).
     is Screen.PackDetail          -> null
     is Screen.CataloguePackDetail -> null
@@ -81,7 +82,7 @@ fun rememberCrumbLabel(screen: Screen): String {
             instances.firstOrNull { it.id == screen.instanceId }?.displayName
                 ?: screen.instanceId
         }
-        is Screen.CataloguePackDetail -> catalogueCrumb(screen.origin, screen.packId, s.crumbLoading)
+        is Screen.CataloguePackDetail -> catalogueCrumb(screen.origin, screen.packId)
         is Screen.ModDetail           -> modCrumb(screen.target)
         // Read live, so a rename in the editor relabels the crumb at once. A screen
         // deleted while it was open says so rather than naming nothing.
@@ -97,24 +98,29 @@ fun rememberCrumbLabel(screen: Screen): String {
  *
  * Guarded on the target, because the trail can hold an entry that is not the
  * screen on top: an unguarded read would label every project crumb with whatever
- * page is open now. Falls back to the route's own name, which is what the reader
- * clicked either way.
+ * page is open now. A page already left answers with the name it had, and one
+ * never loaded with the route's own name, which is what the reader clicked.
  */
 @Composable
 private fun modCrumb(target: ModTarget): String {
     val state: OpenProjectState = koinInject()
     val open by state.open.collectAsState()
-    return open?.takeIf { it.targetKey == target.key }?.title ?: modFallbackLabel(target)
+    val names by state.names.collectAsState()
+    return open?.takeIf { it.targetKey == target.key }?.title
+        ?: names[target.key]
+        ?: modFallbackLabel(target)
 }
 
-/** Resolve a catalogue pack's display title by id (cached when the detail screen
- *  has already fetched it); the raw id is the placeholder + failure fallback. */
+/**
+ * A catalogue pack's title, from what its page published or last read, the way a
+ * project crumb is. Asking the catalogue for the page a second time cost a whole
+ * page read per visit, a Modrinth pack's every build and its team included. The id
+ * stands in until the page has read the pack, and for one it never could.
+ */
 @Composable
-private fun catalogueCrumb(origin: PackOrigin, id: String, loading: String): String {
-    val registry: PackCatalogueRegistry = koinInject()
-    val label by produceState(initialValue = loading, origin, id) {
-        value = loading
-        value = runCatching { registry.forOrigin(origin)?.details(id)?.title }.getOrNull() ?: id
-    }
-    return label
+private fun catalogueCrumb(origin: PackOrigin, id: String): String {
+    val state: OpenProjectState = koinInject()
+    val session: BrowseSession = koinInject()
+    val names by state.names.collectAsState()
+    return names[catalogueTargetKey(origin, id)] ?: session.details(origin, id)?.title ?: id
 }

@@ -5,6 +5,8 @@ import hivens.ui.Screen
 import hivens.ui.i18n.AppStrings
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
+import hivens.ui.feature.catalogue.browse.LocalBrowseContext
+import hivens.ui.feature.catalogue.browse.STUB_BROWSE
 import hivens.ui.screens.custom.ScreenIcons
 import hivens.ui.widgets.about.LocalAboutContext
 import hivens.ui.widgets.about.STUB_ABOUT
@@ -101,6 +103,33 @@ internal object EditorSurfaces {
             shortName = { it.editorSurfShortLibrary },
             stub      = LocalLibraryContext provides STUB_LIBRARY,
             mountedOn = { screen -> screen == Screen.Library },
+            ownerRegion = "appshell.region.center",
+        ),
+        EditorSurfaceSpec(
+            id        = SurfaceId("browse"),
+            icon      = NxIcon.Search,
+            name      = { it.editorSurfBrowse },
+            shortName = { it.editorSurfShortBrowse },
+            stub      = LocalBrowseContext provides STUB_BROWSE,
+            mountedOn = { screen -> screen == Screen.Browse || screen is Screen.BrowseInto },
+            ownerRegion = "appshell.region.center",
+        ),
+        // Both pages give their widgets a context of their own per visit, absent
+        // anywhere else, where the widgets draw nothing: no stub is needed.
+        EditorSurfaceSpec(
+            id        = SurfaceId("project"),
+            icon      = NxIcon.Description,
+            name      = { it.editorSurfProject },
+            shortName = { it.editorSurfShortProject },
+            mountedOn = { screen -> screen is Screen.ModDetail },
+            ownerRegion = "appshell.region.center",
+        ),
+        EditorSurfaceSpec(
+            id        = SurfaceId("catalogue.pack"),
+            icon      = NxIcon.Inventory2,
+            name      = { it.editorSurfCataloguePack },
+            shortName = { it.editorSurfShortCataloguePack },
+            mountedOn = { screen -> screen is Screen.CataloguePackDetail },
             ownerRegion = "appshell.region.center",
         ),
         EditorSurfaceSpec(

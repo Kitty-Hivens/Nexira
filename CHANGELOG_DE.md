@@ -10,6 +10,38 @@ nicht gelesen werden, um eine Version zu verstehen.
 
 ## [Unreleased]
 
+## [2.4.7-beta] - 2026-10-09
+
+### Durchsuchen
+
+Durchsuchen findet jetzt nicht nur Packs, sondern auch Mods, Ressourcenpakete und Shader von Modrinth.
+
+- **Filter** rechts funktionieren wie bei Modrinth selbst: Spielversion, Loader, Kategorien, Umgebung, Lizenz und, na ja, halt der ganze Rest, der da so ist. Gewählte Versionen falten sich unter der Suche zu Bereichen wie „1.20.x“ zusammen.
+- **Installieren in ein Pack.** Wähle ein Pack, und seine Spielversion und sein Loader werden zu Filtern. Was es schon hat, lässt sich ausblenden, und der Knopf auf einer Karte installiert direkt hinein. „Projekte finden“ im Inhalt-Tab öffnet Durchsuchen schon auf dieses Pack ausgerichtet.
+- **Ohne gewähltes Pack** fragt die Installation, wohin, zeigt für jedes Pack, ob es passt, und kann ein neues für das Projekt anlegen.
+- **Tags sind anklickbar.** Eine Kategorie, ein Loader oder eine Version auf einer Projektseite öffnet Durchsuchen mit diesem Filter.
+
+### Mods installieren
+
+Eine Installation nimmt das neueste Release, das auf deinem Pack läuft, und nicht den Build, den der Katalog zufällig zuerst aufgelistet hat. Packs mit Quilt nehmen Fabric-Mods, Packs mit NeoForge 1.20.1 nehmen Forge-Mods.
+
+Benötigte Abhängigkeiten kommen von selbst mit, Ressourcenpakete und Shader landen in ihren eigenen Ordnern, und eine neue Version eines Mods ersetzt die alte, statt daneben zu liegen. Wenn etwas nicht reinging, sagt die Installation, was und warum, statt so zu tun, als wäre alles gut. Dateien, die das Pack selbst abgelegt hat, rührt sie nicht an: Ein Update des Packs würde sie ohnehin zurückbringen.
+
+Während etwas installiert wird, sagt „Spielen“ das und wartet, und in ein Pack, dessen Spiel läuft, wird nichts installiert.
+
+### Hivens-Packs
+
+Ressourcenpakete und Shader, die mit einem Pack vom Hivens-Spiegel kommen, richten sich jetzt nach dem Pack, so wie seine Mods. Pflichtige sind immer an. Optionale schaltest du im Inhalt-Tab und in den Einstellungen des Packs an und aus, und die Wahl übersteht ein Update und eine Reparatur: Ein ausgeschaltetes Ressourcenpaket kam früher nach einem Update zurück, neben seiner eigenen ausgeschalteten Kopie. Eigene Ressourcenpakete und Shader fügst du wie bisher hinzu, schaltest sie aus und löschst sie, wie du willst.
+
+### Seiten
+
+- Die Seite eines Packs in Durchsuchen ist jetzt wie die eines Mods aufgebaut: dieselben Tabs, eine Versionstabelle, aus der sich jede installieren lässt, die Änderungen und die Galerie, die Details im rechten Bereich.
+- Ein Mod, den Modrinth nicht kennt, bekommt seine Seite aus dem Register des Hivens-Spiegels: Name, Autoren, Abhängigkeiten und die Packs, in denen er steckt.
+
+### Kleinigkeiten
+
+Die Ausklapplisten im ganzen Launcher sind neu gemacht: größere Zeilen, die aktuelle Wahl hervorgehoben, und der Knopf bleibt hell, solange seine Liste offen ist. Eine Kleinigkeit, aber eine schöne. Für uns jedenfalls.
+
 ## [2.4.6] - 2026-10-07
 
 ### Musik

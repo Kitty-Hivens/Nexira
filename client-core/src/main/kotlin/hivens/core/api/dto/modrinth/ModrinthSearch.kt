@@ -27,4 +27,13 @@ data class ModrinthSearchHit(
     @SerialName("featured_gallery") val featuredGallery: String? = null,
     /** All gallery screenshots; the first is the banner fallback when none is featured. */
     val gallery: List<String> = emptyList(),
+    /** The publishing account's name, for "by" under the title. */
+    val author: String = "",
+    val downloads: Long = 0,
+    val follows: Long = 0,
+    /** ISO-8601, UTC. When the project last changed, which is what a list sorted for activity shows. */
+    @SerialName("date_modified") val dateModified: String = "",
+    @SerialName("date_created") val dateCreated: String = "",
+    /** The categories the catalogue itself shows on a card, loaders included, in its order. */
+    @SerialName("display_categories") val displayCategories: List<String> = emptyList(),
 )

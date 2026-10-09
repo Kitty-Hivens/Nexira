@@ -1,5 +1,6 @@
 package hivens.launcher.update
 
+import hivens.core.api.dto.smrt.SmrtAssetEntry
 import hivens.core.data.FileData
 import hivens.core.data.FileManifest
 import hivens.core.data.fileManifestOf
@@ -16,7 +17,8 @@ import java.nio.file.Path
  * never walked or hashed, and a file the reconcile ignores costs nothing.
  *
  * Optional-aware: an optional mod toggled off lives at `mods/<name>.disabled`,
- * so a `mods/<name>` path resolves to whichever variant is present. Both hold
+ * and a switched-off resource or shader pack the same way beside its own name,
+ * so such a path resolves to whichever variant is present. Both hold
  * identical bytes, so the recorded sha1 is the mod's either way and the reconcile
  * sees a disabled optional as present at its canonical path -- not "missing",
  * which would re-add it enabled.
@@ -43,14 +45,15 @@ fun managedRealPaths(baseline: FileManifest?, target: FileManifest): Set<String>
     for (path in baseline?.flatten()?.keys.orEmpty() + target.flatten().keys) {
         out += path
         out += "$path.new"
-        if (path.startsWith("mods/")) out += "$path.disabled"
+        if (hasOffName(path)) out += "$path.disabled"
     }
     return out
 }
 
 /**
  * Resolves [path] under [root] to the file actually on disk, or null if absent:
- * the canonical location first, then the `.disabled` variant for a `mods/` path.
+ * the canonical location first, then the `.disabled` variant for a path that can
+ * have one.
  * Lexically confines the result to [root]; a baseline/manifest path that escapes
  * via `..` is skipped rather than read from outside the instance.
  */
@@ -58,9 +61,16 @@ private fun locateOnDisk(root: Path, path: String): Path? {
     val canonical = root.resolve(path).normalize()
     if (!canonical.startsWith(root)) return null
     if (Files.isRegularFile(canonical)) return canonical
-    if (path.startsWith("mods/")) {
+    if (hasOffName(path)) {
         val disabled = root.resolve("$path.disabled").normalize()
         if (disabled.startsWith(root) && Files.isRegularFile(disabled)) return disabled
     }
     return null
 }
+
+/**
+ * Whether a file at [path] can be switched off by a `.disabled` name beside it: a
+ * mod, or a resource or shader pack, see [SmrtAssetEntry.toggleable].
+ */
+internal fun hasOffName(path: String): Boolean =
+    path.startsWith("mods/") || SmrtAssetEntry.TOGGLEABLE_ASSET_DIRS.any { path.startsWith(it) }

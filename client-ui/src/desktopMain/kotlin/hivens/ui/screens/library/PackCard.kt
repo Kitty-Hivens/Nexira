@@ -160,11 +160,15 @@ fun PackCard(
                         // and that alone filled the row, pushing "last played" off the
                         // card entirely. Truncated it still says which build; absent, the
                         // other facts say nothing.
-                        NxMetaChip(
-                            instance.packRef.version ?: "—",
-                            modifier = Modifier.widthIn(max = VERSION_CHIP_MAX),
-                            tone = NxMetaChipTone.OnMedia,
-                        )
+                        // A pack with no build of its own, a local one, has no version to
+                        // name, and a dash in its place read as a fact rather than as none.
+                        instance.packRef.version?.takeIf { it.isNotBlank() }?.let { version ->
+                            NxMetaChip(
+                                version,
+                                modifier = Modifier.widthIn(max = VERSION_CHIP_MAX),
+                                tone = NxMetaChipTone.OnMedia,
+                            )
+                        }
                         instance.forkedFrom?.let {
                             NxMetaChip("fork", tone = NxMetaChipTone.OnMediaAccent)
                         }

@@ -3,6 +3,7 @@ package hivens.launcher.smrt
 import hivens.test.testTransferEngine
 import hivens.core.api.dto.smrt.SmrtPackManifest
 import hivens.core.api.HttpClientProvider
+import hivens.core.update.UpdatePlan
 import hivens.launcher.modrinth.ModrinthClient
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
@@ -184,6 +185,89 @@ class SmrtSyncServiceTest {
             Files.readAllBytes(dir.resolve("servers.dat")),
             "an asset the pack names must land even when a file is already there",
         )
+    }
+
+    // ── Resource packs the player may switch off ─────────────────────────────
+
+    private val rpBytes = "FAITHFUL".toByteArray()
+    private val rpDest = "resourcepacks/faithful-1.zip"
+
+    private fun switchableManifest() = """
+        {"schema_version":2,"pack_id":"test","pack_version":"1","generated_at":"now",
+         "minecraft":{"version":"1.20.1"},"loader":{"name":"fabric","version":"0.19.2"},"java":{"major":17},
+         "mods":[],
+         "assets":[
+           {"dest":"$rpDest","sha1":"${sha1(rpBytes)}","size_bytes":${rpBytes.size},"required":false,"source":{"type":"smrt_static","url":"$RP_URL"}},
+           {"dest":"servers.dat","sha1":"${sha1(serversBytes)}","size_bytes":${serversBytes.size},"required":true,"source":{"type":"smrt_static","url":"$SERVERS_URL"}}
+         ]}
+    """.trimIndent()
+
+    private fun switchableService(rpFetches: MutableList<String> = mutableListOf()): SmrtSyncService = serviceWith(
+        MockEngine { req ->
+            when (req.url.toString()) {
+                RP_URL -> {
+                    rpFetches += req.url.toString()
+                    respond(ByteReadChannel(rpBytes), HttpStatusCode.OK)
+                }
+                SERVERS_URL -> respond(ByteReadChannel(serversBytes), HttpStatusCode.OK)
+                else -> respond("missing ${req.url}", HttpStatusCode.NotFound)
+            }
+        }
+    )
+
+    @Test
+    fun `a resource pack the player switched off is placed off, and a repair keeps it off without fetching it again`() = runTest {
+        val dir = tempDir("asset-off")
+        val fetches = mutableListOf<String>()
+        val service = switchableService(fetches)
+        val off = mapOf(rpDest to false)
+
+        service.sync(parsed(switchableManifest()), dir, assetState = off)
+
+        assertFalse(Files.exists(dir.resolve(rpDest)), "the game would list it under its own name")
+        assertContentEquals(rpBytes, Files.readAllBytes(dir.resolve("$rpDest.disabled")))
+
+        val report = service.verifyAndRepair(dir, parsed(switchableManifest()), assetState = off)
+
+        assertTrue(report.failed.isEmpty())
+        assertFalse(Files.exists(dir.resolve(rpDest)), "a repair used to put the pack's copy back beside the one switched off")
+        assertEquals(1, fetches.size, "the copy under the off name is the pack's bytes and is not fetched again")
+    }
+
+    @Test
+    fun `switching a pack's resource pack moves it between its names and leaves a required asset alone`() = runTest {
+        val dir = tempDir("asset-relabel")
+        val service = switchableService()
+        val m = parsed(switchableManifest())
+        service.sync(m, dir)
+
+        assertTrue(service.relabelAssets(dir, m.assets, mapOf(rpDest to false, "servers.dat" to false)).isEmpty())
+        assertTrue(Files.exists(dir.resolve("$rpDest.disabled")))
+        assertTrue(Files.exists(dir.resolve("servers.dat")), "a required asset has no off")
+
+        service.relabelAssets(dir, m.assets, mapOf(rpDest to true))
+        assertTrue(Files.exists(dir.resolve(rpDest)))
+        assertFalse(Files.exists(dir.resolve("$rpDest.disabled")))
+    }
+
+    @Test
+    fun `an update to a new build of a switched-off resource pack lands it off and takes the old one away`() = runTest {
+        val dir = tempDir("asset-update")
+        Files.createDirectories(dir.resolve("resourcepacks"))
+        Files.write(dir.resolve("$rpDest.disabled"), "OLD".toByteArray())
+        val nextDest = "resourcepacks/faithful-2.zip"
+        val target = parsed(switchableManifest().replace(rpDest, nextDest))
+
+        switchableService().applyUpdate(
+            dir,
+            target,
+            UpdatePlan(toAdd = listOf(nextDest, "servers.dat"), toDelete = listOf(rpDest)),
+            assetState = mapOf(nextDest to false),
+        )
+
+        assertTrue(Files.exists(dir.resolve("$nextDest.disabled")))
+        assertFalse(Files.exists(dir.resolve(nextDest)))
+        assertFalse(Files.exists(dir.resolve("$rpDest.disabled")), "the retired build goes under its off name too")
     }
 
     @Test
@@ -874,6 +958,7 @@ class SmrtSyncServiceTest {
         const val REQ_URL = "https://mirror.test/req.jar"
         const val OPT_URL = "https://mirror.test/opt.jar"
         const val SERVERS_URL = "https://mirror.test/servers.dat"
+        const val RP_URL = "https://mirror.test/faithful.zip"
         const val CF_URL = "https://edge.forgecdn.test/files/2920/433/served.jar"
         const val GH_URL = "https://github.test/Kitty-Hivens/hidemymods/releases/download/v0.2.0/hidemymods-1.7.10.jar"
     }

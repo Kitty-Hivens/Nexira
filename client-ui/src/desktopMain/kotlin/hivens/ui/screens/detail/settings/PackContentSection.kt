@@ -36,7 +36,8 @@ import kotlinx.coroutines.CancellationException
 import org.koin.compose.koinInject
 
 /**
- * Optional content for a mirror pack: the curator's optional mods as switches,
+ * Optional content for a mirror pack: the curator's optional mods and the resource
+ * and shader packs it lets the player switch off, as switches,
  * driven by the same [OptionalContentRules] pipeline the Content tab uses (a
  * flip relabels the `.disabled` files off the app scope). The manifest is
  * fetched for the installed build; an offline fetch collapses to a plain
@@ -83,15 +84,30 @@ internal fun PackContentSection(pack: PackInstance, adopt: (PackEdit) -> Unit) {
     val state = remember(manifest, pack.optionalContent) {
         manifest?.let { OptionalContentRules.enabledState(it.mods, pack.optionalContent) }.orEmpty()
     }
+    val assetState = remember(manifest, pack.optionalContent) {
+        manifest?.let { OptionalContentRules.assetState(it.assets, pack.optionalContent) }.orEmpty()
+    }
 
     val optional = remember(manifest) { manifest?.let { OptionalContentRules.optionalMods(it.mods) }.orEmpty() }
+    val optionalAssets = remember(manifest) { manifest?.let { OptionalContentRules.optionalAssets(it.assets) }.orEmpty() }
+
+    // The whole choice in one write, so a flip of a mod does not drop what was
+    // chosen about the assets, nor the other way round.
+    fun choose(m: SmrtPackManifest, mods: Map<String, Boolean>, assets: Map<String, Boolean>) {
+        val toggles = OptionalContentRules.togglesFrom(m, mods, assets)
+        // Shown at once and composed onto by the next flip: the write is the
+        // launcher's and lands behind it, and a pair of flips made inside that
+        // window must not both start from the record.
+        adopt { it.copy(optionalContent = toggles) }
+        controller.setOptionalModsAsync(pack, m, toggles)
+    }
     val problems = remember(manifest, state) { manifest?.let { OptionalContentRules.problems(it.mods, state) }.orEmpty() }
 
     NxSettingGroup(s.packSettingsOptional) {
         when {
             loading -> Muted(s.packSettingsContentLoading)
             manifest == null -> Muted(s.packSettingsContentUnavailable)
-            optional.isEmpty() -> Muted(s.packSettingsOptionalNone)
+            optional.isEmpty() && optionalAssets.isEmpty() -> Muted(s.packSettingsOptionalNone)
             else -> {
                 Muted(s.packSettingsOptionalCoToggle)
                 optional.forEach { mod ->
@@ -105,15 +121,17 @@ internal fun PackContentSection(pack: PackInstance, adopt: (PackEdit) -> Unit) {
                             presenceLabel(presence, s)?.let { NxMetaChip(it, tone = NxMetaChipTone.Surface) }
                             NxSwitch(state[mod.filename] ?: mod.defaultEnabled, onCheckedChange = { enable ->
                                 val m = manifest ?: return@NxSwitch
-                                val next = OptionalContentRules.applyToggle(m.mods, state, mod.filename, enable)
-                                val toggles = OptionalContentRules.togglesFrom(m.mods, next)
-                                // Shown at once and composed onto by the next flip: the write
-                                // is the launcher's and lands behind it, and a pair of flips
-                                // made inside that window must not both start from the record.
-                                adopt { it.copy(optionalContent = toggles) }
-                                controller.setOptionalModsAsync(pack, m, toggles)
+                                choose(m, OptionalContentRules.applyToggle(m.mods, state, mod.filename, enable), assetState)
                             })
                         }
+                    }
+                }
+                optionalAssets.forEach { asset ->
+                    NxSettingRow(asset.display?.name ?: asset.dest.substringAfterLast('/'), detail = asset.display?.description) {
+                        NxSwitch(assetState[asset.dest] ?: true, onCheckedChange = { enable ->
+                            val m = manifest ?: return@NxSwitch
+                            choose(m, state, assetState + (asset.dest to enable))
+                        })
                     }
                 }
             }

@@ -116,3 +116,7 @@ QueueMusic
 Shuffle
 Campaign
 Paid
+Block
+LockOpen
+Groups
+Verified

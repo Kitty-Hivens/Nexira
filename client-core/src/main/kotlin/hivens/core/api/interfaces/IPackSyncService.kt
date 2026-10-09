@@ -1,5 +1,6 @@
 package hivens.core.api.interfaces
 
+import hivens.core.api.dto.smrt.SmrtAssetEntry
 import hivens.core.api.dto.smrt.SmrtModEntry
 import hivens.core.api.dto.smrt.SmrtPackManifest
 import hivens.core.net.RepairReport
@@ -18,6 +19,12 @@ interface IPackSyncService {
      * [settlePending] at the next launch. An empty list means every flip landed.
      */
     fun relabel(clientDir: Path, mods: List<SmrtModEntry>, enabledState: Map<String, Boolean>): List<String>
+
+    /**
+     * [relabel] for the assets a player may switch off, by `dest` in [assetState].
+     * Answers with the dests whose move could not land now.
+     */
+    fun relabelAssets(clientDir: Path, assets: List<SmrtAssetEntry>, assetState: Map<String, Boolean>): List<String> = emptyList()
 
     /**
      * Carries out the renames and removals a mod's two names were left owing
@@ -90,6 +97,8 @@ interface IPackSyncService {
         clientDir: Path,
         manifest: SmrtPackManifest,
         enabledState: Map<String, Boolean> = emptyMap(),
+        /** The assets the player switched off and on, by `dest`. Absent is on. */
+        assetState: Map<String, Boolean> = emptyMap(),
         progress: ((current: Int, total: Int, path: String) -> Unit)? = null,
     ): RepairReport
 }

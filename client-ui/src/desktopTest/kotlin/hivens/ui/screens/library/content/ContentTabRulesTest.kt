@@ -1,5 +1,6 @@
 package hivens.ui.screens.library.content
 
+import hivens.core.api.dto.smrt.SmrtAssetEntry
 import hivens.core.api.dto.smrt.SmrtModEntry
 import hivens.core.api.dto.smrt.SmrtSource
 import hivens.core.data.OptionalContentRules
@@ -331,5 +332,66 @@ class ContentTabRulesTest {
         )
         assertEquals(2, lockedCount(picked, userOwns = { false }, manifestMods = manifest))
         assertEquals(0, lockedCount(picked, userOwns = { true }, manifestMods = manifest), "detaching hands everything back")
+    }
+
+    // -- resource packs the pack ships ----------------------------------------
+
+    private fun asset(dest: String, required: Boolean) = SmrtAssetEntry(
+        dest = dest,
+        sha1 = "0".repeat(40),
+        sizeBytes = 0,
+        required = required,
+        source = SmrtSource.Unknown,
+    )
+
+    @Test
+    fun `a resource pack the pack requires stays on and stays the pack's`() {
+        val rules = contentRowRules(
+            content("faithful.zip", kind = ContentKind.ResourcePack, enabled = false),
+            manifestEntry = null,
+            userOwned = false,
+            optionalEnabled = null,
+            assetEntry = asset("resourcepacks/faithful.zip", required = true),
+        )
+        assertTrue(rules.effectiveEnabled)
+        assertFalse(rules.showToggle)
+        assertFalse(rules.canDelete, "the next sync would only put it back")
+    }
+
+    @Test
+    fun `a resource pack the pack offers is switched through the pack and not deleted`() {
+        val rules = contentRowRules(
+            content("faithful.zip", kind = ContentKind.ResourcePack),
+            manifestEntry = null,
+            userOwned = false,
+            optionalEnabled = false,
+            assetEntry = asset("resourcepacks/faithful.zip", required = false),
+        )
+        assertTrue(rules.optional)
+        assertTrue(rules.showToggle)
+        assertFalse(rules.effectiveEnabled, "the pack's record says off, whatever the name on disk says")
+        assertFalse(rules.canDelete)
+    }
+
+    @Test
+    fun `a resource pack the player added stays theirs on a tracked pack`() {
+        val rules = contentRowRules(content("mine.zip", kind = ContentKind.ResourcePack), null, userOwned = false, optionalEnabled = null)
+        assertTrue(rules.showToggle)
+        assertTrue(rules.canDelete)
+        assertFalse(rules.optional)
+    }
+
+    @Test
+    fun `a required pack resource pack counts among what blocks an action, an optional one does not`() {
+        val picked = listOf(
+            content("faithful.zip", kind = ContentKind.ResourcePack),
+            content("extra.zip", kind = ContentKind.ResourcePack),
+            content("mine.zip", kind = ContentKind.ResourcePack),
+        )
+        val assets = mapOf(
+            contentKey(ContentKind.ResourcePack, "faithful.zip") to asset("resourcepacks/faithful.zip", required = true),
+            contentKey(ContentKind.ResourcePack, "extra.zip") to asset("resourcepacks/extra.zip", required = false),
+        )
+        assertEquals(1, lockedCount(picked, userOwns = { false }, manifestMods = emptyMap(), manifestAssets = assets))
     }
 }

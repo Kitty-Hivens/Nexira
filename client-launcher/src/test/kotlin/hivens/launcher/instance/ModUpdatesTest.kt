@@ -166,14 +166,20 @@ class ModUpdatesTest {
     @Test
     fun `each folder is asked about the loaders its content is published for`() {
         assertEquals(listOf("neoforge"), loadersFor(ContentKind.Mod, "neoforge"))
-        assertEquals(listOf("minecraft"), loadersFor(ContentKind.ResourcePack, "neoforge"))
+        assertEquals(listOf("minecraft", "canvas", "vanilla"), loadersFor(ContentKind.ResourcePack, "neoforge"), "a shader the game reads from a resource pack lives there too")
         assertEquals(listOf("iris", "optifine"), loadersFor(ContentKind.ShaderPack, "neoforge"))
+    }
+
+    @Test
+    fun `a mod is asked about every loader whose mods the pack runs`() {
+        assertEquals(listOf("quilt", "fabric"), loadersFor(ContentKind.Mod, "quilt"))
+        assertEquals(listOf("neoforge", "forge"), loadersFor(ContentKind.Mod, "neoforge", "1.20.1"))
     }
 
     @Test
     fun `a vanilla instance has no loader to ask a mod about`() {
         assertTrue(loadersFor(ContentKind.Mod, "").isEmpty())
-        assertEquals(listOf("minecraft"), loadersFor(ContentKind.ResourcePack, ""), "a resource pack is published for the game, not for a loader")
+        assertEquals(listOf("minecraft", "canvas", "vanilla"), loadersFor(ContentKind.ResourcePack, ""), "a resource pack is published for the game, not for a loader")
     }
 
     // ── what an install has to drag along ────────────────────────────────────

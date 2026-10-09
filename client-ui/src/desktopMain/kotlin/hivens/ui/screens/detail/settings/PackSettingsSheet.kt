@@ -56,6 +56,7 @@ import hivens.launcher.PackOperationKind
 import hivens.launcher.PackOperationPhase
 import hivens.launcher.PackOperationService
 import hivens.ui.components.ChannelChip
+import hivens.ui.components.label
 import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
@@ -66,7 +67,7 @@ import hivens.ui.nx.NxSideSheet
 import hivens.ui.nx.NxTabRow
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
-import hivens.ui.screens.mod.loaderLabel
+import hivens.ui.feature.catalogue.project.loaderLabel
 import hivens.ui.customization.LocalCustomization
 import hivens.ui.theme.Motion
 import hivens.ui.theme.NxColor
@@ -456,6 +457,7 @@ private fun FooterStatus(operation: PackOperation?, notice: String?) {
                 color = NxColor.status(Status.Success, text = true),
             )
             phase is PackOperationPhase.Failed -> FooterError(s.packVersionsFailed(phase.message))
+            phase is PackOperationPhase.Refused -> FooterError(s.packOperationRefused(phase.work.label(s)))
             notice != null -> FooterError(notice)
         }
     }

@@ -2,6 +2,7 @@ package hivens.launcher.instance
 
 import hivens.core.api.dto.modrinth.ModrinthDependency
 import hivens.core.api.dto.modrinth.ModrinthVersion
+import hivens.launcher.modrinth.acceptedLoaders
 
 /**
  * One installed file, named the way every layer here refers to it: what folder
@@ -187,13 +188,15 @@ fun isBehind(installed: ModrinthVersion, pinned: ModrinthVersion): Boolean =
 /**
  * Which loader ids to ask about for a folder.
  *
- * A mod is published for the loader the instance runs. A resource pack is
- * published for `minecraft`, and a shader for `iris` or `optifine` -- ask for a
- * resource pack under `neoforge` and Modrinth correctly answers that there is
- * nothing, which reads on screen as "no updates" for a folder that has them.
+ * A mod is published for a loader the instance runs, see [acceptedLoaders]. A
+ * resource pack is published for `minecraft`, or for `canvas` or `vanilla` when it
+ * is a shader the game reads out of a resource pack, and a shader pack for `iris`
+ * or `optifine`. Ask for a resource pack under `neoforge` and Modrinth correctly
+ * answers that there is nothing, which reads on screen as "no updates" for a
+ * folder that has them.
  */
-fun loadersFor(kind: ContentKind, loader: String): List<String> = when (kind) {
-    ContentKind.Mod          -> listOfNotNull(loader.takeIf { it.isNotBlank() })
-    ContentKind.ResourcePack -> listOf("minecraft")
+fun loadersFor(kind: ContentKind, loader: String, mcVersion: String = ""): List<String> = when (kind) {
+    ContentKind.Mod          -> acceptedLoaders(loader, mcVersion)
+    ContentKind.ResourcePack -> listOf("minecraft", "canvas", "vanilla")
     ContentKind.ShaderPack   -> listOf("iris", "optifine")
 }

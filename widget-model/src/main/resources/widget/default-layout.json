@@ -232,6 +232,130 @@
           }
         }
       },
+      "browse": {
+        "families": {
+          "general": {
+            "slots": {
+              "header": {
+                "widgets": [
+                    {
+                      "kind": "browse.installing",
+                      "instance_id": "browse-installing-default"
+                    },
+                    {
+                      "kind": "browse.search",
+                      "instance_id": "browse-search-default"
+                    },
+                    {
+                      "kind": "browse.chips",
+                      "instance_id": "browse-chips-default"
+                    }
+                ],
+                "flow": {
+                  "direction": "vertical",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
+              },
+              "body": {
+                "widgets": [
+                  {
+                    "kind": "browse.results",
+                    "instance_id": "browse-results-default"
+                  }
+                ],
+                "flow": {
+                  "direction": "vertical",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
+              }
+            }
+          }
+        }
+      },
+      "project": {
+        "families": {
+          "general": {
+            "slots": {
+              "header": {
+                "widgets": [
+                  {
+                    "kind": "project.header",
+                    "instance_id": "project-header-default"
+                  },
+                  {
+                    "kind": "project.tabs",
+                    "instance_id": "project-tabs-default"
+                  }
+                ],
+                "flow": {
+                  "direction": "vertical",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
+              },
+              "body": {
+                "widgets": [
+                  {
+                    "kind": "project.body",
+                    "instance_id": "project-body-default"
+                  }
+                ],
+                "flow": {
+                  "direction": "vertical",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
+              }
+            }
+          }
+        }
+      },
+      "catalogue.pack": {
+        "families": {
+          "general": {
+            "slots": {
+              "header": {
+                "widgets": [
+                  {
+                    "kind": "catalogue.pack.header",
+                    "instance_id": "catalogue-pack-header-default"
+                  },
+                  {
+                    "kind": "catalogue.pack.tabs",
+                    "instance_id": "catalogue-pack-tabs-default"
+                  }
+                ],
+                "flow": {
+                  "direction": "vertical",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
+              },
+              "body": {
+                "widgets": [
+                  {
+                    "kind": "catalogue.pack.body",
+                    "instance_id": "catalogue-pack-body-default"
+                  }
+                ],
+                "flow": {
+                  "direction": "vertical",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
+              }
+            }
+          }
+        }
+      },
       "appshell.leftrail": {
         "families": {
           "general": {
@@ -391,6 +515,68 @@
                     "kind": "mod.details",
                     "instance_id": "mod-details-default"
                   }
+                ],
+                "flow": {
+                  "direction": "vertical",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
+              }
+            }
+          },
+          "browse": {
+            "slots": {
+              "controls": {
+                "widgets": [
+                    {
+                      "kind": "browse.scope",
+                      "instance_id": "browse-scope-default"
+                    },
+                    {
+                      "kind": "browse.filter.builtBy",
+                      "instance_id": "browse-filter-builtby-default"
+                    },
+                    {
+                      "kind": "browse.filter.installed",
+                      "instance_id": "browse-filter-installed-default"
+                    },
+                    {
+                      "kind": "browse.filter.version",
+                      "instance_id": "browse-filter-version-default"
+                    },
+                    {
+                      "kind": "browse.filter.loader",
+                      "instance_id": "browse-filter-loader-default"
+                    },
+                    {
+                      "kind": "browse.filter.categories",
+                      "instance_id": "browse-filter-categories-default"
+                    },
+                    {
+                      "kind": "browse.filter.features",
+                      "instance_id": "browse-filter-features-default"
+                    },
+                    {
+                      "kind": "browse.filter.resolutions",
+                      "instance_id": "browse-filter-resolutions-default"
+                    },
+                    {
+                      "kind": "browse.filter.performance",
+                      "instance_id": "browse-filter-performance-default"
+                    },
+                    {
+                      "kind": "browse.filter.environment",
+                      "instance_id": "browse-filter-environment-default"
+                    },
+                    {
+                      "kind": "browse.filter.license",
+                      "instance_id": "browse-filter-license-default"
+                    },
+                    {
+                      "kind": "browse.filter.exclusions",
+                      "instance_id": "browse-filter-exclusions-default"
+                    }
                 ],
                 "flow": {
                   "direction": "vertical",

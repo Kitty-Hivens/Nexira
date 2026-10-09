@@ -1,7 +1,12 @@
 package hivens.core.data
 
+import hivens.core.api.dto.smrt.SmrtAssetEntry
 import hivens.core.api.dto.smrt.SmrtDisplay
+import hivens.core.api.dto.smrt.SmrtJava
+import hivens.core.api.dto.smrt.SmrtLoader
+import hivens.core.api.dto.smrt.SmrtMinecraft
 import hivens.core.api.dto.smrt.SmrtModEntry
+import hivens.core.api.dto.smrt.SmrtPackManifest
 import hivens.core.api.dto.smrt.SmrtRequirement
 import hivens.core.api.dto.smrt.SmrtSource
 import kotlin.test.Test
@@ -313,5 +318,69 @@ class OptionalContentRulesTest {
         val state = OptionalContentRules.enabledState(listOf(m), legacy)
 
         assertEquals(false, state["jei-1.12.2-4.16.1.301.jar"], "legacy filename-keyed toggle still applies")
+    }
+
+    // ── Assets the player may switch off ────────────────────────────────────
+
+    private fun asset(dest: String, required: Boolean = false, projectId: String? = null) = SmrtAssetEntry(
+        dest = dest,
+        sha1 = "x",
+        sizeBytes = 1,
+        required = required,
+        source = if (projectId != null) SmrtSource.Modrinth(projectId, "$projectId-v1") else SmrtSource.SmrtStatic("https://example/$dest"),
+    )
+
+    private fun manifest(assets: List<SmrtAssetEntry>) = SmrtPackManifest(
+        schemaVersion = 2,
+        packId = "p",
+        packVersion = "1",
+        generatedAt = "now",
+        minecraft = SmrtMinecraft("1.20.1"),
+        loader = SmrtLoader("fabric", "0.16"),
+        java = SmrtJava(21),
+        mods = mods,
+        assets = assets,
+    )
+
+    @Test
+    fun `only an optional resource or shader pack can be switched off`() {
+        assertTrue(asset("resourcepacks/a.zip").toggleable)
+        assertTrue(asset("shaderpacks/b.zip").toggleable)
+        assertFalse(asset("resourcepacks/c.zip", required = true).toggleable, "the curator made it part of the pack")
+        assertFalse(asset("config/d.json").toggleable, "the game reads a config by its path and has no off for it")
+    }
+
+    @Test
+    fun `an asset nobody switched off is on, and a switched one is read by its key`() {
+        val faithful = asset("resourcepacks/faithful-1.zip", projectId = "faith")
+        val state = OptionalContentRules.assetState(
+            listOf(faithful, asset("resourcepacks/other.zip"), asset("servers.dat", required = true)),
+            listOf(ContentToggle(faithful.stableKey, false)),
+        )
+        assertEquals(mapOf("resourcepacks/faithful-1.zip" to false, "resourcepacks/other.zip" to true, "servers.dat" to true), state)
+    }
+
+    @Test
+    fun `an asset's choice follows its project to a new build, and a mod of the same project is another choice`() {
+        val old = asset("resourcepacks/faithful-1.zip", projectId = "faith")
+        val next = asset("resourcepacks/faithful-2.zip", projectId = "faith")
+        assertEquals(old.stableKey, next.stableKey)
+        assertEquals(false, OptionalContentRules.assetState(listOf(next), listOf(ContentToggle(old.stableKey, false)))[next.dest])
+        assertTrue(old.stableKey != mod("faith.jar", projectId = "faith").stableKey)
+    }
+
+    @Test
+    fun `the whole choice keeps the mods and the assets, and a fresh install seeds both`() {
+        val rp = asset("resourcepacks/a.zip")
+        val m = manifest(listOf(rp, asset("servers.dat", required = true)))
+
+        val toggles = OptionalContentRules.togglesFrom(m, mapOf("foamfix.jar" to true), mapOf(rp.dest to false))
+        assertEquals(false, toggles.single { it.entryId == rp.stableKey }.enabled)
+        assertEquals(true, toggles.single { it.entryId == "foamfix.jar" }.enabled)
+        assertEquals(toggles.toSet(), OptionalContentRules.carried(m, toggles).toSet(), "carrying the choice onto the same build changes nothing")
+
+        val seeded = OptionalContentRules.defaultToggles(m)
+        assertEquals(true, seeded.single { it.entryId == rp.stableKey }.enabled)
+        assertFalse(seeded.any { it.entryId.endsWith("servers.dat") }, "a required asset is no choice")
     }
 }

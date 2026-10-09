@@ -37,7 +37,7 @@ import hivens.ui.icons.Symbol
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxIconButton
-import hivens.ui.screens.mod.rememberLinkFollower
+import hivens.ui.feature.catalogue.project.rememberLinkFollower
 import hivens.ui.theme.Motion
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk

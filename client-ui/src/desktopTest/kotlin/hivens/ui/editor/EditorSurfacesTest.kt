@@ -58,6 +58,14 @@ class EditorSurfacesTest {
     }
 
     @Test
+    fun `both entrances to the catalogue edit the same surface`() {
+        // One screen with two ways in. A surface mounted on only one of them would
+        // leave the other with nothing to arrange, though the same widgets draw it.
+        assertEquals(SurfaceId("browse"), EditorSurfaces.availableFor(Screen.Browse, bundled).first())
+        assertEquals(SurfaceId("browse"), EditorSurfaces.availableFor(Screen.BrowseInto("pack"), bundled).first())
+    }
+
+    @Test
     fun `a screen with no widget surface still offers the shell`() {
         val settings = EditorSurfaces.availableFor(Screen.Settings, bundled)
         assertTrue(settings.isNotEmpty(), "the shell frames every screen")

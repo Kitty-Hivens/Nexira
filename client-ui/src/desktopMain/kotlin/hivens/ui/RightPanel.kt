@@ -24,12 +24,13 @@ import hivens.widget.model.SurfaceId
  * Right-side panel. Surface composable: owns the column container; what fills it
  * resolves through SlotRenderer against the layout graph.
  *
- * The rail has two families, and which one shows is the app's to say. [RailFamily.GENERAL]
+ * The rail has three families, and which one shows is the app's to say. [RailFamily.GENERAL]
  * is the rail at rest -- the feed, and the message history pinned under it.
- * [RailFamily.PROJECT_VIEW] is the rail while something is open in the middle:
- * its slots are about that thing, so they are different slots and not the same
- * ones rearranged, which is why the branch is here in code rather than in the
- * graph. Sign-in moved to the Profile section, so neither family carries an auth
+ * [RailFamily.PROJECT_VIEW] is the rail while something is open in the middle, and
+ * [RailFamily.BROWSE] the rail while the catalogue is: what is searched and where an
+ * install goes. Their slots are about that thing, so they are different slots and
+ * not the same ones rearranged, which is why the branch is here in code rather than
+ * in the graph. Sign-in moved to the Profile section, so no family carries an auth
  * slot.
  */
 @Composable
@@ -59,18 +60,15 @@ fun RightPanel(
             // column only has to hold them off the window edge and apart from each
             // other. Measured off the reference: a 12 gutter between cards, and the
             // rail's own 12 to the edge on both sides.
-            val inset = if (family == RailFamily.PROJECT_VIEW) {
+            val cards = family == RailFamily.PROJECT_VIEW || family == RailFamily.BROWSE
+            val inset = if (cards) {
                 Modifier.verticalScroll(scroll).padding(horizontal = RAIL_GUTTER, vertical = RAIL_GUTTER)
             } else {
                 Modifier
             }
             Column(
                 modifier = modifier.then(inset),
-                verticalArrangement = if (family == RailFamily.PROJECT_VIEW) {
-                    Arrangement.spacedBy(RAIL_GUTTER)
-                } else {
-                    Arrangement.Top
-                },
+                verticalArrangement = if (cards) Arrangement.spacedBy(RAIL_GUTTER) else Arrangement.Top,
             ) {
                 when (family) {
                     RailFamily.PROJECT_VIEW -> {
@@ -84,6 +82,9 @@ fun RightPanel(
                         SlotRenderer(surface, SlotId("modData"), Modifier.fillMaxWidth(), spacing = RAIL_GUTTER)
                         SlotRenderer(surface, SlotId("authorData"), Modifier.fillMaxWidth(), spacing = RAIL_GUTTER)
                     }
+                    // One column of blocks read downward, for the reason above.
+                    RailFamily.BROWSE ->
+                        SlotRenderer(surface, SlotId("controls"), Modifier.fillMaxWidth(), spacing = RAIL_GUTTER)
                     // General, and anything a later build named that this one has
                     // never heard of: the rail at rest is the safe thing to draw,
                     // and drawing nothing would be a blank pane with no way back.
@@ -104,6 +105,7 @@ fun RightPanel(
 object RailFamily {
     val GENERAL: FamilyId = FamilyId.GENERAL
     val PROJECT_VIEW: FamilyId = FamilyId("projectView")
+    val BROWSE: FamilyId = FamilyId("browse")
 }
 
 /**

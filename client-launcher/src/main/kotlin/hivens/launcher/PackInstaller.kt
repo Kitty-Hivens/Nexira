@@ -67,9 +67,10 @@ class PackInstaller(
             packId, manifest.packVersion, instanceId, clientDir)
 
         // Optional-content defaults from the manifest: each optional mod
-        // (required=false) seeds at its default_enabled. Sync places toggled-off
-        // optionals as `.disabled` so a later flip is a rename, not a re-download.
-        val optionalToggles = OptionalContentRules.defaultToggles(manifest.mods)
+        // (required=false) seeds at its default_enabled, each optional asset on.
+        // Sync places toggled-off optionals as `.disabled` so a later flip is a
+        // rename, not a re-download.
+        val optionalToggles = OptionalContentRules.defaultToggles(manifest)
         // The same manifest object everything below is recorded from. Handing sync a
         // pack id instead let it fetch the pack's current build, so a user who picked
         // an older one got that build's pin and baseline over the newest build's files.
@@ -78,6 +79,7 @@ class PackInstaller(
             clientDir = clientDir,
             progress  = progress,
             enabledState = OptionalContentRules.enabledState(manifest.mods, optionalToggles),
+            assetState = OptionalContentRules.assetState(manifest.assets, optionalToggles),
         )
 
         // Provision the canonical runtime (vanilla + loader libraries + client +

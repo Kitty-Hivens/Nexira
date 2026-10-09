@@ -1,10 +1,15 @@
 package hivens.ui.screens.detail
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -39,6 +44,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontFamily
@@ -72,8 +78,9 @@ import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxCalloutBanner
 import hivens.ui.nx.NxCalloutTone
-import hivens.ui.nx.NxContextMenu
-import hivens.ui.nx.NxMenuItem
+import hivens.ui.nx.NxChoiceDivider
+import hivens.ui.nx.NxChoiceItem
+import hivens.ui.nx.NxChoiceMenu
 import hivens.ui.nx.NxRow
 import hivens.ui.nx.NxSteadyText
 import hivens.ui.nx.PlayButton
@@ -83,7 +90,8 @@ import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.screens.ConsoleContent
 import hivens.ui.screens.ConsoleSource
-import hivens.ui.screens.mod.ModTarget
+import hivens.ui.feature.catalogue.project.ModTarget
+import hivens.ui.feature.catalogue.project.loaderLabel
 import hivens.ui.screens.detail.settings.PackSettingsCategory
 import hivens.ui.screens.detail.settings.PackSettingsSheet
 import hivens.ui.screens.library.FileBrowserPane
@@ -132,8 +140,10 @@ fun PackDetailScreen(
     initialShowSettings: Boolean = false,
     initialSettingsSection: PackSettingsCategory? = null,
     onOpenVersions: (fromSettings: Boolean) -> Unit = {},
-    /** Opens the project page for one of this instance's files, or for a search result. */
+    /** Opens the project page for one of this instance's files. */
     onOpenProject: (ModTarget) -> Unit = {},
+    /** Opens the launcher's browse aimed at this pack. */
+    onFindProjects: () -> Unit = {},
 ) {
     PuppetScreen("PackDetail.$instanceId")
     PuppetClick("packDetail.back") { onBack() }
@@ -158,11 +168,6 @@ fun PackDetailScreen(
     val instanceDir = state.instanceDir ?: return
 
     var tabIndex by rememberSaveable(pack.id) { mutableIntStateOf(0) }
-    // Saved for the same reason the tab index is: the content tab's holder is
-    // rebuilt on every visit, so a reader who opened the project browser, opened a
-    // page from it and came back landed in the content list rather than in the
-    // search they left.
-    var browsingProjects by rememberSaveable(pack.id) { mutableStateOf(false) }
     val s = LocalStrings.current
 
     var showSettings by remember(pack.id) { mutableStateOf(initialShowSettings) }
@@ -253,8 +258,7 @@ fun PackDetailScreen(
                     instance = pack,
                     state = contentState,
                     onOpenProject = onOpenProject,
-                    browsing = browsingProjects,
-                    onBrowsing = { browsingProjects = it },
+                    onFindProjects = onFindProjects,
                     onOpenPackSettings = {
                         settingsSection = PackSettingsCategory.Data
                         showSettings = true
@@ -402,9 +406,9 @@ private fun listInstanceLogs(instanceDir: Path): List<File> {
 
 /**
  * Compact log selector for the Logs tab. The collapsed button shows the
- * current selection ("General" or a full filename); the dropdown lists
- * General + every file by full name, newest first, with the active
- * entry tinted in the accent colour (no ambiguous asterisk).
+ * current selection ("General" or a full filename). The list holds General,
+ * then every file by full name, newest first, the one on screen filled with
+ * the accent.
  */
 @Composable
 private fun LogSessionPicker(
@@ -415,6 +419,17 @@ private fun LogSessionPicker(
 ) {
     val s = LocalStrings.current
     var open by remember { mutableStateOf(false) }
+    var shown by remember { mutableStateOf(false) }
+    val turn by animateFloatAsState(if (open) 180f else 0f, animationSpec = Motion.tap, label = "logChevron")
+    val interaction = remember { MutableInteractionSource() }
+    val hovered by interaction.collectIsHoveredAsState()
+    // Lit for as long as its list is on screen, not only while the pointer is over
+    // it: the list takes the pointer, and the trigger went dark under it otherwise.
+    val wash by animateColorAsState(
+        if (hovered || open || shown) NxColor.wash(NxInk.quiet, 0.12f) else Color.Transparent,
+        animationSpec = Motion.tap.of(),
+        label = "logPickerWash",
+    )
 
     val currentLabel = selectedFile?.name ?: s.consoleSessionLive
 
@@ -422,7 +437,9 @@ private fun LogSessionPicker(
         Row(
             modifier = Modifier
                 .clip(MaterialTheme.shapes.small)
-                .clickable { open = true }
+                .background(wash)
+                .hoverable(interaction)
+                .clickable(interactionSource = interaction, indication = null) { open = true }
                 .padding(horizontal = 8.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -431,20 +448,22 @@ private fun LogSessionPicker(
                 color    = NxInk.quiet,
                 fontSize = 11.sp,
             )
-            Symbol(icon = NxIcon.ArrowDropDown,
+            Symbol(
+                icon               = NxIcon.ExpandMore,
                 contentDescription = null,
                 tint               = NxInk.quiet,
-                modifier           = Modifier.size(16.dp),
+                modifier           = Modifier.size(16.dp).rotate(turn),
             )
         }
-        NxContextMenu(expanded = open, onDismissRequest = { open = false }) {
-            NxMenuItem(
+        NxChoiceMenu(expanded = open, onDismissRequest = { open = false }, onShownChange = { shown = it }) {
+            NxChoiceItem(
                 label    = s.consoleSessionLive,
                 selected = selectedFile == null,
                 onClick  = { onSelectGeneral(); open = false },
             )
+            if (files.isNotEmpty()) NxChoiceDivider()
             files.forEach { f ->
-                NxMenuItem(
+                NxChoiceItem(
                     label    = f.name,
                     selected = f == selectedFile,
                     onClick  = { onSelectFile(f); open = false },
@@ -687,7 +706,7 @@ private fun HeroUpdateBadge(text: String, rollback: Boolean, onClick: () -> Unit
 private fun loaderMcLabel(m: CachedManifestSnapshot): String {
     val loader = m.loaderName
         .takeIf { it.isNotBlank() && !it.equals("vanilla", ignoreCase = true) }
-        ?.replaceFirstChar(Char::uppercase)
+        ?.let(::loaderLabel)
     return listOfNotNull(loader, m.minecraftVersion).joinToString(" ")
 }
 

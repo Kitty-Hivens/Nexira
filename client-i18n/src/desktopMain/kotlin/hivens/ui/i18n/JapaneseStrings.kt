@@ -134,7 +134,6 @@ object JapaneseStrings : AppStrings {
     override val windowRestore = "元に戻す"
     override val windowClose = "閉じる"
     override val crumbHome = "ホーム"
-    override val crumbLoading = "読み込み中…"
     override val paginationPrev = "前のページ"
     override val paginationNext = "次のページ"
 
@@ -685,6 +684,55 @@ object JapaneseStrings : AppStrings {
         "optimization" -> "最適化"
         "quests"       -> "クエスト"
         "technology"   -> "技術"
+        "cursed"           -> "呪われた"
+        "decoration"       -> "装飾"
+        "economy"          -> "経済"
+        "equipment"        -> "装備"
+        "food"             -> "食料"
+        "game-mechanics"   -> "ゲームメカニクス"
+        "library"          -> "ライブラリ"
+        "management"       -> "管理"
+        "minigame"         -> "ミニゲーム"
+        "mobs"             -> "モブ"
+        "social"           -> "ソーシャル"
+        "storage"          -> "ストレージ"
+        "transportation"   -> "輸送"
+        "utility"          -> "ユーティリティ"
+        "worldgen"         -> "ワールド生成"
+        "modded"           -> "Mod向け"
+        "realistic"        -> "リアル"
+        "simplistic"       -> "シンプル"
+        "themed"           -> "テーマ"
+        "tweaks"           -> "調整"
+        "vanilla-like"     -> "バニラ風"
+        "audio"            -> "サウンド"
+        "blocks"           -> "ブロック"
+        "core-shaders"     -> "コアシェーダー"
+        "entities"         -> "エンティティ"
+        "environment"      -> "環境"
+        "fonts"            -> "フォント"
+        "gui"              -> "GUI"
+        "items"            -> "アイテム"
+        "locale"           -> "言語"
+        "models"           -> "モデル"
+        "8x-"              -> "8x以下"
+        "512x+"            -> "512x以上"
+        "cartoon"          -> "カートゥーン"
+        "fantasy"          -> "ファンタジー"
+        "semi-realistic"   -> "セミリアル"
+        "atmosphere"       -> "大気"
+        "bloom"            -> "ブルーム"
+        "colored-lighting" -> "カラーライティング"
+        "foliage"          -> "植生"
+        "path-tracing"     -> "パストレーシング"
+        "pbr"              -> "PBR"
+        "reflections"      -> "反射"
+        "shadows"          -> "影"
+        "potato"           -> "ポテト"
+        "low"              -> "低"
+        "medium"           -> "中"
+        "high"             -> "高"
+        "screenshot"       -> "スクリーンショット向け"
         else           -> humanizeCategory(id)
     }
 
@@ -763,6 +811,10 @@ object JapaneseStrings : AppStrings {
     override val contentVersionsLoadFailed = "バージョン一覧を取得できませんでした"
     override val contentDetailAuthors = "作者"
     override val contentDetailSize = "サイズ"
+    override val packRailMods = "Mod 数"
+    override fun packRailSignIn(provider: String) = "$provider へのサインインが必要"
+    override val packRailUsedBy = "収録パック"
+    override val modLinkPage = "プロジェクトページ"
     override val modPageTabDescription = "説明"
     override val modPageTabVersions = "バージョン"
     override val modPageTabChangelog = "更新履歴"
@@ -782,6 +834,83 @@ object JapaneseStrings : AppStrings {
     override val modPageInstallFailed = "インストールできませんでした"
     override val modPageInstallRetry = "再試行"
     override fun modPageInstallMissing(count: Int) = "不足している依存関係: $count"
+
+    // Browse by kind, and the pack an install from it goes into
+    override val browseKindPacks           = "パック"
+    override val installPickerNoPacks      = "インストールできるパックがまだありません"
+    override val installPickerFailed       = "このプロジェクトのバージョンを取得できませんでした"
+    override val installTargetNoBuild      = "このゲームバージョンとローダーに対応するビルドがありません"
+    override val installTargetNotTaken     = "このパックに入れる内容はソース側が決めます"
+    override val installTargetUnknown      = "パックを読み込めませんでした"
+    override val installRefusedGameRunning = "ゲームが起動中です"
+    override val installRefusedBusy        = "パックは現在処理中です"
+    override val installInstalled          = "インストール済み"
+    override fun installSkipLine(project: String, reason: String) = "$project：$reason"
+    override val installSkipLookupFailed = "確認できませんでした"
+    override val installSkipNotPlaceable = "パックに入れられない種類です"
+    override val installSkipNameTaken    = "同じ名前のファイルが既にあります"
+    override val installSkipNotAttempted = "本体のダウンロードに失敗したため未実行"
+    override val installSkipTooDeep      = "依存関係の階層が深すぎます"
+    override val installSkipPackOwned    = "パック自身のファイルです。更新で元に戻ります"
+    override val browseRailFind        = "検索対象"
+    override val browseRailSource      = "ソース"
+    override val browseSearchMods      = "Mod を検索"
+    override val browseSearchResourcePacks = "リソースパックを検索"
+    override val browseSearchShaders   = "シェーダーを検索"
+    override val browseFilterVersion     = "ゲームバージョン"
+    override val browseFilterLoader      = "ローダー"
+    override val browseFilterCategories  = "カテゴリ"
+    override val browseFilterFeatures    = "特徴"
+    override val browseFilterResolutions = "解像度"
+    override val browseFilterPerformance = "負荷"
+    override val browseFilterEnvironment = "環境"
+    override val browseFilterLicense     = "ライセンス"
+    override val browseFilterExclusions  = "除外"
+    override val browseFilterClient      = "クライアント"
+    override val browseFilterServer      = "サーバー"
+    override val browseFilterOpenSource  = "オープンソース"
+    override val browseFilterArchived    = "アーカイブ済み"
+    override val browseFilterShowMore    = "もっと見る"
+    override val browseFilterShowLess    = "閉じる"
+    override val browseFilterAllVersions = "スナップショットを表示"
+    override val browseFilterExclude     = "除外"
+    override val browseFilterUnlockHint  = "解除すると、このパックで動かないものも表示されます"
+    override val browseFilterUnlock      = "フィルターを解除"
+    override val browseFilterRelock      = "パックに合わせる"
+    override val browseHideInstalled     = "インストール済みを隠す"
+    override val browseFilterBuiltBy     = "作成者"
+    override val browseFilterCommunity   = "コミュニティ"
+    override val browseFiltersClearAll   = "すべてクリア"
+    override val browseInstallingInto    = "インストール先"
+    override val browseLeaveTarget       = "このパックへのインストールをやめる"
+    override val browseBackToPack        = "パックに戻る"
+    override val installDialogTitle      = "プロジェクトをインストール"
+    override val installDialogClose      = "閉じる"
+    override val installDialogExisting   = "既存のパック"
+    override val installDialogNew        = "新しいパック"
+    override val installDialogSearch     = "パックを検索"
+    override val installDialogShowUnfit  = "合わないパックも表示"
+    override val installDialogHideUnfit  = "合わないパックを隠す"
+    override val installDialogCreate     = "作成してインストール"
+    override val installDialogCreating   = "パックを準備中"
+    override val installDialogOpenPack   = "パックを開く"
+    override fun browseFilterLockedBy(pack: String) = "パック「$pack」に合わせています"
+    override fun installDialogFitCount(count: Int) = "合うパック: $count"
+    override fun installDialogDone(pack: String) = "「$pack」にインストールしました"
+    override val browseSortLabel       = "並び順"
+    override val browseSortRelevance   = "関連度"
+    override val browseSortDownloads   = "ダウンロード数"
+    override val browseSortFollows     = "フォロワー数"
+    override val browseSortNewest      = "新着"
+    override val browseSortUpdated     = "更新日"
+    override val modPageInstallChoose  = "インストール先を選ぶ"
+    override val editorSurfBrowse      = "探す"
+    override val editorSurfShortBrowse = "探す"
+    override val editorSurfProject     = "プロジェクトページ"
+    override val editorSurfShortProject = "プロジェクト"
+    override val editorSurfCataloguePack = "カタログのパックページ"
+    override val editorSurfShortCataloguePack = "パック"
+    override fun browseByAuthor(name: String) = "作者: $name"
     override val modPageInstallShort = "インストール"
     override fun modPageNoBuildFor(target: String) = "$target 向けのビルドはありません"
     override val modPageNoBuildAny = "適合するビルドがありません"
@@ -975,6 +1104,7 @@ object JapaneseStrings : AppStrings {
     override fun packVersionsApplying(current: Int, total: Int, name: String) = "適用中 $current/$total: ${name}"
     override fun packVersionsApplied(version: String) = "完了しました。現在のビルドは $version です"
     override fun packVersionsFailed(reason: String) = "失敗しました: ${reason}"
+    override fun packOperationRefused(work: String) = "パックが使用中のため、今は実行できません。$work"
     override val packVersionsRetry = "再試行"
     override val packVersionsLoadError = "ミラーに接続できず、バージョン一覧を読み込めませんでした"
 
@@ -1082,6 +1212,7 @@ object JapaneseStrings : AppStrings {
     override val launchBlockRecovering = "復元中…"
     override val launchBlockDeleting = "削除中…"
     override val launchBlockUpdatingContent = "Mod を更新中…"
+    override val launchBlockInstallingContent = "コンテンツをインストール中…"
     override val launchBlockMissing = "ファイルが見つかりません"
     override val launchBlockOtherRunning = "別のゲームが起動中です"
     override val launchStopping = "終了中…"
@@ -1390,6 +1521,28 @@ object JapaneseStrings : AppStrings {
         "widget.home.new.welcome.customGreeting" to "あいさつ文を指定",
         "widget.home.new.welcome.showSubtitle" to "副題を表示",
         "widget.library.body" to "ライブラリ本体",
+        "widget.browse.search" to "カタログ検索",
+        "widget.browse.results" to "カタログの結果",
+        "widget.project.header" to "プロジェクトのヘッダー",
+        "widget.project.tabs" to "プロジェクトのタブ",
+        "widget.project.body" to "プロジェクトのタブ内容",
+        "widget.catalogue.pack.header" to "カタログパックのヘッダー",
+        "widget.catalogue.pack.tabs" to "カタログパックのタブ",
+        "widget.catalogue.pack.body" to "カタログパックのタブ内容",
+        "widget.browse.scope" to "検索対象",
+        "widget.browse.installing" to "インストール先のパック",
+        "widget.browse.chips" to "適用中のフィルター",
+        "widget.browse.filter.version" to "フィルター: ゲームバージョン",
+        "widget.browse.filter.loader" to "フィルター: ローダー",
+        "widget.browse.filter.categories" to "フィルター: カテゴリ",
+        "widget.browse.filter.features" to "フィルター: 特徴",
+        "widget.browse.filter.resolutions" to "フィルター: 解像度",
+        "widget.browse.filter.performance" to "フィルター: 負荷",
+        "widget.browse.filter.environment" to "フィルター: 環境",
+        "widget.browse.filter.license" to "フィルター: ライセンス",
+        "widget.browse.filter.exclusions" to "フィルター: 除外",
+        "widget.browse.filter.installed" to "インストール済みを隠す",
+        "widget.browse.filter.builtBy" to "フィルター: 作成者",
         "widget.library.body.emptyText" to "空のときの文",
         "widget.library.body.emptyTitle" to "空のときの見出し",
         "widget.library.header" to "ライブラリの見出し",

@@ -12,6 +12,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import hivens.core.api.dto.modrinth.ModrinthProject
 import hivens.core.api.dto.modrinth.ModrinthVersion
+import hivens.core.api.dto.smrt.SmrtAssetEntry
 import hivens.core.api.dto.smrt.SmrtModEntry
 import hivens.core.api.dto.smrt.SmrtPackManifest
 import hivens.core.api.interfaces.IMirrorPackClient
@@ -297,22 +298,30 @@ internal class ContentTabState(
     private var manifestVersion: String? = null
     private var optionalState by mutableStateOf<Map<String, Boolean>>(emptyMap())
 
+    /** The pack's switchable assets as the player has them set, by `dest`. */
+    private var assetState by mutableStateOf<Map<String, Boolean>>(emptyMap())
+
     /** filename -> manifest entry, for classifying rows on a tracked mirror pack. */
     private val manifestMods: Map<String, SmrtModEntry> by derivedStateOf {
         manifest?.mods?.associateBy { it.filename }.orEmpty()
     }
 
     /**
-     * Filenames the pack marks optional, i.e. the ones a player may turn off.
-     *
-     * Mods only, and deliberately: the whole optional-content pipeline is -- the
-     * rules read `manifest.mods`, the toggles persist per mod, and the relabel
-     * renames jars. A manifest asset carries the same `required` flag, but nothing
-     * acts on it, so listing an optional resource pack here would offer a switch
-     * that does not exist.
+     * The resource and shader packs the pack ships, by the row's selection key.
+     * A required one is the pack's like a required mod, and an optional one is
+     * switched through the pack like an optional mod, so the choice survives a
+     * sync instead of the file coming back beside the one switched off.
      */
+    private val manifestAssets: Map<String, SmrtAssetEntry> by derivedStateOf {
+        manifest?.assets.orEmpty().mapNotNull { a ->
+            kindOfDest(a.dest)?.takeIf { it != ContentKind.Mod }?.let { contentKey(it, a.dest.substringAfterLast('/')) to a }
+        }.toMap()
+    }
+
+    /** Filenames the pack lets the player turn off: its optional mods and its switchable assets. */
     private val optionalNames: Set<String> by derivedStateOf {
-        manifestMods.values.filterNot { it.required }.map { it.filename }.toSet()
+        manifestMods.values.filterNot { it.required }.map { it.filename }.toSet() +
+            manifestAssets.values.filter { it.toggleable }.map { it.dest.substringAfterLast('/') }
     }
 
     /** What is wrong with the pack's mods as the player has them set, by filename. Once per change, not per row. */
@@ -378,7 +387,7 @@ internal class ContentTabState(
      * action is the pack owning some of what was ticked, and naming the count is
      * the difference between a dead button and one that explains itself.
      */
-    val lockedCount: Int by derivedStateOf { lockedCount(picked, ::userOwns, manifestMods) }
+    val lockedCount: Int by derivedStateOf { lockedCount(picked, ::userOwns, manifestMods, manifestAssets) }
 
     // Cancelled and replaced whenever the list changes, so a rescan does not
     // leave a previous prefetch racing the new one over the same keys.
@@ -414,7 +423,12 @@ internal class ContentTabState(
         instance = updated
         if (!isMirror) return
         if (manifest == null || manifestVersion != updated.installedVersion()) loadManifest()
-        else manifest?.let { optionalState = OptionalContentRules.enabledState(it.mods, updated.optionalContent) }
+        else manifest?.let { seedChoice(it, updated) }
+    }
+
+    private fun seedChoice(m: SmrtPackManifest, from: PackInstance) {
+        optionalState = OptionalContentRules.enabledState(m.mods, from.optionalContent)
+        assetState = OptionalContentRules.assetState(m.assets, from.optionalContent)
     }
 
     private fun PackInstance.installedVersion(): String? = pinnedPackVersion ?: packRef.version
@@ -429,7 +443,7 @@ internal class ContentTabState(
         }.getOrNull()
         manifest = m
         manifestVersion = if (m != null) instance.installedVersion() else null
-        if (m != null) optionalState = OptionalContentRules.enabledState(m.mods, instance.optionalContent)
+        if (m != null) seedChoice(m, instance)
     }
 
     /**
@@ -531,13 +545,17 @@ internal class ContentTabState(
     }
 
     /** What one row may do, given the pack's contract and who owns the instance. */
-    fun rulesFor(content: InstalledContent): ContentRowRules = contentRowRules(
-        content         = content,
-        manifestEntry   = entryFor(content),
-        userOwned       = userOwns(content),
-        optionalEnabled = optionalState[content.fileName],
-        problems        = packProblems[content.fileName].orEmpty(),
-    )
+    fun rulesFor(content: InstalledContent): ContentRowRules {
+        val asset = assetFor(content)
+        return contentRowRules(
+            content         = content,
+            manifestEntry   = entryFor(content),
+            userOwned       = userOwns(content),
+            optionalEnabled = if (asset != null) assetState[asset.dest] else optionalState[content.fileName],
+            problems        = packProblems[content.fileName].orEmpty(),
+            assetEntry      = asset,
+        )
+    }
 
     /**
      * Whether this row is the player's to edit freely.
@@ -573,6 +591,7 @@ internal class ContentTabState(
     fun toggle(content: InstalledContent, enabled: Boolean) {
         val rules = rulesFor(content)
         when {
+            rules.optional && content.kind != ContentKind.Mod -> assetFor(content)?.let { toggleOptionalAsset(it.dest, enabled) }
             rules.optional -> toggleOptional(content.fileName, enabled)
             rules.showToggle -> writeScope.launch {
                 manager.setEnabled(instanceDir, content.kind, content.fileName, enabled)
@@ -587,16 +606,23 @@ internal class ContentTabState(
         // disk lands asynchronously behind it.
         val next = OptionalContentRules.applyToggle(m.mods, optionalState, fileName, enable)
         optionalState = next
-        publish(m, next)
+        publish(m)
+    }
+
+    /** An asset has no requires or conflicts, so its switch moves itself alone. */
+    private fun toggleOptionalAsset(dest: String, enable: Boolean) {
+        val m = manifest ?: return
+        assetState = assetState + (dest to enable)
+        publish(m)
     }
 
     /**
-     * Hand a selection to the launcher. Whole-selection writes supersede each
-     * other there, so a rapid pair reaches the record as one value and the re-seed
-     * that follows agrees with what is on screen.
+     * Hand the whole choice, mods and assets, to the launcher. Whole-selection
+     * writes supersede each other there, so a rapid pair reaches the record as one
+     * value and the re-seed that follows agrees with what is on screen.
      */
-    private fun publish(manifest: SmrtPackManifest, state: Map<String, Boolean>) {
-        controller.setOptionalModsAsync(instance, manifest, OptionalContentRules.togglesFrom(manifest.mods, state))
+    private fun publish(manifest: SmrtPackManifest) {
+        controller.setOptionalModsAsync(instance, manifest, OptionalContentRules.togglesFrom(manifest, optionalState, assetState))
     }
 
     /**
@@ -613,10 +639,12 @@ internal class ContentTabState(
         val (optional, onDisk) = targets.partition { rulesFor(it).optional }
         val m = manifest
         if (m != null && optional.isNotEmpty()) {
+            val (optionalMods, optionalAssets) = optional.partition { it.kind == ContentKind.Mod }
             var next = optionalState
-            optional.forEach { next = OptionalContentRules.applyToggle(m.mods, next, it.fileName, enable) }
+            optionalMods.forEach { next = OptionalContentRules.applyToggle(m.mods, next, it.fileName, enable) }
             optionalState = next
-            publish(m, next)
+            assetState = assetState + optionalAssets.mapNotNull { c -> assetFor(c)?.let { it.dest to enable } }
+            publish(m)
         }
         if (onDisk.isNotEmpty()) {
             writeScope.launch {
@@ -693,29 +721,6 @@ internal class ContentTabState(
             targets.forEach { manager.delete(instanceDir, it.kind, it.fileName) }
             if (single == null) withContext(Dispatchers.Main) { clearSelection() }
             rescan()
-        }
-    }
-
-    // -- browse ---------------------------------------------------------------
-
-    /**
-     * Picks up whatever the project browser downloaded.
-     *
-     * Whether the browser is OPEN is not kept here. This holder is rebuilt on every
-     * visit, so a reader who opened the browser, opened a project page from it and
-     * came back landed in the content list instead of the search they left. The
-     * flag lives beside the tab index now, which is saved for exactly that reason.
-     */
-    fun refreshAfterBrowse() {
-        // Asked again after the rescan: a mod installed from the browser can pin a
-        // newer build of a library the folder already had, and the check is what
-        // says so. The check's own cache is keyed on the file set, so an unchanged
-        // folder costs nothing.
-        scope.launch {
-            rescan()
-            // One at a time: the pane starts a check of its own when the list lands,
-            // and two finishing out of order left the older answer on screen.
-            if (!checkingUpdates) checkUpdates()
         }
     }
 
@@ -941,6 +946,10 @@ internal class ContentTabState(
     private fun entryFor(content: InstalledContent): SmrtModEntry? =
         if (isMirror && content.kind == ContentKind.Mod) manifestMods[content.fileName] else null
 
+    /** The pack's asset that [content] is, or null when the player put it there. */
+    private fun assetFor(content: InstalledContent): SmrtAssetEntry? =
+        if (isMirror && content.kind != ContentKind.Mod) manifestAssets[content.selectionKey()] else null
+
     private fun fileOf(content: InstalledContent): Path = content.pathIn(instanceDir)
 
     /** Where this file's icon is filed for the life of the process. */
@@ -1015,8 +1024,11 @@ internal data class ContentRowRules(
  * [optionalEnabled] is the pack's optional-content state for the file, if any,
  * and [problems] what the pack's rules say is wrong with it as things are set.
  *
- * Resource and shader packs are cosmetic rather than part of the pack contract,
- * so they stay user-managed even while the instance is tracked; mods do not.
+ * A resource or shader pack the player put there is theirs even while the
+ * instance is tracked. One the pack ships is [assetEntry], and it answers to the
+ * pack the way a mod does: a required one stays on, an optional one is switched
+ * through the pack ([optionalEnabled] is then the pack's state for it), and
+ * neither is deleted from here, since the next sync would only put it back.
  */
 internal fun contentRowRules(
     content: InstalledContent,
@@ -1024,13 +1036,15 @@ internal fun contentRowRules(
     userOwned: Boolean,
     optionalEnabled: Boolean?,
     problems: List<OptionalContentRules.Problem> = emptyList(),
+    assetEntry: SmrtAssetEntry? = null,
 ): ContentRowRules {
-    val freeEdit = userOwned || content.kind != ContentKind.Mod
-    val optional = manifestEntry != null && !manifestEntry.required
+    val freeEdit = userOwned || (content.kind != ContentKind.Mod && assetEntry == null)
+    val optional = (manifestEntry != null && !manifestEntry.required) || assetEntry?.toggleable == true
     return ContentRowRules(
         effectiveEnabled = when {
             optional              -> optionalEnabled ?: content.enabled
             manifestEntry != null -> true // required -- always on
+            assetEntry != null    -> true // required -- always on
             else                  -> content.enabled
         },
         showToggle = freeEdit || optional,
@@ -1082,15 +1096,21 @@ internal fun filterContent(
             )
 }
 
-/** How many of [picked] belong to the pack rather than to the user. */
+/**
+ * How many of [picked] belong to the pack rather than to the user: its required
+ * mods and assets, and a mod it does not name. [manifestAssets] is keyed by the
+ * row's selection key.
+ */
 internal fun lockedCount(
     picked: List<InstalledContent>,
     userOwns: (InstalledContent) -> Boolean,
     manifestMods: Map<String, SmrtModEntry>,
+    manifestAssets: Map<String, SmrtAssetEntry> = emptyMap(),
 ): Int = picked.count { c ->
-    val freeEdit = userOwns(c) || c.kind != ContentKind.Mod
-    val entry = if (c.kind == ContentKind.Mod) manifestMods[c.fileName] else null
-    !freeEdit && (entry == null || entry.required)
+    val asset = if (c.kind != ContentKind.Mod) manifestAssets[c.selectionKey()] else null
+    val freeEdit = userOwns(c) || (c.kind != ContentKind.Mod && asset == null)
+    val optional = if (c.kind == ContentKind.Mod) manifestMods[c.fileName]?.required == false else asset?.toggleable == true
+    !freeEdit && !optional
 }
 
 /** Stable across a rescan: kind plus filename is what the row is keyed on too. */

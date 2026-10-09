@@ -78,8 +78,8 @@ class LauncherController(
 
     /**
      * Persists a pack instance's optional-content [toggles] and re-labels the
-     * already-downloaded mods on disk to match -- no network, a flip is just a
-     * `.disabled` rename. The caller passes the [manifest] it already loaded for
+     * already-downloaded mods and switchable assets on disk to match -- no network,
+     * a flip is just a `.disabled` rename. The caller passes the [manifest] it already loaded for
      * the Content tab. Returns the updated instance for the UI to adopt.
      */
     suspend fun setOptionalMods(
@@ -102,6 +102,10 @@ class LauncherController(
                     clientDir,
                     manifest.mods,
                     OptionalContentRules.enabledState(manifest.mods, toggles),
+                ) + smrtSyncService.relabelAssets(
+                    clientDir,
+                    manifest.assets,
+                    OptionalContentRules.assetState(manifest.assets, toggles),
                 )
             }
         }
@@ -889,7 +893,8 @@ class LauncherController(
                 smrtPackClient.fetchManifest(instance.packRef.id)
             }
             val enabled = OptionalContentRules.enabledState(manifest.mods, instance.optionalContent)
-            smrtSyncService.verifyAndRepair(clientDir, manifest, enabled) { current, total, path ->
+            val assets = OptionalContentRules.assetState(manifest.assets, instance.optionalContent)
+            smrtSyncService.verifyAndRepair(clientDir, manifest, enabled, assets) { current, total, path ->
                 // The SYNC stage's own sub-range, so the bar moves during what is
                 // otherwise a silent wait on a hundred-file walk.
                 attempt.setStage(PrepareStage.SYNC, 0.25f + 0.25f * (if (total > 0) current.toFloat() / total else 0f))

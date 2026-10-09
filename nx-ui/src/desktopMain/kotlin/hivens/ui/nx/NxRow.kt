@@ -75,12 +75,18 @@ fun NxRow(
     edgeBleed: Dp = 16.dp,
     compact: Boolean = false,
     labelWidth: Dp? = null,
+    /**
+     * Reads as hovered whatever the pointer says. For a row whose menu is open: the
+     * menu takes the pointer while it is up, and the row went dark under it and lit
+     * again once the menu had gone.
+     */
+    highlighted: Boolean = false,
     trailing: @Composable () -> Unit = {},
 ) {
     val rowModifier = if (onClick != null) {
         val shape = MaterialTheme.shapes.medium
         val interaction = remember { MutableInteractionSource() }
-        val alpha = softHoverAlpha(interaction)
+        val alpha = softHoverAlpha(interaction, highlighted)
         val tint = NxInk.main
         Modifier
             .bleedHorizontally(edgeBleed)
@@ -142,12 +148,12 @@ fun NxRow(
  * per animation frame, to change one rectangle.
  */
 @Composable
-internal fun softHoverAlpha(interaction: MutableInteractionSource): State<Float> {
+internal fun softHoverAlpha(interaction: MutableInteractionSource, held: Boolean = false): State<Float> {
     val hovered by interaction.collectIsHoveredAsState()
     val pressed by interaction.collectIsPressedAsState()
     val target = when {
         pressed -> 0.11f
-        hovered -> 0.06f
+        hovered || held -> 0.06f
         else    -> 0f
     }
     val still = LocalCustomization.current.reduceMotion

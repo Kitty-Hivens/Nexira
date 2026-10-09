@@ -1,5 +1,6 @@
 package hivens.ui.screens.settings
 
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,6 +21,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.boundsInWindow
@@ -31,9 +33,9 @@ import hivens.ui.i18n.AppLocale
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.nx.NxContextMenu
-import hivens.ui.nx.NxMenuItem
-import hivens.ui.nx.NxMenuMark
+import hivens.ui.nx.NxChoiceItem
+import hivens.ui.nx.NxChoiceMenu
+import hivens.ui.nx.NxMenuAlign
 import hivens.ui.nx.NxRow
 import hivens.ui.nx.NxSection
 import hivens.ui.nx.NxSwitch
@@ -74,6 +76,8 @@ internal fun AppearanceSection(
 ) {
     val s = LocalStrings.current
     var langExpanded by remember { mutableStateOf(false) }
+    var langShown by remember { mutableStateOf(false) }
+    val langTurn by animateFloatAsState(if (langExpanded) 180f else 0f, animationSpec = Motion.tap, label = "langChevron")
     var themeSwitchState by remember(isDarkTheme) { mutableStateOf(isDarkTheme) }
 
     NxSection(s.settingsSectionUI) {
@@ -85,6 +89,7 @@ internal fun AppearanceSection(
             icon     = NxIcon.Language,
             iconTint = NxColor.lead(),
             onClick  = { langExpanded = true },
+            highlighted = langShown,
             trailing = {
                 Box {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -96,20 +101,18 @@ internal fun AppearanceSection(
                             fontWeight = FontWeight.Bold,
                             fontFamily = familyForText(currentLocale.displayName),
                         )
-                        Symbol(NxIcon.ArrowDropDown, null, tint = NxColor.lead())
+                        Symbol(NxIcon.ExpandMore, null, tint = NxColor.lead(), modifier = Modifier.rotate(langTurn))
                     }
-                    NxContextMenu(
+                    NxChoiceMenu(
                         expanded         = langExpanded,
                         onDismissRequest = { langExpanded = false },
+                        align            = NxMenuAlign.End,
+                        onShownChange    = { langShown = it },
                     ) {
                         AppLocale.entries.forEach { locale ->
-                            NxMenuItem(
+                            NxChoiceItem(
                                 label    = locale.displayName,
                                 selected = locale == currentLocale,
-                                // One question, four answers: the check mark on the
-                                // row already in force said nothing about the other
-                                // three being answers to the same thing.
-                                mark     = NxMenuMark.Radio,
                                 onClick  = { langExpanded = false; onLocaleChanged(locale) },
                             )
                             PuppetClick("settings.language.${locale.name}") {
@@ -129,7 +132,7 @@ internal fun AppearanceSection(
             icon     = NxIcon.Star,
             iconTint = NxColor.lead(),
             onClick  = onOpenThemePicker,
-            trailing = { Symbol(NxIcon.ArrowDropDown, null, tint = NxColor.lead()) },
+            trailing = { Symbol(NxIcon.ChevronRight, null, tint = NxColor.lead()) },
         )
 
         // Custom background shortcut.

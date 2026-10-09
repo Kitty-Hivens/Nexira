@@ -668,7 +668,7 @@ class LauncherControllerTest {
             loader        = hivens.core.api.dto.smrt.SmrtLoader("forge", "14.23.5.2922"),
             java          = hivens.core.api.dto.smrt.SmrtJava(8),
         )
-        coEvery { packSyncService.verifyAndRepair(any(), any(), any(), any()) } returns hivens.core.net.RepairReport(
+        coEvery { packSyncService.verifyAndRepair(any(), any(), any(), any(), any()) } returns hivens.core.net.RepairReport(
             checked = 1, intact = 0, repaired = listOf("Botania.jar"), bytesFetched = 100L, failed = emptyMap(),
         )
 
@@ -698,7 +698,7 @@ class LauncherControllerTest {
         )
         advanceUntilIdle()
 
-        coVerify(exactly = 1) { packSyncService.verifyAndRepair(any(), any(), any(), any()) }
+        coVerify(exactly = 1) { packSyncService.verifyAndRepair(any(), any(), any(), any(), any()) }
         coVerify(exactly = 2) { packSyncService.enforceRoster(any(), any()) }
         assertEquals(
             "fresh-token",
