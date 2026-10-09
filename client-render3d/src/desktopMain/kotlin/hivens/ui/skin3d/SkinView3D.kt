@@ -137,7 +137,7 @@ fun SkinView3D(
     // loop therefore sleeps first and asks for a frame second -- between two
     // advances Compose is asked for nothing and draws nothing.
     if (motion > 0f && windowFocused) {
-        LaunchedEffect(skin, motion, autoSpin, windowFocused, state.animationRevision) {
+        LaunchedEffect(skin, motion, autoSpin, state.animationRevision) {
             if (!autoSpin && state.animator.isSettled(state.timeMs)) return@LaunchedEffect
             var last = withFrameMillis { it }
             while (true) {

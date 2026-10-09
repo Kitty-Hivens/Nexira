@@ -808,7 +808,7 @@ class SmrtSyncService(
         val actual = runCatching { fileOpRetry("roster relocated $name") { sha1Of(file) } }
             .onFailure {
                 log.warn(
-                    "mods roster: cannot read {} where the loader moved it, it stays unchecked: {}",
+                    "mods roster: {} in the version directory would not open to be hashed, kept and left unchecked: {}",
                     rel.joinToString("/"), it.toString(),
                 )
             }

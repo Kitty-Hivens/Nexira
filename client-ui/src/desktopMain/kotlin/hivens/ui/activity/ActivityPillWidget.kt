@@ -199,7 +199,7 @@ fun ActivityPillWidget(instance: WidgetInstance) {
                     // selection and hands the body back.
                     val sel = selection
                     if (sel != null) {
-                        SelectionPill(sel, shown ?: subject, props, s, cap, open)
+                        SelectionPill(sel, shown, props, s, cap, open)
                     } else if (subject != null) {
                         Pill(shown ?: subject, activities, { picked = it.key }, props, commands, s, cap, open)
                     }
