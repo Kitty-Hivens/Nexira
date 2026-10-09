@@ -87,7 +87,21 @@ object OptionalContentRules {
         placed: (SmrtAssetEntry) -> Boolean? = { null },
     ): Map<String, Boolean> {
         val userState = toggles.associate { it.entryId to it.enabled }
-        return assets.associate { a -> a.dest to (!a.toggleable || (userState[a.stableKey] ?: placed(a) ?: true)) }
+        val keys = assetKeys(assets)
+        return assets.associate { a ->
+            a.dest to (!a.toggleable || (userState[keys.getValue(a.dest)] ?: userState[a.pathKey] ?: placed(a) ?: true))
+        }
+    }
+
+    /**
+     * The key each asset's choice is kept under, by `dest`: its [SmrtAssetEntry.stableKey],
+     * unless another switchable asset of the same manifest shares it. Two resource
+     * packs from one project would otherwise be one choice, and switching either
+     * would move both in the record while the disk followed only the last.
+     */
+    fun assetKeys(assets: List<SmrtAssetEntry>): Map<String, String> {
+        val shared = optionalAssets(assets).groupingBy { it.stableKey }.eachCount().filterValues { it > 1 }.keys
+        return assets.associate { a -> a.dest to if (a.stableKey in shared) a.pathKey else a.stableKey }
     }
 
     /**
@@ -110,7 +124,9 @@ object OptionalContentRules {
      * `default_enabled` and every optional asset on.
      */
     fun defaultToggles(manifest: SmrtPackManifest): List<ContentToggle> =
-        defaultToggles(manifest.mods) + optionalAssets(manifest.assets).map { ContentToggle(it.stableKey, true) }
+        defaultToggles(manifest.mods) + assetKeys(manifest.assets).let { keys ->
+            optionalAssets(manifest.assets).map { ContentToggle(keys.getValue(it.dest), true) }
+        }
 
     /**
      * The whole persistable choice for [manifest]: [mods] by filename and [assets]
@@ -124,8 +140,9 @@ object OptionalContentRules {
         mods: Map<String, Boolean>,
         assets: Map<String, Boolean>,
     ): List<ContentToggle> =
-        togglesFrom(manifest.mods, mods) +
-            optionalAssets(manifest.assets).map { ContentToggle(it.stableKey, assets[it.dest] ?: true) }
+        togglesFrom(manifest.mods, mods) + assetKeys(manifest.assets).let { keys ->
+            optionalAssets(manifest.assets).map { ContentToggle(keys.getValue(it.dest), assets[it.dest] ?: true) }
+        }
 
     /**
      * [manifest]'s choice as [toggles] hold it, carried onto the same manifest's

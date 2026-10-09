@@ -387,6 +387,36 @@ class OptionalContentRulesTest {
         assertFalse(seeded.any { it.entryId.endsWith("servers.dat") }, "a required asset is no choice")
     }
 
+    /** The path carries the version, so a choice keyed on it was lost at the next build. */
+    @Test
+    fun `an asset's choice follows its host's project across builds, and one kept by path is still read`() {
+        fun cf(dest: String) = SmrtAssetEntry(dest = dest, sha1 = "x", sizeBytes = 1, required = false, source = SmrtSource.CurseForge(42, 1))
+        val old = cf("resourcepacks/Faithful-1.2.zip")
+        val next = cf("resourcepacks/Faithful-1.3.zip")
+
+        assertEquals(old.stableKey, next.stableKey)
+        assertEquals(false, OptionalContentRules.assetState(listOf(next), listOf(ContentToggle(old.stableKey, false)))[next.dest])
+        assertEquals(
+            false,
+            OptionalContentRules.assetState(listOf(old), listOf(ContentToggle(old.pathKey, false)))[old.dest],
+            "a choice written before the key followed the host",
+        )
+    }
+
+    /** One key for both, and switching either moved both in the record. */
+    @Test
+    fun `two switchable assets of one project are two choices`() {
+        val day = asset("resourcepacks/Day.zip", projectId = "duo")
+        val night = asset("resourcepacks/Night.zip", projectId = "duo")
+        val m = manifest(listOf(day, night))
+
+        val toggles = OptionalContentRules.togglesFrom(m, emptyMap(), mapOf(day.dest to false, night.dest to true))
+        val state = OptionalContentRules.assetState(m.assets, toggles)
+
+        assertEquals(2, toggles.count { it.entryId.startsWith(SmrtAssetEntry.ASSET_KEY_PREFIX) })
+        assertEquals(mapOf(day.dest to false, night.dest to true), state)
+    }
+
     /**
      * A resource pack the player switched off by hand while the pack still shipped
      * it as plain content: off on disk, and no choice written down. Read as on, the

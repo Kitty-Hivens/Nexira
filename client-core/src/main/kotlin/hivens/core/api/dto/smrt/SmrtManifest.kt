@@ -206,6 +206,8 @@ data class SmrtAssetEntry(
     val sha1: String,
     @SerialName("size_bytes") val sizeBytes: Long,
     val required: Boolean = true,
+    /** Curator-assigned identity, as [SmrtModEntry.slug] is for a mod. Absent from a mirror that predates it. */
+    val slug: String? = null,
     @Serializable(with = SmrtSourceLenientSerializer::class)
     val source: SmrtSource,
     val display: SmrtDisplay? = null,
@@ -230,12 +232,24 @@ data class SmrtAssetEntry(
 
     /**
      * The key the player's choice about this asset is kept under, the way
-     * [SmrtModEntry.stableKey] is for a mod: the Modrinth project where the asset
-     * comes from there, which survives a new build of the same pack, else its path.
+     * [SmrtModEntry.stableKey] is for a mod and by the same chain: the curator's
+     * [slug], then the project of whichever host publishes the file, then the path.
+     * A path carries the version as often as a mod's file name does
+     * (`Faithful-1.2.zip`), so a choice keyed on it was lost at the next build.
      * Prefixed, so an asset and a mod of one project are never the same choice.
      */
     val stableKey: String
-        get() = ASSET_KEY_PREFIX + ((source as? SmrtSource.Modrinth)?.let { "modrinth:${it.projectId}" } ?: dest)
+        get() = ASSET_KEY_PREFIX + (
+            slug
+                ?: (source as? SmrtSource.Modrinth)?.let { "modrinth:${it.projectId}" }
+                ?: (source as? SmrtSource.CurseForge)?.let { "curseforge:${it.projectId}" }
+                ?: (source as? SmrtSource.Github)?.let { "github:${it.repo}" }
+                ?: dest
+            )
+
+    /** The key a choice was kept under before [stableKey] followed the host, read so it is not lost. */
+    val pathKey: String
+        get() = ASSET_KEY_PREFIX + dest
 
     companion object {
         /** The folders an asset can be switched off in, see [toggleable]. */
