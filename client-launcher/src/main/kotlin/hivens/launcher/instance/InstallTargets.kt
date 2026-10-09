@@ -28,7 +28,9 @@ import java.nio.file.Path
  *
  * The project's build list is asked for once and every pack is judged against it
  * with the same rule an install uses, [chooseBuild]. Whether a pack already has the
- * project comes from [InstalledIndex], one reading per pack.
+ * project is read against that same list ([InstalledIndex.readAgainst]), on this
+ * machine: the catalogue is not told what any pack holds just because a dialog
+ * opened.
  */
 class InstallTargets(
     private val modrinth: ModrinthClient,
@@ -93,7 +95,7 @@ class InstallTargets(
         destination: ContentDestination.Pack,
     ): Verdict {
         val snapshot = try {
-            index.read(destination.dir)
+            index.readAgainst(destination.dir, listing)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -101,8 +103,8 @@ class InstallTargets(
             return Verdict.Unknown
         }
         snapshot.of(projectId).firstOrNull()?.let { return Verdict.Present(it) }
-        // Not identified is not absent: an install into it would be refused for the
-        // same reason, see ContentInstaller.plan.
+        // A file that could not be seen or hashed could be a build of this very
+        // project, so the pack is not called a fit.
         if (!snapshot.complete) return Verdict.Unknown
         val build = chooseBuild(listing, destination.mcVersion, destination.loader)
             ?: return Verdict.NotFit(Unfit.NoBuild)
@@ -122,7 +124,7 @@ class InstallTargets(
     private companion object {
         const val INSTANCES_DIR = "instances"
 
-        /** Packs read at once. Each reading hashes a folder and asks the catalogue once. */
+        /** Packs read at once. Each reading lists a folder and hashes what the hash cache has not seen. */
         const val READ_CONCURRENCY = 4
     }
 }

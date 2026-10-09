@@ -21,6 +21,7 @@ import hivens.test.testTransferEngine
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
+import io.ktor.client.engine.mock.toByteArray
 import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
@@ -133,6 +134,9 @@ class ModInstallerTest {
         val busyDuringFetch: MutableList<InstanceWork?> = Collections.synchronizedList(mutableListOf())
         var watching: String? = null
         var hashLookupFails = false
+
+        /** Every hash the catalogue was asked to identify, in the order asked. */
+        val hashesAsked: MutableList<String> = Collections.synchronizedList(mutableListOf())
         val unservable = mutableSetOf<String>()
 
         /** File names the hash of which cannot be read, as a file held open elsewhere. */
@@ -180,6 +184,7 @@ class ModInstallerTest {
                     val single = Regex("/v2/project/([^/]+)/version/([^/]+)$").find(path)
                     val text = when {
                         req.method == HttpMethod.Post && path.endsWith("/v2/version_files") -> {
+                            hashesAsked += Regex("[0-9a-f]{40}").findAll(String(req.body.toByteArray())).map { it.value }
                             if (hashLookupFails) return@MockEngine respond(ByteReadChannel("down"), HttpStatusCode.ServiceUnavailable)
                             json.encodeToString(MapSerializer(String.serializer(), ModrinthVersion.serializer()), byHash)
                         }
@@ -720,7 +725,9 @@ class ModInstallerTest {
 
     private fun Catalogue.targets() = InstallTargets(
         client,
-        InstalledIndex(InstanceContentScanner(), client) { runCatching { sha1(Files.readAllBytes(it)) }.getOrNull() },
+        InstalledIndex(InstanceContentScanner(), client) {
+            if (it.fileName.toString() in unhashable) null else runCatching { sha1(Files.readAllBytes(it)) }.getOrNull()
+        },
         repo,
         data,
     )
@@ -759,16 +766,43 @@ class ModInstallerTest {
     }
 
     @Test
-    fun `a folder the catalogue could not identify is unknown, not a fit`() = runTest {
+    fun `a pack with a file that could not be hashed is unknown, not a fit`() = runTest {
         val c = Catalogue()
-        val v = c.publish("sodium", "sodium-1")
+        c.publish("sodium", "sodium-1")
         val other = c.publish("other", "other-1")
         val p = pack()
         put(p, "mods", "other.jar", c.body(other))
-        c.hashLookupFails = true
+        c.unhashable += "other.jar"
 
         assertEquals(InstallTargets.Verdict.Unknown, c.targets().forProject("sodium").single { it.pack.id == p.id }.verdict)
-        assertTrue(v.files.isNotEmpty())
+    }
+
+    /**
+     * The dialog opens from a project found anywhere, and every pack gets a row. Asked
+     * of the catalogue, that was every file of every pack on every open, SmartyCraft
+     * and mirror packs included, to answer a question about one project whose build
+     * list was already in hand.
+     */
+    @Test
+    fun `which packs a project could go into is answered without telling the catalogue what any pack holds`() = runTest {
+        val c = Catalogue()
+        val v1 = c.publish("sodium", "sodium-1")
+        val v2 = c.publish("sodium", "sodium-2")
+        val other = c.publish("other", "other-1")
+        val has = pack()
+        put(has, "mods", "renamed.jar", c.body(v1))
+        put(has, "mods", "other.jar", c.body(other))
+        val mirror = pack(origin = PackOrigin.Mirror)
+        put(mirror, "resourcepacks", "faithful.zip", jar("the pack's own"))
+        val smarty = pack(origin = PackOrigin.Smartycraft)
+        put(smarty, "mods", "server-mod.jar", jar("the server's own"))
+
+        val answers = c.targets().forProject("sodium").associate { it.pack.id to it.verdict }
+
+        assertTrue(c.hashesAsked.isEmpty(), "asked about ${c.hashesAsked}")
+        assertEquals(InstallTargets.Verdict.Present::class, answers.getValue(has.id)::class)
+        assertEquals(v1, (answers.getValue(has.id) as InstallTargets.Verdict.Present).entry.version, "an older build, recognised by its bytes")
+        assertTrue(v2.files.isNotEmpty())
     }
 
     @Test

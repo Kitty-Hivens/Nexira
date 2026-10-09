@@ -61,6 +61,50 @@ class InstalledIndex(
     }
 
     suspend fun read(instanceDir: Path): Snapshot = withContext(Dispatchers.IO) {
+        val local = hashed(instanceDir)
+        var complete = local.complete
+        val versions = try {
+            modrinth.versionsForHashes(local.files.map { it.second })
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            log.warn("could not identify the content of {}: {}", instanceDir, e.message)
+            complete = false
+            emptyMap()
+        }
+        local.snapshot(complete) { versions[it] }
+    }
+
+    /**
+     * A reading that only answers for one project: which of the instance's files are
+     * builds [listing] names, matched on the sha1 every build publishes for its files.
+     *
+     * Nothing leaves the machine. [read] has to ask the catalogue because it names
+     * every file, and that is a question about one pack the player is installing
+     * into. Asking whether a single project is already somewhere needs only that
+     * project's own build list, which the caller has already fetched, so the hashes
+     * of every other pack, a SmartyCraft or mirror pack's included, stay here.
+     *
+     * Entries the listing does not name carry no version, as a file the catalogue
+     * did not recognise does in [read]. Complete means every file was seen and
+     * hashed: an unread file could be a build of this very project.
+     */
+    suspend fun readAgainst(instanceDir: Path, listing: List<ModrinthVersion>): Snapshot = withContext(Dispatchers.IO) {
+        val byHash = HashMap<String, ModrinthVersion>()
+        for (v in listing) for (f in v.files) byHash.putIfAbsent(f.hashes.sha1.lowercase(), v)
+        val local = hashed(instanceDir)
+        local.snapshot(local.complete) { byHash[it.lowercase()] }
+    }
+
+    /** The instance's content files with their hashes, and whether every one was seen and hashed. */
+    private class Hashed(val files: List<Pair<InstalledContent, String>>, val complete: Boolean) {
+        fun snapshot(complete: Boolean, versionOf: (String) -> ModrinthVersion?) = Snapshot(
+            entries = files.map { (c, hash) -> Entry(ContentRef(c.kind, c.fileName), hash, versionOf(hash), c.enabled) },
+            complete = complete,
+        )
+    }
+
+    private suspend fun hashed(instanceDir: Path): Hashed {
         // A folder that could not be listed, or a file that could not be hashed, is
         // a reading with a hole in it, and says so: read as complete it would let an
         // install place a second build beside a file it could not see.
@@ -81,20 +125,8 @@ class InstalledIndex(
             complete = false
             emptyList()
         }
-        val hashed = items.mapNotNull { c -> hashOf(c.pathIn(instanceDir))?.let { c to it } }
-        if (hashed.size < items.size) complete = false
-        val versions = try {
-            modrinth.versionsForHashes(hashed.map { it.second })
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            log.warn("could not identify the content of {}: {}", instanceDir, e.message)
-            complete = false
-            emptyMap()
-        }
-        Snapshot(
-            entries = hashed.map { (c, hash) -> Entry(ContentRef(c.kind, c.fileName), hash, versions[hash], c.enabled) },
-            complete = complete,
-        )
+        val files = items.mapNotNull { c -> hashOf(c.pathIn(instanceDir))?.let { c to it } }
+        if (files.size < items.size) complete = false
+        return Hashed(files, complete)
     }
 }
