@@ -135,6 +135,13 @@ class ModDetailState(
     var installRefusal by mutableStateOf<ContentInstaller.Refusal?>(null)
         private set
 
+    /**
+     * The build a row of the versions table asked for, while that install is the
+     * last one. What a retry repeats: the header's own install takes the newest that
+     * fits, and a retry through it put a different build in than the one that failed.
+     */
+    private var chosenBuild: ModrinthVersion? = null
+
     /** One project an install left out: its name, and the reason. */
     class LeftOut(val title: String, val skip: ContentInstaller.Skip)
 
@@ -429,6 +436,7 @@ class ModDetailState(
         if (installing) return
         val installer = installer ?: return
         val pack = resolveDestination() ?: return
+        chosenBuild = version
         installing = true
         installFailed = false
         installNoBuild = false
@@ -464,6 +472,7 @@ class ModDetailState(
         val projectId = project?.id ?: return
         val installer = installer ?: return
 
+        chosenBuild = null
         installing = true
         installFailed = false
         installNoBuild = false
@@ -495,6 +504,11 @@ class ModDetailState(
         } finally {
             installing = false
         }
+    }
+
+    /** Repeats the last install as it was asked for: the build a row named, else the newest that fits. */
+    suspend fun retryInstall() {
+        chosenBuild?.let { installVersion(it) } ?: installIntoPack()
     }
 
     /**

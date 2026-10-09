@@ -467,7 +467,8 @@ private fun InstallButton(state: ModDetailState, scope: CoroutineScope) {
                 state.installFailed -> s.modPageInstallRetry
                 else -> s.modPageInstallInto(action.packName)
             },
-            onClick = { scope.launch(Dispatchers.Main) { state.installIntoPack() } },
+            // A retry repeats what failed: a row's build when a row asked for one.
+            onClick = { scope.launch(Dispatchers.Main) { if (state.installFailed) state.retryInstall() else state.installIntoPack() } },
             icon = if (state.installFailed) NxIcon.Refresh else NxIcon.Download,
             enabled = !state.installing,
         )
