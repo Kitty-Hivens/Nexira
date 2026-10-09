@@ -1,8 +1,8 @@
 package hivens.ui.nx
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -45,12 +45,17 @@ fun NxField(
             singleLine    = singleLine,
             textStyle     = ts,
             cursorBrush   = SolidColor(NxColor.lead()),
-            modifier      = Modifier.fillMaxWidth().padding(horizontal = Spacing.s10, vertical = Spacing.s8),
+            modifier      = Modifier.fillMaxWidth(),
         ) { inner ->
-            if (value.isEmpty()) {
-                Text(placeholder, style = ts.copy(color = NxInk.quiet))
+            // The inset is inside the field, not around it. Around it, a press on the
+            // field's own edge landed on nothing, and to the shell it was a press
+            // outside the field, which let go of the caret.
+            Box(Modifier.padding(horizontal = Spacing.s10, vertical = Spacing.s8)) {
+                if (value.isEmpty()) {
+                    Text(placeholder, style = ts.copy(color = NxInk.quiet))
+                }
+                inner()
             }
-            inner()
         }
     }
 }
