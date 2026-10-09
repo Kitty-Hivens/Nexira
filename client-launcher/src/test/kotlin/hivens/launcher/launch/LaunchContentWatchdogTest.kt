@@ -63,6 +63,7 @@ class LaunchContentWatchdogTest {
             clientDir: Path,
             manifest: hivens.core.api.dto.smrt.SmrtPackManifest,
             enabledState: Map<String, Boolean>,
+            assetState: Map<String, Boolean>,
             progress: ((current: Int, total: Int, path: String) -> Unit)?,
         ): hivens.core.net.RepairReport = error("the watchdog does not repair")
 
@@ -111,6 +112,7 @@ class LaunchContentWatchdogTest {
             clientDir: Path,
             manifest: hivens.core.api.dto.smrt.SmrtPackManifest,
             enabledState: Map<String, Boolean>,
+            assetState: Map<String, Boolean>,
             progress: ((current: Int, total: Int, path: String) -> Unit)?,
         ): hivens.core.net.RepairReport = error("the watchdog does not repair")
 

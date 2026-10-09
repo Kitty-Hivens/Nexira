@@ -35,6 +35,10 @@ Required dependencies come along on their own, resource packs and shaders land i
 
 While something is being installed, Play says so and waits, and nothing is installed into a pack whose game is running.
 
+### Hivens packs
+
+Resource packs and shaders that come with a pack from the Hivens mirror now answer to the pack, the way its mods do. Required ones are always on. Optional ones are switched on and off in the Content tab and in the pack's settings, and the choice survives an update and a repair: a resource pack you turned off used to come back after an update, next to its own switched-off copy. Your own resource packs and shaders are still yours to add, turn off and delete as you like.
+
 ### Pages
 
 - A pack's page in Browse now works like a mod's: the same tabs, a versions table you can install any of them from, the changelog and the gallery, with the details in the right panel.

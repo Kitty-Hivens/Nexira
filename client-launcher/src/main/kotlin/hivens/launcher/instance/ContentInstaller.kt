@@ -3,6 +3,7 @@ package hivens.launcher.instance
 import hivens.core.api.dto.modrinth.ModrinthVersion
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
+import hivens.core.data.flatten
 import hivens.core.launch.InstanceWork
 import hivens.core.launch.InstanceWorkRegistry
 import hivens.launcher.launch.RunningPackSource
@@ -33,6 +34,12 @@ sealed interface ContentDestination {
         val mcVersion: String,
         /** The pack's loader as the catalogue names loaders, blank for none. */
         val loader: String,
+        /**
+         * The files the pack itself placed, by path, where the pack's record says so:
+         * a mirror pack's installed build. Null where the instance keeps a record of
+         * its own on disk instead, or none at all.
+         */
+        val packFiles: Set<String>? = null,
     ) : ContentDestination {
         companion object {
             /** The pack [instance] as a destination, its files under [instancesDir]. */
@@ -45,6 +52,7 @@ sealed interface ContentDestination {
                     ?.takeIf { it.isNotBlank() && !it.equals("vanilla", ignoreCase = true) }
                     ?.lowercase()
                     .orEmpty(),
+                packFiles = if (instance.packRef.origin == PackOrigin.Mirror) instance.installedManifest?.flatten()?.keys else null,
             )
         }
     }
@@ -213,8 +221,12 @@ class ContentInstaller(
         if (!snapshot.complete) {
             return Plan(destination, emptyList(), listOf(Skip.LookupFailed(head.projectId)), snapshot.projects)
         }
-        val packFiles = withContext(Dispatchers.IO) { PackPlacedContent.paths(destination.dir) }
-        val keepsRecord = packFiles != null
+        val recorded = withContext(Dispatchers.IO) { PackPlacedContent.paths(destination.dir) }
+        val keepsRecord = recorded != null
+        // A mirror pack names its files in its installed build rather than in a
+        // record on disk, and a resource pack it ships comes back on its next sync
+        // or repair however it was replaced.
+        val packFiles = destination.packFiles ?: recorded
         val present = snapshot.projects.toMutableSet()
         val planned = mutableSetOf<String>()
         val steps = mutableListOf<Step>()

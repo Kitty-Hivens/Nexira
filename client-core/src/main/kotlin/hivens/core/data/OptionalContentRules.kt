@@ -1,6 +1,8 @@
 package hivens.core.data
 
+import hivens.core.api.dto.smrt.SmrtAssetEntry
 import hivens.core.api.dto.smrt.SmrtModEntry
+import hivens.core.api.dto.smrt.SmrtPackManifest
 
 /**
  * Pure rules for a pack instance's optional mods, shared by the install/sync
@@ -11,6 +13,12 @@ import hivens.core.api.dto.smrt.SmrtModEntry
  * (a list of [ContentToggle]); the manifest's `default_enabled` is the fallback
  * for an optional the user has not touched. Incompatibility is the mutual closure
  * of each mod's `display.incompatibleWith`.
+ *
+ * A resource or shader pack the pack ships can be optional too, see
+ * [SmrtAssetEntry.toggleable]. Its state is a `dest -> enabled` view kept in the
+ * same toggle list under [SmrtAssetEntry.stableKey], and the manifest names no
+ * default for one, so an asset nobody switched off is on. The two halves are kept
+ * apart because a mod's rules (requires, conflicts) mean nothing for an asset.
  */
 object OptionalContentRules {
 
@@ -57,6 +65,47 @@ object OptionalContentRules {
             }
         }
     }
+
+    /** The assets of [assets] a player may switch off, in manifest order. */
+    fun optionalAssets(assets: List<SmrtAssetEntry>): List<SmrtAssetEntry> = assets.filter { it.toggleable }
+
+    /**
+     * Effective `dest -> enabled` for every asset of [assets]: the player's [toggles]
+     * entry for one they may switch off, and on for the rest.
+     */
+    fun assetState(assets: List<SmrtAssetEntry>, toggles: List<ContentToggle>): Map<String, Boolean> {
+        val userState = toggles.associate { it.entryId to it.enabled }
+        return assets.associate { a -> a.dest to (!a.toggleable || (userState[a.stableKey] ?: true)) }
+    }
+
+    /**
+     * Seed toggles for a fresh install of [manifest]: every optional mod at its
+     * `default_enabled` and every optional asset on.
+     */
+    fun defaultToggles(manifest: SmrtPackManifest): List<ContentToggle> =
+        defaultToggles(manifest.mods) + optionalAssets(manifest.assets).map { ContentToggle(it.stableKey, true) }
+
+    /**
+     * The whole persistable choice for [manifest]: [mods] by filename and [assets]
+     * by dest, one keyed entry per optional mod and per optional asset.
+     *
+     * What every writer of the choice goes through. A writer that rebuilt the list
+     * from the mods alone dropped what the player had chosen about the assets.
+     */
+    fun togglesFrom(
+        manifest: SmrtPackManifest,
+        mods: Map<String, Boolean>,
+        assets: Map<String, Boolean>,
+    ): List<ContentToggle> =
+        togglesFrom(manifest.mods, mods) +
+            optionalAssets(manifest.assets).map { ContentToggle(it.stableKey, assets[it.dest] ?: true) }
+
+    /**
+     * [manifest]'s choice as [toggles] hold it, carried onto the same manifest's
+     * keys: what a rewrite of the record keeps when it changes nothing about it.
+     */
+    fun carried(manifest: SmrtPackManifest, toggles: List<ContentToggle>): List<ContentToggle> =
+        togglesFrom(manifest, enabledState(manifest.mods, toggles), assetState(manifest.assets, toggles))
 
     /**
      * True when [a] and [b] declare each other (in either direction) under

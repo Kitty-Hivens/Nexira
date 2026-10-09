@@ -7,6 +7,8 @@ import hivens.core.api.dto.modrinth.ModrinthHashes
 import hivens.core.api.dto.modrinth.ModrinthVersion
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.CachedManifestSnapshot
+import hivens.core.data.FileData
+import hivens.core.data.fileManifestOf
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
 import hivens.core.data.PackReference
@@ -412,6 +414,32 @@ class ModInstallerTest {
         assertEquals(ContentInstaller.Skip.PackOwned("sodium", ContentRef(ContentKind.Mod, "sodium-1.jar")), outcome.headLeftOut)
         assertEquals(setOf("sodium-1.jar"), files(p.dir))
         assertTrue(c.fetched.isEmpty())
+    }
+
+    @Test
+    fun `a resource pack a mirror pack ships is not replaced, and one the player added is`() = runTest {
+        // The mirror's sync and repair put the pack's file back by its path however
+        // it was replaced, so the replacement would end up beside it.
+        val c = Catalogue()
+        val own1 = c.publish("faithful", "faithful-1", fileName = "faithful-1.zip", loaders = listOf("minecraft"))
+        val own2 = c.publish("faithful", "faithful-2", fileName = "faithful-2.zip", loaders = listOf("minecraft"))
+        val mine1 = c.publish("stay", "stay-1", fileName = "stay-1.zip", loaders = listOf("minecraft"))
+        val mine2 = c.publish("stay", "stay-2", fileName = "stay-2.zip", loaders = listOf("minecraft"))
+        val p = pack(origin = PackOrigin.Mirror)
+        repo.put(
+            repo.get(p.id)!!.copy(
+                installedManifest = fileManifestOf(mapOf("resourcepacks/faithful-1.zip" to FileData(sha1 = sha1(c.body(own1)), size = 1))),
+            ),
+        )
+        put(p, "resourcepacks", "faithful-1.zip", c.body(own1))
+        put(p, "resourcepacks", "stay-1.zip", c.body(mine1))
+
+        val refused = c.install(p, own2, loader = "", mc = "1.21.1")
+        val replaced = c.install(p, mine2, loader = "", mc = "1.21.1")
+
+        assertEquals(ContentInstaller.Skip.PackOwned("faithful", ContentRef(ContentKind.ResourcePack, "faithful-1.zip")), refused.headLeftOut)
+        assertTrue(replaced.ok)
+        assertEquals(setOf("faithful-1.zip", "stay-2.zip"), files(p.dir, "resourcepacks"))
     }
 
     @Test

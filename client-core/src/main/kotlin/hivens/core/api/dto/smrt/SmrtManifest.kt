@@ -209,7 +209,33 @@ data class SmrtAssetEntry(
     @Serializable(with = SmrtSourceLenientSerializer::class)
     val source: SmrtSource,
     val display: SmrtDisplay? = null,
-)
+) {
+    /**
+     * Whether the player may switch this asset off: one the curator did not mark
+     * required, in a folder the game reads packs from, where a `.disabled` name
+     * keeps the file and stops the game listing it. A config is placed whatever its
+     * flag says, since there is no off for a file the game reads by its path.
+     */
+    val toggleable: Boolean
+        get() = !required && TOGGLEABLE_ASSET_DIRS.any { dest.startsWith(it) }
+
+    /**
+     * The key the player's choice about this asset is kept under, the way
+     * [SmrtModEntry.stableKey] is for a mod: the Modrinth project where the asset
+     * comes from there, which survives a new build of the same pack, else its path.
+     * Prefixed, so an asset and a mod of one project are never the same choice.
+     */
+    val stableKey: String
+        get() = ASSET_KEY_PREFIX + ((source as? SmrtSource.Modrinth)?.let { "modrinth:${it.projectId}" } ?: dest)
+
+    companion object {
+        /** The folders an asset can be switched off in, see [toggleable]. */
+        val TOGGLEABLE_ASSET_DIRS = listOf("resourcepacks/", "shaderpacks/")
+
+        /** What sets an asset's [stableKey] apart from a mod's. */
+        const val ASSET_KEY_PREFIX = "asset:"
+    }
+}
 
 @Serializable
 @OptIn(ExperimentalSerializationApi::class)

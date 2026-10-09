@@ -137,8 +137,9 @@ class PackUpdateService(
                 val plan = computePlan(fresh, target, targetManifest, scanInstanceState(clientDir, paths))
                 val compat = gradeCompat(fresh, target)
                 val enabledState = OptionalContentRules.enabledState(target.mods, fresh.optionalContent)
+                val assetState = OptionalContentRules.assetState(target.assets, fresh.optionalContent)
                 val commitBuild: suspend () -> Unit = {
-                    syncService.applyUpdate(clientDir, target, plan, enabledState, progress)
+                    syncService.applyUpdate(clientDir, target, plan, enabledState, progress, assetState)
                     commit(fresh, target, pinExplicit = targetVersion != null)
                 }
                 // A label-only move writes no file, so there is nothing to snapshot
@@ -187,7 +188,8 @@ class PackUpdateService(
             client.fetchManifest(packId)
         }
         val enabledState = OptionalContentRules.enabledState(manifest.mods, instance.optionalContent)
-        val report = syncService.verifyAndRepair(clientDirOf(instance), manifest, enabledState, progress)
+        val assetState = OptionalContentRules.assetState(manifest.assets, instance.optionalContent)
+        val report = syncService.verifyAndRepair(clientDirOf(instance), manifest, enabledState, assetState, progress)
         log.info(
             "repair: pack={} version={} checked={} intact={} repaired={} fetched={}B failed={}",
             packId, version, report.checked, report.intact, report.repaired.size, report.bytesFetched, report.failed.size,
@@ -333,10 +335,7 @@ class PackUpdateService(
                 // The choice as it stands now, carried onto the new build. The files
                 // were placed from the choice read when the apply began, and a switch
                 // made during it is relabelled once the lock is released.
-                optionalContent = OptionalContentRules.togglesFrom(
-                    target.mods,
-                    OptionalContentRules.enabledState(target.mods, current.optionalContent),
-                ),
+                optionalContent = OptionalContentRules.carried(target, current.optionalContent),
             )
         }
     }

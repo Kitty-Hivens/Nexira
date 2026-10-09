@@ -69,12 +69,16 @@ class SmrtSyncService(
      * Required mods are always active regardless; an optional absent from the
      * map falls back to its manifest `default_enabled`. Empty map = install
      * every mod at its manifest default (the pre-toggle behaviour).
+     *
+     * [assetState] does the same for the assets the player may switch off, by
+     * `dest`, see [SmrtAssetEntry.toggleable]. Absent is on.
      */
     suspend fun sync(
         manifest: SmrtPackManifest,
         clientDir: Path,
         progress: ((current: Int, total: Int, filename: String) -> Unit)? = null,
         enabledState: Map<String, Boolean> = emptyMap(),
+        assetState: Map<String, Boolean> = emptyMap(),
     ) = withContext(Dispatchers.IO) {
         // Serialize against a concurrent structural mutation of this instance (an
         // optional-content toggle relabel), so a rename can't land between the
@@ -117,8 +121,9 @@ class SmrtSyncService(
                 val enabled = enabledState[mod.filename] ?: (mod.required || mod.defaultEnabled)
                 sink.accept("$MODS_PREFIX${mod.filename}", planMod(mod, clientDir, enabled, stuck))
             }
+            val assetStuck = mutableListOf<Path>()
             for (asset in manifest.assets) {
-                sink.accept(asset.dest, planAsset(asset, clientDir))
+                sink.accept(asset.dest, planAsset(asset, clientDir, assetState[asset.dest] ?: true, assetStuck))
             }
             // An install that could not place everything still places the rest, which
             // is the older decision and the right one. What was missing was anyone
@@ -127,6 +132,7 @@ class SmrtSyncService(
             reportUnfetchable(manifest.packId, sink.unfetchable)
             transfers.fetchAll(sink.transfers) { p -> progress?.invoke(p.filesDone, p.filesTotal, p.current) }
             settleStuck(clientDir, manifest.packId, stuck, manifest.mods.map { it.filename })
+            settleStuckAssets(manifest.packId, assetStuck)
 
             // Drop manifest-removed mods and any other archive the manifest
             // does not name. Only top-level mods/{expected_filename} entries
@@ -167,6 +173,7 @@ class SmrtSyncService(
         clientDir: Path,
         manifest: SmrtPackManifest,
         enabledState: Map<String, Boolean>,
+        assetState: Map<String, Boolean>,
         progress: ((current: Int, total: Int, path: String) -> Unit)?,
     ): RepairReport = withContext(Dispatchers.IO) {
         InstanceMutationLock.withLock(clientDir) {
@@ -182,8 +189,9 @@ class SmrtSyncService(
                 val name = if (enabled) mod.filename else "${mod.filename}.disabled"
                 sink.accept(name, planMod(mod, clientDir, enabled, stuck))
             }
+            val assetStuck = mutableListOf<Path>()
             for (asset in manifest.assets) {
-                sink.accept(asset.dest.substringAfterLast('/'), planAsset(asset, clientDir))
+                sink.accept(asset.dest.substringAfterLast('/'), planAsset(asset, clientDir, assetState[asset.dest] ?: true, assetStuck))
             }
             val suspect = sink.transfers
             log.info("repair: pack={}, {} of {} entries need a closer look", manifest.packId, suspect.size, total)
@@ -191,6 +199,7 @@ class SmrtSyncService(
                 progress?.invoke(p.filesDone, p.filesTotal, p.current)
             }
             settleStuck(clientDir, manifest.packId, stuck, manifest.mods.map { it.filename })
+            settleStuckAssets(manifest.packId, assetStuck)
             // A verify is a full comparison against the manifest, so it is exactly the
             // moment the instance can be vouched for -- write the roster here too.
             // Without this, "verify and repair" checked every file and still left the
@@ -239,8 +248,12 @@ class SmrtSyncService(
      * - toDelete: removed (both variants for a mod path).
      * - skippedProtected: never touched.
      *
-     * sha1 is verified after every download (a mismatch throws and drops the bad
+     * sha1 is verified after every download (a mod mismatch throws and drops the bad
      * bytes), same as [sync].
+     *
+     * An asset the player may switch off is placed by [assetState] the same way, so
+     * a resource pack they turned off arrives turned off in its new build, and the
+     * `.disabled` copy of one the pack retired goes with it.
      */
     suspend fun applyUpdate(
         clientDir: Path,
@@ -248,8 +261,11 @@ class SmrtSyncService(
         plan: UpdatePlan,
         enabledState: Map<String, Boolean> = emptyMap(),
         progress: ((current: Int, total: Int, path: String) -> Unit)? = null,
+        assetState: Map<String, Boolean> = emptyMap(),
     ) = withContext(Dispatchers.IO) {
         val index = buildEntryIndex(manifest)
+        val toggleable = manifest.assets.filter { it.toggleable }.mapTo(HashSet()) { it.dest }
+        val assetStuck = mutableListOf<Path>()
         val total = plan.toAdd.size + plan.toUpdate.size + plan.conflicts.size + plan.toDelete.size
         var current = 0
 
@@ -273,6 +289,13 @@ class SmrtSyncService(
                 runCatching { fileOpRetry("update drop stale $filename") { Files.deleteIfExists(stale) } }
                     .onFailure { stuck.add(stale) }
                 sink.accept(path, plan(dest, entry.sha1, entry.size, entry.source, "mod $filename"))
+            } else if (path in toggleable) {
+                val enabled = assetState[path] ?: true
+                val active = resolveSafe(clientDir, path, "asset $path")
+                val disabled = resolveSafe(clientDir, "$path$DISABLED", "asset $path")
+                runCatching { fileOpRetry("update drop stale $path") { Files.deleteIfExists(if (enabled) disabled else active) } }
+                    .onFailure { assetStuck.add(if (enabled) disabled else active) }
+                sink.accept(path, plan(if (enabled) active else disabled, entry.sha1, entry.size, entry.source, "asset $path"))
             } else {
                 val dest = resolveSafe(clientDir, path, "asset $path")
                 sink.accept(path, plan(dest, entry.sha1, entry.size, entry.source, "asset $path"))
@@ -305,16 +328,19 @@ class SmrtSyncService(
             progress?.invoke(current, total, path)
             val target = resolveSafe(clientDir, path, "prune $path")
             runCatching { fileOpRetry("update prune $path") { Files.deleteIfExists(target) } }
-            if (path.startsWith(MODS_PREFIX)) {
+            // A retired mod or switchable asset may be sitting under its off name.
+            if (path.startsWith(MODS_PREFIX) || SmrtAssetEntry.TOGGLEABLE_ASSET_DIRS.any { path.startsWith(it) }) {
                 val disabled = resolveSafe(clientDir, "$path.disabled", "prune $path")
                 runCatching { fileOpRetry("update prune $path disabled") { Files.deleteIfExists(disabled) } }
             }
         }
+        settleStuckAssets(manifest.packId, assetStuck)
 
         // Place every mod at active / .disabled per enabledState even when its bytes did
         // not change: an optional flipped to required (or back) has no toAdd/toUpdate entry
         // but must still move, or a now-required mod would launch missing.
         relabel(clientDir, manifest.mods, enabledState)
+        relabelAssets(clientDir, manifest.assets, assetState)
 
         writeRoster(clientDir, manifest.mods.flatMap { listOf(it.filename, "${it.filename}.disabled") }.toSet())
     }
@@ -551,6 +577,33 @@ class SmrtSyncService(
         }
         PendingVariants.update(clientDir, set = failed, cleared = settled)
         return failed.map { it.key }
+    }
+
+    /**
+     * [relabel] for the assets a player may switch off: a resource or shader pack
+     * moved between its name and its `.disabled` one, no network.
+     *
+     * Nothing is written down for the next launch when a move is refused. The game
+     * reads these folders when it starts rather than holding the files, and the
+     * next sync or update moves whatever is left where the choice puts it.
+     */
+    override fun relabelAssets(clientDir: Path, assets: List<SmrtAssetEntry>, assetState: Map<String, Boolean>): List<String> {
+        val failed = mutableListOf<String>()
+        for (asset in assets) {
+            if (!asset.toggleable) continue
+            val enabled = assetState[asset.dest] ?: true
+            val active = resolveSafe(clientDir, asset.dest, "asset ${asset.dest}")
+            val disabled = resolveSafe(clientDir, "${asset.dest}$DISABLED", "asset ${asset.dest}")
+            val from = if (enabled) disabled else active
+            val to = if (enabled) active else disabled
+            if (!Files.exists(from) || Files.exists(to)) continue
+            runCatching { fileOpRetry("smrt relabel ${asset.dest}") { Files.move(from, to, StandardCopyOption.REPLACE_EXISTING) } }
+                .onFailure {
+                    failed += asset.dest
+                    log.warn("smrt relabel: {} still held after retries; the next sync moves it", asset.dest)
+                }
+        }
+        return failed
     }
 
     override suspend fun settlePending(clientDir: Path): List<String> = withContext(Dispatchers.IO) {
@@ -824,6 +877,15 @@ class SmrtSyncService(
         )
     }
 
+    /**
+     * [sweepStale] for the assets: the other name of a switchable asset that could
+     * not be dropped while the plan was built. Logged and left, see [relabelAssets].
+     */
+    private fun settleStuckAssets(packId: String, stuck: List<Path>) {
+        val left = sweepStale(stuck)
+        if (left.isNotEmpty()) log.warn("smrt sync: pack={} could not drop {} stale asset variant(s): {}", packId, left.size, left)
+    }
+
     private fun reportUnfetchable(packId: String, unfetchable: Map<String, String>) {
         if (unfetchable.isEmpty()) return
         log.warn(
@@ -931,9 +993,28 @@ class SmrtSyncService(
      * `servers.dat` or its JEI settings at all -- the pack ships the server list on
      * purpose, and the exemption silently dropped it.
      */
-    private suspend fun planAsset(asset: SmrtAssetEntry, clientDir: Path): Planned {
-        val dest = resolveSafe(clientDir, asset.dest, "asset ${asset.dest}")
-        return plan(dest, asset.sha1, asset.sizeBytes, asset.source, "asset ${asset.dest}")
+    private suspend fun planAsset(
+        asset: SmrtAssetEntry,
+        clientDir: Path,
+        enabled: Boolean = true,
+        stuck: MutableList<Path> = mutableListOf(),
+    ): Planned = withContext(Dispatchers.IO) {
+        val active = resolveSafe(clientDir, asset.dest, "asset ${asset.dest}")
+        if (!asset.toggleable) return@withContext plan(active, asset.sha1, asset.sizeBytes, asset.source, "asset ${asset.dest}")
+        // A switchable asset the way [planMod] places a mod: under the name the
+        // player's choice gives it, the bytes moved across when they are already
+        // under the other name rather than fetched again, and that other name gone.
+        val disabled = resolveSafe(clientDir, "${asset.dest}$DISABLED", "asset ${asset.dest}")
+        val dest = if (enabled) active else disabled
+        val stale = if (enabled) disabled else active
+        if (!isUpToDate(dest, asset.sha1, asset.sizeBytes) && isUpToDate(stale, asset.sha1, asset.sizeBytes)) {
+            Files.createDirectories(dest.parent)
+            fileOpRetry("smrt sync move ${asset.dest}") { Files.move(stale, dest, StandardCopyOption.REPLACE_EXISTING) }
+            return@withContext Planned.UpToDate
+        }
+        runCatching { fileOpRetry("smrt sync drop stale ${asset.dest}") { Files.deleteIfExists(stale) } }
+            .onFailure { stuck.add(stale) }
+        plan(dest, asset.sha1, asset.sizeBytes, asset.source, "asset ${asset.dest}")
     }
 
     /**
@@ -1083,6 +1164,9 @@ class SmrtSyncService(
         internal const val ROSTER_FILE = ".nexira-mods"
         private const val SOURCE_MIRROR = "mirror"
         private const val MODS_PREFIX = "mods/"
+
+        /** The name a switched-off file sits under, beside its own. */
+        private const val DISABLED = ".disabled"
 
         /**
          * What the instance says about ITSELF rather than about its content, kept
