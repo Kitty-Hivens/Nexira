@@ -264,7 +264,7 @@ class SmrtSyncService(
         assetState: Map<String, Boolean> = emptyMap(),
     ) = withContext(Dispatchers.IO) {
         val index = buildEntryIndex(manifest)
-        val toggleable = manifest.assets.filter { it.toggleable }.mapTo(HashSet()) { it.dest }
+        val offNamed = manifest.assets.filter { it.hasOffName }.associateBy { it.dest }
         val assetStuck = mutableListOf<Path>()
         val total = plan.toAdd.size + plan.toUpdate.size + plan.conflicts.size + plan.toDelete.size
         var current = 0
@@ -289,8 +289,8 @@ class SmrtSyncService(
                 runCatching { fileOpRetry("update drop stale $filename") { Files.deleteIfExists(stale) } }
                     .onFailure { stuck.add(stale) }
                 sink.accept(path, plan(dest, entry.sha1, entry.size, entry.source, "mod $filename"))
-            } else if (path in toggleable) {
-                val enabled = assetState[path] ?: true
+            } else if (path in offNamed) {
+                val enabled = offNamed.getValue(path).let { !it.toggleable || (assetState[path] ?: true) }
                 val active = resolveSafe(clientDir, path, "asset $path")
                 val disabled = resolveSafe(clientDir, "$path$DISABLED", "asset $path")
                 runCatching { fileOpRetry("update drop stale $path") { Files.deleteIfExists(if (enabled) disabled else active) } }
@@ -592,8 +592,9 @@ class SmrtSyncService(
     }
 
     /**
-     * [relabel] for the assets a player may switch off: a resource or shader pack
-     * moved between its name and its `.disabled` one, no network.
+     * [relabel] for the resource and shader packs a pack ships: one the player may
+     * switch off moved between its name and its `.disabled` one as the choice says,
+     * and a required one found off moved back on, no network.
      *
      * Nothing is written down for the next launch when a move is refused. The game
      * reads these folders when it starts rather than holding the files, and the
@@ -602,8 +603,10 @@ class SmrtSyncService(
     override fun relabelAssets(clientDir: Path, assets: List<SmrtAssetEntry>, assetState: Map<String, Boolean>): List<String> {
         val failed = mutableListOf<String>()
         for (asset in assets) {
-            if (!asset.toggleable) continue
-            val enabled = assetState[asset.dest] ?: true
+            if (!asset.hasOffName) continue
+            // A required asset is moved back on wherever it is found off, see
+            // [SmrtAssetEntry.hasOffName]: nothing else would ever move it.
+            val enabled = !asset.toggleable || (assetState[asset.dest] ?: true)
             val active = resolveSafe(clientDir, asset.dest, "asset ${asset.dest}")
             val disabled = resolveSafe(clientDir, "${asset.dest}$DISABLED", "asset ${asset.dest}")
             val from = if (enabled) disabled else active
@@ -1035,13 +1038,15 @@ class SmrtSyncService(
         stuck: MutableList<Path> = mutableListOf(),
     ): Planned = withContext(Dispatchers.IO) {
         val active = resolveSafe(clientDir, asset.dest, "asset ${asset.dest}")
-        if (!asset.toggleable) return@withContext plan(active, asset.sha1, asset.sizeBytes, asset.source, "asset ${asset.dest}")
-        // A switchable asset the way [planMod] places a mod: under the name the
-        // player's choice gives it, the bytes moved across when they are already
-        // under the other name rather than fetched again, and that other name gone.
+        if (!asset.hasOffName) return@withContext plan(active, asset.sha1, asset.sizeBytes, asset.source, "asset ${asset.dest}")
+        // An asset that can sit under a `.disabled` name is placed the way [planMod]
+        // places a mod: under the name the choice gives it, the bytes moved across
+        // when they are already under the other name rather than fetched again, and
+        // that other name gone. A required one has no off, so it lands on, which is
+        // what moves one switched off before the curator made it required.
         val disabled = resolveSafe(clientDir, "${asset.dest}$DISABLED", "asset ${asset.dest}")
-        val dest = if (enabled) active else disabled
-        val stale = if (enabled) disabled else active
+        val dest = if (enabled || !asset.toggleable) active else disabled
+        val stale = if (dest == active) disabled else active
         if (!isUpToDate(dest, asset.sha1, asset.sizeBytes) && isUpToDate(stale, asset.sha1, asset.sizeBytes)) {
             Files.createDirectories(dest.parent)
             fileOpRetry("smrt sync move ${asset.dest}") { Files.move(stale, dest, StandardCopyOption.REPLACE_EXISTING) }

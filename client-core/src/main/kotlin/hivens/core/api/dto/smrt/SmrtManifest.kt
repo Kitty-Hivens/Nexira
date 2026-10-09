@@ -217,7 +217,16 @@ data class SmrtAssetEntry(
      * flag says, since there is no off for a file the game reads by its path.
      */
     val toggleable: Boolean
-        get() = !required && TOGGLEABLE_ASSET_DIRS.any { dest.startsWith(it) }
+        get() = !required && hasOffName
+
+    /**
+     * Whether this asset can sit under a `.disabled` name at all, required or not.
+     * A required one is never put there by the launcher, but it can be found there:
+     * switched off while it was optional, or by hand before it was the pack's to
+     * guard. Every path that places it has to move it back.
+     */
+    val hasOffName: Boolean
+        get() = TOGGLEABLE_ASSET_DIRS.any { dest.startsWith(it) }
 
     /**
      * The key the player's choice about this asset is kept under, the way

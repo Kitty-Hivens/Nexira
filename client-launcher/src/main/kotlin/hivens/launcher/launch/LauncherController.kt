@@ -105,7 +105,7 @@ class LauncherController(
                 ) + smrtSyncService.relabelAssets(
                     clientDir,
                     manifest.assets,
-                    OptionalContentRules.assetState(manifest.assets, toggles),
+                    OptionalContentRules.assetState(manifest.assets, toggles, OptionalContentRules.placedIn(clientDir)),
                 )
             }
         }
@@ -893,7 +893,7 @@ class LauncherController(
                 smrtPackClient.fetchManifest(instance.packRef.id)
             }
             val enabled = OptionalContentRules.enabledState(manifest.mods, instance.optionalContent)
-            val assets = OptionalContentRules.assetState(manifest.assets, instance.optionalContent)
+            val assets = OptionalContentRules.assetState(manifest.assets, instance.optionalContent, OptionalContentRules.placedIn(clientDir))
             smrtSyncService.verifyAndRepair(clientDir, manifest, enabled, assets) { current, total, path ->
                 // The SYNC stage's own sub-range, so the bar moves during what is
                 // otherwise a silent wait on a hundred-file walk.

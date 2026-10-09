@@ -428,7 +428,7 @@ internal class ContentTabState(
 
     private fun seedChoice(m: SmrtPackManifest, from: PackInstance) {
         optionalState = OptionalContentRules.enabledState(m.mods, from.optionalContent)
-        assetState = OptionalContentRules.assetState(m.assets, from.optionalContent)
+        assetState = OptionalContentRules.assetState(m.assets, from.optionalContent, OptionalContentRules.placedIn(instanceDir))
     }
 
     private fun PackInstance.installedVersion(): String? = pinnedPackVersion ?: packRef.version

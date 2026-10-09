@@ -137,7 +137,7 @@ class PackUpdateService(
                 val plan = computePlan(fresh, target, targetManifest, scanInstanceState(clientDir, paths))
                 val compat = gradeCompat(fresh, target)
                 val enabledState = OptionalContentRules.enabledState(target.mods, fresh.optionalContent)
-                val assetState = OptionalContentRules.assetState(target.assets, fresh.optionalContent)
+                val assetState = OptionalContentRules.assetState(target.assets, fresh.optionalContent, OptionalContentRules.placedIn(clientDir))
                 val commitBuild: suspend () -> Unit = {
                     syncService.applyUpdate(clientDir, target, plan, enabledState, progress, assetState)
                     commit(fresh, target, pinExplicit = targetVersion != null)
@@ -188,7 +188,7 @@ class PackUpdateService(
             client.fetchManifest(packId)
         }
         val enabledState = OptionalContentRules.enabledState(manifest.mods, instance.optionalContent)
-        val assetState = OptionalContentRules.assetState(manifest.assets, instance.optionalContent)
+        val assetState = OptionalContentRules.assetState(manifest.assets, instance.optionalContent, OptionalContentRules.placedIn(clientDirOf(instance)))
         val report = syncService.verifyAndRepair(clientDirOf(instance), manifest, enabledState, assetState, progress)
         log.info(
             "repair: pack={} version={} checked={} intact={} repaired={} fetched={}B failed={}",
@@ -335,7 +335,7 @@ class PackUpdateService(
                 // The choice as it stands now, carried onto the new build. The files
                 // were placed from the choice read when the apply began, and a switch
                 // made during it is relabelled once the lock is released.
-                optionalContent = OptionalContentRules.carried(target, current.optionalContent),
+                optionalContent = OptionalContentRules.carried(target, current.optionalContent, OptionalContentRules.placedIn(clientDirOf(current))),
             )
         }
     }

@@ -270,6 +270,35 @@ class SmrtSyncServiceTest {
         assertFalse(Files.exists(dir.resolve("$rpDest.disabled")), "the retired build goes under its off name too")
     }
 
+    /**
+     * The player switched a resource pack off while it was optional, and the next
+     * build makes it required with the same bytes. The scan finds the bytes under
+     * the off name and plans nothing, so it is the placement that has to move it:
+     * the relabel skipped anything not switchable and left it off for good, while
+     * the Content tab drew it on and locked.
+     */
+    @Test
+    fun `a required resource pack found switched off is moved back on, by an update and by a repair, without fetching it`() = runTest {
+        val required = parsed(switchableManifest().replace("\"required\":false", "\"required\":true"))
+        for (run in listOf("update", "repair")) {
+            val dir = tempDir("asset-required-$run")
+            Files.createDirectories(dir.resolve("resourcepacks"))
+            Files.write(dir.resolve("$rpDest.disabled"), rpBytes)
+            Files.write(dir.resolve("servers.dat"), serversBytes)
+            val fetches = mutableListOf<String>()
+            val service = switchableService(fetches)
+
+            when (run) {
+                "update" -> service.applyUpdate(dir, required, UpdatePlan())
+                else -> service.verifyAndRepair(dir, required, emptyMap(), emptyMap(), null)
+            }
+
+            assertContentEquals(rpBytes, Files.readAllBytes(dir.resolve(rpDest)), run)
+            assertFalse(Files.exists(dir.resolve("$rpDest.disabled")), "$run: no copy left under the off name")
+            assertTrue(fetches.isEmpty(), "$run: the bytes were already there")
+        }
+    }
+
     @Test
     fun `enforceRoster drops what the pack does not name and keeps what it does`() = runTest {
         val dir = tempDir("enforce")

@@ -3,6 +3,8 @@ package hivens.core.data
 import hivens.core.api.dto.smrt.SmrtAssetEntry
 import hivens.core.api.dto.smrt.SmrtModEntry
 import hivens.core.api.dto.smrt.SmrtPackManifest
+import java.nio.file.Files
+import java.nio.file.Path
 
 /**
  * Pure rules for a pack instance's optional mods, shared by the install/sync
@@ -72,11 +74,36 @@ object OptionalContentRules {
     /**
      * Effective `dest -> enabled` for every asset of [assets]: the player's [toggles]
      * entry for one they may switch off, and on for the rest.
+     *
+     * An optional asset with no entry is read off the disk through [placed] before it
+     * falls back to on. A record can predate the asset being optional at all: a
+     * resource pack the player switched off by hand while the pack still shipped it
+     * as plain content sits under its `.disabled` name with no choice written down,
+     * and reading that silence as on put the file back in the game at the next relabel.
      */
-    fun assetState(assets: List<SmrtAssetEntry>, toggles: List<ContentToggle>): Map<String, Boolean> {
+    fun assetState(
+        assets: List<SmrtAssetEntry>,
+        toggles: List<ContentToggle>,
+        placed: (SmrtAssetEntry) -> Boolean? = { null },
+    ): Map<String, Boolean> {
         val userState = toggles.associate { it.entryId to it.enabled }
-        return assets.associate { a -> a.dest to (!a.toggleable || (userState[a.stableKey] ?: true)) }
+        return assets.associate { a -> a.dest to (!a.toggleable || (userState[a.stableKey] ?: placed(a) ?: true)) }
     }
+
+    /**
+     * How each asset sits in [clientDir] right now: on when its own name is there,
+     * off when only its `.disabled` name is, null when neither is. The disk half of
+     * [assetState], for a caller that holds the instance's folder.
+     */
+    fun placedIn(clientDir: Path): (SmrtAssetEntry) -> Boolean? = { a ->
+        when {
+            Files.exists(clientDir.resolve(a.dest)) -> true
+            Files.exists(clientDir.resolve(a.dest + DISABLED_SUFFIX)) -> false
+            else -> null
+        }
+    }
+
+    private const val DISABLED_SUFFIX = ".disabled"
 
     /**
      * Seed toggles for a fresh install of [manifest]: every optional mod at its
@@ -103,9 +130,14 @@ object OptionalContentRules {
     /**
      * [manifest]'s choice as [toggles] hold it, carried onto the same manifest's
      * keys: what a rewrite of the record keeps when it changes nothing about it.
+     * [placed] answers for an asset the record says nothing about, see [assetState].
      */
-    fun carried(manifest: SmrtPackManifest, toggles: List<ContentToggle>): List<ContentToggle> =
-        togglesFrom(manifest, enabledState(manifest.mods, toggles), assetState(manifest.assets, toggles))
+    fun carried(
+        manifest: SmrtPackManifest,
+        toggles: List<ContentToggle>,
+        placed: (SmrtAssetEntry) -> Boolean? = { null },
+    ): List<ContentToggle> =
+        togglesFrom(manifest, enabledState(manifest.mods, toggles), assetState(manifest.assets, toggles, placed))
 
     /**
      * True when [a] and [b] declare each other (in either direction) under

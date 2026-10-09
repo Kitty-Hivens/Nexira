@@ -18,6 +18,7 @@ import hivens.core.api.interfaces.IMirrorPackClient
 import hivens.core.data.OptionalContentRules
 import hivens.core.data.PackInstance
 import hivens.launcher.launch.LauncherController
+import hivens.launcher.platform.PlatformPaths
 import hivens.ui.screens.library.content.problemReason
 import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
@@ -53,6 +54,7 @@ internal fun PackContentSection(pack: PackInstance, adopt: (PackEdit) -> Unit) {
     val s = LocalStrings.current
     val mirrorClient: IMirrorPackClient = koinInject()
     val controller: LauncherController = koinInject()
+    val paths: PlatformPaths = koinInject()
     val version = pack.pinnedPackVersion ?: pack.packRef.version
 
     var manifest by remember(pack.id) { mutableStateOf<SmrtPackManifest?>(null) }
@@ -85,7 +87,8 @@ internal fun PackContentSection(pack: PackInstance, adopt: (PackEdit) -> Unit) {
         manifest?.let { OptionalContentRules.enabledState(it.mods, pack.optionalContent) }.orEmpty()
     }
     val assetState = remember(manifest, pack.optionalContent) {
-        manifest?.let { OptionalContentRules.assetState(it.assets, pack.optionalContent) }.orEmpty()
+        val dir = paths.dataDir.resolve("instances").resolve(pack.instanceDirName)
+        manifest?.let { OptionalContentRules.assetState(it.assets, pack.optionalContent, OptionalContentRules.placedIn(dir)) }.orEmpty()
     }
 
     val optional = remember(manifest) { manifest?.let { OptionalContentRules.optionalMods(it.mods) }.orEmpty() }

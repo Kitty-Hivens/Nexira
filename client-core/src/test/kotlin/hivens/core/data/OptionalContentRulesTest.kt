@@ -9,6 +9,7 @@ import hivens.core.api.dto.smrt.SmrtModEntry
 import hivens.core.api.dto.smrt.SmrtPackManifest
 import hivens.core.api.dto.smrt.SmrtRequirement
 import hivens.core.api.dto.smrt.SmrtSource
+import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -382,5 +383,44 @@ class OptionalContentRulesTest {
         val seeded = OptionalContentRules.defaultToggles(m)
         assertEquals(true, seeded.single { it.entryId == rp.stableKey }.enabled)
         assertFalse(seeded.any { it.entryId.endsWith("servers.dat") }, "a required asset is no choice")
+    }
+
+    /**
+     * A resource pack the player switched off by hand while the pack still shipped
+     * it as plain content: off on disk, and no choice written down. Read as on, the
+     * next relabel put it back in the game.
+     */
+    @Test
+    fun `an optional asset with no choice recorded is read off the disk, and a recorded choice wins`() {
+        val handOff = asset("resourcepacks/hand-off.zip")
+        val chosen = asset("resourcepacks/chosen.zip")
+        val absent = asset("resourcepacks/absent.zip")
+        val required = asset("resourcepacks/required.zip", required = true)
+        val dir = Files.createTempDirectory("assets-on-disk")
+        try {
+            Files.createDirectories(dir.resolve("resourcepacks"))
+            Files.writeString(dir.resolve("resourcepacks/hand-off.zip.disabled"), "x")
+            Files.writeString(dir.resolve("resourcepacks/chosen.zip.disabled"), "x")
+            Files.writeString(dir.resolve("resourcepacks/required.zip.disabled"), "x")
+
+            val state = OptionalContentRules.assetState(
+                listOf(handOff, chosen, absent, required),
+                listOf(ContentToggle(chosen.stableKey, true)),
+                OptionalContentRules.placedIn(dir),
+            )
+
+            assertEquals(false, state[handOff.dest], "off on disk and nothing recorded")
+            assertEquals(true, state[chosen.dest], "the recorded choice, not the disk")
+            assertEquals(true, state[absent.dest], "neither name on disk falls back to on")
+            assertEquals(true, state[required.dest], "a required asset has no off")
+            assertEquals(
+                false,
+                OptionalContentRules.carried(manifest(listOf(handOff)), emptyList(), OptionalContentRules.placedIn(dir))
+                    .single { it.entryId == handOff.stableKey }.enabled,
+                "the first rewrite of the record writes the disk's answer down",
+            )
+        } finally {
+            dir.toFile().deleteRecursively()
+        }
     }
 }
