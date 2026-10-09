@@ -2,7 +2,10 @@ package hivens.launcher.catalogue
 
 import hivens.core.api.HttpClientProvider
 import hivens.core.api.catalogue.CataloguePack
+import hivens.core.api.dto.smrt.SmrtManifestVersions
 import hivens.core.api.dto.smrt.SmrtPackListing
+import hivens.core.api.dto.smrt.SmrtPackManifest
+import hivens.core.api.dto.smrt.SmrtPackSummary
 import hivens.core.cache.Cache
 import hivens.core.cache.CacheValue
 import hivens.core.cache.Freshness
@@ -185,8 +188,66 @@ class MirrorPackCatalogueTest {
         assertFalse(MirrorPackCatalogue(client).paged)
     }
 
+    /** A cache holding [stored] past its age: a single read hands it back, a stream hands it and then the load. */
+    private class StoredThenLoaded<V>(private val stored: V) : Cache<V> {
+        override suspend fun get(key: String, loader: suspend () -> V) = stored
+        override suspend fun refresh(key: String, loader: suspend () -> V) = loader()
+        override fun flow(key: String, loader: suspend () -> V): Flow<CacheValue<V>> = flow {
+            emit(CacheValue(stored, Freshness.STALE))
+            emit(CacheValue(loader(), Freshness.FRESH))
+        }
+        override suspend fun invalidate(key: String) {}
+        override suspend fun invalidateAll() {}
+    }
+
+    private fun summaryOf(version: String) =
+        """{"pack_id":"P","display_name":"P","tagline":"t","minecraft_version":"1.21.1","latest_pack_version":"$version"}"""
+
+    private fun manifestOf(version: String, java: Int) =
+        """{"schema_version":2,"pack_id":"P","pack_version":"$version","generated_at":"t","minecraft":{"version":"1.21.1"},
+            "loader":{"name":"fabric","version":"0.16.0"},"java":{"major":$java}}"""
+
+    private fun buildsOf(version: String) = """{"latest":"$version","builds":[{"version_number":"$version","version_type":"release"}]}"""
+
+    /** Caches holding a pack page read when 0.3.0 was current. */
+    private fun storedAt030() = SmrtPackCaches(
+        listing = PassthroughCache(),
+        summary = StoredThenLoaded(lenientJson.decodeFromString(SmrtPackSummary.serializer(), summaryOf("0.3.0"))),
+        manifest = StoredThenLoaded(lenientJson.decodeFromString(SmrtPackManifest.serializer(), manifestOf("0.3.0", 17))),
+        versions = StoredThenLoaded(lenientJson.decodeFromString(SmrtManifestVersions.serializer(), buildsOf("0.3.0"))),
+    )
+
+    /**
+     * Read once, the page showed the stored copy for as long as it stood, and its
+     * Install took the build that was newest when the copy was made.
+     */
+    @Test
+    fun `a pack page shows the stored read and then the mirror's answer`() = runBlocking {
+        val client = routed(
+            "/v1/packs/P" to summaryOf("0.3.1"),
+            "/v1/packs/P/manifest" to manifestOf("0.3.1", 21),
+            "/v1/packs/P/manifest/versions" to buildsOf("0.3.1"),
+            caches = storedAt030(),
+        )
+        val pages = withTimeout(5_000) { MirrorPackCatalogue(client).detailsStream("P").toList() }
+
+        assertEquals("0.3.0", pages.first().latestVersionId)
+        assertEquals("0.3.1", pages.last().latestVersionId)
+        assertEquals(listOf("0.3.1"), pages.last().versions.map { it.id })
+        assertEquals("Java 21", pages.last().runtimeLabel)
+    }
+
+    @Test
+    fun `a pack page keeps the stored read when the mirror cannot be asked`() = runBlocking {
+        val client = routed(caches = storedAt030())
+        val pages = withTimeout(5_000) { MirrorPackCatalogue(client).detailsStream("P").toList() }
+
+        assertEquals(listOf("0.3.0"), pages.map { it.latestVersionId })
+        assertEquals("Java 17", pages.single().runtimeLabel)
+    }
+
     /** Answers by path, for a read that asks several endpoints at once. */
-    private fun routed(vararg routes: Pair<String, String>): SmrtPackClient {
+    private fun routed(vararg routes: Pair<String, String>, caches: SmrtPackCaches = SmrtPackCaches.passthrough()): SmrtPackClient {
         val client = HttpClient(MockEngine) {
             engine {
                 addHandler { req ->
@@ -199,7 +260,7 @@ class MirrorPackCatalogueTest {
                 }
             }
         }
-        return SmrtPackClient(HttpClientProvider { client }, "https://mirror.test")
+        return SmrtPackClient(HttpClientProvider { client }, "https://mirror.test", caches = caches)
     }
 
     @Test

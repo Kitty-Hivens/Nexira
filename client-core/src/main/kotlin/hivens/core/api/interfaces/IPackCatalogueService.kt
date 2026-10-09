@@ -44,6 +44,14 @@ interface IPackCatalogueService {
     /** Full detail for one pack (hero, body, gallery, versions). */
     suspend fun details(packId: String): CataloguePackDetails
 
+    /**
+     * [details] as a stale-then-fresh stream, for the reason [searchStream] is one:
+     * a page that reads once shows what the cache held, and a pack page read that
+     * way offered the build that was newest a day ago as the one to install. The
+     * default is the single answer, for a source that does not cache.
+     */
+    fun detailsStream(packId: String): Flow<CataloguePackDetails> = flow { emit(details(packId)) }
+
     /** Installable versions, newest first where the source orders them. */
     suspend fun versions(packId: String): List<CataloguePackVersion>
 }

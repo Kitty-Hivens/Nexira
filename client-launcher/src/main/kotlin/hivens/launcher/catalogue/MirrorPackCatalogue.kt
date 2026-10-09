@@ -6,6 +6,7 @@ import hivens.core.api.catalogue.CataloguePack
 import hivens.core.api.catalogue.CataloguePackDetails
 import hivens.core.api.catalogue.CataloguePackVersion
 import hivens.core.api.dto.smrt.SmrtCommunityPack
+import hivens.core.api.dto.smrt.SmrtManifestVersions
 import hivens.core.api.dto.smrt.SmrtPackListing
 import hivens.core.api.dto.smrt.SmrtPackManifest
 import hivens.core.api.dto.smrt.SmrtPackSummary
@@ -21,7 +22,11 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
 import org.slf4j.LoggerFactory
 import kotlin.time.Duration.Companion.milliseconds
@@ -171,16 +176,53 @@ class MirrorPackCatalogue(
         val summaryD = async { client.fetchSummary(packId) }
         val manifestD = async { client.fetchManifest(packId) }
         val listingD = async { runCatching { client.listBuilds(packId) }.getOrNull() }
-        val s = summaryD.await()
+        detailsOf(summaryD.await(), manifestD.await(), listingD.await())
+    }
+
+    /**
+     * The three reads as streams, each the stored copy and then the mirror's answer,
+     * and the page again whenever one of them moves. A refresh that fails keeps what
+     * that read already gave. Only the summary or the manifest failing with nothing
+     * stored ends the stream, since then there is no page. The build listing is the
+     * optional third, as it is for [details].
+     */
+    override fun detailsStream(packId: String): Flow<CataloguePackDetails> = combine(
+        client.summaryStream(packId).keepingLast("summary", packId),
+        client.manifestStream(packId).keepingLast("manifest", packId),
+        client.buildsStream(packId).optional(packId),
+    ) { s, m, listing -> detailsOf(s, m, listing) }
+        .distinctUntilChanged()
+
+    /** The last value survives a failure behind it, and only a failure before any value is thrown on. */
+    private fun <T> Flow<T>.keepingLast(what: String, packId: String): Flow<T> = flow {
+        var seen = false
+        emitAll(
+            onEach { seen = true }.catch { e ->
+                if (!seen) throw e
+                log.debug("mirror {} refresh for {} failed, keeping the stored one", what, packId, e)
+            },
+        )
+    }
+
+    /** A read the page does without: null in place of nothing, and the last value kept on a later failure. */
+    private fun <T : Any> Flow<T>.optional(packId: String): Flow<T?> = flow {
+        var seen = false
+        emitAll(
+            map<T, T?> { it }.onEach { seen = true }.catch { e ->
+                log.debug("mirror build listing for {} unavailable", packId, e)
+                if (!seen) emit(null)
+            },
+        )
+    }
+
+    private suspend fun detailsOf(s: SmrtPackSummary, m: SmrtPackManifest, listing: SmrtManifestVersions?): CataloguePackDetails {
         // The summary names a community pack's owner by account id only. The
         // login is the community listing's, read from its stored copy as a rule.
         val owner = if (s.tier == COMMUNITY_TIER) {
-            communityOrNone(forceRefresh = false)?.firstOrNull { it.summary.packId == packId }?.ownerLogin
+            communityOrNone(forceRefresh = false)?.firstOrNull { it.summary.packId == s.packId }?.ownerLogin
         } else {
             null
         }
-        val m = manifestD.await()
-        val listing = listingD.await()
         val tag = language()
         val versions = listing?.builds.orEmpty()
             .map { it.forLanguage(tag) }
@@ -201,7 +243,7 @@ class MirrorPackCatalogue(
                 )
             }
             .ifEmpty { listOf(versionOf(s, m)) }
-        CataloguePackDetails(
+        return CataloguePackDetails(
             origin = origin,
             id = s.packId,
             title = s.displayName,

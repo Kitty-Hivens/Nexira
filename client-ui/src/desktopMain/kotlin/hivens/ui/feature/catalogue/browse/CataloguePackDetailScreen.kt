@@ -96,8 +96,8 @@ import hivens.widget.model.SlotId
 import hivens.widget.model.SurfaceId
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 import java.awt.datatransfer.StringSelection
 
@@ -184,21 +184,21 @@ fun CataloguePackDetailScreen(
         // Only a page with nothing on it says so. A refresh behind a page already
         // read replaces it when it lands, the way the catalogue list does.
         if (state !is DetailState.Loaded) state = DetailState.Loading
-        state = try {
-            val catalogue = registry.forOrigin(origin)
-            if (catalogue == null) {
-                DetailState.Error(s.browseDetailErrorMessage)
-            } else {
-                val details = withContext(Dispatchers.IO) { catalogue.details(packId) }
+        val catalogue = registry.forOrigin(origin)
+            ?: return@LaunchedEffect run { state = DetailState.Error(s.browseDetailErrorMessage) }
+        try {
+            // Every answer the source gives, the stored one and the fresh one behind
+            // it. Read once, the page and its Install offered whatever the cache held.
+            catalogue.detailsStream(packId).flowOn(Dispatchers.IO).collect { details ->
                 session.putDetails(origin, packId, details)
-                DetailState.Loaded(details)
+                state = DetailState.Loaded(details)
             }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             // A source that failed while a page of its own is on screen keeps
             // showing it: an error page loses more than the error explains.
-            (state as? DetailState.Loaded) ?: DetailState.Error(e.message ?: s.browseDetailErrorMessage)
+            if (state !is DetailState.Loaded) state = DetailState.Error(e.message ?: s.browseDetailErrorMessage)
         }
     }
 

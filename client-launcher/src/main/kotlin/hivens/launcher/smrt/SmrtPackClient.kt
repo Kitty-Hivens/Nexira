@@ -82,6 +82,12 @@ class SmrtPackClient(
         return caches.manifest.get(url) { getJson(url) }
     }
 
+    /** Stale-then-fresh view of [fetchManifest], as [buildsStream] is of [listBuilds]. */
+    fun manifestStream(packId: String): Flow<SmrtPackManifest> {
+        val url = "${packUrl(packId)}/manifest"
+        return caches.manifest.flow(url) { getJson(url) }.map { it.value }
+    }
+
     override suspend fun fetchSummary(packId: String): SmrtPackSummary =
         fetchSummary(packId, forceRefresh = false)
 
@@ -89,6 +95,12 @@ class SmrtPackClient(
     suspend fun fetchSummary(packId: String, forceRefresh: Boolean): SmrtPackSummary {
         val url = packUrl(packId)
         return caches.summary.read(url, forceRefresh) { getJson(url) }
+    }
+
+    /** Stale-then-fresh view of [fetchSummary], as [buildsStream] is of [listBuilds]. */
+    fun summaryStream(packId: String): Flow<SmrtPackSummary> {
+        val url = packUrl(packId)
+        return caches.summary.flow(url) { getJson(url) }.map { it.value }
     }
 
     /** Every pack the mirror lists. See [fetchManifest] for what [forceRefresh] costs. */
