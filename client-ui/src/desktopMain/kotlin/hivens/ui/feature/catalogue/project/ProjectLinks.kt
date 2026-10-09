@@ -64,7 +64,8 @@ private const val MODPACK_ROUTE = "modpack"
 fun projectUrl(projectId: String): String = "https://modrinth.com/mod/$projectId"
 
 /**
- * How a link is followed here.
+ * How a link is followed here: the address, and the pack a project it opens should
+ * install into, when the page holding the link has one.
  *
  * A composition local rather than something pulled out of the graph, because the
  * callers are a markdown body and two rail widgets, and a widget must be able to
@@ -74,8 +75,8 @@ fun projectUrl(projectId: String): String = "https://modrinth.com/mod/$projectId
  * The default is the browser, which is what a link does when nothing claims it.
  * The shell provides the version that keeps a reader inside the app.
  */
-val LocalLinkFollower: ProvidableCompositionLocal<(String) -> Unit> =
-    compositionLocalOf { { url: String -> openInBrowser(url) } }
+val LocalLinkFollower: ProvidableCompositionLocal<(url: String, intoInstanceId: String?) -> Unit> =
+    compositionLocalOf { { url: String, _: String? -> openInBrowser(url) } }
 
 /**
  * Follows a link the way a reader expects: a mod opens as a page HERE, everything
@@ -83,27 +84,42 @@ val LocalLinkFollower: ProvidableCompositionLocal<(String) -> Unit> =
  *
  * The launcher draws project pages of its own now, so handing a link to one out
  * to a browser sends the reader out of the app to read a page the app was already
- * able to show them -- and loses the pack they were installing into on the way.
+ * able to show them. [intoInstanceId] is the pack the page holding the link
+ * installs into, and the page a link opens installs into it too: without it a
+ * dependency followed from a pack's mod offered no install, or asked for a pack
+ * the reader had already chosen.
  */
 @Composable
-fun rememberLinkFollower(): (String) -> Unit = LocalLinkFollower.current
+fun rememberLinkFollower(intoInstanceId: String? = null): (String) -> Unit {
+    val follow = LocalLinkFollower.current
+    return remember(follow, intoInstanceId) { { url: String -> follow(url, intoInstanceId) } }
+}
+
+/**
+ * Where a link leads inside the app, or null for an address the app does not draw.
+ * A modpack opens on its pack page, which installs it as a pack of its own rather
+ * than into [intoInstanceId].
+ */
+fun linkScreen(url: String, intoInstanceId: String?): Screen? {
+    val link = modrinthProjectLink(url) ?: return null
+    return if (link.modpack) {
+        Screen.CataloguePackDetail(PackOrigin.Modrinth, link.slug)
+    } else {
+        Screen.ModDetail(ModTarget.Catalogue(link.slug, intoInstanceId))
+    }
+}
 
 /**
  * The shell's own follower: a catalogue project becomes a navigation, a modpack to
  * its pack page, and anything else goes out to the browser.
  */
 @Composable
-fun rememberNavigatingLinkFollower(): (String) -> Unit {
+fun rememberNavigatingLinkFollower(): (url: String, intoInstanceId: String?) -> Unit {
     val uriHandler: UriHandler = LocalUriHandler.current
     val nav: NavRequests = koinInject()
     return remember(uriHandler, nav) {
-        { url: String ->
-            val link = modrinthProjectLink(url)
-            when {
-                link == null -> uriHandler.openUri(url)
-                link.modpack -> nav.open(Screen.CataloguePackDetail(PackOrigin.Modrinth, link.slug))
-                else -> nav.open(Screen.ModDetail(ModTarget.Catalogue(link.slug)))
-            }
+        { url: String, intoInstanceId: String? ->
+            linkScreen(url, intoInstanceId)?.let(nav::open) ?: uriHandler.openUri(url)
         }
     }
 }

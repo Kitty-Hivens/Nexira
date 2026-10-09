@@ -184,7 +184,7 @@ internal fun ModVersionBody(
                 BuildHeader(v, project, installScope)
                 HorizontalDivider(color = NxColor.wash(NxInk.line, 0.25f))
                 Compatibility(v, project)
-                Dependencies(build)
+                Dependencies(build, project.packId)
                 Changes(v)
                 Files(v)
             }
@@ -329,14 +329,14 @@ private fun Compatibility(v: ModrinthVersion, project: ModDetailState) {
  * install what they already have.
  */
 @Composable
-private fun Dependencies(build: ModVersionState) {
+private fun Dependencies(build: ModVersionState, packId: String?) {
     val s = LocalStrings.current
     val groups = listOf(
         DependencyKind.Required to s.modVersionRequires,
         DependencyKind.Optional to s.modVersionOptional,
         DependencyKind.Incompatible to s.modVersionIncompatible,
     )
-    val follow = rememberLinkFollower()
+    val follow = rememberLinkFollower(packId)
     groups.forEach { (kind, title) ->
         val rows = build.dependencies.filter { it.kind == kind }
         if (rows.isEmpty()) return@forEach

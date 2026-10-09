@@ -235,7 +235,7 @@ internal enum class ModPageTab { Description, Versions, Changelog, Gallery }
 @Composable
 internal fun Body(state: ModDetailState, onRetry: () -> Unit) {
     val s = LocalStrings.current
-    val follow = rememberLinkFollower()
+    val follow = rememberLinkFollower(state.packId)
     when {
         state.loading -> Box(Modifier.fillMaxWidth().padding(vertical = 40.dp), contentAlignment = Alignment.Center) {
             CircularProgressIndicator(

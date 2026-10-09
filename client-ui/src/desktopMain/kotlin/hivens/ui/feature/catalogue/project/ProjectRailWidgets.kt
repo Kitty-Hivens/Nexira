@@ -282,7 +282,7 @@ fun ProjectLinksWidget(instance: WidgetInstance) {
     val project by rememberSource(Sources.OpenProject)
     val p = project ?: return
     val s = LocalStrings.current
-    val follow = rememberLinkFollower()
+    val follow = rememberLinkFollower(p.packId)
     if (p.links.isEmpty()) return
 
     RailBlock(s.modRailLinks) {
