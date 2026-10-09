@@ -6,15 +6,16 @@ import dev.hivens.skinema.audio.PcmSink
 import dev.hivens.skinema.player.VideoPlayer
 import hivens.ui.diag.SkinemaGate
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.atomic.AtomicLong
-import kotlin.coroutines.coroutineContext
 import kotlin.math.abs
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
@@ -67,7 +68,7 @@ suspend fun computeWaveform(file: Path, buckets: Int = DEFAULT_BUCKETS): Wavefor
 }
 
 private object WaveformLog {
-    val log = LoggerFactory.getLogger("hivens.ui.audio.Waveform")
+    val log: Logger = LoggerFactory.getLogger("hivens.ui.audio.Waveform")
 }
 
 private suspend fun decodeEnvelope(file: Path, buckets: Int): Waveform? {
@@ -107,7 +108,7 @@ private suspend fun decodeEnvelope(file: Path, buckets: Int): Waveform? {
 
 /** True once the file has played out, false for a decode that failed. */
 private suspend fun awaitEnd(player: VideoPlayer, file: Path): Boolean {
-    while (coroutineContext.isActive) {
+    while (currentCoroutineContext().isActive) {
         when (val st = player.state) {
             VideoPlayer.State.Ended -> return true
             is VideoPlayer.State.Failed -> {
@@ -330,6 +331,7 @@ private const val INITIAL_WINDOWS = 1024
  */
 private const val U8_FULL_SCALE = 128f
 private const val S16_FULL_SCALE = 32768f
+@Suppress("FloatingPointLiteralPrecision")
 private const val S32_FULL_SCALE = 2147483648f
 
 private const val POLL_MS = 20L

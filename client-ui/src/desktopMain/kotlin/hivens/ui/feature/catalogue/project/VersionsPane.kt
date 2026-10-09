@@ -180,9 +180,8 @@ internal fun VersionsPane(
 
     // Everything with a file, newest first. A record with no file is a release
     // nobody can install.
-    val builds = all.orEmpty()
-    val rows = remember(builds) {
-        builds.filter { it.files.isNotEmpty() }.sortedByDescending { it.datePublished }
+    val rows = remember(all) {
+        all.filter { it.files.isNotEmpty() }.sortedByDescending { it.datePublished }
     }
     if (rows.isEmpty()) {
         Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

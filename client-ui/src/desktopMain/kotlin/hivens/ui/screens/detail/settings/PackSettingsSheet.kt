@@ -80,6 +80,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import java.nio.file.Path
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * A change to a pack's settings, as a function of the record rather than a copy of
@@ -162,7 +163,7 @@ fun PackSettingsSheet(
         // of order -- leaving the record on an older value than the field shows.
         // A newer edit cancels this effect, so only what the typing settles on is
         // written, and only ever one write at a time.
-        delay(EDIT_SETTLE_MS)
+        delay(EDIT_SETTLE_MS.milliseconds)
         if (current.persist) repo.update(pack.id, current.change)
         if (edit === current) edit = null
     }

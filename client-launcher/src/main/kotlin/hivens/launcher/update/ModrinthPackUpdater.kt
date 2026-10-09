@@ -182,6 +182,7 @@ class ModrinthPackUpdater(
                         )
                     }
                 } finally {
+                    @Suppress("BlockingMethodInNonBlockingContext")
                     runCatching {
                         Files.list(scratch).use { s -> s.forEach { Files.deleteIfExists(it) } }
                         Files.deleteIfExists(scratch)

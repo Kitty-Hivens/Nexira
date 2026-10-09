@@ -49,7 +49,9 @@ import hivens.ui.icons.Symbol
 import hivens.ui.surface.NxSurface
 import hivens.ui.theme.Motion
 import hivens.ui.theme.Spacing
+import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
+import kotlin.time.Duration.Companion.milliseconds
 import hivens.ui.theme.NxInk
 import hivens.ui.surface.SurfaceKind
 
@@ -195,7 +197,7 @@ fun NxTooltip(
         // Zero means now, not "suspend for zero". A delay of nothing still parks the
         // coroutine until the dispatcher comes back round, which is a frame the
         // caller did not ask to wait for.
-        if (behaviour.delayMillis > 0) kotlinx.coroutines.delay(behaviour.delayMillis.toLong())
+        if (behaviour.delayMillis > 0) delay(behaviour.delayMillis.milliseconds)
         shown = true
     }
 

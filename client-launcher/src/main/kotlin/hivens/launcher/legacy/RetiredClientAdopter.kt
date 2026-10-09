@@ -209,6 +209,8 @@ class RetiredClientAdopter(
             }
             progress(linked, 0, label)
         }
+        // Runs on IO: the only caller is inside withContext(io), which is Dispatchers.IO outside tests.
+        @Suppress("BlockingMethodInNonBlockingContext")
         Files.newDirectoryStream(src).use { top ->
             for (child in top) {
                 if (isRuntimeArtefact(child.name)) continue

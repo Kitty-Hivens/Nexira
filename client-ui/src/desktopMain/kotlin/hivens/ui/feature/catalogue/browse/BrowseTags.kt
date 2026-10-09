@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import kotlin.time.Duration
 
@@ -76,6 +77,6 @@ class BrowseTags(
     }
 
     private companion object {
-        val log = LoggerFactory.getLogger(BrowseTags::class.java)
+        val log: Logger = LoggerFactory.getLogger(BrowseTags::class.java)
     }
 }

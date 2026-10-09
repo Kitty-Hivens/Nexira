@@ -16,6 +16,7 @@ import hivens.launcher.modrinth.ModrinthClient
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
 /**
@@ -150,6 +151,6 @@ class ModrinthPackCatalogue(private val client: ModrinthClient) : IPackCatalogue
     private companion object {
         const val PAGE_SIZE = 40
         const val OWNER_ROLE = "Owner"
-        val log = LoggerFactory.getLogger(ModrinthPackCatalogue::class.java)
+        val log: Logger = LoggerFactory.getLogger(ModrinthPackCatalogue::class.java)
     }
 }

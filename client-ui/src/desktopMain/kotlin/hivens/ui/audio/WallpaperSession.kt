@@ -4,6 +4,7 @@ import dev.hivens.skinema.player.VideoPlayer
 import hivens.ui.widgets.services.MusicPlayerService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -12,7 +13,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
 import java.nio.file.Path
-import kotlin.coroutines.coroutineContext
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
@@ -161,7 +161,7 @@ class WallpaperSession(
         // leaves the scope active, so asking the scope would make the loop rely on
         // delay throwing to stop, which is true today and a trap for whoever moves
         // the delay.
-        while (coroutineContext.isActive) {
+        while (currentCoroutineContext().isActive) {
             val st = player.state
             val mapped = mapPlaybackState(
                 file    = file,

@@ -273,7 +273,9 @@ internal fun rememberParallaxOffset(mouse: () -> Offset, intensity: Float): Para
             // zero for as long as the pointer kept moving. It only travelled once the
             // pointer stopped, which is the opposite of what parallax is.
             .collect { target ->
+                @Suppress("SuspiciousImplicitCoroutineScopeReceiverAccess")
                 launch { offset.x.animateTo(target.x, PARALLAX_SPRING) }
+                @Suppress("SuspiciousImplicitCoroutineScopeReceiverAccess")
                 launch { offset.y.animateTo(target.y, PARALLAX_SPRING) }
             }
     }

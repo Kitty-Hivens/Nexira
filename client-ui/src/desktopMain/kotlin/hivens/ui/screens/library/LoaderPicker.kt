@@ -25,6 +25,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
+import kotlin.time.Duration.Companion.milliseconds
 
 /** The loaders a local pack can be made with, as label and registry id. Null is vanilla. */
 internal val LOADER_CHOICES: List<Pair<String, String?>> = listOf(
@@ -74,7 +75,7 @@ internal fun LoaderPicker(
     LaunchedEffect(loaderId, mcVersion, mcKnown) {
         loaderVersions = emptyList()
         if (loaderId == null || !mcKnown) return@LaunchedEffect
-        delay(300)
+        delay(300.milliseconds)
         loaderVersions = runCatching {
             withContext(Dispatchers.IO) { provisioner.availableLoaderVersions(loaderId, mcVersion) }
         }.getOrDefault(emptyList())

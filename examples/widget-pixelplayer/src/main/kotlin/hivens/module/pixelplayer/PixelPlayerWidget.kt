@@ -47,6 +47,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import org.jetbrains.skia.Image as SkiaImage
 import java.nio.file.Paths
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Tunables the editor writes. Everything is a scalar because the generated prop
@@ -98,7 +99,7 @@ fun PixelPlayerWidget(instance: WidgetInstance) {
         // there is the whole filesystem. NIO walks do not answer cancellation
         // either, so an abandoned one runs to the end on an IO thread. The delay
         // is cancellable and is what keeps those walks from ever starting.
-        delay(SCAN_DEBOUNCE_MS)
+        delay(SCAN_DEBOUNCE_MS.milliseconds)
         // Every failure here is the user's folder being unusual, not a bug: a
         // subdirectory without execute permission makes Files.walk throw at
         // terminal-op time, and an exception out of this effect unwinds the

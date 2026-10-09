@@ -19,6 +19,7 @@ import java.nio.file.Path
 import kotlin.time.Duration.Companion.milliseconds
 
 /** Where the playlist is and what the current track is doing. */
+@Suppress("ArrayInDataClass")
 internal data class PlayerState(
     val tracks: List<Path> = emptyList(),
     val index: Int = -1,

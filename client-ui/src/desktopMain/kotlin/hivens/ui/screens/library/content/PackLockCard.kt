@@ -176,9 +176,9 @@ private fun LockMark() {
             keyframes {
                 durationMillis = d
                 0f at 0
-                -14f at d / 5
+                (-14f) at d / 5
                 10f at d * 2 / 5
-                -5f at d * 3 / 5
+                (-5f) at d * 3 / 5
             },
         )
     }

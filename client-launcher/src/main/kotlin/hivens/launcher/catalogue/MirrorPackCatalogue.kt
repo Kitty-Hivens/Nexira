@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.onStart
 import org.slf4j.LoggerFactory
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * The Hivens mirror as a [IPackCatalogueService]. The mirror has no query
@@ -103,7 +104,7 @@ class MirrorPackCatalogue(
             log.debug("mirror listing refresh failed, keeping the stored list and polling", e)
         }
         while (true) {
-            delay(pollIntervalMs)
+            delay(pollIntervalMs.milliseconds)
             val listing = try {
                 client.listPacks(forceRefresh = true)
             } catch (e: CancellationException) {

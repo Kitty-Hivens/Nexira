@@ -260,6 +260,8 @@ class ModernInstallerResolver(
             dotMinecraft.toString(),
         )
         log.info("{}: running installer: {}", loaderId, command.joinToString(" "))
+        // Runs on IO: the only caller is inside withContext(Dispatchers.IO).
+        @Suppress("BlockingMethodInNonBlockingContext")
         val process = ProcessBuilder(command)
             .directory(dotMinecraft.toFile())
             .redirectErrorStream(true)
@@ -290,6 +292,7 @@ class ModernInstallerResolver(
             kill(process)
             throw IOException("$loaderId installer timed out after $INSTALL_TIMEOUT_MINUTES min")
         }
+        @Suppress("BlockingMethodInNonBlockingContext")
         drain.join(2000)
         if (process.exitValue() != 0) {
             val recent = synchronized(tail) { tail.joinToString("\n") }

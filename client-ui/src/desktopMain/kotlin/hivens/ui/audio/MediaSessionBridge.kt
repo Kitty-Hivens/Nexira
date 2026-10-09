@@ -25,6 +25,7 @@ import hivens.ui.widgets.services.MusicPlayerService
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Publishes what the launcher is playing to the desktop, and takes its media
@@ -155,7 +156,7 @@ class MediaSessionBridge(
         // stopped, and that one arrives within a tick. The first snapshot waits the
         // same tick, which nothing observes, since it happens as the bus name is
         // claimed.
-        val volume = player.volume.sample(VOLUME_SAMPLE_MS)
+        val volume = player.volume.sample(VOLUME_SAMPLE_MS.milliseconds)
         val transport = combine(player.state, player.track, volume) { state, track, level ->
             Triple(state, track, level)
         }
