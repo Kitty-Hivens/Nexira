@@ -71,8 +71,17 @@ class CacheFactory(
         shutdownHook = null
     }
 
-    fun <V> create(namespace: String, serializer: KSerializer<V>, config: CacheConfig<V>): Cache<V> {
-        val disk = XodusDiskStore({ env }, namespace, serializer, json)
+    /**
+     * [maxDiskAgeMs] bounds how long an entry stays on disk, for a namespace whose keys
+     * keep changing; null keeps entries until they are replaced, see [XodusDiskStore].
+     */
+    fun <V> create(
+        namespace: String,
+        serializer: KSerializer<V>,
+        config: CacheConfig<V>,
+        maxDiskAgeMs: Long? = null,
+    ): Cache<V> {
+        val disk = XodusDiskStore({ env }, namespace, serializer, json, maxDiskAgeMs, clock::nowMillis)
         return DefaultCache(disk, config, scope, clock, namespace, ioDispatcher)
     }
 

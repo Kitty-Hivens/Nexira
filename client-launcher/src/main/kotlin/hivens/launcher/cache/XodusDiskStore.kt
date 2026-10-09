@@ -13,6 +13,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
 import java.security.MessageDigest
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Disk backend for one cache namespace over a shared Xodus [Environment]: the
@@ -33,12 +34,23 @@ class XodusDiskStore<V>(
     private val storeName: String,
     private val serializer: KSerializer<V>,
     private val json: Json,
+    /**
+     * How long an entry is kept on disk, or forever when null. For a namespace whose
+     * keys never repeat for long, a search page per query, per filter set and per
+     * offset: the cache never serves an entry past its stale window, and without this
+     * nothing ever removed one, so the store only grew.
+     */
+    private val maxAgeMillis: Long? = null,
+    private val clock: () -> Long = System::currentTimeMillis,
 ) : DiskStore<V> {
 
     constructor(env: Environment, storeName: String, serializer: KSerializer<V>, json: Json) :
         this({ env }, storeName, serializer, json)
 
     private val log = LoggerFactory.getLogger(XodusDiskStore::class.java)
+
+    /** Writes until the next sweep of old entries. The first write of a run sweeps. */
+    private val untilPrune = AtomicInteger(1)
     private val envelopeSerializer = Envelope.serializer(serializer)
 
     /**
@@ -86,6 +98,37 @@ class XodusDiskStore<V>(
                     .put(txn, keyOf(key), ArrayByteIterable(payload))
             }
         }.onFailure { log.warn("cache xodus write failed for {}#{}", storeName, key, it) }
+        val maxAge = maxAgeMillis ?: return
+        if (untilPrune.decrementAndGet() <= 0) {
+            untilPrune.set(PRUNE_EVERY)
+            prune(env, clock() - maxAge)
+        }
+    }
+
+    /**
+     * Drops every entry stored before [cutoff]. Read off the envelope's own
+     * `stored_at` rather than decoding the value, which for a search page is the
+     * whole page; an entry whose stamp cannot be read goes too.
+     */
+    private fun prune(env: Environment, cutoff: Long) {
+        runCatching {
+            var dropped = 0
+            env.executeInTransaction { txn ->
+                val cursor = env.openStore(storeName, StoreConfig.WITHOUT_DUPLICATES, txn).openCursor(txn)
+                try {
+                    while (cursor.next) {
+                        val stored = STORED_AT.find(cursor.value.toByteArray().decodeToString())?.groupValues?.get(1)?.toLongOrNull()
+                        if (stored == null || stored < cutoff) {
+                            cursor.deleteCurrent()
+                            dropped++
+                        }
+                    }
+                } finally {
+                    cursor.close()
+                }
+            }
+            if (dropped > 0) log.debug("cache xodus {}: dropped {} entr(ies) past their age", storeName, dropped)
+        }.onFailure { log.warn("cache xodus prune failed for {}", storeName, it) }
     }
 
     override fun delete(key: String) {
@@ -129,6 +172,12 @@ class XodusDiskStore<V>(
 
     private companion object {
         const val SCHEMA_VERSION = 1
+
+        /** Writes between two sweeps of a store kept to an age. */
+        const val PRUNE_EVERY = 64
+
+        /** The envelope's write time, found without decoding the value beside it. */
+        val STORED_AT = Regex(""""stored_at"\s*:\s*(\d+)""")
 
         /**
          * A short fingerprint of a serial descriptor: its own serial name, then

@@ -33,6 +33,24 @@ class XodusDiskStoreTest {
 
     private fun strings(name: String = "s") = XodusDiskStore(env, name, String.serializer(), json)
 
+    /**
+     * A search page is keyed by its whole URL, so the keys never repeat for long, and
+     * nothing removed an entry the cache would never serve again: the store only grew.
+     */
+    @Test
+    fun `a store kept to an age drops what is older, and one that is not keeps it`() {
+        val now = 10_000L
+        XodusDiskStore(env, "plain", String.serializer(), json).write("old", "kept", 0L)
+        val aged = XodusDiskStore({ env }, "aged", String.serializer(), json, maxAgeMillis = 1_000L, clock = { now })
+        aged.write("fresh", "kept", now)
+        aged.write("old", "dropped", 0L)
+        repeat(64) { aged.write("filler$it", "kept", now) }
+
+        assertNull(aged.read("old"))
+        assertEquals("kept", aged.read("fresh")?.value)
+        assertEquals("kept", XodusDiskStore(env, "plain", String.serializer(), json).read("old")?.value)
+    }
+
     @Test
     fun `write then read round-trips value and timestamp`() {
         strings().write("k", "hello", 123L)

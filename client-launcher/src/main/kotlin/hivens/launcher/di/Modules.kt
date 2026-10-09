@@ -1037,6 +1037,9 @@ private fun Scope.modrinthCaches(): ModrinthCaches {
             "modrinth-search",
             ModrinthSearchResponse.serializer(),
             CacheConfig(ttlMs = 5 * min, staleTtlMs = day, staleMode = StaleMode.FallbackOnFailure, maxEntries = 128),
+            // A page per query, filter set and offset: never served past the day, and
+            // gone from disk after it.
+            maxDiskAgeMs = day,
         ),
     )
 }
