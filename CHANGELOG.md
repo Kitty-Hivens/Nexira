@@ -25,6 +25,9 @@ verbatim, where a hand-wrapped line would render as a <br> staircase.
 
 ## [Unreleased]
 
+### Fixed
+- A pack mod the loader moved into `mods/<mcversion>/` that could not be read was taken for a stranger: `isRelocatedPackMod` answered no on a failed open, so `pruneForeignEntries` deleted the pack's own jar and the session guard reported it as foreign content. A read failure is what an antivirus scanning a freshly moved file looks like, the case `digestScan` already keeps apart from a mismatch. `relocation` answers `UNREADABLE` now, the file stays, and `enforceRoster` and `inspectRoster` name it under `unreadable`, which still leaves the instance unverified. The two read failures log apart (`mods roster: cannot read`), the relocated one with its path under `mods/`.
+
 ## [2.4.7-beta] - 2026-10-09
 
 ### Added

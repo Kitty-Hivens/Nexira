@@ -386,21 +386,22 @@ class SmrtSyncService(
                 digests.mismatched.size, clientDir.fileName, digests.mismatched,
             )
         }
-        if (digests.unreadable.isNotEmpty()) {
+        val unreadable = (digests.unreadable + sweep.unreadable).sorted()
+        if (unreadable.isNotEmpty()) {
             log.warn(
                 "mods enforce: {} file(s) in {} could not be read to check them: {}",
-                digests.unreadable.size, clientDir.fileName, digests.unreadable,
+                unreadable.size, clientDir.fileName, unreadable,
             )
         }
         RosterVerdict(
             // Anything left behind means the instance was not brought in line, and a
             // file that resists deletion is the likeliest thing to have been left on
             // purpose.
-            verified = sweep.blocked.isEmpty() && digests.mismatched.isEmpty() && digests.unreadable.isEmpty(),
+            verified = sweep.blocked.isEmpty() && digests.mismatched.isEmpty() && unreadable.isEmpty(),
             removed = sweep.removed,
             blocked = sweep.blocked,
             mismatched = digests.mismatched,
-            unreadable = digests.unreadable,
+            unreadable = unreadable,
         )
     }
 
@@ -417,14 +418,12 @@ class SmrtSyncService(
                 log.warn("mods inspect: no roster for {}, nothing to hold it to", clientDir.fileName)
                 return@withContext RosterInspection(checkable = false)
             }
-            val foreign = foreignEntries(clientDir, roster, expected.orEmpty())
-                .map { (_, relText) -> relText }
-                .sorted()
+            val walk = foreignEntries(clientDir, roster, expected.orEmpty())
             val digests = if (expected == null) DigestScan() else digestScan(clientDir, expected)
             RosterInspection(
-                foreign = foreign,
+                foreign = walk.foreign.map { (_, relText) -> relText }.sorted(),
                 mismatched = digests.mismatched,
-                unreadable = digests.unreadable,
+                unreadable = (digests.unreadable + walk.unreadable).sorted(),
             )
         }
 
@@ -457,7 +456,7 @@ class SmrtSyncService(
             val file = modsDir.resolve(name)
             if (!Files.isRegularFile(file)) continue
             val actual = runCatching { fileOpRetry("roster digest $name") { sha1Of(file) } }
-                .onFailure { log.warn("mods enforce: cannot read {}: {}", name, it.toString()) }
+                .onFailure { log.warn("mods roster: cannot read {}, it stays unchecked: {}", name, it.toString()) }
                 .getOrNull()
             when {
                 actual == null -> unreadable += name
@@ -480,8 +479,21 @@ class SmrtSyncService(
         return digest.digest().joinToString("") { "%02x".format(it) }
     }
 
-    /** What one sweep of `mods/` managed to remove, and what refused to go. */
-    private data class Sweep(val removed: List<String>, val blocked: List<String>)
+    /**
+     * What one sweep of `mods/` managed to remove, what refused to go, and what it
+     * left because the file would not open to be identified.
+     */
+    private data class Sweep(val removed: List<String>, val blocked: List<String>, val unreadable: List<String>)
+
+    /**
+     * What [foreignEntries] found: the archives the pack does not account for, and
+     * the files it could not read to decide, kept apart for the reason [digestScan]
+     * keeps them apart.
+     */
+    private data class ForeignWalk(val foreign: List<Pair<Path, String>>, val unreadable: List<String>)
+
+    /** What reading a file beside the mods established about it. */
+    private enum class Relocation { PACK_MOD, NOT_PACK_MOD, UNREADABLE }
 
     private data class ResolvableEntry(val source: SmrtSource, val sha1: String, val size: Long)
 
@@ -613,7 +625,8 @@ class SmrtSyncService(
 
     /**
      * Every loadable archive under `mods/` that [expected] does not name, deepest
-     * first, paired with the '/'-joined relative path a person reads in a report.
+     * first, paired with the '/'-joined relative path a person reads in a report,
+     * and apart from them the files that would not open to be identified.
      *
      * Pure: it walks and decides, and touches nothing. [pruneForeignEntries] is this
      * plus a delete, [inspectRoster] is this without one -- the rule for what counts
@@ -624,15 +637,16 @@ class SmrtSyncService(
         clientDir: Path,
         expected: Set<String>,
         digests: Map<String, String> = emptyMap(),
-    ): List<Pair<Path, String>> {
+    ): ForeignWalk {
         val modsDir = clientDir.resolve("mods")
-        if (!Files.isDirectory(modsDir)) return emptyList()
+        if (!Files.isDirectory(modsDir)) return ForeignWalk(emptyList(), emptyList())
         val found = mutableListOf<Pair<Path, String>>()
+        val unreadable = mutableListOf<String>()
         // Computed on first use and only when something nested is actually being
         // judged, because building it opens every rostered jar to read one
         // manifest. An instance with nothing under a subdirectory, which is
         // almost all of them, never pays for it.
-        val unpacked = lazy { unpackedDepNames(modsDir, expected) }
+        val unpacked by lazy { unpackedDepNames(modsDir, expected) }
         Files.walk(modsDir).use { stream ->
             stream.sorted(Comparator.reverseOrder()).forEach { p ->
                 if (p == modsDir) return@forEach
@@ -685,9 +699,18 @@ class SmrtSyncService(
                         // CodeChickenCore's dependency loader relocates what it
                         // finds, leaving nothing at the top level. That one is
                         // matched on bytes, so the move is recognised and a
-                        // substitution under a familiar name is not.
+                        // substitution under a familiar name is not. A file that
+                        // will not open is neither: it stays, and the instance
+                        // stays unchecked, the way an unreadable top-level jar does.
                         val name = p.fileName.toString()
-                        name in unpacked.value || isRelocatedPackMod(p, name, digests)
+                        name in unpacked || when (relocation(p, rel, name, digests)) {
+                            Relocation.PACK_MOD -> true
+                            Relocation.NOT_PACK_MOD -> false
+                            Relocation.UNREADABLE -> {
+                                unreadable += rel.joinToString("/")
+                                true
+                            }
+                        }
                     }
                     else -> true
                 }
@@ -698,7 +721,7 @@ class SmrtSyncService(
                 found += p to rel.joinToString("/")
             }
         }
-        return found
+        return ForeignWalk(found, unreadable)
     }
 
     /**
@@ -770,17 +793,28 @@ class SmrtSyncService(
      * something that moved it rather than by someone adding it.
      *
      * Held to the bytes the pack declared, not to the name alone: the name is what
-     * a substitution would copy, and the digest is what it cannot. Answers false
-     * when the pack shipped no digest for that name, which is the case for an
-     * instance old enough to predate the baseline, so those keep the older and
+     * a substitution would copy, and the digest is what it cannot. Not one of the
+     * pack's when the pack shipped no digest for that name, which is the case for
+     * an instance old enough to predate the baseline, so those keep the older and
      * stricter reading.
+     *
+     * A file that will not open is answered as such and not as a stranger. Whatever
+     * holds it (an antivirus scanning it, a handle the last session has not dropped)
+     * says nothing about its bytes, and the loader that moved the pack's own jar here
+     * is exactly when something else is likely to be reading it.
      */
-    private fun isRelocatedPackMod(file: Path, name: String, digests: Map<String, String>): Boolean {
-        val want = digests[name]?.takeIf { it.isNotBlank() } ?: return false
+    private fun relocation(file: Path, rel: Path, name: String, digests: Map<String, String>): Relocation {
+        val want = digests[name]?.takeIf { it.isNotBlank() } ?: return Relocation.NOT_PACK_MOD
         val actual = runCatching { fileOpRetry("roster relocated $name") { sha1Of(file) } }
-            .onFailure { log.warn("mods enforce: cannot read {}: {}", name, it.toString()) }
+            .onFailure {
+                log.warn(
+                    "mods roster: cannot read {} where the loader moved it, it stays unchecked: {}",
+                    rel.joinToString("/"), it.toString(),
+                )
+            }
             .getOrNull()
-        return actual != null && actual.equals(want, ignoreCase = true)
+            ?: return Relocation.UNREADABLE
+        return if (actual.equals(want, ignoreCase = true)) Relocation.PACK_MOD else Relocation.NOT_PACK_MOD
     }
 
     /**
@@ -799,7 +833,8 @@ class SmrtSyncService(
     ): Sweep {
         val removed = mutableListOf<String>()
         val blocked = mutableListOf<String>()
-        for ((path, relText) in foreignEntries(clientDir, expected, digests)) {
+        val walk = foreignEntries(clientDir, expected, digests)
+        for ((path, relText) in walk.foreign) {
             // An unpacked mod is reported and left where it is. Deleting a tree the
             // launcher did not create is a different kind of act from dropping a
             // stray jar, and the instance is held unverified either way, which is
@@ -815,7 +850,7 @@ class SmrtSyncService(
                 .onFailure { blocked += relText }
         }
         if (removed.isNotEmpty()) log.info("smrt sync: dropped {} foreign entr(ies) from mods/: {}", removed.size, removed)
-        return Sweep(removed, blocked)
+        return Sweep(removed, blocked, walk.unreadable)
     }
 
     /**

@@ -735,6 +735,37 @@ class SmrtSyncServiceTest {
         assertEquals(listOf("1.7.10/Baubles-1.7.10-1.0.1.10.jar"), verdict.removed)
     }
 
+    /**
+     * The loader moved the pack's own jar down a level, and something is reading it
+     * as the launcher looks: an antivirus does exactly that to a file that just
+     * appeared. A failed open is not evidence of a swap, so the jar stays where the
+     * loader put it and the instance stays unchecked, the way an unreadable jar at
+     * the top level does.
+     */
+    @Test
+    fun `a relocated pack mod that cannot be read is kept and leaves the instance unchecked`() = runTest {
+        val dir = tempDir("relocated-unreadable")
+        Files.createDirectories(dir.resolve("mods/1.7.10"))
+        val held = dir.resolve("mods/1.7.10/Baubles-1.7.10-1.0.1.10.jar")
+        Files.write(held, "GENUINE".toByteArray())
+        val baseline = mapOf("Baubles-1.7.10-1.0.1.10.jar" to sha1Hex("GENUINE".toByteArray()))
+        val service = serviceWith(MockEngine { respond("", HttpStatusCode.NotFound) }) { file ->
+            if (file == held) throw AccessDeniedException(file.toString()) else Files.newInputStream(file)
+        }
+
+        val verdict = service.enforceRoster(dir, baseline)
+
+        assertTrue(Files.exists(held), "the pack's own mod is not deleted on the strength of a failed open")
+        assertTrue(verdict.removed.isEmpty())
+        assertEquals(listOf("1.7.10/Baubles-1.7.10-1.0.1.10.jar"), verdict.unreadable)
+        assertFalse(verdict.verified, "unchecked is not cleared, it still denies the token")
+
+        val inspection = service.inspectRoster(dir, baseline)
+
+        assertTrue(inspection.foreign.isEmpty(), "the session guard does not report it as foreign either")
+        assertEquals(listOf("1.7.10/Baubles-1.7.10-1.0.1.10.jar"), inspection.unreadable)
+    }
+
     /** FML unpacks one level down, and reads nothing deeper. */
     @Test
     fun `a declared name deeper than the unpack directory is left alone`() = runTest {
