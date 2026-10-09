@@ -1420,6 +1420,54 @@ class SmrtSyncServiceTest {
         assertFalse(Files.exists(dir.resolve(PendingVariants.FILE_NAME)), "and the entry is done with")
     }
 
+    /**
+     * The game keeps a selected resource pack's zip open, and on Windows that refuses
+     * the rename while it runs. The refusal was only logged and said to wait for the
+     * next sync, so after the restart the pack loaded while the record said off.
+     */
+    @Test
+    fun `a resource pack switch the game held is carried out at the next launch`() = runTest {
+        val dir = tempDir("pending-asset")
+        val service = switchableService()
+        val m = parsed(switchableManifest())
+        service.sync(m, dir)
+        if (!FileSystems.getDefault().supportedFileAttributeViews().contains("posix")) return@runTest
+        val packs = dir.resolve("resourcepacks")
+        val perms = Files.getPosixFilePermissions(packs)
+        Files.setPosixFilePermissions(packs, setOf(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_EXECUTE))
+        val deferred = try {
+            if (Files.isWritable(packs)) return@runTest
+            service.relabelAssets(dir, m.assets, mapOf(rpDest to false))
+        } finally {
+            Files.setPosixFilePermissions(packs, perms)
+        }
+        assertEquals(listOf(rpDest), deferred)
+        assertTrue(Files.exists(dir.resolve(rpDest)), "still on while held")
+
+        assertTrue(service.settlePending(dir).isEmpty())
+
+        assertFalse(Files.exists(dir.resolve(rpDest)), "the pack the player switched off no longer loads")
+        assertTrue(Files.exists(dir.resolve("$rpDest.disabled")))
+        assertFalse(Files.exists(dir.resolve(PendingVariants.FILE_NAME)))
+    }
+
+    @Test
+    fun `a pending entry cannot name anything but one file's own two names in its own folder`() = runTest {
+        val dir = tempDir("pending-asset-bounds")
+        Files.createDirectories(dir.resolve("resourcepacks/nested"))
+        Files.write(dir.resolve("resourcepacks/a.zip"), "A".toByteArray())
+        Files.write(dir.resolve("resourcepacks/nested/b.zip"), "B".toByteArray())
+        Files.writeString(
+            dir.resolve(PendingVariants.FILE_NAME),
+            "move\tresourcepacks/a.zip\tshaderpacks/a.zip.disabled\nmove\tresourcepacks/nested/b.zip\tresourcepacks/nested/b.zip.disabled",
+        )
+
+        syncService().settlePending(dir)
+
+        assertTrue(Files.exists(dir.resolve("resourcepacks/a.zip")), "a move across folders is not honoured")
+        assertTrue(Files.exists(dir.resolve("resourcepacks/nested/b.zip")), "nor one below the folder")
+    }
+
     @Test
     fun `a pending entry cannot name anything but a mod's own two names`() = runTest {
         val dir = tempDir("pending-bounds")

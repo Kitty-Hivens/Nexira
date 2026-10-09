@@ -596,12 +596,13 @@ class SmrtSyncService(
      * switch off moved between its name and its `.disabled` one as the choice says,
      * and a required one found off moved back on, no network.
      *
-     * Nothing is written down for the next launch when a move is refused. The game
-     * reads these folders when it starts rather than holding the files, and the
-     * next sync or update moves whatever is left where the choice puts it.
+     * A move the game refuses is written down for the next launch, as a mod's is.
+     * The game keeps the zip of a selected resource or shader pack open the way it
+     * keeps a jar, and on Windows that refuses the rename for as long as it runs.
      */
     override fun relabelAssets(clientDir: Path, assets: List<SmrtAssetEntry>, assetState: Map<String, Boolean>): List<String> {
-        val failed = mutableListOf<String>()
+        val failed = mutableListOf<PendingVariants.Op>()
+        val settled = mutableListOf<String>()
         for (asset in assets) {
             if (!asset.hasOffName) continue
             // A required asset is moved back on wherever it is found off, see
@@ -611,14 +612,23 @@ class SmrtSyncService(
             val disabled = resolveSafe(clientDir, "${asset.dest}$DISABLED", "asset ${asset.dest}")
             val from = if (enabled) disabled else active
             val to = if (enabled) active else disabled
-            if (!Files.exists(from) || Files.exists(to)) continue
-            runCatching { fileOpRetry("smrt relabel ${asset.dest}") { Files.move(from, to, StandardCopyOption.REPLACE_EXISTING) } }
-                .onFailure {
-                    failed += asset.dest
-                    log.warn("smrt relabel: {} still held after retries; the next sync moves it", asset.dest)
-                }
+            when {
+                !Files.exists(from) -> settled += asset.dest
+                Files.exists(to) -> Unit
+                else -> runCatching { fileOpRetry("smrt relabel ${asset.dest}") { Files.move(from, to, StandardCopyOption.REPLACE_EXISTING) } }
+                    .onSuccess { settled += asset.dest }
+                    .onFailure {
+                        failed += PendingVariants.Op.Move(
+                            from.fileName.toString(),
+                            to.fileName.toString(),
+                            dir = asset.dest.substringBefore('/'),
+                        )
+                        log.warn("smrt relabel: {} still held after retries; applies at the next launch", asset.dest)
+                    }
+            }
         }
-        return failed
+        PendingVariants.update(clientDir, set = failed, cleared = settled)
+        return failed.map { it.key }
     }
 
     override suspend fun settlePending(clientDir: Path): List<String> = withContext(Dispatchers.IO) {
