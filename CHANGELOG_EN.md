@@ -18,6 +18,8 @@ verbatim and a hand-wrapped line becomes a staircase of breaks.
 
 ## [Unreleased]
 
+## [2.4.7-beta] - 2026-10-09
+
 ### Browse
 
 Browse now finds mods, resource packs and shaders from Modrinth, not only packs.

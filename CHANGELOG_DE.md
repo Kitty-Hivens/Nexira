@@ -10,6 +10,8 @@ nicht gelesen werden, um eine Version zu verstehen.
 
 ## [Unreleased]
 
+## [2.4.7-beta] - 2026-10-09
+
 ### Durchsuchen
 
 Durchsuchen findet jetzt nicht nur Packs, sondern auch Mods, Ressourcenpakete und Shader von Modrinth.
