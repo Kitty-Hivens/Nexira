@@ -252,7 +252,8 @@ private fun SubjectBlock(subject: InstallSubject) {
 private sealed interface RowState {
     data object Idle : RowState
     data object Working : RowState
-    data object Done : RowState
+    /** Landed, with [missing] required dependencies it went without. */
+    data class Done(val missing: Int = 0) : RowState
     data class Failed(val problem: InstallProblem) : RowState
 }
 
@@ -261,7 +262,7 @@ private sealed interface NewPackState {
     data object Idle : NewPackState
     data class Creating(val key: String) : NewPackState
     data object Installing : NewPackState
-    data class Done(val pack: PackInstance) : NewPackState
+    data class Done(val pack: PackInstance, val missing: Int = 0) : NewPackState
     data class Failed(val message: String) : NewPackState
 }
 
@@ -320,15 +321,16 @@ private fun rememberInstallDialogModel(subject: InstallSubject): InstallDialogMo
         rows = rows + (id to RowState.Working)
         appScope.launch(Dispatchers.Main) {
             val target = candidate.destination
-            val problem = try {
-                problemOf(withContext(Dispatchers.IO) { installer.install(target.dir, build, target.mcVersion, target.loader) })
+            val state = try {
+                val outcome = withContext(Dispatchers.IO) { installer.install(target.dir, build, target.mcVersion, target.loader) }
+                problemOf(outcome)?.let { RowState.Failed(it) } ?: RowState.Done(outcome.missing.size)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 log.warn("installing {} into {} failed", subject.projectId, target.dir, e)
-                InstallProblem.NotLanded
+                RowState.Failed(InstallProblem.NotLanded)
             }
-            rows = rows + (id to (problem?.let { RowState.Failed(it) } ?: RowState.Done))
+            rows = rows + (id to state)
         }
     }
 
@@ -354,7 +356,7 @@ private fun rememberInstallDialogModel(subject: InstallSubject): InstallDialogMo
                 val build = chooseBuild(builds, target.mcVersion, target.loader)
                     ?: return@launch run { newPack = NewPackState.Failed("") }
                 val outcome = withContext(Dispatchers.IO) { installer.install(target.dir, build, target.mcVersion, target.loader) }
-                newPack = if (outcome.ok) NewPackState.Done(pack) else NewPackState.Failed("")
+                newPack = if (outcome.ok) NewPackState.Done(pack, outcome.missing.size) else NewPackState.Failed("")
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -485,7 +487,7 @@ private fun CandidateRow(
     val s = LocalStrings.current
     val verdict = candidate.verdict
     val fits = verdict is InstallTargets.Verdict.Fits
-    val present = verdict is InstallTargets.Verdict.Present || state == RowState.Done
+    val present = verdict is InstallTargets.Verdict.Present || state is RowState.Done
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
     val wash by animateColorAsState(
@@ -514,12 +516,15 @@ private fun CandidateRow(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                val note = (state as? RowState.Failed)?.problem?.label(s) ?: unfitReason(verdict, s)
+                val missing = (state as? RowState.Done)?.missing?.takeIf { it > 0 }
+                val note = (state as? RowState.Failed)?.problem?.label(s)
+                    ?: missing?.let { s.modPageInstallMissing(it) }
+                    ?: unfitReason(verdict, s)
                 Text(
                     note ?: runtimeLabel(candidate.destination),
                     style = MaterialTheme.typography.labelMedium,
                     color = when {
-                        state is RowState.Failed -> NxColor.status(Status.Error, text = true)
+                        state is RowState.Failed || missing != null -> NxColor.status(Status.Error, text = true)
                         else -> NxInk.quiet
                     },
                     maxLines = 1,
@@ -640,6 +645,9 @@ private fun NewPack(model: InstallDialogModel) {
             ) {
                 Symbol(NxIcon.CheckCircle, contentDescription = null, tint = NxColor.lead(), size = 40.dp)
                 Text(s.installDialogDone(state.pack.displayName), style = MaterialTheme.typography.titleMedium, color = NxInk.main, fontWeight = FontWeight.SemiBold)
+                if (state.missing > 0) {
+                    Text(s.modPageInstallMissing(state.missing), style = MaterialTheme.typography.labelMedium, color = NxColor.status(Status.Error, text = true))
+                }
                 NxButton(label = s.installDialogOpenPack, onClick = { model.openPack(state.pack.id) }, style = NxButtonStyle.Secondary, compact = true)
             }
         }

@@ -251,6 +251,14 @@ internal class ProjectBrowseState(
     var problems by mutableStateOf(emptyMap<String, InstallProblem>())
         private set
 
+    /**
+     * How many required dependencies an install that landed went without, by
+     * project. The build is in, and the game will refuse it until they are, which
+     * only the project page used to say: a card read installed and nothing more.
+     */
+    var missing by mutableStateOf(emptyMap<String, Int>())
+        private set
+
     suspend fun loadPresent() {
         if (destination == null) return
         presentRead = true
@@ -376,9 +384,11 @@ internal class ProjectBrowseState(
         val id = hit.projectId
         working = working + id
         problems = problems - id
+        missing = missing - id
         val problem = try {
             val outcome = installInto(hit)
             if (outcome?.ok == true) present = present + outcome.present + id
+            if (outcome?.ok == true && outcome.missing.isNotEmpty()) missing = missing + (id to outcome.missing.size)
             if (outcome == null) InstallProblem.NoBuild else problemOf(outcome)
         } catch (e: CancellationException) {
             throw e
@@ -547,7 +557,7 @@ internal fun ProjectResults(
                     ProjectCard(
                         hit      = hit,
                         iconSize = icon,
-                        note     = problem?.label(s),
+                        note     = problem?.label(s) ?: state.missing[id]?.let { s.modPageInstallMissing(it) },
                         onOpen   = open,
                         modifier = Modifier.animateItem(
                             fadeInSpec    = Motion.fade,

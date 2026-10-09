@@ -55,6 +55,23 @@ class ProjectBrowseStateTest {
         assertTrue(state.working.isEmpty(), "the row must not stay spinning after the work ends")
     }
 
+    /** The build is in, and the game will refuse it until what it needs is: the card has to say so. */
+    @Test
+    fun `an install that landed without a required dependency says how many it went without`() = runTest {
+        val state = state(install = { hit ->
+            landed(hit.projectId).let { if (hit.projectId == "ars") it.copy(missing = listOf("curios", "patchouli")) else it }
+        })
+
+        state.install(hit("ars"))
+
+        assertEquals(setOf("ars"), state.present, "the build itself landed")
+        assertEquals(mapOf("ars" to 2), state.missing)
+        assertTrue(state.problems.isEmpty(), "it is not a failed install, the action is not offered again")
+
+        state.install(hit("jei"))
+        assertEquals(null, state.missing["jei"])
+    }
+
     @Test
     fun `a download that throws does not report success`() = runTest {
         val state = state(install = { throw IOException("connection reset") })
