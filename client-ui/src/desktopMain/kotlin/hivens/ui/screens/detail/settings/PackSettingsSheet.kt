@@ -67,7 +67,7 @@ import hivens.ui.nx.NxSideSheet
 import hivens.ui.nx.NxTabRow
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
-import hivens.ui.screens.mod.loaderLabel
+import hivens.ui.feature.catalogue.project.loaderLabel
 import hivens.ui.customization.LocalCustomization
 import hivens.ui.theme.Motion
 import hivens.ui.theme.NxColor

@@ -2,7 +2,7 @@ package hivens.ui.widgets
 
 import hivens.core.activity.Activity
 import hivens.ui.notifications.PersistedNotification
-import hivens.ui.screens.mod.OpenProject
+import hivens.ui.feature.catalogue.project.OpenProject
 import hivens.widget.model.SourceKey
 
 /**

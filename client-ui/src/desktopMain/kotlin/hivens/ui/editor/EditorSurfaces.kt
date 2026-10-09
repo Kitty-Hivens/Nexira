@@ -5,8 +5,8 @@ import hivens.ui.Screen
 import hivens.ui.i18n.AppStrings
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
-import hivens.ui.screens.browse.LocalBrowseContext
-import hivens.ui.screens.browse.STUB_BROWSE
+import hivens.ui.feature.catalogue.browse.LocalBrowseContext
+import hivens.ui.feature.catalogue.browse.STUB_BROWSE
 import hivens.ui.screens.custom.ScreenIcons
 import hivens.ui.widgets.about.LocalAboutContext
 import hivens.ui.widgets.about.STUB_ABOUT

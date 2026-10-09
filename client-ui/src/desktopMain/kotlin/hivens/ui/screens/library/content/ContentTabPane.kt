@@ -108,8 +108,8 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.theme.familyForText
 import hivens.ui.theme.decorativeColor
-import hivens.ui.screens.mod.ModTarget
-import hivens.ui.screens.mod.rememberLinkFollower
+import hivens.ui.feature.catalogue.project.ModTarget
+import hivens.ui.feature.catalogue.project.rememberLinkFollower
 import hivens.ui.screens.versions.pickerIntentFor
 import hivens.ui.screens.versions.pickerVersionsOf
 import hivens.ui.screens.versions.VersionPickerWindow

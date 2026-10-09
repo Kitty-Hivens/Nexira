@@ -90,8 +90,8 @@ import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.screens.ConsoleContent
 import hivens.ui.screens.ConsoleSource
-import hivens.ui.screens.mod.ModTarget
-import hivens.ui.screens.mod.loaderLabel
+import hivens.ui.feature.catalogue.project.ModTarget
+import hivens.ui.feature.catalogue.project.loaderLabel
 import hivens.ui.screens.detail.settings.PackSettingsCategory
 import hivens.ui.screens.detail.settings.PackSettingsSheet
 import hivens.ui.screens.library.FileBrowserPane

@@ -9,10 +9,10 @@ import hivens.core.data.PackOrigin
 import hivens.ui.Screen
 import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.screens.browse.BrowseSession
-import hivens.ui.screens.browse.catalogueTargetKey
-import hivens.ui.screens.mod.ModTarget
-import hivens.ui.screens.mod.OpenProjectState
+import hivens.ui.feature.catalogue.browse.BrowseSession
+import hivens.ui.feature.catalogue.browse.catalogueTargetKey
+import hivens.ui.feature.catalogue.project.ModTarget
+import hivens.ui.feature.catalogue.project.OpenProjectState
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.model.screen
 import org.koin.compose.koinInject
