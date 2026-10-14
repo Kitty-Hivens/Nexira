@@ -10,7 +10,7 @@
 kotlin            = "2.5.0-Beta1"
 compose           = "1.13.0-alpha01"
 buildconfigPlugin = "6.1.2"
-versionsPlugin    = "0.64.0"
+versionsPlugin    = "0.65.0"
 # ksp tracks its own release line, decoupled from the Kotlin version. KSP2 runs
 # on the Analysis API it bundles, so it does not need to match the Kotlin minor
 # (:widget-processor / :client-ui kspKotlinDesktop are the check). Bump when a
