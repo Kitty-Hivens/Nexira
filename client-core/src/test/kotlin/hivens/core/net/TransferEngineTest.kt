@@ -313,6 +313,35 @@ class TransferEngineTest {
         assertEquals(2, host.bodies, "the cut body was not retried exactly once")
     }
 
+    /**
+     * The shape of a JDK archive: no digest pinned, no size known up front, one
+     * plain GET that the line cuts partway through.
+     *
+     * What lands is a streamed prefix plus the blocks fetched after it, and nothing
+     * downstream compares that file to anything but an unpack. The bytes have to be
+     * right here, so the prefix is kept only up to a block boundary and the rest is
+     * asked for from exactly that offset.
+     */
+    @Test
+    fun `an unpinned archive of unknown size cut mid-stream is finished from its last whole block`() = runTest {
+        val dir = tempDir("xfer-archive-cut")
+        val dest = dir.resolve("jdk.zip")
+        val host = Host(payload).apply { truncateNext = 1 }
+
+        engine(mapOf(URL to host), blocksInFlight = 1)
+            .fetch(Transfer(URL, dest, expect = null, size = -1L, skip = SkipIfPresent.Never))
+
+        assertContentEquals(payload, Files.readAllBytes(dest), "the prefix and the blocks did not make the object")
+        // Fifty of the hundred bytes arrived: three whole blocks of sixteen are kept
+        // and the transfer asks for everything from byte 48, nothing before it.
+        assertEquals(
+            listOf<String?>(null, "bytes=0-0", "bytes=48-63", "bytes=64-79", "bytes=80-95", "bytes=96-99"),
+            host.ranges,
+        )
+        assertFalse(Files.exists(partialOf(dest)))
+        assertFalse(Files.exists(journalOf(dest)), "the journal outlived the transfer")
+    }
+
     // ── blocked transfers ─────────────────────────────────────────────────────
 
     @Test

@@ -371,8 +371,12 @@ class TransferEngine(
         onProgress: (Long, Long) -> Unit,
     ): Long {
         var lastError: Throwable? = null
-        var blocked = t.size >= parallelThreshold ||
-            (t.size <= 0L && (journals.read(partial)?.size ?: 0L) >= parallelThreshold)
+        var rangesIgnored = false
+        fun blockedNow(): Boolean = !rangesIgnored && (
+            t.size >= parallelThreshold ||
+                (t.size <= 0L && (journals.read(partial)?.size ?: 0L) >= parallelThreshold)
+            )
+        var blocked = blockedNow()
         repeat(attempts) { attempt ->
             try {
                 return if (blocked) fetchBlocks(t, url, partial, onProgress) else streamWhole(t, url, partial, onProgress)
@@ -380,6 +384,7 @@ class TransferEngine(
                 // Nothing to wait for: this host serves whole bodies. Switch modes
                 // and spend the attempt on the transfer instead of on a backoff.
                 log.debug("transfer: {} ignores ranges, streaming {} whole", url, t.dest.fileName)
+                rangesIgnored = true
                 blocked = false
                 dropPartial(partial)
                 journals.delete(partial)
@@ -388,6 +393,11 @@ class TransferEngine(
                 if (!isTransientTransferError(e)) throw e
                 gate.onTransientError()
                 lastError = e
+                // A stream that broke part-way has just written down the blocks it
+                // got. Asked again as a stream, the next attempt would delete them
+                // and start from zero, which on a line that cuts at the same place
+                // every time is three identical failures.
+                blocked = blockedNow()
                 if (attempt < attempts - 1) {
                     val wait = backoffMs.getOrElse(attempt) { backoffMs.last() }
                     log.debug(
