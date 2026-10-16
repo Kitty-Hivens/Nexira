@@ -23,9 +23,13 @@ import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
+/** What `java -version` did: [ok], and in [detail] the exit code, the time it took and what it printed. */
+internal data class JavaProbe(val ok: Boolean, val detail: String, val timedOut: Boolean = false)
+
 class JavaManagerService(
     baseDir: Path,
     private val transfers: TransferEngine,
+    private val probeTimeoutSeconds: Long = JAVA_PROBE_TIMEOUT_SECONDS,
 ) : IJavaManager {
     private val log = LoggerFactory.getLogger(JavaManagerService::class.java)
     private val runtimesDir: Path = baseDir.resolve("runtimes")
@@ -58,11 +62,12 @@ class JavaManagerService(
         recoverInterruptedSwap(targetDir)
 
         val existing = findJavaExecutable(targetDir)
-        if (existing != null && isJavaUsable(existing)) {
+        val existingProbe = existing?.let { probeJava(it) }
+        if (existing != null && existingProbe!!.ok) {
             return existing
         }
         if (existing != null) {
-            log.warn("Java at {} failed -version check, treating as broken and re-downloading", existing)
+            log.warn("Java at {} failed -version check ({}), treating as broken and re-downloading", existing, existingProbe!!.detail)
         } else {
             log.info("Java {} ({}/{}) was not found locally. We are starting to download...", javaMajor, os, arch)
         }
@@ -76,8 +81,9 @@ class JavaManagerService(
             setExecutablePermissions(executable)
         }
 
-        if (!isJavaUsable(executable)) {
-            throw IOException("Java was downloaded and extracted, but $executable failed -version check. Archive may be corrupt or missing native loader files (e.g. libjli.so).")
+        val probe = probeJava(executable)
+        if (!probe.ok) {
+            throw IOException("Java was downloaded and extracted, but $executable failed -version check: ${probe.detail}")
         }
 
         onProgress("Java $javaMajor ready")
@@ -183,41 +189,80 @@ class JavaManagerService(
         } catch (_: Exception) { null }
     }
 
+    /** True iff `<javaExe> -version` runs to exit code 0, see [probeJava] for the reason when it does not. */
+    internal fun isJavaUsable(javaExe: Path): Boolean = probeJava(javaExe).ok
+
     /**
-     * Runs `<javaExe> -version` and returns true iff the process completes
-     * with exit code 0 within a few seconds. Detects JDKs whose binary exists
-     * and has the executable bit set but cannot actually launch — e.g. an
-     * extracted archive missing native loader files like `libjli.so`, where
-     * the dynamic linker fails before the JVM itself starts.
+     * Runs `<javaExe> -version` and reports whether it completed with exit code 0,
+     * and why not when it did not. Detects JDKs whose binary exists and has the
+     * executable bit set but cannot actually launch, e.g. an extracted archive
+     * missing native loader files like `libjli.so`, where the dynamic linker
+     * fails before the JVM itself starts.
+     *
+     * A start that overran the timeout is tried once more: the first run of a
+     * tree that was just written is the slowest it will ever be, and a verdict
+     * of "broken" on a JDK that only needed a second to warm up threw away a
+     * working install.
      */
-    internal fun isJavaUsable(javaExe: Path): Boolean {
-        return try {
-            val process = ProcessBuilder(javaExe.toString(), "-version")
+    internal fun probeJava(javaExe: Path): JavaProbe {
+        var last = JavaProbe(false, "was not run")
+        repeat(PROBE_ATTEMPTS) {
+            last = probeOnce(javaExe)
+            if (last.ok || !last.timedOut) return last
+            log.info("Java at {} did not answer -version in {}s, trying once more", javaExe, probeTimeoutSeconds)
+        }
+        return last
+    }
+
+    private fun probeOnce(javaExe: Path): JavaProbe {
+        val started = System.nanoTime()
+        val process = try {
+            ProcessBuilder(javaExe.toString(), "-version")
                 .redirectErrorStream(true)
                 .start()
-            // Drain the merged stream in a background daemon thread so a
-            // chatty JDK does not block on a full pipe buffer, and so a
-            // hanging child cannot keep us in readBytes() past the
-            // waitFor timeout. Daemon so JVM exit is never blocked by a
-            // stuck reader.
-            Thread {
-                try { process.inputStream.use { it.readBytes() } } catch (_: Exception) {}
-            }.apply { isDaemon = true }.start()
-            if (!process.waitFor(5, TimeUnit.SECONDS)) {
-                process.destroyForcibly()
-                // destroyForcibly is async (SIGKILL on Linux,
-                // TerminateProcess on Windows). Block briefly so file
-                // handles release before the caller deletes targetDir
-                // -- on Windows a still-alive java.exe keeps extracted
-                // files locked, turning the recovery re-download into
-                // an exception loop.
-                process.waitFor(3, TimeUnit.SECONDS)
-                return false
-            }
-            process.exitValue() == 0
-        } catch (_: Exception) {
-            false
+        } catch (e: Exception) {
+            return JavaProbe(false, "could not be started (${e.javaClass.simpleName}: ${e.message})")
         }
+        // Drain the merged stream in a background daemon thread so a
+        // chatty JDK does not block on a full pipe buffer, and so a
+        // hanging child cannot keep us in a read past the waitFor
+        // timeout. Daemon so JVM exit is never blocked by a stuck reader.
+        val output = StringBuilder()
+        val reader = Thread {
+            try {
+                process.inputStream.bufferedReader().use { stream ->
+                    val buffer = CharArray(512)
+                    while (true) {
+                        val n = stream.read(buffer)
+                        if (n < 0) break
+                        synchronized(output) {
+                            output.append(buffer, 0, minOf(n, PROBE_OUTPUT_LIMIT - output.length).coerceAtLeast(0))
+                        }
+                    }
+                }
+            } catch (_: Exception) {}
+        }.apply { isDaemon = true; start() }
+
+        val finished = process.waitFor(probeTimeoutSeconds, TimeUnit.SECONDS)
+        if (!finished) {
+            process.destroyForcibly()
+            // destroyForcibly is async (SIGKILL on Linux,
+            // TerminateProcess on Windows). Block briefly so file
+            // handles release before the caller deletes targetDir
+            // -- on Windows a still-alive java.exe keeps extracted
+            // files locked, turning the recovery re-download into
+            // an exception loop.
+            process.waitFor(3, TimeUnit.SECONDS)
+        }
+        reader.join(PROBE_READER_JOIN_MS)
+        val said = synchronized(output) { output.toString() }.trim().replace(Regex("\\s*[\\r\\n]+\\s*"), " | ")
+        val quoted = if (said.isEmpty()) "" else ", output: $said"
+        val elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started)
+        if (!finished) {
+            return JavaProbe(false, "did not finish within ${probeTimeoutSeconds}s$quoted", timedOut = true)
+        }
+        val exit = process.exitValue()
+        return if (exit == 0) JavaProbe(true, "ran in $elapsedMs ms") else JavaProbe(false, "exit code $exit after $elapsedMs ms$quoted")
     }
 
     /**
@@ -251,11 +296,19 @@ class JavaManagerService(
 
         try {
             if (isZip) unzip(archive.toFile(), incoming) else untargz(archive.toFile(), incoming)
-            if (findJavaExecutable(incoming) == null) {
+            val unpacked = findJavaExecutable(incoming)
+            if (unpacked == null) {
                 // Worded to match the post-install check below: this is the same
                 // condition found earlier, and the all-mirrors-failed error
                 // quotes this message, so the reason reaches the user either way.
                 throw IOException("Java was downloaded, but the executable file was not found in the unpacked archive")
+            }
+            // Run it before the swap, not after: a tree that unpacks and still will
+            // not start belongs to this mirror's attempt, so the next mirror is tried
+            // and the installed runtime is left where it is.
+            val probe = probeJava(unpacked)
+            if (!probe.ok) {
+                throw IOException("Java was unpacked, but $unpacked failed -version check: ${probe.detail}")
             }
 
             // Two renames with the swap between them, rather than a delete and
@@ -544,6 +597,16 @@ class JavaManagerService(
     }
 
     companion object {
+        /**
+         * How long `java -version` gets. A cold start of a freshly written JDK
+         * took 1.7 s on a plain disk, so the old five seconds left no room for a
+         * busy or slow machine.
+         */
+        internal const val JAVA_PROBE_TIMEOUT_SECONDS = 20L
+        private const val PROBE_ATTEMPTS = 2
+        private const val PROBE_OUTPUT_LIMIT = 600
+        private const val PROBE_READER_JOIN_MS = 2_000L
+
         // Real-Chrome User-Agent. See downloadAndUnpack for why this is
         // not the launcher's default identifier.
         internal const val DOWNLOAD_UA =

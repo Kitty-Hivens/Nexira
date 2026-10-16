@@ -305,12 +305,63 @@ class JavaManagerServiceTest {
     @EnabledOnOs(OS.LINUX, OS.MAC)
     fun `isJavaUsable returns false when subprocess does not finish within timeout`() {
         // A real broken JDK can hang during the dynamic linker stage. The
-        // 5s timeout fires and destroyForcibly cleans up; we must not
+        // timeout fires and destroyForcibly cleans up; we must not
         // wait forever.
         val slow = workDir / "slow"
         Files.writeString(slow, "#!/bin/sh\nsleep 30\n")
         slow.toFile().setExecutable(true)
-        assertFalse(svc.isJavaUsable(slow))
+        assertFalse(shortProbe().isJavaUsable(slow))
+    }
+
+    @Test
+    @EnabledOnOs(OS.LINUX, OS.MAC)
+    fun `a failed probe says why it failed`() {
+        val failing = workDir / "failing"
+        Files.writeString(failing, "#!/bin/sh\necho 'cannot load the thing' >&2\nexit 3\n")
+        failing.toFile().setExecutable(true)
+
+        val probe = svc.probeJava(failing)
+
+        assertFalse(probe.ok)
+        assertTrue("exit code 3" in probe.detail, "the exit code is missing from: ${probe.detail}")
+        assertTrue("cannot load the thing" in probe.detail, "what the process printed is missing from: ${probe.detail}")
+    }
+
+    @Test
+    fun `a probe of a file that cannot be started says why`() {
+        val probe = svc.probeJava(workDir / "does-not-exist")
+
+        assertFalse(probe.ok)
+        assertTrue("could not be started" in probe.detail, "the start failure is missing from: ${probe.detail}")
+    }
+
+    @Test
+    @EnabledOnOs(OS.LINUX, OS.MAC)
+    fun `a start that is only slow the first time is not called broken`() {
+        // The first run of a tree that was just written is the slowest it will
+        // ever be. The marker file makes only the first run overrun the timeout.
+        val marker = workDir / "ran-once"
+        val warmingUp = workDir / "warming-up"
+        Files.writeString(warmingUp, "#!/bin/sh\nif [ -f '$marker' ]; then exit 0; fi\ntouch '$marker'\nsleep 30\n")
+        warmingUp.toFile().setExecutable(true)
+
+        val probe = shortProbe().probeJava(warmingUp)
+
+        assertTrue(probe.ok, "a slow first start was reported as broken: ${probe.detail}")
+    }
+
+    @Test
+    @EnabledOnOs(OS.LINUX, OS.MAC)
+    fun `a start that never finishes is reported as a timeout`() {
+        val slow = workDir / "never"
+        Files.writeString(slow, "#!/bin/sh\nsleep 30\n")
+        slow.toFile().setExecutable(true)
+
+        val probe = shortProbe().probeJava(slow)
+
+        assertFalse(probe.ok)
+        assertTrue(probe.timedOut)
+        assertTrue("did not finish" in probe.detail, "the timeout is missing from: ${probe.detail}")
     }
 
     // ── an install interrupted between its two renames ───────────────────
@@ -743,6 +794,9 @@ class JavaManagerServiceTest {
 
     // ── helpers ───────────────────────────────────────────────────────────
 
+    /** A service whose `-version` gets one second, so a test of a hang does not wait out the real limit. */
+    private fun shortProbe() = JavaManagerService(workDir, testTransferEngine(buildMockClient("")), probeTimeoutSeconds = 1)
+
     /**
      * Build a minimal in-memory `.tar.gz` containing a single regular-file
      * entry at [path] with execute-bit-set mode. Default [payload] is a
@@ -891,6 +945,51 @@ class JavaManagerServiceTest {
 
         assertFalse(Files.exists(workDir.resolve("java-21-linux-amd64.incoming")))
         assertFalse(Files.exists(workDir.resolve("java-21-linux-amd64.previous")))
+    }
+
+    @Test
+    @EnabledOnOs(OS.LINUX, OS.MAC)
+    fun `an archive whose java will not start is refused before the installed runtime is touched`() {
+        val target = workDir.resolve("java-21-linux-amd64")
+        val exe = installedJava(target)
+        Files.writeString(target.resolve("marker.txt"), "OLD")
+
+        val archive = tarGzOnDisk("unrunnable.tar.gz", mapOf("jdk/bin/java" to "not a program, no shebang"))
+        val failure = assertFailsWith<IOException> { svc.installUnpacked(archive, target, isZip = false) }
+
+        assertTrue("failed -version" in failure.message.orEmpty(), "the reason is missing from: ${failure.message}")
+        assertTrue(Files.exists(exe), "the working runtime was replaced by one that does not start")
+        assertEquals("OLD", Files.readString(target.resolve("marker.txt")))
+        assertFalse(Files.exists(workDir.resolve("java-21-linux-amd64.incoming")))
+    }
+
+    @Test
+    @EnabledOnOs(OS.LINUX, OS.MAC)
+    fun `a mirror whose archive does not start is followed by the next one`() {
+        // The first mirror unpacks fine and its java cannot run, the shape of a
+        // download that arrived damaged. The second has a good one, and the
+        // install must end on it instead of stopping at the first.
+        val broken = synthesiseJdkTarGz("jdk-21/bin/java", "unrunnable garbage with no shebang".toByteArray())
+        val good = synthesiseJdkTarGz("jdk-21/bin/java")
+        val provider = HttpClientProvider {
+            HttpClient(MockEngine { request ->
+                val bytes = if (request.url.host == "download.bell-sw.com") broken else good
+                respond(
+                    content = ByteReadChannel(bytes),
+                    status = HttpStatusCode.OK,
+                    headers = headersOf(HttpHeaders.ContentType, "application/octet-stream"),
+                )
+            })
+        }
+
+        withSystemProp("os.name", "Linux") {
+            withSystemProp("os.arch", "amd64") {
+                val resolved = runBlocking {
+                    JavaManagerService(workDir, testTransferEngine(provider)).getJavaPathForMajor(21)
+                }
+                assertTrue(svc.isJavaUsable(resolved), "the install did not end on the mirror that works")
+            }
+        }
     }
 
     @Test
