@@ -908,6 +908,7 @@ class JavaManagerServiceTest {
     }
 
     @Test
+    @EnabledOnOs(OS.LINUX, OS.MAC)
     fun `a good archive replaces the installed runtime`() {
         val target = workDir.resolve("java-21-linux-amd64")
         installedJava(target)
