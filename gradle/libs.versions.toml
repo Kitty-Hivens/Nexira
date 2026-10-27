@@ -21,7 +21,7 @@ ksp               = "2.3.12"
 ktor              = "3.6.0"
 # Test-only. Pinned to whatever ktor-client-okhttp resolves, so the
 # certificate helper matches the TLS stack under test.
-okhttp            = "5.5.0"
+okhttp            = "5.5.1"
 koin              = "4.2.2"
 xodus             = "2.0.1"
 serialization     = "1.11.0"
