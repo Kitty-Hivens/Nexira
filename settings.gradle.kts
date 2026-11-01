@@ -102,9 +102,13 @@ include(":client-cli")
 // What decides how sound plays: the queue, the repeat modes and the state machine over an
 // engine. Shared by the desktop and Android builds; the engines are handed in.
 include(":client-playback")
-// The Android application: hosts the shared modules on a phone. Starts as a probe that
-// plays a file through the shared player.
-include(":android-app")
+// The Android application: hosts the shared modules on a phone. It cannot even be configured
+// without an SDK, so a machine that has none (the analysis container, a contributor who only
+// builds the desktop launcher) leaves it out instead of failing the whole build.
+val androidSdkKnown = System.getenv("ANDROID_HOME") != null ||
+    System.getenv("ANDROID_SDK_ROOT") != null ||
+    file("local.properties").takeIf { it.isFile }?.readLines().orEmpty().any { it.startsWith("sdk.dir=") }
+if (androidSdkKnown) include(":android-app")
 include(":client-media")
 // Tray seam carved out of client-ui: :client-tray holds the TrayController SPI
 // and its libtray-backed impl. It depends only on libtray -- the launch engine
