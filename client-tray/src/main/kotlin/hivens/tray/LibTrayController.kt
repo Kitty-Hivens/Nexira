@@ -5,6 +5,7 @@ import dev.hivens.libtray.TrayBuilder
 import dev.hivens.libtray.TrayEvent
 import dev.hivens.libtray.TrayMenu
 import dev.hivens.libtray.TrayMenuItem
+import dev.hivens.libtray.TraySubscription
 import org.slf4j.LoggerFactory
 import java.io.InputStream
 
@@ -34,7 +35,7 @@ class LibTrayController : TrayController {
     @Volatile private var tray: Tray? = null
     @Volatile private var strings: TrayStrings? = null
     @Volatile private var appName: String = "Nexira"
-    @Volatile private var unsubscribe: (() -> Unit)? = null
+    @Volatile private var subscription: TraySubscription? = null
 
     /**
      * Installing a tray and taking it down happen under this, and [generation] says
@@ -89,7 +90,7 @@ class LibTrayController : TrayController {
                     return
                 }
                 tray = t
-                unsubscribe = t.onEvent { event ->
+                subscription = t.onEvent { event ->
                     when (event) {
                         // Left click -> restore window. Standard tray-icon behaviour.
                         is TrayEvent.Activated -> onShowWindow?.invoke()
@@ -155,10 +156,10 @@ class LibTrayController : TrayController {
     override fun shutdown() {
         synchronized(lifecycle) {
             generation++
-            runCatching { unsubscribe?.invoke() }
+            runCatching { subscription?.close() }
             runCatching { tray?.close() }
             tray = null
-            unsubscribe = null
+            subscription = null
             gameRunning = false
             gameServerName = null
             state = State.NOT_STARTED
