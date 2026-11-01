@@ -2,6 +2,7 @@ package hivens.core.net
 
 import java.nio.file.Path
 import java.util.concurrent.CyclicBarrier
+import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
@@ -23,14 +24,23 @@ class SetProgressTest {
     private fun racing(threads: Int, work: (Int) -> Unit) {
         val pool = Executors.newFixedThreadPool(threads)
         try {
-            val barrier = CyclicBarrier(threads)
-            (0 until threads)
-                .map { i -> pool.submit { barrier.await(); work(i) } }
-                .forEach { it.get() }
+            racingOn(pool, threads, work)
         } finally {
             pool.shutdown()
             pool.awaitTermination(30, TimeUnit.SECONDS)
         }
+    }
+
+    /**
+     * The same on a pool the caller keeps, for a test that races many times: a pool per round
+     * costs more than the round, and a slow machine spent its whole time budget on threads.
+     * The pool must hold at least [threads] workers or the barrier never opens.
+     */
+    private fun racingOn(pool: ExecutorService, threads: Int, work: (Int) -> Unit) {
+        val barrier = CyclicBarrier(threads)
+        (0 until threads)
+            .map { i -> pool.submit { barrier.await(); work(i) } }
+            .forEach { it.get() }
     }
 
     @Test
@@ -57,13 +67,19 @@ class SetProgressTest {
     fun `the last report of a set accounts for every file`() {
         val files = 5
         var stale = 0
-        repeat(2_000) {
-            var last: TransferProgress? = null
-            val tracker = SetProgress(files.toLong(), files, { last = it })
+        val pool = Executors.newFixedThreadPool(files)
+        try {
+            repeat(2_000) {
+                var last: TransferProgress? = null
+                val tracker = SetProgress(files.toLong(), files, { last = it })
 
-            racing(files) { i -> tracker.finished(transfer(i)) }
+                racingOn(pool, files) { i -> tracker.finished(transfer(i)) }
 
-            if (last?.filesDone != files) stale++
+                if (last?.filesDone != files) stale++
+            }
+        } finally {
+            pool.shutdown()
+            pool.awaitTermination(30, TimeUnit.SECONDS)
         }
         assertEquals(0, stale, "$stale of 2000 sets ended on a report that had not counted every file")
     }
