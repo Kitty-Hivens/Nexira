@@ -15,6 +15,15 @@
 // a question during code review.
 pluginManagement {
     repositories {
+        // The Android Gradle Plugin is published here and nowhere else; the filter
+        // keeps every other plugin resolving from the portal.
+        google {
+            content {
+                includeGroupByRegex("com\\.android(\\..*)?")
+                includeGroupByRegex("com\\.google\\.android(\\..*)?")
+                includeGroupByRegex("androidx(\\..*)?")
+            }
+        }
         gradlePluginPortal()
         mavenCentral()
     }
@@ -69,6 +78,8 @@ rootProject.name = "nexira"
 include(":experimental:client-boot")
 include(":client-config")
 include(":client-core")
+// Shared test doubles for :client-core and its consumers (stands in for java-test-fixtures).
+include(":client-core-testing")
 // Auth seam carved out of the launcher god-module: :client-auth holds the
 // provider-agnostic AuthProvider SPI, :client-auth-smartycraft the SmartyCraft impl,
 // :client-auth-microsoft the Microsoft (MSA device-code) impl.
@@ -88,6 +99,12 @@ include(":client-update")
 include(":client-cli")
 // Media playback support (yt-dlp + URL video cache) feeding the Skinema player.
 // Its own seam: consumed by the UI only, unknown to the launch engine.
+// What decides how sound plays: the queue, the repeat modes and the state machine over an
+// engine. Shared by the desktop and Android builds; the engines are handed in.
+include(":client-playback")
+// The Android application: hosts the shared modules on a phone. Starts as a probe that
+// plays a file through the shared player.
+include(":android-app")
 include(":client-media")
 // Tray seam carved out of client-ui: :client-tray holds the TrayController SPI
 // and its libtray-backed impl. It depends only on libtray -- the launch engine

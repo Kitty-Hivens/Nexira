@@ -16,6 +16,14 @@ versionsPlugin    = "0.66.0"
 # (:widget-processor / :client-ui kspKotlinDesktop are the check). Bump when a
 # newer KSP ships.
 ksp               = "2.3.12"
+# Android Gradle Plugin, KMP library flavour. Only the Android target of shared
+# modules uses it; the desktop launcher does not depend on it.
+agp               = "9.5.0"
+# Media3 (ExoPlayer): the Android engine behind PlaybackEngines. Google Maven,
+# Apache-2.0, no telemetry of its own.
+media3            = "1.11.1"
+# Hosts the shared Compose UI inside an Activity (ComponentActivity.setContent).
+activityCompose   = "1.13.0"
 
 # ── Core libraries ───────────────────────────────────────────────────────────
 ktor              = "3.6.0"
@@ -99,7 +107,10 @@ libnotify         = "0.1.2"
 # Replaces the in-tree IKeyringStorage + 4 native impls + the AES fallback that
 # lived inside CredentialsManager. Same dev.hivens family, mavenCentral.
 # 0.2.1: private D-Bus connection -- same shared-bus message-theft fix as libtray.
-libvault          = "0.2.1"
+# 0.3.0: split in three. libvault-core holds the API and the file and memory tiers,
+# libvault keeps the desktop keyrings (found through ServiceLoader), libvault-android
+# adds the Android Keystore. Vault.open and SecretVault keep their names.
+libvault          = "0.3.0"
 
 # Media decode/playback (Kitty-Hivens/skinema) -- FFmpeg via Panama, frames
 # out as Skia images, fail-closed/drop-late, built for looping backgrounds.
@@ -111,7 +122,7 @@ libvault          = "0.2.1"
 # exact version `compose` above resolves). It also moves the FFmpeg pin to the
 # n9.0 line, which renames every soname the loader asks for, so it pairs only
 # with the natives below.
-skinema           = "0.8.2"
+skinema           = "0.9.0"
 
 # The natives are versioned as the FFmpeg build they carry plus a repack
 # revision, not as the library: skinema names the natives version it pairs with
@@ -165,6 +176,7 @@ kotlinx-serialization-json      = { group = "org.jetbrains.kotlinx", name = "kot
 kotlinx-coroutines-core         = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core",    version.ref = "coroutines" }
 kotlinx-coroutines-test         = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test",    version.ref = "coroutines" }
 kotlinx-coroutines-swing        = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-swing",   version.ref = "coroutines" }
+kotlinx-coroutines-android      = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
 kotlinx-coroutines-slf4j        = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-slf4j",   version.ref = "coroutines" }
 
 # DI
@@ -187,6 +199,11 @@ material-color-utilities        = { group = "com.materialkolor",   name = "mater
 filekit-core                    = { group = "io.github.vinceglb", name = "filekit-core",         version.ref = "filekit" }
 filekit-dialogs-compose         = { group = "io.github.vinceglb", name = "filekit-dialogs-compose", version.ref = "filekit" }
 
+# Android
+media3-exoplayer                = { group = "androidx.media3", name = "media3-exoplayer", version.ref = "media3" }
+media3-session                  = { group = "androidx.media3", name = "media3-session", version.ref = "media3" }
+androidx-activity-compose       = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
+
 # Misc
 commons-compress                = { group = "org.apache.commons", name = "commons-compress", version.ref = "commonsCompress" }
 jbsdiff                          = { group = "io.sigpipe", name = "jbsdiff", version.ref = "jbsdiff" }
@@ -194,6 +211,8 @@ xodus-environment               = { group = "org.jetbrains.xodus", name = "xodus
 libtray                         = { group = "dev.hivens", name = "libtray", version.ref = "libtray" }
 libnotify                       = { group = "dev.hivens", name = "libnotify", version.ref = "libnotify" }
 libvault                        = { group = "dev.hivens", name = "libvault", version.ref = "libvault" }
+libvault-core                   = { group = "dev.hivens", name = "libvault-core", version.ref = "libvault" }
+libvault-android                = { group = "dev.hivens", name = "libvault-android", version.ref = "libvault" }
 # skinema-compose pulls -core and -skiko at runtime; -skiko (the Skia frame
 # bridge, VideoFrameImage) is also a compile dep -- the background renders
 # frames through its own Painter rather than VideoSurface. Natives are
@@ -232,3 +251,5 @@ compose                         = { id = "org.jetbrains.compose",               
 buildconfig                     = { id = "com.github.gmazzo.buildconfig",             version.ref = "buildconfigPlugin" }
 versions                        = { id = "io.github.ben-manes.versions",              version.ref = "versionsPlugin" }
 ksp                             = { id = "com.google.devtools.ksp",                   version.ref = "ksp" }
+android-kmp-library             = { id = "com.android.kotlin.multiplatform.library",  version.ref = "agp" }
+android-application             = { id = "com.android.application",                   version.ref = "agp" }

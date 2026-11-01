@@ -7,6 +7,8 @@ plugins {
     alias(libs.plugins.kotlin.compose.compiler) apply false
     alias(libs.plugins.compose) apply false
     alias(libs.plugins.buildconfig) apply false
+    alias(libs.plugins.android.kmp.library) apply false
+    alias(libs.plugins.android.application) apply false
     alias(libs.plugins.versions)
 }
 
@@ -110,6 +112,19 @@ subprojects {
                 }
             }
         }
+        // A multiplatform module with a plain jvm() target runs its tests as jvmTest and
+        // has no test task of its own. Every `:module:test` in CI, the docs and the
+        // fingers of whoever types one stops working the day a module is converted,
+        // so the name is given back. Only where jvmTest exists: a module with another
+        // target name keeps what it has instead of getting a task that tests nothing.
+        if (tasks.names.contains("jvmTest") && !tasks.names.contains("test")) {
+            tasks.register("test") {
+                group = "verification"
+                description = "Runs the JVM tests of a multiplatform module under the name every module has."
+                dependsOn("jvmTest")
+            }
+        }
+
         // Kotlin's compilerOptions.jvmTarget defaults to JVM_1_8 if a
         // subproject's build script does not set it. A new module added
         // without explicit kotlin { jvmToolchain(27) } / compilerOptions {
@@ -124,9 +139,14 @@ subprojects {
         // one that mattered would have scrolled past with the rest. A warning that
         // is right to keep is answered where it stands, with an opt-in or a
         // suppression that says why, rather than left for the next reader.
+        //
+        // The Android targets are the exception: they compile to the Java level the
+        // game runtime ships at, and the module sets that itself.
         tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile>().configureEach {
             compilerOptions {
-                jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_27)
+                if (!name.contains("Android") && !project.plugins.hasPlugin("com.android.application")) {
+                    jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_27)
+                }
                 allWarningsAsErrors.set(true)
             }
         }

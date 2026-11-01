@@ -5,6 +5,7 @@ import androidx.compose.ui.unit.dp
 import java.awt.Rectangle
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /**
  * The size the window is born at, which decides what the user sees before
@@ -63,5 +64,37 @@ class WindowGeometryTest {
             DpSize(2000.dp, 1400.dp),
             initialWindowSize(Rectangle(560, 40, 2000, 1400), restore),
         )
+    }
+
+    @Test
+    fun `the restored frame is the restore size centred on the work area`() {
+        assertEquals(
+            Rectangle(730, 336, 1100, 720),
+            restoredBounds(Rectangle(0, 0, 2560, 1392), restore),
+        )
+    }
+
+    @Test
+    fun `the restored frame is centred on the monitor it was restored on`() {
+        // A second monitor to the right with a panel on top.
+        assertEquals(
+            Rectangle(2560 + 410, 40 + 160, 1100, 720),
+            restoredBounds(Rectangle(2560, 40, 1920, 1040), restore),
+        )
+    }
+
+    @Test
+    fun `a small screen gets a restored frame that is visibly not maximised`() {
+        assertEquals(Rectangle(128, 72, 1024, 576), restoredBounds(Rectangle(0, 0, 1280, 720), restore))
+    }
+
+    @Test
+    fun `the restored frame sits inside the work area and short of it on both axes`() {
+        for ((w, h) in listOf(800 to 600, 1024 to 768, 1280 to 720, 1366 to 768, 1920 to 1080, 3840 to 2160, 1001 to 1001)) {
+            val wa = Rectangle(100, 50, w, h)
+            val r = restoredBounds(wa, restore)
+            assertTrue(wa.contains(r), "${w}x$h: $r outside $wa")
+            assertTrue(r.width < wa.width && r.height < wa.height, "${w}x$h: $r reads as maximised")
+        }
     }
 }

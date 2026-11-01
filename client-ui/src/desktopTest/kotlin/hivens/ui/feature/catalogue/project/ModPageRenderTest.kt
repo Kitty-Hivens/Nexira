@@ -32,7 +32,7 @@ import hivens.core.api.dto.modrinth.ModrinthVersion
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackInstance
 import hivens.core.net.TransferEngine
-import hivens.launcher.instance.ContentKind
+import hivens.launcher.content.ContentKind
 import hivens.launcher.instance.InstalledContent
 import hivens.launcher.instance.InstanceContentScanner
 import hivens.launcher.modrinth.ModrinthClient

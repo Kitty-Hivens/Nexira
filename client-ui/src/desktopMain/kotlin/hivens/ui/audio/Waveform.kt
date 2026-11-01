@@ -3,6 +3,7 @@ package hivens.ui.audio
 import dev.hivens.skinema.audio.PcmEncoding
 import dev.hivens.skinema.audio.PcmFormat
 import dev.hivens.skinema.audio.PcmSink
+import dev.hivens.skinema.libav.MediaInput
 import dev.hivens.skinema.player.VideoPlayer
 import hivens.ui.diag.SkinemaGate
 import kotlinx.coroutines.Dispatchers
@@ -77,7 +78,7 @@ private suspend fun decodeEnvelope(file: Path, buckets: Int): Waveform? {
         // loop = false is load bearing. The default turns the lap at the end of
         // the file, and a sink that never blocks would then read the same track
         // forever at decode speed.
-        VideoPlayer(path = file, loop = false, audio = true, sink = sink)
+        VideoPlayer(input = MediaInput.File(file), loop = false, audio = true, sink = sink)
     } catch (e: Exception) {
         WaveformLog.log.warn("Waveform open failed for {}", file, e)
         return null

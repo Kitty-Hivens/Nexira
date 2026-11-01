@@ -18,23 +18,32 @@ import kotlin.test.assertTrue
  */
 class FilePickerCallSitesTest {
 
-    private val sourceRoot = File("src/desktopMain/kotlin")
+    private val sourceRoots = listOf("desktopMain", "jvmSharedMain", "androidMain").map { File("src/$it/kotlin") }
+    private val sharedRoot = File("src/jvmSharedMain/kotlin")
     private val helper = "hivens/ui/utils/FilePickers.kt"
+
+    /** The helper is one declaration with a platform implementation per host, so the sanctioned sites are all three files. */
+    private val sanctioned = setOf(
+        helper,
+        "hivens/ui/utils/FilePickers.desktop.kt",
+        "hivens/ui/utils/FilePickers.android.kt",
+    )
 
     /** Paths are compared with `/` so the helper is excluded on Windows too, where [File.path] separates with `\`. */
     private fun sourcesOutsideHelper(): Sequence<Pair<String, File>> =
-        sourceRoot.walkTopDown()
-            .filter { it.isFile && it.extension == "kt" }
-            .map { it.relativeTo(sourceRoot).invariantSeparatorsPath to it }
-            .filterNot { (path, _) -> path == helper }
+        sourceRoots.asSequence().filter { it.isDirectory }.flatMap { root ->
+            root.walkTopDown()
+                .filter { it.isFile && it.extension == "kt" }
+                .map { it.relativeTo(root).invariantSeparatorsPath to it }
+        }.filterNot { (path, _) -> path in sanctioned }
 
     @Test
     fun `the picker helper is where the sources live`() {
         assertTrue(
-            sourceRoot.isDirectory,
-            "expected the desktop sources at ${sourceRoot.absolutePath} -- this test reads them as text",
+            sharedRoot.isDirectory,
+            "expected the shared sources at ${sharedRoot.absolutePath} -- this test reads them as text",
         )
-        assertTrue(File(sourceRoot, helper).isFile, "$helper is the only sanctioned FileKit call site")
+        assertTrue(File(sharedRoot, helper).isFile, "$helper is the only sanctioned FileKit call site")
     }
 
     @Test

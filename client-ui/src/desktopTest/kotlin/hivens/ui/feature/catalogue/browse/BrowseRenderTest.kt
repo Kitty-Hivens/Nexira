@@ -41,7 +41,7 @@ import hivens.core.data.PackReference
 import hivens.core.net.TransferEngine
 import hivens.launcher.catalogue.PackArtResolver
 import hivens.launcher.catalogue.PackCatalogueRegistry
-import hivens.launcher.instance.ContentKind
+import hivens.launcher.content.ContentKind
 import hivens.launcher.modrinth.ModrinthClient
 import hivens.launcher.smrt.SmrtPackClient
 import hivens.ui.i18n.AppLocale

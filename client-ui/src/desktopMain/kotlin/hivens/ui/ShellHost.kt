@@ -10,8 +10,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.KeyEvent
-import androidx.compose.ui.unit.DpSize
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.ApplicationScope
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPlacement
@@ -21,7 +19,8 @@ import hivens.config.Branding
 import hivens.launcher.platform.AppRelauncher
 import hivens.ui.bootstrap.GuiBootstrap
 import hivens.ui.bootstrap.RecoveryEntry
-import hivens.ui.chrome.IS_TILING_WM
+import hivens.ui.chrome.RESTORE_WINDOW_SIZE
+import hivens.ui.chrome.WindowManagerProbe
 import hivens.ui.chrome.initialWindowSize
 import hivens.ui.chrome.screenWorkArea
 import hivens.ui.generated.resources.Res
@@ -33,12 +32,6 @@ import hivens.ui.threshold.BootStage
 import hivens.ui.threshold.ThresholdOverlay
 import kotlinx.coroutines.flow.StateFlow
 import org.jetbrains.compose.resources.painterResource
-
-/**
- * The size the window returns to when un-maximised. Not what it opens at --
- * see [initialWindowSize].
- */
-private val RESTORE_SIZE = DpSize(1100.dp, 720.dp)
 
 /**
  * Late-bound window callbacks. The window is created BEFORE Koin exists, so
@@ -72,7 +65,7 @@ fun ApplicationScope.ShellHost(
 ) {
     val outcome by outcomeFlow.collectAsState()
 
-    val undecorated = pre.peek.useCustomChrome && !IS_TILING_WM
+    val undecorated = pre.peek.useCustomChrome && WindowManagerProbe.allowsCustomFrame
     // Maximised everywhere, and born at the size it will be.
     //
     // The OS owns the maximised geometry per its own rules -- never a
@@ -88,7 +81,7 @@ fun ApplicationScope.ShellHost(
     val windowState = rememberWindowState(
         placement = WindowPlacement.Maximized,
         position  = WindowPosition.PlatformDefault,
-        size      = remember { initialWindowSize(screenWorkArea(null), RESTORE_SIZE) },
+        size      = remember { initialWindowSize(screenWorkArea(null), RESTORE_WINDOW_SIZE) },
     )
     val visibleState = remember { mutableStateOf(true) }
     val chrome = remember { WindowChromeHooks(defaultClose = { exitApplication() }) }
@@ -109,10 +102,11 @@ fun ApplicationScope.ShellHost(
         state          = windowState,
         visible        = visibleState.value,
         title          = Branding.TITLE,
-        // Replace the OS title bar with our own -- but ONLY where the OS draws
-        // one. A tiling WM draws no title bar for tiled windows (nothing to
-        // hide), and an undecorated AWT window there ignores the WM's external
-        // fullscreen state (_NET_WM_STATE_FULLSCREEN), so super+F breaks.
+        // Replace the OS title bar with our own -- but ONLY where the window
+        // manager leaves the frame to the window (WindowManagerProbe). One that
+        // manages every window itself draws no title bar to replace, and an
+        // undecorated AWT window there ignores its external fullscreen state
+        // (_NET_WM_STATE_FULLSCREEN), so super+F breaks.
         // Peeked pre-Koin because flipping undecorated later recreates the
         // AWT peer -- a visible flash.
         undecorated    = undecorated,

@@ -37,72 +37,29 @@ val LocalChromeClose = staticCompositionLocalOf<() -> Unit> { {} }
 val LocalWindowHide = staticCompositionLocalOf<() -> Unit> { {} }
 
 /**
- * Whether the in-app top bar replaces the OS chrome (undecorated window). Mirrors
- * SettingsData.useCustomChrome, provided from AppShell. When false the OS title
- * bar is shown, so the bar's caption buttons / window-drag must stand down (the
- * OS handles minimize/maximize/close/move). The breadcrumb still renders -- it is
- * app content, not window chrome. Default true (the breadcrumb-only widget preview).
- */
-val LocalUseCustomChrome = staticCompositionLocalOf { true }
-
-/**
- * Whether the caption buttons (minimize / maximize / close) should show by
- * default. On a tiling WM the window manager owns those actions and an in-app
- * copy is redundant clutter, so the default hides them there; on Windows / macOS
- * / a floating DE the user expects them. [WindowControlsMode] lets the user force
- * either way regardless of detection.
- */
-@kotlinx.serialization.Serializable
-enum class WindowControlsMode { Auto, Show, Hide }
-
-fun WindowControlsMode.resolved(): Boolean = when (this) {
-    WindowControlsMode.Show -> true
-    WindowControlsMode.Hide -> false
-    WindowControlsMode.Auto -> !IS_TILING_WM
-}
-
-private val TILING_WM_TOKENS = listOf(
-    "hyprland", "sway", "i3", "river", "bspwm", "dwm", "qtile", "wayfire",
-    "hikari", "awesome", "xmonad", "herbstluft", "spectrwm", "leftwm", "niri",
-)
-
-/** Best-effort tiling-WM detection (Linux only). Floating DEs and Windows/macOS
- *  return false, so caption buttons default on there. */
-val IS_TILING_WM: Boolean = run {
-    if (!System.getProperty("os.name").orEmpty().lowercase().contains("linux")) return@run false
-    val env = System.getenv()
-    if (!env["HYPRLAND_INSTANCE_SIGNATURE"].isNullOrBlank()) return@run true
-    if (!env["SWAYSOCK"].isNullOrBlank()) return@run true
-    if (!env["I3SOCK"].isNullOrBlank()) return@run true
-    val desktop = buildString {
-        append(env["XDG_CURRENT_DESKTOP"].orEmpty()); append(' ')
-        append(env["XDG_SESSION_DESKTOP"].orEmpty()); append(' ')
-        append(env["DESKTOP_SESSION"].orEmpty())
-    }.lowercase()
-    TILING_WM_TOKENS.any { it in desktop }
-}
-
-/**
  * Drags the OS window when the user drags this region (the bar's empty space).
  * Replaces FrameWindowScope.WindowDraggableArea, which a deep widget can't reach:
  * moves the AWT window by the pointer delta (works under X11 / XWayland).
  * Double-click toggles maximize via [onDoubleClick]. Dragging a maximized window
  * un-maximizes it under the cursor via [maximizer] (OS behavior). No-op when
  * [window] is null.
+ *
+ * The move happens only when [canMove] says the window manager allows it (see
+ * [WindowCapabilities]). Where it does not, the window manager owns the window's
+ * position, and a client-side move only fights it.
  */
 fun Modifier.windowDragArea(
     window: ComposeWindow?,
     maximizer: WindowMaximizer? = null,
+    canMove: Boolean = true,
     onDoubleClick: (() -> Unit)? = null,
 ): Modifier {
-    // On a tiling WM the compositor owns window position (and maximize) -- a
-    // client-side AWT move fights it. Leave moving to the WM there, same as the
-    // resize grips. Drag-to-move only makes sense for OS-floating windows.
-    if (window == null || IS_TILING_WM) return this
-    return this
-        .pointerInput(window, onDoubleClick) {
-            detectTapGestures(onDoubleTap = { onDoubleClick?.invoke() })
-        }
+    if (window == null) return this
+    val withDoubleClick = if (onDoubleClick == null) this else this.pointerInput(window, onDoubleClick) {
+        detectTapGestures(onDoubleTap = { onDoubleClick() })
+    }
+    if (!canMove) return withDoubleClick
+    return withDoubleClick
         .pointerInput(window, maximizer) {
             // Anchor the move against the ABSOLUTE screen cursor, not the Compose-local drag
             // delta. Feeding the local delta back into setLocation oscillates: moving the

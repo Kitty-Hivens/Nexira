@@ -162,7 +162,7 @@ class WallpaperSession(
         // delay throwing to stop, which is true today and a trap for whoever moves
         // the delay.
         while (currentCoroutineContext().isActive) {
-            val st = player.state
+            val st = player.state.toEngineState()
             val mapped = mapPlaybackState(
                 file    = file,
                 st      = st,
@@ -174,8 +174,8 @@ class WallpaperSession(
                 durMs   = (player.durationNanos ?: 0L) / 1_000_000L,
             )
             ifStillAttached(player) { _state.value = mapped }
-            if (_track.value == null && st != VideoPlayer.State.Opening) readMetadata(player, file)
-            if (st is VideoPlayer.State.Failed) {
+            if (_track.value == null && st != EngineState.Opening) readMetadata(player, file)
+            if (st is EngineState.Failed) {
                 log.warn("Wallpaper playback failed for {}", file, st.cause)
                 return
             }

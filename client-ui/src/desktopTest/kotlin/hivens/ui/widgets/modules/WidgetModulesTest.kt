@@ -47,11 +47,11 @@ class WidgetModulesTest {
 
     private fun modules() = WidgetModules(
         directory = folder,
-        shadowDir = tmp.resolve("shadow"),
         stateFile = tmp.resolve("widget-modules.json"),
         json      = json,
         builtIn   = GeneratedWidgetRegistry,
         scope     = scope,
+        host      = DesktopWidgetModuleHost(folder, shadowDir = tmp.resolve("shadow")),
     )
 
     private fun install() = fixtureJar.copyTo(folder.resolve("fixture.jar"), overwrite = true)

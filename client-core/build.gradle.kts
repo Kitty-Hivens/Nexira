@@ -1,45 +1,71 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
-    alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.kotlin.serialization)
-    `java-test-fixtures`
+    alias(libs.plugins.android.kmp.library)
 }
 
-dependencies {
-    implementation(project(":client-config"))
+kotlin {
+    // KMP modules don't apply the `java` plugin, so the root's toolchain pin
+    // skips them; set it here so org.gradle.jvm.version matches the JDK 27 modules.
+    jvmToolchain(27)
+    jvm()
+    android {
+        namespace = "hivens.core"
+        compileSdk = providers.gradleProperty("nexira.android.compileSdk").map(String::toInt).getOrElse(36)
+        minSdk = 31
+        compilerOptions {
+            jvmTarget.set(JvmTarget.JVM_25)
+        }
+    }
 
-    // Logging
-    implementation(libs.slf4j.api)
+    sourceSets {
+        val jvmSharedMain by creating {
+            dependsOn(getByName("commonMain"))
+        }
+        getByName("jvmMain").dependsOn(jvmSharedMain)
+        getByName("androidMain").dependsOn(jvmSharedMain)
 
-    // Ktor Client & Serialization
-    implementation(libs.ktor.client.core)
-    implementation(libs.ktor.client.okhttp)
-    implementation(libs.ktor.client.content.negotiation)
-    implementation(libs.ktor.serialization.json)
+        getByName("jvmSharedMain") {
+            dependencies {
+                implementation(project(":client-config"))
 
-    // JSON
-    implementation(libs.kotlinx.serialization.json)
+                // Logging
+                implementation(libs.slf4j.api)
 
-    // Coroutines (Mutex / StateFlow / CompletableDeferred for the cache layer).
-    // Was previously only transitive via ktor; depend on it explicitly.
-    implementation(libs.kotlinx.coroutines.core)
+                // Ktor Client & Serialization
+                implementation(libs.ktor.client.core)
+                implementation(libs.ktor.client.okhttp)
+                implementation(libs.ktor.client.content.negotiation)
+                implementation(libs.ktor.serialization.json)
 
-    // Archive extraction with unix-mode-aware ZipArchiveEntry -- needed by
-    // ZipUtils to reject symlink entries that bypass plain Zip Slip checks.
-    implementation(libs.commons.compress)
+                // JSON
+                implementation(libs.kotlinx.serialization.json)
 
-    // TEST
-    testImplementation(kotlin("test"))
-    testImplementation(libs.ktor.client.mock)
-    testImplementation(libs.kotlinx.coroutines.test)
-    testImplementation(libs.mockk)
-    testImplementation(libs.slf4j.simple)
+                // Coroutines (Mutex / StateFlow / CompletableDeferred for the cache layer).
+                // Was previously only transitive via ktor; depend on it explicitly.
+                implementation(libs.kotlinx.coroutines.core)
 
-    testFixturesImplementation(libs.ktor.client.core)
-    testFixturesImplementation(libs.ktor.client.mock)
-    testFixturesImplementation(libs.ktor.client.content.negotiation)
-    testFixturesImplementation(libs.ktor.serialization.json)
+                // Archive extraction with unix-mode-aware ZipArchiveEntry -- needed by
+                // ZipUtils to reject symlink entries that bypass plain Zip Slip checks.
+                implementation(libs.commons.compress)
+            }
+        }
+
+        getByName("jvmTest") {
+            dependencies {
+                implementation(kotlin("test"))
+                implementation(libs.ktor.client.mock)
+                implementation(libs.kotlinx.coroutines.test)
+                implementation(libs.mockk)
+                implementation(libs.slf4j.simple)
+                implementation(project(":client-core-testing"))
+            }
+        }
+    }
 }
 
-tasks.test {
+tasks.withType<Test>().configureEach {
     useJUnitPlatform()
 }

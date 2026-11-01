@@ -6,6 +6,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.awt.ComposeWindow
 import androidx.compose.ui.window.WindowState
+import java.awt.EventQueue
 import java.awt.Frame
 import java.awt.GraphicsConfiguration
 import java.awt.Rectangle
@@ -39,14 +40,14 @@ fun screenWorkArea(gc: GraphicsConfiguration?): Rectangle {
 /**
  * Maximize / restore driven end-to-end by the window manager.
  *
- * The window never fakes its own maximized state. [maximized] is recomputed ONLY
- * from what the system actually did -- never optimistically when a button is
- * pressed. Two system-driven signals feed it, so it is correct on every WM:
- *   - the maximized state the WM declares, via [WindowStateListener] on the frame's
- *     extendedState (the EWMH `_NET_WM_STATE_MAXIMIZED` contract);
- *   - the frame actually filling the work area, via [java.awt.event.ComponentListener]
- *     on resize -- ground truth for a compositor that maximizes without setting the
- *     state atom. We read the geometry the WM produced; we never impose it.
+ * The window never fakes its own maximized state. [maximized] is the frame's
+ * extendedState as the window manager reports it through [WindowStateListener]:
+ * the system's own maximize state on Windows and macOS, the EWMH
+ * `_NET_WM_STATE_MAXIMIZED` atoms on X11 and XWayland. It is never set when a
+ * button is pressed, and never inferred from how big the frame is. A frame that
+ * merely fills the screen is not maximized, and treating it as one left the
+ * button offering a restore the window manager had nothing to do for, so the
+ * click went nowhere until the window was resized by hand.
  *
  * [maximize] / [restore] COMMAND the system directly via [Frame.setExtendedState]
  * (MAXIMIZED_BOTH), NOT through WindowState.placement, whose "apply only on change"
@@ -56,11 +57,25 @@ fun screenWorkArea(gc: GraphicsConfiguration?): Rectangle {
  * asks the toolkit whether the WM supports the state at all; the caller hides the
  * button when not.
  *
+ * Leaving the maximized state hands the frame back at the normal size the window
+ * manager remembers for it. Until the window has been restored once, that is the
+ * work area, since it is born there (see [initialWindowSize]), so the first restore
+ * would look exactly like a maximized window. That first restore is given
+ * [RESTORE_WINDOW_SIZE] instead, and from then on the window manager remembers a
+ * real normal size and every later restore is left to it. Windows offers no way
+ * to set that size while the frame stays maximized: a reshape of a zoomed frame
+ * drops the maximized bit. A window manager that does not allow the window to be
+ * resized (see [WindowCapabilities]) owns the geometry outright and is never
+ * handed a size.
+ *
  * With `-Dnexira.puppet.port` set, every event dumps the full window state (raw
  * extendedState, Compose placement, observed flag, bounds vs work area) under the
  * `WINDBG` tag, so a run can be correlated line-by-line against the WM's own view.
  */
-class WindowMaximizer(private val state: WindowState) {
+class WindowMaximizer(
+    private val state: WindowState,
+    private val capabilities: WindowCapabilitiesSource,
+) {
     /** Real WM-reported state. Recomputed only from system events, never on click. */
     var maximized by mutableStateOf(false)
         private set
@@ -68,6 +83,9 @@ class WindowMaximizer(private val state: WindowState) {
     /** Whether the running WM supports programmatic maximize, per the toolkit. */
     var supported by mutableStateOf(true)
         private set
+
+    /** True until the window has left maximized once and been given a normal size. */
+    private var firstRestorePending = true
 
     private var window: ComposeWindow? = null
     private var stateListener: WindowStateListener? = null
@@ -80,17 +98,18 @@ class WindowMaximizer(private val state: WindowState) {
         val sl = WindowStateListener { e ->
             dump(w, "WM-state-event old=${decode(e.oldState)} new=${decode(e.newState)}")
             refresh(w)
-        }
-        val cl = object : ComponentAdapter() {
-            override fun componentResized(e: ComponentEvent) {
-                dump(w, "resize-event")
-                refresh(w)
-            }
+            // Resize after the one this same transition posts, or the WM's would land on top of it.
+            if (firstRestorePending && isMax(e.oldState) && !isMax(e.newState)) EventQueue.invokeLater { giveRestoredSize(w) }
         }
         w.addWindowStateListener(sl)
-        w.addComponentListener(cl)
         stateListener = sl
-        sizeListener = cl
+        if (DEBUG) {
+            val cl = object : ComponentAdapter() {
+                override fun componentResized(e: ComponentEvent) = dump(w, "resize-event")
+            }
+            w.addComponentListener(cl)
+            sizeListener = cl
+        }
         log.info("window maximize: WM support={}, initial maximized={}", supported, maximized)
         dump(w, "attach")
     }
@@ -120,7 +139,7 @@ class WindowMaximizer(private val state: WindowState) {
      * ordinary use, since it only fires when the answer actually moves.
      */
     private fun refresh(w: ComposeWindow) {
-        val now = isMax(w.extendedState) || fillsWorkArea(w)
+        val now = isMax(w.extendedState)
         if (now != maximized) {
             maximized = now
             val b = w.bounds
@@ -134,11 +153,22 @@ class WindowMaximizer(private val state: WindowState) {
         }
     }
 
-    private fun fillsWorkArea(w: ComposeWindow): Boolean {
-        val wa = screenWorkArea(w.graphicsConfiguration)
-        if (wa.width <= 0 || wa.height <= 0) return false
-        val b = w.bounds
-        return b.width >= wa.width * 0.95f && b.height >= wa.height * 0.95f
+    /**
+     * Gives the window its first normal size, on the first time it leaves
+     * maximized. Waits for the next restore when the window went straight back
+     * to maximized in between.
+     */
+    private fun giveRestoredSize(w: ComposeWindow) {
+        if (window !== w || !firstRestorePending || isMax(w.extendedState)) return
+        firstRestorePending = false
+        if (!capabilities.current.resize) return
+        val target = restoredBounds(screenWorkArea(w.graphicsConfiguration), RESTORE_WINDOW_SIZE)
+        log.info(
+            "window state -> first restore, normal size {}x{} at {},{}",
+            target.width, target.height, target.x, target.y,
+        )
+        w.bounds = target
+        dump(w, "first-restore-size")
     }
 
     fun maximize() {
@@ -162,23 +192,27 @@ class WindowMaximizer(private val state: WindowState) {
     // observed flag, so a fast click can't act on a stale value.
     fun toggle() {
         val w = window ?: return
-        if (isMax(w.extendedState) || fillsWorkArea(w)) restore() else maximize()
+        if (isMax(w.extendedState)) restore() else maximize()
     }
 
     /**
      * Un-maximize for a title-bar drag on an undecorated frame: request a native
      * restore, then best-effort re-anchor so the cursor stays proportionally over
-     * the bar. The restored bounds settle asynchronously on some WMs, so this reads
-     * what it can and the drag loop re-reads `window.location` afterward.
+     * the bar. On the first restore the normal size is given right here rather
+     * than after the event, so the drag carries the window it will end up with.
+     * The restored bounds settle asynchronously on some WMs, so this reads what it
+     * can and the drag loop re-reads `window.location` afterward.
      */
     fun unmaximizeUnderCursor(mouseX: Int, mouseY: Int) {
         val w = window ?: return
         if (!maximized) return
         val cur = w.bounds
+        val first = firstRestorePending && capabilities.current.resize
+        firstRestorePending = false
         restore()
-        val restored = w.bounds
+        val restored = if (first) restoredBounds(screenWorkArea(w.graphicsConfiguration), RESTORE_WINDOW_SIZE) else w.bounds
         val ratioX = if (cur.width > 0) ((mouseX - cur.x).toFloat() / cur.width).coerceIn(0f, 1f) else 0.5f
-        w.setLocation(mouseX - (ratioX * restored.width).toInt(), cur.y)
+        w.setBounds(mouseX - (ratioX * restored.width).toInt(), cur.y, restored.width, restored.height)
     }
 
     private fun isMax(s: Int) = (s and Frame.MAXIMIZED_BOTH) == Frame.MAXIMIZED_BOTH
@@ -195,7 +229,7 @@ class WindowMaximizer(private val state: WindowState) {
         log.info(
             "WINDBG | $event | ext=${decode(es)} placement=${state.placement} observed.max=$maximized " +
                 "bounds=[${b.x},${b.y} ${b.width}x${b.height}] work=[${wa.x},${wa.y} ${wa.width}x${wa.height}] " +
-                "fills=${fillsWorkArea(w)} supported=$supported",
+                "firstRestorePending=$firstRestorePending supported=$supported",
         )
     }
 

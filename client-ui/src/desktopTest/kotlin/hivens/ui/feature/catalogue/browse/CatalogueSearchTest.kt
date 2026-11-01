@@ -2,7 +2,7 @@ package hivens.ui.feature.catalogue.browse
 
 import hivens.core.api.dto.modrinth.ModrinthCategoryTag
 import hivens.core.data.PackOrigin
-import hivens.launcher.instance.ContentKind
+import hivens.launcher.content.ContentKind
 import hivens.launcher.modrinth.ENV_CLIENT
 import hivens.launcher.modrinth.ENV_SERVER
 import hivens.launcher.modrinth.FilterField

@@ -61,31 +61,6 @@ import kotlin.math.roundToInt
 private val log = LoggerFactory.getLogger("WidgetPreview")
 
 /**
- * What the gallery has for one widget.
- *
- * [Pending] is the state before anybody asked, [Drawn] a picture, and [Refused] a
- * widget that could not be composed outside the surface it belongs to. Refused is
- * an ordinary outcome rather than an error: a widget is free to need a context the
- * palette cannot hand it, and the tile falls back to its letter.
- */
-sealed interface WidgetPreview {
-    data object Pending : WidgetPreview
-
-    /**
-     * The widget, trimmed to what it drew.
-     *
-     * The scene is larger than most widgets: one is 340 by 48 and is drawn at the
-     * top of a 320 by 200 frame, so the raster is mostly nothing below it. The
-     * trim happens once, here, rather than every time a tile paints: it is what
-     * lets the tile take the widget's own proportions, and it is the difference
-     * between holding a megabyte per preview and holding what the widget covers.
-     */
-    data class Drawn(val image: ImageBitmap) : WidgetPreview
-
-    data object Refused : WidgetPreview
-}
-
-/**
  * Draws widgets off screen so the gallery can show the real thing.
  *
  * Android does not need this: its widgets are RemoteViews, a description the
@@ -107,10 +82,10 @@ sealed interface WidgetPreview {
  * locals across a composition boundary this way.
  */
 @Stable
-class WidgetPreviewHost internal constructor(
+class OffscreenPreviewHost internal constructor(
     private val locals: CompositionLocalContext,
     private val density: Density,
-) {
+) : WidgetPreviewHost {
     private val cache: SnapshotStateMap<WidgetKind, WidgetPreview> = mutableStateMapOf()
 
     /**
@@ -129,12 +104,12 @@ class WidgetPreviewHost internal constructor(
     private val pool = ScenePool(density)
 
     /** Releases the scenes. Called when the gallery leaves the composition. */
-    fun close() {
+    override fun close() {
         pool.close()
     }
 
     /** What is known about [kind] right now, without asking for it to be drawn. */
-    fun peek(kind: WidgetKind): WidgetPreview = cache[kind] ?: WidgetPreview.Pending
+    override fun peek(kind: WidgetKind): WidgetPreview = cache[kind] ?: WidgetPreview.Pending
 
     /**
      * Draws [kind] unless it is already drawn, and records the outcome.
@@ -157,7 +132,7 @@ class WidgetPreviewHost internal constructor(
      * which leaves the event queue a turn between them: the gallery fills in
      * visibly rather than all at once after a freeze.
      */
-    suspend fun draw(kind: WidgetKind, descriptor: WidgetDescriptor) {
+    override suspend fun draw(kind: WidgetKind, descriptor: WidgetDescriptor) {
         if (cache.containsKey(kind)) return
         val outcome = gate.withLock { cache[kind] ?: render(kind, descriptor) }
         cache[kind] = outcome
@@ -448,23 +423,6 @@ private fun PreviewSubject(descriptor: WidgetDescriptor, kind: WidgetKind, box: 
 }
 
 /**
- * How large a frame to draw the widget into.
- *
- * Its declared preferred size where it has one, because that is the size it says
- * it looks correct at. Where it has none, a frame wide enough for the flow
- * widgets, which are the ones that declare nothing: they take the width they are
- * given and stand at whatever height their content comes to.
- */
-internal fun frameFor(sizing: WidgetSizing): Size {
-    val w = sizing.prefWidth.takeIf { it > 0 } ?: DEFAULT_FRAME_W
-    val h = sizing.prefHeight.takeIf { it > 0 } ?: DEFAULT_FRAME_H
-    return Size(w.toFloat(), h.toFloat())
-}
-
-private const val DEFAULT_FRAME_W = 320
-private const val DEFAULT_FRAME_H = 200
-
-/**
  * [box] shrunk until its raster fits [MAX_PX] on both axes, keeping its shape.
  *
  * A tile is a thumbnail, so a widget that wants more than this gets drawn at a
@@ -492,31 +450,12 @@ private val PREVIEW_PATH = SlotPath(SurfaceId("preview"), SlotId("preview"))
  * the field builds a new one, so every preview is lost to a typo.
  */
 @Composable
-fun rememberWidgetPreviewHost(): WidgetPreviewHost {
+actual fun rememberWidgetPreviewHost(): WidgetPreviewHost {
     val locals = currentCompositionLocalContext
     val density = LocalDensity.current
-    val host = remember(locals, density) { WidgetPreviewHost(locals, density) }
+    val host = remember(locals, density) { OffscreenPreviewHost(locals, density) }
     // The scenes hold native surfaces and a global snapshot observer each. A
     // theme change builds a new host, and this retires the one it replaced.
     DisposableEffect(host) { onDispose { host.close() } }
     return host
-}
-
-/**
- * The preview for [kind], drawn the first time a tile asks and cached after.
- *
- * Lazy by tile rather than eager for the registry: a gallery that drew sixty
- * widgets on open would spend the open doing it, and most of them are below the
- * fold.
- */
-@Composable
-fun rememberWidgetPreview(host: WidgetPreviewHost, kind: WidgetKind): WidgetPreview {
-    val registry = LocalWidgetRegistry.current
-    var state by remember(kind) { mutableStateOf(host.peek(kind)) }
-    LaunchedEffect(host, kind) {
-        val descriptor = registry[kind] ?: return@LaunchedEffect
-        host.draw(kind, descriptor)
-        state = host.peek(kind)
-    }
-    return state
 }

@@ -62,6 +62,7 @@ import dev.hivens.skinema.compose.VideoScale
 import dev.hivens.skinema.compose.VideoSurface
 import dev.hivens.skinema.compose.rememberPlayerState
 import dev.hivens.skinema.libav.HwAccel
+import dev.hivens.skinema.libav.MediaInput
 import dev.hivens.skinema.player.VideoPlayer as SkinemaPlayer
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.IconKey
@@ -286,7 +287,7 @@ private class InlineVideo(
      * so it used to leave the caller with nothing to catch it.
      */
     val player: SkinemaPlayer? = try {
-        SkinemaPlayer(path = path, loop = loop, audio = audio, hardware = HwAccel.AUTO)
+        SkinemaPlayer(input = MediaInput.File(path), loop = loop, audio = audio, hardware = HwAccel.AUTO)
     } catch (e: LinkageError) {
         log.error("Video natives unavailable for {}", path, e)
         null
@@ -333,7 +334,7 @@ private fun rememberInlineVideo(path: Path, loop: Boolean, audio: Boolean): Inli
  * after the inline view) and always plays with sound + controls.
  */
 @Composable
-fun FullscreenVideo(
+fun FullscreenVideoWithHandoff(
     url: String,
     posterUrl: String? = null,
     handoff: VideoHandoff? = null,

@@ -16,6 +16,12 @@ const val MIN_WINDOW_WIDTH_DP = 800
 const val MIN_WINDOW_HEIGHT_DP = 600
 
 /**
+ * The size the window returns to when un-maximised. Not what it opens at,
+ * see [initialWindowSize].
+ */
+val RESTORE_WINDOW_SIZE = DpSize(1100.dp, 720.dp)
+
+/**
  * The size the window is created at: the work area, whatever the desktop is.
  *
  * Compose draws one frame before showing the window, sized to what was asked
@@ -46,3 +52,16 @@ fun initialWindowSize(workArea: Rectangle, restore: DpSize): DpSize {
         height = maxOf(workArea.height, MIN_WINDOW_HEIGHT_DP).dp,
     )
 }
+
+/**
+ * The frame a window gets the first time it leaves maximised: [restore], centred
+ * on the work area it was restored on, and never more than 80% of it on either
+ * axis, so a small screen still gets a window that visibly is not maximised.
+ */
+fun restoredBounds(workArea: Rectangle, restore: DpSize): Rectangle {
+    val w = minOf(restore.width.value.toInt(), (workArea.width * RESTORE_CAP_FRACTION).toInt())
+    val h = minOf(restore.height.value.toInt(), (workArea.height * RESTORE_CAP_FRACTION).toInt())
+    return Rectangle(workArea.x + (workArea.width - w) / 2, workArea.y + (workArea.height - h) / 2, w, h)
+}
+
+private const val RESTORE_CAP_FRACTION = 0.8f

@@ -4,7 +4,7 @@ import hivens.core.api.dto.smrt.SmrtAssetEntry
 import hivens.core.api.dto.smrt.SmrtModEntry
 import hivens.core.api.dto.smrt.SmrtSource
 import hivens.core.data.OptionalContentRules
-import hivens.launcher.instance.ContentKind
+import hivens.launcher.content.ContentKind
 import hivens.launcher.instance.InstalledContent
 import kotlin.test.Test
 import kotlin.test.assertEquals

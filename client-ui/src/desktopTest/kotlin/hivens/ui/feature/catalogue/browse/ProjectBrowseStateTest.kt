@@ -6,7 +6,7 @@ import hivens.core.data.PackOrigin
 import hivens.core.data.PackReference
 import hivens.core.launch.InstanceWork
 import hivens.launcher.instance.ContentInstaller
-import hivens.launcher.instance.ContentKind
+import hivens.launcher.content.ContentKind
 import hivens.launcher.instance.ModInstaller
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.launch

@@ -26,9 +26,6 @@ import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.Status
 
-/** True on macOS, where caption buttons live at the LEFT (traffic-light side). */
-val HOST_IS_MAC: Boolean = System.getProperty("os.name").orEmpty().lowercase().contains("mac")
-
 /**
  * Custom caption buttons for the undecorated window: minimize, maximize/restore,
  * close. Glyphs are vector-drawn (not font icons) so they stay crisp and need no
@@ -39,11 +36,16 @@ val HOST_IS_MAC: Boolean = System.getProperty("os.name").orEmpty().lowercase().c
  * undecorated frame's AWT placement round-trip is unreliable on Windows, so the
  * glyph reads our own state (see [WindowMaximizer]). Placement (which end of the
  * bar) is the caller's job; on macOS use [HOST_IS_MAC] to put these on the left.
+ *
+ * Minimize and maximize show only when the window manager allows them for this
+ * window ([capabilities]), so no button stands there doing nothing. Close is the
+ * app's own and always shows.
  */
 @Composable
 fun WindowControls(
     state: WindowState,
     maximizer: WindowMaximizer,
+    capabilities: WindowCapabilities,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -54,25 +56,27 @@ fun WindowControls(
     val maximized = maximizer.maximized
 
     Row(modifier) {
-        CaptionButton(
-            label = s.windowMinimize,
-            tint = tint,
-            hoverBg = hover,
-            onClick = { state.isMinimized = true },
-            glyph = { c ->
-                drawLine(
-                    color = c,
-                    start = Offset(0f, size.height / 2f),
-                    end = Offset(size.width, size.height / 2f),
-                    strokeWidth = strokePx(),
-                    cap = StrokeCap.Round,
-                )
-            },
-        )
+        if (capabilities.minimize) {
+            CaptionButton(
+                label = s.windowMinimize,
+                tint = tint,
+                hoverBg = hover,
+                onClick = { state.isMinimized = true },
+                glyph = { c ->
+                    drawLine(
+                        color = c,
+                        start = Offset(0f, size.height / 2f),
+                        end = Offset(size.width, size.height / 2f),
+                        strokeWidth = strokePx(),
+                        cap = StrokeCap.Round,
+                    )
+                },
+            )
+        }
 
-        // Offered only when the WM actually supports programmatic maximize
-        // (queried via the toolkit, not guessed) -- no dead control otherwise.
-        if (maximizer.supported) {
+        // The toolkit's answer stays in as well: on Windows and macOS it is the
+        // only one there is.
+        if (maximizer.supported && capabilities.maximize) {
             CaptionButton(
                 label = if (maximized) s.windowRestore else s.windowMaximize,
                 tint = tint,
