@@ -20,7 +20,7 @@ kotlin {
     }
 
     sourceSets {
-        val jvmSharedMain by creating {
+        val jvmSharedMain = create("jvmSharedMain") {
             dependsOn(getByName("commonMain"))
         }
         getByName("jvmMain").dependsOn(jvmSharedMain)

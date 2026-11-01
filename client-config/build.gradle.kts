@@ -44,7 +44,7 @@ kotlin {
     sourceSets {
         // The code both JVM targets share: java.* and System properties exist on
         // ART as well, but a common source set cannot see them.
-        val jvmSharedMain by creating {
+        val jvmSharedMain = create("jvmSharedMain") {
             dependsOn(getByName("commonMain"))
         }
         getByName("jvmMain").dependsOn(jvmSharedMain)

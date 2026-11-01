@@ -23,11 +23,11 @@ dependencies {
 // classpath on purpose: a fixture the tests could already see would resolve
 // through the parent loader and the tests would pass without the jar being
 // opened. The tests rewrite its manifest to produce the malformed variants.
-val fixtureModule: SourceSet by sourceSets.creating {
+val fixtureModule: SourceSet = sourceSets.create("fixtureModule") {
     compileClasspath += sourceSets["main"].output + configurations["compileClasspath"].incoming.files
 }
 
-val fixtureModuleJar by tasks.registering(Jar::class) {
+val fixtureModuleJar = tasks.register<Jar>("fixtureModuleJar") {
     archiveFileName.set("fixture-module.jar")
     destinationDirectory.set(layout.buildDirectory.dir("fixtures"))
     from(fixtureModule.output)

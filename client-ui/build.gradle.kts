@@ -96,7 +96,7 @@ kotlin {
         // What both hosts compile: the screens and the code under them. Anything that
         // names a desktop window, AWT, Skia or a desktop-only library stays in
         // desktopMain, and the Android host supplies its own.
-        val jvmSharedMain by creating {
+        val jvmSharedMain = create("jvmSharedMain") {
             dependsOn(getByName("commonMain"))
         }
         getByName("desktopMain").dependsOn(jvmSharedMain)
