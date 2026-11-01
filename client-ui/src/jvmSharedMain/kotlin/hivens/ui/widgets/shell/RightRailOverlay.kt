@@ -1,7 +1,6 @@
 package hivens.ui.widgets.shell
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -13,6 +12,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.height
 import androidx.compose.ui.Alignment
 import hivens.ui.systemGestureExcluded
+import hivens.ui.theme.Motion
 import hivens.ui.theme.NxInk
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -55,8 +55,9 @@ internal fun RightRailOverlay(
     // finger and snaps on release, the way the rail in the row follows the pointer on a
     // desktop, so the two read as one control. Back out the same way, or by the signal.
     val progress = remember { Animatable(0f) }
+    val slide = Motion.panelSlide.of<Float>()
     val scope = rememberCoroutineScope()
-    LaunchedEffect(open) { progress.animateTo(if (open) 1f else 0f, tween(220)) }
+    LaunchedEffect(open) { progress.animateTo(if (open) 1f else 0f, slide) }
 
     val shape = RoundedCornerShape(topStart = 16.dp)
     val width = panelWidth + endInset
@@ -80,9 +81,9 @@ internal fun RightRailOverlay(
                         scope.launch { progress.snapTo((progress.value - delta / widthPx).coerceIn(0f, 1f)) }
                     },
                     onDragEnd = {
-                        if (progress.value > 0.5f) onOpen() else scope.launch { progress.animateTo(0f, tween(160)) }
+                        if (progress.value > 0.5f) onOpen() else scope.launch { progress.animateTo(0f, slide) }
                     },
-                    onDragCancel = { scope.launch { progress.animateTo(if (open) 1f else 0f, tween(160)) } },
+                    onDragCancel = { scope.launch { progress.animateTo(if (open) 1f else 0f, slide) } },
                 )
             },
         )
@@ -105,9 +106,9 @@ internal fun RightRailOverlay(
                                 scope.launch { progress.snapTo((progress.value - delta / widthPx).coerceIn(0f, 1f)) }
                             },
                             onDragEnd = {
-                                if (progress.value < 0.5f) onClose() else scope.launch { progress.animateTo(1f, tween(160)) }
+                                if (progress.value < 0.5f) onClose() else scope.launch { progress.animateTo(1f, slide) }
                             },
-                            onDragCancel = { scope.launch { progress.animateTo(if (open) 1f else 0f, tween(160)) } },
+                            onDragCancel = { scope.launch { progress.animateTo(if (open) 1f else 0f, slide) } },
                         )
                     },
                     contentAlignment = Alignment.Center,

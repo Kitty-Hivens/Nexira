@@ -30,7 +30,7 @@ EXCLUDE_PATH_FRAGMENTS = ("/build/", "/.gradle/", "/.idea/")
 
 # Where the vocabulary itself lives, and the one place allowed to read the raw
 # axis. Anything else asking these questions is bypassing the scale.
-VOCABULARY = ("nx-ui/src/desktopMain/kotlin/hivens/ui/theme/Motion.kt",)
+VOCABULARY = ("nx-ui/src/jvmSharedMain/kotlin/hivens/ui/theme/Motion.kt",)
 
 # Deliberate exemptions. Each names why the scale cannot reach it -- not a place
 # to park a site nobody wanted to move.
@@ -38,7 +38,7 @@ EXEMPT = {
     # A state holder, not a composable: a role is a @Composable read and cannot
     # be taken where these defaults are declared, and console scrolling is
     # navigation rather than interface motion.
-    "client-ui/src/desktopMain/kotlin/hivens/ui/screens/console/LogScrollState.kt": {"literal-duration"},
+    "client-ui/src/jvmSharedMain/kotlin/hivens/ui/screens/console/LogScrollState.kt": {"literal-duration"},
     # The easter engine scales its own set pieces through that mirrored value.
     "client-easter": {"literal-duration"},
 }
