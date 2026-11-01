@@ -78,7 +78,7 @@ class JournalStore(private val json: Json = DEFAULT_JSON) {
     }
 
     fun delete(partial: Path) {
-        runCatching { Files.deleteIfExists(pathFor(partial)) }
+        val _ = runCatching { Files.deleteIfExists(pathFor(partial)) }
     }
 
     /**

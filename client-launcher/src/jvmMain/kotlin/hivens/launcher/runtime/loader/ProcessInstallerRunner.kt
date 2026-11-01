@@ -97,9 +97,9 @@ class ProcessInstallerRunner(private val javaManager: IJavaManager) : InstallerR
      */
     private fun kill(process: Process) {
         val children = runCatching { process.descendants().toList() }.getOrDefault(emptyList())
-        runCatching { process.destroyForcibly() }
-        children.forEach { runCatching { it.destroyForcibly() } }
-        runCatching { process.waitFor(5, TimeUnit.SECONDS) }
+        val _ = runCatching { process.destroyForcibly() }
+        children.forEach { val _ = runCatching { it.destroyForcibly() } }
+        val _ = runCatching { process.waitFor(5, TimeUnit.SECONDS) }
     }
 
     private companion object {

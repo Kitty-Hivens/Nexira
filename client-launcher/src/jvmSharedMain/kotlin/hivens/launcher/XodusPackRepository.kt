@@ -95,7 +95,7 @@ class XodusPackRepository(
             block(env)
         } finally {
             if (!holdOpen) {
-                runCatching { env.close() }
+                val _ = runCatching { env.close() }
                 openEnv = null
             }
         }
@@ -168,10 +168,12 @@ class XodusPackRepository(
     fun close() {
         // removeShutdownHook throws once shutdown is underway (i.e. when the hook itself
         // calls close); swallow it -- removal only matters on the explicit-close path.
-        if (hookInstalled) runCatching { Runtime.getRuntime().removeShutdownHook(shutdownHook) }
+        if (hookInstalled) {
+            val _ = runCatching { Runtime.getRuntime().removeShutdownHook(shutdownHook) }
+        }
         synchronized(envLock) {
             closed = true
-            runCatching { openEnv?.takeIf { it.isOpen }?.close() }
+            val _ = runCatching { openEnv?.takeIf { it.isOpen }?.close() }
             openEnv = null
         }
     }
@@ -264,7 +266,7 @@ class XodusPackRepository(
             meta.put(txn, key(SCHEMA_KEY), StringBinding.stringToEntry(schemaVersion.toString()))
         } }
         if (legacy.isNotEmpty()) {
-            runCatching {
+            val _ = runCatching {
                 Files.move(
                     legacyPacksFile,
                     legacyPacksFile.resolveSibling(legacyPacksFile.fileName.toString() + ".migrated"),

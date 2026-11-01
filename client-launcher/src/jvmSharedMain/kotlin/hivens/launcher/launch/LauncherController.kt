@@ -453,7 +453,7 @@ class LauncherController(
                             // and the launch waits for it like any other stop.
                             if (abortToken.get()) {
                                 _state.value = LaunchState.Stopping(handle)
-                                runCatching { handle.terminate() }
+                                val _ = runCatching { handle.terminate() }
                             } else {
                                 _state.value = LaunchState.GameRunning(handle)
                             }
@@ -472,7 +472,7 @@ class LauncherController(
                         } catch (e: Exception) {
                             logger.error("The session guard could not be armed for {}, stopping the game", label, e)
                             prepared.guardFailed.set(true)
-                            runCatching { handle.terminate() }
+                            val _ = runCatching { handle.terminate() }
                         }
                     }
 
@@ -531,7 +531,7 @@ class LauncherController(
             // reach it. Not on a plain cancellation: when the launcher itself is
             // shutting down the scope is cancelled with no stop requested, and a
             // game the person chose to leave running on quit has to stay running.
-            if (abortToken.get() || e !is CancellationException) spawned?.let { runCatching { it.terminate() } }
+            if (abortToken.get() || e !is CancellationException) spawned?.let { val _ = runCatching { it.terminate() } }
             synchronized(launchLock) {
                 val mine = ownsController(launchTag)
                 if (mine) {
@@ -958,7 +958,7 @@ class LauncherController(
                 guardFailed.set(true)
                 _state.value = LaunchState.Stopping(handle)
             }
-            runCatching { handle.terminate() }
+            val _ = runCatching { handle.terminate() }
             return@launch
         }
         if (findings.isEmpty()) return@launch
@@ -986,7 +986,7 @@ class LauncherController(
         synchronized(launchLock) {
             if (runningHandle === handle) _state.value = LaunchState.Stopping(handle)
         }
-        runCatching { handle.terminate() }
+        val _ = runCatching { handle.terminate() }
     }
 
     /**
@@ -1254,7 +1254,7 @@ class LauncherController(
             val handle = runningHandle
             if (handle != null) {
                 _state.value = LaunchState.Stopping(handle)
-                runCatching { handle.terminate() }
+                val _ = runCatching { handle.terminate() }
             } else {
                 launchJob?.cancel()
                 _state.value = LaunchState.Idle

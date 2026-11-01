@@ -48,7 +48,7 @@ class WidgetModuleLoaderTest {
         // A loaded module holds its jar open. Two of the three hosts will unlink an
         // open file and the third will not, so releasing first is what makes this
         // teardown mean the same thing everywhere.
-        opened.forEach { runCatching { it.loader.close() } }
+        opened.forEach { val _ = runCatching { it.loader.close() } }
         opened.clear()
         Files.walk(tmp).use { walk ->
             walk.sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) }

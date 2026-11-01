@@ -66,7 +66,7 @@ private class CommonsSharedZip(path: Path) : SharedZip {
         try {
             ZipFile.builder().setSeekableByteChannel(channel).get()
         } catch (t: Throwable) {
-            runCatching { channel.close() }
+            val _ = runCatching { channel.close() }
             throw t
         }
     }

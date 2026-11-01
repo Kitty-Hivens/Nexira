@@ -319,14 +319,14 @@ class JavaManagerService(
             Files.move(incoming, targetDir)
             deleteTree(previous)
         } catch (e: Exception) {
-            runCatching { deleteTree(incoming) }
+            val _ = runCatching { deleteTree(incoming) }
             // A swap that failed between the two renames leaves the install
             // under `.previous`; put it back rather than leaving the user with
             // nothing.
             if (!Files.exists(targetDir) && Files.exists(previous)) {
-                runCatching { Files.move(previous, targetDir) }
+                val _ = runCatching { Files.move(previous, targetDir) }
             }
-            runCatching { deleteTree(previous) }
+            val _ = runCatching { deleteTree(previous) }
             throw e
         }
     }

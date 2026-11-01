@@ -183,7 +183,7 @@ class AudioPlayer(
         queueWrite?.cancel()
         queueWrite = scope.launch {
             delay(QUEUE_WRITE_DELAY_MS.milliseconds)
-            withContext(Dispatchers.IO) { runCatching { persistQueue(files, index) } }
+            withContext(Dispatchers.IO) { val _ = runCatching { persistQueue(files, index) } }
         }
     }
 
@@ -433,7 +433,7 @@ class AudioPlayer(
         volumeWrite?.cancel()
         volumeWrite = scope.launch {
             delay(VOLUME_WRITE_DELAY_MS.milliseconds)
-            withContext(Dispatchers.IO) { runCatching { persistVolume(clamped) } }
+            withContext(Dispatchers.IO) { val _ = runCatching { persistVolume(clamped) } }
         }
     }
 

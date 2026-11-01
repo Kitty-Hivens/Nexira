@@ -43,7 +43,7 @@ internal class LoaderSourceCache(private val root: Path?) {
     /** Drops an entry that turned out unreadable, so the next attempt fetches it again. */
     fun discard(file: Path?) {
         file ?: return
-        runCatching { Files.deleteIfExists(file) }
+        val _ = runCatching { Files.deleteIfExists(file) }
     }
 
     private companion object {

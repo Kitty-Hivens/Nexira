@@ -44,9 +44,9 @@ class DesktopIntegration {
         }
 
         Files.writeString(entry, desktopEntryContent(appImage, icon))
-        runCatching { entry.toFile().setExecutable(true) }
+        val _ = runCatching { entry.toFile().setExecutable(true) }
         // Best-effort menu refresh; absent on minimal systems, never fatal.
-        runCatching { ProcessBuilder("update-desktop-database", appsDir.toString()).start() }
+        val _ = runCatching { ProcessBuilder("update-desktop-database", appsDir.toString()).start() }
 
         logger.info("Installed desktop entry at {}", entry)
         entry
@@ -69,7 +69,7 @@ class DesktopIntegration {
         val appImage = System.getenv("APPIMAGE") ?: return@runCatching false
         val home = System.getProperty("user.home") ?: return@runCatching false
         if (!isDeadEntry(entryPath(home), appImage)) return@runCatching false
-        installEntry().getOrThrow()
+        val _ = installEntry().getOrThrow()
         logger.info("Desktop entry pointed at a missing AppImage, now at {}", appImage)
         true
     }.onFailure { logger.warn("Failed to heal desktop entry", it) }

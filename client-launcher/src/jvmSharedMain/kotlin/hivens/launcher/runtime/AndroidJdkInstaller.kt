@@ -86,9 +86,11 @@ class AndroidJdkInstaller(
             deleteTree(previous)
             deleteTree(incoming)
         } catch (e: Exception) {
-            runCatching { deleteTree(incoming) }
-            if (!Files.exists(home) && Files.exists(previous)) runCatching { Files.move(previous, home) }
-            runCatching { deleteTree(previous) }
+            val _ = runCatching { deleteTree(incoming) }
+            if (!Files.exists(home) && Files.exists(previous)) {
+                val _ = runCatching { Files.move(previous, home) }
+            }
+            val _ = runCatching { deleteTree(previous) }
             throw e
         }
     }

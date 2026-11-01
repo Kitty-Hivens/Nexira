@@ -136,7 +136,7 @@ internal object PendingVariants {
     private fun write(clientDir: Path, ops: Collection<Op>) {
         val file = clientDir.resolve(FILE_NAME)
         if (ops.isEmpty()) {
-            runCatching { Files.deleteIfExists(file) }
+            val _ = runCatching { Files.deleteIfExists(file) }
             return
         }
         // Replaced whole, like the roster: a snapshot hardlinks it.

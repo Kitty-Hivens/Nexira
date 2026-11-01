@@ -86,7 +86,7 @@ class LibTrayController : TrayController {
             synchronized(lifecycle) {
                 if (generation != mine) {
                     // Shut down while the host was being reached: this tray is nobody's.
-                    runCatching { t.close() }
+                    val _ = runCatching { t.close() }
                     return
                 }
                 tray = t
@@ -156,8 +156,8 @@ class LibTrayController : TrayController {
     override fun shutdown() {
         synchronized(lifecycle) {
             generation++
-            runCatching { subscription?.close() }
-            runCatching { tray?.close() }
+            val _ = runCatching { subscription?.close() }
+            val _ = runCatching { tray?.close() }
             tray = null
             subscription = null
             gameRunning = false

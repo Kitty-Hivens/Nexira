@@ -359,7 +359,7 @@ internal class MacOSKeychainStorage : IKeyringStorage {
         val release = cfReleaseHandle ?: return
         for (ref in refs) {
             if (ref.address() == 0L) continue
-            runCatching { release.invokeExact(ref) as Unit }
+            val _ = runCatching { release.invokeExact(ref) as Unit }
         }
     }
 }

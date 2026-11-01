@@ -96,7 +96,7 @@ class InstanceContentManager {
                 resolveWithinRoot(dir, if (enabled) newFileName else newFileName + DISABLED_SUFFIX)
             }.getOrElse {
                 log.warn("Refusing to replace {} with {}: {}", oldFileName, newFileName, it.message)
-                runCatching { Files.deleteIfExists(source) }
+                val _ = runCatching { Files.deleteIfExists(source) }
                 return@withLock false
             }
             runCatching {
@@ -115,7 +115,7 @@ class InstanceContentManager {
                 log.warn("Replacing {} with {} failed: {}", oldFileName, newFileName, it.message)
                 // The replacement never landed anywhere the game would load it,
                 // so take the scratch copy down with the failure.
-                runCatching { Files.deleteIfExists(source) }
+                val _ = runCatching { Files.deleteIfExists(source) }
                 false
             }
         }
@@ -145,12 +145,12 @@ class InstanceContentManager {
                 resolveWithinRoot(dir, if (enabled) fileName else fileName + DISABLED_SUFFIX)
             }.getOrElse {
                 log.warn("Refusing to place {}: {}", fileName, it.message)
-                runCatching { Files.deleteIfExists(source) }
+                val _ = runCatching { Files.deleteIfExists(source) }
                 return@withLock false
             }
             if (Files.exists(dir.resolve(fileName)) || Files.exists(dir.resolve(fileName + DISABLED_SUFFIX))) {
                 log.warn("Refusing to place {}: the name is taken", fileName)
-                runCatching { Files.deleteIfExists(source) }
+                val _ = runCatching { Files.deleteIfExists(source) }
                 return@withLock false
             }
             runCatching {
@@ -161,7 +161,7 @@ class InstanceContentManager {
                 true
             }.getOrElse {
                 log.warn("Placing {} failed: {}", fileName, it.message)
-                runCatching { Files.deleteIfExists(source) }
+                val _ = runCatching { Files.deleteIfExists(source) }
                 false
             }
         }
@@ -197,7 +197,7 @@ class InstanceContentManager {
                         }
                     }.getOrElse {
                         log.warn("Add {} failed: {}", src, it.message)
-                        runCatching { Files.deleteIfExists(staged) }
+                        val _ = runCatching { Files.deleteIfExists(staged) }
                         false
                     }
                 }

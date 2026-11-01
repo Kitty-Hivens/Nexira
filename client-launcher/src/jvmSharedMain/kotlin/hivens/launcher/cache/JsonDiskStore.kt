@@ -36,13 +36,13 @@ class JsonDiskStore<V>(
         return runCatching {
             val env = json.decodeFromString(envelopeSerializer, readUtf8(file))
             if (env.schemaVersion != SCHEMA_VERSION) {
-                runCatching { Files.deleteIfExists(file) }
+                val _ = runCatching { Files.deleteIfExists(file) }
                 return null
             }
             StoredEntry(env.value, env.storedAt)
         }.getOrElse { e ->
             log.debug("cache disk entry {} unreadable; dropping", file, e)
-            runCatching { Files.deleteIfExists(file) }
+            val _ = runCatching { Files.deleteIfExists(file) }
             null
         }
     }
@@ -55,7 +55,7 @@ class JsonDiskStore<V>(
     }
 
     override fun delete(key: String) {
-        runCatching { Files.deleteIfExists(fileFor(key)) }
+        val _ = runCatching { Files.deleteIfExists(fileFor(key)) }
     }
 
     override fun clear() {
@@ -67,7 +67,7 @@ class JsonDiskStore<V>(
                     // Also sweep AtomicFiles' "<hash>.json.tmp" left by a write that
                     // crashed between temp-create and rename; reads never touch it.
                     n.endsWith(".json") || n.endsWith(".json.tmp")
-                }.forEach { runCatching { Files.deleteIfExists(it) } }
+                }.forEach { val _ = runCatching { Files.deleteIfExists(it) } }
             }
         }.onFailure { log.warn("cache clear failed for {}", dir, it) }
     }

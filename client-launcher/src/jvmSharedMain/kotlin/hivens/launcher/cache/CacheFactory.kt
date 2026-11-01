@@ -53,7 +53,7 @@ class CacheFactory(
             // NotCompliantMBeanException before the shell starts. Disabling it sidesteps both.
             val config = EnvironmentConfig().setManagementEnabled(false)
             Environments.newInstance(dir.toFile(), config).also { e ->
-                val hook = Thread { runCatching { e.close() } }
+                val hook = Thread { val _ = runCatching { e.close() } }
                 shutdownHook = hook
                 Runtime.getRuntime().addShutdownHook(hook)
             }
@@ -66,8 +66,8 @@ class CacheFactory(
     /** Closes the cache environment and drops its shutdown hook. No-op if it was never opened. */
     fun close() {
         val hook = shutdownHook ?: return
-        runCatching { Runtime.getRuntime().removeShutdownHook(hook) }
-        runCatching { env?.close() }
+        val _ = runCatching { Runtime.getRuntime().removeShutdownHook(hook) }
+        val _ = runCatching { env?.close() }
         shutdownHook = null
     }
 

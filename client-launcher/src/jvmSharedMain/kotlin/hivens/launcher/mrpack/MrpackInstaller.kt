@@ -368,7 +368,7 @@ class MrpackInstaller(
                 zip.getInputStream(zip.getEntry(entry.name)).use { input -> budget.copyTo(input, staged) }
                 moveAtomic(staged, dest)
             } catch (e: Throwable) {
-                runCatching { Files.deleteIfExists(staged) }
+                val _ = runCatching { Files.deleteIfExists(staged) }
                 throw e
             }
             written++
@@ -430,7 +430,7 @@ class MrpackInstaller(
         val instance = install(archive, source, iconUrl, bannerUrl, onReserveDir, progress)
         // Dropped only once the install is through. A failure leaves the archive for
         // the next attempt to continue from instead of pulling it again.
-        runCatching { Files.deleteIfExists(archive) }
+        val _ = runCatching { Files.deleteIfExists(archive) }
         instance
     }
 

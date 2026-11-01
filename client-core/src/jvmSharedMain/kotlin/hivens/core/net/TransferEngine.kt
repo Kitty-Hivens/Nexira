@@ -703,7 +703,7 @@ class TransferEngine(
         if (declared < parallelThreshold || have <= 0L) return
         val whole = (have / blockSize).toInt()
         if (whole <= 0) return
-        runCatching {
+        val _ = runCatching {
             FileChannel.open(partial, StandardOpenOption.WRITE).use { it.truncate(whole.toLong() * blockSize) }
             journals.write(
                 partial,
@@ -802,7 +802,7 @@ class TransferEngine(
     private fun partialOf(dest: Path): Path = TransferStaging.partialOf(dest)
 
     private fun dropPartial(partial: Path) {
-        runCatching { Files.deleteIfExists(partial) }
+        val _ = runCatching { Files.deleteIfExists(partial) }
     }
 
     /**

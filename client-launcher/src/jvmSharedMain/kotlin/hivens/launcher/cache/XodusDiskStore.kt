@@ -133,7 +133,7 @@ class XodusDiskStore<V>(
 
     override fun delete(key: String) {
         val env = environment() ?: return
-        runCatching {
+        val _ = runCatching {
             env.executeInTransaction { txn ->
                 env.openStore(storeName, StoreConfig.WITHOUT_DUPLICATES, txn).delete(txn, keyOf(key))
             }

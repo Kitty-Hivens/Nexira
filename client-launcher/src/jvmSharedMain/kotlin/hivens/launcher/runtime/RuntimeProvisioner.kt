@@ -567,7 +567,7 @@ class RuntimeProvisioner(
                     Files.copy(candidate, tmp, StandardCopyOption.REPLACE_EXISTING)
                     moveAtomic(tmp, task.dest)
                 } finally {
-                    runCatching { Files.deleteIfExists(tmp) }
+                    val _ = runCatching { Files.deleteIfExists(tmp) }
                 }
             }
             true
@@ -618,7 +618,7 @@ class RuntimeProvisioner(
             Files.write(tmp, bytes)
             moveAtomic(tmp, dest)
         } finally {
-            runCatching { Files.deleteIfExists(tmp) }
+            val _ = runCatching { Files.deleteIfExists(tmp) }
         }
     }
 
@@ -644,7 +644,7 @@ class RuntimeProvisioner(
             Files.copy(src, tmp, StandardCopyOption.REPLACE_EXISTING)
             moveAtomic(tmp, dest)
         } finally {
-            runCatching { Files.deleteIfExists(tmp) }
+            val _ = runCatching { Files.deleteIfExists(tmp) }
         }
     }
 

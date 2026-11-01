@@ -167,7 +167,7 @@ object DataDirMigration {
     }
 
     private fun writeMarker(marker: Path, target: Path) {
-        runCatching {
+        val _ = runCatching {
             Files.writeString(marker, "Migrated to $target at ${Instant.now()}\n")
         }
     }

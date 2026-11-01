@@ -119,13 +119,13 @@ object SingleInstance {
         val lock = heldLock
         heldLock = null
         heldChannel = null
-        runCatching { lock?.release() }
-        runCatching { channel?.close() }
+        val _ = runCatching { lock?.release() }
+        val _ = runCatching { channel?.close() }
         if (channel != null) log.info("Single-instance lock released")
     }
 
     private fun writeShowSignal(dataDir: Path) {
-        runCatching {
+        val _ = runCatching {
             val show = dataDir.resolve(".show")
             // Atomic create -- the prior `if (!Files.exists) createFile` was
             // a TOCTOU window: two launchers started in the same millisecond
@@ -153,7 +153,7 @@ object SingleInstance {
      * `cat ~/.local/share/nexira/.lock.pid` debugging.
      */
     private fun writePid(dataDir: Path) {
-        runCatching {
+        val _ = runCatching {
             Files.writeString(dataDir.resolve(".lock.pid"), "${ProcessHandle.current().pid()}\n")
         }
     }

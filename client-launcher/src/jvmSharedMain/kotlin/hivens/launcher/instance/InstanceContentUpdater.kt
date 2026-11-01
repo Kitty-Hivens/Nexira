@@ -392,12 +392,14 @@ class InstanceContentUpdater(
                             failed = if (ok) run.failed else run.failed + name,
                         )
                     }
-                    if (ok) runCatching { onChanged() }
+                    if (ok) {
+                        val _ = runCatching { onChanged() }
+                    }
                 }
             }.awaitAll()
         }
         mark(key) { it.copy(current = null, finished = true) }
-        runCatching { onChanged() }
+        val _ = runCatching { onChanged() }
     }
 
     /** Drop a finished run once the screen has shown its outcome. */
@@ -501,11 +503,11 @@ internal suspend fun swapIn(
 internal suspend fun sweepContentScratch(instanceDir: Path, kinds: List<ContentKind>) = withContext(Dispatchers.IO) {
     for (kind in kinds) {
         val dir = instanceDir.resolve(kind.folderName())
-        runCatching {
+        val _ = runCatching {
             if (!Files.isDirectory(dir)) return@runCatching
             Files.list(dir).use { stream ->
                 stream.filter { it.fileName.toString().startsWith(InstanceContentUpdater.SCRATCH_PREFIX) }
-                    .forEach { runCatching { Files.deleteIfExists(it) } }
+                    .forEach { val _ = runCatching { Files.deleteIfExists(it) } }
             }
         }
     }

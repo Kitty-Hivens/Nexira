@@ -48,8 +48,11 @@ fun deleteTree(path: Path, clearReadOnly: Boolean = true) {
                 if (!retry) throw e
                 // Not a read-only mark, or not a filesystem that has one: the first
                 // refusal is the answer.
-                runCatching { Files.setAttribute(file, "dos:readonly", false, LinkOption.NOFOLLOW_LINKS) }
-                    .getOrElse { throw e }
+                try {
+                    Files.setAttribute(file, "dos:readonly", false, LinkOption.NOFOLLOW_LINKS)
+                } catch (_: Throwable) {
+                    throw e
+                }
                 Files.deleteIfExists(file)
             }
             return FileVisitResult.CONTINUE

@@ -70,7 +70,7 @@ class MacUpdateApplicatorTest {
                 }
             }
             .start()
-        process.inputStream.readBytes()
+        val _ = process.inputStream.readBytes()
         assertTrue(process.waitFor(30, TimeUnit.SECONDS), "the script did not finish")
         return process.exitValue()
     }

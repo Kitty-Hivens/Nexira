@@ -207,7 +207,7 @@ class PrismLauncherSource(
         var loaderVersion: String? = null
         var legacyMappings = false
         // mmc-pack.json's `components` is an array of {uid, version}; walk it tolerantly.
-        runCatching {
+        val _ = runCatching {
             val comps = json.parseToJsonElement(Files.readString(dir.resolve("mmc-pack.json")))
                 .jsonObject["components"] as? JsonArray ?: return@runCatching
             comps.forEach { el ->

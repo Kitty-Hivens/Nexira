@@ -166,8 +166,10 @@ class PackSnapshotService(
         json.decodeFromString(SnapshotRecord.serializer(), readUtf8(dir.resolve("snapshot.json")))
 
     private fun linkOrCopy(src: Path, dst: Path, replace: Boolean) {
-        if (replace) runCatching { Files.deleteIfExists(dst) }
-        runCatching { Files.createLink(dst, src) }
+        if (replace) {
+            val _ = runCatching { Files.deleteIfExists(dst) }
+        }
+        val _ = runCatching { Files.createLink(dst, src) }
             .recoverCatching {
                 if (replace) {
                     Files.copy(src, dst, StandardCopyOption.REPLACE_EXISTING)

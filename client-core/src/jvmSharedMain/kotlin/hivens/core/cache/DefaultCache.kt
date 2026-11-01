@@ -319,7 +319,7 @@ class DefaultCache<V>(
                     if (op.delete) {
                         runCatching { diskStore.delete(key) }
                     } else if (op.epoch == diskEpoch) {
-                        runCatching { diskStore.write(key, op.value as V, op.storedAtMillis) }
+                        val _ = runCatching { diskStore.write(key, op.value as V, op.storedAtMillis) }
                     }
                     // else: an invalidateAll bumped the epoch after this op was
                     // produced; dropping the write avoids resurrecting a cleared value.

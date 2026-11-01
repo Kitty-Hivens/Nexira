@@ -117,11 +117,11 @@ class VideoCacheService(
 
     // LRU touch -- eviction picks the oldest mtime, so a cache hit refreshes it.
     private fun touch(target: Path) {
-        runCatching { Files.setLastModifiedTime(target, FileTime.fromMillis(System.currentTimeMillis())) }
+        val _ = runCatching { Files.setLastModifiedTime(target, FileTime.fromMillis(System.currentTimeMillis())) }
     }
 
     private fun evictOverCap() {
-        runCatching {
+        val _ = runCatching {
             val files = Files.list(dir).use { stream ->
                 stream.iterator().asSequence()
                     .filter { Files.isRegularFile(it) && !VideoCacheFiles.isPartial(it.fileName.toString()) }

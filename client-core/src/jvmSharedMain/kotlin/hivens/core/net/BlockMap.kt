@@ -75,7 +75,7 @@ class BlockMapStore(private val json: Json = DEFAULT_JSON) {
     }
 
     fun delete(dest: Path) {
-        runCatching { Files.deleteIfExists(pathFor(dest)) }
+        val _ = runCatching { Files.deleteIfExists(pathFor(dest)) }
     }
 
     private fun pathFor(dest: Path): Path {

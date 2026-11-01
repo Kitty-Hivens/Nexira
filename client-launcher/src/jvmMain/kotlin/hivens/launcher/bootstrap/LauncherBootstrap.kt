@@ -149,7 +149,7 @@ object LauncherBootstrap {
             // The data dir may not exist yet on a fresh install; the lock file
             // needs its parent. Idempotent, and completeCore re-creates after
             // a potential data-dir move.
-            runCatching { Files.createDirectories(initialPaths.dataDir) }
+            val _ = runCatching { Files.createDirectories(initialPaths.dataDir) }
             // Acquired BEFORE any window shows: a duplicate launch drops the
             // .show signal for the running instance and exits without ever
             // flashing a window of its own. Also before migration is consulted
@@ -228,7 +228,7 @@ object LauncherBootstrap {
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
             val handlerLog = LoggerFactory.getLogger("CrashHandler")
             handlerLog.error("Uncaught exception on thread '${thread.name}'", throwable)
-            runCatching {
+            val _ = runCatching {
                 val report     = crashReporter.generate(throwable, thread)
                 val reportFile = crashReporter.saveToDisk(report)
                 handlerLog.error("Crash report written to {}", reportFile.absolutePath)

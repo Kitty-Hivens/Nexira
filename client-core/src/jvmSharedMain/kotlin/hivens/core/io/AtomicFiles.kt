@@ -92,7 +92,7 @@ object AtomicFiles {
 
     /** Flush the temp file's bytes to stable storage before the rename publishes it. */
     private fun fsyncFile(file: Path) {
-        runCatching {
+        val _ = runCatching {
             FileChannel.open(file, StandardOpenOption.WRITE).use { it.force(true) }
         }
     }
@@ -103,7 +103,7 @@ object AtomicFiles {
      * non-POSIX filesystems), where this is a no-op.
      */
     private fun fsyncDir(dir: Path) {
-        runCatching {
+        val _ = runCatching {
             FileChannel.open(dir, StandardOpenOption.READ).use { it.force(true) }
         }
     }

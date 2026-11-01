@@ -472,7 +472,7 @@ class UpdateService(
     }
 
     private fun updateLastMetaCheck() {
-        runCatching {
+        val _ = runCatching {
             Files.writeString(lastMetaCheckFile, System.currentTimeMillis().toString())
         }
     }

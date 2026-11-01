@@ -148,18 +148,22 @@ internal class ProcessLaunchHandle(
      */
     override fun terminate() {
         val children = runCatching { process.descendants().toList() }.getOrDefault(emptyList())
-        runCatching { process.destroy() }
+        val _ = runCatching { process.destroy() }
         Thread {
             val exited = runCatching { process.waitFor(TERMINATE_GRACE_SECONDS, TimeUnit.SECONDS) }
                 .getOrDefault(false)
-            if (!exited) runCatching { process.destroyForcibly() }
+            if (!exited) {
+                val _ = runCatching { process.destroyForcibly() }
+            }
             val left = children.filter { it.isAlive }
-            left.forEach { runCatching { it.destroy() } }
+            left.forEach { val _ = runCatching { it.destroy() } }
             val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(TERMINATE_GRACE_SECONDS)
             left.forEach { child ->
                 val remaining = (deadline - System.nanoTime()).coerceAtLeast(0L)
                 val gone = runCatching { child.onExit().get(remaining, TimeUnit.NANOSECONDS); true }.getOrDefault(false)
-                if (!gone) runCatching { child.destroyForcibly() }
+                if (!gone) {
+                    val _ = runCatching { child.destroyForcibly() }
+                }
             }
         }.apply {
             isDaemon = true

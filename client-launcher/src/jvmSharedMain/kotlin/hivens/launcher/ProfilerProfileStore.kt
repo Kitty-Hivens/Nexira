@@ -62,7 +62,7 @@ class ProfilerProfileStore(private val json: Json) {
 
     /** Consumes the agent's metrics file so a session is folded exactly once. */
     fun deleteMetrics(instanceDir: Path) {
-        runCatching { Files.deleteIfExists(metricsPath(instanceDir)) }
+        val _ = runCatching { Files.deleteIfExists(metricsPath(instanceDir)) }
     }
 
     companion object {
