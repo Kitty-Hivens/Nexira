@@ -1,5 +1,6 @@
 package hivens.ui.widgets.modules
 
+import hivens.widget.api.ScreenEffect
 import hivens.widget.api.WidgetRegistry
 import java.nio.file.Path
 
@@ -14,6 +15,9 @@ interface LoadedModule : AutoCloseable {
     val name: String
     val file: Path
     val registry: WidgetRegistry
+
+    /** The screen effects this module carries, none for one that only has widgets. */
+    val effects: List<ScreenEffect> get() = emptyList()
 
     /** The names of the files this module's code is read from, so copies nothing reads any more can be swept. */
     val filesInUse: Set<String>

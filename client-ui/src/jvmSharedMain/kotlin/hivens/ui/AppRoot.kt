@@ -48,6 +48,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import okhttp3.Call
+import hivens.ui.widgets.modules.ScreenEffectHost
+import hivens.ui.widgets.modules.WidgetModules
+import org.koin.compose.getKoin
 import org.koin.compose.koinInject
 import org.slf4j.LoggerFactory
 import java.nio.file.Path
@@ -309,98 +312,109 @@ fun AppRoot(
 
     LaunchedEffect(tone.avgLuminance) { onWallpaperLuminance(tone.avgLuminance) }
 
-    Box(
-        Modifier
-            .fillMaxSize()
-            // Base fill behind the wallpaper: while a custom background decodes (or its
-            // first video frame arrives) CustomBackground paints nothing, and without
-            // this the bare window default -- a flat grey -- shows through. The theme
-            // surface is covered edge-to-edge once the image is ready.
-            .background(NxColor.page)
-            .onSizeChanged { windowSize = it }
-            .pointerInput(Unit) {
-                awaitPointerEventScope {
-                    while (true) {
-                        val event = awaitPointerEvent(PointerEventPass.Initial)
-                        val change = event.changes.firstOrNull()
-                        val touch = change?.type == PointerType.Touch
-                        if (event.type == PointerEventType.Move || (touch && event.type == PointerEventType.Press)) {
-                            val pos = change?.position
-                            if (pos != null && windowSize.width > 0 && windowSize.height > 0) {
-                                mousePxPos.value = pos
-                                mousePos.value   = Offset(pos.x / windowSize.width, pos.y / windowSize.height)
+    // What the person chose to look through, if a module brought it. Read where the shell does, so
+    // an effect switched on or a module switched off takes hold on the next frame.
+    val modules = getKoin().getOrNull<WidgetModules>()
+    val effects = modules?.state?.collectAsState()?.value?.effects.orEmpty()
+    ScreenEffectHost(
+        effects       = effects,
+        selected      = customization.screenEffect,
+        intensity     = customization.screenEffectIntensity,
+        reducedMotion = customization.reduceMotion,
+    ) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                // Base fill behind the wallpaper: while a custom background decodes (or its
+                // first video frame arrives) CustomBackground paints nothing, and without
+                // this the bare window default -- a flat grey -- shows through. The theme
+                // surface is covered edge-to-edge once the image is ready.
+                .background(NxColor.page)
+                .onSizeChanged { windowSize = it }
+                .pointerInput(Unit) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            val event = awaitPointerEvent(PointerEventPass.Initial)
+                            val change = event.changes.firstOrNull()
+                            val touch = change?.type == PointerType.Touch
+                            if (event.type == PointerEventType.Move || (touch && event.type == PointerEventType.Press)) {
+                                val pos = change?.position
+                                if (pos != null && windowSize.width > 0 && windowSize.height > 0) {
+                                    mousePxPos.value = pos
+                                    mousePos.value   = Offset(pos.x / windowSize.width, pos.y / windowSize.height)
+                                }
+                            } else if (touch && event.type == PointerEventType.Release) {
+                                // A finger has no resting place on the glass, so the picture goes back to centre.
+                                mousePos.value = Offset(0.5f, 0.5f)
                             }
-                        } else if (touch && event.type == PointerEventType.Release) {
-                            // A finger has no resting place on the glass, so the picture goes back to centre.
-                            mousePos.value = Offset(0.5f, 0.5f)
                         }
                     }
                 }
-            }
-    ) {
-      WallpaperLayer(
-          settings         = backgroundSettings,
-          mousePosProvider = { mousePos.value },
-          // Colours are passed on as reported and not from the initial state, which
-          // would clear the stored ones on every start before the picture decoded.
-          onTone           = { tone = it; onWallpaperColours(it.colours) },
-          // The one setting a player widget can move while the wallpaper is what
-          // its transport is pointed at. Through the same state the appearance
-          // panel writes, so the two sliders are one value and the debounce above
-          // persists it once.
-          onAudioVolume    = { volume -> backgroundManager.update { it.copy(audioVolume = volume) } },
-      )
-
-      af.WrapContent(
-          pixelCursorState = mousePxPos,
-          windowSize       = windowSize,
-          onRealClose      = onRealExit,
-          onHideTray       = onHideToTray,
-      ) {
-          AppLayout(
-              appState = appState,
-              currentScreen = backStack.current,
-              onScreenChange = backStack::navigate,
-              onSwitchTab = backStack::switchTo,
-              onReplaceScreen = backStack::replaceCurrent,
-              onBack = { backStack.back() },
-              canGoBack = backStack.canGoBack,
-              canGoForward = backStack.canGoForward,
-              onForward = { backStack.forward() },
-              trail = backStack.trail,
-              onPopTo = backStack::popTo,
-              onLogin = { session -> appState = AppState.Authenticated(session) },
-              onLogout = { pendingLogout = true },
-              isDarkTheme = isDarkTheme,
-              onToggleDarkTheme = onToggleDarkTheme,
-              themeMode = themeMode,
-              onThemeModeChanged = onThemeModeChanged,
-              systemThemeAvailable = systemThemeAvailable,
-              themeLibrary = themeLibrary,
-              onThemeSelected = onThemeSelected,
-              currentLocale = currentLocale,
-              onLocaleChanged = onLocaleChanged,
-              backgroundSettings = backgroundSettings,
-              onBackgroundSettingsChanged = { change -> backgroundManager.update(change) },
-              customization              = customization,
-              onCustomizationChanged     = onCustomizationChanged,
+        ) {
+          WallpaperLayer(
+              settings         = backgroundSettings,
+              mousePosProvider = { mousePos.value },
+              // Colours are passed on as reported and not from the initial state, which
+              // would clear the stored ones on every start before the picture decoded.
+              onTone           = { tone = it; onWallpaperColours(it.colours) },
+              // The one setting a player widget can move while the wallpaper is what
+              // its transport is pointed at. Through the same state the appearance
+              // panel writes, so the two sliders are one value and the debounce above
+              // persists it once.
+              onAudioVolume    = { volume -> backgroundManager.update { it.copy(audioVolume = volume) } },
           )
 
-          NotificationStack()
-
-          if (pendingLogout) {
-              val s = LocalStrings.current
-              DestructiveConfirmDialog(
-                  title        = s.logoutConfirmTitle,
-                  body         = s.logoutConfirmBody,
-                  confirmLabel = s.navLogout,
-                  onConfirm    = doLogout,
-                  onDismiss    = { pendingLogout = false },
+          af.WrapContent(
+              pixelCursorState = mousePxPos,
+              windowSize       = windowSize,
+              onRealClose      = onRealExit,
+              onHideTray       = onHideToTray,
+          ) {
+              AppLayout(
+                  appState = appState,
+                  currentScreen = backStack.current,
+                  onScreenChange = backStack::navigate,
+                  onSwitchTab = backStack::switchTo,
+                  onReplaceScreen = backStack::replaceCurrent,
+                  onBack = { backStack.back() },
+                  canGoBack = backStack.canGoBack,
+                  canGoForward = backStack.canGoForward,
+                  onForward = { backStack.forward() },
+                  trail = backStack.trail,
+                  onPopTo = backStack::popTo,
+                  onLogin = { session -> appState = AppState.Authenticated(session) },
+                  onLogout = { pendingLogout = true },
+                  isDarkTheme = isDarkTheme,
+                  onToggleDarkTheme = onToggleDarkTheme,
+                  themeMode = themeMode,
+                  onThemeModeChanged = onThemeModeChanged,
+                  systemThemeAvailable = systemThemeAvailable,
+                  themeLibrary = themeLibrary,
+                  onThemeSelected = onThemeSelected,
+                  currentLocale = currentLocale,
+                  onLocaleChanged = onLocaleChanged,
+                  backgroundSettings = backgroundSettings,
+                  onBackgroundSettingsChanged = { change -> backgroundManager.update(change) },
+                  customization              = customization,
+                  onCustomizationChanged     = onCustomizationChanged,
               )
+
+              NotificationStack()
+
+              if (pendingLogout) {
+                  val s = LocalStrings.current
+                  DestructiveConfirmDialog(
+                      title        = s.logoutConfirmTitle,
+                      body         = s.logoutConfirmBody,
+                      confirmLabel = s.navLogout,
+                      onConfirm    = doLogout,
+                      onDismiss    = { pendingLogout = false },
+                  )
+              }
+              // Automation bypass for the now two-step logout (request -> confirm).
+              PuppetClick("logout.confirm") { doLogout() }
           }
-          // Automation bypass for the now two-step logout (request -> confirm).
-          PuppetClick("logout.confirm") { doLogout() }
-      }
+        }
     }
 }
 

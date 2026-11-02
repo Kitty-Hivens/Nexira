@@ -189,6 +189,10 @@ fun AppLayout(
                             onSurfaceBlurChanged = { onCustomizationChanged(customization.copy(surfaceBlur = it)) },
                             reduceMotion      = customization.reduceMotion,
                             onReduceMotionChanged = { onCustomizationChanged(customization.copy(reduceMotion = it)) },
+                            screenEffect      = customization.screenEffect,
+                            onScreenEffectChanged = { onCustomizationChanged(customization.copy(screenEffect = it)) },
+                            screenEffectIntensity = customization.screenEffectIntensity,
+                            onScreenEffectIntensityChanged = { onCustomizationChanged(customization.copy(screenEffectIntensity = it)) },
                             onOpenThemePicker = { onScreenChange(Screen.ThemePicker) },
                         )
 

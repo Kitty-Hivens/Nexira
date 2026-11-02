@@ -3,6 +3,7 @@ package hivens.ui.widgets.modules
 import hivens.core.io.AtomicFiles
 import hivens.core.io.readUtf8
 import hivens.widget.api.CompositeWidgetRegistry
+import hivens.widget.api.ScreenEffect
 import hivens.widget.api.WidgetDescriptor
 import hivens.widget.api.WidgetRegistry
 import hivens.widget.model.WidgetKind
@@ -75,7 +76,7 @@ class WidgetModules(
     }
 
     /** The registry and the list, together, so a reader never sees one without the other. */
-    data class Snapshot(val registry: WidgetRegistry, val entries: List<Entry>)
+    data class Snapshot(val registry: WidgetRegistry, val entries: List<Entry>, val effects: List<ScreenEffect> = emptyList())
 
     /** A module that crashed and was switched off, for the notice the shell shows once it is back up. */
     data class CrashNotice(val name: String, val failure: String)
@@ -193,6 +194,16 @@ class WidgetModules(
         composite.shadowed.forEach {
             log.warn("Widget '{}' from '{}' is shadowed by '{}' and will not be used", it.kind.value, labels[it.bySource], labels[it.heldBy])
         }
+        // One effect per id. A module that repeats another's loses it, and says so, for the same
+        // reason a shadowed widget does.
+        val effects = LinkedHashMap<String, ScreenEffect>()
+        scan.loaded.forEach { module ->
+            module.effects.forEach { effect ->
+                if (effects.putIfAbsent(effect.id, effect) != null) {
+                    log.warn("Screen effect '{}' from '{}' is shadowed by an earlier module and will not be used", effect.id, module.id)
+                }
+            }
+        }
         val present = (scan.loaded.map { it.id } + scan.disabled.map { it.id }).toSet()
         val entries = buildList {
             scan.loaded.forEach { add(Entry.Loaded(it.id, it.name, it.file, it.registry.all().size)) }
@@ -200,7 +211,7 @@ class WidgetModules(
             scan.rejected.forEach { add(Entry.Refused(it.file, it.reason)) }
             (saved.known.keys + saved.disabled.keys).filter { it !in present }.sorted().forEach { add(Entry.Gone(it)) }
         }
-        return Snapshot(composite, entries)
+        return Snapshot(composite, entries, effects.values.toList())
     }
 
     private fun release(leaving: List<LoadedModule>) {

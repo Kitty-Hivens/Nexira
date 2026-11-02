@@ -102,6 +102,10 @@ interface AppStrings {
 
     /** Said under a setting the device cannot honour, which is shown but cannot be changed. */
     val settingsUnsupportedHere: String
+    val screenEffectTitle: String
+    val screenEffectOff: String
+    val screenEffectStrength: String
+    val screenEffectWarning: String
     val settingsCloseAfterLaunch: String
     val settingsCloseAfterLaunchDesc: String
     val settingsSaved: String

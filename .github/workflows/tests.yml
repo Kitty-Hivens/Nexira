@@ -104,7 +104,7 @@ jobs:
           :client-easter:desktopTest :nx-ui:desktopTest
           :widget-api:test :widget-model:test :widget-processor:test :widget-loader:test
           :authlib-agent:test :profiler-agent:test
-          :experimental:client-boot:test :examples:widget-pixelplayer:test
+          :experimental:client-boot:test :examples:widget-pixelplayer:test :examples:widget-screenfx:test
           --continue
 
       # The runtime-module guard is a config-time read with no compilation behind

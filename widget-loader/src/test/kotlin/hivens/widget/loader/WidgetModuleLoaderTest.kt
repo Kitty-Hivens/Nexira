@@ -154,6 +154,43 @@ class WidgetModuleLoaderTest {
     }
 
     @Test
+    fun `a module brings its screen effects out of its own jar`() {
+        install("good.jar")
+
+        val effect = scan().loaded.single().effects.single()
+
+        assertEquals("fixture.effect", effect.id)
+        assertEquals("Fixture Effect", effect.displayName)
+        assertTrue(effect.javaClass.classLoader !== javaClass.classLoader, "the effect resolved through the parent loader")
+    }
+
+    @Test
+    fun `a module that carries only screen effects is a module with no widgets`() {
+        install("effects-only.jar", withRegistryService = false)
+
+        val scan = scan()
+
+        assertEquals(emptyList(), scan.rejected)
+        val module = scan.loaded.single()
+        assertEquals(emptyMap(), module.registry.all())
+        assertEquals(listOf("fixture.effect"), module.effects.map { it.id })
+    }
+
+    @Test
+    fun `a screen effect with no id is refused, not offered under a blank name`() {
+        install("good.jar")
+        System.setProperty("fixture.effectBlankId", "1")
+        val scan = try {
+            scan()
+        } finally {
+            System.clearProperty("fixture.effectBlankId")
+        }
+
+        assertEquals(emptyList(), scan.loaded)
+        assertTrue("no id" in scan.rejected.single().reason, scan.rejected.single().reason)
+    }
+
+    @Test
     fun `a damaged jar is refused rather than taking the scan down with it`() {
         modules.resolve("broken.jar").writeText("this is not a zip")
         install("good.jar")
@@ -288,6 +325,7 @@ class WidgetModuleLoaderTest {
         api: Int? = WidgetApi.VERSION,
         apiText: String? = null,
         withService: Boolean = true,
+        withRegistryService: Boolean = true,
     ) {
         val manifest = Manifest().apply {
             mainAttributes[Attributes.Name.MANIFEST_VERSION] = "1.0"
@@ -301,6 +339,7 @@ class WidgetModuleLoaderTest {
                     .filterNot { it.isDirectory }
                     .filterNot { it.name.equals("META-INF/MANIFEST.MF", ignoreCase = true) }
                     .filterNot { !withService && it.name.startsWith("META-INF/services/") }
+                    .filterNot { !withRegistryService && it.name == "META-INF/services/hivens.widget.api.WidgetRegistry" }
                     .forEach { entry ->
                         out.putNextEntry(JarEntry(entry.name))
                         source.getInputStream(entry).use { it.copyTo(out) }

@@ -1,9 +1,11 @@
 package hivens.widget.loader
 
+import hivens.widget.api.ScreenEffect
 import hivens.widget.api.WidgetApi
 import hivens.widget.api.WidgetDescriptor
 import hivens.widget.api.WidgetRegistry
 import hivens.widget.api.widgetPropsJson
+import hivens.widget.model.WidgetKind
 import org.slf4j.LoggerFactory
 import java.net.URLClassLoader
 import java.nio.file.Files
@@ -31,6 +33,8 @@ data class LoadedWidgetModule(
     val file: Path,
     val registry: WidgetRegistry,
     val loader: URLClassLoader,
+    /** The screen effects it carries, which is none for a module that only has widgets. */
+    val effects: List<ScreenEffect> = emptyList(),
 ) : WidgetModuleResult
 
 /**
@@ -180,17 +184,32 @@ class WidgetModuleLoader(
             return RejectedWidgetModule(jar, "could not instantiate its registry: ${it.message}")
         }
 
-        return when (registries.size) {
-            0 -> {
+        val effects = runCatching {
+            ServiceLoader.load(ScreenEffect::class.java, loader).filter { it.javaClass.classLoader === loader }
+        }.getOrElse {
+            loader.release()
+            return RejectedWidgetModule(jar, "could not instantiate its screen effects: ${it.message}")
+        }
+
+        return when {
+            // A module may carry nothing but effects: it is a module all the same, with no widgets.
+            registries.isEmpty() && effects.isEmpty() -> {
                 loader.release()
                 RejectedWidgetModule(jar, "declares the widget API but carries no registry service")
             }
-            1 -> {
+            registries.size > 1 -> {
+                // The processor emits exactly one per module. More than one means a
+                // hand-assembled or merged jar, where which registry wins is not
+                // something this can decide for the author.
+                loader.release()
+                RejectedWidgetModule(jar, "carries ${registries.size} registries; a module must carry one")
+            }
+            else -> {
                 // Listed once here, where a failure is this module's alone. Everything
                 // downstream reads the list outside any guard, building the registry
                 // the whole shell resolves from, so a registry that throws there took
                 // the shell down on every start instead of being refused by name.
-                val registry = registries.single()
+                val registry = registries.singleOrNull() ?: NoWidgets
                 val listed = runCatching { registry.all().values.toList() }.getOrElse {
                     loader.release()
                     return RejectedWidgetModule(jar, "its registry failed to list its widgets: ${it.message ?: it.javaClass.simpleName}")
@@ -202,16 +221,32 @@ class WidgetModuleLoader(
                     loader.release()
                     return RejectedWidgetModule(jar, fault)
                 }
-                LoadedWidgetModule(id, name, jar, registry, loader)
-            }
-            // The processor emits exactly one per module. More than one means a
-            // hand-assembled or merged jar, where which registry wins is not
-            // something this can decide for the author.
-            else -> {
-                loader.release()
-                RejectedWidgetModule(jar, "carries ${registries.size} registries; a module must carry one")
+                effectFault(effects)?.let { fault ->
+                    loader.release()
+                    return RejectedWidgetModule(jar, fault)
+                }
+                LoadedWidgetModule(id, name, jar, registry, loader, effects)
             }
         }
+    }
+
+    /** Why the screen effects of one module cannot work as declared, or null when they can. */
+    private fun effectFault(effects: List<ScreenEffect>): String? {
+        val ids = effects.map { effect ->
+            guarded { effect.id.trim() }.getOrElse { return "a screen effect's id could not be read: ${it.message}" }
+        }
+        if (ids.any { it.isEmpty() }) return "a screen effect has no id"
+        ids.groupBy { it }.entries.firstOrNull { it.value.size > 1 }?.let { return "two screen effects share the id '${it.key}'" }
+        effects.forEach { effect ->
+            guarded { effect.displayName }.getOrElse { return "screen effect '${effect.id}' has no readable name: ${it.message}" }
+        }
+        return null
+    }
+
+    /** What a module with no widgets contributes to the registry. */
+    private object NoWidgets : WidgetRegistry {
+        override fun all(): Map<WidgetKind, WidgetDescriptor> = emptyMap()
+        override fun get(kind: WidgetKind): WidgetDescriptor? = null
     }
 
     /**
