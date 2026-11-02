@@ -35,7 +35,9 @@ fun Modifier.sliderKeyboardAdjust(
     val hovered by interaction.collectIsHoveredAsState()
     val live = rememberUpdatedState(value)
     LaunchedEffect(hovered) {
-        if (hovered) val _ = runCatching { focus.requestFocus() }
+        if (hovered) {
+            val _ = runCatching { focus.requestFocus() }
+        }
     }
     return this
         .hoverable(interaction)
