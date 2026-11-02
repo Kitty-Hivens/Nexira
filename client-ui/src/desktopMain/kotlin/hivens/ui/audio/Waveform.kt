@@ -95,7 +95,7 @@ private suspend fun decodeEnvelope(file: Path, buckets: Int): Waveform? {
         // Closing is what guarantees nothing is still writing into the sink, so
         // the fold is only safe to read after this returns. It is bounded at a
         // second by the player's own contract.
-        runCatching { player.close() }
+        val _ = runCatching { player.close() }
     }
     if (!finished) return null
 

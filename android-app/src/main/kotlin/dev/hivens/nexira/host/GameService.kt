@@ -57,18 +57,18 @@ class GameService : Service() {
             override fun onLine(line: ByteArray) {
                 val m = Message.obtain(null, GameIpc.MSG_LINE)
                 m.data = Bundle().apply { putByteArray(GameIpc.KEY_LINE, line) }
-                runCatching { client.send(m) }
+                val _ = runCatching { client.send(m) }
             }
 
             override fun onExit(code: Int) {
-                runCatching { client.send(Message.obtain(null, GameIpc.MSG_EXIT, code, 0)) }
+                val _ = runCatching { client.send(Message.obtain(null, GameIpc.MSG_EXIT, code, 0)) }
             }
         }
         // A thread with a stack of its own: the JVM's main thread is whichever thread
         // creates it, and the launcher it replaces gives it a larger one than a default.
         Thread(null, {
             val code = JvmHost.run(spec.javaHome, spec.options.toTypedArray(), spec.mainClass, spec.args.toTypedArray(), listener)
-            runCatching { client.send(Message.obtain(null, GameIpc.MSG_EXIT, code, 0)) }
+            val _ = runCatching { client.send(Message.obtain(null, GameIpc.MSG_EXIT, code, 0)) }
             // The VM cannot be made again in this process, so the process goes with it.
             handler.postDelayed({ Process.killProcess(Process.myPid()) }, GRACE_AFTER_EXIT_MS)
         }, "game-jvm-main", MAIN_THREAD_STACK).start()

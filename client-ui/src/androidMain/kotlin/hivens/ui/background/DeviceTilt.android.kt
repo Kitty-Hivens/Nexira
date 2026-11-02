@@ -42,7 +42,7 @@ internal fun rememberDeviceTilt(enabled: Boolean): () -> Offset {
             return@DisposableEffect onDispose { }
         }
         val listener = TiltListener(context) { tilt = it }
-        val start = { manager.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_UI) }
+        val start = { val _ = manager.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_UI) }
         val stop = {
             manager.unregisterListener(listener)
             listener.reset()

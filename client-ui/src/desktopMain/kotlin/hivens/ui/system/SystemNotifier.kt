@@ -98,7 +98,7 @@ object SystemNotifier {
             synchronized(lifecycle) {
                 if (generation != mine) {
                     // Shut down while the daemon was being reached: this one is nobody's.
-                    runCatching { n.close() }
+                    val _ = runCatching { n.close() }
                     return
                 }
                 notifier = n
@@ -145,8 +145,8 @@ object SystemNotifier {
     fun shutdown() {
         synchronized(lifecycle) {
             generation++
-            runCatching { unsubscribe?.invoke() }
-            runCatching { notifier?.close() }
+            val _ = runCatching { unsubscribe?.invoke() }
+            val _ = runCatching { notifier?.close() }
             notifier = null
             unsubscribe = null
             onShowWindow = null

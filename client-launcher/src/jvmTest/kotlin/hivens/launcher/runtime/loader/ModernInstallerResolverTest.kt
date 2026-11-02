@@ -247,7 +247,7 @@ class ModernInstallerResolverTest {
         try {
             val provider = HttpClientProvider { HttpClient(engine) }
             val forge = ModernInstallerResolver.forge(provider, testTransferEngine(provider), Json { ignoreUnknownKeys = true }, runner, cache)
-            runCatching { forge.resolve("1.20.1", "47.4.10") }
+            val _ = runCatching { forge.resolve("1.20.1", "47.4.10") }
             assertEquals(listOf<Int?>(ModernInstallerResolver.FORGE_INSTALLER_JAVA), runner.asked)
             assertEquals(8, ModernInstallerResolver.FORGE_INSTALLER_JAVA)
         } finally {
@@ -264,7 +264,7 @@ class ModernInstallerResolverTest {
         try {
             val provider = HttpClientProvider { HttpClient(engine) }
             val neoforge = ModernInstallerResolver.neoforge(provider, testTransferEngine(provider), Json { ignoreUnknownKeys = true }, runner, cache)
-            runCatching { neoforge.resolve("1.21.1", "21.1.66") }
+            val _ = runCatching { neoforge.resolve("1.21.1", "21.1.66") }
             assertEquals(listOf<Int?>(null), runner.asked)
         } finally {
             cache.toFile().deleteRecursively()

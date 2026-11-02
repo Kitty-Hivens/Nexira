@@ -187,7 +187,7 @@ class YtDlpService(
 
     private fun probeVersion(cmd: String): Boolean = runCatching {
         val proc = ProcessBuilder(cmd, "--version").redirectErrorStream(true).start()
-        Thread { runCatching { proc.inputStream.use { it.readBytes() } } }.apply { isDaemon = true }.start()
+        Thread { val _ = runCatching { proc.inputStream.use { it.readBytes() } } }.apply { isDaemon = true }.start()
         if (!proc.waitFor(VERSION_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
             proc.destroyForcibly(); proc.waitFor(3, TimeUnit.SECONDS); return false
         }
@@ -215,7 +215,7 @@ class YtDlpService(
         // Drain stdout in a daemon thread so a full pipe buffer cannot wedge the
         // process; keep the tail for an error message.
         val reader = Thread {
-            runCatching {
+            val _ = runCatching {
                 proc.inputStream.bufferedReader().forEachLine { line ->
                     onLine(line)
                     synchronized(tail) {
@@ -256,15 +256,15 @@ class YtDlpService(
      */
     private fun kill(proc: Process) {
         val children = runCatching { proc.descendants().toList() }.getOrDefault(emptyList())
-        runCatching { proc.destroyForcibly() }
-        children.forEach { runCatching { it.destroyForcibly() } }
-        runCatching { proc.waitFor(5, TimeUnit.SECONDS) }
+        val _ = runCatching { proc.destroyForcibly() }
+        children.forEach { val _ = runCatching { it.destroyForcibly() } }
+        val _ = runCatching { proc.waitFor(5, TimeUnit.SECONDS) }
     }
 
     // -- cache eviction (shared video-cache dir) -----------------------------
 
     private fun evictOverCap() {
-        runCatching {
+        val _ = runCatching {
             val files = Files.list(videoCacheDir).use { s ->
                 s.filter { Files.isRegularFile(it) && !VideoCacheFiles.isPartial(it.fileName.toString()) }.toList()
             }

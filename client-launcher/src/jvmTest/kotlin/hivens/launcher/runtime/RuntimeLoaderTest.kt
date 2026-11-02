@@ -40,7 +40,7 @@ class RuntimeLoaderTest {
     @AfterTest
     fun cleanup() {
         if (!Files.exists(tmp)) return
-        Files.walk(tmp).use { s -> s.sorted(Comparator.reverseOrder()).forEach { runCatching { Files.delete(it) } } }
+        Files.walk(tmp).use { s -> s.sorted(Comparator.reverseOrder()).forEach { val _ = runCatching { Files.delete(it) } } }
     }
 
     private fun sha1(b: ByteArray) = MessageDigest.getInstance("SHA-1").digest(b).joinToString("") { "%02x".format(it) }

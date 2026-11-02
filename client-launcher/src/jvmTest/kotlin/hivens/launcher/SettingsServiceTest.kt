@@ -204,7 +204,7 @@ class SettingsServiceTest {
                     // Never empty and never partial: the file is published whole or
                     // not at all.
                     assertTrue(text.isNotEmpty(), "settings.json was observed truncated to nothing")
-                    json.decodeFromString<SettingsData>(text)
+                    val _ = json.decodeFromString<SettingsData>(text)
                 }
             }
             writer.await()
@@ -241,6 +241,6 @@ class SettingsServiceTest {
 
         // File on disk must be valid JSON regardless of the racing.
         val finalText = withContext(Dispatchers.IO) { Files.readString(workDir / "settings.json") }
-        json.decodeFromString<SettingsData>(finalText)  // throws if torn
+        val _ = json.decodeFromString<SettingsData>(finalText)  // throws if torn
     }
 }

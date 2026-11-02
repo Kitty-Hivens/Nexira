@@ -240,7 +240,7 @@ private fun decodeAndCacheDownscaled(file: File, cached: File, prefix: String, m
     }
 
 private fun writePngCache(image: Image, dst: File, prefix: String) {
-    runCatching {
+    val _ = runCatching {
         val encoded = image.encodeToData(EncodedImageFormat.PNG) ?: return
         encoded.use { enc ->
             val dir = dst.parentFile ?: return

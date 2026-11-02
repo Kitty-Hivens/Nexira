@@ -66,7 +66,7 @@ internal class VideoFramePainter(
     override val intrinsicSize: Size get() = displaySize
 
     override fun DrawScope.onDraw() {
-        frameStamp() // snapshot read -- a new frame invalidates this draw
+        val _ = frameStamp() // snapshot read -- a new frame invalidates this draw
         val image = takeFrame() ?: return
         val w = size.width
         val h = size.height
@@ -215,7 +215,7 @@ private fun openBackgroundPlayer(
     return try {
         VideoPlayer(input = MediaInput.File(file.toPath()), loop = loop, audio = audio, sink = sink, hardware = hardware, unwatched = unwatched)
     } catch (e: LinkageError) {
-        runCatching { sink?.close() }
+        val _ = runCatching { sink?.close() }
         log.error("Background media natives unavailable for {}", file.absolutePath, e)
         null
     }

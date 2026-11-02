@@ -94,7 +94,7 @@ fun ConfirmCodeDialog(
     // Wayland stack. runCatching guards the node-not-yet-attached race the way the
     // rest of the UI does.
     val codeFocus = remember { FocusRequester() }
-    LaunchedEffect(Unit) { runCatching { codeFocus.requestFocus() } }
+    LaunchedEffect(Unit) { val _ = runCatching { codeFocus.requestFocus() } }
 
     fun accept(raw: String) {
         // Cap at CODE_LENGTH, strip non-digits -- the server rejects anything else

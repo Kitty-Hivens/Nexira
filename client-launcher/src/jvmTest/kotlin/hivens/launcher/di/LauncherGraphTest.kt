@@ -61,7 +61,7 @@ class LauncherGraphTest {
 
     @AfterTest
     fun stop() {
-        runCatching { koin.get<IPackRepository>().let { (it as? AutoCloseable)?.close() } }
+        val _ = runCatching { koin.get<IPackRepository>().let { (it as? AutoCloseable)?.close() } }
         stopKoin()
         dir.toFile().deleteRecursively()
     }
