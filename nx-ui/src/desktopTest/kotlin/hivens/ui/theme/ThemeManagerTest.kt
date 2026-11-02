@@ -144,4 +144,40 @@ class ThemeManagerTest {
         ThemeManager(tempDir()) { _, c -> published += c }.save(ThemeLibrary())
         assertTrue(published.single().contains("\"${ThemeManager.SCHEMA_KEY}\""))
     }
+
+    private val moduleTheme = Theme(
+        id = "looks/outrun",
+        name = "Outrun",
+        dark = Scheme(
+            steps = listOf(Color(0xFF140A28), Color(0xFF1F1038)),
+            inks = Themes.Celestia.dark.inks,
+            colors = listOf(Color(0xFFFF4DA6)),
+        ),
+    )
+
+    @Test
+    fun `a theme a module brought is listed and can be the active one`() {
+        val library = ThemeLibrary(selected = moduleTheme.id, contributed = listOf(moduleTheme))
+
+        assertTrue(moduleTheme in library.all)
+        assertEquals(moduleTheme, library.active)
+    }
+
+    @Test
+    fun `a choice naming a theme whose module is gone lands on the default and keeps the choice`() {
+        val library = ThemeLibrary(selected = moduleTheme.id)
+
+        assertEquals(Themes.default, library.active)
+        assertEquals(moduleTheme.id, library.selected)
+    }
+
+    @Test
+    fun `themes a module brought are never written`() {
+        var written = ""
+        ThemeManager(tempDir()) { _, c -> written = c }
+            .save(ThemeLibrary(selected = moduleTheme.id, contributed = listOf(moduleTheme)))
+
+        assertTrue("looks/outrun" in written, "the choice is stored")
+        assertTrue("Outrun" !in written && "FF4DA6" !in written, "the theme itself was stored")
+    }
 }

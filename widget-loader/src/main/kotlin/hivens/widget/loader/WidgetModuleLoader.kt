@@ -1,6 +1,6 @@
 package hivens.widget.loader
 
-import hivens.widget.api.ModuleSetting
+import hivens.widget.api.ModuleContribution
 import hivens.widget.api.ModuleStrings
 import hivens.widget.api.ScreenEffect
 import hivens.widget.api.WidgetApi
@@ -37,11 +37,14 @@ data class LoadedWidgetModule(
     val file: Path,
     val registry: WidgetRegistry,
     val loader: URLClassLoader,
-    /** The screen effects it carries, which is none for a module that only has widgets. */
-    val effects: List<ScreenEffect> = emptyList(),
+    /** What it adds besides widgets: effects, themes, particle fields. None for a module that only has widgets. */
+    val contributions: List<ModuleContribution> = emptyList(),
     /** The words it brought, per language, for what it declares for a person to read. */
     val strings: ModuleStrings = ModuleStrings.EMPTY,
-) : WidgetModuleResult
+) : WidgetModuleResult {
+    /** The screen effects among [contributions]. */
+    val effects: List<ScreenEffect> get() = contributions.filterIsInstance<ScreenEffect>()
+}
 
 /**
  * A module the caller asked not to load. Its manifest was read, so it can be named
@@ -100,6 +103,7 @@ class WidgetModuleLoader(
     private val parent: ClassLoader = WidgetModuleLoader::class.java.classLoader,
     private val shadowDir: Path? = null,
     private val disabled: Set<String> = emptySet(),
+    private val contributionKinds: List<Class<out ModuleContribution>> = ModuleContribution.kinds,
 ) {
 
     private val log = LoggerFactory.getLogger(WidgetModuleLoader::class.java)
@@ -200,18 +204,24 @@ class WidgetModuleLoader(
             return RejectedWidgetModule(jar, "could not instantiate its registry: ${it.message}")
         }
 
-        val effects = runCatching {
-            ServiceLoader.load(ScreenEffect::class.java, loader).filter { it.javaClass.classLoader === loader }
-        }.getOrElse {
-            loader.release()
-            return RejectedWidgetModule(jar, "could not instantiate its screen effects: ${it.message}")
+        val contributions = mutableListOf<ModuleContribution>()
+        val byKind = mutableListOf<List<ModuleContribution>>()
+        contributionKinds.forEach { kind ->
+            val found = runCatching {
+                ServiceLoader.load(kind, loader).filter { it.javaClass.classLoader === loader }
+            }.getOrElse {
+                loader.release()
+                return RejectedWidgetModule(jar, "could not instantiate its ${kind.simpleName} services: ${it.message}")
+            }
+            byKind += found
+            contributions += found
         }
 
         return when {
             // A module may carry nothing but effects: it is a module all the same, with no widgets.
-            registries.isEmpty() && effects.isEmpty() -> {
+            registries.isEmpty() && contributions.isEmpty() -> {
                 loader.release()
-                RejectedWidgetModule(jar, "declares the widget API but carries neither a registry nor a screen effect service")
+                RejectedWidgetModule(jar, "declares the widget API but carries neither a registry nor a contribution service")
             }
             registries.size > 1 -> {
                 // The processor emits exactly one per module. More than one means a
@@ -237,32 +247,13 @@ class WidgetModuleLoader(
                     loader.release()
                     return RejectedWidgetModule(jar, fault)
                 }
-                effectFault(effects)?.let { fault ->
+                byKind.firstNotNullOfOrNull { ModuleContribution.faultIn(it) { read -> guarded(read) } }?.let { fault ->
                     loader.release()
                     return RejectedWidgetModule(jar, fault)
                 }
-                LoadedWidgetModule(id, name, jar, registry, loader, effects, readStrings(opened, id))
+                LoadedWidgetModule(id, name, jar, registry, loader, contributions, readStrings(opened, id))
             }
         }
-    }
-
-    /** Why the screen effects of one module cannot work as declared, or null when they can. */
-    private fun effectFault(effects: List<ScreenEffect>): String? {
-        val ids = effects.map { effect ->
-            guarded { effect.id.trim() }.getOrElse { return "a screen effect's id could not be read: ${it.message}" }
-        }
-        if (ids.any { it.isEmpty() }) return "a screen effect has no id"
-        effects.zip(ids).firstOrNull { (effect, trimmed) -> effect.id != trimmed || '/' in trimmed }?.let { (effect, _) ->
-            return "screen effect id '${effect.id}' has surrounding space or a slash"
-        }
-        ids.groupBy { it }.entries.firstOrNull { it.value.size > 1 }?.let { return "two screen effects share the id '${it.key}'" }
-        effects.forEach { effect ->
-            guarded { effect.label }.getOrElse { return "screen effect '${effect.id}' has no readable label: ${it.message}" }
-            val settings = guarded { effect.settings }
-                .getOrElse { return "screen effect '${effect.id}' has settings that could not be read: ${it.message}" }
-            ModuleSetting.faultIn(settings)?.let { return "screen effect '${effect.id}': $it" }
-        }
-        return null
     }
 
     /**

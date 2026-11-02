@@ -115,8 +115,8 @@ class WidgetModulesTest {
         val effect = modules().state.value.effects.single()
 
         assertEquals("fixture/fixture.effect", effect.scope)
-        assertEquals("Fixture Effect", effect.strings.get(effect.effect.label, "en"))
-        assertEquals(1, (modules().state.value.entries.single() as WidgetModules.Entry.Loaded).effects)
+        assertEquals("Fixture Effect", effect.strings.get(effect.item.label, "en"))
+        assertEquals(2, (modules().state.value.entries.single() as WidgetModules.Entry.Loaded).contributions, "the fixture carries an effect and a theme")
     }
 
     @Test

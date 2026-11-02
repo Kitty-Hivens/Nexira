@@ -1632,7 +1632,7 @@ object GermanStrings : AppStrings {
     override val modulesReload = "Ordner neu einlesen"
     override val modulesOpenFolder = "Ordner öffnen"
     override fun moduleWidgets(n: Int) = "Widgets: $n"
-    override fun moduleEffects(n: Int) = "Effekte: $n"
+    override fun moduleContributions(n: Int) = "Beiträge: $n"
     override val moduleOff = "Ausgeschaltet"
     override fun moduleOffAfterCrash(failure: String) = "Nach einem Absturz ausgeschaltet: $failure"
     override fun moduleRefused(reason: String) = "Nicht geladen: $reason"

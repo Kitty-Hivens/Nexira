@@ -31,16 +31,7 @@ data class ScreenEffectState(
  * handed. It runs in the composition on every frame the effect moves, so what it does per frame is
  * what the interface costs.
  */
-interface ScreenEffect {
-    /** Stable across versions of the module, since the person's choices are stored by it. */
-    val id: String
-
-    /** What the settings call it: a key into the module's [ModuleStrings], shown as written without an entry. */
-    val label: String
-
-    /** What the person can adjust, drawn and stored by the launcher. Nothing by default. */
-    val settings: List<ModuleSetting> get() = emptyList()
-
+interface ScreenEffect : ModuleContribution {
     @Composable
     fun Apply(state: ScreenEffectState, content: @Composable () -> Unit)
 }

@@ -5,7 +5,10 @@ import hivens.core.io.readUtf8
 import hivens.widget.api.CompositeWidgetRegistry
 import hivens.widget.api.ModuleSetting
 import hivens.widget.api.ModuleStrings
+import hivens.widget.api.ParticleContribution
+import hivens.widget.api.ModuleContribution
 import hivens.widget.api.ScreenEffect
+import hivens.widget.api.ThemeContribution
 import hivens.widget.api.WidgetDescriptor
 import hivens.widget.api.WidgetRegistry
 import hivens.widget.model.WidgetKind
@@ -71,7 +74,7 @@ class WidgetModules(
     /** One line of the module list. */
     sealed interface Entry {
         /** Loaded and in the registry. */
-        data class Loaded(val id: String, val name: String, val file: Path, val kinds: Int, val effects: Int = 0) : Entry
+        data class Loaded(val id: String, val name: String, val file: Path, val kinds: Int, val contributions: Int = 0) : Entry
 
         /** Switched off. [crash] is the failure that switched it off, null when a person did. */
         data class Off(val id: String, val name: String, val file: Path, val crash: String?) : Entry
@@ -84,12 +87,24 @@ class WidgetModules(
     }
 
     /** The registry and the list, together, so a reader never sees one without the other. */
-    data class Snapshot(val registry: WidgetRegistry, val entries: List<Entry>, val effects: List<ModuleEffect> = emptyList(), val widgetStrings: Map<WidgetKind, ModuleStrings> = emptyMap())
+    data class Snapshot(
+        val registry: WidgetRegistry,
+        val entries: List<Entry>,
+        val contributions: List<Contributed<ModuleContribution>> = emptyList(),
+        val widgetStrings: Map<WidgetKind, ModuleStrings> = emptyMap(),
+    ) {
+        /** The contributions of one kind, in the order the modules load. */
+        inline fun <reified T : ModuleContribution> of(): List<Contributed<T>> =
+            contributions.mapNotNull { c -> (c.item as? T)?.let { Contributed(c.moduleId, c.moduleName, it, c.strings) } }
 
-    /** A screen effect with the module that brought it and the words that module ships. */
-    class ModuleEffect(val moduleId: String, val moduleName: String, val effect: ScreenEffect, val strings: ModuleStrings) {
-        /** The key the person's choices for this effect are stored under. */
-        val scope: String get() = "$moduleId/${effect.id}"
+        val effects: List<Contributed<ScreenEffect>> get() = of<ScreenEffect>()
+        val themes: List<Contributed<ThemeContribution>> get() = of<ThemeContribution>()
+    }
+
+    /** A contribution with the module that brought it and the words that module ships. */
+    class Contributed<out T : ModuleContribution>(val moduleId: String, val moduleName: String, val item: T, val strings: ModuleStrings) {
+        /** The key the person's choices for this contribution are stored under. */
+        val scope: String get() = "$moduleId/${item.id}"
     }
 
     /** A module that crashed and was switched off, for the notice the shell shows once it is back up. */
@@ -217,8 +232,14 @@ class WidgetModules(
     }
 
     private fun snapshotOf(scan: ModuleScan): Snapshot {
-        val sources = listOf(builtIn) + scan.loaded.map { it.registry }
-        val labels = listOf("built-in") + scan.loaded.map { it.id }
+        // A module's particle fields are widgets of its own, so they join the registry beside its others.
+        val particleWidgets = scan.loaded.associate { module ->
+            module.id to ModuleParticleWidgets(module.contributions.filterIsInstance<ParticleContribution>().map {
+                Contributed(module.id, module.name, it, module.strings)
+            })
+        }
+        val sources = listOf(builtIn) + scan.loaded.flatMap { listOf(it.registry, particleWidgets.getValue(it.id)) }
+        val labels = listOf("built-in") + scan.loaded.flatMap { listOf(it.id, "${it.id} particles") }
         val composite = CompositeWidgetRegistry(sources)
         log.info("Widget registry: {} kinds from {} source(s) [{}]", composite.all().size, sources.size, labels.joinToString(", "))
         // A contribution that loses its id loses it silently otherwise: the widget
@@ -228,18 +249,20 @@ class WidgetModules(
         }
         // Effects are told apart by module, so two modules may use one id. An id repeated inside a
         // module is refused by the loader before it gets here.
-        val effects = scan.loaded.flatMap { module ->
-            module.effects.map { ModuleEffect(module.id, module.name, it, module.strings) }
+        val contributions = scan.loaded.flatMap { module ->
+            module.contributions.map { Contributed(module.id, module.name, it, module.strings) }
         }
         val present = (scan.loaded.map { it.id } + scan.disabled.map { it.id }).toSet()
         val entries = buildList {
-            scan.loaded.forEach { add(Entry.Loaded(it.id, it.name, it.file, it.registry.all().size, it.effects.size)) }
+            scan.loaded.forEach { add(Entry.Loaded(it.id, it.name, it.file, it.registry.all().size, it.contributions.size)) }
             scan.disabled.forEach { add(Entry.Off(it.id, it.name, it.file, saved.disabled[it.id]?.takeIf { s -> s.isNotBlank() })) }
             scan.rejected.forEach { add(Entry.Refused(it.file, it.reason)) }
             (saved.known.keys + saved.disabled.keys).filter { it !in present }.sorted().forEach { add(Entry.Gone(it)) }
         }
-        val widgetStrings = scan.loaded.flatMap { module -> module.registry.all().keys.map { it to module.strings } }.toMap()
-        return Snapshot(composite, entries, effects, widgetStrings)
+        val widgetStrings = scan.loaded.flatMap { module ->
+            (module.registry.all().keys + particleWidgets.getValue(module.id).all().keys).map { it to module.strings }
+        }.toMap()
+        return Snapshot(composite, entries, contributions, widgetStrings)
     }
 
     private fun release(leaving: List<LoadedModule>) {

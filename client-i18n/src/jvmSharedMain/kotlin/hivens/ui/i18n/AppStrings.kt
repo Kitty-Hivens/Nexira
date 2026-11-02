@@ -1673,7 +1673,7 @@ interface AppStrings {
     val modulesReload: String
     val modulesOpenFolder: String
     fun moduleWidgets(n: Int): String
-    fun moduleEffects(n: Int): String
+    fun moduleContributions(n: Int): String
     val moduleOff: String
     fun moduleOffAfterCrash(failure: String): String
     fun moduleRefused(reason: String): String

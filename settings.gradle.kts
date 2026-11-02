@@ -143,6 +143,7 @@ include(":widget-processor")
 // Kept in the build so it keeps compiling against the API it demonstrates.
 include(":examples:widget-pixelplayer")
 include(":examples:widget-screenfx")
+include(":examples:widget-looks")
 // Runtime discovery of widget modules: scans a directory for jars, checks the
 // ABI they declare, and hands back registries. Separate from :widget-api so a
 // module author compiles against the kernel without pulling in its loader.

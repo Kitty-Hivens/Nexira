@@ -8,13 +8,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import hivens.widget.api.ModuleValues
 import hivens.widget.api.ScreenEffectState
-import hivens.ui.widgets.modules.WidgetModules.ModuleEffect
+import hivens.ui.widgets.modules.WidgetModules.Contributed
+import hivens.widget.api.ScreenEffect
 
 /**
  * Draws [content] through every screen effect the person has switched on, or plainly when none is,
  * or when the module that carried it is off or gone.
  *
- * [settings] is what the person set, by [ModuleEffect.scope]. Effects that are on are drawn one
+ * [settings] is what the person set, by [Contributed.scope]. Effects that are on are drawn one
  * inside the next in the order the modules load: the first is outermost, so it bends what the
  * others drew.
  *
@@ -24,7 +25,7 @@ import hivens.ui.widgets.modules.WidgetModules.ModuleEffect
  */
 @Composable
 fun ScreenEffectHost(
-    effects: List<ModuleEffect>,
+    effects: List<Contributed<ScreenEffect>>,
     settings: Map<String, Map<String, String>>,
     reducedMotion: Boolean,
     content: @Composable () -> Unit,
@@ -37,7 +38,7 @@ fun ScreenEffectHost(
 
 @Composable
 private fun Layer(
-    on: List<ModuleEffect>,
+    on: List<Contributed<ScreenEffect>>,
     index: Int,
     settings: Map<String, Map<String, String>>,
     reducedMotion: Boolean,
@@ -50,7 +51,7 @@ private fun Layer(
     }
     // Keyed by what the effect is, so one switched on or off in the middle leaves the others' state alone.
     key(entry.scope) {
-        val state = ScreenEffectState(ModuleValues(entry.effect.settings, settings[entry.scope].orEmpty()), reducedMotion)
-        entry.effect.Apply(state) { Layer(on, index + 1, settings, reducedMotion, inner) }
+        val state = ScreenEffectState(ModuleValues(entry.item.settings, settings[entry.scope].orEmpty()), reducedMotion)
+        entry.item.Apply(state) { Layer(on, index + 1, settings, reducedMotion, inner) }
     }
 }

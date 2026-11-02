@@ -1,7 +1,7 @@
 package hivens.ui.widgets.modules
 
 import hivens.widget.api.ModuleStrings
-import hivens.widget.api.ScreenEffect
+import hivens.widget.api.ModuleContribution
 import hivens.widget.api.WidgetRegistry
 import hivens.widget.loader.LoadedWidgetModule
 import hivens.widget.loader.WidgetModuleLoader
@@ -40,7 +40,7 @@ private class JarModule(private val module: LoadedWidgetModule) : LoadedModule {
     override val name: String get() = module.name
     override val file: Path get() = module.file
     override val registry: WidgetRegistry get() = module.registry
-    override val effects: List<ScreenEffect> get() = module.effects
+    override val contributions: List<ModuleContribution> get() = module.contributions
     override val strings: ModuleStrings get() = module.strings
 
     override val filesInUse: Set<String>

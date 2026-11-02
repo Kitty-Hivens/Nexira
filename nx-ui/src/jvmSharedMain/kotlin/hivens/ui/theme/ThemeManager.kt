@@ -33,11 +33,17 @@ data class ThemeLibrary(
     val selected: String = Themes.default.id,
     val own: List<Theme> = emptyList(),
     val wallpaper: List<Int> = emptyList(),
+    /**
+     * The themes modules brought, which the shell fills in from whatever is loaded. Never stored: a
+     * module that is off or gone takes its themes with it, and a selection that named one lands on
+     * the default until the module is back.
+     */
+    val contributed: List<Theme> = emptyList(),
 ) {
     /** The theme made from [wallpaper], null without one. Named in English: a screen shows its own word for it. */
     val fromWallpaper: Theme? by lazy { themeFromWallpaper(wallpaper, "Wallpaper") }
 
-    val all: List<Theme> get() = Themes.all + listOfNotNull(fromWallpaper) + own
+    val all: List<Theme> get() = Themes.all + listOfNotNull(fromWallpaper) + contributed + own
 
     val active: Theme get() = all.firstOrNull { it.id == selected } ?: Themes.default
 }

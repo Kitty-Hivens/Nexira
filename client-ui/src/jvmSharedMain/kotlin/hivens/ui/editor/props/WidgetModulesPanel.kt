@@ -69,7 +69,7 @@ internal fun WidgetModulesPanel(
                             ModuleHeader(entry.name, on = true) { inBackground { modules.setEnabled(entry.id, false) } }
                             PuppetToggle("modules.${entry.id}", true) { on -> inBackground { modules.setEnabled(entry.id, on) } }
                             Detail(s.moduleWidgets(entry.kinds))
-                            if (entry.effects > 0) Detail(s.moduleEffects(entry.effects))
+                            if (entry.contributions > 0) Detail(s.moduleContributions(entry.contributions))
                             Detail(entry.file.fileName.toString())
                         }
                         is WidgetModules.Entry.Off -> {

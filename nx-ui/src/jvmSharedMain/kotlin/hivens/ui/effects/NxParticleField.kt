@@ -23,14 +23,22 @@ import kotlin.math.sin
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * What a field of particles is: a closed set of characters, like an arrival.
- *
- * Each one is a rule for where mote number i is at time t, and nothing else. There
- * is no simulation to step and no state per mote, so a frame costs one pass over the
- * motes and allocates nothing, the same field is drawn at any moment it is asked
- * for, and a later timeline can scrub it.
+ * What a field of particles is: a rule for where mote number i is at time t, and which colours
+ * it is drawn from, and nothing else. There is no simulation to step and no state per mote, so a
+ * frame costs one pass over the motes, the same field is drawn at any moment it is asked for, and a
+ * later timeline can scrub it. The launcher's own fields are the [ParticleField] enum, and a module
+ * brings more by implementing this.
  */
-enum class ParticleField {
+interface ParticleRule {
+    /** The colours [moteAt]'s `colour` numbers pick from, given the theme's inks and accents. Asked when the theme changes. */
+    fun palette(ink: Color, quiet: Color, colors: List<Color>): List<Color>
+
+    /** Mote [i] at [t] seconds in a [w] by [h] dp area. Asked for every mote on every frame. */
+    fun moteAt(i: Int, t: Float, w: Float, h: Float): Mote
+}
+
+/** The fields that ship: a closed set of characters, like an arrival. */
+enum class ParticleField : ParticleRule {
     /** Motes hanging in the air, drifting and breathing. */
     Dust,
 
@@ -41,7 +49,16 @@ enum class ParticleField {
     Snow,
 
     /** Points fixed in place that twinkle. */
-    Stars,
+    Stars;
+
+    override fun palette(ink: Color, quiet: Color, colors: List<Color>): List<Color> = when (this) {
+        Dust -> listOf(quiet)
+        Snow -> listOf(ink)
+        Stars -> listOf(ink, ink, ink, colors.first())
+        Embers -> colors
+    }
+
+    override fun moteAt(i: Int, t: Float, w: Float, h: Float): Mote = moteAt(this, i, t, w, h)
 }
 
 /** How many motes a field holds for its area. Three steps, so a field is never thick enough to read as noise. */
@@ -60,21 +77,14 @@ enum class ParticleDensity(internal val areaPerMoteDp: Float) {
  */
 @Composable
 fun NxParticleField(
-    field: ParticleField,
+    field: ParticleRule,
     modifier: Modifier = Modifier,
     density: ParticleDensity = ParticleDensity.Even,
 ) {
     val scheme = LocalScheme.current.scheme
     val ink = NxInk.main
     val quiet = NxInk.quiet
-    val palette: List<Color> = remember(scheme, field, ink, quiet) {
-        when (field) {
-            ParticleField.Dust -> listOf(quiet)
-            ParticleField.Snow -> listOf(ink)
-            ParticleField.Stars -> listOf(ink, ink, ink, scheme.colors.first())
-            ParticleField.Embers -> scheme.colors
-        }
-    }
+    val palette: List<Color> = remember(scheme, field, ink, quiet) { field.palette(ink, quiet, scheme.colors) }
     // Named apart from the draw scope's own density, which is the screen's.
     val perArea = density
     // Held on its first frame when the person asked for less movement: the field
@@ -105,7 +115,7 @@ fun NxParticleField(
         if (w <= 0f || h <= 0f) return@Canvas
         val count = moteCount(w, h, perArea)
         for (i in 0 until count) {
-            val m = moteAt(field, i, t, w, h)
+            val m = field.moteAt(i, t, w, h)
             if (m.alpha <= 0.01f) continue
             drawCircle(
                 color = palette[m.colour % palette.size].copy(alpha = m.alpha),
@@ -117,7 +127,7 @@ fun NxParticleField(
 }
 
 /** One mote at one moment, in dp. [colour] picks from the field's palette. */
-internal data class Mote(val x: Float, val y: Float, val radius: Float, val alpha: Float, val colour: Int)
+data class Mote(val x: Float, val y: Float, val radius: Float, val alpha: Float, val colour: Int)
 
 /** How many motes [density] puts in a [w] by [h] dp area, held under a ceiling a frame can always afford. */
 internal fun moteCount(w: Float, h: Float, density: ParticleDensity): Int =

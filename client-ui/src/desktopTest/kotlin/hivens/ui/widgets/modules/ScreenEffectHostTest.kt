@@ -8,7 +8,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.unit.Density
-import hivens.ui.widgets.modules.WidgetModules.ModuleEffect
+import hivens.ui.widgets.modules.WidgetModules.Contributed
 import hivens.widget.api.ModuleSetting
 import hivens.widget.api.ModuleStrings
 import hivens.widget.api.ScreenEffect
@@ -36,13 +36,13 @@ class ScreenEffectHostTest {
         }
     }
 
-    private fun entry(effect: ScreenEffect, module: String = "m") =
-        ModuleEffect(module, module, effect, ModuleStrings.EMPTY)
+    private fun entry(effect: ScreenEffect, module: String = "m"): Contributed<ScreenEffect> =
+        Contributed(module, module, effect, ModuleStrings.EMPTY)
 
     private fun on(vararg scopes: String): Map<String, Map<String, String>> =
         scopes.associateWith { mapOf(WidgetModules.EFFECT_ENABLED to "true") }
 
-    private class Harness(val effects: List<ModuleEffect>, settings: Map<String, Map<String, String>>, reduced: Boolean = false) {
+    private class Harness(val effects: List<Contributed<ScreenEffect>>, settings: Map<String, Map<String, String>>, reduced: Boolean = false) {
         var settings by mutableStateOf(settings)
         var reduced by mutableStateOf(reduced)
         val tokens = mutableListOf<Any>()

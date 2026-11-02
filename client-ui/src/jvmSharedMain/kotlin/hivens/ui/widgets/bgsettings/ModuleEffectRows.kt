@@ -18,7 +18,8 @@ import hivens.ui.nx.NxToggle
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
 import hivens.ui.widgets.modules.WidgetModules
-import hivens.ui.widgets.modules.WidgetModules.ModuleEffect
+import hivens.ui.widgets.modules.WidgetModules.Contributed
+import hivens.widget.api.ScreenEffect
 import hivens.widget.api.ModuleSetting
 import hivens.widget.api.ModuleValues
 import org.koin.compose.getKoin
@@ -56,21 +57,21 @@ internal fun ModuleEffectRows(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun EffectBlock(entry: ModuleEffect, stored: Map<String, String>, onSet: (key: String, value: String) -> Unit) {
+private fun EffectBlock(entry: Contributed<ScreenEffect>, stored: Map<String, String>, onSet: (key: String, value: String) -> Unit) {
     val tag = LocalAppLocale.current.tag
     val text = { key: String -> entry.strings.get(key, tag) }
     val on = stored[WidgetModules.EFFECT_ENABLED]?.toBooleanStrictOrNull() == true
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         NxToggle(
-            label           = text(entry.effect.label),
+            label           = text(entry.item.label),
             checked         = on,
             description     = entry.moduleName,
             accent          = NxColor.lead(),
             onCheckedChange = { onSet(WidgetModules.EFFECT_ENABLED, ModuleValues.encode(it)) },
         )
         if (on) {
-            val settings = remember(entry.effect) { entry.effect.settings }
+            val settings = remember(entry.item) { entry.item.settings }
             val values = ModuleValues(settings, stored)
             settings.forEach { setting -> SettingRow(setting, values, text, onSet) }
         }

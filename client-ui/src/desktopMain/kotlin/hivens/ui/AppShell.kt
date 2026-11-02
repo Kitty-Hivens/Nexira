@@ -125,6 +125,7 @@ import hivens.widget.api.WidgetSurfaceRenderer
 import androidx.compose.foundation.background
 import hivens.ui.widgets.WidgetSurface
 import hivens.ui.widgets.modules.WidgetModules
+import hivens.ui.widgets.modules.toThemes
 import hivens.ui.widgets.state.WidgetStateStore
 import hivens.widget.api.LocalWidgetCommandRegistry
 import hivens.widget.api.LocalWidgetDataRegistry
@@ -655,7 +656,7 @@ fun FrameWindowScope.AppShellContent(
         val packAutoUpdateService: PackAutoUpdateService = koinInject()
         val applyRecovery: ApplyRecovery = koinInject()
         val themeManager  = remember { ThemeManager(dataDirectory, AtomicFiles::writeString) }
-        var themeLibrary  by remember {
+        var storedThemes  by remember {
             val loaded = themeManager.load()
             // The manager decides read-only on its own, in a module that cannot see
             // the notice registry, so the fact is carried across here. This runs
@@ -664,6 +665,10 @@ fun FrameWindowScope.AppShellContent(
             if (themeManager.readOnly) NewerBuildData.record(ReadOnlyStore.Theme)
             mutableStateOf(loaded)
         }
+        // The stored library with the themes the loaded modules bring, which are never stored.
+        val moduleSnapshot by widgetModules.state.collectAsState()
+        val moduleThemes = remember(moduleSnapshot, currentLocale) { moduleSnapshot.themes.toThemes(currentLocale.tag) }
+        val themeLibrary = storedThemes.copy(contributed = moduleThemes)
 
         // Customization extension: persisted choices for whether surfaces blur
         // and how the nav rail draws its selection. Provided via
@@ -997,8 +1002,8 @@ fun FrameWindowScope.AppShellContent(
                             // Stored with the selection, so the wallpaper theme opens in
                             // itself next time. Written only when the picture changed.
                             if (colours != themeLibrary.wallpaper) {
-                                val library = themeLibrary.copy(wallpaper = colours)
-                                themeLibrary = library
+                                val library = storedThemes.copy(wallpaper = colours)
+                                storedThemes = library
                                 preferences.write("the wallpaper colours") { themeManager.save(library) }
                             }
                         },
@@ -1035,8 +1040,8 @@ fun FrameWindowScope.AppShellContent(
                         systemThemeAvailable = systemThemeAvailable,
                         themeLibrary         = themeLibrary,
                         onThemeSelected      = { id ->
-                            val library = themeLibrary.copy(selected = id)
-                            themeLibrary = library
+                            val library = storedThemes.copy(selected = id)
+                            storedThemes = library
                             preferences.write("the theme") { themeManager.save(library) }
                         },
                         currentLocale   = currentLocale,

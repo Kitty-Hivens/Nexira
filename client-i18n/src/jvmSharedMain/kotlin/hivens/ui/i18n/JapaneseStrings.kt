@@ -1638,7 +1638,7 @@ object JapaneseStrings : AppStrings {
     override val modulesReload = "フォルダを読み込み直す"
     override val modulesOpenFolder = "フォルダを開く"
     override fun moduleWidgets(n: Int) = "ウィジェット: $n"
-    override fun moduleEffects(n: Int) = "エフェクト: $n"
+    override fun moduleContributions(n: Int) = "追加要素: $n"
     override val moduleOff = "オフ"
     override fun moduleOffAfterCrash(failure: String) = "クラッシュしたためオフにしました: $failure"
     override fun moduleRefused(reason: String) = "読み込まれていません: $reason"

@@ -1590,7 +1590,7 @@ object EnglishStrings : AppStrings {
     override val modulesReload = "Read the folder again"
     override val modulesOpenFolder = "Open the folder"
     override fun moduleWidgets(n: Int) = "Widgets: $n"
-    override fun moduleEffects(n: Int) = "Effects: $n"
+    override fun moduleContributions(n: Int) = "Additions: $n"
     override val moduleOff = "Switched off"
     override fun moduleOffAfterCrash(failure: String) = "Switched off after it crashed: $failure"
     override fun moduleRefused(reason: String) = "Not loaded: $reason"

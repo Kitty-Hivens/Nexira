@@ -1,6 +1,8 @@
 package hivens.widget.loader
 
 import hivens.widget.api.ModuleValues
+import hivens.widget.api.ScreenEffect
+import hivens.widget.api.ThemeContribution
 import hivens.widget.api.WidgetApi
 import java.nio.file.Files
 import java.nio.file.Path
@@ -252,6 +254,47 @@ class WidgetModuleLoaderTest {
 
         assertEquals(setOf("en", "ru"), module.strings.languages)
         assertEquals("fixture", module.id)
+    }
+
+    @Test
+    fun `every kind of contribution is found in the jar, each by its own service file`() {
+        install("good.jar")
+
+        val module = scan().loaded.single()
+
+        assertEquals(listOf("fixture.effect"), module.contributions.filterIsInstance<ScreenEffect>().map { it.id })
+        assertEquals(listOf("fixture.theme"), module.contributions.filterIsInstance<ThemeContribution>().map { it.id })
+    }
+
+    @Test
+    fun `a kind the host did not ask for is not read`() {
+        install("good.jar")
+
+        val module = WidgetModuleLoader(modules, contributionKinds = listOf(ThemeContribution::class.java)).scan()
+            .also { opened += it.loaded }.loaded.single()
+
+        assertEquals(listOf("fixture.theme"), module.contributions.map { it.id })
+    }
+
+    @Test
+    fun `two jars carrying one module id load the first and refuse the second by name`() {
+        install("a.jar")
+        install("b.jar")
+
+        val scan = scan()
+
+        assertEquals(listOf("fixture"), scan.loaded.map { it.id })
+        assertTrue("already carried by a.jar" in scan.rejected.single().reason, scan.rejected.single().reason)
+    }
+
+    @Test
+    fun `a contribution id with a slash is refused`() {
+        install("good.jar")
+
+        val scan = withProperty("fixture.effectSlashId") { scan() }
+
+        assertEquals(emptyList(), scan.loaded)
+        assertTrue("slash" in scan.rejected.single().reason, scan.rejected.single().reason)
     }
 
     @Test

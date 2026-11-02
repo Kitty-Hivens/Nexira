@@ -9,7 +9,11 @@ import hivens.widget.api.ScreenEffectState
 class FixtureEffect : ScreenEffect {
 
     override val id: String
-        get() = if (System.getProperty(BLANK_ID) != null) " " else EFFECT_ID
+        get() = when {
+            System.getProperty(BLANK_ID) != null -> " "
+            System.getProperty(SLASH_ID) != null -> "a/b"
+            else -> EFFECT_ID
+        }
 
     override val label: String = "fixture.label"
 
@@ -31,6 +35,9 @@ class FixtureEffect : ScreenEffect {
 
         /** Set, the effect names itself with nothing, as a hand written one might. */
         const val BLANK_ID = "fixture.effectBlankId"
+
+        /** Set, the effect names itself with a slash, which the stored choices are keyed by. */
+        const val SLASH_ID = "fixture.effectSlashId"
 
         /** Set, the effect declares one setting key twice. */
         const val REPEATED_KEY = "fixture.effectRepeatedKey"

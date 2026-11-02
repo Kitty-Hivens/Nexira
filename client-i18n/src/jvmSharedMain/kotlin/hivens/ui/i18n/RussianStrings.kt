@@ -1645,7 +1645,7 @@ object RussianStrings : AppStrings {
     override val modulesReload = "Перечитать папку"
     override val modulesOpenFolder = "Открыть папку"
     override fun moduleWidgets(n: Int) = "Виджетов: $n"
-    override fun moduleEffects(n: Int) = "Эффектов: $n"
+    override fun moduleContributions(n: Int) = "Дополнений: $n"
     override val moduleOff = "Выключен"
     override fun moduleOffAfterCrash(failure: String) = "Выключен после сбоя: $failure"
     override fun moduleRefused(reason: String) = "Не загружен: $reason"
