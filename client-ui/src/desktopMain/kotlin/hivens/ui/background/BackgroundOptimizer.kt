@@ -181,11 +181,11 @@ class BackgroundOptimizer(
                 log.info("Optimized wallpaper {} -> {}x{} via {}", src.fileName, dw, dh, encoder)
                 return@withContext
             } catch (e: CancellationException) {
-                runCatching { Files.deleteIfExists(part) }
+                val _ = runCatching { Files.deleteIfExists(part) }
                 log.info("Wallpaper transcode of {} cancelled", src.fileName)
                 throw e
             } catch (e: LibavException) {
-                runCatching { Files.deleteIfExists(part) }
+                val _ = runCatching { Files.deleteIfExists(part) }
                 log.debug("Encoder {} unavailable or failed for {}, trying next", encoder, src.fileName, e)
             }
         }
@@ -223,7 +223,7 @@ class BackgroundOptimizer(
  */
 internal fun sweepTranscodes(cacheDir: Path, keep: Path?) {
     val keepName = keep?.fileName?.toString()
-    runCatching {
+    val _ = runCatching {
         cacheDir.toFile()
             .listFiles { f -> f.isFile && f.name.endsWith(".mp4") && !f.name.endsWith(".part.mp4") }
             ?.forEach { f -> if (f.name != keepName) f.delete() }

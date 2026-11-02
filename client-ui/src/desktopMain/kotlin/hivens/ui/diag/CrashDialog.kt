@@ -78,7 +78,7 @@ object CrashDialog {
      * Daemon = true so a hung native call doesn't pin the JVM at exit.
      */
     private inline fun openOnDaemonThread(name: String, crossinline body: () -> Unit) {
-        Thread({ runCatching { body() } }, name).apply {
+        Thread({ val _ = runCatching { body() } }, name).apply {
             isDaemon = true
             start()
         }

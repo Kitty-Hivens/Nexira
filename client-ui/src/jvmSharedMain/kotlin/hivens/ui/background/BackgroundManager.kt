@@ -41,7 +41,7 @@ class BackgroundManager(
 
     // Built here rather than at shutdown, for the reason WidgetStateFlushHook gives:
     // a class first loaded while the process exits may no longer be readable.
-    private val onShutdown = Runnable { runCatching { flush() } }
+    private val onShutdown = Runnable { val _ = runCatching { flush() } }
 
     init {
         Runtime.getRuntime().addShutdownHook(Thread(onShutdown, "nexira-background-flush"))

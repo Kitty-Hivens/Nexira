@@ -88,7 +88,7 @@ class ScenePoolTest {
         paint(raster)
         assertEquals(1, pool.built)
 
-        runCatching { blowUp(raster) }
+        val _ = runCatching { blowUp(raster) }
         assertEquals(0, pool.held, "the spoiled scene is still held, so its leftovers go into the next preview")
 
         paint(raster, Color.Green)
@@ -98,7 +98,7 @@ class ScenePoolTest {
     @Test
     fun `one bad widget does not end the run`() {
         val raster = IntSize(64, 48)
-        runCatching { blowUp(raster) }
+        val _ = runCatching { blowUp(raster) }
         assertTrue(
             runCatching { paint(raster, Color.Green) }.isSuccess,
             "a gallery renders every widget, so one refusal must not stop the rest",

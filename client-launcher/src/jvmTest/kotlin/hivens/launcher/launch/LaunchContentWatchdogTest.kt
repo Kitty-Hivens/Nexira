@@ -31,7 +31,7 @@ class LaunchContentWatchdogTest {
     @OptIn(ExperimentalPathApi::class)
     @AfterTest
     fun cleanup() {
-        temps.forEach { runCatching { it.deleteRecursively() } }
+        temps.forEach { val _ = runCatching { it.deleteRecursively() } }
     }
 
     private fun tempDir(prefix: String): Path {

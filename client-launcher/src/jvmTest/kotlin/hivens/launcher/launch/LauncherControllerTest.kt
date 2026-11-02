@@ -138,7 +138,7 @@ class LauncherControllerTest {
     @OptIn(kotlin.io.path.ExperimentalPathApi::class)
     @AfterTest
     fun tearDown() {
-        runCatching { sandbox.deleteRecursively() }
+        val _ = runCatching { sandbox.deleteRecursively() }
     }
 
     private fun newController(

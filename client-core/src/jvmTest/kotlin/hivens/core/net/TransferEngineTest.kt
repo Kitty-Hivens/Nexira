@@ -407,7 +407,7 @@ class TransferEngineTest {
 
         // A partial plus journal left by a build where this path held other bytes.
         val stale = Host(other).apply { cutRangeAt = 48L }
-        runCatching {
+        val _ = runCatching {
             engine(mapOf(URL to stale), blocksInFlight = 1).fetch(Transfer(URL, dest, otherSha1, other.size.toLong()))
         }
         assertTrue(Files.exists(journalOf(dest)), "the fixture did not leave a journal to go stale")
@@ -450,7 +450,7 @@ class TransferEngineTest {
         val transfer = Transfer(URL, dest, expect = null, size = payload.size.toLong())
 
         val first = Host(payload).apply { etag = "v1"; cutRangeAt = 48L }
-        runCatching { engine(mapOf(URL to first), blocksInFlight = 1).fetch(transfer) }
+        val _ = runCatching { engine(mapOf(URL to first), blocksInFlight = 1).fetch(transfer) }
         assertTrue(Files.exists(journalOf(dest)), "the fixture did not leave a journal")
 
         val same = Host(payload).apply { etag = "v1" }

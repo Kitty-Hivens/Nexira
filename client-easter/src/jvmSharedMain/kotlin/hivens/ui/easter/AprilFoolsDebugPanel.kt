@@ -13,6 +13,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import hivens.ui.nx.NxSliderTrack
 import hivens.ui.nx.NxSwitch
 import kotlinx.coroutines.launch
 import hivens.ui.theme.NxInk
@@ -74,7 +75,7 @@ fun AprilFoolsDebugPanel() {
                 testBtn.originalVisible = true
 
                 scope.launch {
-                    runCatching { event(testBtn, fakeCursor, fakeWs) }
+                    val _ = runCatching { event(testBtn, fakeCursor, fakeWs) }
                 }
             },
             enabled        = isForced,
@@ -165,14 +166,12 @@ fun AprilFoolsDebugPanel() {
                 )
             }
 
-            Slider(
+            NxSliderTrack(
                 value         = intensity,
+                range         = 0f..1f,
                 onValueChange = { AprilFools.debugIntensity = it },
                 enabled       = isForced,
-                colors        = SliderDefaults.colors(
-                    thumbColor       = NxColor.status(Status.Error),
-                    activeTrackColor = NxColor.status(Status.Error),
-                ),
+                modifier      = Modifier.fillMaxWidth(),
             )
 
             // Quick day presets

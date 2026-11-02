@@ -942,7 +942,7 @@ class JavaManagerServiceTest {
         installedJava(target)
 
         val archive = tarGzOnDisk("truncated2.tar.gz", mapOf("jdk/README" to "not a jvm"))
-        runCatching { svc.installUnpacked(archive, target, isZip = false) }
+        val _ = runCatching { svc.installUnpacked(archive, target, isZip = false) }
 
         assertFalse(Files.exists(workDir.resolve("java-21-linux-amd64.incoming")))
         assertFalse(Files.exists(workDir.resolve("java-21-linux-amd64.previous")))

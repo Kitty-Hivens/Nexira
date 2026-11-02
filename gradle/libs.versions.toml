@@ -29,7 +29,7 @@ activityCompose   = "1.13.0"
 ktor              = "3.6.0"
 # Test-only. Pinned to whatever ktor-client-okhttp resolves, so the
 # certificate helper matches the TLS stack under test.
-okhttp            = "5.5.0"
+okhttp            = "5.5.1"
 koin              = "4.2.2"
 xodus             = "2.0.1"
 serialization     = "1.11.0"
@@ -47,7 +47,7 @@ composeMaterial3  = "1.13.0-beta01"
 # The desktop artifact has no Compose-Path bridge, so nx-ui builds the path from
 # the cubics itself (see PolygonShape).
 graphicsShapes    = "1.1.0"
-markdownRenderer  = "0.45.0"
+markdownRenderer  = "0.46.0"
 # org.jetbrains:markdown -- md->html parser under markdown-m3, used directly by the in-launcher HTML renderer (hivens.ui.render).
 markdown          = "0.7.18"
 # jsoup -- HTML parsing for the in-launcher HTML renderer.

@@ -25,9 +25,9 @@ class DesktopWidgetModuleHost(
 
     /** Copies no live loader reads from any more. Best effort: a host that will not delete an open file keeps it for later. */
     override fun sweepUnused(inUse: Set<String>) {
-        runCatching {
+        val _ = runCatching {
             Files.list(shadowDir).use { files ->
-                files.filter { it.fileName.toString() !in inUse }.forEach { runCatching { Files.deleteIfExists(it) } }
+                files.filter { it.fileName.toString() !in inUse }.forEach { val _ = runCatching { Files.deleteIfExists(it) } }
             }
         }
     }

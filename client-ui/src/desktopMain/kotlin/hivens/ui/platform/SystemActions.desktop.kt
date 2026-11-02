@@ -79,7 +79,7 @@ internal object DesktopSystemActions {
     }
 
     private inline fun runOnThread(name: String, crossinline body: () -> Unit) {
-        Thread({ runCatching { body() } }, name).apply {
+        Thread({ val _ = runCatching { body() } }, name).apply {
             isDaemon = true
             start()
         }
