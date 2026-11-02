@@ -25,7 +25,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.BasicTextField
+import hivens.ui.nx.NxBasicTextField
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -687,7 +687,7 @@ private fun ContentFilterButton(
 @Composable
 private fun ContentSearch(query: String, onQuery: (String) -> Unit, placeholder: String) {
     NxSurface(SurfaceKind.Field, modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
-        BasicTextField(
+        NxBasicTextField(
             value         = query,
             onValueChange = onQuery,
             singleLine    = true,

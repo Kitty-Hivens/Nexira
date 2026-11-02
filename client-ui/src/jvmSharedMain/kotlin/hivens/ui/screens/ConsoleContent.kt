@@ -23,7 +23,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
+import hivens.ui.nx.NxBasicTextField
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
@@ -1053,7 +1053,7 @@ private fun SearchPrompt(
             fontSize   = 12.sp,
             modifier   = Modifier.padding(end = 8.dp),
         )
-        BasicTextField(
+        NxBasicTextField(
             value         = query,
             onValueChange = onQueryChange,
             singleLine    = true,
@@ -1194,7 +1194,7 @@ private fun CommandInputRow(
             fontSize   = 12.sp,
             modifier   = Modifier.padding(end = 8.dp),
         )
-        BasicTextField(
+        NxBasicTextField(
             value         = value,
             onValueChange = onValueChange,
             singleLine    = true,

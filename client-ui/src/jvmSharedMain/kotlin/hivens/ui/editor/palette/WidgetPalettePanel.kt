@@ -27,7 +27,7 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
+import hivens.ui.nx.NxBasicTextField
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -343,7 +343,7 @@ private fun PaletteSearchField(query: String, onQueryChange: (String) -> Unit) {
             )
             Spacer(Modifier.width(8.dp))
             Box(Modifier.weight(1f)) {
-                BasicTextField(
+                NxBasicTextField(
                     value         = query,
                     onValueChange = onQueryChange,
                     singleLine    = true,

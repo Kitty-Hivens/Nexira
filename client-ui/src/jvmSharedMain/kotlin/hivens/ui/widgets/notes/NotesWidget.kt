@@ -9,7 +9,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.BasicTextField
+import hivens.ui.nx.NxBasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -96,7 +96,7 @@ fun NotesWidget(instance: WidgetInstance) {
 
             Spacer(Modifier.height(8.dp * scale))
 
-            BasicTextField(
+            NxBasicTextField(
                 value         = notes.body,
                 onValueChange = { notes = notes.copy(body = it) },
                 textStyle     = MaterialTheme.typography.bodyMedium.scaled(scale).copy(color = NxInk.main),

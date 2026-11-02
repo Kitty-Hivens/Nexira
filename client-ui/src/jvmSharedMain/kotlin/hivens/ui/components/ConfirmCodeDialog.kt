@@ -12,8 +12,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardActions
+import hivens.ui.nx.NxBasicTextField
+import androidx.compose.foundation.text.input.KeyboardActionHandler
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -130,7 +130,7 @@ fun ConfirmCodeDialog(
                 Box {
                     // The real input, invisible but focused: it owns the caret, the
                     // keyboard and paste, while the cells below are what is seen.
-                    BasicTextField(
+                    NxBasicTextField(
                         value = code,
                         onValueChange = { if (!isSubmitting) accept(it) },
                         singleLine = true,
@@ -139,9 +139,9 @@ fun ConfirmCodeDialog(
                             keyboardType = KeyboardType.NumberPassword,
                             imeAction = ImeAction.Done,
                         ),
-                        keyboardActions = KeyboardActions(
-                            onDone = { if (complete && !isSubmitting) onSubmit(code) },
-                        ),
+                        onKeyboardAction = KeyboardActionHandler {
+                            if (complete && !isSubmitting) onSubmit(code)
+                        },
                         cursorBrush = SolidColor(NxColor.lead()),
                         textStyle = TextStyle(color = NxInk.main),
                         modifier = Modifier

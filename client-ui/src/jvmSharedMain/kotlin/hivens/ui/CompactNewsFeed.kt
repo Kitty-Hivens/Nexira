@@ -11,7 +11,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
+import hivens.ui.nx.NxBasicTextField
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.mutableStateOf
@@ -402,7 +402,7 @@ private fun NewsFilterField(query: String, onQueryChange: (String) -> Unit) {
             )
             Spacer(Modifier.width(6.dp))
             Box(Modifier.weight(1f)) {
-                BasicTextField(
+                NxBasicTextField(
                     value         = query,
                     onValueChange = onQueryChange,
                     singleLine    = true,

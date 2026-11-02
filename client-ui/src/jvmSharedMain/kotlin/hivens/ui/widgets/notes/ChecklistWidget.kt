@@ -14,8 +14,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardActions
+import hivens.ui.nx.NxBasicTextField
+import androidx.compose.foundation.text.input.KeyboardActionHandler
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
@@ -192,14 +192,14 @@ private fun AddRow(scale: Float, onAdd: (String) -> Unit) {
         draft = ""
     }
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-        BasicTextField(
+        NxBasicTextField(
             value           = draft,
             onValueChange   = { draft = it },
             singleLine      = true,
             textStyle       = MaterialTheme.typography.bodyMedium.scaled(scale).copy(color = NxInk.main),
             cursorBrush     = SolidColor(NxColor.lead()),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-            keyboardActions = KeyboardActions(onDone = { commit() }),
+            onKeyboardAction = KeyboardActionHandler { commit() },
             modifier        = Modifier.weight(1f),
             decorationBox   = { inner ->
                 if (draft.isEmpty()) {

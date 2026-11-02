@@ -26,7 +26,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.text.BasicTextField
+import hivens.ui.nx.NxBasicTextField
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -556,7 +556,7 @@ internal fun SearchField(
             Modifier.fillMaxWidth().padding(end = if (trailing != null) 6.dp else 0.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            BasicTextField(
+            NxBasicTextField(
                 value         = value,
                 onValueChange = onValueChange,
                 singleLine    = true,

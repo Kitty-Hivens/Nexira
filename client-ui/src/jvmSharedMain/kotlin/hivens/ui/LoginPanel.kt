@@ -14,7 +14,8 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.foundation.text.input.KeyboardActionHandler
+import hivens.ui.nx.rememberFieldState
 import androidx.compose.ui.unit.dp
 import hivens.config.Protocol
 import hivens.core.api.AuthException
@@ -338,20 +339,18 @@ fun LoginPanel(
             errorMessage = null
         }
 
-        OutlinedTextField(
-            value                = password,
-            onValueChange        = { password = it; errorMessage = null; twoFactorUnsupported = false },
-            label                = { Text(s.loginPassword) },
-            modifier             = Modifier.fillMaxWidth(),
-            singleLine           = true,
-            visualTransformation = PasswordVisualTransformation(),
-            keyboardOptions      = KeyboardOptions(
+        val passwordState = rememberFieldState(password) { password = it; errorMessage = null; twoFactorUnsupported = false }
+        OutlinedSecureTextField(
+            state            = passwordState,
+            label            = { Text(s.loginPassword) },
+            modifier         = Modifier.fillMaxWidth(),
+            keyboardOptions  = KeyboardOptions(
                 keyboardType = KeyboardType.Password,
                 imeAction    = ImeAction.Done
             ),
-            keyboardActions = KeyboardActions(onDone = { doLogin() }),
-            shape   = MaterialTheme.shapes.small,
-            colors  = fieldColors
+            onKeyboardAction = KeyboardActionHandler { doLogin() },
+            shape            = MaterialTheme.shapes.small,
+            colors           = fieldColors
         )
         PuppetField("login.password", password) {
             password = it

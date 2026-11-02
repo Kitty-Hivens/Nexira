@@ -45,8 +45,6 @@ fun NxField(
     singleLine: Boolean = true,
     textStyle: TextStyle? = null,
 ) {
-    val state = rememberFieldState(value, onValueChange)
-
     NxSurface(
         kind     = SurfaceKind.Field,
         shape    = MaterialTheme.shapes.small,
@@ -54,18 +52,19 @@ fun NxField(
     ) {
         // Inside the surface, so the ink is the one that reads on the field itself.
         val ts = textStyle ?: MaterialTheme.typography.bodySmall.copy(color = NxInk.main)
-        BasicTextField(
-            state       = state,
-            lineLimits  = if (singleLine) TextFieldLineLimits.SingleLine else TextFieldLineLimits.Default,
-            textStyle   = ts,
-            cursorBrush = SolidColor(NxColor.lead()),
-            modifier    = Modifier.fillMaxWidth(),
+        NxBasicTextField(
+            value         = value,
+            onValueChange = onValueChange,
+            singleLine    = singleLine,
+            textStyle     = ts,
+            cursorBrush   = SolidColor(NxColor.lead()),
+            modifier      = Modifier.fillMaxWidth(),
             // The inset is inside the field, not around it. Around it, a press on the
             // field's own edge landed on nothing, and to the shell it was a press
             // outside the field, which let go of the caret.
-            decorator   = TextFieldDecorator { inner ->
+            decorationBox = { inner ->
                 Box(Modifier.padding(horizontal = Spacing.s10, vertical = Spacing.s8)) {
-                    if (state.text.isEmpty()) {
+                    if (value.isEmpty()) {
                         Text(placeholder, style = ts.copy(color = NxInk.quiet))
                     }
                     inner()
@@ -83,7 +82,7 @@ fun NxField(
  * stay on screen over a value that never took it.
  */
 @Composable
-internal fun rememberFieldState(value: String, onValueChange: (String) -> Unit): TextFieldState {
+fun rememberFieldState(value: String, onValueChange: (String) -> Unit): TextFieldState {
     val state = rememberTextFieldState(value)
     val latestValue = rememberUpdatedState(value)
     val latestChange = rememberUpdatedState(onValueChange)

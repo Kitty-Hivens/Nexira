@@ -11,7 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
+import hivens.ui.nx.NxBasicTextField
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -127,7 +127,7 @@ internal fun HexField(
                 modifier         = Modifier.fillMaxSize().padding(horizontal = 10.dp),
                 contentAlignment = Alignment.CenterStart,
             ) {
-                BasicTextField(
+                NxBasicTextField(
                     value         = text,
                     onValueChange = { t ->
                         text = t
