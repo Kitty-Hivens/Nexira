@@ -47,6 +47,18 @@ exclude:
   - name: DestructingShortFormNameMismatch
   - name: CustomComponentDestructuringMigration
   #
+  # The multiplatform modules share a JVM source set between their desktop and Android
+  # targets, and the linter's import resolves none of that set's libraries (slf4j,
+  # kotlinx.serialization and the rest come back as unresolved references, which the
+  # report lists as sanity problems), whatever SDK is mounted. Resolving them is what
+  # the two inspections below depend on. With a library type unresolved, code after
+  # `runCatching { ... }.getOrElse { return x }` is reported as unreachable, and an
+  # expect declaration is reported as having no Android actual. The compiler builds
+  # every one of these sites, so both rules only report the import, not the code. Take
+  # them back when the import resolves the shared set.
+  - name: KotlinUnreachableCode
+  - name: KotlinNoActualForExpect
+  #
   # Historically also excluded: UnusedAssignment, UnusedSymbol,
   # HasPlatformType. Removed 2026-05-17 -- they were muted because an
   # older Qodana JVM Community release mis-flagged Compose composables
