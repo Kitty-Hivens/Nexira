@@ -7,8 +7,10 @@ plugins {
 
 android {
     namespace = "dev.hivens.nexira"
-    // Compose 1.13 for Android is built against API 37, so the app compiles and targets it.
-    compileSdk = 37
+    // Compose 1.13 for Android is built against API 37.1, so the app compiles against that and targets 37.
+    compileSdk {
+        version = release(37) { minorApiLevel = 1 }
+    }
 
     defaultConfig {
         applicationId = "dev.hivens.nexira"
