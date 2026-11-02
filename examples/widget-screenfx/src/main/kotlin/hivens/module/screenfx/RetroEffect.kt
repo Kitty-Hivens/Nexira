@@ -9,7 +9,7 @@ package hivens.module.screenfx
  * person's strength is how far the monitor takes the interface from its own picture.
  */
 internal object RetroEffect {
-    val effect = ShaderEffect("screenfx.retro", "Retro", """
+    val effect = ShaderEffect("screenfx.retro", "retro", """
 uniform shader content;
 uniform float2 resolution;
 uniform float time;

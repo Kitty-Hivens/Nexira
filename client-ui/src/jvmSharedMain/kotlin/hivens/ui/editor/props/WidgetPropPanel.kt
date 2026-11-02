@@ -1,5 +1,6 @@
 package hivens.ui.editor.props
 
+import hivens.ui.widgets.modules.widgetLabel
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -195,7 +196,7 @@ private fun PropPanelBody(
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    text       = s.widgetLabel(descriptor.displayName),
+                    text       = widgetLabel(descriptor.kind, descriptor.displayName),
                     style      = MaterialTheme.typography.titleSmall,
                     color      = NxInk.main,
                     fontWeight = FontWeight.SemiBold,
@@ -224,7 +225,7 @@ private fun PropPanelBody(
                     if (anns.any { it is PropHidden }) continue
                     val name = sd.getElementName(i)
                     val cur = effective[name] ?: continue
-                    val label = s.widgetLabel(anns.filterIsInstance<PropLabel>().firstOrNull()?.value ?: name)
+                    val label = widgetLabel(descriptor.kind, anns.filterIsInstance<PropLabel>().firstOrNull()?.value ?: name)
                     if (name in instance.props && name !in readable) {
                         Text(
                             text  = s.editorPropUnreadable,

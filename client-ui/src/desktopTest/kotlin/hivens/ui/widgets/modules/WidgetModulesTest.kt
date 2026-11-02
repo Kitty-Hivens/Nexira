@@ -110,6 +110,50 @@ class WidgetModulesTest {
     }
 
     @Test
+    fun `a module's effects are listed with their scope and its words`() {
+        install()
+        val effect = modules().state.value.effects.single()
+
+        assertEquals("fixture/fixture.effect", effect.scope)
+        assertEquals("Fixture Effect", effect.strings.get(effect.effect.label, "en"))
+        assertEquals(1, (modules().state.value.entries.single() as WidgetModules.Entry.Loaded).effects)
+    }
+
+    @Test
+    fun `what is set for an effect is applied at once and survives a restart`() {
+        install()
+        val m = modules()
+        m.setEffectSetting("fixture/fixture.effect", WidgetModules.EFFECT_ENABLED, "true")
+        m.setEffectSetting("fixture/fixture.effect", "amount", "0.75")
+
+        assertEquals(mapOf("enabled" to "true", "amount" to "0.75"), m.settings.value["fixture/fixture.effect"])
+        assertEquals("0.75", modules().settings.value["fixture/fixture.effect"]?.get("amount"))
+    }
+
+    @Test
+    fun `settings are kept for a module that is switched off`() {
+        install()
+        val m = modules()
+        m.setEffectSetting("fixture/fixture.effect", "amount", "0.75")
+        m.setEnabled("fixture", false)
+
+        assertEquals(emptyList(), m.state.value.effects)
+        assertEquals("0.75", m.settings.value["fixture/fixture.effect"]?.get("amount"))
+    }
+
+    @Test
+    fun `forgetting a module forgets what was set for it`() {
+        install()
+        val m = modules()
+        m.setEffectSetting("fixture/fixture.effect", "amount", "0.75")
+        Files.delete(folder.resolve("fixture.jar"))
+        m.reload()
+        m.forget("fixture")
+
+        assertEquals(emptyMap(), m.settings.value)
+    }
+
+    @Test
     fun `a crash from a module's code switches that module off and says so`() {
         install()
         val m = modules()

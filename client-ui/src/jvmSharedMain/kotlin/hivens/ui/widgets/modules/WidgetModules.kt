@@ -3,6 +3,8 @@ package hivens.ui.widgets.modules
 import hivens.core.io.AtomicFiles
 import hivens.core.io.readUtf8
 import hivens.widget.api.CompositeWidgetRegistry
+import hivens.widget.api.ModuleSetting
+import hivens.widget.api.ModuleStrings
 import hivens.widget.api.ScreenEffect
 import hivens.widget.api.WidgetDescriptor
 import hivens.widget.api.WidgetRegistry
@@ -58,12 +60,18 @@ class WidgetModules(
         val disabled: Map<String, String> = emptyMap(),
         /** Module id to the widget kinds it brought the last time it loaded. */
         val known: Map<String, List<String>> = emptyMap(),
+        /**
+         * What the person set for each screen effect, as module id, slash, effect id, then the setting
+         * key, with [EFFECT_ENABLED] for whether the effect is on. Kept for a module that is off or gone,
+         * so it comes back set the way it was left.
+         */
+        val settings: Map<String, Map<String, String>> = emptyMap(),
     )
 
     /** One line of the module list. */
     sealed interface Entry {
         /** Loaded and in the registry. */
-        data class Loaded(val id: String, val name: String, val file: Path, val kinds: Int) : Entry
+        data class Loaded(val id: String, val name: String, val file: Path, val kinds: Int, val effects: Int = 0) : Entry
 
         /** Switched off. [crash] is the failure that switched it off, null when a person did. */
         data class Off(val id: String, val name: String, val file: Path, val crash: String?) : Entry
@@ -76,7 +84,13 @@ class WidgetModules(
     }
 
     /** The registry and the list, together, so a reader never sees one without the other. */
-    data class Snapshot(val registry: WidgetRegistry, val entries: List<Entry>, val effects: List<ScreenEffect> = emptyList())
+    data class Snapshot(val registry: WidgetRegistry, val entries: List<Entry>, val effects: List<ModuleEffect> = emptyList(), val widgetStrings: Map<WidgetKind, ModuleStrings> = emptyMap())
+
+    /** A screen effect with the module that brought it and the words that module ships. */
+    class ModuleEffect(val moduleId: String, val moduleName: String, val effect: ScreenEffect, val strings: ModuleStrings) {
+        /** The key the person's choices for this effect are stored under. */
+        val scope: String get() = "$moduleId/${effect.id}"
+    }
 
     /** A module that crashed and was switched off, for the notice the shell shows once it is back up. */
     data class CrashNotice(val name: String, val failure: String)
@@ -85,8 +99,12 @@ class WidgetModules(
     private var live: List<LoadedModule> = emptyList()
     private val _state = MutableStateFlow(Snapshot(builtIn, emptyList()))
     private val _crashNotice = MutableStateFlow<CrashNotice?>(null)
+    private val _settings = MutableStateFlow(saved.settings)
 
     val state: StateFlow<Snapshot> = _state.asStateFlow()
+
+    /** What is set for each screen effect, by [ModuleEffect.scope]. Read in the composition, so a change is drawn at once. */
+    val settings: StateFlow<Map<String, Map<String, String>>> = _settings.asStateFlow()
 
     /** Set when a module was switched off after crashing, until the shell has said so. */
     val crashNotice: StateFlow<CrashNotice?> = _crashNotice.asStateFlow()
@@ -137,6 +155,15 @@ class WidgetModules(
         reload()
     }
 
+    /** Stores one value of a screen effect, under [scope] and [key], and applies it without reading the folder again. */
+    fun setEffectSetting(scope: String, key: String, value: String) {
+        synchronized(lock) {
+            saved = saved.copy(settings = saved.settings + (scope to (saved.settings[scope].orEmpty() + (key to value))))
+            _settings.value = saved.settings
+            write()
+        }
+    }
+
     /**
      * Forgets a module whose jar is gone, and with it the record that kept its
      * widgets from the prune. The widgets themselves stay in the layout until the
@@ -144,7 +171,12 @@ class WidgetModules(
      */
     fun forget(id: String) {
         synchronized(lock) {
-            saved = saved.copy(known = saved.known - id, disabled = saved.disabled - id)
+            saved = saved.copy(
+                known = saved.known - id,
+                disabled = saved.disabled - id,
+                settings = saved.settings.filterKeys { !it.startsWith("$id/") },
+            )
+            _settings.value = saved.settings
             write()
         }
         reload()
@@ -194,24 +226,20 @@ class WidgetModules(
         composite.shadowed.forEach {
             log.warn("Widget '{}' from '{}' is shadowed by '{}' and will not be used", it.kind.value, labels[it.bySource], labels[it.heldBy])
         }
-        // One effect per id. A module that repeats another's loses it, and says so, for the same
-        // reason a shadowed widget does.
-        val effects = LinkedHashMap<String, ScreenEffect>()
-        scan.loaded.forEach { module ->
-            module.effects.forEach { effect ->
-                if (effects.putIfAbsent(effect.id, effect) != null) {
-                    log.warn("Screen effect '{}' from '{}' is shadowed by an earlier module and will not be used", effect.id, module.id)
-                }
-            }
+        // Effects are told apart by module, so two modules may use one id. An id repeated inside a
+        // module is refused by the loader before it gets here.
+        val effects = scan.loaded.flatMap { module ->
+            module.effects.map { ModuleEffect(module.id, module.name, it, module.strings) }
         }
         val present = (scan.loaded.map { it.id } + scan.disabled.map { it.id }).toSet()
         val entries = buildList {
-            scan.loaded.forEach { add(Entry.Loaded(it.id, it.name, it.file, it.registry.all().size)) }
+            scan.loaded.forEach { add(Entry.Loaded(it.id, it.name, it.file, it.registry.all().size, it.effects.size)) }
             scan.disabled.forEach { add(Entry.Off(it.id, it.name, it.file, saved.disabled[it.id]?.takeIf { s -> s.isNotBlank() })) }
             scan.rejected.forEach { add(Entry.Refused(it.file, it.reason)) }
             (saved.known.keys + saved.disabled.keys).filter { it !in present }.sorted().forEach { add(Entry.Gone(it)) }
         }
-        return Snapshot(composite, entries, effects.values.toList())
+        val widgetStrings = scan.loaded.flatMap { module -> module.registry.all().keys.map { it to module.strings } }.toMap()
+        return Snapshot(composite, entries, effects, widgetStrings)
     }
 
     private fun release(leaving: List<LoadedModule>) {
@@ -241,7 +269,10 @@ class WidgetModules(
             .onFailure { log.warn("Could not save the widget module list to {}", stateFile, it) }
     }
 
-    private companion object {
+    companion object {
+        /** The reserved key under an effect's scope for whether it is on, which no module can declare. */
+        const val EFFECT_ENABLED = ModuleSetting.RESERVED_ENABLED
+
         /** Long enough for the composition to have drawn a frame without the module. */
         val RELEASE_GRACE = 3.seconds
 

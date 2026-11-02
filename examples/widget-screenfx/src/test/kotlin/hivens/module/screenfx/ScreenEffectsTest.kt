@@ -9,6 +9,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Density
+import hivens.widget.api.ModuleValues
 import hivens.widget.api.ScreenEffect
 import hivens.widget.api.ScreenEffectState
 import org.jetbrains.skia.EncodedImageFormat
@@ -36,7 +37,20 @@ class ScreenEffectsTest {
         val loaded = ServiceLoader.load(ScreenEffect::class.java).toList()
 
         assertEquals(setOf("screenfx.trip", "screenfx.retro", "screenfx.glitch"), loaded.map { it.id }.toSet())
-        assertTrue(loaded.all { it.displayName.isNotBlank() })
+        assertTrue(loaded.all { it.label.isNotBlank() })
+    }
+
+    @Test
+    fun `every label and setting label is a key the module has words for in every language it ships`() {
+        val tables = listOf("en", "ru", "de", "ja").associateWith { tag ->
+            java.util.Properties().apply {
+                ScreenEffectsTest::class.java.classLoader.getResourceAsStream("i18n/$tag.properties")!!.reader(Charsets.UTF_8).use { load(it) }
+            }
+        }
+        val keys = ServiceLoader.load(ScreenEffect::class.java).flatMap { listOf(it.label) + it.settings.map { s -> s.label } }.toSet()
+        tables.forEach { (tag, table) ->
+            assertEquals(emptySet(), keys - table.stringPropertyNames(), "keys missing in $tag")
+        }
     }
 
     @Test
@@ -72,7 +86,7 @@ class ScreenEffectsTest {
                         drawRect(Brush.linearGradient(listOf(Color.Red, Color.Green, Color.Blue)))
                     }
                 }
-                if (effect == null) picture() else effect.Apply(ScreenEffectState(strength, reducedMotion = false), picture)
+                if (effect == null) picture() else effect.Apply(ScreenEffectState(ModuleValues(effect.settings, mapOf("strength" to strength.toString())), reducedMotion = false), picture)
             }
             try {
                 // The clock starts at the first frame, so the later frames are what moves.

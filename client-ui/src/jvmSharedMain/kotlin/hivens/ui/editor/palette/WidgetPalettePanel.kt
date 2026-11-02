@@ -53,7 +53,10 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.editor.EditModeController
 import hivens.ui.editor.dnd.DragController
 import hivens.ui.editor.dnd.DropTargetRegistry
+import hivens.ui.i18n.LocalAppLocale
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.widgets.modules.LocalWidgetLabels
+import hivens.widget.api.WidgetDescriptor
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.editor.rememberDockOffset
@@ -94,19 +97,22 @@ fun WidgetPalettePanel(
     // instance, and the chrome hides the remove button for them. If
     // the palette also exposed them, the user could drop duplicates
     // into arbitrary slots and never be able to remove them.
-    val descriptors = remember(registry0, s) {
+    val labels = LocalWidgetLabels.current
+    val locale = LocalAppLocale.current
+    val nameOf = { d: WidgetDescriptor -> labels.of(d.kind, d.displayName, s, locale) }
+    val descriptors = remember(registry0, s, labels, locale) {
         registry0.all().values
             .filter { it.removable }
-            .sortedBy { s.widgetLabel(it.displayName).lowercase() }
+            .sortedBy { nameOf(it).lowercase() }
     }
     // Above the search branch: remembered inside it, a query matching nothing
     // takes the host out of the composition and every preview is lost to a typo.
     val previews = rememberWidgetPreviewHost()
     var query by remember { mutableStateOf("") }
-    val filtered = remember(descriptors, query, s) {
+    val filtered = remember(descriptors, query, s, labels, locale) {
         if (query.isBlank()) descriptors
         else descriptors.filter {
-            s.widgetLabel(it.displayName).contains(query, ignoreCase = true) || it.kind.value.contains(query, ignoreCase = true)
+            nameOf(it).contains(query, ignoreCase = true) || it.kind.value.contains(query, ignoreCase = true)
         }
     }
 

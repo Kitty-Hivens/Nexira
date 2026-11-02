@@ -10,7 +10,7 @@ package hivens.module.screenfx
  * The person's strength scales how hard each burst hits.
  */
 internal object GlitchEffect {
-    val effect = ShaderEffect("screenfx.glitch", "Glitchcore", """
+    val effect = ShaderEffect("screenfx.glitch", "glitch", """
 uniform shader content;
 uniform float2 resolution;
 uniform float time;

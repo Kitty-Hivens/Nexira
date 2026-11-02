@@ -79,16 +79,6 @@ data class CustomizationSettings(
      * fit for the minimal LeftBar / Dot / None selections.
      */
     val navHoverHighlight: Boolean = true,
-
-    /**
-     * The id of the screen effect a module brought, applied to the whole interface. Null applies
-     * none, which is every launcher until somebody picks one. Kept as the id alone, so the choice
-     * outlives the module that is off or gone and comes back with it.
-     */
-    val screenEffect: String? = null,
-
-    /** How strongly the chosen effect is drawn, 0 to 1. Half by default: a look to try, not a wall. */
-    val screenEffectIntensity: Float = 0.5f,
 ) {
     /**
      * The selection this build understands, or the default when the file names

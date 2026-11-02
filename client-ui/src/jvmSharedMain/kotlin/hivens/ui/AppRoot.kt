@@ -48,7 +48,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import okhttp3.Call
+import hivens.ui.widgets.modules.LocalWidgetLabels
 import hivens.ui.widgets.modules.ScreenEffectHost
+import hivens.ui.widgets.modules.WidgetLabels
 import hivens.ui.widgets.modules.WidgetModules
 import org.koin.compose.getKoin
 import org.koin.compose.koinInject
@@ -312,14 +314,18 @@ fun AppRoot(
 
     LaunchedEffect(tone.avgLuminance) { onWallpaperLuminance(tone.avgLuminance) }
 
-    // What the person chose to look through, if a module brought it. Read where the shell does, so
-    // an effect switched on or a module switched off takes hold on the next frame.
+    // What the person switched on to look through, if a module brought it. Read where the shell does,
+    // so an effect switched on or a module switched off takes hold on the next frame.
     val modules = getKoin().getOrNull<WidgetModules>()
     val effects = modules?.state?.collectAsState()?.value?.effects.orEmpty()
+    val effectSettings = modules?.settings?.collectAsState()?.value.orEmpty()
+    // Names of a module's widgets in the person's language, which the editor panels read.
+    val widgetStrings = modules?.state?.collectAsState()?.value?.widgetStrings.orEmpty()
+    val widgetLabels = remember(widgetStrings) { WidgetLabels { widgetStrings[it] } }
+    CompositionLocalProvider(LocalWidgetLabels provides widgetLabels) {
     ScreenEffectHost(
         effects       = effects,
-        selected      = customization.screenEffect,
-        intensity     = customization.screenEffectIntensity,
+        settings      = effectSettings,
         reducedMotion = customization.reduceMotion,
     ) {
         Box(
@@ -415,6 +421,7 @@ fun AppRoot(
               PuppetClick("logout.confirm") { doLogout() }
           }
         }
+    }
     }
 }
 

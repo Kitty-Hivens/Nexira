@@ -1,5 +1,6 @@
 package hivens.widget.loader
 
+import hivens.widget.api.ModuleValues
 import hivens.widget.api.WidgetApi
 import java.nio.file.Files
 import java.nio.file.Path
@@ -145,12 +146,12 @@ class WidgetModuleLoaderTest {
     }
 
     @Test
-    fun `a module declaring the API but carrying no registry is refused`() {
+    fun `a module declaring the API but carrying no service at all is refused`() {
         install("empty.jar", withService = false)
 
         val rejected = scan().rejected.single()
 
-        assertTrue("no registry" in rejected.reason, rejected.reason)
+        assertTrue("neither a registry" in rejected.reason, rejected.reason)
     }
 
     @Test
@@ -160,7 +161,7 @@ class WidgetModuleLoaderTest {
         val effect = scan().loaded.single().effects.single()
 
         assertEquals("fixture.effect", effect.id)
-        assertEquals("Fixture Effect", effect.displayName)
+        assertEquals("fixture.label", effect.label)
         assertTrue(effect.javaClass.classLoader !== javaClass.classLoader, "the effect resolved through the parent loader")
     }
 
@@ -188,6 +189,69 @@ class WidgetModuleLoaderTest {
 
         assertEquals(emptyList(), scan.loaded)
         assertTrue("no id" in scan.rejected.single().reason, scan.rejected.single().reason)
+    }
+
+    @Test
+    fun `a screen effect carries its settings with their declared defaults`() {
+        install("good.jar")
+
+        val effect = scan().loaded.single().effects.single()
+
+        assertEquals(listOf("flag", "amount"), effect.settings.map { it.key })
+        assertEquals(0.25f, ModuleValues(effect.settings).amount("amount"))
+    }
+
+    @Test
+    fun `a setting key declared twice refuses the module`() {
+        install("good.jar")
+
+        val scan = withProperty("fixture.effectRepeatedKey") { scan() }
+
+        assertEquals(emptyList(), scan.loaded)
+        assertTrue("share the key 'flag'" in scan.rejected.single().reason, scan.rejected.single().reason)
+    }
+
+    @Test
+    fun `a setting named like the launcher's own key refuses the module`() {
+        install("good.jar")
+
+        val scan = withProperty("fixture.effectReservedKey") { scan() }
+
+        assertEquals(emptyList(), scan.loaded)
+        assertTrue("enabled" in scan.rejected.single().reason, scan.rejected.single().reason)
+    }
+
+    @Test
+    fun `a module brings its words per language, read from its own jar`() {
+        install("good.jar")
+
+        val strings = scan().loaded.single().strings
+
+        assertEquals(setOf("en", "ru"), strings.languages)
+        assertEquals("Тестовый эффект", strings.get("fixture.label", "ru"))
+        assertEquals("Fixture Effect", strings.get("fixture.label", "en"))
+    }
+
+    @Test
+    fun `a key a language lacks is read in English, and a key nobody has as itself`() {
+        install("good.jar")
+
+        val strings = scan().loaded.single().strings
+
+        assertEquals("Flag", strings.get("fixture.flag", "ru"))
+        assertEquals("Flag", strings.get("fixture.flag", "ja"))
+        assertEquals("no.such.key", strings.get("no.such.key", "ru"))
+        assertEquals("Sum 1 and 2", strings.get("fixture.sum", "de", 1, 2))
+    }
+
+    @Test
+    fun `a language file that cannot be read costs the module that language only`() {
+        install("good.jar", extra = mapOf("i18n/de.properties" to "broken=\\uZZZZ\n"))
+
+        val module = scan().loaded.single()
+
+        assertEquals(setOf("en", "ru"), module.strings.languages)
+        assertEquals("fixture", module.id)
     }
 
     @Test
@@ -318,6 +382,15 @@ class WidgetModuleLoaderTest {
      * damaged manifest or its service entry withheld. Everything else about the
      * jar -- the compiled registry, the descriptor it carries -- is genuine.
      */
+    private fun <T> withProperty(name: String, block: () -> T): T {
+        System.setProperty(name, "1")
+        return try {
+            block()
+        } finally {
+            System.clearProperty(name)
+        }
+    }
+
     private fun install(
         fileName: String,
         id: String? = "fixture",
@@ -326,6 +399,7 @@ class WidgetModuleLoaderTest {
         apiText: String? = null,
         withService: Boolean = true,
         withRegistryService: Boolean = true,
+        extra: Map<String, String> = emptyMap(),
     ) {
         val manifest = Manifest().apply {
             mainAttributes[Attributes.Name.MANIFEST_VERSION] = "1.0"
@@ -345,6 +419,11 @@ class WidgetModuleLoaderTest {
                         source.getInputStream(entry).use { it.copyTo(out) }
                         out.closeEntry()
                     }
+                extra.forEach { (name, text) ->
+                    out.putNextEntry(JarEntry(name))
+                    out.write(text.toByteArray(Charsets.UTF_8))
+                    out.closeEntry()
+                }
             }
         }
     }

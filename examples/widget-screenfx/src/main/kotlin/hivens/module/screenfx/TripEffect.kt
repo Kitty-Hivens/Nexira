@@ -9,7 +9,7 @@ package hivens.module.screenfx
  * a mix between the interface and its own fold, driven by the clock and the person's strength.
  */
 internal object TripEffect {
-    val effect = ShaderEffect("screenfx.trip", "Trip", """
+    val effect = ShaderEffect("screenfx.trip", "trip", """
 uniform shader content;
 uniform float2 resolution;
 uniform float time;

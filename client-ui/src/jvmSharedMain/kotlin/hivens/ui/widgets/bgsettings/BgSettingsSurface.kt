@@ -60,10 +60,6 @@ fun BgSettingsSurface(
     onSurfaceBlurChanged: (Boolean) -> Unit,
     reduceMotion: Boolean,
     onReduceMotionChanged: (Boolean) -> Unit,
-    screenEffect: String?,
-    onScreenEffectChanged: (String?) -> Unit,
-    screenEffectIntensity: Float,
-    onScreenEffectIntensityChanged: (Float) -> Unit,
     onOpenThemePicker: () -> Unit,
 ) {
     // The shell's value, not a copy taken on the way in. The screen is not the
@@ -114,10 +110,6 @@ fun BgSettingsSurface(
                 onSurfaceBlurChanged = onSurfaceBlurChanged,
                 reduceMotion         = reduceMotion,
                 onReduceMotionChanged = onReduceMotionChanged,
-                screenEffect         = screenEffect,
-                onScreenEffectChanged = onScreenEffectChanged,
-                screenEffectIntensity = screenEffectIntensity,
-                onScreenEffectIntensityChanged = onScreenEffectIntensityChanged,
                 onOpenThemePicker    = onOpenThemePicker,
                 modifier             = Modifier.width(THEME_PANEL_WIDTH).fillMaxHeight(),
             )

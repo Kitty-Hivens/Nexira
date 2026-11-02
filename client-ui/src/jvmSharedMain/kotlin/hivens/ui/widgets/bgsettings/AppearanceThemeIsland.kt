@@ -45,10 +45,6 @@ internal fun AppearanceThemeIsland(
     onSurfaceBlurChanged: (Boolean) -> Unit,
     reduceMotion: Boolean,
     onReduceMotionChanged: (Boolean) -> Unit,
-    screenEffect: String?,
-    onScreenEffectChanged: (String?) -> Unit,
-    screenEffectIntensity: Float,
-    onScreenEffectIntensityChanged: (Float) -> Unit,
     onOpenThemePicker: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -120,12 +116,7 @@ internal fun AppearanceThemeIsland(
                 onCheckedChange = onReduceMotionChanged,
             )
 
-            ScreenEffectRows(
-                selected    = screenEffect,
-                onSelected  = onScreenEffectChanged,
-                intensity   = screenEffectIntensity,
-                onIntensity = onScreenEffectIntensityChanged,
-            )
+            ModuleEffectRows()
 
             NxRow(
                 title    = s.settingsThemePicker,

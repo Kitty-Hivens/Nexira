@@ -11,6 +11,7 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asComposeRenderEffect
 import androidx.compose.ui.graphics.graphicsLayer
+import hivens.widget.api.ModuleSetting
 import hivens.widget.api.ScreenEffect
 import hivens.widget.api.ScreenEffectState
 import org.jetbrains.skia.ImageFilter
@@ -28,9 +29,13 @@ import org.jetbrains.skia.RuntimeShaderBuilder
  */
 internal class ShaderEffect(
     override val id: String,
-    override val displayName: String,
+    override val label: String,
     private val source: String,
 ) : ScreenEffect {
+
+    override val settings: List<ModuleSetting> = listOf(
+        ModuleSetting.Amount(STRENGTH, "strength", default = 0.5f),
+    )
 
     @Composable
     override fun Apply(state: ScreenEffectState, content: @Composable () -> Unit) {
@@ -56,7 +61,7 @@ internal class ShaderEffect(
             Modifier.graphicsLayer {
                 builder.uniform(RESOLUTION, size.width, size.height)
                 builder.uniform(TIME, seconds)
-                builder.uniform(STRENGTH, state.intensity)
+                builder.uniform(STRENGTH, state.values.amount(STRENGTH))
                 renderEffect = ImageFilter.makeRuntimeShader(builder, CHILD, null).asComposeRenderEffect()
             },
         ) { content() }

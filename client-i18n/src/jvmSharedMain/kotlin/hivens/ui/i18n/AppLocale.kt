@@ -49,6 +49,13 @@ val LocalStrings: ProvidableCompositionLocal<AppStrings> =
     staticCompositionLocalOf { RussianStrings }
 
 /**
+ * The language the interface is in, for text that does not come from [AppStrings]: a module
+ * brings its own words per language tag and picks by this one.
+ */
+val LocalAppLocale: ProvidableCompositionLocal<AppLocale> =
+    staticCompositionLocalOf { AppLocale.RUSSIAN }
+
+/**
  * Convenience accessor inside Composables.
  *
  *   val s = LocalStrings.current
@@ -71,6 +78,7 @@ fun LocaleProvider(
 ) {
     CompositionLocalProvider(
         LocalStrings provides stringsFor(locale),
+        LocalAppLocale provides locale,
         content = content,
     )
 }

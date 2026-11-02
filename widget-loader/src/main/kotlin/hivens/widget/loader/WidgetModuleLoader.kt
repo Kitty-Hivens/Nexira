@@ -1,5 +1,7 @@
 package hivens.widget.loader
 
+import hivens.widget.api.ModuleSetting
+import hivens.widget.api.ModuleStrings
 import hivens.widget.api.ScreenEffect
 import hivens.widget.api.WidgetApi
 import hivens.widget.api.WidgetDescriptor
@@ -7,11 +9,13 @@ import hivens.widget.api.WidgetRegistry
 import hivens.widget.api.widgetPropsJson
 import hivens.widget.model.WidgetKind
 import org.slf4j.LoggerFactory
+import java.io.InputStreamReader
 import java.net.URLClassLoader
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
+import java.util.Properties
 import java.util.ServiceLoader
 import java.util.jar.JarFile
 
@@ -35,6 +39,8 @@ data class LoadedWidgetModule(
     val loader: URLClassLoader,
     /** The screen effects it carries, which is none for a module that only has widgets. */
     val effects: List<ScreenEffect> = emptyList(),
+    /** The words it brought, per language, for what it declares for a person to read. */
+    val strings: ModuleStrings = ModuleStrings.EMPTY,
 ) : WidgetModuleResult
 
 /**
@@ -122,7 +128,17 @@ class WidgetModuleLoader(
         val off = mutableListOf<DisabledWidgetModule>()
         jars.forEach { jar ->
             when (val result = load(jar)) {
-                is LoadedWidgetModule -> loaded += result
+                is LoadedWidgetModule -> {
+                    val first = loaded.firstOrNull { it.id == result.id }
+                    if (first == null) {
+                        loaded += result
+                    } else {
+                        // Settings, the on and off switch and the crash record are all kept by id, so
+                        // two jars sharing one would be switched and set as a single module.
+                        result.loader.release()
+                        rejected += RejectedWidgetModule(jar, "its id '${result.id}' is already carried by ${first.file.fileName}")
+                    }
+                }
                 is RejectedWidgetModule -> rejected += result
                 is DisabledWidgetModule -> off += result
             }
@@ -195,7 +211,7 @@ class WidgetModuleLoader(
             // A module may carry nothing but effects: it is a module all the same, with no widgets.
             registries.isEmpty() && effects.isEmpty() -> {
                 loader.release()
-                RejectedWidgetModule(jar, "declares the widget API but carries no registry service")
+                RejectedWidgetModule(jar, "declares the widget API but carries neither a registry nor a screen effect service")
             }
             registries.size > 1 -> {
                 // The processor emits exactly one per module. More than one means a
@@ -225,7 +241,7 @@ class WidgetModuleLoader(
                     loader.release()
                     return RejectedWidgetModule(jar, fault)
                 }
-                LoadedWidgetModule(id, name, jar, registry, loader, effects)
+                LoadedWidgetModule(id, name, jar, registry, loader, effects, readStrings(opened, id))
             }
         }
     }
@@ -236,11 +252,39 @@ class WidgetModuleLoader(
             guarded { effect.id.trim() }.getOrElse { return "a screen effect's id could not be read: ${it.message}" }
         }
         if (ids.any { it.isEmpty() }) return "a screen effect has no id"
+        effects.zip(ids).firstOrNull { (effect, trimmed) -> effect.id != trimmed || '/' in trimmed }?.let { (effect, _) ->
+            return "screen effect id '${effect.id}' has surrounding space or a slash"
+        }
         ids.groupBy { it }.entries.firstOrNull { it.value.size > 1 }?.let { return "two screen effects share the id '${it.key}'" }
         effects.forEach { effect ->
-            guarded { effect.displayName }.getOrElse { return "screen effect '${effect.id}' has no readable name: ${it.message}" }
+            guarded { effect.label }.getOrElse { return "screen effect '${effect.id}' has no readable label: ${it.message}" }
+            val settings = guarded { effect.settings }
+                .getOrElse { return "screen effect '${effect.id}' has settings that could not be read: ${it.message}" }
+            ModuleSetting.faultIn(settings)?.let { return "screen effect '${effect.id}': $it" }
         }
         return null
+    }
+
+    /**
+     * The language files of a module: every `i18n/<tag>.properties` in its jar, read from the jar
+     * itself so the launcher's own resources, which a parent-first loader would answer with, never
+     * stand in for them. A file that cannot be read costs the module that language and nothing more.
+     */
+    private fun readStrings(jar: Path, id: String): ModuleStrings {
+        val tables = HashMap<String, Map<String, String>>()
+        runCatching {
+            JarFile(jar.toFile()).use { file ->
+                file.entries().asSequence().forEach { entry ->
+                    val tag = STRINGS_FILE.matchEntire(entry.name)?.groupValues?.get(1) ?: return@forEach
+                    runCatching {
+                        val properties = Properties()
+                        InputStreamReader(file.getInputStream(entry), Charsets.UTF_8).use { properties.load(it) }
+                        tables[tag] = properties.stringPropertyNames().associateWith { properties.getProperty(it) }
+                    }.onFailure { log.warn("Widget module '{}' has an unreadable language file {}: {}", id, entry.name, it.message) }
+                }
+            }
+        }.onFailure { log.warn("Widget module '{}' language files could not be read: {}", id, it.message) }
+        return if (tables.isEmpty()) ModuleStrings.EMPTY else ModuleStrings(tables)
     }
 
     /** What a module with no widgets contributes to the registry. */
@@ -322,6 +366,8 @@ class WidgetModuleLoader(
     companion object {
         /** What a module's class loader is named, ahead of the module's id. */
         const val LOADER_PREFIX = "widget-module:"
+
+        private val STRINGS_FILE = Regex("""i18n/([A-Za-z][A-Za-z0-9_-]*)\.properties""")
 
         /**
          * The module whose code is on [error]'s stack, or null when none is.

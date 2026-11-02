@@ -102,9 +102,7 @@ interface AppStrings {
 
     /** Said under a setting the device cannot honour, which is shown but cannot be changed. */
     val settingsUnsupportedHere: String
-    val screenEffectTitle: String
-    val screenEffectOff: String
-    val screenEffectStrength: String
+    val moduleSettingsTitle: String
     val screenEffectWarning: String
     val settingsCloseAfterLaunch: String
     val settingsCloseAfterLaunchDesc: String
@@ -1675,6 +1673,7 @@ interface AppStrings {
     val modulesReload: String
     val modulesOpenFolder: String
     fun moduleWidgets(n: Int): String
+    fun moduleEffects(n: Int): String
     val moduleOff: String
     fun moduleOffAfterCrash(failure: String): String
     fun moduleRefused(reason: String): String

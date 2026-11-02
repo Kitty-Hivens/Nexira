@@ -1,5 +1,6 @@
 package hivens.ui.editor.decoration
 
+import hivens.ui.widgets.modules.widgetLabel
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -868,7 +869,7 @@ fun EditableWidgetChrome(
                 title             = { Text(s.editorForceRemoveTitle) },
                 text              = {
                     Text(
-                        text = s.editorForceRemoveBody(s.widgetLabel(descriptor.displayName)),
+                        text = s.editorForceRemoveBody(widgetLabel(descriptor.kind, descriptor.displayName)),
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 },

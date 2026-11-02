@@ -1,5 +1,6 @@
 package hivens.ui.editor.palette
 
+import hivens.ui.widgets.modules.widgetLabel
 import androidx.compose.foundation.background
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
@@ -95,7 +96,7 @@ fun PaletteItem(
     val graph by rememberUpdatedState(LocalLayoutGraph.current)
     val s = LocalStrings.current
     // Resolve the widget's label via key-indirection (see AppStrings.widgetLabel).
-    val label = s.widgetLabel(descriptor.displayName)
+    val label = widgetLabel(descriptor.kind, descriptor.displayName)
     val density = LocalDensity.current.density
 
     val background = if (isHovered) NxColor.wash(NxColor.lead(), 0.12f)
