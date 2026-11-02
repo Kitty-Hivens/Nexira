@@ -34,7 +34,7 @@ class ModIconLookupsTest {
     @AfterTest
     fun cleanup() {
         scope.cancel()
-        runCatching { dir.deleteRecursively() }
+        val _ = runCatching { dir.deleteRecursively() }
     }
 
     private fun caches() = ModIconCaches(

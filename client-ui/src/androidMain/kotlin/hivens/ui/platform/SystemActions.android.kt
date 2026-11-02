@@ -13,14 +13,14 @@ internal actual fun hostOpenFolder(path: String) = Unit
 internal actual fun hostOpenFile(file: File) = Unit
 
 internal actual fun hostOpenUrl(url: String) {
-    runCatching {
+    val _ = runCatching {
         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         AndroidAppContext.require().startActivity(intent)
     }
 }
 
 internal actual fun hostCopyToClipboard(text: String) {
-    runCatching {
+    val _ = runCatching {
         val context = AndroidAppContext.require()
         context.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("", text))
     }

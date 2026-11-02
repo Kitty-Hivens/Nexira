@@ -263,14 +263,14 @@ class MediaSessionBridge(
      */
     private fun releaseOnShutdown() {
         val body: () -> Unit = { close() }
-        val task = Runnable { runCatching(body) }
-        runCatching { Runtime.getRuntime().addShutdownHook(Thread(task, "nexira-media-session")) }
+        val task = Runnable { val _ = runCatching(body) }
+        val _ = runCatching { Runtime.getRuntime().addShutdownHook(Thread(task, "nexira-media-session")) }
     }
 
     override fun close() {
         job?.cancel()
         job = null
-        runCatching { session?.close() }
+        val _ = runCatching { session?.close() }
         session = null
     }
 

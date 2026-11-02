@@ -140,13 +140,13 @@ class SystemAudioOutput : AudioOutput, AutoCloseable {
      */
     private fun releaseOnShutdown() {
         val body: () -> Unit = { close() }
-        val task = Runnable { runCatching(body) }
-        runCatching { Runtime.getRuntime().addShutdownHook(Thread(task, "nexira-audio-output")) }
+        val task = Runnable { val _ = runCatching(body) }
+        val _ = runCatching { Runtime.getRuntime().addShutdownHook(Thread(task, "nexira-audio-output")) }
     }
 
     override fun close() {
         synchronized(lock) {
-            runCatching { backend?.close() }
+            val _ = runCatching { backend?.close() }
             backend = null
         }
     }

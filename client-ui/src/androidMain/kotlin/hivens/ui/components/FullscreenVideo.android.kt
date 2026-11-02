@@ -13,7 +13,7 @@ import androidx.compose.ui.platform.LocalContext
 actual fun FullscreenVideo(url: String, posterUrl: String?, onDismiss: () -> Unit) {
     val context = LocalContext.current
     LaunchedEffect(url) {
-        runCatching {
+        val _ = runCatching {
             context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         }
         onDismiss()

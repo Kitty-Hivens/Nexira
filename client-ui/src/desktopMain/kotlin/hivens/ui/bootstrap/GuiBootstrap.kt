@@ -108,12 +108,12 @@ object GuiBootstrap {
         // class may no longer work -- a replaced image, a rebuild over a live
         // process. The log this was found in shows exactly that: the crash was
         // reported to disk and then the dialog meant to surface it failed too.
-        runCatching { CrashDialog::class.java.name }
+        val _ = runCatching { CrashDialog::class.java.name }
         // Same reasoning, one layer earlier. ShellRecovery is the enum
         // recordShellCrash returns, and its first executed reference is inside
         // crash handling itself, so a process whose classes have gone out from
         // under it dies deciding how to recover rather than recovering.
-        runCatching { ShellRecovery::class.java.name }
+        val _ = runCatching { ShellRecovery::class.java.name }
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
             val handlerLog = LoggerFactory.getLogger("CrashHandler")
             handlerLog.error("Uncaught exception on thread '${thread.name}'", throwable)

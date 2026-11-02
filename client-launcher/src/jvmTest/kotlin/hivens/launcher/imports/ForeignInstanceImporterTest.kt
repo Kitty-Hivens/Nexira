@@ -30,7 +30,7 @@ class ForeignInstanceImporterTest {
     private val sandboxes = mutableListOf<Path>()
 
     @AfterTest
-    fun tearDown() = sandboxes.forEach { runCatching { it.deleteRecursively() } }
+    fun tearDown() = sandboxes.forEach { val _ = runCatching { it.deleteRecursively() } }
 
     private fun tmp(name: String): Path = Files.createTempDirectory(name).also { sandboxes.add(it) }
 

@@ -37,6 +37,14 @@ jobs:
         with:
           distribution: liberica
           java-version: '27'
+      # The multiplatform modules carry an Android target, and without an SDK the linter's
+      # import leaves them half resolved: libraries come back unresolved, and the analysis
+      # then reports code after a getOrElse that returns as unreachable, and expect
+      # declarations as having no Android actual. The runner already has an SDK, so it is
+      # mounted into the container the way the JDK is.
+      - name: Locate the Android SDK
+        id: sdk
+        run: echo "path=${ANDROID_HOME:-$ANDROID_SDK_ROOT}" >> "$GITHUB_OUTPUT"
       - name: 'Qodana Scan'
         uses: JetBrains/qodana-action@v2026.2.2
         env:
@@ -56,5 +64,6 @@ jobs:
           push-fixes: 'none'
           # Mount the runner's JDK 27 into the linter container so projectJDK
           # (/root/.jdks/jdk) resolves the Gradle toolchain. Space-separated: the
-          # comma form is deprecated and the action warns on it every run.
-          args: -v ${{ steps.jdk.outputs.path }}:/root/.jdks/jdk
+          # comma form is deprecated and the action warns on it every run. The Android SDK
+          # goes in the same way, with ANDROID_HOME pointing at it inside the container.
+          args: -v ${{ steps.jdk.outputs.path }}:/root/.jdks/jdk -v ${{ steps.sdk.outputs.path }}:/opt/android-sdk -e ANDROID_HOME=/opt/android-sdk

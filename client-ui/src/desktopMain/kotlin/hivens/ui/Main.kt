@@ -284,8 +284,8 @@ fun main(args: Array<String>) {
     // exitProcess below routes every exit through this hook.
     Runtime.getRuntime().addShutdownHook(
         Thread {
-            runCatching { PuppetServerLoader.instance.stop() }
-            runCatching { stopKoin() }
+            val _ = runCatching { PuppetServerLoader.instance.stop() }
+            val _ = runCatching { stopKoin() }
         },
     )
 
@@ -320,7 +320,7 @@ fun main(args: Array<String>) {
             // on this thread: the first screen to read it would otherwise open it on
             // the UI thread. Whatever goes wrong is the registry's to report, and it
             // is no reason to stop the boot.
-            runCatching { GlobalContext.get().get<IPackRepository>().observe() }
+            val _ = runCatching { GlobalContext.get().get<IPackRepository>().observe() }
             result
         }.onSuccess { result ->
             bootStage.value   = BootStage.Done
@@ -341,7 +341,7 @@ fun main(args: Array<String>) {
             }
         }.onFailure { e ->
             LoggerFactory.getLogger("Main").error("Boot failed before the shell could start", e)
-            runCatching {
+            val _ = runCatching {
                 val reporter = pre.crashReporter.get()
                 reporter.saveToDisk(reporter.generate(e, Thread.currentThread()))
             }
@@ -474,7 +474,7 @@ private fun runShellWithRecovery(
             ShellRecovery.FATAL     -> {
                 log.error("Safe mode itself crashed -- giving up on the UI")
                 if (saved != null) {
-                    runCatching {
+                    val _ = runCatching {
                         SwingUtilities.invokeAndWait { CrashDialog.show(saved.first, saved.second) }
                     }
                 }

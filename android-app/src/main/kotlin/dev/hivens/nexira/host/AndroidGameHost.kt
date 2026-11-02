@@ -153,8 +153,8 @@ private class ServiceLaunchHandle(
     private fun finish(code: Int) {
         if (!exit.complete(code)) return
         output.close()
-        runCatching { context.unbindService(connection) }
-        runCatching { specFile.delete() }
+        val _ = runCatching { context.unbindService(connection) }
+        val _ = runCatching { specFile.delete() }
         thread.quitSafely()
     }
 
@@ -165,7 +165,7 @@ private class ServiceLaunchHandle(
     }
 
     override fun terminate() {
-        runCatching { service?.send(Message.obtain(null, GameIpc.MSG_TERMINATE)) }
+        val _ = runCatching { service?.send(Message.obtain(null, GameIpc.MSG_TERMINATE)) }
     }
 
     /** The game has no console to type into on a phone. */

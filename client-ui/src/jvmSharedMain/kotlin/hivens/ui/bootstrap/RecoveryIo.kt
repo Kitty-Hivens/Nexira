@@ -144,12 +144,12 @@ object RecoveryIo {
     }.getOrNull()
 
     private fun writeSettings(dataDir: Path, root: JsonObject) {
-        runCatching {
+        val _ = runCatching {
             AtomicFiles.writeString(dataDir.resolve(Storage.SETTINGS_FILE), pretty.encodeToString(JsonObject.serializer(), root))
         }
     }
 
     private fun deleteQuietly(path: Path) {
-        runCatching { Files.deleteIfExists(path) }
+        val _ = runCatching { Files.deleteIfExists(path) }
     }
 }

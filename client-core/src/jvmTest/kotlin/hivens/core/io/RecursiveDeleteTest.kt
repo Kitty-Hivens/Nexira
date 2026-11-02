@@ -23,7 +23,7 @@ class RecursiveDeleteTest {
         // Not deleteTree: teardown must survive a test that left the tree in a
         // state deleteTree itself would choke on.
         Files.walk(root).use { walk ->
-            walk.sorted(Comparator.reverseOrder()).forEach { entry -> runCatching { Files.deleteIfExists(entry) }
+            walk.sorted(Comparator.reverseOrder()).forEach { entry -> val _ = runCatching { Files.deleteIfExists(entry) }
         } }
     }
 

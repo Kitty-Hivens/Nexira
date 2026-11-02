@@ -315,7 +315,7 @@ fun ThresholdOverlay(
                     }
                     ThresholdButton(strings.thresholdOpenLogs.lowercase(), pixelFont, pal) {
                         thread(isDaemon = true) {
-                            runCatching { Desktop.getDesktop().open(logsDir.toFile()) }
+                            val _ = runCatching { Desktop.getDesktop().open(logsDir.toFile()) }
                         }
                     }
                     ThresholdButton(strings.thresholdQuit.lowercase(), pixelFont, pal, onClick = onQuit)

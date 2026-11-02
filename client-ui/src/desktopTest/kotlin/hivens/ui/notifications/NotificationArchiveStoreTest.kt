@@ -25,7 +25,7 @@ class NotificationArchiveStoreTest {
 
     @AfterTest
     fun tearDown() {
-        runCatching { dir.toFile().deleteRecursively() }
+        val _ = runCatching { dir.toFile().deleteRecursively() }
     }
 
     private fun entry(
