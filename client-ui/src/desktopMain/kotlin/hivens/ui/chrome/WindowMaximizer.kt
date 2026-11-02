@@ -173,7 +173,7 @@ class WindowMaximizer(
 
     fun maximize() {
         val w = window ?: return
-        runCatching { w.maximizedBounds = screenWorkArea(w.graphicsConfiguration) }
+        val _ = runCatching { w.maximizedBounds = screenWorkArea(w.graphicsConfiguration) }
         log.info("window state -> WM: requesting maximize")
         dump(w, "cmd maximize PRE")
         w.extendedState = w.extendedState or Frame.MAXIMIZED_BOTH

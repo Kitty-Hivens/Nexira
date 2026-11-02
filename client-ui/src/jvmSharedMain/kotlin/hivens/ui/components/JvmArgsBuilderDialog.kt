@@ -1,6 +1,7 @@
 package hivens.ui.components
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxSectionHeader
+import hivens.ui.nx.NxSliderTrack
 import hivens.ui.nx.NxSwitch
 
 import androidx.compose.foundation.background
@@ -636,12 +637,11 @@ private fun SliderField(
                 modifier = Modifier.weight(1f))
             Text(display, color = NxColor.lead(text = true), fontFamily = LocalMonoFamily.current)
         }
-        Slider(
-            value = value, onValueChange = onChange, valueRange = valueRange, steps = steps,
-            colors = SliderDefaults.colors(
-                thumbColor = NxColor.lead(),
-                activeTrackColor = NxColor.lead(),
-            ),
+        NxSliderTrack(
+            value = value,
+            range = valueRange,
+            onValueChange = { onChange(snapToSteps(it, valueRange, steps)) },
+            modifier = Modifier.fillMaxWidth(),
         )
         Text(hint, color = NxInk.quiet,
             style = MaterialTheme.typography.bodySmall)
@@ -687,4 +687,11 @@ private fun IntInput(
         Text(hint, color = NxInk.quiet,
             style = MaterialTheme.typography.bodySmall)
     }
+}
+
+/** [x] moved to the nearest of the [steps] marks between the ends of [range], the way a stepped slider reports it. */
+private fun snapToSteps(x: Float, range: ClosedFloatingPointRange<Float>, steps: Int): Float {
+    if (steps <= 0) return x
+    val gap = (range.endInclusive - range.start) / (steps + 1)
+    return range.start + Math.round((x - range.start) / gap) * gap
 }

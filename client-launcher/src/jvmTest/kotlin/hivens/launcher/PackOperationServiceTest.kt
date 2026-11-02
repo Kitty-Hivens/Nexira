@@ -51,7 +51,9 @@ class PackOperationServiceTest {
     @OptIn(ExperimentalPathApi::class)
     @AfterTest
     fun tearDown() {
-        if (::dataDir.isInitialized) runCatching { dataDir.deleteRecursively() }
+        if (::dataDir.isInitialized) {
+            val _ = runCatching { dataDir.deleteRecursively() }
+        }
     }
 
     @Test

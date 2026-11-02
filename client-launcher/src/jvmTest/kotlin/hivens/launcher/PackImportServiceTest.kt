@@ -14,7 +14,7 @@ class PackImportServiceTest {
 
     @AfterTest
     fun cleanup() {
-        temps.forEach { runCatching { Files.deleteIfExists(it) } }
+        temps.forEach { val _ = runCatching { Files.deleteIfExists(it) } }
     }
 
     private fun zipWith(vararg entries: String): Path {

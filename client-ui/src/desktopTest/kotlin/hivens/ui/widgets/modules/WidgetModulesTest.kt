@@ -42,7 +42,7 @@ class WidgetModulesTest {
     @AfterTest
     fun tearDown() {
         scope.cancel()
-        Files.walk(tmp).use { walk -> walk.sorted(Comparator.reverseOrder()).forEach { runCatching { Files.deleteIfExists(it) } } }
+        Files.walk(tmp).use { walk -> walk.sorted(Comparator.reverseOrder()).forEach { val _ = runCatching { Files.deleteIfExists(it) } } }
     }
 
     private fun modules() = WidgetModules(

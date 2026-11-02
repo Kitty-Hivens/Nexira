@@ -38,7 +38,7 @@ class RuntimeProvisionerTest {
     fun cleanup() {
         if (!Files.exists(tmp)) return
         Files.walk(tmp).use { stream ->
-            stream.sorted(Comparator.reverseOrder()).forEach { runCatching { Files.delete(it) } }
+            stream.sorted(Comparator.reverseOrder()).forEach { val _ = runCatching { Files.delete(it) } }
         }
     }
 

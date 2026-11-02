@@ -70,7 +70,7 @@ class LauncherRootLocatorTest {
             val locator = LauncherRootLocator(home = sandbox, env = { null }, osName = "Linux")
             assertEquals(listOf(real), locator.existingRoots(ForeignLauncher.Vanilla))
         } finally {
-            runCatching { sandbox.deleteRecursively() }
+            val _ = runCatching { sandbox.deleteRecursively() }
         }
     }
 }

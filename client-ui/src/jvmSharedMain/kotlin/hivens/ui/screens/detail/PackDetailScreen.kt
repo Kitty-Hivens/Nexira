@@ -387,12 +387,12 @@ private fun PackLogsTab(packId: String, instanceDir: Path) {
 // to find here.
 private fun listInstanceLogs(instanceDir: Path): List<File> {
     val out = mutableListOf<File>()
-    runCatching {
+    val _ = runCatching {
         instanceDir.resolve("logs").toFile()
             .listFiles { f -> f.isFile && f.name.endsWith(".log") }
             ?.let { out.addAll(it) }
     }
-    runCatching {
+    val _ = runCatching {
         instanceDir.resolve("crash-reports").toFile()
             .listFiles { f -> f.isFile && (f.name.endsWith(".txt") || f.name.endsWith(".log")) }
             ?.let { out.addAll(it) }

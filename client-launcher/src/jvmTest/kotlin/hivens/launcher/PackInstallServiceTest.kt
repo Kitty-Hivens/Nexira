@@ -33,7 +33,9 @@ class PackInstallServiceTest {
     @OptIn(ExperimentalPathApi::class)
     @AfterTest
     fun tearDown() {
-        if (::sandbox.isInitialized) runCatching { sandbox.deleteRecursively() }
+        if (::sandbox.isInitialized) {
+            val _ = runCatching { sandbox.deleteRecursively() }
+        }
     }
 
     private val pack = CataloguePack(

@@ -86,7 +86,7 @@ private class FramePainter(
     override val intrinsicSize: Size get() = displaySize
 
     override fun DrawScope.onDraw() {
-        stamp()
+        val _ = stamp()
         val frame = frames.frameForDraw() ?: return
         with(frame) { drawInto(Rect(Offset.Zero, size)) }
     }

@@ -94,7 +94,7 @@ internal fun DiagnosticsSection(
             // Wait one frame so the panel is laid out before the scroll request;
             // bringIntoView() against a not-yet-positioned target is a no-op.
             yield()
-            runCatching { debugPanelBringIntoView.bringIntoView() }
+            val _ = runCatching { debugPanelBringIntoView.bringIntoView() }
         }
     }
 
@@ -189,7 +189,7 @@ internal fun DiagnosticsSection(
                             label    = s.settingsReportOnGithub,
                             onClick  = {
                                 val zip = lastBundlePath ?: return@NxButton
-                                runCatching {
+                                val _ = runCatching {
                                     // Copy the path so the user can drag-attach from the
                                     // file manager OR paste it into a comment.
                                     SystemActions.copyToClipboard(zip.toString())
@@ -207,7 +207,7 @@ internal fun DiagnosticsSection(
                 PuppetClick("settings.createDiagBundle", enabled = !bundleBusy) { createBundle(reveal = false) }
                 PuppetClick("settings.reportOnGithub", enabled = lastBundlePath != null) {
                     val zip = lastBundlePath ?: return@PuppetClick
-                    runCatching {
+                    val _ = runCatching {
                         SystemActions.copyToClipboard(zip.toString())
                         SystemActions.openUrl(IssueReporter.bundleIssueUrl(zip, s.reportPrompts()))
                     }

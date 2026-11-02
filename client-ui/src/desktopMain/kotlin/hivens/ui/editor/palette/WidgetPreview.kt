@@ -243,17 +243,17 @@ internal class ScenePool(private val density: Density) {
         return try {
             block(scene)
         } catch (cause: Throwable) {
-            scenes.remove(raster)?.let { spoiled -> runCatching { spoiled.close() } }
+            scenes.remove(raster)?.let { spoiled -> val _ = runCatching { spoiled.close() } }
             throw cause
         } finally {
             // Reads the map rather than the local, so a scene the catch above
             // already closed is not composed into.
-            scenes[raster]?.let { kept -> runCatching { kept.setContent {} } }
+            scenes[raster]?.let { kept -> val _ = runCatching { kept.setContent {} } }
         }
     }
 
     fun close() {
-        scenes.values.forEach { scene -> runCatching { scene.close() } }
+        scenes.values.forEach { scene -> val _ = runCatching { scene.close() } }
         scenes.clear()
     }
 }

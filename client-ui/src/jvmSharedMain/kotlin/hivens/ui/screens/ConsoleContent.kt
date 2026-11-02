@@ -360,7 +360,7 @@ internal fun ConsoleContent(
     // pre-composition exception in the rare race where the field has not
     // attached yet -- the next attempt via user click resolves it.
     LaunchedEffect(Unit) {
-        runCatching { logFocus.requestFocus() }
+        val _ = runCatching { logFocus.requestFocus() }
     }
 
     // Deferred focus request for the search prompt. openSearch() raises a
@@ -371,7 +371,7 @@ internal fun ConsoleContent(
     // fires on the next frame with the target alive.
     LaunchedEffect(pendingSearchFocus, searchOpen) {
         if (pendingSearchFocus && searchOpen) {
-            runCatching { searchFocus.requestFocus() }
+            val _ = runCatching { searchFocus.requestFocus() }
             pendingSearchFocus = false
         }
     }
@@ -507,7 +507,7 @@ internal fun ConsoleContent(
         // onPreviewKeyEvent live so j/k/g/G/Ctrl+End/etc. continue to work
         // after dismissing the prompt. clearFocus() leaves no owner in the
         // window's focus tree -- chords go dead until the user clicks.
-        runCatching { logFocus.requestFocus() }
+        val _ = runCatching { logFocus.requestFocus() }
     }
 
     val commandRowShown = isLive && (gameConsole.canSendCommands || gameConsole.hasLocalCommands)
@@ -518,7 +518,7 @@ internal fun ConsoleContent(
             ConsoleFocus.Command -> cmdFocus.takeIf { commandRowShown }
             ConsoleFocus.Log -> null
         } ?: logFocus
-        runCatching { requester.requestFocus() }.onFailure { runCatching { logFocus.requestFocus() } }
+        runCatching { requester.requestFocus() }.onFailure { val _ = runCatching { logFocus.requestFocus() } }
     }
 
     // ── Puppet hooks ────────────────────────────────────────────────────────
@@ -667,7 +667,7 @@ internal fun ConsoleContent(
                         filterInfo, filterWarn, filterError, searchAsFilter,
                         settings.highlightRules, settings.filterRules,
                     ),
-                    onInteract      = { runCatching { logFocus.requestFocus() } },
+                    onInteract      = { val _ = runCatching { logFocus.requestFocus() } },
                     onViewportWidth = { hostWidthPx = it },
                     modifier        = Modifier
                         .focusRequester(logFocus)
@@ -786,7 +786,7 @@ internal fun ConsoleContent(
                         cmdHistoryIdx = -1
                     } else {
                         focusManager.clearFocus()
-                        runCatching { logFocus.requestFocus() }
+                        val _ = runCatching { logFocus.requestFocus() }
                     }
                 },
                 onFocusChanged   = {

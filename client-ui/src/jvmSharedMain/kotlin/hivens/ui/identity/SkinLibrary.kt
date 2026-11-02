@@ -118,7 +118,7 @@ class SkinLibrary(private val dir: Path, private val json: Json) {
         .maxByOrNull { it.lastAppliedAt!! }?.id
 
     fun delete(id: String) = synchronized(lock) {
-        runCatching { Files.deleteIfExists(file(id)) }
+        val _ = runCatching { Files.deleteIfExists(file(id)) }
         writeIndex(Index(readIndex().skins.filterNot { it.id == id }))
     }
 

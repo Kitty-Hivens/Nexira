@@ -48,10 +48,10 @@ public class SkinemaEngines(
         return try {
             construct(file, sink)
         } catch (e: Exception) {
-            runCatching { sink?.close() }
+            val _ = runCatching { sink?.close() }
             throw e
         } catch (e: LinkageError) {
-            runCatching { sink?.close() }
+            val _ = runCatching { sink?.close() }
             throw e
         }
     }
