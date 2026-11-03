@@ -662,6 +662,8 @@ val runtimeModule = module {
             transfers = get(),
             json = get(),
             loaderRegistry = get(),
+            // Only a host whose C library cannot load Mojang's natives binds one
+            hostNatives = getOrNull(),
         )
     }
 

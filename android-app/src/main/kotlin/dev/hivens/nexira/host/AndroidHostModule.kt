@@ -11,6 +11,9 @@ import hivens.core.security.IKeyringStorage
 import hivens.launcher.launch.GameHost
 import hivens.launcher.platform.PlatformPaths
 import hivens.launcher.runtime.AndroidJdkInstaller
+import hivens.launcher.runtime.AndroidNativesCatalog
+import hivens.launcher.runtime.AndroidNativesInstaller
+import hivens.launcher.runtime.HostNativeSource
 import hivens.launcher.security.NoOpKeyringStorage
 import org.koin.core.module.Module
 import org.koin.dsl.module
@@ -50,6 +53,12 @@ fun androidHostModule(context: Context): Module = module {
         val engine = get<TransferEngine>()
         AndroidJdkInstaller(get<Path>().resolve("runtimes")) { transfer, progress -> engine.fetch(transfer, progress) }
     }
+    // Mojang's natives are glibc builds, so the phone brings its own for the LWJGL release a game carries
+    single {
+        val engine = get<TransferEngine>()
+        AndroidNativesInstaller(get<Path>().resolve("natives"), AndroidNativesCatalog.PINNED) { transfer, progress -> engine.fetch(transfer, progress) }
+    }
+    single<HostNativeSource> { get<AndroidNativesInstaller>() }
     single { AndroidJavaManager(get()) }
     single<IJavaManager> { get<AndroidJavaManager>() }
     single<GameHost> { AndroidGameHost(app) { major, progress -> get<AndroidJavaManager>().homeFor(major, progress) } }
