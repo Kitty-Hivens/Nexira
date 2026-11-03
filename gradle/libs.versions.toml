@@ -15,7 +15,7 @@ versionsPlugin    = "0.66.0"
 # on the Analysis API it bundles, so it does not need to match the Kotlin minor
 # (:widget-processor / :client-ui kspKotlinDesktop are the check). Bump when a
 # newer KSP ships.
-ksp               = "2.3.12"
+ksp               = "2.3.13"
 # Android Gradle Plugin, KMP library flavour. Only the Android target of shared
 # modules uses it; the desktop launcher does not depend on it.
 agp               = "9.5.0"
