@@ -32,7 +32,8 @@
 #define LOG(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, TAG, __VA_ARGS__)
 
-/* The Android jni.h stops at 1.6, and HotSpot reads the version it is given. */
+/* The Android jni.h stops at 1.6, and HotSpot reads the version it is given. 8 knows nothing past 1.8. */
+#define JNI_VERSION_JAVA8 0x00010008
 #define JNI_VERSION_JAVA10 0x000a0000
 
 typedef jint (*CreateJavaVM)(JavaVM **, void **, void *);
@@ -113,6 +114,21 @@ static void JNICALL vm_exit(jint code) {
     _exit(code);
 }
 
+/*
+ * Loads a library of the runtime by its path, so that a library that names it as a dependency finds it
+ * already loaded: the loader of an app looks in the app's own directories and not beside the VM.
+ */
+static void preload(const char *home, const char *relative) {
+    char path[4096];
+    snprintf(path, sizeof(path), "%s/%s", home, relative);
+    if (access(path, R_OK) != 0) return;
+    if (dlopen(path, RTLD_NOW | RTLD_GLOBAL) == NULL) {
+        LOGE("dlopen %s failed: %s", path, dlerror());
+    } else {
+        LOG("preloaded %s", path);
+    }
+}
+
 static char *utf(JNIEnv *env, jstring s) {
     const char *chars = (*env)->GetStringUTFChars(env, s, NULL);
     char *copy = strdup(chars);
@@ -137,7 +153,16 @@ Java_dev_hivens_nexira_host_JvmHost_run(JNIEnv *env, jclass cls, jstring javaHom
 
     char *home = utf(env, javaHome);
     char path[4096];
+    /* 9 and later keep the VM under lib/server. 8 keeps it, and every library with it, under lib/aarch64. */
     snprintf(path, sizeof(path), "%s/lib/server/libjvm.so", home);
+    int java8 = 0;
+    if (access(path, R_OK) != 0) {
+        snprintf(path, sizeof(path), "%s/lib/aarch64/server/libjvm.so", home);
+        java8 = 1;
+        /* The C++ runtime and FreeType that 8's VM and font library are linked against travel in its image. */
+        preload(home, "lib/aarch64/libc++_shared.so");
+        preload(home, "lib/aarch64/libfreetype.so");
+    }
 
     void *lib = dlopen(path, RTLD_NOW | RTLD_LOCAL);
     if (lib == NULL) {
@@ -162,7 +187,7 @@ Java_dev_hivens_nexira_host_JvmHost_run(JNIEnv *env, jclass cls, jstring javaHom
 
     JavaVMInitArgs vmArgs;
     memset(&vmArgs, 0, sizeof(vmArgs));
-    vmArgs.version = JNI_VERSION_JAVA10;
+    vmArgs.version = java8 ? JNI_VERSION_JAVA8 : JNI_VERSION_JAVA10;
     vmArgs.nOptions = count + 1;
     vmArgs.options = vmOptions;
     vmArgs.ignoreUnrecognized = JNI_FALSE;

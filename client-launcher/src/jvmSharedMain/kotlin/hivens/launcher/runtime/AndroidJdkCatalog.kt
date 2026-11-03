@@ -26,8 +26,8 @@ data class AndroidJdkRelease(
 }
 
 /**
- * The Java builds a phone can be given. Nothing is pinned until a release has been
- * built, because a pin is the SHA-256 of an archive that exists.
+ * The Java builds a phone can be given. A build is pinned once its release exists, by
+ * `scripts/pin-android-jdk.py`, because a pin is the SHA-256 of an archive that exists.
  */
 class AndroidJdkCatalog(releases: List<AndroidJdkRelease>) {
 
@@ -47,6 +47,6 @@ class AndroidJdkCatalog(releases: List<AndroidJdkRelease>) {
         /** Where a build of [version] is published, named the way the build script names its archive. */
         fun assetUrl(version: String): String = "$RELEASES/jdk-$version/jdk-$version-android-aarch64.zip"
 
-        val PINNED = AndroidJdkCatalog(emptyList())
+        val PINNED = AndroidJdkCatalog(ANDROID_JDK_PINS)
     }
 }

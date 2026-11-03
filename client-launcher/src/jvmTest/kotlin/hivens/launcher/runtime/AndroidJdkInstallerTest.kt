@@ -102,6 +102,26 @@ class AndroidJdkInstallerTest {
     }
 
     @Test
+    fun `a runtime in the layout 8 has is recognised, installed and told from an older build by its own version string`() = runBlocking {
+        val zip8 = zip(
+            mapOf(
+                "jdk-8u492-android-aarch64/release" to "JAVA_VERSION=\"1.8.0_492\"\nOS_ARCH=\"aarch64\"\n",
+                "jdk-8u492-android-aarch64/lib/aarch64/server/libjvm.so" to "vm eight",
+                "jdk-8u492-android-aarch64/lib/aarch64/jli/libjli.so" to "jli",
+            ),
+        )
+        val release8 = AndroidJdkRelease(8, "1.8.0_492", "https://example.invalid/jdk8.zip", sha)
+        val home8 = tmp.resolve("runtimes").resolve(AndroidJdkInstaller.folderName(8))
+
+        val fake = FakeFetch(zip8)
+        assertEquals(home8, installer(fake).ensure(release8))
+        assertEquals("vm eight", Files.readString(home8.resolve("lib/aarch64/server/libjvm.so")))
+
+        installer(fake).ensure(release8)
+        assertEquals(1, fake.transfers.size, "the installed 8 is found again, so it is not fetched twice")
+    }
+
+    @Test
     fun `an archive with no top folder installs the same`() = runBlocking {
         installer(FakeFetch(runtimeZip(top = null))).ensure(release())
         assertEquals("vm new", libjvm())

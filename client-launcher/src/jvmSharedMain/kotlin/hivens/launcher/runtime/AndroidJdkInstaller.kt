@@ -134,7 +134,7 @@ class AndroidJdkInstaller(
     /** The version of the runtime installed at [home], or null when there is none that could be loaded. */
     private fun installedVersion(home: Path): String? = if (hasRuntime(home)) versionOf(home) else null
 
-    private fun hasRuntime(dir: Path): Boolean = Files.isRegularFile(dir.resolve(LIBJVM))
+    private fun hasRuntime(dir: Path): Boolean = LIBJVM_PATHS.any { Files.isRegularFile(dir.resolve(it)) }
 
     private fun versionOf(home: Path): String? {
         val release = home.resolve("release")
@@ -145,7 +145,8 @@ class AndroidJdkInstaller(
     }
 
     companion object {
-        private const val LIBJVM = "lib/server/libjvm.so"
+        /** Where the VM sits in a runtime: the modular layout of 9 and later, then the one 8 has, with its libraries under `lib/aarch64`. */
+        private val LIBJVM_PATHS = listOf("lib/server/libjvm.so", "lib/aarch64/server/libjvm.so")
 
         /** Named as the desktop names the same target, so a runtime is found under one scheme. */
         fun folderName(major: Int): String = "java-$major-linux-arm64-bionic"
