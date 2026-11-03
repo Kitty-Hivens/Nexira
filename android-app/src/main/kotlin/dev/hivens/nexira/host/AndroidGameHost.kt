@@ -69,9 +69,14 @@ private class AndroidRuntime(
             "-Duser.home=${context.filesDir.absolutePath}",
             "-Duser.dir=$workDir",
         ) + launch.embeddedVmOptions()
-        // A game that carries the GLFW library draws a window, and the window is a screen of ours
-        val natives = options.firstNotNullOfOrNull { it.removePrefix("-Dorg.lwjgl.librarypath=").takeIf { path -> path != it } }
-        val glfw = natives?.let { File(it, "libglfw.so") }?.takeIf { it.isFile }
+        // A game that carries the host core library draws a window, and the window is a screen of ours. The libraries
+        // are wherever the launcher put the natives: on the library path, or where LWJGL is told to look.
+        val nativeDirs = options.flatMap { option ->
+            listOf("-Dorg.lwjgl.librarypath=", "-Djava.library.path=")
+                .mapNotNull { prefix -> option.removePrefix(prefix).takeIf { it != option } }
+        }.flatMap { it.split(':') }.filter { it.isNotEmpty() }.map(::File)
+        fun nativeLibrary(name: String): File? = nativeDirs.map { File(it, name) }.firstOrNull { it.isFile }
+        val host = nativeLibrary("libnxhost.so")
         val spec = LaunchSpec(
             javaHome = home.toString(),
             // What this platform needs of the VM comes first, so what the pack passes wins
@@ -79,8 +84,9 @@ private class AndroidRuntime(
             options = options,
             mainClass = launch.mainClass.replace('.', '/'),
             args = launch.gameArgs,
-            glfwLibrary = glfw?.absolutePath,
-            preload = listOfNotNull(natives?.let { File(it, "libMobileGL.so") }?.takeIf { it.isFile }?.absolutePath),
+            hostLibrary = host?.absolutePath,
+            // The core first: the stand-ins for GLFW and SDL depend on it by name
+            preload = listOfNotNull(host?.absolutePath, nativeLibrary("libMobileGL.so")?.absolutePath),
         )
         val specFile = File(context.filesDir, "launches/${UUID.randomUUID()}.json").apply {
             parentFile?.mkdirs()
@@ -90,7 +96,7 @@ private class AndroidRuntime(
 
         val output = QueueInputStream()
         ProcessLogHandler().attachStreams(output, EMPTY, onLog, onDrained)
-        if (glfw != null) {
+        if (host != null) {
             context.startActivity(Intent(context, GameActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         }
         return ServiceLaunchHandle(context, specFile, output, afterExit).also { it.connect() }

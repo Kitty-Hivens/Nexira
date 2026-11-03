@@ -65,7 +65,16 @@ internal object GameSession {
         send(Message.obtain(null, GameIpc.MSG_DISPLAY).apply { data = bundle })
     }
 
-    fun input(kind: Int, a: Int = 0, b: Int = 0, meta: Int = 0, x: Double = 0.0, y: Double = 0.0) {
+    fun input(
+        kind: Int,
+        a: Int = 0,
+        b: Int = 0,
+        meta: Int = 0,
+        x: Double = 0.0,
+        y: Double = 0.0,
+        z: Double = 0.0,
+        source: Int = GameIpc.SOURCE_DEVICE,
+    ) {
         send(Message.obtain(null, GameIpc.MSG_INPUT, kind, 0).apply {
             data = Bundle().apply {
                 putInt(GameIpc.KEY_A, a)
@@ -73,6 +82,8 @@ internal object GameSession {
                 putInt(GameIpc.KEY_META, meta)
                 putDouble(GameIpc.KEY_X, x)
                 putDouble(GameIpc.KEY_Y, y)
+                putDouble(GameIpc.KEY_Z, z)
+                putInt(GameIpc.KEY_SOURCE, source)
             }
         })
     }

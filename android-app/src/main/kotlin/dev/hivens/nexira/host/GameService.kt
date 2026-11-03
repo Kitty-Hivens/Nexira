@@ -29,7 +29,7 @@ class GameService : Service() {
             when (msg.what) {
                 GameIpc.MSG_START -> start(msg.replyTo, msg.data.getString(GameIpc.KEY_SPEC))
                 GameIpc.MSG_TERMINATE -> terminate()
-                GameIpc.MSG_SURFACE -> GlfwBridge.attachSurface(surfaceOf(msg.data))
+                GameIpc.MSG_SURFACE -> HostBridge.attachSurface(surfaceOf(msg.data))
                 GameIpc.MSG_DISPLAY -> display(msg.data)
                 GameIpc.MSG_INPUT -> input(msg.arg1, msg.data)
                 else -> super.handleMessage(msg)
@@ -59,8 +59,8 @@ class GameService : Service() {
             return
         }
         // Before the VM exists, so that what the screen sends right behind the start finds its way in
-        spec.preload.forEach { GlfwBridge.preload(it) }
-        spec.glfwLibrary?.let { if (!GlfwBridge.load(it)) Log.e(TAG, "no window for this launch: $it did not load") }
+        spec.preload.forEach { HostBridge.preload(it) }
+        spec.hostLibrary?.let { if (!HostBridge.load(it)) Log.e(TAG, "no window for this launch: $it did not load") }
 
         val listener = object : JvmListener {
             override fun onLine(line: ByteArray) {
@@ -84,7 +84,7 @@ class GameService : Service() {
     }
 
     private fun display(data: Bundle) {
-        GlfwBridge.setDisplay(
+        HostBridge.setDisplay(
             data.getInt(GameIpc.KEY_WIDTH), data.getInt(GameIpc.KEY_HEIGHT),
             data.getFloat(GameIpc.KEY_REFRESH), data.getFloat(GameIpc.KEY_DENSITY),
         )
@@ -96,15 +96,18 @@ class GameService : Service() {
         val meta = data.getInt(GameIpc.KEY_META)
         val x = data.getDouble(GameIpc.KEY_X)
         val y = data.getDouble(GameIpc.KEY_Y)
+        val z = data.getDouble(GameIpc.KEY_Z)
+        val source = data.getInt(GameIpc.KEY_SOURCE)
         when (kind) {
-            GameIpc.INPUT_KEY -> GlfwBridge.postKey(a, b, meta)
-            GameIpc.INPUT_CHAR -> GlfwBridge.postChar(a)
-            GameIpc.INPUT_CURSOR -> GlfwBridge.postCursor(x, y)
-            GameIpc.INPUT_BUTTON -> GlfwBridge.postMouseButton(a, b, meta)
-            GameIpc.INPUT_SCROLL -> GlfwBridge.postScroll(x, y)
-            GameIpc.INPUT_RELATIVE -> GlfwBridge.postRelativeMotion(x, y)
-            GameIpc.INPUT_FOCUS -> GlfwBridge.postFocus(a != 0)
-            GameIpc.INPUT_CLOSE -> GlfwBridge.postCloseRequest()
+            GameIpc.INPUT_KEY -> HostBridge.postKey(a, b, meta)
+            GameIpc.INPUT_TEXT -> HostBridge.postText(a)
+            GameIpc.INPUT_POINTER_MOVE -> HostBridge.postPointerMove(x, y, source)
+            GameIpc.INPUT_POINTER_BUTTON -> HostBridge.postPointerButton(a, b, meta, source)
+            GameIpc.INPUT_SCROLL -> HostBridge.postScroll(x, y)
+            GameIpc.INPUT_RELATIVE -> HostBridge.postRelativeMotion(x, y, source)
+            GameIpc.INPUT_TOUCH -> HostBridge.postTouch(a, b, x, y, z)
+            GameIpc.INPUT_FOCUS -> HostBridge.postFocus(a != 0)
+            GameIpc.INPUT_CLOSE -> HostBridge.postClose()
         }
     }
 

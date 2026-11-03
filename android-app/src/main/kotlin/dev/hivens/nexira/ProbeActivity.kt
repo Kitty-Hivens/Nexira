@@ -81,10 +81,13 @@ class ProbeActivity : Activity() {
             .buildAsync()
         connecting.addListener({ controller = connecting.get() }, mainExecutor)
 
-        if (intent.getBooleanExtra("vault", false)) Thread { VaultProbe.run(applicationContext) }.start()
-        if (intent.getBooleanExtra("graph", false)) Thread { runCatching { GraphProbe.run() }.onFailure { Log.e(TAG, "graph probe failed", it) } }.start()
-        intent.getStringExtra("host")?.let { scenario -> Thread { runCatching { HostProbe.run(applicationContext, scenario, intent.getStringExtra("jdk")) }.onFailure { Log.e(TAG, "host probe failed", it) } }.start() }
-        if (intent.getBooleanExtra("xodus", false)) Thread { runCatching { XodusProbe.run(applicationContext) }.onFailure { Log.e(TAG, "xodus probe failed", it) } }.start()
+        // Only for the start of this screen: it is made again when the system took it back, and a scenario that ran
+        // once must not run a second time on the intent it was started with.
+        val fresh = savedInstanceState == null
+        if (fresh && intent.getBooleanExtra("vault", false)) Thread { VaultProbe.run(applicationContext) }.start()
+        if (fresh && intent.getBooleanExtra("graph", false)) Thread { runCatching { GraphProbe.run() }.onFailure { Log.e(TAG, "graph probe failed", it) } }.start()
+        intent.getStringExtra("host")?.takeIf { fresh }?.let { scenario -> Thread { runCatching { HostProbe.run(applicationContext, scenario, intent.getStringExtra("jdk")) }.onFailure { Log.e(TAG, "host probe failed", it) } }.start() }
+        if (fresh && intent.getBooleanExtra("xodus", false)) Thread { runCatching { XodusProbe.run(applicationContext) }.onFailure { Log.e(TAG, "xodus probe failed", it) } }.start()
 
         val files = intent.getStringExtra("files")?.split(',')?.map { Path.of(it.trim()) }
         if (files != null) {

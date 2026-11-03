@@ -82,26 +82,64 @@ class GameActivity : Activity(), SurfaceHolder.Callback {
         if (down) {
             val character = event.unicodeChar
             if (character > 0 && !Character.isISOControl(character)) {
-                GameSession.input(GameIpc.INPUT_CHAR, a = character)
+                GameSession.input(GameIpc.INPUT_TEXT, a = character)
             }
         }
         return true
     }
 
+    /** The finger that came down first stands in for the mouse, the others are only touches. */
+    private var mouseFinger = -1
+
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        val x = event.x.toDouble()
-        val y = event.y.toDouble()
         when (event.actionMasked) {
-            MotionEvent.ACTION_DOWN -> {
-                GameSession.input(GameIpc.INPUT_CURSOR, x = x, y = y)
-                GameSession.input(GameIpc.INPUT_BUTTON, a = 0, b = 1)
+            MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
+                val index = event.actionIndex
+                touch(event, index, DOWN)
+                if (mouseFinger < 0) {
+                    mouseFinger = event.getPointerId(index)
+                    mouse(event.getX(index), event.getY(index), down = true)
+                }
             }
-            MotionEvent.ACTION_MOVE -> GameSession.input(GameIpc.INPUT_CURSOR, x = x, y = y)
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                GameSession.input(GameIpc.INPUT_CURSOR, x = x, y = y)
-                GameSession.input(GameIpc.INPUT_BUTTON, a = 0, b = 0)
+            MotionEvent.ACTION_MOVE -> {
+                for (index in 0 until event.pointerCount) {
+                    touch(event, index, MOVE)
+                    if (event.getPointerId(index) == mouseFinger) {
+                        GameSession.input(GameIpc.INPUT_POINTER_MOVE, x = event.getX(index).toDouble(), y = event.getY(index).toDouble(), source = GameIpc.SOURCE_TOUCH)
+                    }
+                }
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP, MotionEvent.ACTION_CANCEL -> {
+                val index = event.actionIndex
+                touch(event, index, UP)
+                if (event.getPointerId(index) == mouseFinger || event.actionMasked == MotionEvent.ACTION_CANCEL) {
+                    mouseFinger = -1
+                    mouse(event.getX(index), event.getY(index), down = false)
+                }
             }
         }
         return true
+    }
+
+    private fun touch(event: MotionEvent, index: Int, action: Int) {
+        GameSession.input(
+            GameIpc.INPUT_TOUCH,
+            a = event.getPointerId(index),
+            b = action,
+            x = event.getX(index).toDouble(),
+            y = event.getY(index).toDouble(),
+            z = event.getPressure(index).toDouble(),
+        )
+    }
+
+    private fun mouse(x: Float, y: Float, down: Boolean) {
+        GameSession.input(GameIpc.INPUT_POINTER_MOVE, x = x.toDouble(), y = y.toDouble(), source = GameIpc.SOURCE_TOUCH)
+        GameSession.input(GameIpc.INPUT_POINTER_BUTTON, a = 0, b = if (down) 1 else 0, source = GameIpc.SOURCE_TOUCH)
+    }
+
+    private companion object {
+        const val UP = 0
+        const val DOWN = 1
+        const val MOVE = 2
     }
 }
