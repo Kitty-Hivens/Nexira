@@ -2,6 +2,7 @@ package hivens.launcher.runtime
 
 import hivens.test.testTransferEngine
 import hivens.core.api.HttpClientProvider
+import hivens.core.platform.Libc
 import hivens.launcher.runtime.loader.LibrarySpec
 import hivens.launcher.runtime.loader.LoaderProfile
 import hivens.launcher.runtime.loader.LoaderRegistry
@@ -54,6 +55,8 @@ class RuntimeProvisionerTest {
         client: HttpClient,
         osName: String = "Linux",
         osArch: String = "amd64",
+        libc: Libc = Libc.UNKNOWN,
+        hostNatives: HostNativeSource? = null,
     ) = RuntimeProvisioner(
         librariesDir = librariesDir,
         assetsDir = assetsDir,
@@ -64,6 +67,8 @@ class RuntimeProvisionerTest {
         osArch = osArch,
         versionManifestUrl = MANIFEST_URL,
         resourcesBaseUrl = RES_BASE,
+        libc = libc,
+        hostNatives = hostNatives,
     )
 
     // -- pure logic -----------------------------------------------------------
@@ -278,6 +283,117 @@ class RuntimeProvisionerTest {
         assertTrue(libs.any { it.coord.classifier == null && it.path.toString().contains("plain-1.jar") }, "normal lib kept")
         assertTrue("natives-linux" in classifiers, "host native kept -- the module graph needs it")
         assertTrue("natives-linux-arm64" !in classifiers, "foreign-arch native must be dropped from the classpath")
+    }
+
+    private fun lwjglVersion(): MojangVersion = MojangVersion(
+        assetIndex = MojangAssetIndexRef(id = "x", sha1 = "x", url = "u"),
+        downloads = MojangDownloads(MojangArtifact(sha1 = "c", size = 1, url = "https://piston/client.jar")),
+        libraries = listOf(
+            MojangLibrary(
+                name = "org.lwjgl:lwjgl:3.3.3",
+                downloads = MojangLibraryDownloads(MojangArtifact("org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3.jar", "b", 1, "https://libs/lwjgl.jar")),
+            ),
+            MojangLibrary(
+                name = "org.lwjgl:lwjgl:3.3.3:natives-linux-arm64",
+                downloads = MojangLibraryDownloads(MojangArtifact("org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3-natives-linux-arm64.jar", "n", 1, "https://libs/natives.jar")),
+                rules = listOf(MojangRule("allow", MojangOs("linux"))),
+            ),
+        ),
+    )
+
+    @Test
+    fun `an arm64 glibc host takes Mojang's arm64 natives`() {
+        val p = provisioner(HttpClient(MockEngine { respond("", HttpStatusCode.OK) }), osArch = "aarch64", libc = Libc.GLIBC)
+
+        val natives = p.nativeLibraries(lwjglVersion()).map { it.path }
+
+        assertEquals(listOf(librariesDir.resolve("org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3-natives-linux-arm64.jar")), natives)
+    }
+
+    @Test
+    fun `a bionic or musl host takes none of Mojang's glibc natives, from the plan, the classpath or the extract set`() {
+        for (libc in listOf(Libc.BIONIC, Libc.MUSL)) {
+            val p = provisioner(HttpClient(MockEngine { respond("", HttpStatusCode.OK) }), osArch = "aarch64", libc = libc)
+            val version = lwjglVersion()
+
+            assertTrue(p.nativeLibraries(version).isEmpty(), "$libc: no natives to extract")
+            val classifiers = p.vanillaLibraries(version).map { it.coord.classifier }
+            assertEquals(listOf<String?>(null), classifiers, "$libc: only the plain jar stays on the classpath")
+            val dests = p.planVanillaDownloads("3.3.3", version, MojangAssetIndex(objects = emptyMap())).map { it.dest.toString() }
+            assertTrue(dests.none { it.contains("natives") }, "$libc: nothing glibc is downloaded, got $dests")
+        }
+    }
+
+    @Test
+    fun `the natives of the host come in for the LWJGL release the classpath has`() = runTest {
+        val libBytes = "LWJGL-JAR".toByteArray()
+        val clientBytes = "CLIENT-JAR".toByteArray()
+        val indexJson = """{"objects":{}}"""
+        val versionJson = """
+            {
+              "assetIndex": {"id":"1.12","sha1":"${sha1(indexJson)}","size":${indexJson.length},"totalSize":0,"url":"$INDEX_URL"},
+              "downloads": {"client": {"sha1":"${sha1(clientBytes)}","size":${clientBytes.size},"url":"$CLIENT_URL"}},
+              "libraries": [
+                {"name":"org.lwjgl:lwjgl:3.3.3","downloads":{"artifact":{"path":"org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3.jar","sha1":"${sha1(libBytes)}","size":${libBytes.size},"url":"https://test.invalid/libs/lwjgl.jar"}}},
+                {"name":"org.lwjgl:lwjgl:3.3.3:natives-linux-arm64","downloads":{"artifact":{"path":"org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3-natives-linux-arm64.jar","sha1":"00","size":1,"url":"https://test.invalid/libs/glibc-natives.jar"}},"rules":[{"action":"allow","os":{"name":"linux"}}]}
+              ]
+            }
+        """.trimIndent()
+        val requests = mutableListOf<String>()
+        val engine = MockEngine { req ->
+            val url = req.url.toString()
+            requests += url
+            when (url) {
+                MANIFEST_URL -> respond("""{"versions":[{"id":"1.12.2","url":"$VERSION_URL"}]}""", HttpStatusCode.OK, jsonHeaders)
+                VERSION_URL -> respond(versionJson, HttpStatusCode.OK, jsonHeaders)
+                INDEX_URL -> respond(indexJson, HttpStatusCode.OK, jsonHeaders)
+                "https://test.invalid/libs/lwjgl.jar" -> respond(ByteReadChannel(libBytes), HttpStatusCode.OK)
+                CLIENT_URL -> respond(ByteReadChannel(clientBytes), HttpStatusCode.OK)
+                else -> respond("missing: $url", HttpStatusCode.NotFound)
+            }
+        }
+        val asked = mutableListOf<String>()
+        val hostJar = tmp.resolve("host-natives.jar")
+        val source = HostNativeSource { version, _ ->
+            asked += version
+            listOf(hostJar)
+        }
+        val p = provisioner(HttpClient(engine), osArch = "aarch64", libc = Libc.BIONIC, hostNatives = source)
+
+        val runtime = p.ensureRuntime("1.12.2", null, "")
+
+        assertEquals(listOf("3.3.3"), asked, "asked for the release the classpath carries")
+        assertEquals(listOf(hostJar), runtime.natives, "the host's jars and none of Mojang's")
+        assertTrue(requests.none { it.contains("glibc-natives") }, "Mojang's glibc jar is never requested, got $requests")
+    }
+
+    @Test
+    fun `a classpath with no LWJGL 3 gets no host natives and nothing is asked`() = runTest {
+        val clientBytes = "CLIENT-JAR".toByteArray()
+        val indexJson = """{"objects":{}}"""
+        val versionJson = """
+            {
+              "assetIndex": {"id":"1.12","sha1":"${sha1(indexJson)}","size":${indexJson.length},"totalSize":0,"url":"$INDEX_URL"},
+              "downloads": {"client": {"sha1":"${sha1(clientBytes)}","size":${clientBytes.size},"url":"$CLIENT_URL"}},
+              "libraries": []
+            }
+        """.trimIndent()
+        val engine = MockEngine { req ->
+            when (req.url.toString()) {
+                MANIFEST_URL -> respond("""{"versions":[{"id":"1.12.2","url":"$VERSION_URL"}]}""", HttpStatusCode.OK, jsonHeaders)
+                VERSION_URL -> respond(versionJson, HttpStatusCode.OK, jsonHeaders)
+                INDEX_URL -> respond(indexJson, HttpStatusCode.OK, jsonHeaders)
+                CLIENT_URL -> respond(ByteReadChannel(clientBytes), HttpStatusCode.OK)
+                else -> respond("missing", HttpStatusCode.NotFound)
+            }
+        }
+        var asked = false
+        val p = provisioner(HttpClient(engine), osArch = "aarch64", libc = Libc.BIONIC, hostNatives = { _, _ -> asked = true; emptyList() })
+
+        val runtime = p.ensureRuntime("1.12.2", null, "")
+
+        assertTrue(!asked, "no LWJGL 3, so no release to ask for")
+        assertTrue(runtime.natives.isEmpty())
     }
 
     // -- end to end (MockEngine) ----------------------------------------------

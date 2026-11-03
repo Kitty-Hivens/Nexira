@@ -8,6 +8,8 @@ import hivens.core.net.DigestAlgorithm
 import hivens.core.net.SkipIfPresent
 import hivens.core.net.Transfer
 import hivens.core.net.TransferEngine
+import hivens.core.platform.Libc
+import hivens.core.platform.OS
 import hivens.core.platform.Platform
 import hivens.launcher.runtime.loader.DownloadProgress
 import hivens.launcher.runtime.loader.LibrarySpec
@@ -67,10 +69,19 @@ class RuntimeProvisioner(
     osArch: String = (System.getProperty("os.arch") ?: ""),
     private val versionManifestUrl: String = VERSION_MANIFEST_URL,
     private val resourcesBaseUrl: String = RESOURCES_BASE,
+    libc: Libc = OS.libc,
+    /** The natives for a host whose C library cannot load Mojang's, see [HostNativeSource]. Null on a host that can. */
+    private val hostNatives: HostNativeSource? = null,
 ) {
     private val log = LoggerFactory.getLogger(RuntimeProvisioner::class.java)
     private val httpClient get() = clientProvider.current
     private val mojangOs: String = Platform.classify(osName).mojang
+
+    /**
+     * Mojang's native jars are glibc builds: on bionic or musl they would be downloaded, unpacked and then fail to
+     * load, so such a host takes none of them and gets its natives from [hostNatives] instead.
+     */
+    private val mojangNativesUsable: Boolean = !(mojangOs == "linux" && (libc == Libc.BIONIC || libc == Libc.MUSL))
 
     /**
      * The Mojang native classifiers to keep for THIS host, matched exactly so a
@@ -83,6 +94,7 @@ class RuntimeProvisioner(
      * x64 spellings.
      */
     private val acceptedNativeClassifiers: Set<String> = run {
+        if (!mojangNativesUsable) return@run emptySet()
         val arch = osArch.lowercase()
         val arm64 = arch.contains("aarch64") || arch.contains("arm64")
         when (mojangOs) {
@@ -93,9 +105,10 @@ class RuntimeProvisioner(
     }
 
     /** This OS's native classifiers without an architecture, see [ensureRuntime]'s override natives. */
-    private val hostOsClassifiers: Set<String> = when (mojangOs) {
-        "windows" -> setOf("natives-windows")
-        "osx" -> setOf("natives-macos", "natives-osx")
+    private val hostOsClassifiers: Set<String> = when {
+        !mojangNativesUsable -> emptySet()
+        mojangOs == "windows" -> setOf("natives-windows")
+        mojangOs == "osx" -> setOf("natives-macos", "natives-osx")
         else -> setOf("natives-linux")
     }
 
@@ -163,13 +176,16 @@ class RuntimeProvisioner(
         }
         val vanilla = ensureVanilla(mcVersion, progress, seed)
         if (profile == null) {
-            return@withContext ResolvedRuntime(
-                libraries = vanilla.libraries,
-                clientJar = vanilla.clientJar,
-                mainClass = VANILLA_MAIN_CLASS,
-                assetIndexId = vanilla.assetIndexId,
-                natives = vanilla.natives.map { it.path },
-                javaMajor = vanilla.javaMajor,
+            return@withContext withHostNatives(
+                ResolvedRuntime(
+                    libraries = vanilla.libraries,
+                    clientJar = vanilla.clientJar,
+                    mainClass = VANILLA_MAIN_CLASS,
+                    assetIndexId = vanilla.assetIndexId,
+                    natives = vanilla.natives.map { it.path },
+                    javaMajor = vanilla.javaMajor,
+                ),
+                progress,
             )
         }
 
@@ -215,7 +231,7 @@ class RuntimeProvisioner(
         } else {
             vanilla.natives.filterNot { profile.removeFromBase(it.coord) }.map { it.path }
         }
-        ResolvedRuntime(
+        withHostNatives(ResolvedRuntime(
             // removeFromBase is a no-op for every additive loader, so their merged
             // set is byte-identical to before.
             libraries = mergeLibraries(base, overlay),
@@ -238,7 +254,24 @@ class RuntimeProvisioner(
             // Loader override (Cleanroom -> 25) wins; else inherit vanilla's declared.
             javaMajor = profile.javaMajor ?: vanilla.javaMajor,
             loaderVersion = profile.version,
-        )
+        ), progress)
+    }
+
+    /**
+     * Adds what [hostNatives] has for the LWJGL release the resolved classpath carries, which is the loader's when a
+     * loader swapped LWJGL and Mojang's otherwise. A classpath with no LWJGL 3 (everything up to 1.12.2 on its own)
+     * has nothing to match, so nothing is added and the launch says it has no natives.
+     */
+    private suspend fun withHostNatives(runtime: ResolvedRuntime, progress: DownloadProgress): ResolvedRuntime {
+        val source = hostNatives ?: return runtime
+        val lwjgl = runtime.libraries.firstOrNull { it.coord.groupArtifact == "org.lwjgl:lwjgl" }?.coord?.version
+        if (lwjgl == null) {
+            log.warn("no LWJGL 3 on the classpath of {}, so there are no host natives to add", runtime.clientJar.fileName)
+            return runtime
+        }
+        val jars = source.natives(lwjgl) { progress(0, 0, it) }
+        if (jars.isEmpty()) log.warn("the host has no LWJGL {} natives", lwjgl)
+        return runtime.copy(natives = runtime.natives + jars)
     }
 
     /**
