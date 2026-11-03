@@ -33,6 +33,27 @@ object HostProbe {
 
     private const val TAG = "NexiraProbe"
 
+    /**
+     * Copies what a window test needs from the app's external directory (`window/`: the jars, the native libraries,
+     * the test class in a jar) into the data directory, where a library can be opened from, and returns the VM
+     * options that put it on the class path and the library path.
+     */
+    private fun stageWindow(context: Context): List<String> {
+        val from = File(context.getExternalFilesDir(null), "window")
+        val to = File(context.filesDir, "window").apply { mkdirs() }
+        from.listFiles()?.filter { it.isFile }?.forEach { it.copyTo(File(to, it.name), overwrite = true) }
+        val jars = to.listFiles { f -> f.name.endsWith(".jar") }.orEmpty().sortedBy { it.name }.joinToString(":") { it.absolutePath }
+        return listOf(
+            "-cp", jars,
+            "-Xmx512m",
+            "--enable-native-access=ALL-UNNAMED",
+            "-Dorg.lwjgl.librarypath=${to.absolutePath}",
+            "-Dorg.lwjgl.opengl.libname=libMobileGL.so",
+            // The jars carry the hashes of the stock natives and these are built here
+            "-Dorg.lwjgl.util.NoHashChecks=true",
+        )
+    }
+
     fun run(context: Context, scenario: String, release: String?) = runBlocking {
         val installer = GlobalContext.get().get<AndroidJdkInstaller>()
         val pinned = release?.split('|')?.let { (url, sha, version) -> AndroidJdkRelease(25, version, url, sha) }
@@ -53,12 +74,18 @@ object HostProbe {
             "exit7" -> "Exit7"
             "terminate" -> "Sleeper"
             "ffm" -> "Ffm"
+            "window" -> "Window"
             else -> "Hello"
         }
+        val window = if (scenario == "window") stageWindow(context) else null
         var drained = false
         var after = false
         val handle = prepared.start(
-            launch = GameLaunch(listOf("-cp", jar.absolutePath, "-Xmx192m", "--enable-native-access=ALL-UNNAMED"), mainClass, listOf("from", "host")),
+            launch = if (window != null) {
+                GameLaunch(window, mainClass, listOf("30"))
+            } else {
+                GameLaunch(listOf("-cp", jar.absolutePath, "-Xmx192m", "--enable-native-access=ALL-UNNAMED"), mainClass, listOf("from", "host"))
+            },
             workDir = context.filesDir.toPath() as Path,
             boundLaunch = true,
             onLog = { line, type: LauncherLogType -> Log.i(TAG, "game[$type] $line") },

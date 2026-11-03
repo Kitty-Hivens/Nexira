@@ -64,17 +64,23 @@ private class AndroidRuntime(
         onDrained: () -> Unit,
         afterExit: () -> Unit,
     ): LaunchHandle {
+        val options = HOST_OPTIONS + listOf(
+            "-Djava.io.tmpdir=${context.cacheDir.absolutePath}",
+            "-Duser.home=${context.filesDir.absolutePath}",
+            "-Duser.dir=$workDir",
+        ) + launch.embeddedVmOptions()
+        // A game that carries the GLFW library draws a window, and the window is a screen of ours
+        val natives = options.firstNotNullOfOrNull { it.removePrefix("-Dorg.lwjgl.librarypath=").takeIf { path -> path != it } }
+        val glfw = natives?.let { File(it, "libglfw.so") }?.takeIf { it.isFile }
         val spec = LaunchSpec(
             javaHome = home.toString(),
             // What this platform needs of the VM comes first, so what the pack passes wins
             // where the two name the same flag.
-            options = HOST_OPTIONS + listOf(
-                "-Djava.io.tmpdir=${context.cacheDir.absolutePath}",
-                "-Duser.home=${context.filesDir.absolutePath}",
-                "-Duser.dir=$workDir",
-            ) + launch.embeddedVmOptions(),
+            options = options,
             mainClass = launch.mainClass.replace('.', '/'),
             args = launch.gameArgs,
+            glfwLibrary = glfw?.absolutePath,
+            preload = listOfNotNull(natives?.let { File(it, "libMobileGL.so") }?.takeIf { it.isFile }?.absolutePath),
         )
         val specFile = File(context.filesDir, "launches/${UUID.randomUUID()}.json").apply {
             parentFile?.mkdirs()
@@ -84,6 +90,9 @@ private class AndroidRuntime(
 
         val output = QueueInputStream()
         ProcessLogHandler().attachStreams(output, EMPTY, onLog, onDrained)
+        if (glfw != null) {
+            context.startActivity(Intent(context, GameActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        }
         return ServiceLaunchHandle(context, specFile, output, afterExit).also { it.connect() }
     }
 
@@ -135,6 +144,7 @@ private class ServiceLaunchHandle(
                 data = Bundle().apply { putString(GameIpc.KEY_SPEC, specFile.absolutePath) }
             }
             messenger.send(start)
+            GameSession.connected(messenger)
         }
 
         override fun onServiceDisconnected(name: ComponentName) {
@@ -152,6 +162,7 @@ private class ServiceLaunchHandle(
 
     private fun finish(code: Int) {
         if (!exit.complete(code)) return
+        GameSession.ended()
         output.close()
         val _ = runCatching { context.unbindService(connection) }
         val _ = runCatching { specFile.delete() }

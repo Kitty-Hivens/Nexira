@@ -30,6 +30,14 @@
             android:name=".ProbeActivity"
             android:exported="true" />
 
+        <!-- The game's window: one surface, the game draws into it from its own process. -->
+        <activity
+            android:name=".host.GameActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.DeviceDefault.NoActionBar.Fullscreen"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|keyboard|navigation|uiMode|density|locale|layoutDirection"
+            android:screenOrientation="sensorLandscape" />
+
         <!-- The game's JVM lives here, in a process of its own: it is one per process and cannot be made again. -->
         <service
             android:name=".host.GameService"
