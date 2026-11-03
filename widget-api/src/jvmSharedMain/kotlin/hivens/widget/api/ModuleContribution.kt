@@ -41,7 +41,7 @@ interface ModuleContribution {
                 if (id.isBlank()) return "a contribution has no id"
                 if (id != id.trim() || '/' in id) return "contribution id '$id' has surrounding space or a slash"
                 ids += id
-                read { item.label }.getOrElse { return "contribution '$id' has no readable label: ${it.message}" }
+                val _ = read { item.label }.getOrElse { return "contribution '$id' has no readable label: ${it.message}" }
                 @Suppress("UNCHECKED_CAST")
                 val settings = read { item.settings }
                     .getOrElse { return "contribution '$id' has settings that could not be read: ${it.message}" } as List<ModuleSetting>
