@@ -91,10 +91,18 @@ class GameActivity : Activity(), SurfaceHolder.Callback {
     /** The finger that came down first stands in for the mouse, the others are only touches. */
     private var mouseFinger = -1
 
+    /**
+     * Android reuses a pointer id as soon as a finger lifts, and the touch controller wants an index that only grows
+     * and starts at one, so every touch gets a number of its own that is never given out again.
+     */
+    private val fingers = HashMap<Int, Int>()
+    private var nextFinger = 1
+
     override fun onTouchEvent(event: MotionEvent): Boolean {
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
                 val index = event.actionIndex
+                fingers[event.getPointerId(index)] = nextFinger++
                 touch(event, index, DOWN)
                 if (mouseFinger < 0) {
                     mouseFinger = event.getPointerId(index)
@@ -109,22 +117,28 @@ class GameActivity : Activity(), SurfaceHolder.Callback {
                     }
                 }
             }
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP, MotionEvent.ACTION_CANCEL -> {
-                val index = event.actionIndex
-                touch(event, index, UP)
-                if (event.getPointerId(index) == mouseFinger || event.actionMasked == MotionEvent.ACTION_CANCEL) {
-                    mouseFinger = -1
-                    mouse(event.getX(index), event.getY(index), down = false)
-                }
-            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> lift(event, event.actionIndex)
+            // A cancel ends every finger at once
+            MotionEvent.ACTION_CANCEL -> for (index in 0 until event.pointerCount) lift(event, index)
         }
         return true
     }
 
+    private fun lift(event: MotionEvent, index: Int) {
+        touch(event, index, UP)
+        val pointer = event.getPointerId(index)
+        fingers.remove(pointer)
+        if (pointer == mouseFinger) {
+            mouseFinger = -1
+            mouse(event.getX(index), event.getY(index), down = false)
+        }
+    }
+
     private fun touch(event: MotionEvent, index: Int, action: Int) {
+        val finger = fingers[event.getPointerId(index)] ?: return
         GameSession.input(
             GameIpc.INPUT_TOUCH,
-            a = event.getPointerId(index),
+            a = finger,
             b = action,
             x = event.getX(index).toDouble(),
             y = event.getY(index).toDouble(),
