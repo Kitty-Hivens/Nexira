@@ -25,6 +25,7 @@ import java.io.File
 import java.io.InputStream
 import java.io.OutputStream
 import java.nio.file.Path
+import java.util.TimeZone
 import java.util.UUID
 import java.util.concurrent.LinkedBlockingQueue
 
@@ -64,29 +65,32 @@ private class AndroidRuntime(
         onDrained: () -> Unit,
         afterExit: () -> Unit,
     ): LaunchHandle {
-        val options = HOST_OPTIONS + listOf(
-            "-Djava.io.tmpdir=${context.cacheDir.absolutePath}",
-            "-Duser.home=${context.filesDir.absolutePath}",
-            "-Duser.dir=$workDir",
-        ) + launch.embeddedVmOptions()
         // A game that carries the host core library draws a window, and the window is a screen of ours. The libraries
         // are wherever the launcher put the natives: on the library path, or where LWJGL is told to look.
-        val nativeDirs = options.flatMap { option ->
-            listOf("-Dorg.lwjgl.librarypath=", "-Djava.library.path=")
-                .mapNotNull { prefix -> option.removePrefix(prefix).takeIf { it != option } }
-        }.flatMap { it.split(':') }.filter { it.isNotEmpty() }.map(::File)
+        val nativeDirs = launch.libraryDirectories().map(::File)
         fun nativeLibrary(name: String): File? = nativeDirs.map { File(it, name) }.firstOrNull { it.isFile }
         val host = nativeLibrary("libnxhost.so")
         val spec = LaunchSpec(
             javaHome = home.toString(),
             // What this platform needs of the VM comes first, so what the pack passes wins
             // where the two name the same flag.
-            options = options,
+            options = HOST_OPTIONS + listOf(
+                "-Djava.io.tmpdir=${context.cacheDir.absolutePath}",
+                "-Duser.home=${context.filesDir.absolutePath}",
+                "-Duser.dir=$workDir",
+                // Android keeps the zone in a setting and the JVM looks for it in files a phone does not have
+                "-Duser.timezone=${TimeZone.getDefault().id}",
+            ) + (if (host != null) windowGameOptions() else emptyList()) + launch.embeddedVmOptions(),
             mainClass = launch.mainClass.replace('.', '/'),
             args = launch.gameArgs,
             hostLibrary = host?.absolutePath,
             // The core first: the stand-ins for GLFW and SDL depend on it by name
             preload = listOfNotNull(host?.absolutePath, nativeLibrary("libMobileGL.so")?.absolutePath),
+            environment = mapOf(
+                "JAVA_HOME" to home.toString(),
+                "HOME" to context.filesDir.absolutePath,
+                "TMPDIR" to context.cacheDir.absolutePath,
+            ),
         )
         val specFile = File(context.filesDir, "launches/${UUID.randomUUID()}.json").apply {
             parentFile?.mkdirs()
@@ -101,6 +105,25 @@ private class AndroidRuntime(
         }
         return ServiceLaunchHandle(context, specFile, output, afterExit).also { it.connect() }
     }
+
+    private fun windowGameOptions(): List<String> = listOf(
+        "-Dorg.lwjgl.opengl.libname=libMobileGL.so",
+        // The jars carry the hashes of the stock natives and these are built for this platform
+        "-Dorg.lwjgl.util.NoHashChecks=true",
+        // No jemalloc is built for bionic, and LWJGL reaches for it by default
+        "-Dorg.lwjgl.system.allocator=system",
+        // Asked of the VM directly because what it reads inside an app's cpuset can be fewer than the phone has
+        "-XX:ActiveProcessorCount=${Runtime.getRuntime().availableProcessors()}",
+        // 17 and older take the default from a locale an app process does not set
+        "-Dfile.encoding=UTF-8",
+        // This JDK is headless, and a loader or a mod that opens a dialog should hear so instead of failing to link
+        "-Djava.awt.headless=true",
+        // The runtime image carries no jspawnhelper, the default way to start a child process
+        "-Djdk.lang.Process.launchMechanism=FORK",
+        // Loaders that draw their own window before the game does would need a second surface
+        "-Dfml.earlyprogresswindow=false",
+        "-Dloader.disable_forked_guis=true",
+    )
 
     private companion object {
         const val TAG = "NexiraHost"
@@ -162,7 +185,15 @@ private class ServiceLaunchHandle(
     }
 
     fun connect() {
-        val bound = context.bindService(Intent(context, GameService::class.java), connection, Context.BIND_AUTO_CREATE)
+        val intent = Intent(context, GameService::class.java)
+        // Started as well as bound: only a foreground service keeps the game's process alive once the screen is left.
+        // Refused when the launcher is not in front, and then the game still runs for as long as Android lets it.
+        try {
+            val _ = context.startForegroundService(intent)
+        } catch (e: IllegalStateException) {
+            Log.w(TAG, "the game runs without a foreground service", e)
+        }
+        val bound = context.bindService(intent, connection, Context.BIND_AUTO_CREATE)
         if (!bound) finish(LOST)
     }
 
@@ -191,6 +222,7 @@ private class ServiceLaunchHandle(
     }
 
     private companion object {
+        const val TAG = "NexiraHost"
         const val LOST = -1
     }
 }

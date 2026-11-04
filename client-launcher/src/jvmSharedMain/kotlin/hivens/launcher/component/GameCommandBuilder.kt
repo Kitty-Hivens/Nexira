@@ -54,6 +54,12 @@ data class GameLaunch(
         return out
     }
 
+    /** The directories native libraries are looked for in, from the JVM's library path and LWJGL's own, in the order they were given. */
+    fun libraryDirectories(): List<String> = jvmArgs
+        .flatMap { arg -> LIBRARY_PATH_PREFIXES.mapNotNull { prefix -> arg.removePrefix(prefix).takeIf { it != arg } } }
+        .flatMap { it.split(File.pathSeparatorChar) }
+        .filter { it.isNotEmpty() }
+
     /** The whole command for a host that runs the Java at [javaExec]. */
     fun commandLine(javaExec: String): List<String> =
         ArrayList<String>(jvmArgs.size + gameArgs.size + 2).apply {
@@ -65,6 +71,7 @@ data class GameLaunch(
 
     private companion object {
         val CLASS_PATH_FLAGS = setOf("-cp", "-classpath", "--class-path")
+        val LIBRARY_PATH_PREFIXES = listOf("-Djava.library.path=", "-Dorg.lwjgl.librarypath=")
 
         /** The launcher's options whose value is a separate word on the command line and joined with `=` in the VM. */
         val VALUE_FLAGS = setOf(

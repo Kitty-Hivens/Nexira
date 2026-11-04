@@ -48,9 +48,6 @@ object HostProbe {
             "-Xmx512m",
             "--enable-native-access=ALL-UNNAMED",
             "-Dorg.lwjgl.librarypath=${to.absolutePath}",
-            "-Dorg.lwjgl.opengl.libname=libMobileGL.so",
-            // The jars carry the hashes of the stock natives and these are built here
-            "-Dorg.lwjgl.util.NoHashChecks=true",
         )
     }
 

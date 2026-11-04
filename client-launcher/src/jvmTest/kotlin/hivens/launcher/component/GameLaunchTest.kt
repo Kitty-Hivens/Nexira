@@ -47,4 +47,18 @@ class GameLaunchTest {
     fun `a value that looks like an option is still the value of the flag before it`() {
         assertEquals(listOf("-Djava.class.path=-weird.jar"), launch("-cp", "-weird.jar").embeddedVmOptions())
     }
+
+    @Test
+    fun `the library directories come from both paths in the order they were given`() {
+        assertEquals(
+            listOf("/lwjgl", "/a", "/b"),
+            launch("-Xmx1G", "-Dorg.lwjgl.librarypath=/lwjgl", "-cp", "a.jar", "-Djava.library.path=/a:/b").libraryDirectories(),
+        )
+    }
+
+    @Test
+    fun `an empty entry is no library directory and a launch without a path has none`() {
+        assertEquals(listOf("/a"), launch("-Djava.library.path=:/a:").libraryDirectories())
+        assertEquals(emptyList(), launch("-Xmx1G", "-Dorg.lwjgl.opengl.libname=libMobileGL.so").libraryDirectories())
+    }
 }

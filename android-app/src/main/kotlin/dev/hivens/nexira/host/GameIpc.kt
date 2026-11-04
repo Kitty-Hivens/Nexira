@@ -73,6 +73,8 @@ internal data class LaunchSpec(
     val hostLibrary: String? = null,
     /** Libraries to open by path before the VM starts, so the game's open of them by name finds them. */
     val preload: List<String> = emptyList(),
+    /** Variables to set in the process before the VM starts: a native library reads them once, when it loads. */
+    val environment: Map<String, String> = emptyMap(),
 ) {
     fun toJson(): String = JSONObject()
         .put("javaHome", javaHome)
@@ -81,6 +83,7 @@ internal data class LaunchSpec(
         .put("args", JSONArray(args))
         .put("hostLibrary", hostLibrary ?: JSONObject.NULL)
         .put("preload", JSONArray(preload))
+        .put("environment", JSONObject(environment))
         .toString()
 
     companion object {
@@ -91,6 +94,7 @@ internal data class LaunchSpec(
                 json.getString("javaHome"), strings("options"), json.getString("mainClass"), strings("args"),
                 hostLibrary = json.optString("hostLibrary").takeIf { it.isNotEmpty() && it != "null" },
                 preload = json.optJSONArray("preload")?.let { a -> List(a.length()) { a.getString(it) } } ?: emptyList(),
+                environment = json.optJSONObject("environment")?.let { o -> o.keys().asSequence().associateWith(o::getString) } ?: emptyMap(),
             )
         }
     }

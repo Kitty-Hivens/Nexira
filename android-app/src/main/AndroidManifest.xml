@@ -6,6 +6,7 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
 
     <application
         android:name=".NexiraApp"
@@ -30,10 +31,12 @@
             android:name=".ProbeActivity"
             android:exported="true" />
 
-        <!-- The game's window: one surface, the game draws into it from its own process. -->
+        <!-- The game's window: one surface, the game draws into it from its own process. One screen in a task of its own, so the notification comes back to it instead of opening a second. -->
         <activity
             android:name=".host.GameActivity"
             android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity="dev.hivens.nexira.game"
             android:theme="@android:style/Theme.DeviceDefault.NoActionBar.Fullscreen"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|keyboard|navigation|uiMode|density|locale|layoutDirection"
             android:screenOrientation="sensorLandscape" />
@@ -42,7 +45,12 @@
         <service
             android:name=".host.GameService"
             android:exported="false"
-            android:process=":jvm" />
+            android:foregroundServiceType="specialUse"
+            android:process=":jvm">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Keeps a running game alive while its screen is not in front" />
+        </service>
 
         <service
             android:name=".PlaybackService"
