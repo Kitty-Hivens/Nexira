@@ -67,7 +67,7 @@ jobs:
   # ─────────────────────────────────────────────────────────────────────────
   review-gate:
     name: Review Gate
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       pull-requests: read
       contents: read
@@ -183,7 +183,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-26.04, macos-26, windows-2025]
     defaults:
       run:
         shell: bash
@@ -242,7 +242,7 @@ jobs:
   # ─────────────────────────────────────────────────────────────────────────
   changelog:
     name: Extract Changelog
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     needs: test   # tests must pass before we touch artefacts
     # The notes travel as an artifact of two files rather than as job outputs.
     # An output reaches a later step as an environment variable, and Linux
@@ -362,7 +362,7 @@ jobs:
   # ─────────────────────────────────────────────────────────────────────────
   build-windows:
     name: Windows (EXE + ZIP)
-    runs-on: windows-latest
+    runs-on: windows-2025
     needs: changelog
     env:
       APP_VERSION: ${{ needs.changelog.outputs.version }}
@@ -527,17 +527,17 @@ jobs:
   # MACOS — DMG (Apple Silicon only in the release pipeline)
   #
   # Compose Desktop's `packageReleaseDmg` produces a host-architecture
-  # DMG. macos-latest runners are Apple Silicon since the GH Actions
+  # DMG. macos-26 runners are Apple Silicon since the GH Actions
   # migration in 2024-2025.
   #
   # x86_64 (Intel) build is intentionally absent from the release pipeline.
-  # The macos-13 runner (last Intel image GH actively maintains) sits in
+  # The macos-26-intel runner (last Intel image GH actively maintains) sits in
   # queue 12+ hours during US workday peaks on the free-tier pool, and
   # `continue-on-error` does NOT help here: it only kicks in once a job
   # finishes (success/failure/cancelled), so a job stuck in queue still
   # blocks any dependent. The Intel DMG is produced separately via the
   # manual `build-macos-x86_64-community.yml` workflow, dispatched by the
-  # maintainer against the published tag once macos-13 capacity returns.
+  # maintainer against the published tag once macos-26-intel capacity returns.
   # Intel users therefore see the DMG appear on the GitHub Release page
   # with a delay — usually hours, occasionally days. Acceptable trade-off
   # given the Intel-Mac install base in 2026 and our $0/year budget.
@@ -547,7 +547,7 @@ jobs:
   build-macos:
     name: macOS (DMG, aarch64)
     needs: changelog
-    runs-on: macos-latest
+    runs-on: macos-26
     env:
       APP_VERSION: ${{ needs.changelog.outputs.version }}
     steps:
@@ -606,7 +606,7 @@ jobs:
   release:
     name: Publish GitHub Release
     needs: [changelog, build-windows, build-linux, build-macos, portability]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: write
     env:

@@ -56,7 +56,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-26.04, macos-26, windows-2025]
     # shell: bash so the gradlew invocation is identical on Windows runners
     # (PowerShell's default would mangle it).
     defaults:

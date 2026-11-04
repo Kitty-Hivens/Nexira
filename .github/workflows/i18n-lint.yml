@@ -16,7 +16,7 @@ permissions:
 jobs:
   scan:
     name: i18n hardcoded strings
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v7
 

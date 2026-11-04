@@ -35,7 +35,7 @@ permissions:
 jobs:
   scan:
     name: Test suites reach the matrix
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v7
 
