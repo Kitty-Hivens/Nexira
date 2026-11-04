@@ -26,7 +26,7 @@ jobs:
           RUN_ID: ${{ github.event.workflow_run.id }}
         run: |
           unscheduled=$(gh api "repos/$REPO/actions/runs/$RUN_ID/jobs?filter=latest" --paginate \
-            -q '[.jobs[] | select(.conclusion == "failure" and ((.runner_name // "") == "") and ([.steps[] | select(.conclusion != null and .conclusion != "skipped")] | length == 0))] | length')
+            -q '[.jobs[] | select((.conclusion == "failure" or .conclusion == "cancelled") and ((.runner_name // "") == "") and ([.steps[] | select(.conclusion != null and .conclusion != "skipped")] | length == 0))] | length')
           echo "unscheduled failed jobs: $unscheduled"
           if [ "$unscheduled" -gt 0 ]; then
             gh run rerun "$RUN_ID" --failed --repo "$REPO"
