@@ -26,6 +26,12 @@ internal object GameIpc {
     /** Launcher to game: one input event, its kind in arg1 and its values in [KEY_A], [KEY_B], [KEY_META], [KEY_X], [KEY_Y], [KEY_Z], [KEY_SOURCE]. */
     const val MSG_INPUT = 7
 
+    /** Game to launcher: how the game wants the cursor, in arg1: [CURSOR_NORMAL], 1 hidden or [CURSOR_CAPTURED]. */
+    const val MSG_CURSOR_MODE = 8
+
+    const val CURSOR_NORMAL = 0
+    const val CURSOR_CAPTURED = 2
+
     const val INPUT_KEY = 1
     const val INPUT_TEXT = 2
     const val INPUT_POINTER_MOVE = 3

@@ -160,6 +160,7 @@ private class ServiceLaunchHandle(
             when (msg.what) {
                 GameIpc.MSG_LINE -> msg.data.getByteArray(GameIpc.KEY_LINE)?.let { output.write(it) }
                 GameIpc.MSG_EXIT -> finish(msg.arg1)
+                GameIpc.MSG_CURSOR_MODE -> GameSession.cursorModeChanged(msg.arg1)
                 else -> super.handleMessage(msg)
             }
         }

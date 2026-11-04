@@ -1,6 +1,5 @@
 package dev.hivens.nexira.host
 
-import android.app.Activity
 import android.os.Bundle
 import android.os.Message
 import android.os.Messenger
@@ -10,7 +9,7 @@ import android.view.Surface
  * What the launcher's process knows about the game that is running: the connection to the process it runs in,
  * and the screen showing it.
  *
- * The surface and the display are kept and replayed when the connection comes up, because the screen is up
+ * The surface, the display and the focus are kept and replayed when the connection comes up, because the screen is up
  * before the game's process has started listening, and when the screen goes the game is told.
  */
 internal object GameSession {
@@ -18,25 +17,29 @@ internal object GameSession {
     private var service: Messenger? = null
     private var surface: Surface? = null
     private var display: Bundle? = null
-    private var screen: Activity? = null
+    private var focused = false
+    private var screen: GameActivity? = null
+    private var cursorMode = GameIpc.CURSOR_NORMAL
 
     /** The screen showing the game, so it can be closed when the game ends. */
-    fun screenUp(activity: Activity) = synchronized(lock) { screen = activity }
+    fun screenUp(activity: GameActivity) = synchronized(lock) { screen = activity }
 
-    fun screenDown(activity: Activity) = synchronized(lock) {
+    fun screenDown(activity: GameActivity) = synchronized(lock) {
         if (screen === activity) {
             screen = null
             surface = null
+            focused = false
         }
     }
 
     fun connected(messenger: Messenger) {
-        val (pendingSurface, pendingDisplay) = synchronized(lock) {
+        val (pendingSurface, pendingDisplay, pendingFocus) = synchronized(lock) {
             service = messenger
-            surface to display
+            Triple(surface, display, focused)
         }
         pendingDisplay?.let { send(Message.obtain(null, GameIpc.MSG_DISPLAY).apply { data = it }) }
         pendingSurface?.let { sendSurface(it) }
+        if (pendingFocus) input(GameIpc.INPUT_FOCUS, a = 1)
     }
 
     /** The game is over: the screen has nothing left to show. */
@@ -44,6 +47,8 @@ internal object GameSession {
         val activity = synchronized(lock) {
             service = null
             surface = null
+            focused = false
+            cursorMode = GameIpc.CURSOR_NORMAL
             screen.also { screen = null }
         }
         activity?.runOnUiThread { activity.finish() }
@@ -63,6 +68,22 @@ internal object GameSession {
         }
         synchronized(lock) { display = bundle }
         send(Message.obtain(null, GameIpc.MSG_DISPLAY).apply { data = bundle })
+    }
+
+    fun focusChanged(hasFocus: Boolean) {
+        synchronized(lock) { focused = hasFocus }
+        input(GameIpc.INPUT_FOCUS, a = if (hasFocus) 1 else 0)
+    }
+
+    /** What the game last asked of the cursor, for a screen that comes up after it did. */
+    fun cursorMode(): Int = synchronized(lock) { cursorMode }
+
+    fun cursorModeChanged(mode: Int) {
+        val activity = synchronized(lock) {
+            cursorMode = mode
+            screen
+        }
+        activity?.runOnUiThread { activity.cursorModeChanged(mode) }
     }
 
     fun input(

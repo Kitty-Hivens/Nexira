@@ -31,4 +31,12 @@ internal object HostBridge {
     external fun postTouch(fingerId: Int, action: Int, x: Double, y: Double, pressure: Double)
     external fun postFocus(focused: Boolean)
     external fun postClose()
+
+    /** Told when the game changes how it wants the cursor: 0 normal, 1 hidden, 2 captured. On a thread of the bridge's own. */
+    @Volatile var onCursorMode: ((Int) -> Unit)? = null
+
+    /** Called from native code. */
+    fun cursorModeChanged(mode: Int) {
+        onCursorMode?.invoke(mode)
+    }
 }

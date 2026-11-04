@@ -102,6 +102,9 @@ class GameService : Service() {
         spec.workDir?.let { JvmHost.enterDirectory(it) }
         // Before the VM exists, so that what the screen sends right behind the start finds its way in
         spec.preload.forEach { HostBridge.preload(it) }
+        HostBridge.onCursorMode = { mode ->
+            val _ = runCatching { client.send(Message.obtain(null, GameIpc.MSG_CURSOR_MODE, mode, 0)) }
+        }
         spec.hostLibrary?.let { if (!HostBridge.load(it)) Log.e(TAG, "no window for this launch: $it did not load") }
 
         val listener = object : JvmListener {

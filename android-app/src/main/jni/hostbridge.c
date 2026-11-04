@@ -10,6 +10,7 @@
 #include <android/native_window_jni.h>
 #include <dlfcn.h>
 #include <jni.h>
+#include <pthread.h>
 #include <stdlib.h>
 
 #define TAG "NexiraHost"
@@ -28,7 +29,61 @@ static struct {
     void (*postTouch)(int, int, double, double, double);
     void (*postFocus)(int);
     void (*postClose)(void);
+    void (*setHandler)(const void *);
 } core;
+
+/* The layout of NxHostHandler in nxhost.h. The core is not linked here, so neither is its header. */
+struct CoreHandler {
+    void (*cursorMode)(int);
+    void (*clipboard)(const char *);
+    void (*textInput)(int);
+};
+
+static JavaVM *g_vm = NULL;
+static jobject g_bridge = NULL;
+static jmethodID g_on_cursor_mode = NULL;
+static pthread_mutex_t g_mode_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t g_mode_changed = PTHREAD_COND_INITIALIZER;
+static int g_mode = 0;
+static int g_mode_pending = 0;
+
+/*
+ * The core calls this on the game's thread, which belongs to the game's VM and has no business in ART, so it only leaves
+ * a note for the thread below. A second change before that thread looks replaces the first: only the last one matters.
+ */
+static void cursor_mode_from_game(int mode) {
+    pthread_mutex_lock(&g_mode_lock);
+    g_mode = mode;
+    g_mode_pending = 1;
+    pthread_cond_signal(&g_mode_changed);
+    pthread_mutex_unlock(&g_mode_lock);
+}
+
+static void *cursor_mode_thread(void *arg) {
+    (void)arg;
+    JNIEnv *env = NULL;
+    if ((*g_vm)->AttachCurrentThread(g_vm, &env, NULL) != JNI_OK) return NULL;
+    for (;;) {
+        pthread_mutex_lock(&g_mode_lock);
+        while (!g_mode_pending) pthread_cond_wait(&g_mode_changed, &g_mode_lock);
+        int mode = g_mode;
+        g_mode_pending = 0;
+        pthread_mutex_unlock(&g_mode_lock);
+        (*env)->CallVoidMethod(env, g_bridge, g_on_cursor_mode, mode);
+        if ((*env)->ExceptionCheck(env)) (*env)->ExceptionClear(env);
+    }
+}
+
+static void listen_to_core(JNIEnv *env, jobject bridge) {
+    static const struct CoreHandler handler = { cursor_mode_from_game, NULL, NULL };
+    (*env)->GetJavaVM(env, &g_vm);
+    g_bridge = (*env)->NewGlobalRef(env, bridge);
+    jclass cls = (*env)->GetObjectClass(env, bridge);
+    g_on_cursor_mode = (*env)->GetMethodID(env, cls, "cursorModeChanged", "(I)V");
+    pthread_t thread;
+    if (pthread_create(&thread, NULL, cursor_mode_thread, NULL) == 0) pthread_detach(thread);
+    core.setHandler(&handler);
+}
 
 static int resolve(void *lib, const char *name, void **slot) {
     *slot = dlsym(lib, name);
@@ -71,8 +126,12 @@ Java_dev_hivens_nexira_host_HostBridge_load(JNIEnv *env, jclass cls, jstring pat
           && resolve(lib, "nxhostPostRelativeMotion", (void **)&core.postRelativeMotion)
           && resolve(lib, "nxhostPostTouch", (void **)&core.postTouch)
           && resolve(lib, "nxhostPostFocus", (void **)&core.postFocus)
-          && resolve(lib, "nxhostPostClose", (void **)&core.postClose);
-    if (ok) LOG("host core entry points from %s", chars);
+          && resolve(lib, "nxhostPostClose", (void **)&core.postClose)
+          && resolve(lib, "nxhostSetHandler", (void **)&core.setHandler);
+    if (ok) {
+        LOG("host core entry points from %s", chars);
+        listen_to_core(env, cls);
+    }
     (*env)->ReleaseStringUTFChars(env, path, chars);
     return ok ? JNI_TRUE : JNI_FALSE;
 }
