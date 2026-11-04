@@ -234,6 +234,16 @@ Java_dev_hivens_nexira_host_JvmHost_run(JNIEnv *env, jclass cls, jstring javaHom
     return result;
 }
 
+JNIEXPORT jboolean JNICALL
+Java_dev_hivens_nexira_host_JvmHost_enterDirectory(JNIEnv *env, jclass cls, jstring path) {
+    (void)cls;
+    char *dir = utf(env, path);
+    int ok = chdir(dir) == 0;
+    if (!ok) LOGE("chdir %s failed", dir);
+    free(dir);
+    return ok ? JNI_TRUE : JNI_FALSE;
+}
+
 static void *exit_thread(void *arg) {
     (void)arg;
     JNIEnv *jenv = NULL;

@@ -32,10 +32,16 @@ class AndroidNativesInstaller(
             return@withContext emptyList()
         }
         release.assets.map { asset ->
-            val dest = dir.resolve("lwjgl-${release.lwjglVersion}").resolve(asset.name)
+            // The digest is in the name because a natives folder is rebuilt when the names of its archives change, and
+            // an archive like the host's keeps its own name from one build to the next.
+            val dest = dir.resolve("lwjgl-${release.lwjglVersion}").resolve("${asset.sha256.take(DIGEST_IN_NAME)}-${asset.name}")
             onProgress("Fetching ${asset.name}...")
             fetch(Transfer(url = asset.url, dest = dest, expect = Digest(DigestAlgorithm.SHA256, asset.sha256))) { _, _ -> }
             dest
         }
+    }
+
+    private companion object {
+        const val DIGEST_IN_NAME = 16
     }
 }

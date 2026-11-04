@@ -33,6 +33,9 @@ object JvmHost {
         listener: JvmListener,
     ): Int
 
+    /** Moves this process into [path]. A relative path the game opens natively goes by this, not by `user.dir`. */
+    external fun enterDirectory(path: String): Boolean
+
     /** Asks the running game to exit as a termination signal would, so its shutdown hooks run. */
     external fun requestExit()
 }

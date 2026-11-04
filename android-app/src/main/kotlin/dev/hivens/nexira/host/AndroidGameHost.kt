@@ -91,6 +91,7 @@ private class AndroidRuntime(
                 "HOME" to context.filesDir.absolutePath,
                 "TMPDIR" to context.cacheDir.absolutePath,
             ),
+            workDir = workDir.toString(),
         )
         val specFile = File(context.filesDir, "launches/${UUID.randomUUID()}.json").apply {
             parentFile?.mkdirs()
