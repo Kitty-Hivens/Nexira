@@ -1,7 +1,9 @@
 package dev.hivens.nexira.host
 
 import android.app.Activity
+import android.content.Context
 import android.os.Bundle
+import android.text.InputType
 import android.view.InputDevice
 import android.view.KeyEvent
 import android.view.MotionEvent
@@ -10,6 +12,10 @@ import android.view.SurfaceView
 import android.view.ViewConfiguration
 import android.view.WindowInsets
 import android.view.WindowManager
+import android.view.inputmethod.BaseInputConnection
+import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputConnection
+import android.view.inputmethod.InputMethodManager
 import kotlin.math.hypot
 
 /**
@@ -18,12 +24,14 @@ import kotlin.math.hypot
  * The game lives in another process, so this holds nothing of it: the surface, the display and the input go through
  * [GameSession], and the screen closes itself when the game ends.
  *
- * A mouse is a mouse, captured while the game looks around. A finger stands in for one: over a menu it is the pointer,
- * and while the game looks around a drag turns the view, a hold is the left button and a tap the right.
+ * A mouse is a mouse, captured while the game looks around. Fingers go to the TouchController mod when the game has it,
+ * and over a menu the first one is the pointer as well. A game without the mod gets the first finger as a mouse: a drag
+ * turns the view while the game looks around, a hold is the left button and a tap the right. A tap with two fingers
+ * brings up the keyboard there, since nothing in the game can ask for it.
  */
 class GameActivity : Activity(), SurfaceHolder.Callback {
 
-    private lateinit var view: SurfaceView
+    private lateinit var view: GameSurface
     private var cursorMode = GameIpc.CURSOR_NORMAL
     private var touchSlop = 0
 
@@ -35,13 +43,21 @@ class GameActivity : Activity(), SurfaceHolder.Callback {
         }
         touchSlop = ViewConfiguration.get(this).scaledTouchSlop
 
-        view = SurfaceView(this).apply {
+        view = GameSurface(this).apply {
             holder.addCallback(this@GameActivity)
             isFocusable = true
             isFocusableInTouchMode = true
             setOnCapturedPointerListener { _, event -> capturedMouse(event) }
+            // The keyboard covers the bottom of the game, where a chat line is, so the game moves up out of its way
+            setOnApplyWindowInsetsListener { surface, insets ->
+                surface.translationY = -insets.getInsets(WindowInsets.Type.ime()).bottom.toFloat()
+                insets
+            }
         }
         setContentView(view)
+        // Android 15 and later draw edge to edge by themselves, the older ones the app supports have to be told
+        @Suppress("DEPRECATION")
+        window.setDecorFitsSystemWindows(false)
         // The decor view exists only after the content does
         window.insetsController?.hide(WindowInsets.Type.systemBars())
         GameSession.screenUp(this)
@@ -103,6 +119,19 @@ class GameActivity : Activity(), SurfaceHolder.Callback {
             view.releasePointerCapture()
         }
     }
+
+    internal fun softKeyboard(show: Boolean) {
+        val keyboard = getSystemService(InputMethodManager::class.java)
+        if (show) {
+            val _ = view.requestFocus()
+            val _ = keyboard.showSoftInput(view, 0)
+        } else {
+            val _ = keyboard.hideSoftInputFromWindow(view.windowToken, 0)
+        }
+        softKeyboardShown = show
+    }
+
+    private var softKeyboardShown = false
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (event.keyCode == KeyEvent.KEYCODE_VOLUME_UP || event.keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
@@ -186,6 +215,10 @@ class GameActivity : Activity(), SurfaceHolder.Callback {
     private var lookMoved = false
     private var lookHolding = false
 
+    /** A second finger came down soon after the first and neither has gone anywhere, so far a tap with two fingers. */
+    private var twoFingerTap = false
+    private var firstFingerAt = 0L
+
     private val startHolding = Runnable {
         if (lookFinger != NO_FINGER && !lookMoved) {
             lookHolding = true
@@ -205,6 +238,13 @@ class GameActivity : Activity(), SurfaceHolder.Callback {
         if (event.isFromSource(InputDevice.SOURCE_MOUSE)) {
             return if (event.actionMasked == MotionEvent.ACTION_MOVE) mouse(event) else true
         }
+        GameSession.touchController()?.let { touchController ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP ->
+                    fingers[event.getPointerId(event.actionIndex)]?.let { touchController.liftPointer(it) }
+                MotionEvent.ACTION_CANCEL -> touchController.clearPointers()
+            }
+        }
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> fingerDown(event, event.actionIndex)
             MotionEvent.ACTION_MOVE -> for (index in 0 until event.pointerCount) fingerMoved(event, index)
@@ -221,8 +261,19 @@ class GameActivity : Activity(), SurfaceHolder.Callback {
         touch(event, index, DOWN)
         val x = event.getX(index)
         val y = event.getY(index)
+        val touchController = GameSession.touchController()
+        if (touchController == null) {
+            if (event.pointerCount == 1) {
+                firstFingerAt = event.eventTime
+                twoFingerTap = false
+            } else if (event.pointerCount == 2 && event.eventTime - firstFingerAt < TWO_FINGER_TAP_MS) {
+                twoFingerTap = true
+            } else {
+                twoFingerTap = false
+            }
+        }
         if (cursorMode == GameIpc.CURSOR_CAPTURED) {
-            if (lookFinger == NO_FINGER) {
+            if (touchController == null && lookFinger == NO_FINGER) {
                 lookFinger = pointer
                 lookX = x
                 lookY = y
@@ -249,6 +300,7 @@ class GameActivity : Activity(), SurfaceHolder.Callback {
         if (pointer == lookFinger) {
             if (!lookMoved && hypot(x - lookStartX, y - lookStartY) > touchSlop) {
                 lookMoved = true
+                twoFingerTap = false
                 view.removeCallbacks(startHolding)
             }
             if (lookMoved) {
@@ -272,17 +324,25 @@ class GameActivity : Activity(), SurfaceHolder.Callback {
             view.removeCallbacks(startHolding)
             when {
                 lookHolding -> fingerButton(LEFT, down = false)
-                !lookMoved && !cancelled -> {
+                !lookMoved && !cancelled && !twoFingerTap -> {
                     fingerButton(RIGHT, down = true)
                     fingerButton(RIGHT, down = false)
                 }
             }
             lookHolding = false
         }
+        // The last finger of a tap with two is the end of it
+        if (twoFingerTap && !cancelled && event.pointerCount == 1) {
+            twoFingerTap = false
+            if (event.eventTime - firstFingerAt < TWO_FINGER_TAP_MS * 2) softKeyboard(!softKeyboardShown)
+        }
     }
 
     private fun touch(event: MotionEvent, index: Int, action: Int) {
         val finger = fingers[event.getPointerId(index)] ?: return
+        if (action != UP && view.width > 0 && view.height > 0) {
+            GameSession.touchController()?.pointer(finger, event.getX(index) / view.width, event.getY(index) / view.height)
+        }
         GameSession.input(
             GameIpc.INPUT_TOUCH,
             a = finger,
@@ -308,11 +368,82 @@ class GameActivity : Activity(), SurfaceHolder.Callback {
         const val MOVE = 2
         const val NO_FINGER = -1
         const val HOLD_MS = 300L
+        const val TWO_FINGER_TAP_MS = 250L
 
         const val LEFT = 0
         const val RIGHT = 1
         const val MIDDLE = 2
         const val BUTTON_4 = 3
         const val BUTTON_5 = 4
+    }
+}
+
+/**
+ * The game's surface, which is also where a soft keyboard types. Text arrives as a keyboard commits it and goes to the
+ * game as typed characters, and what the keyboard is still composing is shown by typing and rubbing out.
+ */
+private class GameSurface(context: Context) : SurfaceView(context) {
+
+    override fun onCheckIsTextEditor(): Boolean = true
+
+    override fun onCreateInputConnection(outAttrs: EditorInfo): InputConnection {
+        outAttrs.inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+        outAttrs.imeOptions = EditorInfo.IME_FLAG_NO_FULLSCREEN or EditorInfo.IME_FLAG_NO_EXTRACT_UI or EditorInfo.IME_ACTION_DONE
+        return GameInputConnection(this)
+    }
+}
+
+private class GameInputConnection(view: SurfaceView) : BaseInputConnection(view, false) {
+
+    private var composing = 0
+
+    private fun rubOut(count: Int) {
+        repeat(count) {
+            press(KeyEvent.KEYCODE_DEL)
+        }
+    }
+
+    private fun press(keyCode: Int) {
+        GameSession.input(GameIpc.INPUT_KEY, a = keyCode, b = 1)
+        GameSession.input(GameIpc.INPUT_KEY, a = keyCode, b = 0)
+    }
+
+    /** Returns how many characters the game now counts. */
+    private fun type(text: CharSequence): Int {
+        var count = 0
+        text.toString().codePoints().forEach { codepoint ->
+            count++
+            if (codepoint == '\n'.code) press(KeyEvent.KEYCODE_ENTER) else GameSession.input(GameIpc.INPUT_TEXT, a = codepoint)
+        }
+        return count
+    }
+
+    override fun setComposingText(text: CharSequence, newCursorPosition: Int): Boolean {
+        rubOut(composing)
+        composing = type(text)
+        return true
+    }
+
+    override fun finishComposingText(): Boolean {
+        composing = 0
+        return true
+    }
+
+    override fun commitText(text: CharSequence, newCursorPosition: Int): Boolean {
+        rubOut(composing)
+        composing = 0
+        val _ = type(text)
+        return true
+    }
+
+    override fun deleteSurroundingText(beforeLength: Int, afterLength: Int): Boolean {
+        rubOut(beforeLength)
+        repeat(afterLength) { press(KeyEvent.KEYCODE_FORWARD_DEL) }
+        return true
+    }
+
+    override fun performEditorAction(actionCode: Int): Boolean {
+        press(KeyEvent.KEYCODE_ENTER)
+        return true
     }
 }

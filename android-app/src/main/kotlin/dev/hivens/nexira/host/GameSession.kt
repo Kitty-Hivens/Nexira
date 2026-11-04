@@ -20,6 +20,19 @@ internal object GameSession {
     private var focused = false
     private var screen: GameActivity? = null
     private var cursorMode = GameIpc.CURSOR_NORMAL
+    private var touchController: TouchControllerLink? = null
+
+    /** The mod's end of the fingers for this game, closed with it. */
+    fun touchControllerOpened(link: TouchControllerLink?) = synchronized(lock) { touchController = link }
+
+    /** The touch controller, once the mod in the game has spoken. */
+    fun touchController(): TouchControllerLink? = synchronized(lock) { touchController }?.takeIf { it.connected }
+
+    /** The mod asks for the keyboard. */
+    fun softKeyboard(show: Boolean) {
+        val activity = synchronized(lock) { screen }
+        activity?.runOnUiThread { activity.softKeyboard(show) }
+    }
 
     /** The screen showing the game, so it can be closed when the game ends. */
     fun screenUp(activity: GameActivity) = synchronized(lock) { screen = activity }
@@ -44,13 +57,17 @@ internal object GameSession {
 
     /** The game is over: the screen has nothing left to show. */
     fun ended() {
-        val activity = synchronized(lock) {
+        val (activity, link) = synchronized(lock) {
             service = null
             surface = null
             focused = false
             cursorMode = GameIpc.CURSOR_NORMAL
-            screen.also { screen = null }
+            val going = screen to touchController
+            screen = null
+            touchController = null
+            going
         }
+        val _ = runCatching { link?.close() }
         activity?.runOnUiThread { activity.finish() }
     }
 

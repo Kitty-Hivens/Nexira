@@ -51,6 +51,7 @@ dependencies {
     implementation(project(":client-launcher"))
     implementation(project(":client-ui"))
     implementation(libs.libvault.android)
+    implementation(libs.touchcontroller.proxy.android)
     implementation(libs.kotlinx.serialization.json)
 
     implementation(libs.androidx.activity.compose)

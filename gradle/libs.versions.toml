@@ -112,6 +112,10 @@ libnotify         = "0.1.2"
 # adds the Android Keystore. Vault.open and SecretVault keep their names.
 libvault          = "0.3.0"
 
+# The launcher's side of the TouchController mod's protocol (LGPL-3.0): the mod
+# draws the on-screen controls and reads the fingers from this client.
+touchcontrollerProxy = "0.0.8"
+
 # Media decode/playback (Kitty-Hivens/skinema) -- FFmpeg via Panama, frames
 # out as Skia images, fail-closed/drop-late, built for looping backgrounds.
 # Replaces the in-tree Skia-Codec animation path in CustomBackground and adds
@@ -203,6 +207,7 @@ filekit-dialogs-compose         = { group = "io.github.vinceglb", name = "fileki
 media3-exoplayer                = { group = "androidx.media3", name = "media3-exoplayer", version.ref = "media3" }
 media3-session                  = { group = "androidx.media3", name = "media3-session", version.ref = "media3" }
 androidx-activity-compose       = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
+touchcontroller-proxy-android   = { group = "top.fifthlight.touchcontroller", name = "proxy-client-android", version.ref = "touchcontrollerProxy" }
 
 # Misc
 commons-compress                = { group = "org.apache.commons", name = "commons-compress", version.ref = "commonsCompress" }

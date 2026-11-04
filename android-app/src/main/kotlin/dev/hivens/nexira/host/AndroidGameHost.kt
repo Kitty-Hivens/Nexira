@@ -70,6 +70,8 @@ private class AndroidRuntime(
         val nativeDirs = launch.libraryDirectories().map(::File)
         fun nativeLibrary(name: String): File? = nativeDirs.map { File(it, name) }.firstOrNull { it.isFile }
         val host = nativeLibrary("libnxhost.so")
+        val touchController = if (host != null) TouchControllerLink.open(context) else null
+        GameSession.touchControllerOpened(touchController)
         val spec = LaunchSpec(
             javaHome = home.toString(),
             // What this platform needs of the VM comes first, so what the pack passes wins
@@ -90,7 +92,7 @@ private class AndroidRuntime(
                 "JAVA_HOME" to home.toString(),
                 "HOME" to context.filesDir.absolutePath,
                 "TMPDIR" to context.cacheDir.absolutePath,
-            ),
+            ) + (if (touchController != null) mapOf(TouchControllerLink.SOCKET_VARIABLE to TouchControllerLink.SOCKET_NAME) else emptyMap()),
             workDir = workDir.toString(),
         )
         val specFile = File(context.filesDir, "launches/${UUID.randomUUID()}.json").apply {
