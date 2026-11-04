@@ -112,20 +112,26 @@ fun BrowseSearchWidget(instance: WidgetInstance) {
     val c: BrowseController = koinInject()
     val s = LocalStrings.current
     PuppetField("browse.search", c.query) { c.query = it }
-    SearchField(
-        value         = c.query,
-        onValueChange = { c.query = it },
-        placeholder   = searchPlaceholder(c.kind, s),
-        modifier      = Modifier.padding(bottom = 10.dp),
-        // The catalogue sorts its own lists and not the mirror's, which comes in the
-        // order the mirror publishes it.
-        trailing      = if (c.kind != null || c.origin == PackOrigin.Modrinth) {
-            { SortPicker(c) }
-        } else {
-            null
-        },
-    )
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        // On a narrow column the words of the pill took the field's whole width
+        val narrow = maxWidth < NARROW_SEARCH
+        SearchField(
+            value         = c.query,
+            onValueChange = { c.query = it },
+            placeholder   = searchPlaceholder(c.kind, s),
+            modifier      = Modifier.padding(bottom = 10.dp),
+            // The catalogue sorts its own lists and not the mirror's, which comes in the
+            // order the mirror publishes it.
+            trailing      = if (c.kind != null || c.origin == PackOrigin.Modrinth) {
+                { SortPicker(c, wordless = narrow) }
+            } else {
+                null
+            },
+        )
+    }
 }
+
+private val NARROW_SEARCH = 560.dp
 
 private fun searchPlaceholder(kind: ContentKind?, s: AppStrings): String = when (kind) {
     null -> s.browseSearchPlaceholder
@@ -136,7 +142,7 @@ private fun searchPlaceholder(kind: ContentKind?, s: AppStrings): String = when 
 
 /** The order of a catalogue search, as a pill at the end of the field. */
 @Composable
-private fun SortPicker(c: BrowseController) {
+private fun SortPicker(c: BrowseController, wordless: Boolean) {
     val s = LocalStrings.current
     var open by remember { mutableStateOf(false) }
     var shown by remember { mutableStateOf(false) }
@@ -161,13 +167,17 @@ private fun SortPicker(c: BrowseController) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Text(s.browseSortLabel, style = MaterialTheme.typography.labelLarge, color = NxInk.quiet, maxLines = 1)
-            AnimatedContent(
-                targetState    = c.sort,
-                transitionSpec = { fade.enter togetherWith fade.exit using SizeTransform(clip = false) { _, _ -> tap.of() } },
-                label          = "sortValue",
-            ) { sort ->
-                Text(sort.label(s), style = MaterialTheme.typography.labelLarge, color = NxInk.main, fontWeight = FontWeight.SemiBold, maxLines = 1)
+            if (wordless) {
+                Symbol(NxIcon.Tune, contentDescription = s.browseSortLabel, tint = NxInk.main, size = 18.dp)
+            } else {
+                Text(s.browseSortLabel, style = MaterialTheme.typography.labelLarge, color = NxInk.quiet, maxLines = 1)
+                AnimatedContent(
+                    targetState    = c.sort,
+                    transitionSpec = { fade.enter togetherWith fade.exit using SizeTransform(clip = false) { _, _ -> tap.of() } },
+                    label          = "sortValue",
+                ) { sort ->
+                    Text(sort.label(s), style = MaterialTheme.typography.labelLarge, color = NxInk.main, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                }
             }
             Symbol(NxIcon.ExpandMore, contentDescription = null, tint = NxInk.quiet, size = 18.dp, modifier = Modifier.rotate(turn))
         }
@@ -266,7 +276,7 @@ fun BrowseInstallingWidget(instance: WidgetInstance) {
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                        FlowRow(itemVerticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                             if (runs.mcVersion.isNotBlank()) Fact(NxIcon.Inventory2, "Minecraft ${runs.mcVersion}")
                             if (runs.loader.isNotBlank()) {
                                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {

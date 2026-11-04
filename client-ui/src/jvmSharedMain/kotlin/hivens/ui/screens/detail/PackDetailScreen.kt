@@ -50,6 +50,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
@@ -190,9 +191,13 @@ fun PackDetailScreen(
     }
     PuppetClick("packDetail.abort") { state.abortLaunch() }
 
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+    // A low window, a phone on its side, has to leave the tab body room under the hero
+    val lowWindow = maxHeight < LOW_WINDOW
     Column(Modifier.fillMaxSize()) {
         Hero(
             pack           = pack,
+            compact        = lowWindow,
             launchControl  = launchControl,
             onBack         = onBack,
             onOpenSettings = { settingsSection = null; showSettings = true },
@@ -270,6 +275,7 @@ fun PackDetailScreen(
             }
             }
         }
+    }
     }
 
     // Above the tabs: it covers the screen.
@@ -475,6 +481,7 @@ private fun LogSessionPicker(
 @Composable
 private fun Hero(
     pack: PackInstance,
+    compact: Boolean,
     launchControl: LaunchControl,
     onBack: () -> Unit,
     onOpenSettings: () -> Unit,
@@ -495,7 +502,7 @@ private fun Hero(
         Modifier
             .fillMaxWidth()
             .padding(start = 16.dp, top = 8.dp, end = 16.dp)
-            .height(196.dp)
+            .height(if (compact) 88.dp else 196.dp)
             .clip(MaterialTheme.shapes.medium),
     ) {
         // Pixel-art base -> real banner -> scrim, same layering as the cards.
@@ -514,18 +521,23 @@ private fun Hero(
         }
         Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = if (bannerUrl != null) 0.5f else 0.4f)))
 
-        // Top row: folder + settings (end). Back lives in the top-bar breadcrumb
-        // now, so the hero no longer draws its own arrow.
-        Row(
-            modifier              = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.End,
-            verticalAlignment     = Alignment.CenterVertically,
-        ) {
+        val actions: @Composable () -> Unit = {
             Row {
                 if (bannerIsVideo) HeroAction(NxIcon.OpenInFull, s.videoFullscreen) { bannerFullscreen = true }
                 HeroAction(NxIcon.FolderOpen, null, onOpenFolder)
                 HeroAction(NxIcon.Settings, s.packCardSettings, onOpenSettings)
             }
+        }
+
+        // Top row: folder + settings (end). Back lives in the top-bar breadcrumb
+        // now, so the hero no longer draws its own arrow. A compact hero has one row,
+        // and they sit in it beside Play.
+        if (!compact) {
+            Row(
+                modifier              = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment     = Alignment.CenterVertically,
+            ) { actions() }
         }
 
         // Bottom row: avatar + name + chips, Play pinned to the end. Sheds the
@@ -536,22 +548,32 @@ private fun Hero(
             val showSource   = maxWidth >= 460.dp
             val playIconOnly = maxWidth < 500.dp
             Row(
-                modifier              = Modifier.fillMaxSize().padding(start = 24.dp, end = 24.dp, top = 52.dp, bottom = 20.dp),
-                verticalAlignment     = Alignment.Bottom,
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                modifier              = if (compact) {
+                    Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 8.dp)
+                } else {
+                    Modifier.fillMaxSize().padding(start = 24.dp, end = 24.dp, top = 52.dp, bottom = 20.dp)
+                },
+                verticalAlignment     = if (compact) Alignment.CenterVertically else Alignment.Bottom,
+                horizontalArrangement = Arrangement.spacedBy(if (compact) 12.dp else 16.dp),
             ) {
-                HeroAvatar(iconUrl = art.iconUrl, displayName = pack.displayName, hue = hueA)
-                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                HeroAvatar(iconUrl = art.iconUrl, displayName = pack.displayName, hue = hueA, size = if (compact) 56.dp else 72.dp)
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(if (compact) 4.dp else 8.dp)) {
                     Text(
                         text       = pack.displayName,
                         fontFamily = familyForText(pack.displayName),
-                        style      = MaterialTheme.typography.headlineMedium,
+                        style      = if (compact) MaterialTheme.typography.titleMedium else MaterialTheme.typography.headlineMedium,
                         color      = Color.White,
                         fontWeight = FontWeight.Bold,
-                        maxLines   = 2,
+                        maxLines   = if (compact) 1 else 2,
                         overflow   = TextOverflow.Ellipsis,
                     )
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    // Wraps rather than squeezes: squeezed, a chip broke its words letter by letter.
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement   = Arrangement.spacedBy(4.dp),
+                        itemVerticalAlignment = Alignment.CenterVertically,
+                        maxLines              = if (compact) 1 else 2,
+                    ) {
                         if (showSource) SourceChip(pack.packRef.origin)
                         pack.cachedManifest?.let { HeroChip(loaderMcLabel(it)) }
                         versionLabel?.let { HeroChip("v$it") }
@@ -567,6 +589,7 @@ private fun Hero(
                         HeroChip(lastPlayedShort(pack.lastPlayedEpochOrZero, s))
                     }
                 }
+                if (compact) actions()
                 // The pill walks the launch: Play -> wait (prepare/sync, inert)
                 // -> Exit (stop the running game) -> Play again, and names the
                 // reason when Play is not on offer. Failed falls back to Play --
@@ -675,7 +698,7 @@ private fun HeroChip(text: String) {
             .background(Color.Black.copy(alpha = 0.4f))
             .padding(horizontal = 8.dp, vertical = 3.dp),
     ) {
-        Text(text, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.9f))
+        Text(text, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.9f), maxLines = 1)
     }
 }
 
@@ -719,7 +742,7 @@ private fun lastPlayedShort(epoch: Long, s: AppStrings): String {
 }
 
 @Composable
-private fun HeroAvatar(iconUrl: String?, displayName: String, hue: Color) {
+private fun HeroAvatar(iconUrl: String?, displayName: String, hue: Color, size: Dp) {
     val initials = displayName
         .split(' ', '-', '_')
         .filter { it.isNotBlank() }
@@ -730,7 +753,7 @@ private fun HeroAvatar(iconUrl: String?, displayName: String, hue: Color) {
         model              = iconUrl,
         contentDescription = null,
         contentScale       = ContentScale.Crop,
-        modifier           = Modifier.size(72.dp).clip(RoundedCornerShape(14.dp)),
+        modifier           = Modifier.size(size).clip(RoundedCornerShape(14.dp)),
         loading            = { Box(Modifier.fillMaxSize().background(hue)) },
         error              = {
             Box(Modifier.fillMaxSize().background(hue), contentAlignment = Alignment.Center) {
@@ -751,3 +774,6 @@ private fun NotFound(onBack: () -> Unit) {
         }
     }
 }
+
+/** Below this height the hero gives up its banner space. */
+private val LOW_WINDOW = 480.dp

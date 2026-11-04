@@ -600,6 +600,7 @@ internal fun ProjectResults(
             // The catalogue's own break: a narrow column takes the small icon so the
             // title keeps its width.
             val icon = if (maxWidth >= WIDE_CARD) ICON_WIDE else ICON_NARROW
+            val stacked = maxWidth < STACKED_CARD
             // One list per question: it starts where the reader left that question's
             // answer, and says where they leave it under that question's name. Shared
             // across questions, a kept answer shown in place of another kept the other's
@@ -639,6 +640,7 @@ internal fun ProjectResults(
                         ProjectCard(
                             hit      = hit,
                             iconSize = icon,
+                            stacked  = stacked,
                             note     = problem?.label(s) ?: state.missing[id]?.let { s.modPageInstallMissing(it) },
                             onOpen   = open,
                             modifier = Modifier.animateItem(
@@ -772,6 +774,8 @@ internal fun ProjectCard(
     hit: ModrinthSearchHit,
     modifier: Modifier = Modifier,
     iconSize: Dp = ICON_WIDE,
+    /** The numbers and the action under the text rather than beside it, for a column too narrow to spare the width. */
+    stacked: Boolean = false,
     note: String? = null,
     onOpen: (() -> Unit)? = null,
     action: (@Composable () -> Unit)? = null,
@@ -792,16 +796,13 @@ internal fun ProjectCard(
         shape    = shape,
         modifier = modifier.fillMaxWidth().border(1.dp, edge, shape),
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .hoverable(interaction)
-                .then(if (onOpen != null) Modifier.clickable(interactionSource = interaction, indication = null, onClick = onOpen) else Modifier)
-                .padding(CARD_PADDING),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            ProjectIcon(hit, iconSize)
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        val area = Modifier
+            .fillMaxWidth()
+            .hoverable(interaction)
+            .then(if (onOpen != null) Modifier.clickable(interactionSource = interaction, indication = null, onClick = onOpen) else Modifier)
+            .padding(CARD_PADDING)
+        val text = @Composable { width: Modifier ->
+            Column(width, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
                         hit.title,
@@ -838,21 +839,41 @@ internal fun ProjectCard(
                 }
                 ProjectTags(hit.displayCategories.ifEmpty { hit.categories }, max = if (action != null) TAGS_WITH_ACTION else TAGS)
             }
-            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                action?.invoke()
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Stat(NxIcon.Download, hit.downloads, s.modPageStatDownloads)
-                    Stat(NxIcon.Favorite, hit.follows, s.modPageStatFollowers)
+        }
+        val stats = @Composable {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Stat(NxIcon.Download, hit.downloads, s.modPageStatDownloads)
+                Stat(NxIcon.Favorite, hit.follows, s.modPageStatFollowers)
+            }
+        }
+        if (stacked) {
+            Column(area, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    ProjectIcon(hit, iconSize)
+                    text(Modifier.weight(1f))
                 }
-                if (hit.dateModified.isNotBlank()) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Symbol(NxIcon.History, contentDescription = null, tint = NxInk.quiet, size = 16.dp)
-                        Text(
-                            s.modUpdatedOn(relativeAge(hit.dateModified, s)),
-                            style    = MaterialTheme.typography.labelMedium,
-                            color    = NxInk.quiet,
-                            maxLines = 1,
-                        )
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    stats()
+                    action?.invoke()
+                }
+            }
+        } else {
+            Row(area, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                ProjectIcon(hit, iconSize)
+                text(Modifier.weight(1f))
+                Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    action?.invoke()
+                    stats()
+                    if (hit.dateModified.isNotBlank()) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Symbol(NxIcon.History, contentDescription = null, tint = NxInk.quiet, size = 16.dp)
+                            Text(
+                                s.modUpdatedOn(relativeAge(hit.dateModified, s)),
+                                style    = MaterialTheme.typography.labelMedium,
+                                color    = NxInk.quiet,
+                                maxLines = 1,
+                            )
+                        }
                     }
                 }
             }
@@ -929,6 +950,7 @@ private val CARD_GAP = 10.dp
 internal val ICON_WIDE = 100.dp
 internal val ICON_NARROW = 64.dp
 private val WIDE_CARD = 850.dp
+private val STACKED_CARD = 560.dp
 private val TITLE = 20.sp
 private val STAT_ICON = 20.dp
 private val ACTION_ICON = 16.dp
