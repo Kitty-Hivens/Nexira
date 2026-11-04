@@ -852,7 +852,13 @@ internal fun ProjectCard(
                     ProjectIcon(hit, iconSize)
                     text(Modifier.weight(1f))
                 }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                // A row gave the action what the numbers left, and cut its label short
+                FlowRow(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalArrangement   = Arrangement.spacedBy(8.dp),
+                    itemVerticalAlignment = Alignment.CenterVertically,
+                ) {
                     stats()
                     action?.invoke()
                 }
