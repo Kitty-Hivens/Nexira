@@ -40,7 +40,8 @@ object HostProbe {
      */
     private fun stageWindow(context: Context): List<String> {
         val from = File(context.getExternalFilesDir(null), "window")
-        val to = File(context.filesDir, "window").apply { mkdirs() }
+        // Emptied first: a jar left by an earlier run would come first on the class path
+        val to = File(context.filesDir, "window").apply { deleteRecursively(); mkdirs() }
         from.listFiles()?.filter { it.isFile }?.forEach { it.copyTo(File(to, it.name), overwrite = true) }
         val jars = to.listFiles { f -> f.name.endsWith(".jar") }.orEmpty().sortedBy { it.name }.joinToString(":") { it.absolutePath }
         return listOf(
