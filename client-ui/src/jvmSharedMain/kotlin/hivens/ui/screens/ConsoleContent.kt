@@ -82,6 +82,10 @@ import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
+import hivens.ui.nx.NxButton
+import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxSteadyText
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetField
@@ -266,6 +270,8 @@ internal fun ConsoleContent(
     var cmdHistoryIdx   by remember { mutableIntStateOf(-1) }
     var currentMatch    by remember { mutableIntStateOf(0) }
     var copiedFlash     by remember { mutableStateOf(false) }
+    // The last selection came from a finger, which has no right click to reach the copy with
+    var fingerSelected  by remember { mutableStateOf(false) }
 
     val canvasState     = rememberLogCanvasState()
     val selection       = remember { LogSelection() }
@@ -607,6 +613,7 @@ internal fun ConsoleContent(
             showTimestamps = showTimestamps,
             onToggleTimestamps = { onSettingsChange(settings.copy(showTimestamps = !showTimestamps)) },
             onCopyAll     = { copyAll() },
+            onOpenSearch  = { if (searchOpen) closeSearch() else openSearch() },
             // Export what's on screen, not the live buffer: in a file-
             // backed Logs-tab view the live buffer may hold a different
             // pack's session, so exportEntries(entries) writes the
@@ -668,6 +675,7 @@ internal fun ConsoleContent(
                         settings.highlightRules, settings.filterRules,
                     ),
                     onInteract      = { val _ = runCatching { logFocus.requestFocus() } },
+                    onTouchSelection = { fingerSelected = true },
                     onViewportWidth = { hostWidthPx = it },
                     modifier        = Modifier
                         .focusRequester(logFocus)
@@ -677,6 +685,21 @@ internal fun ConsoleContent(
             }
 
             ConsoleScrollbars(canvasState = canvasState, wrap = wrapText, hostWidthPx = { hostWidthPx })
+
+            if (fingerSelected && selection.active) {
+                NxButton(
+                    label    = s.consoleMenuCopySelection,
+                    onClick  = {
+                        copySelection()
+                        selection.collapse()
+                        fingerSelected = false
+                    },
+                    style    = NxButtonStyle.Primary,
+                    icon     = NxIcon.ContentCopy,
+                    compact  = true,
+                    modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
+                )
+            }
 
             // Ephemeral "copied" toast. Crossfade keeps a steady boxshape
             // while the content swaps between "showing" and "hidden" --
@@ -842,6 +865,7 @@ private fun Toolbar(
     showTimestamps: Boolean,
     onToggleTimestamps: () -> Unit,
     onCopyAll: () -> Unit,
+    onOpenSearch: () -> Unit,
     onSave: () -> Unit,
     onClear: () -> Unit,
     /** A file-backed view has no buffer to wipe, and the control says so. */
@@ -917,6 +941,10 @@ private fun Toolbar(
                 )
             }
 
+            // The keys that open the search are not on a touch screen
+            IconButton(onClick = onOpenSearch, modifier = Modifier.size(32.dp)) {
+                Symbol(NxIcon.Search, strings.consoleSearchPlaceholder, tint = NxInk.quiet)
+            }
             IconButton(onClick = onToggleWrap, modifier = Modifier.size(32.dp)) {
                 Symbol(NxIcon.WrapText,
                     contentDescription = strings.consoleWrap,
@@ -1057,6 +1085,8 @@ private fun SearchPrompt(
             value         = query,
             onValueChange = onQueryChange,
             singleLine    = true,
+            keyboardOptions  = KeyboardOptions(imeAction = ImeAction.Search),
+            onKeyboardAction = { onNext() },
             textStyle     = TextStyle(
                 color      = NxInk.main,
                 fontSize   = 12.sp,
@@ -1198,6 +1228,9 @@ private fun CommandInputRow(
             value         = value,
             onValueChange = onValueChange,
             singleLine    = true,
+            // The key on a soft keyboard is an action and not an Enter, so the key handler below never sees it
+            keyboardOptions  = KeyboardOptions(imeAction = ImeAction.Send),
+            onKeyboardAction = { onSubmit() },
             textStyle     = TextStyle(
                 color      = NxInk.main,
                 fontSize   = 12.sp,

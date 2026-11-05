@@ -6,7 +6,10 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.tappableElement
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
@@ -334,7 +337,9 @@ fun AndroidShell() {
                                 val settingsStore: ConsoleSettingsStore = koinInject()
                                 val consoleSettings by settingsStore.settings.collectAsState()
                                 NxSurface(SurfaceKind.Page, Modifier.fillMaxSize()) {
-                                    Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
+                                    // Not safeDrawing: a phone on its side reports its camera as a band the height of the
+                                    // screen, and the gesture bar needs nothing kept clear under it.
+                                    Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.statusBars.union(WindowInsets.tappableElement).union(WindowInsets.ime))) {
                                         ConsoleContent(settings = consoleSettings, onSettingsChange = settingsStore::update)
                                     }
                                 }

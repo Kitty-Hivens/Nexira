@@ -1,5 +1,10 @@
 package hivens.ui.screens.console
 
+import androidx.compose.animation.core.AnimationState
+import androidx.compose.animation.core.animateDecay
+import androidx.compose.animation.splineBasedDecay
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
@@ -11,9 +16,12 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
@@ -22,7 +30,13 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.util.VelocityTracker
+import androidx.compose.ui.input.pointer.util.addPointerInputChange
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
@@ -30,6 +44,7 @@ import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
 import hivens.ui.screens.ConsolePalette
 import hivens.ui.utils.LogType
+import kotlin.math.abs
 import kotlin.time.Duration.Companion.milliseconds
 
 // Virtualized log view. Draws only the lines a viewport covers, from cached per-line
@@ -137,6 +152,8 @@ internal fun LogCanvas(
     // height index; a pure entries append leaves it untouched (append stays O(1)).
     contentKey: Any?,
     onInteract: () -> Unit = {},
+    /** A finger picked a line, so whoever holds this canvas offers what a right click would. */
+    onTouchSelection: () -> Unit = {},
     onViewportWidth: (Int) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
@@ -173,6 +190,7 @@ internal fun LogCanvas(
     // stopped following the pointer as soon as a running game printed anything.
     val currentLines by rememberUpdatedState(lines)
     val currentStyle by rememberUpdatedState(effStyle)
+    val wrapNow = rememberUpdatedState(wrap)
     val currentStartPad by rememberUpdatedState(startPadPx)
     val currentTopPad by rememberUpdatedState(topPadPx)
     fun hitAt(p: Offset): DocPos = state.hitTest(p.x, p.y, currentLines, currentStyle, currentTopPad, currentStartPad)
@@ -192,6 +210,9 @@ internal fun LogCanvas(
     }
 
     val idx = state.heightIndex
+    val haptics = LocalHapticFeedback.current
+    val flingScope = rememberCoroutineScope()
+    val fling = remember { arrayOfNulls<Job>(1) }
 
     Box(
         modifier = modifier
@@ -208,6 +229,91 @@ internal fun LogCanvas(
             }
             .onWheelScroll { dy ->
                 if (dy != 0f) state.scroll.scrollBy(dy * lineHeightPx * SCROLL_LINES_PER_NOTCH)
+            }
+            .pointerInput(Unit) {
+                // A finger has one way to move and two things to do with it: a drag scrolls, and only a hold first
+                // starts a selection, which a mouse starts by dragging. Read ahead of the mouse's gestures below,
+                // which give up on what this consumes, and a plain tap is left to them.
+                val decay = splineBasedDecay<Float>(this)
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                    if (down.type != PointerType.Touch) return@awaitEachGesture
+                    fling[0]?.cancel()
+                    val tracker = VelocityTracker().apply { addPosition(down.uptimeMillis, down.position) }
+                    val holdEnds = down.uptimeMillis + viewConfiguration.longPressTimeoutMillis
+                    var mode = TouchMode.Undecided
+                    var at = down.position
+                    var now = down.uptimeMillis
+                    while (true) {
+                        val event = if (mode == TouchMode.Undecided) {
+                            withTimeoutOrNull((holdEnds - now).coerceAtLeast(1L)) { awaitPointerEvent(PointerEventPass.Initial) }
+                        } else {
+                            awaitPointerEvent(PointerEventPass.Initial)
+                        }
+                        if (event == null) {
+                            val line = hitAt(at).line
+                            val text = currentLines.lines.getOrNull(line)?.text
+                            if (text == null) {
+                                mode = TouchMode.Scrolling
+                                continue
+                            }
+                            mode = TouchMode.Selecting
+                            onInteract()
+                            selection.select(DocPos(line, 0), DocPos(line, text.length))
+                            onTouchSelection()
+                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                            dragPos = at
+                            continue
+                        }
+                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                        now = change.uptimeMillis
+                        if (!change.pressed) {
+                            if (mode != TouchMode.Undecided) change.consume()
+                            break
+                        }
+                        val p = change.position
+                        tracker.addPointerInputChange(change)
+                        if (mode == TouchMode.Undecided && (p - down.position).getDistance() > viewConfiguration.touchSlop) {
+                            mode = TouchMode.Scrolling
+                            at = p
+                        }
+                        when (mode) {
+                            TouchMode.Undecided -> at = p
+                            TouchMode.Scrolling -> {
+                                val _ = state.scroll.scrollBy(at.y - p.y)
+                                if (!wrapNow.value) {
+                                    state.hOffsetPx = (state.hOffsetPx + at.x - p.x).coerceIn(0f, state.maxHOffset(viewportWidthPx))
+                                }
+                                at = p
+                                change.consume()
+                            }
+                            TouchMode.Selecting -> {
+                                dragPos = p
+                                autoScroll = when {
+                                    p.y < AUTO_SCROLL_EDGE_PX               -> -1
+                                    p.y > size.height - AUTO_SCROLL_EDGE_PX -> 1
+                                    else                                    -> 0
+                                }
+                                selection.extendTo(hitAt(p))
+                                change.consume()
+                            }
+                        }
+                    }
+                    autoScroll = 0
+                    if (mode == TouchMode.Scrolling) {
+                        val velocity = -tracker.calculateVelocity().y
+                        if (abs(velocity) > 0f) {
+                            fling[0] = flingScope.launch {
+                                var last = 0f
+                                AnimationState(0f, velocity).animateDecay(decay) {
+                                    val moved = state.scroll.scrollBy(value - last)
+                                    last = value
+                                    if (moved == 0f) cancelAnimation()
+                                }
+                            }
+                        }
+                    }
+                }
             }
             .pointerInput(Unit) {
                 detectTapGestures(onTap = { pos ->
@@ -301,6 +407,9 @@ internal fun LogCanvas(
             },
     )
 }
+
+/** What a finger on the log turned out to be doing. */
+private enum class TouchMode { Undecided, Scrolling, Selecting }
 
 private const val SCROLL_LINES_PER_NOTCH = 3f
 private const val AUTO_SCROLL_EDGE_PX = 24f
