@@ -81,7 +81,8 @@ class AndroidJdkInstallerTest {
         Files.createDirectories(home.resolve("lib/server"))
         Files.writeString(home.resolve("lib/server/libjvm.so"), "vm old")
         Files.writeString(home.resolve("release"), "JAVA_VERSION=\"$version\"\n")
-        build?.let { Files.writeString(home.resolve(".nexira-build"), it) }
+        val marker = home.resolve(".nexira-build")
+        if (build != null) Files.writeString(marker, build) else Files.deleteIfExists(marker)
     }
 
     private fun libjvm(): String = Files.readString(home.resolve("lib/server/libjvm.so"))
