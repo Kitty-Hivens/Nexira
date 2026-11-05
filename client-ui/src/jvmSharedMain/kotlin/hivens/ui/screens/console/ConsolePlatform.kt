@@ -6,6 +6,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.Clipboard
+import java.io.File
 
 /**
  * What a scrollbar needs to know about a scrollable the console draws itself, the
@@ -35,6 +36,12 @@ internal expect fun ConsoleContextMenu(entries: () -> List<ConsoleMenuEntry>, co
  */
 @Composable
 internal expect fun BoxScope.ConsoleScrollbars(canvasState: LogCanvasState, wrap: Boolean, hostWidthPx: () -> Int)
+
+/**
+ * Takes a log just written to [file] to where its reader can get at it, false when they turned that down. A desktop
+ * reader opens the logs folder themselves. On a phone that folder is private to the app, so the system asks where to.
+ */
+internal expect suspend fun deliverConsoleExport(file: File): Boolean
 
 /** Puts [text] on the clipboard as plain text. */
 internal expect suspend fun Clipboard.copyPlainText(text: String)

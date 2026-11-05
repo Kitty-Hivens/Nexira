@@ -190,6 +190,7 @@ object JapaneseStrings : AppStrings {
     override val consoleSaveToFile = "ファイルに保存"
     override val consoleSearchPlaceholder = "検索…"
     override val consoleCopied = "コピーしました"
+    override val consoleSaved = "保存しました"
     override val consoleCommandPlaceholder = "ゲームへのコマンド (Enter、↑↓ で履歴、Esc)"
     override val consoleMenuCopyLine = "行をコピー"
     override val consoleMenuCopySelection = "選択範囲をコピー"

@@ -29,6 +29,7 @@ import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxTheme
 import java.awt.datatransfer.StringSelection
+import java.io.File
 
 @Composable
 internal actual fun ConsoleContextMenu(entries: () -> List<ConsoleMenuEntry>, content: @Composable () -> Unit) {
@@ -84,5 +85,7 @@ private fun ScrollMetrics.asScrollbarAdapter(): ScrollbarAdapter = object : Scro
     override val viewportSize: Double get() = this@asScrollbarAdapter.viewportSize
     override suspend fun scrollTo(scrollOffset: Double) = this@asScrollbarAdapter.scrollTo(scrollOffset)
 }
+
+internal actual suspend fun deliverConsoleExport(file: File): Boolean = true
 
 internal actual suspend fun Clipboard.copyPlainText(text: String) = setClipEntry(ClipEntry(StringSelection(text)))

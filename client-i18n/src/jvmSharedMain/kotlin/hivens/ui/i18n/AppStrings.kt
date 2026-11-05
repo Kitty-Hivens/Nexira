@@ -209,6 +209,7 @@ interface AppStrings {
     val consoleSaveToFile: String
     val consoleSearchPlaceholder: String
     val consoleCopied: String
+    val consoleSaved: String
     val consoleCommandPlaceholder: String
     val consoleMenuCopyLine: String
     val consoleMenuCopySelection: String

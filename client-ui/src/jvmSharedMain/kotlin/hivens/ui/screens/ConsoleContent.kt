@@ -97,6 +97,7 @@ import hivens.ui.screens.console.ConsoleMenuEntry
 import hivens.ui.screens.console.ConsoleScrollbars
 import hivens.ui.screens.console.DocPos
 import hivens.ui.screens.console.copyPlainText
+import hivens.ui.screens.console.deliverConsoleExport
 import hivens.ui.screens.console.onWheelScroll
 import hivens.ui.screens.console.LineModels
 import hivens.ui.screens.console.clampMatchIndex
@@ -269,7 +270,7 @@ internal fun ConsoleContent(
     val cmdHistory      = remember { mutableStateListOf<String>() }
     var cmdHistoryIdx   by remember { mutableIntStateOf(-1) }
     var currentMatch    by remember { mutableIntStateOf(0) }
-    var copiedFlash     by remember { mutableStateOf(false) }
+    var flashText       by remember { mutableStateOf<String?>(null) }
     // The last selection came from a finger, which has no right click to reach the copy with
     var fingerSelected  by remember { mutableStateOf(false) }
 
@@ -437,14 +438,18 @@ internal fun ConsoleContent(
     // hit-tests it, and copy assembles from the model.
 
     // ── Copy actions ───────────────────────────────────────────────────────
+    fun flash(text: String) {
+        flashText = text
+        scope.launch {
+            delay(900.milliseconds)
+            flashText = null
+        }
+    }
+
     fun copyAll() {
         val text = copyAllText(entries)
         scope.launch { clipboard.copyPlainText(text) }
-        copiedFlash = true
-        scope.launch {
-            delay(900.milliseconds)
-            copiedFlash = false
-        }
+        flash(s.consoleCopied)
     }
 
     // Copy the logical line under the caret (last click / F3 target). One entry is
@@ -455,11 +460,7 @@ internal fun ConsoleContent(
         val caret = selection.focus?.line ?: selection.anchor?.line
         val lineText = copyLineText(models.lines.size, caret) { models.lines[it].text } ?: return
         scope.launch { clipboard.copyPlainText(lineText) }
-        copiedFlash = true
-        scope.launch {
-            delay(900.milliseconds)
-            copiedFlash = false
-        }
+        flash(s.consoleCopied)
     }
 
     // Copy the active selection, assembled from the model across lines. No active
@@ -468,11 +469,7 @@ internal fun ConsoleContent(
         val text = selection.copyText(models)
         if (text.isEmpty()) return
         scope.launch { clipboard.copyPlainText(text) }
-        copiedFlash = true
-        scope.launch {
-            delay(900.milliseconds)
-            copiedFlash = false
-        }
+        flash(s.consoleCopied)
     }
 
     // ── Match jumping ──────────────────────────────────────────────────────
@@ -618,7 +615,12 @@ internal fun ConsoleContent(
             // backed Logs-tab view the live buffer may hold a different
             // pack's session, so exportEntries(entries) writes the
             // session the user is actually looking at.
-            onSave        = { gameConsole.exportEntries(entries) },
+            onSave        = {
+                val exported = gameConsole.exportEntries(entries)
+                if (exported != null) {
+                    scope.launch { if (deliverConsoleExport(exported)) flash(s.consoleSaved) }
+                }
+            },
             // Clear only acts on the live buffer; a file-backed view is
             // read-only. The control is disabled there rather than looking
             // live and doing nothing when it is pressed.
@@ -708,17 +710,17 @@ internal fun ConsoleContent(
             // the interface's idea of a quick microinteraction (mpv-OSD
             // style: appear on action, dissolve when idle).
             Crossfade(
-                targetState   = copiedFlash,
+                targetState   = flashText,
                 animationSpec = Motion.fade.of(),
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .padding(top = 12.dp),
             ) { showing ->
-                if (showing) {
+                if (showing != null) {
                     val toastFill = NxColor.status(Status.Success)
                     Surface(color = toastFill) {
                         Text(
-                            text     = s.consoleCopied,
+                            text     = showing,
                             // The ink is chosen against the success fill, so it
                             // reads on a light one and on a dark one alike.
                             color    = NxColor.on(toastFill),
