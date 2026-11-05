@@ -77,10 +77,11 @@ class AndroidJdkInstallerTest {
 
     private val home: Path get() = tmp.resolve("runtimes").resolve(AndroidJdkInstaller.folderName(25))
 
-    private fun installOld(version: String = "25.0.4") {
+    private fun installOld(version: String = "25.0.4", build: String? = null) {
         Files.createDirectories(home.resolve("lib/server"))
         Files.writeString(home.resolve("lib/server/libjvm.so"), "vm old")
         Files.writeString(home.resolve("release"), "JAVA_VERSION=\"$version\"\n")
+        build?.let { Files.writeString(home.resolve(".nexira-build"), it) }
     }
 
     private fun libjvm(): String = Files.readString(home.resolve("lib/server/libjvm.so"))
@@ -129,12 +130,29 @@ class AndroidJdkInstallerTest {
     }
 
     @Test
-    fun `an installed runtime of the pinned version is used without a download`() = runBlocking {
-        installOld("25.0.5")
+    fun `an installed runtime of the pinned build is used without a download`() = runBlocking {
+        installOld("25.0.5", build = sha)
         val fake = FakeFetch(runtimeZip())
         installer(fake).ensure(release("25.0.5"))
         assertTrue(fake.transfers.isEmpty())
         assertEquals("vm old", libjvm())
+    }
+
+    @Test
+    fun `another build of the pinned version is replaced, and so is one that does not say which build it is`() = runBlocking {
+        for (build in listOf("b".repeat(64), null)) {
+            installOld("25.0.5", build)
+            installer(FakeFetch(runtimeZip("25.0.5"))).ensure(release("25.0.5"))
+            assertEquals("vm new", libjvm())
+        }
+    }
+
+    @Test
+    fun `a build it installed itself is found again by its digest`() = runBlocking {
+        val fake = FakeFetch(runtimeZip())
+        installer(fake).ensure(release())
+        installer(fake).ensure(release())
+        assertEquals(1, fake.transfers.size)
     }
 
     @Test
@@ -187,6 +205,7 @@ class AndroidJdkInstallerTest {
         Files.createDirectories(previous.resolve("lib/server"))
         Files.writeString(previous.resolve("lib/server/libjvm.so"), "vm rescued")
         Files.writeString(previous.resolve("release"), "JAVA_VERSION=\"25.0.5\"\n")
+        Files.writeString(previous.resolve(".nexira-build"), sha)
         val fake = FakeFetch(runtimeZip())
         installer(fake).ensure(release("25.0.5"))
         assertTrue(fake.transfers.isEmpty())

@@ -3,6 +3,8 @@ package hivens.launcher.runtime
 import hivens.core.io.UnpackBudget
 import hivens.core.io.UnpackLimits
 import hivens.core.io.deleteTree
+import hivens.core.io.readUtf8
+import hivens.core.io.writeUtf8
 import hivens.core.net.Digest
 import hivens.core.net.DigestAlgorithm
 import hivens.core.net.Transfer
@@ -44,7 +46,7 @@ class AndroidJdkInstaller(
 
     private suspend fun provision(release: AndroidJdkRelease, home: Path, onProgress: (String) -> Unit): Path {
         recoverInterruptedSwap(home)
-        if (installedVersion(home) == release.version) return home
+        if (installedVersion(home) == release.version && installedBuild(home) == release.sha256) return home
 
         onProgress("Downloading Java ${release.major}...")
         val archive = downloads.resolve("${folderName(release.major)}.zip")
@@ -81,6 +83,7 @@ class AndroidJdkInstaller(
             if (found != release.version) {
                 throw IOException("The archive for Java ${release.major} is version ${found ?: "unknown"}, expected ${release.version}")
             }
+            writeUtf8(unpacked.resolve(BUILD_MARKER), release.sha256)
             if (Files.exists(home)) Files.move(home, previous)
             Files.move(unpacked, home)
             deleteTree(previous)
@@ -134,6 +137,13 @@ class AndroidJdkInstaller(
     /** The version of the runtime installed at [home], or null when there is none that could be loaded. */
     private fun installedVersion(home: Path): String? = if (hasRuntime(home)) versionOf(home) else null
 
+    /**
+     * The digest of the archive the runtime at [home] came from. A new build of one Java version carries a fix the version
+     * does not show, so the version alone would keep a phone on the old build for good.
+     */
+    private fun installedBuild(home: Path): String? =
+        home.resolve(BUILD_MARKER).takeIf { Files.isRegularFile(it) }?.let { readUtf8(it).trim() }
+
     private fun hasRuntime(dir: Path): Boolean = LIBJVM_PATHS.any { Files.isRegularFile(dir.resolve(it)) }
 
     private fun versionOf(home: Path): String? {
@@ -147,6 +157,8 @@ class AndroidJdkInstaller(
     companion object {
         /** Where the VM sits in a runtime: the modular layout of 9 and later, then the one 8 has, with its libraries under `lib/aarch64`. */
         private val LIBJVM_PATHS = listOf("lib/server/libjvm.so", "lib/aarch64/server/libjvm.so")
+
+        private const val BUILD_MARKER = ".nexira-build"
 
         /** Named as the desktop names the same target, so a runtime is found under one scheme. */
         fun folderName(major: Int): String = "java-$major-linux-arm64-bionic"
