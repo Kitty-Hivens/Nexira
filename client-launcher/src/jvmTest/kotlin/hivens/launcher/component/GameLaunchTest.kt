@@ -1,11 +1,15 @@
 package hivens.launcher.component
 
+import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class GameLaunchTest {
 
     private fun launch(vararg jvm: String) = GameLaunch(jvm.toList(), "Main", listOf("--username", "Steve"))
+
+    /** What the JVM's own library path is split on, which differs between hosts. */
+    private val sep = File.pathSeparator
 
     @Test
     fun `the command line is the java, the options, the class and the game arguments in that order`() {
@@ -52,13 +56,13 @@ class GameLaunchTest {
     fun `the library directories come from both paths in the order they were given`() {
         assertEquals(
             listOf("/lwjgl", "/a", "/b"),
-            launch("-Xmx1G", "-Dorg.lwjgl.librarypath=/lwjgl", "-cp", "a.jar", "-Djava.library.path=/a:/b").libraryDirectories(),
+            launch("-Xmx1G", "-Dorg.lwjgl.librarypath=/lwjgl", "-cp", "a.jar", "-Djava.library.path=/a$sep/b").libraryDirectories(),
         )
     }
 
     @Test
     fun `an empty entry is no library directory and a launch without a path has none`() {
-        assertEquals(listOf("/a"), launch("-Djava.library.path=:/a:").libraryDirectories())
+        assertEquals(listOf("/a"), launch("-Djava.library.path=$sep/a$sep").libraryDirectories())
         assertEquals(emptyList(), launch("-Xmx1G", "-Dorg.lwjgl.opengl.libname=libMobileGL.so").libraryDirectories())
     }
 }
