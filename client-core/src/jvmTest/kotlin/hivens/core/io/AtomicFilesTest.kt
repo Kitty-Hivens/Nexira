@@ -87,7 +87,8 @@ class AtomicFilesTest {
         }
         start.countDown()
         pool.shutdown()
-        assertTrue(pool.awaitTermination(30, TimeUnit.SECONDS), "writers did not finish")
+        // Every write is a real fsync, one at a time, and a Windows runner's disk took over 30 s for the lot
+        assertTrue(pool.awaitTermination(120, TimeUnit.SECONDS), "writers did not finish")
 
         assertEquals(emptyList(), failures.toList(), "a write of a file someone else is publishing must not fail")
         assertTrue(Files.readString(file).startsWith("writer-"), "the published file is one writer's whole content")
