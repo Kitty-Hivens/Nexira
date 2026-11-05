@@ -264,7 +264,8 @@ class RuntimeProvisioner(
      */
     private suspend fun withHostNatives(runtime: ResolvedRuntime, progress: DownloadProgress): ResolvedRuntime {
         val source = hostNatives ?: return runtime
-        val lwjgl = runtime.libraries.firstOrNull { it.coord.groupArtifact == "org.lwjgl:lwjgl" }?.coord?.version
+        // A variant of the core jar carries its name on the version (Cleanroom's 3.4.1-unsafe) and takes its release's natives
+        val lwjgl = runtime.libraries.firstOrNull { it.coord.groupArtifact == "org.lwjgl:lwjgl" }?.coord?.version?.substringBefore('-')
         if (lwjgl == null) {
             log.warn("no LWJGL 3 on the classpath of {}, so there are no host natives to add", runtime.clientJar.fileName)
             return runtime

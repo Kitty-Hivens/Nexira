@@ -368,6 +368,46 @@ class RuntimeProvisionerTest {
     }
 
     @Test
+    fun `a variant of the LWJGL core jar takes the natives of its release`() = runTest {
+        val libBytes = "LWJGL-JAR".toByteArray()
+        val clientBytes = "CLIENT-JAR".toByteArray()
+        val indexJson = """{"objects":{}}"""
+        val versionJson = """
+            {
+              "assetIndex": {"id":"1.12","sha1":"${sha1(indexJson)}","size":${indexJson.length},"totalSize":0,"url":"$INDEX_URL"},
+              "downloads": {"client": {"sha1":"${sha1(clientBytes)}","size":${clientBytes.size},"url":"$CLIENT_URL"}},
+              "libraries": [
+                {"name":"org.lwjgl:lwjgl:3.4.1-unsafe","downloads":{"artifact":{"path":"org/lwjgl/lwjgl/3.4.1/lwjgl-3.4.1-unsafe.jar","sha1":"${sha1(libBytes)}","size":${libBytes.size},"url":"https://test.invalid/libs/lwjgl.jar"}}}
+              ]
+            }
+        """.trimIndent()
+        val engine = MockEngine { req ->
+            when (val url = req.url.toString()) {
+                MANIFEST_URL -> respond("""{"versions":[{"id":"1.12.2","url":"$VERSION_URL"}]}""", HttpStatusCode.OK, jsonHeaders)
+                VERSION_URL -> respond(versionJson, HttpStatusCode.OK, jsonHeaders)
+                INDEX_URL -> respond(indexJson, HttpStatusCode.OK, jsonHeaders)
+                "https://test.invalid/libs/lwjgl.jar" -> respond(ByteReadChannel(libBytes), HttpStatusCode.OK)
+                CLIENT_URL -> respond(ByteReadChannel(clientBytes), HttpStatusCode.OK)
+                else -> respond("missing: $url", HttpStatusCode.NotFound)
+            }
+        }
+        val asked = mutableListOf<String>()
+        val p = provisioner(
+            HttpClient(engine),
+            osArch = "aarch64",
+            libc = Libc.BIONIC,
+            hostNatives = { version, _ ->
+                asked += version
+                emptyList()
+            },
+        )
+
+        val _ = p.ensureRuntime("1.12.2", null, "")
+
+        assertEquals(listOf("3.4.1"), asked)
+    }
+
+    @Test
     fun `a classpath with no LWJGL 3 gets no host natives and nothing is asked`() = runTest {
         val clientBytes = "CLIENT-JAR".toByteArray()
         val indexJson = """{"objects":{}}"""
