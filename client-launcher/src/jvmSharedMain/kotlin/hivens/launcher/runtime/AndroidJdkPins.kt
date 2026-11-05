@@ -12,5 +12,5 @@ internal val ANDROID_JDK_PINS: List<AndroidJdkRelease> = listOf(
     AndroidJdkRelease(21, "21.0.13", AndroidJdkCatalog.assetUrl("21.0.13"),
         "3f63b6e3c56d97708efea100bbda69b543179f1f43c04257535bf888b098f8a0"),
     AndroidJdkRelease(25, "25.0.5", AndroidJdkCatalog.assetUrl("25.0.5"),
-        "2253dc1358756f49bd6797c532f04a3ba336e0325f471f6255099c8e5f9b5cc9"),
+        "2b7277f2f5531a235e09956d7fe50c95264cd15790c55787c636df2ef61294d9"),
 )
