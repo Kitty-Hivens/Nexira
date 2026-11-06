@@ -1172,6 +1172,7 @@ object EnglishStrings : AppStrings {
     override val launchBlockInstallingContent   = "Installing content…"
     override val launchBlockMissing             = "Files not found"
     override val launchBlockOtherRunning        = "Another game is running"
+    override val launchBlockSigningIn           = "Signing in…"
     override val launchStopping                 = "Stopping…"
     override val quitGameTitle                  = "A game is running"
     override fun quitGameBody(packName: String) = "\"$packName\" is still running. You can leave it running or stop it before quitting. Your playtime is recorded either way."

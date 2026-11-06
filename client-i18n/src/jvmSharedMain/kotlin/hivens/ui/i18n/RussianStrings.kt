@@ -1218,6 +1218,7 @@ object RussianStrings : AppStrings {
     override val launchBlockInstallingContent   = "Устанавливается контент…"
     override val launchBlockMissing             = "Файлы не найдены"
     override val launchBlockOtherRunning        = "Запущена другая игра"
+    override val launchBlockSigningIn           = "Вход…"
     override val launchStopping                 = "Останавливается…"
     override val quitGameTitle                  = "Игра запущена"
     override fun quitGameBody(packName: String) = "Сборка «$packName» ещё запущена. Её можно оставить работать или остановить перед выходом. Время игры запишется в обоих случаях."

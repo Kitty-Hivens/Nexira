@@ -178,10 +178,9 @@ fun PackDetailScreen(
     // version picker -- is a modal over the whole screen, and a modal drawn
     // inside a tab body is sized and clipped by that body.
     val contentState = rememberContentTabState(pack)
-    val authedSession = (appState as? AppState.Authenticated)?.session
     // The same decision the home widgets make: whether this pack can be played, and
     // when not, why not in words the control can show.
-    val launchControl = rememberLaunchControl(pack, authedSession)
+    val launchControl = rememberLaunchControl(pack, appState)
 
     // The hero's play/abort are the only way to drive a pack launch, so the control
     // surface has to reach them -- a scenario that cannot start a launch cannot check

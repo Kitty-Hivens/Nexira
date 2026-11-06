@@ -1215,6 +1215,7 @@ object GermanStrings : AppStrings {
     override val launchBlockInstallingContent   = "Inhalte werden installiert…"
     override val launchBlockMissing             = "Dateien nicht gefunden"
     override val launchBlockOtherRunning        = "Ein anderes Spiel läuft"
+    override val launchBlockSigningIn           = "Anmeldung…"
     override val launchStopping                 = "Wird beendet…"
     override val quitGameTitle                  = "Ein Spiel läuft"
     override fun quitGameBody(packName: String) = "„$packName“ läuft noch. Sie können es weiterlaufen lassen oder vor dem Beenden stoppen. Die Spielzeit wird in beiden Fällen gespeichert."

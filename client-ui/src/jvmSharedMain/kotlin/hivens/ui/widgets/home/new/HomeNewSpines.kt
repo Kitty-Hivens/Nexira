@@ -46,7 +46,6 @@ import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackInstance
 import hivens.core.update.PackUpdateStatus
 import hivens.core.update.PackUpdateStatusHub
-import hivens.ui.AppState
 import hivens.ui.Screen
 import hivens.ui.components.rememberLaunchControl
 import hivens.ui.effects.pixelArtBackground
@@ -151,8 +150,7 @@ private fun Spine(pack: PackInstance, open: Boolean, onChoose: () -> Unit, modif
         )
         if (face < 1f) ClosedFace(pack, Modifier.align(Alignment.BottomCenter).alpha(1f - face))
         if (face > 0f) {
-            val session = (ctx.appState as? AppState.Authenticated)?.session
-            val control = rememberLaunchControl(pack, session)
+            val control = rememberLaunchControl(pack, ctx.appState)
             Column(
                 Modifier.align(Alignment.BottomStart).padding(28.dp).alpha(face),
                 verticalArrangement = Arrangement.spacedBy(16.dp),

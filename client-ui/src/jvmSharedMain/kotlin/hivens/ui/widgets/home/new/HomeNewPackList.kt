@@ -44,7 +44,6 @@ import coil3.compose.AsyncImage
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackInstance
 import hivens.core.launch.LaunchControlMode
-import hivens.ui.AppState
 import hivens.ui.Screen
 import hivens.ui.components.rememberLaunchControl
 import hivens.ui.effects.pixelArtBackground
@@ -196,8 +195,7 @@ private fun PackRow(pack: PackInstance, columns: PackListColumns) {
     val s = LocalStrings.current
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
-    val session = (ctx.appState as? AppState.Authenticated)?.session
-    val control = rememberLaunchControl(pack, session)
+    val control = rememberLaunchControl(pack, ctx.appState)
 
     Row(
         modifier = Modifier

@@ -23,6 +23,12 @@ sealed interface LaunchBlock {
     data object OtherGameRunning : LaunchBlock
 
     /**
+     * The stored account is still being signed in, so who plays is not known yet. Nothing to do but wait: it
+     * ends as a session or as [NoIdentity], and offering either of those now would be a guess.
+     */
+    data object ResolvingIdentity : LaunchBlock
+
+    /**
      * Nobody to play as: no account signed in and no offline name. Unlike the others
      * the control can do something about this, by taking the player to sign in.
      */
@@ -35,16 +41,19 @@ sealed interface LaunchBlock {
  * Ordered by what the player should hear first. Work in progress is named before
  * anything else because it is the reason that will resolve by itself, and a missing
  * sign-in comes last because signing in would not help while any of the others holds.
+ * [identityResolving] outranks [hasIdentity]: an offline name is no answer yet while the account may still come back.
  */
 fun launchBlockFor(
     hasIdentity: Boolean,
     work: InstanceWork?,
     instancePresent: Boolean,
     otherLaunchActive: Boolean,
+    identityResolving: Boolean,
 ): LaunchBlock? = when {
     work != null -> LaunchBlock.Busy(work)
     !instancePresent -> LaunchBlock.Missing
     otherLaunchActive -> LaunchBlock.OtherGameRunning
+    identityResolving -> LaunchBlock.ResolvingIdentity
     !hasIdentity -> LaunchBlock.NoIdentity
     else -> null
 }

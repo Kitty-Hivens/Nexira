@@ -1220,6 +1220,7 @@ object JapaneseStrings : AppStrings {
     override val launchBlockInstallingContent = "コンテンツをインストール中…"
     override val launchBlockMissing = "ファイルが見つかりません"
     override val launchBlockOtherRunning = "別のゲームが起動中です"
+    override val launchBlockSigningIn = "サインイン中…"
     override val launchStopping = "終了中…"
     override val quitGameTitle = "ゲームが起動中です"
     override fun quitGameBody(packName: String) = "「$packName」はまだ起動しています。起動したままにするか、終了前に停止できます。プレイ時間はどちらの場合も記録されます。"

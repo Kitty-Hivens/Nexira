@@ -1370,6 +1370,7 @@ interface AppStrings {
     val launchBlockMissing: String
     /** The launch control while another pack's launch or game holds the launcher. */
     val launchBlockOtherRunning: String
+    val launchBlockSigningIn: String
     /** The launch control while its game has been asked to end and has not gone yet. */
     val launchStopping: String
     /** Asked on quit while a game is running: whether to leave it running or stop it first. */

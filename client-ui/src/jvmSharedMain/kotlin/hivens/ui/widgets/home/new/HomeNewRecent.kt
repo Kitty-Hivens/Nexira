@@ -15,7 +15,6 @@ import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.zIndex
 import hivens.core.launch.LaunchControlMode
-import hivens.ui.AppState
 import hivens.ui.components.rememberLaunchControl
 import hivens.ui.nx.PlayGround
 import hivens.ui.nx.PlayLayout
@@ -196,8 +195,7 @@ private fun PackTile(pack: PackInstance, onClick: () -> Unit, modifier: Modifier
         targetValue   = if (hovered) 1f else 0f,
         animationSpec = spring(dampingRatio = LIFT_DAMPING, stiffness = Spring.StiffnessMediumLow),
     )
-    val session = (ctx.appState as? AppState.Authenticated)?.session
-    val control = rememberLaunchControl(pack, session)
+    val control = rememberLaunchControl(pack, ctx.appState)
     val runsOn = pack.cachedManifest?.let { m ->
         listOfNotNull(
             m.minecraftVersion.takeIf { it.isNotBlank() },

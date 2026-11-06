@@ -93,20 +93,34 @@ class InstanceWorkTest {
     fun `the block says the reason that will resolve itself first`() {
         assertEquals(
             LaunchBlock.Busy(InstanceWork.Update),
-            launchBlockFor(hasIdentity = false, work = InstanceWork.Update, instancePresent = false, otherLaunchActive = true),
+            launchBlockFor(hasIdentity = false, work = InstanceWork.Update, instancePresent = false, otherLaunchActive = true, identityResolving = false),
         )
         assertEquals(
             LaunchBlock.Missing,
-            launchBlockFor(hasIdentity = false, work = null, instancePresent = false, otherLaunchActive = true),
+            launchBlockFor(hasIdentity = false, work = null, instancePresent = false, otherLaunchActive = true, identityResolving = false),
         )
         assertEquals(
             LaunchBlock.OtherGameRunning,
-            launchBlockFor(hasIdentity = false, work = null, instancePresent = true, otherLaunchActive = true),
+            launchBlockFor(hasIdentity = false, work = null, instancePresent = true, otherLaunchActive = true, identityResolving = false),
         )
         assertEquals(
             LaunchBlock.NoIdentity,
-            launchBlockFor(hasIdentity = false, work = null, instancePresent = true, otherLaunchActive = false),
+            launchBlockFor(hasIdentity = false, work = null, instancePresent = true, otherLaunchActive = false, identityResolving = false),
         )
-        assertNull(launchBlockFor(hasIdentity = true, work = null, instancePresent = true, otherLaunchActive = false))
+        assertNull(launchBlockFor(hasIdentity = true, work = null, instancePresent = true, otherLaunchActive = false, identityResolving = false))
+    }
+
+    @Test
+    fun `while the account is still signing in nothing is offered, not the sign-in and not an offline game`() {
+        for (hasIdentity in listOf(false, true)) {
+            assertEquals(
+                LaunchBlock.ResolvingIdentity,
+                launchBlockFor(hasIdentity = hasIdentity, work = null, instancePresent = true, otherLaunchActive = false, identityResolving = true),
+            )
+        }
+        assertEquals(
+            LaunchBlock.OtherGameRunning,
+            launchBlockFor(hasIdentity = false, work = null, instancePresent = true, otherLaunchActive = true, identityResolving = true),
+        )
     }
 }

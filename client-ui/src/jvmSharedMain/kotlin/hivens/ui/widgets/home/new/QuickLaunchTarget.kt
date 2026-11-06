@@ -7,7 +7,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackInstance
-import hivens.ui.AppState
 import hivens.ui.components.LaunchControl
 import hivens.ui.components.rememberLaunchControl
 import hivens.ui.nx.PlayButton
@@ -43,8 +42,7 @@ internal fun rememberQuickLaunchTarget(playLabel: String? = null): QuickLaunchTa
 
     val target: PackInstance = remember(all) { all.minWithOrNull(RecentFirst) } ?: return null
 
-    val session = (ctx.appState as? AppState.Authenticated)?.session
-    return QuickLaunchTarget(target, rememberLaunchControl(target, session, playLabel))
+    return QuickLaunchTarget(target, rememberLaunchControl(target, ctx.appState, playLabel))
 }
 
 /**

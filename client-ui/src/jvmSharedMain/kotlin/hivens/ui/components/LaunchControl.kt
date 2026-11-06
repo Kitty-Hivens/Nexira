@@ -10,7 +10,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import hivens.auth.OfflineAuthProvider
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.data.PackInstance
-import hivens.core.data.SessionData
 import hivens.core.launch.InstanceWork
 import hivens.core.launch.InstanceWorkRegistry
 import hivens.core.launch.LaunchBlock
@@ -22,6 +21,7 @@ import hivens.launcher.PackOperationService
 import hivens.launcher.instance.InstanceContentUpdater
 import hivens.launcher.launch.LauncherController
 import hivens.launcher.platform.PlatformPaths
+import hivens.ui.AppState
 import hivens.ui.Screen
 import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
@@ -79,9 +79,10 @@ data class LaunchControl(
 @Composable
 fun rememberLaunchControl(
     pack: PackInstance,
-    session: SessionData?,
+    appState: AppState,
     playLabel: String? = null,
 ): LaunchControl {
+    val session = (appState as? AppState.Authenticated)?.session
     val s = LocalStrings.current
     val controller: LauncherController = koinInject()
     val launchDriver: LaunchDriver = koinInject()
@@ -131,6 +132,7 @@ fun rememberLaunchControl(
             work = work,
             instancePresent = present,
             otherLaunchActive = !launcherIdle,
+            identityResolving = appState is AppState.Loading,
         )
     }
 
@@ -183,7 +185,7 @@ fun rememberLaunchControl(
             icon = block.icon(),
             tone = when (block) {
                 LaunchBlock.NoIdentity -> PlayTone.Ready
-                is LaunchBlock.Busy -> PlayTone.Waiting
+                is LaunchBlock.Busy, LaunchBlock.ResolvingIdentity -> PlayTone.Waiting
                 LaunchBlock.Missing -> PlayTone.Problem
                 LaunchBlock.OtherGameRunning -> PlayTone.Unavailable
             },
@@ -210,6 +212,7 @@ private fun LaunchBlock.label(s: AppStrings): String = when (this) {
     is LaunchBlock.Busy -> work.label(s)
     LaunchBlock.Missing -> s.launchBlockMissing
     LaunchBlock.OtherGameRunning -> s.launchBlockOtherRunning
+    LaunchBlock.ResolvingIdentity -> s.launchBlockSigningIn
     LaunchBlock.NoIdentity -> s.packDetailPlayLoginRequired
 }
 
@@ -234,5 +237,5 @@ private fun LaunchBlock.icon(): IconKey = when (this) {
     }
     LaunchBlock.Missing -> NxIcon.Warning
     LaunchBlock.OtherGameRunning -> NxIcon.HourglassEmpty
-    LaunchBlock.NoIdentity -> NxIcon.Person
+    LaunchBlock.ResolvingIdentity, LaunchBlock.NoIdentity -> NxIcon.Person
 }
