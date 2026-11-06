@@ -121,7 +121,8 @@ fun NxRow(
                     style      = if (compact) MaterialTheme.typography.bodySmall else LocalTextStyle.current,
                     color      = if (compact) NxInk.quiet else NxInk.main,
                     fontWeight = FontWeight.Medium,
-                    maxLines   = 1,
+                    // Two for the wide form: a phone held upright cut "Custom background" short.
+                    maxLines   = if (compact) 1 else 2,
                     overflow   = TextOverflow.Ellipsis,
                 )
                 if (subtitle != null) {

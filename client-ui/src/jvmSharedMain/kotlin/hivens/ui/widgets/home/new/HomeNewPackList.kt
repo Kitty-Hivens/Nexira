@@ -84,7 +84,7 @@ data class PackListProps(
 // widget is showing is left out, so the two do not say the same thing twice.
 //
 // Narrow, the facts that are least needed to choose a pack go first: when it was
-// played, then what it runs on. The name and the hours stay.
+// played, then what it runs on, then the hours and the waiting build. The name stays.
 //
 // Every pack is listed unless the props name a ceiling. Where the slot bounds the
 // height, as on a Home that does not scroll, the list scrolls inside it rather than
@@ -177,13 +177,16 @@ internal fun ScrollingRows(
 }
 
 /** Which of the optional columns a row of this width has room for. */
-internal data class PackListColumns(val runsOn: Boolean, val played: Boolean) {
+internal data class PackListColumns(val runsOn: Boolean, val played: Boolean, val hoursAndUpdate: Boolean) {
     companion object {
         fun forWidth(widthDp: Float) = PackListColumns(
             runsOn = widthDp >= RUNS_ON_FROM,
             played = widthDp >= PLAYED_FROM,
+            hoursAndUpdate = widthDp >= HOURS_FROM,
         )
 
+        /** Below this a row is a mark and a name: with these beside it a phone held upright left the name no width at all. */
+        private const val HOURS_FROM = 400f
         private const val RUNS_ON_FROM = 520f
         private const val PLAYED_FROM = 720f
     }
@@ -242,18 +245,23 @@ private fun PackRow(pack: PackInstance, columns: PackListColumns) {
                 modifier = Modifier.weight(1f),
             )
         }
-        Box(Modifier.weight(1.2f)) {
-            PendingUpdateBadge(pack.id, tone = NxMetaChipTone.Surface)
+        if (columns.hoursAndUpdate) {
+            Box(Modifier.weight(1.2f)) {
+                PendingUpdateBadge(pack.id, tone = NxMetaChipTone.Surface)
+            }
+            val hours = pack.playtimeSeconds / 3600
+            Text(
+                text     = if (hours > 0) s.homeFactHours(hours) else "",
+                style    = MaterialTheme.typography.bodyMedium,
+                color    = NxInk.quiet,
+                maxLines = 1,
+                modifier = Modifier.width(HOURS_WIDTH),
+            )
         }
-        val hours = pack.playtimeSeconds / 3600
-        Text(
-            text     = if (hours > 0) s.homeFactHours(hours) else "",
-            style    = MaterialTheme.typography.bodyMedium,
-            color    = NxInk.quiet,
-            maxLines = 1,
-            modifier = Modifier.width(HOURS_WIDTH),
-        )
-        RowPlay(QuickLaunchTarget(pack, control), visible = hovered || control.mode != LaunchControlMode.Play)
+        val underWay = control.mode != LaunchControlMode.Play
+        if (columns.hoursAndUpdate || underWay) {
+            RowPlay(QuickLaunchTarget(pack, control), visible = hovered || underWay)
+        }
     }
 }
 

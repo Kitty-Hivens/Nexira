@@ -528,17 +528,6 @@ private fun Hero(
             }
         }
 
-        // Top row: folder + settings (end). Back lives in the top-bar breadcrumb
-        // now, so the hero no longer draws its own arrow. A compact hero has one row,
-        // and they sit in it beside Play.
-        if (!compact) {
-            Row(
-                modifier              = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.End,
-                verticalAlignment     = Alignment.CenterVertically,
-            ) { actions() }
-        }
-
         // Bottom row: avatar + name + chips, Play pinned to the end. Sheds the
         // hours, then the source chip, and collapses Play to an icon as the hero
         // narrows (right panel open / small window).
@@ -546,11 +535,41 @@ private fun Hero(
             val showPlaytime = maxWidth >= 560.dp
             val showSource   = maxWidth >= 460.dp
             val playIconOnly = maxWidth < 500.dp
+            // Play beside the name left a phone held upright a name four letters wide, so it joins the top row.
+            val playOnTop = !compact && maxWidth < PLAY_ON_TOP
+            val play: @Composable () -> Unit = {
+                // The pill walks the launch: Play -> wait (prepare/sync, inert)
+                // -> Exit (stop the running game) -> Play again, and names the
+                // reason when Play is not on offer. Failed falls back to Play --
+                // the error toast carries the diagnosis.
+                PlayButton(
+                    label    = launchControl.label,
+                    icon     = launchControl.icon,
+                    tone     = launchControl.tone,
+                    progress = launchControl.progress,
+                    onClick  = launchControl.onClick,
+                    ground   = PlayGround.Media,
+                    iconOnly = playIconOnly,
+                )
+            }
+            // Top row: folder + settings (end). Back lives in the top-bar breadcrumb
+            // now, so the hero no longer draws its own arrow. A compact hero has one row,
+            // and they sit in it beside Play.
+            if (!compact) {
+                Row(
+                    modifier              = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment     = Alignment.CenterVertically,
+                ) {
+                    actions()
+                    if (playOnTop) play()
+                }
+            }
             Row(
                 modifier              = if (compact) {
                     Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 8.dp)
                 } else {
-                    Modifier.fillMaxSize().padding(start = 24.dp, end = 24.dp, top = 52.dp, bottom = 20.dp)
+                    Modifier.fillMaxSize().padding(start = if (playOnTop) 16.dp else 24.dp, end = if (playOnTop) 16.dp else 24.dp, top = 52.dp, bottom = 20.dp)
                 },
                 verticalAlignment     = if (compact) Alignment.CenterVertically else Alignment.Bottom,
                 horizontalArrangement = Arrangement.spacedBy(if (compact) 12.dp else 16.dp),
@@ -560,7 +579,11 @@ private fun Hero(
                     Text(
                         text       = pack.displayName,
                         fontFamily = familyForText(pack.displayName),
-                        style      = if (compact) MaterialTheme.typography.titleMedium else MaterialTheme.typography.headlineMedium,
+                        style      = when {
+                            compact   -> MaterialTheme.typography.titleMedium
+                            playOnTop -> MaterialTheme.typography.titleLarge
+                            else      -> MaterialTheme.typography.headlineMedium
+                        },
                         color      = Color.White,
                         fontWeight = FontWeight.Bold,
                         maxLines   = if (compact) 1 else 2,
@@ -589,19 +612,7 @@ private fun Hero(
                     }
                 }
                 if (compact) actions()
-                // The pill walks the launch: Play -> wait (prepare/sync, inert)
-                // -> Exit (stop the running game) -> Play again, and names the
-                // reason when Play is not on offer. Failed falls back to Play --
-                // the error toast carries the diagnosis.
-                PlayButton(
-                    label    = launchControl.label,
-                    icon     = launchControl.icon,
-                    tone     = launchControl.tone,
-                    progress = launchControl.progress,
-                    onClick  = launchControl.onClick,
-                    ground   = PlayGround.Media,
-                    iconOnly = playIconOnly,
-                )
+                if (!playOnTop) play()
             }
         }
     }
@@ -776,3 +787,4 @@ private fun NotFound(onBack: () -> Unit) {
 
 /** Below this height the hero gives up its banner space. */
 private val LOW_WINDOW = 480.dp
+private val PLAY_ON_TOP = 420.dp

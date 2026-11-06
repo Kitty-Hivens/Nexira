@@ -2,6 +2,7 @@ package hivens.ui.widgets.themepicker
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.height
@@ -74,10 +75,12 @@ fun ThemePickerSurface(
             // On a panel of its own, like the grid and the preview under it: the title
             // is text, and on the bare page it lay over whatever the wallpaper had there.
             NxSurface(SurfaceKind.Panel, Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
-                Row(
+                // Wraps rather than squeezes: on a phone held upright Apply was left two letters.
+                FlowRow(
                     modifier              = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 14.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment     = Alignment.CenterVertically,
+                    verticalArrangement   = Arrangement.spacedBy(8.dp),
+                    itemVerticalAlignment = Alignment.CenterVertically,
                 ) {
                     // No back arrow of its own. The window frame already carries one,
                     // enabled by the same history this screen would pop.

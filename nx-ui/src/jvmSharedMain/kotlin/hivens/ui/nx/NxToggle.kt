@@ -58,7 +58,7 @@ fun NxToggle(
                     text       = label,
                     color      = NxInk.main.copy(alpha = alpha),
                     fontWeight = FontWeight.Medium,
-                    maxLines   = 1,
+                    maxLines   = 2,
                     overflow   = TextOverflow.Ellipsis,
                 )
                 if (description != null) {
@@ -66,7 +66,7 @@ fun NxToggle(
                         text     = description,
                         style    = MaterialTheme.typography.bodySmall,
                         color    = NxInk.quiet.copy(alpha = alpha),
-                        maxLines = 2,
+                        maxLines = 4,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }

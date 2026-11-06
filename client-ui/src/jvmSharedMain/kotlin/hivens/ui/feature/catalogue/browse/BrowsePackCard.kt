@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
@@ -25,6 +26,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import coil3.compose.SubcomposeAsyncImage
@@ -81,12 +83,15 @@ fun BrowsePackCard(
         // Banners can be bright, so they get a heavier wash than the dark art.
         Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = if (pack.bannerUrl != null) 0.45f else 0.32f)))
 
+        BoxWithConstraints(Modifier.fillMaxSize()) {
+        // On a phone held upright the badge and the author beside the title left it three letters.
+        val narrow = maxWidth < NARROW_CARD
         Row(
-            modifier              = Modifier.fillMaxSize().padding(14.dp),
+            modifier              = Modifier.fillMaxSize().padding(if (narrow) 10.dp else 14.dp),
             verticalAlignment     = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            horizontalArrangement = Arrangement.spacedBy(if (narrow) 10.dp else 14.dp),
         ) {
-            BrowseAvatar(pack = pack, hue = hueA)
+            BrowseAvatar(pack = pack, hue = hueA, size = if (narrow) NARROW_AVATAR else Dimens.packAvatar)
 
             Column(
                 modifier            = Modifier.weight(1f),
@@ -106,6 +111,20 @@ fun BrowsePackCard(
                         modifier   = Modifier.weight(1f, fill = false),
                     )
                     // A community pack says whose it is, the way a project card does.
+                    if (!narrow) {
+                        pack.author?.let { author ->
+                            Text(
+                                text     = s.browseByAuthor(author),
+                                style    = MaterialTheme.typography.bodySmall,
+                                color    = Color.White.copy(alpha = 0.75f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        SourceBadge(pack.origin)
+                    }
+                }
+                if (narrow) {
                     pack.author?.let { author ->
                         Text(
                             text     = s.browseByAuthor(author),
@@ -115,7 +134,6 @@ fun BrowsePackCard(
                             overflow = TextOverflow.Ellipsis,
                         )
                     }
-                    SourceBadge(pack.origin)
                 }
                 // Mirror summaries sometimes ship tagline == name; don't echo the title.
                 if (pack.tagline.isNotBlank() && !pack.tagline.equals(pack.title, ignoreCase = true)) {
@@ -144,6 +162,7 @@ fun BrowsePackCard(
                     maxLines              = 1,
                 ) {
                     pack.mcVersion?.let { NxMetaChip("MC $it", tone = NxMetaChipTone.OnMedia) }
+                    if (narrow) SourceBadge(pack.origin)
                     pack.tags.take(CARD_TAGS).forEach { tag ->
                         NxMetaChip(
                             if (pack.origin == PackOrigin.Modrinth) s.modrinthCategory(tag) else tag,
@@ -155,16 +174,23 @@ fun BrowsePackCard(
                 }
             }
 
-            Symbol(
-                NxIcon.ArrowForwardIos,
-                contentDescription = null,
-                tint               = Color.White.copy(alpha = 0.75f),
-                modifier           = Modifier.size(20.dp),
-            )
-            Spacer(Modifier.width(4.dp))
+            // The whole card is the target, so the arrow is the first thing a narrow one can spare.
+            if (!narrow) {
+                Symbol(
+                    NxIcon.ArrowForwardIos,
+                    contentDescription = null,
+                    tint               = Color.White.copy(alpha = 0.75f),
+                    modifier           = Modifier.size(20.dp),
+                )
+                Spacer(Modifier.width(4.dp))
+            }
+        }
         }
     }
 }
+
+private val NARROW_CARD = 420.dp
+private val NARROW_AVATAR = 48.dp
 
 /**
  * Tags a card names before it starts counting.
@@ -176,12 +202,12 @@ fun BrowsePackCard(
 private const val CARD_TAGS = 2
 
 @Composable
-private fun BrowseAvatar(pack: CataloguePack, hue: Color) {
+private fun BrowseAvatar(pack: CataloguePack, hue: Color, size: Dp) {
     SubcomposeAsyncImage(
         model              = pack.iconUrl,
         contentDescription = null,
         contentScale       = ContentScale.Crop,
-        modifier           = Modifier.size(Dimens.packAvatar).clip(RoundedCornerShape(Dimens.packAvatarCorner)),
+        modifier           = Modifier.size(size).clip(RoundedCornerShape(Dimens.packAvatarCorner)),
         // While the icon resolves, a flat hue avoids a letters-then-icon flash;
         // a missing or broken icon (incl. a null url) lands in error -> initials.
         loading            = { Box(Modifier.fillMaxSize().background(hue)) },

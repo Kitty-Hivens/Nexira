@@ -81,12 +81,34 @@ fun HomeNewContinue(instance: WidgetInstance) {
     val (hueA, hueB) = decorativePair(pack.id)
     val openDetail = { ctx.onScreenChange(Screen.PackDetail(pack.id)) }
 
-    BoxWithConstraints(Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 28.dp)) {
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
         // The name is the picture here, so it takes its size from the room it has:
         // a wide window sets it large, a narrow slot still sets it as a heading.
-        val nameSize = (maxWidth.value / NAME_DIVISOR).coerceIn(NAME_MIN, NAME_MAX)
+        val narrow = maxWidth < NARROW
+        val nameSize = if (narrow) NAME_NARROW else ((maxWidth.value - WIDE_PADDING * 2) / NAME_DIVISOR).coerceIn(NAME_MIN, NAME_MAX)
         val markHeight = (nameSize * MARK_RATIO).dp
-        Column {
+        val facts: @Composable (Modifier) -> Unit = { modifier ->
+            FlowRow(
+                modifier              = modifier,
+                horizontalArrangement = Arrangement.spacedBy(if (narrow) 24.dp else 44.dp),
+                verticalArrangement   = Arrangement.spacedBy(12.dp),
+            ) {
+                val hours = pack.playtimeSeconds / 3600
+                if (hours > 0) Numeral(s.homeFactHours(hours), s.homeFactPlaytime)
+                Numeral(lastPlayedLabel(pack.lastPlayedEpochOrZero), s.homeFactLastSession)
+                pack.cachedManifest?.let { m ->
+                    if (m.minecraftVersion.isNotBlank()) {
+                        Numeral(m.minecraftVersion, loaderLabel(m.loaderName.ifBlank { "vanilla" }))
+                    }
+                }
+            }
+        }
+        Column(
+            Modifier.padding(
+                horizontal = if (narrow) 20.dp else WIDE_PADDING.dp,
+                vertical   = if (narrow) 20.dp else 28.dp,
+            ),
+        ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text       = if (pack.lastPlayedEpochOrZero > 0L) s.homeQuickContinue else s.homeQuickStart,
@@ -119,33 +141,27 @@ fun HomeNewContinue(instance: WidgetInstance) {
                     lineHeight = (nameSize * 1.06f).sp,
                     fontWeight = FontWeight.Bold,
                     color      = NxInk.main,
-                    maxLines   = 1,
+                    maxLines   = if (narrow) 2 else 1,
                     overflow   = TextOverflow.Ellipsis,
-                    modifier   = Modifier.clickable(onClick = openDetail),
+                    modifier   = Modifier.weight(1f, fill = false).clickable(onClick = openDetail),
                 )
             }
             Spacer(Modifier.height(22.dp))
-            Row(verticalAlignment = Alignment.Bottom) {
+            // Beside the button, a phone held upright left the facts a few letters of width each.
+            if (narrow) {
                 if (p.showFacts) {
-                    FlowRow(
-                        modifier              = Modifier.weight(1f),
-                        horizontalArrangement = Arrangement.spacedBy(44.dp),
-                        verticalArrangement   = Arrangement.spacedBy(12.dp),
-                    ) {
-                        val hours = pack.playtimeSeconds / 3600
-                        if (hours > 0) Numeral(s.homeFactHours(hours), s.homeFactPlaytime)
-                        Numeral(lastPlayedLabel(pack.lastPlayedEpochOrZero), s.homeFactLastSession)
-                        pack.cachedManifest?.let { m ->
-                            if (m.minecraftVersion.isNotBlank()) {
-                                Numeral(m.minecraftVersion, loaderLabel(m.loaderName.ifBlank { "vanilla" }))
-                            }
-                        }
-                    }
-                } else {
-                    Spacer(Modifier.weight(1f))
+                    facts(Modifier.fillMaxWidth())
+                    Spacer(Modifier.height(16.dp))
                 }
-                Spacer(Modifier.width(24.dp))
-                QuickLaunchButton(quickLaunch = quickLaunch, ground = PlayGround.Surface, layout = p.playLayout)
+                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
+                    QuickLaunchButton(quickLaunch = quickLaunch, ground = PlayGround.Surface, layout = p.playLayout)
+                }
+            } else {
+                Row(verticalAlignment = Alignment.Bottom) {
+                    if (p.showFacts) facts(Modifier.weight(1f)) else Spacer(Modifier.weight(1f))
+                    Spacer(Modifier.width(24.dp))
+                    QuickLaunchButton(quickLaunch = quickLaunch, ground = PlayGround.Surface, layout = p.playLayout)
+                }
             }
         }
     }
@@ -171,6 +187,11 @@ internal fun Numeral(value: String, label: String) {
         )
     }
 }
+
+/** Below this the facts stand over the button and the name may take two lines. */
+private val NARROW = 420.dp
+private const val NAME_NARROW = 28f
+private const val WIDE_PADDING = 32f
 
 /** Width over name size: at 1500dp of room the name is set at about 72sp. */
 private const val NAME_DIVISOR = 21f
