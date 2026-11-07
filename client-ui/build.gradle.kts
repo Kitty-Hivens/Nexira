@@ -163,6 +163,8 @@ kotlin {
                 implementation(libs.androidx.activity.compose)
                 implementation(libs.skinema.compose)
             }
+            // A SmartyCraft-bound pack joins through the authlib-redirect agent on a phone too, see the agent block below
+            resources.srcDir(layout.buildDirectory.dir("generated/authlibAgent"))
         }
 
         val desktopMain = getByName("desktopMain") {
