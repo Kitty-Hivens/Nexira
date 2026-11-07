@@ -92,7 +92,7 @@ private class AndroidRuntime(
                 "JAVA_HOME" to home.toString(),
                 "HOME" to context.filesDir.absolutePath,
                 "TMPDIR" to context.cacheDir.absolutePath,
-            ) + (if (touchController != null) mapOf(TouchControllerLink.SOCKET_VARIABLE to TouchControllerLink.SOCKET_NAME) else emptyMap()),
+            ) + (if (touchController != null) mapOf(TouchControllerLink.SOCKET_VARIABLE to touchController.socketName) else emptyMap()),
             workDir = workDir.toString(),
         )
         val specFile = File(context.filesDir, "launches/${UUID.randomUUID()}.json").apply {
