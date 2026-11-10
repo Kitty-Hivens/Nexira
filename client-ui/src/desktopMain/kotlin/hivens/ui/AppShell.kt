@@ -74,6 +74,7 @@ import hivens.ui.chrome.OpeningFrame
 import hivens.ui.chrome.WindowMaximizer
 import hivens.ui.chrome.WindowResizeHandles
 import hivens.ui.chrome.WindowSessionWriter
+import hivens.ui.chrome.fillUnpainted
 import hivens.ui.components.UpdateManager
 import hivens.core.io.AtomicFiles
 import hivens.ui.customization.CustomizationManager
@@ -152,6 +153,9 @@ import org.jetbrains.compose.resources.ExperimentalResourceApi
 import org.koin.compose.koinInject
 import org.koin.core.qualifier.named
 import org.slf4j.LoggerFactory
+import androidx.compose.ui.graphics.toArgb
+import hivens.ui.theme.NxColor
+import java.awt.Color as AwtColor
 import java.awt.Dimension
 import java.awt.Toolkit
 import javax.swing.SwingUtilities
@@ -1008,6 +1012,10 @@ fun FrameWindowScope.AppShellContent(
                 dark     = isDarkTheme,
                 uiFamily = uiFamily,
             ) {
+                // What shows where Skia has not drawn yet while the window grows:
+                // the page colour, so a resize shows the theme and not light grey.
+                val page = NxColor.page
+                SideEffect { window.fillUnpainted(AwtColor(page.toArgb(), false)) }
                 ThemeRevealHost(themeReveal) {
                 val migration = boot.pendingMigration
                 if (migration != null) {

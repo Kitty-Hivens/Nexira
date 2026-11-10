@@ -10,6 +10,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
@@ -27,6 +28,7 @@ import hivens.ui.chrome.RESTORE_WINDOW_SIZE
 import hivens.ui.chrome.SavedWindow
 import hivens.ui.chrome.WindowManagerProbe
 import hivens.ui.chrome.currentWorkAreas
+import hivens.ui.chrome.fillUnpainted
 import hivens.ui.chrome.openingFrame
 import hivens.ui.chrome.screenWorkArea
 import hivens.ui.generated.resources.Res
@@ -36,8 +38,10 @@ import hivens.ui.i18n.stringsFor
 import hivens.ui.threshold.BootOutcome
 import hivens.ui.threshold.BootStage
 import hivens.ui.threshold.ThresholdOverlay
+import hivens.ui.threshold.ThresholdPalette
 import kotlinx.coroutines.flow.StateFlow
 import org.jetbrains.compose.resources.painterResource
+import java.awt.Color as AwtColor
 
 /**
  * Late-bound window callbacks. The window is created BEFORE Koin exists, so
@@ -139,6 +143,12 @@ fun ApplicationScope.ShellHost(
         icon           = windowIcon,
         onPreviewKeyEvent = { chrome.onPreviewKey(it) },
     ) {
+        // What shows where Skia has not drawn yet, until the shell's theme takes
+        // over (see AppShell): the boot screen's own background, not white.
+        LaunchedEffect(Unit) {
+            val field = (if (pre.peek.isDarkTheme) ThresholdPalette.Dark else ThresholdPalette.Light).field
+            window.fillUnpainted(AwtColor(field.toArgb(), false))
+        }
         if (maximizeFromInside) {
             LaunchedEffect(Unit) {
                 window.maximizedBounds = screenWorkArea(window.graphicsConfiguration)

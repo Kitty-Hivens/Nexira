@@ -54,6 +54,14 @@ object GuiBootstrap {
         // -- not a property Skiko reads -- so nothing was ever capped to 60.)
         System.setProperty("skiko.vsync.enabled", "true")
 
+        // A window that grows shows its new part before Skia has drawn a frame
+        // that large. Windows fills that part first, and AWT answers the fill
+        // with the frame's background, white unless told otherwise, so a resize
+        // flashed white squares. Without the fill the gap keeps what was there,
+        // and the frame's background is the theme's page (see AppShell) for
+        // whatever does show through. Read once when the toolkit starts.
+        System.setProperty("sun.awt.noerasebackground", "true")
+
         // X11 WM_CLASS override. See XToolkitOverride doc for the
         // cross-vendor reflection rationale; the JVM must have been
         // launched with `--add-opens=java.desktop/sun.awt.X11=ALL-UNNAMED`.
