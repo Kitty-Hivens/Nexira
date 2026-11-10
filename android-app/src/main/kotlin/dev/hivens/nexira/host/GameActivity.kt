@@ -51,6 +51,11 @@ class GameActivity : Activity(), SurfaceHolder.Callback {
             // The keyboard covers the bottom of the game, where a chat line is, so the game moves up out of its way
             setOnApplyWindowInsetsListener { surface, insets ->
                 surface.translationY = -insets.getInsets(WindowInsets.Type.ime()).bottom.toFloat()
+                val imeVisible = insets.isVisible(WindowInsets.Type.ime())
+                // A keyboard the player put away themselves ends the typing too, or the next key of a hardware
+                // keyboard would bring it back instead of reaching the game
+                if (imeWasVisible && !imeVisible && takesText) this@GameActivity.softKeyboard(false)
+                imeWasVisible = imeVisible
                 insets
             }
         }
@@ -120,18 +125,28 @@ class GameActivity : Activity(), SurfaceHolder.Callback {
         }
     }
 
+    /**
+     * Puts the game into typing or takes it out. The surface takes text only meanwhile: while it does, Android hands
+     * every key to the input method first, and the keyboard turns a key into text, so a key the game binds (T for the
+     * chat) never reached it as a key. Outside typing a hardware keyboard's keys go to the game directly, and
+     * [dispatchKeyEvent] still passes their characters on.
+     */
     internal fun softKeyboard(show: Boolean) {
         val keyboard = getSystemService(InputMethodManager::class.java)
+        if (view.takesText != show) {
+            view.takesText = show
+            // The input method asks whether the view takes text when input starts, so it starts again
+            keyboard.restartInput(view)
+        }
         if (show) {
             val _ = view.requestFocus()
             val _ = keyboard.showSoftInput(view, 0)
         } else {
             val _ = keyboard.hideSoftInputFromWindow(view.windowToken, 0)
         }
-        softKeyboardShown = show
     }
 
-    private var softKeyboardShown = false
+    private var imeWasVisible = false
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (event.keyCode == KeyEvent.KEYCODE_VOLUME_UP || event.keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
@@ -334,7 +349,7 @@ class GameActivity : Activity(), SurfaceHolder.Callback {
         // The last finger of a tap with two is the end of it
         if (twoFingerTap && !cancelled && event.pointerCount == 1) {
             twoFingerTap = false
-            if (event.eventTime - firstFingerAt < TWO_FINGER_TAP_MS * 2) softKeyboard(!softKeyboardShown)
+            if (event.eventTime - firstFingerAt < TWO_FINGER_TAP_MS * 2) softKeyboard(!view.takesText)
         }
     }
 
@@ -379,14 +394,19 @@ class GameActivity : Activity(), SurfaceHolder.Callback {
 }
 
 /**
- * The game's surface, which is also where a soft keyboard types. Text arrives as a keyboard commits it and goes to the
- * game as typed characters, and what the keyboard is still composing is shown by typing and rubbing out.
+ * The game's surface, which is also where a soft keyboard types while [takesText] is set. Text arrives as a keyboard
+ * commits it and goes to the game as typed characters, and what the keyboard is still composing is shown by typing and
+ * rubbing out.
  */
 private class GameSurface(context: Context) : SurfaceView(context) {
 
-    override fun onCheckIsTextEditor(): Boolean = true
+    /** Whether the game is typing, set by [GameActivity.softKeyboard]. */
+    var takesText = false
 
-    override fun onCreateInputConnection(outAttrs: EditorInfo): InputConnection {
+    override fun onCheckIsTextEditor(): Boolean = takesText
+
+    override fun onCreateInputConnection(outAttrs: EditorInfo): InputConnection? {
+        if (!takesText) return null
         outAttrs.inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
         outAttrs.imeOptions = EditorInfo.IME_FLAG_NO_FULLSCREEN or EditorInfo.IME_FLAG_NO_EXTRACT_UI or EditorInfo.IME_ACTION_DONE
         return GameInputConnection(this)
