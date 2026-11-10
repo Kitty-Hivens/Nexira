@@ -28,10 +28,6 @@
             </intent-filter>
         </activity>
 
-        <activity
-            android:name=".ProbeActivity"
-            android:exported="true" />
-
         <!-- The game's window: one surface, the game draws into it from its own process. One screen in a task of its own, so the notification comes back to it instead of opening a second. -->
         <activity
             android:name=".host.GameActivity"

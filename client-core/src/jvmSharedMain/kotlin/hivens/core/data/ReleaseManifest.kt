@@ -42,9 +42,9 @@ data class ReleaseManifest(
 @Serializable
 data class ReleaseAsset(
     @SerialName("name") val name: String,
-    /** Coarse platform tag: "windows" | "macos" | "linux". */
+    /** Coarse platform tag: "windows" | "macos" | "linux" | "android". */
     @SerialName("platform") val platform: String,
-    /** Distribution kind: "installer" | "portable" | "appimage" | "dmg". */
+    /** Distribution kind: "installer" | "portable" | "appimage" | "dmg" | "apk". */
     @SerialName("kind") val kind: String,
     @SerialName("sha256") val sha256: String,
     @SerialName("size") val size: Long,

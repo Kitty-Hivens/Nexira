@@ -583,6 +583,78 @@ jobs:
           path: Nexira-${{ env.APP_VERSION }}-aarch64.dmg
 
   # ─────────────────────────────────────────────────────────────────────────
+  # ANDROID: APK, arm64, beta
+  #
+  # Signed with the release key from the repository's secrets. Android will not
+  # install an update signed with another key, so the job stops rather than
+  # publish an APK that came out unsigned. While Android is in beta a failure
+  # here does not hold back the desktop release (see the release job's `if`).
+  # ─────────────────────────────────────────────────────────────────────────
+  build-android:
+    name: Android (APK, arm64)
+    needs: changelog
+    runs-on: ubuntu-26.04
+    env:
+      APP_VERSION: ${{ needs.changelog.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: ${{ env.JAVA_DISTRIBUTION }}
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: 'gradle'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # The runner image carries an SDK but not necessarily the platform and NDK
+      # this app pins, so they are installed by the same names the build script uses.
+      - name: Install the SDK platform and NDK
+        run: |
+          if [ -z "${ANDROID_HOME:-}" ]; then
+            echo "::error title=Android SDK::ANDROID_HOME is not set on this runner image."
+            exit 1
+          fi
+          sdkmanager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$sdkmanager" --licenses > /dev/null || true
+          "$sdkmanager" --install "platforms;android-37.1" "ndk;28.2.13676358" "build-tools;36.1.0" > /dev/null
+
+      - name: Build the signed APK
+        env:
+          ANDROID_KEYSTORE_BASE64:   ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS:         ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD:      ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -z "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "::error title=Android signing::The ANDROID_KEYSTORE_BASE64 secret is empty."
+            exit 1
+          fi
+          export ANDROID_KEYSTORE_FILE="$RUNNER_TEMP/release.jks"
+          trap 'rm -f "$ANDROID_KEYSTORE_FILE"' EXIT
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$ANDROID_KEYSTORE_FILE"
+          ./gradlew :android-app:assembleRelease -PappVersion="$APP_VERSION"
+
+      # AGP names the output -unsigned when no key reached it, so a missing signed
+      # file is exactly the case of a key that did not arrive.
+      - name: Check the signature and name the APK
+        run: |
+          apk=android-app/build/outputs/apk/release/android-app-release.apk
+          if [ ! -f "$apk" ]; then
+            echo "::error title=Android signing::No signed APK was built."
+            ls android-app/build/outputs/apk/release/ || true
+            exit 1
+          fi
+          apksigner="$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)apksigner"
+          "$apksigner" verify --print-certs "$apk"
+          mv "$apk" "Nexira-$APP_VERSION-Android-arm64.apk"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: android-artifacts
+          path: Nexira-${{ env.APP_VERSION }}-Android-arm64.apk
+
+  # ─────────────────────────────────────────────────────────────────────────
   # PORTABILITY GATE — the freshly built AppImage must start across distros
   # before we publish. Reuses appimage-portability.yml against this run's
   # linux-artifacts (not a published asset), so a distro regression blocks the
@@ -605,7 +677,16 @@ jobs:
   # ─────────────────────────────────────────────────────────────────────────
   release:
     name: Publish GitHub Release
-    needs: [changelog, build-windows, build-linux, build-macos, portability]
+    needs: [changelog, build-windows, build-linux, build-macos, build-android, portability]
+    # Every desktop leg must pass. Android is in beta and only has to finish, so
+    # a release whose APK failed goes out without one, and the table leaves the row out.
+    if: >-
+      ${{ !cancelled()
+          && needs.changelog.result == 'success'
+          && needs.build-windows.result == 'success'
+          && needs.build-linux.result == 'success'
+          && needs.build-macos.result == 'success'
+          && needs.portability.result == 'success' }}
     runs-on: ubuntu-26.04
     permissions:
       contents: write
@@ -675,6 +756,7 @@ jobs:
               *aarch64.dmg)           plat=macos;   kind=dmg-arm64 ;;
               *x86_64.dmg)            plat=macos;   kind=dmg-intel ;;
               *.dmg)                  plat=macos;   kind=dmg       ;;
+              *.apk)                  plat=android; kind=apk       ;;
               *)                      plat=unknown; kind=unknown   ;;
             esac
 

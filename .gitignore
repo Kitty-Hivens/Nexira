@@ -101,6 +101,11 @@ hs_err_pid*.log
 replay_pid*.log
 core.[0-9]*
 
+# Signing keys. The Android release key lives outside the repository and reaches
+# CI as a secret, so one copied in by mistake must never be swept into a commit.
+*.jks
+*.keystore
+
 # Python bytecode from the lint scanners. They were standalone files until they
 # started sharing a module-discovery helper; importing it is what makes CPython
 # write a cache next to them.

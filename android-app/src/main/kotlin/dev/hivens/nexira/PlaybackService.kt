@@ -24,7 +24,8 @@ class PlaybackService : MediaSessionService() {
                 PendingIntent.getActivity(
                     this,
                     0,
-                    Intent(this, ProbeActivity::class.java),
+                    // What the home screen icon starts, so a tap brings the launcher's task forward instead of a second copy.
+                    packageManager.getLaunchIntentForPackage(packageName) ?: Intent(this, NexiraActivity::class.java),
                     PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
                 ),
             )

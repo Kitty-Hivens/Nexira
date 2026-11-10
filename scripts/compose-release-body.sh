@@ -53,6 +53,7 @@ CHANGELOG_DETAILS="$(cat "$CHANGELOG_NOTES_FILE")"
 # Build the SHA256 checksum table by walking dist/SHA256SUMS.txt.
 CHECKSUMS=""
 APPIMAGE_FILE=""
+APK_FILE=""
 while IFS= read -r line; do
   hash=$(echo "$line" | awk '{print $1}')
   file=$(echo "$line" | awk '{print $2}' | sed 's|^\./||')
@@ -60,7 +61,12 @@ while IFS= read -r line; do
   CHECKSUMS="${CHECKSUMS}| \`${file}\` | \`${hash}\` |"$'\n'
   # The AppImage is named by channel rather than version (see build-appimage.sh),
   # so it is read off the list of what was built instead of being spelled here.
-  case "$file" in *.AppImage) APPIMAGE_FILE="$file" ;; esac
+  # The APK is read off the same list, since a release may go out without it
+  # while Android is in beta.
+  case "$file" in
+    *.AppImage) APPIMAGE_FILE="$file" ;;
+    *.apk)      APK_FILE="$file" ;;
+  esac
 done < "$CHECKSUMS_FILE"
 
 # Compose the body around the given What's Changed text. Heredoc-style printf so
@@ -86,7 +92,11 @@ compose() {
   if [ -n "$APPIMAGE_FILE" ]; then
     printf '| Linux AppImage    | [`%s`](%s/%s) |\n' "$APPIMAGE_FILE" "$REPO_BASE" "$APPIMAGE_FILE"
   fi
-  printf '| macOS Apple Silicon | [`Nexira-%s-aarch64.dmg`](%s/Nexira-%s-aarch64.dmg) |\n\n' "$APP_VERSION" "$REPO_BASE" "$APP_VERSION"
+  printf '| macOS Apple Silicon | [`Nexira-%s-aarch64.dmg`](%s/Nexira-%s-aarch64.dmg) |\n' "$APP_VERSION" "$REPO_BASE" "$APP_VERSION"
+  if [ -n "$APK_FILE" ]; then
+    printf '| Android (beta, arm64) | [`%s`](%s/%s) |\n' "$APK_FILE" "$REPO_BASE" "$APK_FILE"
+  fi
+  printf '\n'
 
   printf '<details>\n<summary>SHA256 Checksums</summary>\n\n'
   printf '| File | SHA256 |\n|---|---|\n'

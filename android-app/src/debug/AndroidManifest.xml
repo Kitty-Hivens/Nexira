@@ -1,4 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <application android:networkSecurityConfig="@xml/debug_network_security" />
+    <application android:networkSecurityConfig="@xml/debug_network_security">
+        <!-- Exported so adb can start it with a scenario. It fetches and runs whatever runtime its extras name, so it never leaves a debug build. -->
+        <activity
+            android:name=".ProbeActivity"
+            android:exported="true" />
+    </application>
 </manifest>
