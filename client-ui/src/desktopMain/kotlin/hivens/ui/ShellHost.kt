@@ -38,7 +38,6 @@ import hivens.ui.threshold.BootStage
 import hivens.ui.threshold.ThresholdOverlay
 import kotlinx.coroutines.flow.StateFlow
 import org.jetbrains.compose.resources.painterResource
-import java.awt.Frame
 
 /**
  * Late-bound window callbacks. The window is created BEFORE Koin exists, so
@@ -143,7 +142,10 @@ fun ApplicationScope.ShellHost(
         if (maximizeFromInside) {
             LaunchedEffect(Unit) {
                 window.maximizedBounds = screenWorkArea(window.graphicsConfiguration)
-                window.extendedState = window.extendedState or Frame.MAXIMIZED_BOTH
+                // Through the state, not the frame: Compose applies the state's
+                // placement to the frame, and a frame maximised behind its back
+                // is put back to the Floating the state still says.
+                windowState.placement = WindowPlacement.Maximized
             }
         }
         Box(Modifier.fillMaxSize()) {
