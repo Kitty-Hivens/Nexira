@@ -1,6 +1,8 @@
 package hivens.core.diag
 
 import java.time.Instant
+import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.CountDownLatch
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -70,21 +72,30 @@ class ActionRingTest {
         // non-atomic and the trim loop was outside any lock. Spawn many writers,
         // each hammering record(), and assert the ring NEVER exceeds CAPACITY at
         // any observation point.
+        //
+        // An exception thrown on a writer thread never reaches the test thread, so
+        // every overshoot, and anything a writer throws, is collected and asserted
+        // on here instead.
+        val failures = ConcurrentLinkedQueue<String>()
+        val start = CountDownLatch(1)
         val threads = (1..16).map { tIdx ->
             Thread {
-                repeat(500) { i ->
-                    ActionRing.record("t${tIdx}-${i}")
-                    // Probe the size while writers are still active -- must not exceed.
-                    val snap = ActionRing.snapshot()
-                    if (snap.size > ActionRing.CAPACITY) {
-                        throw AssertionError("size=${snap.size} exceeded CAPACITY=${ActionRing.CAPACITY}")
+                start.await()
+                runCatching {
+                    repeat(500) { i ->
+                        ActionRing.record("t${tIdx}-${i}")
+                        // Probe the size while writers are still active -- must not exceed.
+                        val size = ActionRing.snapshot().size
+                        if (size > ActionRing.CAPACITY) failures += "writer $tIdx saw size=$size"
                     }
-                }
+                }.onFailure { failures += "writer $tIdx threw $it" }
             }
         }
         threads.forEach { it.start() }
+        start.countDown()
         threads.forEach { it.join() }
 
+        assertEquals(emptyList(), failures.toList(), "the ring must stay within CAPACITY=${ActionRing.CAPACITY} under concurrent writers")
         val finalSize = ActionRing.snapshot().size
         assertEquals(ActionRing.CAPACITY, finalSize,
             "after 16×500 records the ring should be exactly at capacity")
