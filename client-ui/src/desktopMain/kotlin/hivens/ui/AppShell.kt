@@ -3,7 +3,9 @@ package hivens.ui
 import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
 import hivens.ui.components.QuitWithGameHost
 import hivens.ui.components.QuitGate
@@ -68,8 +70,10 @@ import hivens.ui.chrome.LocalCustomChromeAvailable
 import hivens.ui.chrome.LocalWindowCapabilities
 import hivens.ui.chrome.WindowCapabilitiesSource
 import hivens.ui.chrome.WindowManagerProbe
+import hivens.ui.chrome.OpeningFrame
 import hivens.ui.chrome.WindowMaximizer
 import hivens.ui.chrome.WindowResizeHandles
+import hivens.ui.chrome.WindowSessionWriter
 import hivens.ui.components.UpdateManager
 import hivens.core.io.AtomicFiles
 import hivens.ui.customization.CustomizationManager
@@ -186,6 +190,7 @@ fun FrameWindowScope.AppShellContent(
     windowState: WindowState,
     visibleState: MutableState<Boolean>,
     chrome: WindowChromeHooks,
+    opening: OpeningFrame,
     exitApp: () -> Unit,
 ) {
     // Tray teardown is composition-scoped: the tray is re-init'd per
@@ -269,8 +274,32 @@ fun FrameWindowScope.AppShellContent(
     // Native maximize/restore for the undecorated window -- the WM owns the
     // geometry and reports the real maximized state back through WindowMaximizer's
     // listener; we never fake it. Detach the listener on dispose.
-    val maximizer = remember { WindowMaximizer(windowState, windowCapabilities).also { it.attach(window) } }
+    val maximizer = remember { WindowMaximizer(windowState, windowCapabilities, opening.normal).also { it.attach(window) } }
     DisposableEffect(window) { onDispose { maximizer.detach() } }
+
+    // Remembers how the window is left, for the next start to open it that way.
+    // Only where the window manager lets the window place itself: elsewhere the
+    // next start ignores the record anyway (see openingFrame).
+    if (WindowManagerProbe.allowsCustomFrame) {
+        val session = remember { WindowSessionWriter(boot.paths.dataDir, maximizer, opening.normal) }
+        DisposableEffect(window) {
+            session.attach(window)
+            onDispose {
+                // On the way out, in place: the process may be gone before a coroutine runs.
+                session.snapshot()?.let(session::save)
+                session.detach()
+            }
+        }
+        LaunchedEffect(session) {
+            snapshotFlow { session.changes to maximizer.maximized }
+                .drop(1)
+                .collectLatest {
+                    delay(WindowSessionWriter.SETTLE_MS.milliseconds)
+                    val record = session.snapshot() ?: return@collectLatest
+                    withContext(Dispatchers.IO) { session.save(record) }
+                }
+        }
+    }
 
     // Skinema media (FFmpeg natives) can be disabled by boot recovery on an
     // environment where it fails; latch the process gate before the background

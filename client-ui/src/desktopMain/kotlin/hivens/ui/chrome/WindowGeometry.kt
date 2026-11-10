@@ -35,8 +35,8 @@ val RESTORE_WINDOW_SIZE = DpSize(1100.dp, 720.dp)
  * Hence no window-manager branch. A floating desktop maximises the window right
  * after showing it, so the work area is what it becomes; a tiling one assigns
  * the frame itself, and the work area lands far closer to that than any invented
- * size. The launcher opens full-size either way -- a floating launcher window
- * was a 1.x shape.
+ * size. This is the size of a window that opens maximised. One left as a window
+ * opens at the frame it was left with (see [openingFrame]).
  *
  * [restore] is the size the window returns to when un-maximised, and the
  * fallback for a work area a display peer has not negotiated yet.

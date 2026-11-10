@@ -67,8 +67,10 @@ fun screenWorkArea(gc: GraphicsConfiguration?): Rectangle {
  * manager remembers for it. Until the window has been restored once, that is the
  * work area, since it is born there (see [initialWindowSize]), so the first restore
  * would look exactly like a maximized window. That first restore is given
- * [RESTORE_WINDOW_SIZE] instead, and from then on the window manager remembers a
- * real normal size and every later restore is left to it. Windows offers no way
+ * [firstRestore], the frame the window had when it was last closed (see
+ * [WindowSessionWriter]), or [RESTORE_WINDOW_SIZE] where nothing was saved, and
+ * from then on the window manager remembers a real normal size and every later
+ * restore is left to it. Windows offers no way
  * to set that size while the frame stays maximized: a reshape of a zoomed frame
  * drops the maximized bit. A window manager that does not allow the window to be
  * resized (see [WindowCapabilities]) owns the geometry outright and is never
@@ -81,6 +83,7 @@ fun screenWorkArea(gc: GraphicsConfiguration?): Rectangle {
 class WindowMaximizer(
     private val state: WindowState,
     private val capabilities: WindowCapabilitiesSource,
+    private val firstRestore: Rectangle? = null,
 ) {
     /** The frame's extendedState, recomputed only from system events, never on click. */
     private var frameMaximized by mutableStateOf(false)
@@ -92,7 +95,7 @@ class WindowMaximizer(
     var supported by mutableStateOf(true)
         private set
 
-    /** True until the window has left maximized once and been given a normal size. */
+    /** True while a window born maximized has not left it yet and been given a normal size. */
     private var firstRestorePending = true
 
     private var window: ComposeWindow? = null
@@ -102,6 +105,10 @@ class WindowMaximizer(
     fun attach(w: ComposeWindow) {
         window = w
         supported = Toolkit.getDefaultToolkit().isFrameStateSupported(Frame.MAXIMIZED_BOTH)
+        // Only a window born maximized has a normal size nobody chose. One that
+        // opened as a window already has the size it was left at, and the window
+        // manager remembers whatever it is moved to after that.
+        firstRestorePending = isMax(w.extendedState)
         refresh(w)
         val sl = WindowStateListener { e ->
             dump(w, "WM-state-event old=${decode(e.oldState)} new=${decode(e.newState)}")
@@ -170,7 +177,7 @@ class WindowMaximizer(
         if (window !== w || !firstRestorePending || isMax(w.extendedState)) return
         firstRestorePending = false
         if (!capabilities.current.resize) return
-        val target = restoredBounds(screenWorkArea(w.graphicsConfiguration), RESTORE_WINDOW_SIZE)
+        val target = firstRestoreBounds(w)
         log.info(
             "window state -> first restore, normal size {}x{} at {},{}",
             target.width, target.height, target.x, target.y,
@@ -218,10 +225,13 @@ class WindowMaximizer(
         val first = firstRestorePending && capabilities.current.resize
         firstRestorePending = false
         restore()
-        val restored = if (first) restoredBounds(screenWorkArea(w.graphicsConfiguration), RESTORE_WINDOW_SIZE) else w.bounds
+        val restored = if (first) firstRestoreBounds(w) else w.bounds
         val ratioX = if (cur.width > 0) ((mouseX - cur.x).toFloat() / cur.width).coerceIn(0f, 1f) else 0.5f
         w.setBounds(mouseX - (ratioX * restored.width).toInt(), cur.y, restored.width, restored.height)
     }
+
+    private fun firstRestoreBounds(w: ComposeWindow): Rectangle =
+        firstRestore ?: restoredBounds(screenWorkArea(w.graphicsConfiguration), RESTORE_WINDOW_SIZE)
 
     private fun isMax(s: Int) = (s and Frame.MAXIMIZED_BOTH) == Frame.MAXIMIZED_BOTH
 
