@@ -81,7 +81,7 @@ kotlin {
     }
     android {
         namespace = "hivens.ui"
-        compileSdk = providers.gradleProperty("nexira.android.compileSdk").map(String::toInt).getOrElse(36)
+        compileSdk = providers.gradleProperty("nexira.android.compileSdk").map(String::toInt).getOrElse(37)
         minSdk = 31
         // Compose resources travel as assets of the Android library, which are only packaged when the library takes part in resource processing.
         androidResources {

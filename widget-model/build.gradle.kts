@@ -21,7 +21,7 @@ kotlin {
     jvm()
     android {
         namespace = "hivens.widget.model"
-        compileSdk = providers.gradleProperty("nexira.android.compileSdk").map(String::toInt).getOrElse(36)
+        compileSdk = providers.gradleProperty("nexira.android.compileSdk").map(String::toInt).getOrElse(37)
         minSdk = 31
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_25)
