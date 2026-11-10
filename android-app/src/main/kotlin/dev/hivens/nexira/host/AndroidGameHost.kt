@@ -22,9 +22,11 @@ import hivens.launcher.launch.PreparedRuntime
 import hivens.launcher.launch.RuntimeRequest
 import kotlinx.coroutines.CompletableDeferred
 import java.io.File
+import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
 import java.nio.file.Path
+import java.util.Properties
 import java.util.TimeZone
 import java.util.UUID
 import java.util.concurrent.LinkedBlockingQueue
@@ -70,8 +72,10 @@ private class AndroidRuntime(
         val nativeDirs = launch.libraryDirectories().map(::File)
         fun nativeLibrary(name: String): File? = nativeDirs.map { File(it, name) }.firstOrNull { it.isFile }
         val host = nativeLibrary("libnxhost.so")
+        if (host != null) turnOffForgeSplash(launch, workDir)
         val touchController = if (host != null) TouchControllerLink.open(context) else null
         GameSession.touchControllerOpened(touchController)
+        val packOptions = launch.embeddedVmOptions()
         val spec = LaunchSpec(
             javaHome = home.toString(),
             // What this platform needs of the VM comes first, so what the pack passes wins
@@ -82,17 +86,18 @@ private class AndroidRuntime(
                 "-Duser.dir=$workDir",
                 // Android keeps the zone in a setting and the JVM looks for it in files a phone does not have
                 "-Duser.timezone=${TimeZone.getDefault().id}",
-            ) + (if (host != null) windowGameOptions() else emptyList()) + launch.embeddedVmOptions(),
+            ) + (if (host != null) windowGameOptions(packOptions) else emptyList()) + packOptions,
             mainClass = launch.mainClass.replace('.', '/'),
             args = launch.gameArgs,
             hostLibrary = host?.absolutePath,
             // The core first: the stand-ins for GLFW and SDL depend on it by name
-            preload = listOfNotNull(host?.absolutePath, nativeLibrary("libMobileGL.so")?.absolutePath),
+            preload = listOfNotNull(host?.absolutePath, nativeLibrary("libMobileGL.so")?.absolutePath, nativeLibrary("libSimpleFPEWrapper.so")?.absolutePath),
             environment = mapOf(
                 "JAVA_HOME" to home.toString(),
                 "HOME" to context.filesDir.absolutePath,
                 "TMPDIR" to context.cacheDir.absolutePath,
-            ) + (if (touchController != null) mapOf(TouchControllerLink.SOCKET_VARIABLE to touchController.socketName) else emptyMap()),
+            ) + (if (host != null) WINDOW_GAME_ENVIRONMENT else emptyMap())
+                + (if (touchController != null) mapOf(TouchControllerLink.SOCKET_VARIABLE to touchController.socketName) else emptyMap()),
             workDir = workDir.toString(),
         )
         val specFile = File(context.filesDir, "launches/${UUID.randomUUID()}.json").apply {
@@ -109,10 +114,42 @@ private class AndroidRuntime(
         return ServiceLaunchHandle(context, specFile, output, afterExit).also { it.connect() }
     }
 
-    private fun windowGameOptions(): List<String> = listOf(
-        "-Dorg.lwjgl.opengl.libname=libMobileGL.so",
+    /**
+     * The splash of Forge on LWJGL 2 draws on its own thread through a second, hidden window, and GLFW here has the one
+     * window the surface is, so it cannot work on a phone whatever the pack says. Forge writes `enabled=true` into the
+     * file itself on every start, so the key is set again for every launch and the file's other keys are kept.
+     *
+     * A file that cannot be written is logged and the game starts anyway: the splash is the game's to fail on.
+     */
+    private fun turnOffForgeSplash(launch: GameLaunch, workDir: Path) {
+        if (launch.mainClass !in FORGE_WITH_SPLASH) return
+        val splash = workDir.resolve("config").resolve("splash.properties").toFile()
+        try {
+            val properties = Properties()
+            if (splash.isFile) splash.inputStream().use { properties.load(it) }
+            if (properties.getProperty("enabled") == "false") return
+            properties.setProperty("enabled", "false")
+            splash.parentFile?.mkdirs()
+            splash.outputStream().use { properties.store(it, null) }
+        } catch (e: IOException) {
+            Log.w(TAG, "the Forge splash could not be turned off in $splash", e)
+        }
+    }
+
+    private fun windowGameOptions(packOptions: List<String>): List<String> = listOfNotNull(
+        // The wrapper draws what a game before 1.17 asks for, and hands a context asking for the core profile to MobileGL
+        "-Dorg.lwjgl.opengl.libname=libSimpleFPEWrapper.so",
         // The jars carry the hashes of the stock natives and these are built for this platform
         "-Dorg.lwjgl.util.NoHashChecks=true",
+        // Java 8 starts with the parallel collector and the tuning below is for G1, the default from 9 on. A pack that
+        // names a collector keeps it: the VM refuses to start with two.
+        "-XX:+UseG1GC".takeIf { packOptions.none { selectsCollector(it) } },
+        // A phone kills the game long before the heap is full, so what the VM keeps beside the heap counts as well:
+        // remembered sets shrink with larger regions, a pack holds the same strings many times over, and the code
+        // cache does not need to be able to reach its desktop size.
+        "-XX:G1HeapRegionSize=8M",
+        "-XX:+UseStringDeduplication",
+        "-XX:ReservedCodeCacheSize=160M",
         // No jemalloc is built for bionic, and LWJGL reaches for it by default
         "-Dorg.lwjgl.system.allocator=system",
         // Asked of the VM directly because what it reads inside an app's cpuset can be fewer than the phone has
@@ -134,6 +171,19 @@ private class AndroidRuntime(
         /** No archive of shared classes in this build, no perf-data file in a directory that does not exist, and the VM leaves the signals to ART. */
         val HOST_OPTIONS = listOf("-Xshare:off", "-XX:-UsePerfData", "-Xrs")
         val EMPTY: InputStream = object : InputStream() { override fun read(): Int = -1 }
+
+        val WINDOW_GAME_ENVIRONMENT = mapOf(
+            "SFPEW_EGL" to "libMobileGL.so",
+            // The wrapper asks MobileGL for a core context, and in a strict one binding a deleted name is an error.
+            // Minecraft before 1.17 deletes each texture name it was just given before its first bind, so without
+            // this every texture lands in the one object that happens to be bound.
+            "MOBILEGL_RELAXED_SEMANTICS" to "1",
+        )
+        val FORGE_WITH_SPLASH = setOf("net.minecraft.launchwrapper.Launch", "top.outlands.foundation.boot.Foundation")
+
+        private val COLLECTOR_FLAG = Regex("""-XX:\+Use[A-Za-z]+GC""")
+
+        fun selectsCollector(option: String): Boolean = COLLECTOR_FLAG.matches(option)
     }
 }
 

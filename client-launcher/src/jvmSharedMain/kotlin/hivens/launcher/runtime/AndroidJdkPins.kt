@@ -6,11 +6,11 @@ package hivens.launcher.runtime
  */
 internal val ANDROID_JDK_PINS: List<AndroidJdkRelease> = listOf(
     AndroidJdkRelease(8, "1.8.0_492", AndroidJdkCatalog.assetUrl("8u492"),
-        "3f50bb47df5674ce94c89653f33cd22df24cebf69feaa3674ed82dddf4ccffb0"),
+        "64544c5005377a1ebbad6f49187388bf21955b80245a7a0e8bc7c2af090cdd57"),
     AndroidJdkRelease(17, "17.0.21", AndroidJdkCatalog.assetUrl("17.0.21"),
-        "1b738258a9e2a974701f40f3444d1df3f952106c3e8489f330744b6e1378502c"),
+        "a153505b82bff92bd053356c61fee823b64074fedcc71baee25bc7be96cb38cd"),
     AndroidJdkRelease(21, "21.0.13", AndroidJdkCatalog.assetUrl("21.0.13"),
-        "3f63b6e3c56d97708efea100bbda69b543179f1f43c04257535bf888b098f8a0"),
+        "465b67474245e80493d179f5c9aec5bc78c55d48addaccfed919174ae8a618e1"),
     AndroidJdkRelease(25, "25.0.5", AndroidJdkCatalog.assetUrl("25.0.5"),
-        "2b7277f2f5531a235e09956d7fe50c95264cd15790c55787c636df2ef61294d9"),
+        "b886b90c964271418f4ca937be02bcfd36ea41af0e5eaf1ddd86c5889e63e0d8"),
 )
