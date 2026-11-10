@@ -86,7 +86,7 @@ internal class LauncherService(
         val adaptive = resolveAdaptive(
             enabled = adaptiveApplies(adaptiveEnabled, runtime.fixedMemory),
             instanceDir = clientRootPath,
-            baseMemoryMb = baselineMemory(runtime.fixedMemory, runtime.memoryMb, SystemMemory.totalPhysicalMb()),
+            baseMemoryMb = baselineMemory(runtime.fixedMemory, runtime.memoryMb, SystemMemory.heapBudgetMb()),
         )
         val memory = adaptive.memoryMb
 
@@ -334,7 +334,7 @@ internal class LauncherService(
 
         // 1024 == the modded-client floor normalizeMemory also enforces.
         val derived = HeapDeriver.derive(
-            samples, SystemMemory.totalPhysicalMb(), floorMb = 1024, current = profile.derivedHeapMb,
+            samples, SystemMemory.heapBudgetMb(), floorMb = 1024, current = profile.derivedHeapMb,
         )
         if (samples != profile.recentSamples || derived != profile.derivedHeapMb) {
             profilerStore.writeProfile(

@@ -74,11 +74,11 @@ internal fun PackRuntimeSection(
 
     // Auto-heap resolution mirrors the old settings tab: the adaptive profile when
     // enabled and present, else the physical-memory heuristic.
-    var resolvedAutoMb by remember { mutableStateOf(AutomaticHeap.compute(SystemMemory.totalPhysicalMb())) }
+    var resolvedAutoMb by remember { mutableStateOf(AutomaticHeap.compute(SystemMemory.heapBudgetMb())) }
     LaunchedEffect(instanceDir) {
         val adaptiveOn = settingsService.getSettings().adaptiveMemoryEnabled
         val derivedMb = if (adaptiveOn) withContext(Dispatchers.IO) { profilerStore.readProfile(instanceDir)?.derivedHeapMb } else null
-        resolvedAutoMb = derivedMb ?: AutomaticHeap.compute(SystemMemory.totalPhysicalMb())
+        resolvedAutoMb = derivedMb ?: AutomaticHeap.compute(SystemMemory.heapBudgetMb())
     }
 
     var showJvmBuilder by remember(pack.id) { mutableStateOf(false) }

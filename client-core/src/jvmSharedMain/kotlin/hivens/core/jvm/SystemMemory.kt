@@ -26,6 +26,17 @@ object SystemMemory {
 
     /** Host physical RAM (MB) for sizing; [FALLBACK_MB] when the platform does not expose it. */
     fun totalPhysicalMb(): Int = cachedMb ?: FALLBACK_MB
+
+    /**
+     * What sizing a game's heap may count on: physical RAM, less what stays out of reach on this platform. A phone
+     * keeps its system and whatever it has running in memory, and kills the game rather than ask them to leave, so
+     * the share of RAM that suits a desktop gets the game killed there. Not what a person may choose: an explicit
+     * setting still goes up to [totalPhysicalMb].
+     */
+    fun heapBudgetMb(): Int = (totalPhysicalMb() - HOST_RESERVED_MB).coerceAtLeast(0)
 }
 
 internal expect fun readPhysicalMb(): Int?
+
+/** The RAM (MB) a game cannot count on here, beyond what the sizers already leave to the rest of its own process. */
+internal expect val HOST_RESERVED_MB: Int

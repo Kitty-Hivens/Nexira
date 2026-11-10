@@ -65,7 +65,9 @@ fun RamSelector(
 ) {
     val s = LocalStrings.current
     val systemRamMb = remember { SystemMemory.totalPhysicalMb() }
-    val recommendedMb = (systemRamMb * RECOMMENDED_SHARE).toInt()
+    // From what the game may take, not from the whole machine: on a phone the system and the launcher keep a share
+    // the game cannot have, and a heap sized from the total gets the game killed.
+    val recommendedMb = remember { (SystemMemory.heapBudgetMb() * RECOMMENDED_SHARE).toInt() }
 
     NxSettingRow(
         title  = s.ramModeTitle,
@@ -164,7 +166,7 @@ internal fun formatRam(mb: Int, s: AppStrings): String = when {
 
 private const val MB_PER_GB = 1024f
 
-/** The share of physical memory the slider offers, leaving the rest to the system. */
+/** The share of the heap budget the slider offers, leaving the rest to the system and to what the VM keeps beside the heap. */
 private const val RECOMMENDED_SHARE = 0.75
 
 private const val STEP_GB = 0.5f

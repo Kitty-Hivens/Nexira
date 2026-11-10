@@ -24,4 +24,11 @@ class SystemMemoryTest {
         assertEquals(expectedMb, mb)
         assertEquals(expectedMb, SystemMemory.totalPhysicalMbOrNull())
     }
+
+    /** A desktop keeps nothing back from the heap budget, so sizing there is what it was before the budget existed. */
+    @Test
+    fun `the heap budget on a desktop is all of physical RAM`() {
+        assertEquals(0, HOST_RESERVED_MB)
+        assertEquals(SystemMemory.totalPhysicalMb(), SystemMemory.heapBudgetMb())
+    }
 }

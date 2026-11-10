@@ -6,6 +6,8 @@ import java.lang.management.ManagementFactory
 
 private val logger = LoggerFactory.getLogger("SystemMemory")
 
+internal actual val HOST_RESERVED_MB: Int = 0
+
 internal actual fun readPhysicalMb(): Int? {
     return try {
         val os = ManagementFactory.getOperatingSystemMXBean() as OperatingSystemMXBean
