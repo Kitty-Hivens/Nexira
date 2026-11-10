@@ -860,6 +860,11 @@ val bundleAuthlibAgent = tasks.register<Copy>("bundleAuthlibAgent") {
 tasks.matching { it.name.endsWith("ProcessResources") }.configureEach {
     dependsOn(bundleProfilerAgent, bundleAuthlibAgent)
 }
+// The Android library collects its Java resources in tasks of its own (mergeAndroidMainJavaResource,
+// compressAndroidMainJavaRes), which the name match above does not reach.
+tasks.matching { it.name.contains("AndroidMainJavaRes") }.configureEach {
+    dependsOn(bundleAuthlibAgent)
+}
 
 // Portable ZIP packaging lives in the build_release workflow's
 // PowerShell step, not in a Gradle task. The previous local-dev task
