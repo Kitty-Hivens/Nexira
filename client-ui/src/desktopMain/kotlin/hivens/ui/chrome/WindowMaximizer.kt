@@ -40,14 +40,20 @@ fun screenWorkArea(gc: GraphicsConfiguration?): Rectangle {
 /**
  * Maximize / restore driven end-to-end by the window manager.
  *
- * The window never fakes its own maximized state. [maximized] is the frame's
- * extendedState as the window manager reports it through [WindowStateListener]:
- * the system's own maximize state on Windows and macOS, the EWMH
- * `_NET_WM_STATE_MAXIMIZED` atoms on X11 and XWayland. It is never set when a
- * button is pressed, and never inferred from how big the frame is. A frame that
- * merely fills the screen is not maximized, and treating it as one left the
- * button offering a restore the window manager had nothing to do for, so the
- * click went nowhere until the window was resized by hand.
+ * The window never fakes its own maximized state. On X11 and XWayland
+ * [maximized] is the EWMH `_NET_WM_STATE_MAXIMIZED` atoms as the window manager
+ * writes them, read by [WindowCapabilitiesSource] over its own connection. The
+ * frame's extendedState is not that: AWT sets it the moment the launcher asks,
+ * before the window manager has answered, so clicks in quick succession read an
+ * answer that had not come yet and sent the window manager contradicting
+ * requests, and a request it dropped left the button showing the wrong state for
+ * good. Where nothing watches the window, on Windows and macOS whose systems
+ * change it at once, [maximized] is extendedState as [WindowStateListener]
+ * reports it. It is never set when a button is pressed, and never inferred from
+ * how big the frame is. A frame that merely fills the screen is not maximized,
+ * and treating it as one left the button offering a restore the window manager
+ * had nothing to do for, so the click went nowhere until the window was resized
+ * by hand.
  *
  * [maximize] / [restore] COMMAND the system directly via [Frame.setExtendedState]
  * (MAXIMIZED_BOTH), NOT through WindowState.placement, whose "apply only on change"
@@ -76,9 +82,11 @@ class WindowMaximizer(
     private val state: WindowState,
     private val capabilities: WindowCapabilitiesSource,
 ) {
-    /** Real WM-reported state. Recomputed only from system events, never on click. */
-    var maximized by mutableStateOf(false)
-        private set
+    /** The frame's extendedState, recomputed only from system events, never on click. */
+    private var frameMaximized by mutableStateOf(false)
+
+    /** Real WM-reported state: the window manager's own word where it is watched, the frame's elsewhere. */
+    val maximized: Boolean get() = capabilities.maximized ?: frameMaximized
 
     /** Whether the running WM supports programmatic maximize, per the toolkit. */
     var supported by mutableStateOf(true)
@@ -140,13 +148,13 @@ class WindowMaximizer(
      */
     private fun refresh(w: ComposeWindow) {
         val now = isMax(w.extendedState)
-        if (now != maximized) {
-            maximized = now
+        if (now != frameMaximized) {
+            frameMaximized = now
             val b = w.bounds
             val wa = screenWorkArea(w.graphicsConfiguration)
             log.info(
-                "window state <- WM reports maximized={} (ext={} bounds={}x{} at {},{} work={}x{} at {},{})",
-                maximized, decode(w.extendedState),
+                "window state <- frame reports maximized={} (ext={} bounds={}x{} at {},{} work={}x{} at {},{})",
+                frameMaximized, decode(w.extendedState),
                 b.width, b.height, b.x, b.y,
                 wa.width, wa.height, wa.x, wa.y,
             )
@@ -188,11 +196,11 @@ class WindowMaximizer(
         dump(w, "cmd restore POST")
     }
 
-    // Decide off the window's real state at click time, not the possibly-lagging
-    // observed flag, so a fast click can't act on a stale value.
+    // Decided by what the window manager has said, so a click before it answers
+    // the last one repeats that request instead of sending the opposite.
     fun toggle() {
         val w = window ?: return
-        if (isMax(w.extendedState)) restore() else maximize()
+        if (capabilities.maximized ?: isMax(w.extendedState)) restore() else maximize()
     }
 
     /**

@@ -54,6 +54,15 @@ class WindowCapabilitiesTest {
     }
 
     @Test
+    fun `a window is maximised when the window manager says so along both axes`() {
+        // What an XWayland window read off a live session carries, maximised by the shell and focused.
+        assertTrue(maximizedFromState(listOf("_NET_WM_STATE_MAXIMIZED_VERT", "_NET_WM_STATE_MAXIMIZED_HORZ", "_NET_WM_STATE_FOCUSED")))
+        assertFalse(maximizedFromState(listOf("_NET_WM_STATE_MAXIMIZED_VERT")), "one axis is not the window the button maximises")
+        assertFalse(maximizedFromState(listOf("_NET_WM_STATE_FOCUSED")))
+        assertFalse(maximizedFromState(emptyList()), "a window with no state written has none")
+    }
+
+    @Test
     fun `auto shows the buttons wherever the window manager leaves anything to the frame`() {
         assertTrue(WindowControlsMode.Auto.resolved(WindowCapabilities.Everything))
         assertTrue(WindowControlsMode.Auto.resolved(WindowCapabilities.Nothing.copy(minimize = true)))

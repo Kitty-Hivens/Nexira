@@ -20,6 +20,15 @@ internal fun capabilitiesFromAllowedActions(actions: Collection<String>): Window
     minimize = "_NET_WM_ACTION_MINIMIZE" in actions,
 )
 
+/**
+ * Whether the window manager says, in `_NET_WM_STATE`, that the window is
+ * maximised. Both axes, for the same reason as the maximise button's action.
+ */
+internal fun maximizedFromState(states: Collection<String>): Boolean =
+    "_NET_WM_STATE_MAXIMIZED_VERT" in states && "_NET_WM_STATE_MAXIMIZED_HORZ" in states
+
+private val STATE_NAMES = listOf("_NET_WM_STATE_MAXIMIZED_VERT", "_NET_WM_STATE_MAXIMIZED_HORZ")
+
 private val ACTION_NAMES = listOf(
     "_NET_WM_ACTION_MOVE",
     "_NET_WM_ACTION_RESIZE",
@@ -64,16 +73,25 @@ object WindowManagerProbe {
 }
 
 /**
- * The launcher window's [WindowCapabilities], kept current from what the window
- * manager publishes.
+ * The launcher window's [WindowCapabilities] and its maximised state, kept
+ * current from what the window manager publishes.
  *
  * On X11 a thread of its own holds an [X11Display] connection, finds the
- * window's X11 client window and re-reads `_NET_WM_ALLOWED_ACTIONS` every time
- * the window manager rewrites it. The first read happens on [attach] itself, so
- * the bar never shows a button for a moment before taking it away.
+ * window's X11 client window and re-reads `_NET_WM_ALLOWED_ACTIONS` and
+ * `_NET_WM_STATE` every time the window manager rewrites them, which it does for
+ * a change of its own as much as for one the launcher asked for. The first read
+ * happens on [attach] itself, so the bar never shows a button for a moment
+ * before taking it away.
  */
 class WindowCapabilitiesSource {
     var current by mutableStateOf(initial())
+        private set
+
+    /**
+     * Whether the window manager says the window is maximised, or null where
+     * nothing is watching it: off X11, or where the window could not be found.
+     */
+    var maximized by mutableStateOf<Boolean?>(null)
         private set
 
     @Volatile private var stopped = false
@@ -114,23 +132,41 @@ class WindowCapabilitiesSource {
         fun read(): WindowCapabilities? = x.longs(client, allowedActions)?.let { atoms ->
             capabilitiesFromAllowedActions(atoms.toList().mapNotNull { actionAtoms[it] })
         }
+        val netWmState = x.atom("_NET_WM_STATE")
+        val stateAtoms = STATE_NAMES.associateBy { x.atom(it) }.filterKeys { it != 0L }
+        // A window the window manager has written no state for has none.
+        fun readMaximized(): Boolean = maximizedFromState(
+            x.longs(client, netWmState)?.toList().orEmpty().mapNotNull { stateAtoms[it] },
+        )
 
         x.watchProperties(client)
         // Until the window manager has written the property for this window, the
         // declaration it made on the root stands, and that declaration was yes.
         read()?.let { current = it }
-        log.info("window capabilities: {} (X11 window 0x{})", current, client.toString(16))
+        maximized = readMaximized()
+        log.info("window capabilities: {}, maximized={} (X11 window 0x{})", current, maximized, client.toString(16))
 
         Thread({
             try {
                 while (!stopped) {
-                    val changes = x.awaitPropertyChanges(POLL_TIMEOUT_MS)
-                    if (changes.none { (w, atom) -> w == client && atom == allowedActions }) continue
-                    val next = read() ?: continue
-                    EventQueue.invokeLater {
-                        if (next != current) {
-                            log.info("window capabilities <- WM: {}", next)
-                            current = next
+                    val changes = x.awaitPropertyChanges(POLL_TIMEOUT_MS).filter { (w, _) -> w == client }
+                    if (changes.any { (_, atom) -> atom == allowedActions }) {
+                        read()?.let { next ->
+                            EventQueue.invokeLater {
+                                if (next != current) {
+                                    log.info("window capabilities <- WM: {}", next)
+                                    current = next
+                                }
+                            }
+                        }
+                    }
+                    if (changes.any { (_, atom) -> atom == netWmState }) {
+                        val next = readMaximized()
+                        EventQueue.invokeLater {
+                            if (next != maximized) {
+                                log.info("window state <- WM: maximized={}", next)
+                                maximized = next
+                            }
                         }
                     }
                 }
