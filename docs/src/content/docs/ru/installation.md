@@ -7,7 +7,7 @@ description: Как установить Nexira на Windows, Linux и macOS.
 
 ## Windows
 
-Релизы для Windows будут подписываться: бесплатную подпись кода предоставляет [SignPath.io](https://about.signpath.io), сертификат выдан [SignPath Foundation](https://signpath.org). Подробнее в [политике подписи кода](../code-signing/).
+Релизы для Windows пока не подписаны. На системе с включённым Smart App Control Windows блокирует лаунчер, и обойти это можно, только выключив Smart App Control. Подробнее в [политике подписи кода](../code-signing/).
 
 **Установщик (рекомендуется)**
 
@@ -68,11 +68,11 @@ sudo apt install libfuse2
 
 ## Где хранятся данные
 
-| Платформа | Путь |
-|---|---|
-| Windows | `%LOCALAPPDATA%\Nexira` |
-| macOS | `~/Library/Application Support/Nexira` |
-| Linux | `$XDG_DATA_HOME/nexira` (по умолчанию `~/.local/share/nexira`) |
+| Платформа | Путь                                                           |
+|-----------|----------------------------------------------------------------|
+| Windows   | `%LOCALAPPDATA%\Nexira`                                        |
+| macOS     | `~/Library/Application Support/Nexira`                         |
+| Linux     | `$XDG_DATA_HOME/nexira` (по умолчанию `~/.local/share/nexira`) |
 
 Папка установки -- отдельная: `%AppData%\Nexira` (установщик Windows) или место AppImage на Linux. Пользовательские данные (клиенты, настройки, кэш скинов, краш-репорты, логи) живут по путям выше.
 

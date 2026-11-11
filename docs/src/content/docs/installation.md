@@ -7,7 +7,7 @@ Download the latest release from [GitHub Releases](https://github.com/Kitty-Hive
 
 ## Windows
 
-Windows releases are to be code signed: free code signing provided by [SignPath.io](https://about.signpath.io), certificate by [SignPath Foundation](https://signpath.org). See the [code signing policy](../code-signing/).
+Windows releases are not code signed yet. On a system with Smart App Control turned on, Windows blocks the launcher, and the only way past it is to turn Smart App Control off. See the [code signing policy](../code-signing/).
 
 **Installer (recommended)**
 
@@ -68,11 +68,11 @@ If you previously had Aura installed, Nexira detects the old data directory on f
 
 ## Where your data lives
 
-| Platform | Path |
-|---|---|
-| Windows | `%LOCALAPPDATA%\Nexira` |
-| macOS | `~/Library/Application Support/Nexira` |
-| Linux | `$XDG_DATA_HOME/nexira` (default `~/.local/share/nexira`) |
+| Platform | Path                                                      |
+|----------|-----------------------------------------------------------|
+| Windows  | `%LOCALAPPDATA%\Nexira`                                   |
+| macOS    | `~/Library/Application Support/Nexira`                    |
+| Linux    | `$XDG_DATA_HOME/nexira` (default `~/.local/share/nexira`) |
 
 The install directory is separate -- `%AppData%\Nexira` (Windows installer) or the AppImage location on Linux. User data (clients, settings, skin cache, crash reports, logs) lives at the paths above.
 
