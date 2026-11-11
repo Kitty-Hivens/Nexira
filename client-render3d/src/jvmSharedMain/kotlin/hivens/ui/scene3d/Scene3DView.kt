@@ -29,6 +29,7 @@ import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.withContext
 import kotlin.math.PI
 import kotlin.math.sqrt
+import kotlin.time.Duration.Companion.milliseconds
 
 // Compose host for a scene graph. The scene itself stays plain mutable Kotlin.
 // Rendering is asynchronous: the composition thread only flattens the scene to
@@ -156,7 +157,7 @@ fun Scene3DView(
                 val started = System.nanoTime()
                 frame = req?.let { withContext(Dispatchers.Default) { renderer.render(it) } }
                 val spare = minRenderIntervalMs() - (System.nanoTime() - started) / 1_000_000L
-                if (spare > 0L) delay(spare)
+                if (spare > 0L) delay(spare.milliseconds)
             }
     }
 

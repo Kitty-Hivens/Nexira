@@ -19,6 +19,7 @@ import hivens.widget.model.PropLabel
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
 import hivens.widget.model.WidgetSizing
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
@@ -53,7 +54,7 @@ class ModuleParticleWidgets(fields: List<Contributed<ParticleContribution>>) : W
 private class ParticleWidgetDescriptor(override val kind: WidgetKind, private val field: ParticleContribution) : WidgetDescriptor {
     override val displayName: String = field.label
     override val removable: Boolean = true
-    override val propsSerializer = ModuleParticleProps.serializer()
+    override val propsSerializer: KSerializer<ModuleParticleProps> = ModuleParticleProps.serializer()
     override val defaultPropsJson: JsonObject =
         widgetPropsJson.encodeToJsonElement(ModuleParticleProps.serializer(), ModuleParticleProps()).jsonObject
     override val sizing: WidgetSizing = WidgetSizing(minWidth = 80, minHeight = 80)

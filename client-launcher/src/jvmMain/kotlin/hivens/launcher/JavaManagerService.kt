@@ -237,7 +237,7 @@ class JavaManagerService(
                         val n = stream.read(buffer)
                         if (n < 0) break
                         synchronized(output) {
-                            output.append(buffer, 0, minOf(n, PROBE_OUTPUT_LIMIT - output.length).coerceAtLeast(0))
+                            output.appendRange(buffer, 0, minOf(n, PROBE_OUTPUT_LIMIT - output.length).coerceAtLeast(0))
                         }
                     }
                 }

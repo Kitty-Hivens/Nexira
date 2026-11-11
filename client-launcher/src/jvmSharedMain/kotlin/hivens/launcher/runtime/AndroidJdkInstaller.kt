@@ -44,6 +44,8 @@ class AndroidJdkInstaller(
         lockFor(home).withLock { provision(release, home, onProgress) }
     }
 
+    // Runs inside ensure's withContext(Dispatchers.IO), which the inspection cannot see from here.
+    @Suppress("BlockingMethodInNonBlockingContext")
     private suspend fun provision(release: AndroidJdkRelease, home: Path, onProgress: (String) -> Unit): Path {
         recoverInterruptedSwap(home)
         if (installedVersion(home) == release.version && installedBuild(home) == release.sha256) return home

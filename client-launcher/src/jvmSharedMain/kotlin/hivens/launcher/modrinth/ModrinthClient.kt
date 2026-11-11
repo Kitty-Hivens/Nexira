@@ -104,8 +104,8 @@ class ModrinthClient(
      * Cached briefly by its URL, see [ModrinthCaches.search].
      */
     suspend fun searchModpacks(query: String, offset: Int = 0, limit: Int = 40): ModrinthSearchResponse {
-        val q = URLEncoder.encode(query, "UTF-8")
-        val facets = URLEncoder.encode("""[["project_type:modpack"]]""", "UTF-8")
+        val q = URLEncoder.encode(query, StandardCharsets.UTF_8)
+        val facets = URLEncoder.encode("""[["project_type:modpack"]]""", StandardCharsets.UTF_8)
         val url = "$API_BASE/v2/search?query=$q&facets=$facets&offset=$offset&limit=$limit"
         return caches.search.get(url) { getJson(url) }
     }
@@ -190,9 +190,9 @@ class ModrinthClient(
         limit: Int = 40,
         index: String = "relevance",
     ): ModrinthSearchResponse {
-        val q = URLEncoder.encode(query, "UTF-8")
-        val expression = URLEncoder.encode(searchExpression(projectType, filters), "UTF-8")
-        val order = URLEncoder.encode(index, "UTF-8")
+        val q = URLEncoder.encode(query, StandardCharsets.UTF_8)
+        val expression = URLEncoder.encode(searchExpression(projectType, filters), StandardCharsets.UTF_8)
+        val order = URLEncoder.encode(index, StandardCharsets.UTF_8)
         val url = "$API_BASE/v2/search?query=$q&new_filters=$expression&index=$order&offset=$offset&limit=$limit"
         return caches.search.get(url) { getJson(url) }
     }

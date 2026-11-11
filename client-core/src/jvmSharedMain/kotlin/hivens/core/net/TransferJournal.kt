@@ -95,6 +95,6 @@ class JournalStore(private val json: Json = DEFAULT_JSON) {
 
     private companion object {
         val log: Logger = LoggerFactory.getLogger(JournalStore::class.java)
-        val DEFAULT_JSON = Json { ignoreUnknownKeys = true; encodeDefaults = true }
+        val DEFAULT_JSON: Json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
     }
 }

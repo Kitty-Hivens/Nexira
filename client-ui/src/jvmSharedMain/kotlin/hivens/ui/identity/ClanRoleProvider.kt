@@ -13,6 +13,7 @@ import kotlinx.coroutines.withContext
 import org.jsoup.Jsoup
 import org.slf4j.LoggerFactory
 import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -49,7 +50,7 @@ class ClanRoleProvider internal constructor(
 
     suspend fun eligibility(nick: String): ClanRole {
         cache[nick]?.takeIf { clock.nowMillis() - it.at <= CACHE_TTL_MS }?.let { return it.role }
-        val html = fetchPage("$BASE_URL${URLEncoder.encode(nick, "UTF-8")}")
+        val html = fetchPage("$BASE_URL${URLEncoder.encode(nick, StandardCharsets.UTF_8)}")
         val role = html?.let { parseEligibility(it, nick) } ?: ClanRole.Unknown
         cache[nick] = Cached(role, clock.nowMillis())
         return role

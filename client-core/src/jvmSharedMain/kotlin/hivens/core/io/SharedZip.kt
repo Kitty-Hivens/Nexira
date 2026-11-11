@@ -56,7 +56,9 @@ private class NativeSharedZip(path: Path) : SharedZip {
         return out.asSequence()
     }
 
-    override fun close() = zip.close()
+    override fun close() {
+        zip.close()
+    }
 }
 
 /** Windows-safe reader over a delete-sharing NIO channel (Commons Compress). */
@@ -84,5 +86,7 @@ private class CommonsSharedZip(path: Path) : SharedZip {
         return out.asSequence()
     }
 
-    override fun close() = zip.close()
+    override fun close() {
+        zip.close()
+    }
 }
