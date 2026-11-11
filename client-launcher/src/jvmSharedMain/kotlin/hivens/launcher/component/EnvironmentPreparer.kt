@@ -1,0 +1,184 @@
+package hivens.launcher.component
+
+import hivens.core.io.readUtf8
+import hivens.core.io.writeUtf8
+import hivens.core.io.deleteTree
+import hivens.core.io.resolveWithinRoot
+import hivens.core.platform.OS
+import hivens.core.util.ZipUtils
+import hivens.launcher.util.ClientFileHelper
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import org.slf4j.LoggerFactory
+import java.io.IOException
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.StandardCopyOption
+import java.util.stream.Collectors
+
+/**
+ * The per-instance natives directory: unpacked from the jars the runtime
+ * provisioner already resolved and verified, so nothing here reaches the
+ * network.
+ */
+class EnvironmentPreparer {
+    private val log = LoggerFactory.getLogger(EnvironmentPreparer::class.java)
+
+    /**
+     * Extracts the host natives from the jars the runtime provisioner resolved
+     * from the version manifest. Matches the EXACT LWJGL version the resolved
+     * classpath references -- a fixed fallback version mismatches the bindings
+     * and LWJGL refuses to start. Idempotent: a
+     * valid natives dir short-circuits. The jars are already downloaded and
+     * sha1-verified by the provisioner; this only unpacks + flattens them, so
+     * it makes no network calls.
+     */
+    suspend fun prepareNativesFromManifest(
+        clientRoot: Path,
+        nativesDirName: String,
+        nativeJars: List<Path>,
+        rebuild: Boolean = false,
+    ) = withContext(Dispatchers.IO) {
+        // Built from the pack's Minecraft version, and emptied below: a name that
+        // left the instance would have the clean delete whatever it landed on.
+        val nativesDir = resolveWithinRoot(clientRoot, nativesDirName)
+        val osSuffix = OS.platform.lwjgl
+
+        // The folder check answers "is there something loadable here", which is
+        // what a first launch needs and not what a launch carrying a session
+        // token needs. `java.library.path` points here, so whatever sits under
+        // these names is what the JVM loads -- and a native library runs inside
+        // the game process, which is a stronger position than any mod has. The
+        // contents are wholly derived from jars already verified on download, so
+        // a bound launch re-derives them rather than trusting what it finds.
+        //
+        // A folder built from other jars is not one to trust either. The folder is
+        // named after the Minecraft version alone, and a pack whose loader changed
+        // (vanilla to Legacy Fabric, which brings its own LWJGL) kept the old
+        // natives, which the new LWJGL then failed to load. The jars it was built
+        // from are written beside it and compared.
+        val source = sourceStamp(nativeJars)
+        val sameSource = runCatching { readUtf8(nativesDir.resolve(SOURCE_STAMP)) }.getOrNull() == source
+        val canRebuild = allPresent(nativeJars)
+        val trustFolder = (!rebuild && sameSource) || !canRebuild
+        // A folder whose last extraction did not finish is not one to trust, however
+        // loadable it looks: the check below finds one lwjgl library and passes, and
+        // the game then dies inside the child JVM on the one that is missing.
+        val interrupted = Files.isRegularFile(nativesDir.resolve(EXTRACTING_MARKER))
+        if (trustFolder && !interrupted && isFolderValidForOs(nativesDir, osSuffix)) {
+            if (!canRebuild && (rebuild || !sameSource)) {
+                // Wiping with no complete source to rebuild from would cost the
+                // instance its natives for a reason the user cannot act on.
+                log.error("Natives cannot be re-derived for $osSuffix -- source jars incomplete, keeping what is on disk")
+            } else {
+                log.info("Natives valid for $osSuffix.")
+            }
+            return@withContext
+        }
+        // The whole tree, not its top level. A file left one directory down
+        // survived the clear, and the flatten below then moved it over what had
+        // just been unpacked, into the folder the JVM loads from.
+        deleteTree(nativesDir)
+        ClientFileHelper.ensureDirectoryExists(nativesDir)
+
+        if (nativeJars.isEmpty()) {
+            log.error("No native libraries resolved from the manifest for $osSuffix -- natives directory will be empty")
+            return@withContext
+        }
+        writeUtf8(nativesDir.resolve(EXTRACTING_MARKER), "")
+        for (jar in nativeJars) {
+            if (!Files.isRegularFile(jar)) {
+                throw IOException("A native library the game needs is missing: ${jar.fileName}")
+            }
+            try {
+                ZipUtils.unzip(jar.toFile(), nativesDir.toFile())
+            } catch (e: Exception) {
+                throw IOException("Could not unpack the native library ${jar.fileName}", e)
+            }
+        }
+        flattenNatives(nativesDir)
+        if (!isFolderValidForOs(nativesDir, osSuffix)) {
+            throw IOException("The native libraries for $osSuffix are incomplete, so the game could not start")
+        }
+        writeUtf8(nativesDir.resolve(SOURCE_STAMP), source)
+        Files.deleteIfExists(nativesDir.resolve(EXTRACTING_MARKER))
+    }
+
+    /** The jars a natives folder is built from, by name, which carries the artifact and its version. */
+    private fun sourceStamp(nativeJars: List<Path>): String =
+        nativeJars.map { it.fileName.toString() }.sorted().joinToString("\n")
+
+    /** Every declared native jar is on disk, so a rebuild can complete. */
+    private fun allPresent(nativeJars: List<Path>): Boolean =
+        nativeJars.isNotEmpty() && nativeJars.all { Files.isRegularFile(it) }
+
+    /**
+     * Pulls .so/.dll to the root of the folder if they are in subfolders
+     */
+    internal fun flattenNatives(dir: Path) {
+        try {
+            if (!Files.exists(dir)) return
+            // .use{} closes the stream's underlying directory handle. Without
+            // it the OS fd leaks until GC eventually collects the stream object.
+            val libraries = Files.walk(dir).use { stream ->
+                stream
+                    .filter { Files.isRegularFile(it) }
+                    .filter {
+                        val name = it.fileName.toString()
+                        name.endsWith(".so") || name.endsWith(".dll") || name.endsWith(".dylib")
+                    }
+                    .collect(Collectors.toList())
+            }
+
+            for (lib in libraries) {
+                val target = dir.resolve(lib.fileName)
+                if (lib.parent != dir) {
+                    Files.move(lib, target, StandardCopyOption.REPLACE_EXISTING)
+                }
+            }
+        } catch (e: Exception) {
+            log.warn("Failed to flatten natives directory", e)
+        }
+    }
+
+    /**
+     * The natives directory is "valid" only when an actual lwjgl
+     * native is present, not just *any* file with the platform's
+     * extension. Catching only the extension treats a directory
+     * containing only `libjinput-*.so` as valid (jinput is a `.so`
+     * too), letting [prepareNativesFromManifest] short-circuit on a
+     * half-populated dir; the game then dies with
+     * `UnsatisfiedLinkError: no lwjgl64 in java.library.path`.
+     *
+     * Substring match on `lwjgl` keeps the gate version-agnostic: it
+     * catches LWJGL 2 (`liblwjgl.so` + `liblwjgl64.so`) and LWJGL 3
+     * (`liblwjgl.so`, `liblwjgl-glfw.so`, …) plus the missing-`lib`-
+     * prefix Windows naming (`lwjgl.dll`) without enumerating module
+     * names that could drift across versions.
+     */
+    internal fun isFolderValidForOs(dir: Path, os: String): Boolean {
+        if (!Files.exists(dir)) return false
+        val extension = when (os) {
+            "linux"   -> ".so"
+            "windows" -> ".dll"
+            "macos"   -> ".dylib"
+            else -> return false
+        }
+        return try {
+            Files.list(dir).use { stream ->
+                stream.anyMatch {
+                    val name = it.fileName.toString().lowercase()
+                    name.contains("lwjgl") && name.endsWith(extension)
+                }
+            }
+        } catch (_: Exception) { false }
+    }
+
+    private companion object {
+        /** Present while an extraction is under way, so one that died partway is not trusted next time. */
+        const val EXTRACTING_MARKER = ".nexira-extracting"
+
+        /** The jars the folder was last built from, see [sourceStamp]. */
+        const val SOURCE_STAMP = ".nexira-natives-from"
+    }
+}

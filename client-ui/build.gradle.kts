@@ -15,6 +15,7 @@ plugins {
     alias(libs.plugins.buildconfig)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
+    alias(libs.plugins.android.kmp.library)
     // nexira.packaging: convention plugin from buildSrc/ that owns the
     // jlink + jpackage tasks for distribution builds. Currently registers
     // `:client-ui:customRuntime` only -- the jpackage path lands in a
@@ -78,8 +79,29 @@ kotlin {
         // kotlin.test only, so kotlin("test") just resolves to the junit5 variant.
         testRuns["test"].executionTask.configure { useJUnitPlatform() }
     }
+    android {
+        namespace = "hivens.ui"
+        compileSdk = providers.gradleProperty("nexira.android.compileSdk").map(String::toInt).getOrElse(37)
+        minSdk = 31
+        // Compose resources travel as assets of the Android library, which are only packaged when the library takes part in resource processing.
+        androidResources {
+            enable = true
+        }
+        compilerOptions {
+            jvmTarget.set(JvmTarget.JVM_25)
+        }
+    }
 
     sourceSets {
+        // What both hosts compile: the screens and the code under them. Anything that
+        // names a desktop window, AWT, Skia or a desktop-only library stays in
+        // desktopMain, and the Android host supplies its own.
+        val jvmSharedMain = create("jvmSharedMain") {
+            dependsOn(getByName("commonMain"))
+        }
+        getByName("desktopMain").dependsOn(jvmSharedMain)
+        getByName("androidMain").dependsOn(jvmSharedMain)
+
         getByName("commonMain") {
             dependencies {
                 implementation(libs.compose.runtime)
@@ -106,32 +128,20 @@ kotlin {
                 val coilV     = libs.versions.coil.get()
                 implementation("$coilCoord:coil-compose:$coilV")        { exclude(group = "org.jetbrains.skiko") }
                 implementation("$coilCoord:coil-network-okhttp:$coilV") { exclude(group = "org.jetbrains.skiko") }
-                // SVG for pack descriptions, which are full of shields.io badges.
-                // Deliberately NOT coil-svg: its renderer on this platform is Skia's
-                // SVG module, which draws no text -- see SvgImageDecoder. Animation
-                // is elsewhere again: coil-gif is Android-only and does not resolve
-                // here, so moving images go through skinema below.
-                implementation(libs.jsvg)
                 implementation(libs.ktor.serialization.json)
             }
         }
 
-        val desktopMain = getByName("desktopMain") {
+        getByName("jvmSharedMain") {
             dependencies {
-                implementation(compose.desktop.currentOs)
-
                 implementation(project(":client-config"))
+                implementation(project(":client-playback"))
                 implementation(project(":client-core"))
                 implementation(project(":client-auth"))
                 implementation(project(":client-launcher"))
-                implementation(project(":client-update"))
                 implementation(project(":client-media"))
-                implementation(project(":client-tray"))
                 implementation(project(":widget-api"))
                 implementation(project(":nx-ui"))
-                // Packages carved out of this module and kept under their
-                // original names (hivens.ui.i18n / .scene3d / .render3d /
-                // .skin3d / .easter), so every call site here is unchanged.
                 implementation(project(":client-i18n"))
                 implementation(project(":client-render3d"))
                 implementation(project(":client-easter"))
@@ -140,6 +150,37 @@ kotlin {
                 implementation(libs.filekit.dialogs.compose)
                 implementation(libs.koin.core)
                 implementation(libs.koin.compose)
+                implementation(libs.ktor.client.core)
+                implementation(libs.jsoup)
+                implementation(libs.markdown.core)
+                // Material You colour science -- wallpaper-seeded palette engine.
+                implementation(libs.material.color.utilities)
+            }
+        }
+
+        getByName("androidMain") {
+            dependencies {
+                implementation(libs.androidx.activity.compose)
+                implementation(libs.skinema.compose)
+            }
+            // A SmartyCraft-bound pack joins through the authlib-redirect agent on a phone too, see the agent block below
+            resources.srcDir(layout.buildDirectory.dir("generated/authlibAgent"))
+        }
+
+        val desktopMain = getByName("desktopMain") {
+            dependencies {
+                implementation(compose.desktop.currentOs)
+
+                implementation(project(":client-update"))
+                implementation(project(":client-tray"))
+                implementation(project(":client-window"))
+
+                // SVG for pack descriptions, which are full of shields.io badges.
+                // Deliberately NOT coil-svg: its renderer on this platform is Skia's
+                // SVG module, which draws no text -- see SvgImageDecoder. Animation
+                // is elsewhere again: coil-gif is Android-only and does not resolve
+                // here, so moving images go through skinema below.
+                implementation(libs.jsvg)
                 implementation(libs.kotlinx.coroutines.swing)
                 implementation(libs.logback.classic)
                 // libtray now enters transitively via :client-tray; only
@@ -193,13 +234,6 @@ kotlin {
                     else -> error("skinema-natives: no decode classifier for host OS '$hostOs' (arch '$hostArch')")
                 }
                 runtimeOnly("dev.hivens:skinema-natives:${libs.versions.skinemaNatives.get()}:$skinemaNativeClassifier")
-                implementation(libs.ktor.client.core)
-                // In-launcher HTML renderer (hivens.ui.render): jsoup parses, the
-                // markdown lib does md->html. The velocipede before the standalone lib.
-                implementation(libs.jsoup)
-                implementation(libs.markdown.core)
-                // Material You colour science -- wallpaper-seeded palette engine.
-                implementation(libs.material.color.utilities)
             }
         }
 
@@ -259,6 +293,9 @@ kotlin {
 // configuration per target compilation, not per source set.
 dependencies {
     add("kspDesktop", project(":widget-processor"))
+    // The same processor on the Android target: each target gets the registry of the
+    // widgets it compiles, so a widget that only exists on the desktop is simply absent.
+    add("kspAndroid", project(":widget-processor"))
     // Widget modules arrive from the user's widgets directory at boot, not from
     // this build. The loader is what finds them.
     add("desktopMainImplementation", project(":widget-loader"))
@@ -671,7 +708,7 @@ tasks.matching { it.name == "customRuntime" || it.name == "emitAppImageProfile" 
 // `-PnexiraComposeMetrics=true`. They write per-compile files into
 // `build/compose_metrics` and `build/compose_reports`, useful for
 // recomposition audits but wasted IO on every regular compile.
-tasks.withType<KotlinJvmCompile>().configureEach {
+tasks.withType<KotlinJvmCompile>().matching { !it.name.contains("Android") }.configureEach {
     compilerOptions {
         jvmTarget.set(JvmTarget.JVM_27)
 
@@ -797,7 +834,7 @@ tasks.configureEach {
     if (name.contains("checkRuntime")) {
         dependsOn(
             ":client-config:generateBuildConfigClasses",
-            ":client-config:processResources",
+            ":client-config:jvmProcessResources",
             ":client-core:processResources",
             ":client-launcher:processResources"
         )
@@ -823,6 +860,11 @@ val bundleAuthlibAgent = tasks.register<Copy>("bundleAuthlibAgent") {
 }
 tasks.matching { it.name.endsWith("ProcessResources") }.configureEach {
     dependsOn(bundleProfilerAgent, bundleAuthlibAgent)
+}
+// The Android library collects its Java resources in tasks of its own (mergeAndroidMainJavaResource,
+// compressAndroidMainJavaRes), which the name match above does not reach.
+tasks.matching { it.name.contains("AndroidMainJavaRes") }.configureEach {
+    dependsOn(bundleAuthlibAgent)
 }
 
 // Portable ZIP packaging lives in the build_release workflow's
@@ -859,6 +901,10 @@ tasks.withType<JavaExec>().configureEach {
 // is kept off that module's: a fixture the tests could already see would resolve
 // through the parent loader and prove nothing about loading.
 tasks.named<Test>("desktopTest") {
+    // FilePickerCallSitesTest reads the Android sources as text. Nothing else makes
+    // them an input of this task, so without this a change there was restored from the
+    // build cache as a pass the test never gave.
+    inputs.dir("src/androidMain/kotlin").withPropertyName("androidMainSources").withPathSensitivity(PathSensitivity.RELATIVE)
     dependsOn(":widget-loader:fixtureModuleJar")
     systemProperty(
         "nexira.test.fixtureModuleJar",

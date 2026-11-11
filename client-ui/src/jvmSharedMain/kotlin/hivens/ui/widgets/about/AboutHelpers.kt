@@ -1,0 +1,109 @@
+package hivens.ui.widgets.about
+
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import hivens.ui.icons.IconKey
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
+import hivens.ui.platform.SystemActions
+import hivens.ui.theme.LocalMonoFamily
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
+
+// Shared composables reused across the about widgets. SectionLabel
+// titles a group, InfoRow renders one label/value pair (5 system
+// rows use this), LinkButton is the outlined external-link affordance.
+
+@Composable
+internal fun SectionLabel(text: String) {
+    Text(
+        text          = text,
+        style         = MaterialTheme.typography.labelSmall,
+        fontWeight    = FontWeight.Bold,
+        color         = NxColor.lead(),
+        letterSpacing = 1.sp,
+    )
+}
+
+@Composable
+internal fun InfoRow(icon: IconKey, label: String, value: String) {
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        // The value goes under its label where the two would not share a line: a long value
+        // right-aligned beside a label wrapped into two ragged lines, or was cut off.
+        val stacked = maxWidth < STACK_BELOW
+        if (stacked) {
+            Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Symbol(icon, null, tint = NxInk.quiet.copy(alpha = 0.4f), modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(label, color = NxInk.quiet, fontSize = 13.sp)
+                }
+                Text(
+                    text       = value,
+                    color      = NxInk.main,
+                    fontSize   = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    fontFamily = LocalMonoFamily.current,
+                    modifier   = Modifier.padding(start = 24.dp),
+                )
+            }
+        } else {
+            Row(
+                modifier          = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Symbol(icon, null, tint = NxInk.quiet.copy(alpha = 0.4f), modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(label, color = NxInk.quiet, fontSize = 13.sp)
+                Spacer(Modifier.width(12.dp))
+                Text(
+                    text       = value,
+                    color      = NxInk.main,
+                    fontSize   = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    fontFamily = LocalMonoFamily.current,
+                    textAlign  = TextAlign.End,
+                    modifier   = Modifier.weight(1f),
+                )
+            }
+        }
+    }
+}
+
+/** Under this width a label and its value take a line each. */
+private val STACK_BELOW = 420.dp
+
+@Composable
+internal fun LinkButton(label: String, url: String, icon: IconKey) {
+    OutlinedButton(
+        onClick        = { SystemActions.openUrl(url) },
+        modifier       = Modifier.fillMaxWidth(),
+        shape          = MaterialTheme.shapes.small,
+        border         = BorderStroke(1.dp, NxInk.line.copy(alpha = 0.2f)),
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+    ) {
+        Symbol(icon, null, modifier = Modifier.size(16.dp), tint = NxColor.lead())
+        Spacer(Modifier.width(8.dp))
+        Text(label, color = NxInk.main)
+        Spacer(Modifier.weight(1f))
+        Symbol(NxIcon.OpenInNew, null, tint = NxInk.quiet.copy(alpha = 0.4f), modifier = Modifier.size(14.dp))
+    }
+}

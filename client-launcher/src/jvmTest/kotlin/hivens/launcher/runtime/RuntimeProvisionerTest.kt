@@ -1,0 +1,803 @@
+package hivens.launcher.runtime
+
+import hivens.test.testTransferEngine
+import hivens.core.api.HttpClientProvider
+import hivens.core.platform.Libc
+import hivens.launcher.runtime.loader.LibrarySpec
+import hivens.launcher.runtime.loader.LoaderProfile
+import hivens.launcher.runtime.loader.LoaderRegistry
+import hivens.launcher.runtime.loader.LoaderResolver
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.mock.MockEngine
+import io.ktor.client.engine.mock.respond
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.headersOf
+import io.ktor.utils.io.ByteReadChannel
+import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
+import java.io.IOException
+import java.nio.file.Files
+import java.nio.file.Path
+import java.security.MessageDigest
+import java.util.Comparator
+import kotlin.io.path.exists
+import kotlin.io.path.readText
+import kotlin.test.AfterTest
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
+
+class RuntimeProvisionerTest {
+
+    private val json = Json { ignoreUnknownKeys = true }
+    private val tmp: Path = Files.createTempDirectory("nexira-rt-test")
+    private val librariesDir: Path = tmp.resolve("libraries")
+    private val assetsDir: Path = tmp.resolve("assets")
+
+    @AfterTest
+    fun cleanup() {
+        if (!Files.exists(tmp)) return
+        Files.walk(tmp).use { stream ->
+            stream.sorted(Comparator.reverseOrder()).forEach { val _ = runCatching { Files.delete(it) } }
+        }
+    }
+
+    private fun sha1(bytes: ByteArray): String =
+        MessageDigest.getInstance("SHA-1").digest(bytes).joinToString("") { "%02x".format(it) }
+
+    private fun sha1(s: String): String = sha1(s.toByteArray())
+
+    // Pin the host arch: CI runners vary (macos-latest is arm64), and an
+    // un-pinned os.arch flips acceptedNativeClassifiers to the -arm64 variant,
+    // breaking tests that assert the x64 `natives-<os>` classifier.
+    private fun provisioner(
+        client: HttpClient,
+        osName: String = "Linux",
+        osArch: String = "amd64",
+        libc: Libc = Libc.UNKNOWN,
+        hostNatives: HostNativeSource? = null,
+    ) = RuntimeProvisioner(
+        librariesDir = librariesDir,
+        assetsDir = assetsDir,
+        clientProvider = HttpClientProvider { client },
+        transfers = testTransferEngine(HttpClientProvider { client }),
+        json = json,
+        osName = osName,
+        osArch = osArch,
+        versionManifestUrl = MANIFEST_URL,
+        resourcesBaseUrl = RES_BASE,
+        libc = libc,
+        hostNatives = hostNatives,
+    )
+
+    // -- pure logic -----------------------------------------------------------
+
+    @Test
+    fun `client jar lands at a synthetic minecraft coord under libraries`() {
+        val p = provisioner(HttpClient(MockEngine { respond("", HttpStatusCode.OK) }))
+        assertEquals(
+            "net/minecraft/minecraft/1.12.2/minecraft-1.12.2.jar",
+            p.clientJarRelPath("1.12.2"),
+        )
+    }
+
+    @Test
+    fun `asset object path and url are content-addressed by hash prefix`() {
+        val p = provisioner(HttpClient(MockEngine { respond("", HttpStatusCode.OK) }))
+        val hash = "abcd1234ef567890abcd1234ef567890abcd1234"
+        assertEquals("objects/ab/$hash", p.assetObjectRelPath(hash))
+        assertEquals("$RES_BASE/ab/$hash", p.assetObjectUrl(hash))
+        assertEquals("indexes/1.12.json", p.assetIndexRelPath("1.12"))
+    }
+
+    @Test
+    fun `rule evaluation keeps allowed libs and drops wrong-platform libs`() {
+        val p = provisioner(HttpClient(MockEngine { respond("", HttpStatusCode.OK) }), osName = "Linux")
+        assertTrue(p.isLibraryAllowed(emptyList()))
+        assertTrue(p.isLibraryAllowed(listOf(MojangRule("allow"))))
+        // allow-all then disallow-on-linux -> disallowed on linux.
+        assertTrue(!p.isLibraryAllowed(listOf(MojangRule("allow"), MojangRule("disallow", MojangOs("linux")))))
+        // default-disallow then allow-only-osx -> disallowed on linux.
+        assertTrue(!p.isLibraryAllowed(listOf(MojangRule("disallow"), MojangRule("allow", MojangOs("osx")))))
+    }
+
+    @Test
+    fun `planner maps libraries, client, and every asset object`() {
+        val p = provisioner(HttpClient(MockEngine { respond("", HttpStatusCode.OK) }))
+        val version = MojangVersion(
+            assetIndex = MojangAssetIndexRef(id = "1.12", sha1 = "x", url = "u"),
+            downloads = MojangDownloads(MojangArtifact(sha1 = "c", size = 9, url = "https://piston/client.jar")),
+            libraries = listOf(
+                MojangLibrary(
+                    name = "com.mojang:patchy:1.1",
+                    downloads = MojangLibraryDownloads(
+                        MojangArtifact("com/mojang/patchy/1.1/patchy-1.1.jar", "l", 6, "https://libs/patchy.jar"),
+                    ),
+                ),
+                // dropped: disallowed on linux even though it has an artifact.
+                MojangLibrary(
+                    name = "win.only:lib:1",
+                    downloads = MojangLibraryDownloads(MojangArtifact("win/only/lib/1/lib-1.jar", "w", 1, "https://libs/win.jar")),
+                    rules = listOf(MojangRule("disallow"), MojangRule("allow", MojangOs("windows"))),
+                ),
+            ),
+        )
+        val index = MojangAssetIndex(objects = mapOf("minecraft/lang/en_us.lang" to MojangAssetObject("deadbeef", 4)))
+
+        val tasks = p.planVanillaDownloads("1.12.2", version, index)
+
+        // patchy lib + client jar + 1 asset object; the windows-only lib is dropped on linux.
+        assertEquals(3, tasks.size)
+        val byDest = tasks.associateBy { it.dest }
+        assertTrue(byDest.keys.any { it == librariesDir.resolve("com/mojang/patchy/1.1/patchy-1.1.jar") })
+        assertTrue(byDest.keys.any { it == librariesDir.resolve("net/minecraft/minecraft/1.12.2/minecraft-1.12.2.jar") })
+        assertTrue(byDest.keys.any { it == assetsDir.resolve("objects/de/deadbeef") })
+        assertTrue(byDest.keys.none { it.toString().contains("win") }, "wrong-platform lib must be dropped")
+    }
+
+    @Test
+    fun `a library path climbing out of the libraries root is refused`() {
+        // artifact.path comes from the per-version json, which carries no
+        // signature of its own -- the sha1 chain hanging off it authenticates
+        // the bytes, never the document that names them. So the destination is
+        // the server's to choose unless it is bounded.
+        val p = provisioner(HttpClient(MockEngine { respond("", HttpStatusCode.OK) }))
+        val version = MojangVersion(
+            assetIndex = MojangAssetIndexRef(id = "1.12", sha1 = "x", url = "u"),
+            downloads = MojangDownloads(MojangArtifact(sha1 = "c", size = 9, url = "https://piston/client.jar")),
+            libraries = listOf(
+                MojangLibrary(
+                    name = "evil:lib:1",
+                    downloads = MojangLibraryDownloads(
+                        MojangArtifact("../../../../.config/autostart/evil.desktop", "l", 6, "https://libs/evil"),
+                    ),
+                ),
+            ),
+        )
+        val index = MojangAssetIndex(objects = emptyMap())
+
+        assertFailsWith<IOException> { p.planVanillaDownloads("1.12.2", version, index) }
+    }
+
+    @Test
+    fun `an asset hash climbing out of the assets root is refused`() {
+        val p = provisioner(HttpClient(MockEngine { respond("", HttpStatusCode.OK) }))
+        val version = MojangVersion(
+            assetIndex = MojangAssetIndexRef(id = "1.12", sha1 = "x", url = "u"),
+            downloads = MojangDownloads(MojangArtifact(sha1 = "c", size = 9, url = "https://piston/client.jar")),
+        )
+        // The hash is pasted straight into the object path, so it decides where
+        // the object lands as much as any explicit path field does.
+        val index = MojangAssetIndex(objects = mapOf("x" to MojangAssetObject("../../../../evil", 4)))
+
+        assertFailsWith<IOException> { p.planVanillaDownloads("1.12.2", version, index) }
+    }
+
+    @Test
+    fun `native jar paths pick host-matching classifiers from both manifest shapes`() {
+        val p = provisioner(HttpClient(MockEngine { respond("", HttpStatusCode.OK) }), osName = "Linux")
+        val version = MojangVersion(
+            assetIndex = MojangAssetIndexRef(id = "x", sha1 = "x", url = "u"),
+            downloads = MojangDownloads(MojangArtifact(sha1 = "c", size = 1, url = "u")),
+            libraries = listOf(
+                // pre-1.19 shape: base artifact + per-os classifier natives. linux kept;
+                // windows dropped; the sources classifier ignored entirely.
+                MojangLibrary(
+                    name = "org.lwjgl.lwjgl:lwjgl:2.9.4",
+                    downloads = MojangLibraryDownloads(
+                        artifact = MojangArtifact("org/lwjgl/lwjgl/lwjgl/2.9.4/lwjgl-2.9.4.jar", "a", 1, "u"),
+                        classifiers = mapOf(
+                            "natives-linux" to MojangArtifact("org/lwjgl/lwjgl/lwjgl/2.9.4/lwjgl-2.9.4-natives-linux.jar", "n", 1, "u"),
+                            "natives-windows" to MojangArtifact("org/lwjgl/lwjgl/lwjgl/2.9.4/lwjgl-2.9.4-natives-windows.jar", "w", 1, "u"),
+                            "sources" to MojangArtifact("org/lwjgl/lwjgl/lwjgl/2.9.4/lwjgl-2.9.4-sources.jar", "s", 1, "u"),
+                        ),
+                    ),
+                ),
+                // 1.19+ shape: the native is its own library, classifier in the coord,
+                // gated by an os rule. linux kept.
+                MojangLibrary(
+                    name = "org.lwjgl:lwjgl:3.3.3:natives-linux",
+                    downloads = MojangLibraryDownloads(
+                        artifact = MojangArtifact("org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3-natives-linux.jar", "m", 1, "u"),
+                    ),
+                    rules = listOf(MojangRule("allow", MojangOs("linux"))),
+                ),
+                // 1.19+ windows native -- dropped on linux by the os rule.
+                MojangLibrary(
+                    name = "org.lwjgl:lwjgl:3.3.3:natives-windows",
+                    downloads = MojangLibraryDownloads(
+                        artifact = MojangArtifact("org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3-natives-windows.jar", "mw", 1, "u"),
+                    ),
+                    rules = listOf(MojangRule("allow", MojangOs("windows"))),
+                ),
+            ),
+        )
+
+        val natives = p.nativeLibraries(version).map { it.path }
+
+        assertEquals(2, natives.size, "exactly the two linux natives, got $natives")
+        assertTrue(natives.contains(librariesDir.resolve("org/lwjgl/lwjgl/lwjgl/2.9.4/lwjgl-2.9.4-natives-linux.jar")))
+        assertTrue(natives.contains(librariesDir.resolve("org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3-natives-linux.jar")))
+        assertTrue(natives.none { it.toString().contains("windows") }, "wrong-OS natives must be dropped")
+        assertTrue(natives.none { it.toString().contains("sources") }, "non-native classifiers must be ignored")
+    }
+
+    @Test
+    fun `planner downloads the host classifier natives, not other platforms`() {
+        val p = provisioner(HttpClient(MockEngine { respond("", HttpStatusCode.OK) }), osName = "Linux")
+        val version = MojangVersion(
+            assetIndex = MojangAssetIndexRef(id = "x", sha1 = "x", url = "u"),
+            downloads = MojangDownloads(MojangArtifact(sha1 = "c", size = 1, url = "https://piston/client.jar")),
+            libraries = listOf(
+                MojangLibrary(
+                    name = "org.lwjgl.lwjgl:lwjgl:2.9.4",
+                    downloads = MojangLibraryDownloads(
+                        artifact = MojangArtifact("org/lwjgl/lwjgl/lwjgl/2.9.4/lwjgl-2.9.4.jar", "a", 1, "https://libs/base.jar"),
+                        classifiers = mapOf(
+                            "natives-linux" to MojangArtifact("org/lwjgl/lwjgl/lwjgl/2.9.4/lwjgl-2.9.4-natives-linux.jar", "n", 1, "https://libs/nat-linux.jar"),
+                            "natives-windows" to MojangArtifact("org/lwjgl/lwjgl/lwjgl/2.9.4/lwjgl-2.9.4-natives-windows.jar", "w", 1, "https://libs/nat-win.jar"),
+                        ),
+                    ),
+                ),
+            ),
+        )
+        val index = MojangAssetIndex(objects = emptyMap())
+
+        val dests = p.planVanillaDownloads("2.9.4", version, index).map { it.dest }
+
+        assertTrue(dests.contains(librariesDir.resolve("org/lwjgl/lwjgl/lwjgl/2.9.4/lwjgl-2.9.4.jar")), "base jar downloaded")
+        assertTrue(dests.contains(librariesDir.resolve("org/lwjgl/lwjgl/lwjgl/2.9.4/lwjgl-2.9.4-natives-linux.jar")), "host natives downloaded")
+        assertTrue(dests.none { it.toString().contains("natives-windows") }, "wrong-OS natives must not be downloaded")
+    }
+
+    @Test
+    fun `vanilla libraries keep the host native and drop foreign-platform natives`() {
+        val p = provisioner(HttpClient(MockEngine { respond("", HttpStatusCode.OK) }), osName = "Linux")
+        val version = MojangVersion(
+            assetIndex = MojangAssetIndexRef(id = "x", sha1 = "x", url = "u"),
+            downloads = MojangDownloads(MojangArtifact(sha1 = "c", size = 1, url = "u")),
+            libraries = listOf(
+                MojangLibrary(
+                    name = "com.example:plain:1",
+                    downloads = MojangLibraryDownloads(MojangArtifact("com/example/plain/1/plain-1.jar", "p", 1, "u")),
+                ),
+                MojangLibrary(
+                    name = "org.lwjgl:lwjgl:3.3.3:natives-linux",
+                    downloads = MojangLibraryDownloads(MojangArtifact("org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3-natives-linux.jar", "l", 1, "u")),
+                    rules = listOf(MojangRule("allow", MojangOs("linux"))),
+                ),
+                // Same OS, foreign arch: passes the os.name rule but must NOT land on
+                // -cp -- on the module path it would collide as a second org.lwjgl.natives.
+                MojangLibrary(
+                    name = "org.lwjgl:lwjgl:3.3.3:natives-linux-arm64",
+                    downloads = MojangLibraryDownloads(MojangArtifact("org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3-natives-linux-arm64.jar", "a", 1, "u")),
+                    rules = listOf(MojangRule("allow", MojangOs("linux"))),
+                ),
+            ),
+        )
+
+        val libs = p.vanillaLibraries(version)
+        val classifiers = libs.map { it.coord.classifier }
+        assertEquals(2, libs.size, "plain lib + host native only, got $classifiers")
+        assertTrue(libs.any { it.coord.classifier == null && it.path.toString().contains("plain-1.jar") }, "normal lib kept")
+        assertTrue("natives-linux" in classifiers, "host native kept -- the module graph needs it")
+        assertTrue("natives-linux-arm64" !in classifiers, "foreign-arch native must be dropped from the classpath")
+    }
+
+    private fun lwjglVersion(): MojangVersion = MojangVersion(
+        assetIndex = MojangAssetIndexRef(id = "x", sha1 = "x", url = "u"),
+        downloads = MojangDownloads(MojangArtifact(sha1 = "c", size = 1, url = "https://piston/client.jar")),
+        libraries = listOf(
+            MojangLibrary(
+                name = "org.lwjgl:lwjgl:3.3.3",
+                downloads = MojangLibraryDownloads(MojangArtifact("org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3.jar", "b", 1, "https://libs/lwjgl.jar")),
+            ),
+            MojangLibrary(
+                name = "org.lwjgl:lwjgl:3.3.3:natives-linux-arm64",
+                downloads = MojangLibraryDownloads(MojangArtifact("org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3-natives-linux-arm64.jar", "n", 1, "https://libs/natives.jar")),
+                rules = listOf(MojangRule("allow", MojangOs("linux"))),
+            ),
+        ),
+    )
+
+    @Test
+    fun `an arm64 glibc host takes Mojang's arm64 natives`() {
+        val p = provisioner(HttpClient(MockEngine { respond("", HttpStatusCode.OK) }), osArch = "aarch64", libc = Libc.GLIBC)
+
+        val natives = p.nativeLibraries(lwjglVersion()).map { it.path }
+
+        assertEquals(listOf(librariesDir.resolve("org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3-natives-linux-arm64.jar")), natives)
+    }
+
+    @Test
+    fun `a bionic or musl host takes none of Mojang's glibc natives, from the plan, the classpath or the extract set`() {
+        for (libc in listOf(Libc.BIONIC, Libc.MUSL)) {
+            val p = provisioner(HttpClient(MockEngine { respond("", HttpStatusCode.OK) }), osArch = "aarch64", libc = libc)
+            val version = lwjglVersion()
+
+            assertTrue(p.nativeLibraries(version).isEmpty(), "$libc: no natives to extract")
+            val classifiers = p.vanillaLibraries(version).map { it.coord.classifier }
+            assertEquals(listOf<String?>(null), classifiers, "$libc: only the plain jar stays on the classpath")
+            val dests = p.planVanillaDownloads("3.3.3", version, MojangAssetIndex(objects = emptyMap())).map { it.dest.toString() }
+            assertTrue(dests.none { it.contains("natives") }, "$libc: nothing glibc is downloaded, got $dests")
+        }
+    }
+
+    @Test
+    fun `the natives of the host come in for the LWJGL release the classpath has`() = runTest {
+        val libBytes = "LWJGL-JAR".toByteArray()
+        val clientBytes = "CLIENT-JAR".toByteArray()
+        val indexJson = """{"objects":{}}"""
+        val versionJson = """
+            {
+              "assetIndex": {"id":"1.12","sha1":"${sha1(indexJson)}","size":${indexJson.length},"totalSize":0,"url":"$INDEX_URL"},
+              "downloads": {"client": {"sha1":"${sha1(clientBytes)}","size":${clientBytes.size},"url":"$CLIENT_URL"}},
+              "libraries": [
+                {"name":"org.lwjgl:lwjgl:3.3.3","downloads":{"artifact":{"path":"org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3.jar","sha1":"${sha1(libBytes)}","size":${libBytes.size},"url":"https://test.invalid/libs/lwjgl.jar"}}},
+                {"name":"org.lwjgl:lwjgl:3.3.3:natives-linux-arm64","downloads":{"artifact":{"path":"org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3-natives-linux-arm64.jar","sha1":"00","size":1,"url":"https://test.invalid/libs/glibc-natives.jar"}},"rules":[{"action":"allow","os":{"name":"linux"}}]}
+              ]
+            }
+        """.trimIndent()
+        val requests = mutableListOf<String>()
+        val engine = MockEngine { req ->
+            val url = req.url.toString()
+            requests += url
+            when (url) {
+                MANIFEST_URL -> respond("""{"versions":[{"id":"1.12.2","url":"$VERSION_URL"}]}""", HttpStatusCode.OK, jsonHeaders)
+                VERSION_URL -> respond(versionJson, HttpStatusCode.OK, jsonHeaders)
+                INDEX_URL -> respond(indexJson, HttpStatusCode.OK, jsonHeaders)
+                "https://test.invalid/libs/lwjgl.jar" -> respond(ByteReadChannel(libBytes), HttpStatusCode.OK)
+                CLIENT_URL -> respond(ByteReadChannel(clientBytes), HttpStatusCode.OK)
+                else -> respond("missing: $url", HttpStatusCode.NotFound)
+            }
+        }
+        val asked = mutableListOf<String>()
+        val hostJar = tmp.resolve("host-natives.jar")
+        val source = HostNativeSource { version, _ ->
+            asked += version
+            listOf(hostJar)
+        }
+        val p = provisioner(HttpClient(engine), osArch = "aarch64", libc = Libc.BIONIC, hostNatives = source)
+
+        val runtime = p.ensureRuntime("1.12.2", null, "")
+
+        assertEquals(listOf("3.3.3"), asked, "asked for the release the classpath carries")
+        assertEquals(listOf(hostJar), runtime.natives, "the host's jars and none of Mojang's")
+        assertTrue(requests.none { it.contains("glibc-natives") }, "Mojang's glibc jar is never requested, got $requests")
+    }
+
+    @Test
+    fun `a variant of the LWJGL core jar takes the natives of its release`() = runTest {
+        val libBytes = "LWJGL-JAR".toByteArray()
+        val clientBytes = "CLIENT-JAR".toByteArray()
+        val indexJson = """{"objects":{}}"""
+        val versionJson = """
+            {
+              "assetIndex": {"id":"1.12","sha1":"${sha1(indexJson)}","size":${indexJson.length},"totalSize":0,"url":"$INDEX_URL"},
+              "downloads": {"client": {"sha1":"${sha1(clientBytes)}","size":${clientBytes.size},"url":"$CLIENT_URL"}},
+              "libraries": [
+                {"name":"org.lwjgl:lwjgl:3.4.1-unsafe","downloads":{"artifact":{"path":"org/lwjgl/lwjgl/3.4.1/lwjgl-3.4.1-unsafe.jar","sha1":"${sha1(libBytes)}","size":${libBytes.size},"url":"https://test.invalid/libs/lwjgl.jar"}}}
+              ]
+            }
+        """.trimIndent()
+        val engine = MockEngine { req ->
+            when (val url = req.url.toString()) {
+                MANIFEST_URL -> respond("""{"versions":[{"id":"1.12.2","url":"$VERSION_URL"}]}""", HttpStatusCode.OK, jsonHeaders)
+                VERSION_URL -> respond(versionJson, HttpStatusCode.OK, jsonHeaders)
+                INDEX_URL -> respond(indexJson, HttpStatusCode.OK, jsonHeaders)
+                "https://test.invalid/libs/lwjgl.jar" -> respond(ByteReadChannel(libBytes), HttpStatusCode.OK)
+                CLIENT_URL -> respond(ByteReadChannel(clientBytes), HttpStatusCode.OK)
+                else -> respond("missing: $url", HttpStatusCode.NotFound)
+            }
+        }
+        val asked = mutableListOf<String>()
+        val p = provisioner(
+            HttpClient(engine),
+            osArch = "aarch64",
+            libc = Libc.BIONIC,
+            hostNatives = { version, _ ->
+                asked += version
+                emptyList()
+            },
+        )
+
+        val _ = p.ensureRuntime("1.12.2", null, "")
+
+        assertEquals(listOf("3.4.1"), asked)
+    }
+
+    @Test
+    fun `a classpath with no LWJGL 3 gets no host natives and nothing is asked`() = runTest {
+        val clientBytes = "CLIENT-JAR".toByteArray()
+        val indexJson = """{"objects":{}}"""
+        val versionJson = """
+            {
+              "assetIndex": {"id":"1.12","sha1":"${sha1(indexJson)}","size":${indexJson.length},"totalSize":0,"url":"$INDEX_URL"},
+              "downloads": {"client": {"sha1":"${sha1(clientBytes)}","size":${clientBytes.size},"url":"$CLIENT_URL"}},
+              "libraries": []
+            }
+        """.trimIndent()
+        val engine = MockEngine { req ->
+            when (req.url.toString()) {
+                MANIFEST_URL -> respond("""{"versions":[{"id":"1.12.2","url":"$VERSION_URL"}]}""", HttpStatusCode.OK, jsonHeaders)
+                VERSION_URL -> respond(versionJson, HttpStatusCode.OK, jsonHeaders)
+                INDEX_URL -> respond(indexJson, HttpStatusCode.OK, jsonHeaders)
+                CLIENT_URL -> respond(ByteReadChannel(clientBytes), HttpStatusCode.OK)
+                else -> respond("missing", HttpStatusCode.NotFound)
+            }
+        }
+        var asked = false
+        val p = provisioner(HttpClient(engine), osArch = "aarch64", libc = Libc.BIONIC, hostNatives = { _, _ -> asked = true; emptyList() })
+
+        val runtime = p.ensureRuntime("1.12.2", null, "")
+
+        assertTrue(!asked, "no LWJGL 3, so no release to ask for")
+        assertTrue(runtime.natives.isEmpty())
+    }
+
+    // -- end to end (MockEngine) ----------------------------------------------
+
+    @Test
+    fun `ensureVanilla downloads runtime, verifies sha1, returns libraries, idempotent`() = runTest {
+        val libBytes = "PATCHY-JAR".toByteArray()
+        val clientBytes = "CLIENT-JAR".toByteArray()
+        val objBytes = "EN-US-LANG".toByteArray()
+        val objHash = sha1(objBytes)
+
+        val indexJson = """{"objects":{"minecraft/lang/en_us.lang":{"hash":"$objHash","size":${objBytes.size}}}}"""
+        val indexSha = sha1(indexJson)
+
+        val versionJson = """
+            {
+              "assetIndex": {"id":"1.12","sha1":"$indexSha","size":${indexJson.length},"totalSize":${objBytes.size},"url":"$INDEX_URL"},
+              "downloads": {"client": {"sha1":"${sha1(clientBytes)}","size":${clientBytes.size},"url":"$CLIENT_URL"}},
+              "libraries": [
+                {"name":"com.mojang:patchy:1.1","downloads":{"artifact":{"path":"com/mojang/patchy/1.1/patchy-1.1.jar","sha1":"${sha1(libBytes)}","size":${libBytes.size},"url":"$LIB_URL"}}}
+              ]
+            }
+        """.trimIndent()
+        val manifestJson = """{"versions":[{"id":"1.12.2","url":"$VERSION_URL"}]}"""
+
+        val requests = mutableListOf<String>()
+        val engine = MockEngine { req ->
+            val url = req.url.toString()
+            requests += url
+            when (url) {
+                MANIFEST_URL -> respond(manifestJson, HttpStatusCode.OK, jsonHeaders)
+                VERSION_URL -> respond(versionJson, HttpStatusCode.OK, jsonHeaders)
+                INDEX_URL -> respond(indexJson, HttpStatusCode.OK, jsonHeaders)
+                LIB_URL -> respond(ByteReadChannel(libBytes), HttpStatusCode.OK)
+                CLIENT_URL -> respond(ByteReadChannel(clientBytes), HttpStatusCode.OK)
+                "$RES_BASE/${objHash.take(2)}/$objHash" -> respond(ByteReadChannel(objBytes), HttpStatusCode.OK)
+                else -> respond("missing: $url", HttpStatusCode.NotFound)
+            }
+        }
+        val p = provisioner(HttpClient(engine))
+
+        val result = p.ensureVanilla("1.12.2")
+
+        assertEquals("1.12", result.assetIndexId)
+        assertEquals(librariesDir.resolve("net/minecraft/minecraft/1.12.2/minecraft-1.12.2.jar"), result.clientJar)
+        assertTrue(result.clientJar.exists(), "client jar materialised")
+        assertEquals("CLIENT-JAR", result.clientJar.readText())
+        assertEquals("PATCHY-JAR", librariesDir.resolve("com/mojang/patchy/1.1/patchy-1.1.jar").readText())
+        assertEquals("EN-US-LANG", assetsDir.resolve("objects/${objHash.take(2)}/$objHash").readText())
+        assertTrue(assetsDir.resolve("indexes/1.12.json").exists(), "asset index persisted")
+        // Vanilla libraries returned with coord + on-disk path (the merge base).
+        assertEquals(1, result.libraries.size)
+        assertEquals("com.mojang:patchy", result.libraries[0].coord.groupArtifact)
+        assertEquals(librariesDir.resolve("com/mojang/patchy/1.1/patchy-1.1.jar"), result.libraries[0].path)
+
+        // Second call is FULLY OFFLINE: the version json is cached, the asset
+        // index sha already matches on disk, and every heavy file is present, so
+        // nothing touches the network. This is the offline-launch guarantee.
+        requests.clear()
+        val again = p.ensureVanilla("1.12.2")
+        assertEquals("1.12", again.assetIndexId)
+        assertTrue(requests.isEmpty(), "a warm relaunch must make ZERO network requests, got: $requests")
+    }
+
+    // Another launcher's tree is offered, not trusted: what matches the manifest is
+    // taken without a download, and what does not is downloaded as if absent.
+    @Test
+    fun `an offered tree is taken where it matches and downloaded where it does not`() = runTest {
+        val libBytes = "PATCHY-JAR".toByteArray()
+        val clientBytes = "CLIENT-JAR".toByteArray()
+        val objBytes = "EN-US-LANG".toByteArray()
+        val objHash = sha1(objBytes)
+        val indexJson = """{"objects":{"minecraft/lang/en_us.lang":{"hash":"$objHash","size":${objBytes.size}}}}"""
+        val versionJson = """
+            {
+              "assetIndex": {"id":"1.12","sha1":"${sha1(indexJson)}","size":${indexJson.length},"url":"$INDEX_URL"},
+              "downloads": {"client": {"sha1":"${sha1(clientBytes)}","size":${clientBytes.size},"url":"$CLIENT_URL"}},
+              "libraries": [
+                {"name":"com.mojang:patchy:1.1","downloads":{"artifact":{"path":"com/mojang/patchy/1.1/patchy-1.1.jar","sha1":"${sha1(libBytes)}","size":${libBytes.size},"url":"$LIB_URL"}}}
+              ]
+            }
+        """.trimIndent()
+        val manifestJson = """{"versions":[{"id":"1.12.2","url":"$VERSION_URL"}]}"""
+
+        // The foreign tree: the asset and the client jar are genuine, the library is
+        // the same size as the real one and is not it.
+        val foreign = tmp.resolve("foreign")
+        val seedAssets = foreign.resolve("assets")
+        val seedLibs = foreign.resolve("libraries")
+        val seedClient = foreign.resolve("versions/1.12.2/1.12.2.jar")
+        Files.createDirectories(seedAssets.resolve("objects/${objHash.take(2)}"))
+        Files.write(seedAssets.resolve("objects/${objHash.take(2)}/$objHash"), objBytes)
+        Files.createDirectories(seedLibs.resolve("com/mojang/patchy/1.1"))
+        Files.write(seedLibs.resolve("com/mojang/patchy/1.1/patchy-1.1.jar"), "PATCHY-BAD".toByteArray())
+        Files.createDirectories(seedClient.parent)
+        Files.write(seedClient, clientBytes)
+
+        val requests = mutableListOf<String>()
+        val engine = MockEngine { req ->
+            val url = req.url.toString()
+            requests += url
+            when (url) {
+                MANIFEST_URL -> respond(manifestJson, HttpStatusCode.OK, jsonHeaders)
+                VERSION_URL -> respond(versionJson, HttpStatusCode.OK, jsonHeaders)
+                INDEX_URL -> respond(indexJson, HttpStatusCode.OK, jsonHeaders)
+                LIB_URL -> respond(ByteReadChannel(libBytes), HttpStatusCode.OK)
+                CLIENT_URL -> respond(ByteReadChannel(clientBytes), HttpStatusCode.OK)
+                "$RES_BASE/${objHash.take(2)}/$objHash" -> respond(ByteReadChannel(objBytes), HttpStatusCode.OK)
+                else -> respond("missing: $url", HttpStatusCode.NotFound)
+            }
+        }
+        val p = provisioner(HttpClient(engine))
+
+        p.ensureVanilla("1.12.2", seed = RuntimeSeed(librariesDir = seedLibs, assetsDir = seedAssets, clientJar = seedClient))
+
+        assertEquals("PATCHY-JAR", librariesDir.resolve("com/mojang/patchy/1.1/patchy-1.1.jar").readText(), "the mismatching library was downloaded")
+        assertTrue(LIB_URL in requests)
+        assertEquals("EN-US-LANG", assetsDir.resolve("objects/${objHash.take(2)}/$objHash").readText())
+        assertTrue(requests.none { it.startsWith(RES_BASE) }, "the matching asset was taken, not downloaded")
+        assertTrue(CLIENT_URL !in requests, "the matching client jar was taken, not downloaded")
+    }
+
+    @Test
+    fun `ensureVanilla throws on sha1 mismatch and leaves no partial file`() = runTest {
+        val libBytes = "REAL-LIB".toByteArray()
+        val indexJson = """{"objects":{}}"""
+        val indexSha = sha1(indexJson)
+        val versionJson = """
+            {
+              "assetIndex": {"id":"1.12","sha1":"$indexSha","size":${indexJson.length},"url":"$INDEX_URL"},
+              "downloads": {"client": {"sha1":"deadbeefdeadbeefdeadbeefdeadbeefdeadbeef","size":1,"url":"$CLIENT_URL"}},
+              "libraries": [
+                {"name":"x:y:1","downloads":{"artifact":{"path":"x/y/1/y-1.jar","sha1":"0000000000000000000000000000000000000000","size":${libBytes.size},"url":"$LIB_URL"}}}
+              ]
+            }
+        """.trimIndent()
+        val manifestJson = """{"versions":[{"id":"1.12.2","url":"$VERSION_URL"}]}"""
+
+        val engine = MockEngine { req ->
+            when (req.url.toString()) {
+                MANIFEST_URL -> respond(manifestJson, HttpStatusCode.OK, jsonHeaders)
+                VERSION_URL -> respond(versionJson, HttpStatusCode.OK, jsonHeaders)
+                INDEX_URL -> respond(indexJson, HttpStatusCode.OK, jsonHeaders)
+                LIB_URL -> respond(ByteReadChannel(libBytes), HttpStatusCode.OK) // hashes to != declared sha1
+                CLIENT_URL -> respond(ByteReadChannel("c".toByteArray()), HttpStatusCode.OK)
+                else -> respond("missing", HttpStatusCode.NotFound)
+            }
+        }
+        val p = provisioner(HttpClient(engine))
+
+        assertFailsWith<IOException> { p.ensureVanilla("1.12.2") }
+        assertTrue(!librariesDir.resolve("x/y/1/y-1.jar").exists(), "bad download must not leave a file")
+    }
+
+    // -- javaMajor declare-model (loader > vanilla > heuristic precedence) ----
+
+    @Test
+    fun `ensureVanilla captures Mojang javaVersion (and no-loader runtime inherits it)`() = runTest {
+        val clientBytes = "C".toByteArray()
+        val indexJson = """{"objects":{}}"""
+        val indexSha = sha1(indexJson)
+        // 1.17+ vanilla json shape: carries `javaVersion.majorVersion` directly.
+        val versionJson = """
+            {
+              "assetIndex": {"id":"17","sha1":"$indexSha","size":${indexJson.length},"url":"$INDEX_URL"},
+              "downloads": {"client": {"sha1":"${sha1(clientBytes)}","size":${clientBytes.size},"url":"$CLIENT_URL"}},
+              "javaVersion": {"majorVersion": 21},
+              "libraries": []
+            }
+        """.trimIndent()
+        val manifestJson = """{"versions":[{"id":"1.21.1","url":"$VERSION_URL"}]}"""
+
+        val engine = MockEngine { req ->
+            when (req.url.toString()) {
+                MANIFEST_URL -> respond(manifestJson, HttpStatusCode.OK, jsonHeaders)
+                VERSION_URL -> respond(versionJson, HttpStatusCode.OK, jsonHeaders)
+                INDEX_URL -> respond(indexJson, HttpStatusCode.OK, jsonHeaders)
+                CLIENT_URL -> respond(ByteReadChannel(clientBytes), HttpStatusCode.OK)
+                else -> respond("missing", HttpStatusCode.NotFound)
+            }
+        }
+        val p = provisioner(HttpClient(engine))
+
+        val vanilla = p.ensureVanilla("1.21.1")
+        assertEquals(21, vanilla.javaMajor, "Mojang's javaVersion.majorVersion captured from the version json")
+
+        val resolved = p.ensureRuntime(mcVersion = "1.21.1", loaderName = null, loaderVersion = "")
+        assertEquals(21, resolved.javaMajor, "no-loader runtime inherits vanilla's declared major")
+    }
+
+    @Test
+    fun `loader profile declared javaMajor wins over Mojang's vanilla declaration`() = runTest {
+        val clientBytes = "C".toByteArray()
+        val indexJson = """{"objects":{}}"""
+        val indexSha = sha1(indexJson)
+        // Vanilla declares 21; a loader profile declares 25 -- loader wins. This is
+        // the forward shape Cleanroom needs (1.12.2 on Cleanroom -> Java 25, not 8).
+        val versionJson = """
+            {
+              "assetIndex": {"id":"17","sha1":"$indexSha","size":${indexJson.length},"url":"$INDEX_URL"},
+              "downloads": {"client": {"sha1":"${sha1(clientBytes)}","size":${clientBytes.size},"url":"$CLIENT_URL"}},
+              "javaVersion": {"majorVersion": 21},
+              "libraries": []
+            }
+        """.trimIndent()
+        val manifestJson = """{"versions":[{"id":"1.21.1","url":"$VERSION_URL"}]}"""
+
+        val engine = MockEngine { req ->
+            when (req.url.toString()) {
+                MANIFEST_URL -> respond(manifestJson, HttpStatusCode.OK, jsonHeaders)
+                VERSION_URL -> respond(versionJson, HttpStatusCode.OK, jsonHeaders)
+                INDEX_URL -> respond(indexJson, HttpStatusCode.OK, jsonHeaders)
+                CLIENT_URL -> respond(ByteReadChannel(clientBytes), HttpStatusCode.OK)
+                else -> respond("missing", HttpStatusCode.NotFound)
+            }
+        }
+        // Stub resolver returns a profile declaring Java 25; empty libraries -> no extra HTTP.
+        val stub = object : LoaderResolver {
+            override val loaderId = "stub"
+            override suspend fun resolve(mcVersion: String, loaderVersion: String) =
+                LoaderProfile(version = "test", libraries = emptyList(), mainClass = "fake.Main", javaMajor = 25)
+        }
+        val p = RuntimeProvisioner(
+            librariesDir = librariesDir,
+            assetsDir = assetsDir,
+            clientProvider = HttpClientProvider { HttpClient(engine) },
+            transfers = testTransferEngine(HttpClientProvider { HttpClient(engine) }),
+            json = json,
+            loaderRegistry = LoaderRegistry(listOf(stub)),
+            osName = "Linux",
+            versionManifestUrl = MANIFEST_URL,
+            resourcesBaseUrl = RES_BASE,
+        )
+
+        val resolved = p.ensureRuntime(mcVersion = "1.21.1", loaderName = "stub", loaderVersion = "any")
+        assertEquals(25, resolved.javaMajor, "loader profile.javaMajor must win over vanilla.javaMajor")
+    }
+
+    /**
+     * The overlay's coordinates come from a loader profile or an installer's
+     * version json, and `MavenCoord.parse` validates no segment, so the path built
+     * from one is the document's to choose unless it is bounded.
+     */
+    @Test
+    fun `a loader library whose coordinate climbs out of the libraries root is refused`() = runTest {
+        val clientBytes = "C".toByteArray()
+        val indexJson = """{"objects":{}}"""
+        val versionJson = """
+            {
+              "assetIndex": {"id":"17","sha1":"${sha1(indexJson)}","size":${indexJson.length},"url":"$INDEX_URL"},
+              "downloads": {"client": {"sha1":"${sha1(clientBytes)}","size":${clientBytes.size},"url":"$CLIENT_URL"}},
+              "libraries": []
+            }
+        """.trimIndent()
+        val engine = MockEngine { req ->
+            when (req.url.toString()) {
+                MANIFEST_URL -> respond("""{"versions":[{"id":"1.21.1","url":"$VERSION_URL"}]}""", HttpStatusCode.OK, jsonHeaders)
+                VERSION_URL -> respond(versionJson, HttpStatusCode.OK, jsonHeaders)
+                INDEX_URL -> respond(indexJson, HttpStatusCode.OK, jsonHeaders)
+                CLIENT_URL -> respond(ByteReadChannel(clientBytes), HttpStatusCode.OK)
+                else -> respond("missing", HttpStatusCode.NotFound)
+            }
+        }
+        val climbing = object : LoaderResolver {
+            override val loaderId = "stub"
+            override suspend fun resolve(mcVersion: String, loaderVersion: String) = LoaderProfile(
+                version = "test",
+                libraries = listOf(LibrarySpec(MavenCoord.parse("evil:../../out:1"), bundled = "X".toByteArray())),
+                mainClass = "fake.Main",
+            )
+        }
+        val p = RuntimeProvisioner(
+            librariesDir = librariesDir,
+            assetsDir = assetsDir,
+            clientProvider = HttpClientProvider { HttpClient(engine) },
+            transfers = testTransferEngine(HttpClientProvider { HttpClient(engine) }),
+            json = json,
+            loaderRegistry = LoaderRegistry(listOf(climbing)),
+            osName = "Linux",
+            versionManifestUrl = MANIFEST_URL,
+            resourcesBaseUrl = RES_BASE,
+        )
+
+        // `evil/../../out/1/../../out-1.jar` lands beside the libraries root, in a
+        // directory the test can write to. The directories it climbs through exist,
+        // so only the boundary can refuse it.
+        Files.createDirectories(librariesDir.resolve("evil"))
+        Files.createDirectories(tmp.resolve("out/1"))
+        assertFailsWith<IOException> { p.ensureRuntime(mcVersion = "1.21.1", loaderName = "stub", loaderVersion = "any") }
+        assertTrue(!Files.exists(tmp.resolve("out-1.jar")), "nothing is written for the climbing coordinate")
+    }
+
+    /**
+     * A loader nothing here serves used to read as no loader at all: the pack
+     * started as plain vanilla with every mod ignored and nothing said.
+     */
+    @Test
+    fun `a loader nothing here serves is refused before anything is downloaded`() = runTest {
+        val requested = mutableListOf<String>()
+        val engine = MockEngine { req ->
+            requested += req.url.toString()
+            respond("missing", HttpStatusCode.NotFound)
+        }
+        val p = provisioner(HttpClient(engine))
+
+        val failure = runCatching { p.ensureRuntime(mcVersion = "1.20.1", loaderName = "forg", loaderVersion = "") }.exceptionOrNull()
+
+        assertTrue(failure is IOException && "forg" in failure.message.orEmpty(), "got $failure")
+        assertTrue(requested.isEmpty(), "nothing is fetched for a pack that cannot run: $requested")
+    }
+
+    /** Fabric on 1.12.2, or a version typo, used to fail only once the whole vanilla runtime was on disk. */
+    @Test
+    fun `a loader that cannot serve the version fails before the vanilla download`() = runTest {
+        val clientBytes = "C".toByteArray()
+        val indexJson = """{"objects":{}}"""
+        val versionJson = """
+            {
+              "assetIndex": {"id":"17","sha1":"${sha1(indexJson)}","size":${indexJson.length},"url":"$INDEX_URL"},
+              "downloads": {"client": {"sha1":"${sha1(clientBytes)}","size":${clientBytes.size},"url":"$CLIENT_URL"}},
+              "libraries": []
+            }
+        """.trimIndent()
+        val requested = mutableListOf<String>()
+        val engine = MockEngine { req ->
+            requested += req.url.toString()
+            when (req.url.toString()) {
+                MANIFEST_URL -> respond("""{"versions":[{"id":"1.12.2","url":"$VERSION_URL"}]}""", HttpStatusCode.OK, jsonHeaders)
+                VERSION_URL -> respond(versionJson, HttpStatusCode.OK, jsonHeaders)
+                INDEX_URL -> respond(indexJson, HttpStatusCode.OK, jsonHeaders)
+                CLIENT_URL -> respond(ByteReadChannel(clientBytes), HttpStatusCode.OK)
+                else -> respond("missing", HttpStatusCode.NotFound)
+            }
+        }
+        val refusing = object : LoaderResolver {
+            override val loaderId = "fabric"
+            override suspend fun resolve(mcVersion: String, loaderVersion: String): LoaderProfile =
+                throw IOException("fabric has no loader versions for Minecraft $mcVersion")
+        }
+        val p = RuntimeProvisioner(
+            librariesDir = librariesDir,
+            assetsDir = assetsDir,
+            clientProvider = HttpClientProvider { HttpClient(engine) },
+            transfers = testTransferEngine(HttpClientProvider { HttpClient(engine) }),
+            json = json,
+            loaderRegistry = LoaderRegistry(listOf(refusing)),
+            osName = "Linux",
+            versionManifestUrl = MANIFEST_URL,
+            resourcesBaseUrl = RES_BASE,
+        )
+
+        runCatching { p.ensureRuntime(mcVersion = "1.12.2", loaderName = "fabric", loaderVersion = "") }
+            .onSuccess { error("the loader refused, so the runtime must not be provisioned") }
+
+        assertTrue(CLIENT_URL !in requested && INDEX_URL !in requested, "nothing past the version json was fetched: $requested")
+    }
+
+    private companion object {
+        const val MANIFEST_URL = "https://test.invalid/manifest.json"
+        const val VERSION_URL = "https://test.invalid/1.12.2.json"
+        const val INDEX_URL = "https://test.invalid/1.12.json"
+        const val LIB_URL = "https://test.invalid/libs/patchy.jar"
+        const val CLIENT_URL = "https://test.invalid/client.jar"
+        const val RES_BASE = "https://res.invalid"
+        val jsonHeaders = headersOf("Content-Type", "application/json")
+    }
+}

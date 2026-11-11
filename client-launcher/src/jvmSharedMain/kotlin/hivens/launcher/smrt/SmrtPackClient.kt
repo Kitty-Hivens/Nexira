@@ -1,0 +1,231 @@
+package hivens.launcher.smrt
+
+import hivens.core.api.HttpClientProvider
+import hivens.core.api.dto.smrt.SmrtBuildDiff
+import hivens.core.api.dto.smrt.SmrtCommunityPack
+import hivens.core.api.dto.smrt.SmrtManifestVersions
+import hivens.core.api.dto.smrt.SmrtModDetail
+import hivens.core.api.dto.smrt.SmrtPackListing
+import hivens.core.api.dto.smrt.SmrtPackManifest
+import hivens.core.api.dto.smrt.SmrtPackSummary
+import hivens.core.api.interfaces.IMirrorPackClient
+import hivens.core.cache.read
+import hivens.launcher.cache.SmrtPackCaches
+import hivens.core.net.metadataTimeout
+import io.ktor.client.request.get
+import io.ktor.client.statement.HttpResponse
+import io.ktor.client.statement.bodyAsText
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.encodeURLParameter
+import io.ktor.http.isSuccess
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
+import java.io.IOException
+
+/**
+ * Thin HTTP wrapper for the smrt mirror's `/v1/...` endpoints. Uses the
+ * "direct" HttpClient (strict TLS, no per-host bypass) since the mirror is public
+ * CDN-fronted and needs none of the SC channel's special handling. Modrinth
+ * reads live in [hivens.launcher.modrinth.ModrinthClient].
+ */
+class SmrtPackClient(
+    private val httpProvider: HttpClientProvider,
+    private val mirrorBase: String = DEFAULT_MIRROR_BASE,
+    private val json: Json = DEFAULT_JSON,
+    private val caches: SmrtPackCaches = SmrtPackCaches.passthrough(),
+) : IMirrorPackClient {
+    companion object {
+        const val DEFAULT_MIRROR_BASE = "https://smrt.hivens.dev"
+        private const val USER_AGENT = "Nexira-smrt-mirror-client"
+
+        // Tolerant decoder: spec says unknown fields and unknown source
+        // variants must be silently ignored on the client side, both for
+        // forward-compat (server adds new optional fields without
+        // bumping schema_version) and for the open-ended display
+        // metadata block.
+        val DEFAULT_JSON = Json {
+            ignoreUnknownKeys = true
+            isLenient = true
+            encodeDefaults = false
+        }
+    }
+
+    override suspend fun fetchManifest(packId: String): SmrtPackManifest =
+        fetchManifest(packId, forceRefresh = false)
+
+    /**
+     * The pack's current manifest. [forceRefresh] bypasses the cache TTL and is
+     * for a check the user asked for; an ambient read must leave it false or a
+     * screen opening turns into an unconditional round trip.
+     */
+    suspend fun fetchManifest(packId: String, forceRefresh: Boolean): SmrtPackManifest {
+        val url = "${packUrl(packId)}/manifest"
+        return caches.manifest.read(url, forceRefresh) { getJson(url) }
+    }
+
+    /**
+     * Fetch a specific historical manifest version. Pinned-version
+     * instances (the install-time `pack_version` is recorded on
+     * [hivens.core.data.PackInstance.pinnedPackVersion]) must call
+     * this rather than the latest endpoint, since the mirror may
+     * have bumped the pack since install and a divergent latest
+     * manifest's MC version / loader / Java major would not match
+     * the files that were synced to disk.
+     */
+    override suspend fun fetchManifestVersion(packId: String, version: String): SmrtPackManifest {
+        // Same cache as the latest endpoint, keyed by the version-pinned URL; a
+        // pinned historical manifest is immutable so it stays a warm cache hit.
+        val url = "${packUrl(packId)}/manifest/${version.encodeURLParameter()}"
+        return caches.manifest.get(url) { getJson(url) }
+    }
+
+    /** Stale-then-fresh view of [fetchManifest], as [buildsStream] is of [listBuilds]. */
+    fun manifestStream(packId: String): Flow<SmrtPackManifest> {
+        val url = "${packUrl(packId)}/manifest"
+        return caches.manifest.flow(url) { getJson(url) }.map { it.value }
+    }
+
+    override suspend fun fetchSummary(packId: String): SmrtPackSummary =
+        fetchSummary(packId, forceRefresh = false)
+
+    /** The pack summary. See [fetchManifest] for what [forceRefresh] costs. */
+    suspend fun fetchSummary(packId: String, forceRefresh: Boolean): SmrtPackSummary {
+        val url = packUrl(packId)
+        return caches.summary.read(url, forceRefresh) { getJson(url) }
+    }
+
+    /** Stale-then-fresh view of [fetchSummary], as [buildsStream] is of [listBuilds]. */
+    fun summaryStream(packId: String): Flow<SmrtPackSummary> {
+        val url = packUrl(packId)
+        return caches.summary.flow(url) { getJson(url) }.map { it.value }
+    }
+
+    /** Every pack the mirror lists. See [fetchManifest] for what [forceRefresh] costs. */
+    suspend fun listPacks(forceRefresh: Boolean = false): SmrtPackListing {
+        val url = "$mirrorBase/v1/packs"
+        return caches.listing.read(url, forceRefresh) { getJson(url) }
+    }
+
+    /**
+     * Stale-then-fresh view of the pack listing, the way [buildsStream] is for the
+     * build listing: the stored one at once when it is merely stale, then the
+     * reloaded one.
+     */
+    fun packsStream(): Flow<SmrtPackListing> {
+        val url = "$mirrorBase/v1/packs"
+        return caches.listing.flow(url) { getJson(url) }.map { it.value }
+    }
+
+    /**
+     * The published community packs, each with its owner's login. Listed apart from
+     * [listPacks], which is the official catalogue alone.
+     */
+    suspend fun listCommunity(forceRefresh: Boolean = false): List<SmrtCommunityPack> {
+        val url = "$mirrorBase/v1/community"
+        return caches.community.read(url, forceRefresh) { getJson(url) }
+    }
+
+    /** Stale-then-fresh view of [listCommunity], as [packsStream] is of [listPacks]. */
+    fun communityStream(): Flow<List<SmrtCommunityPack>> {
+        val url = "$mirrorBase/v1/community"
+        return caches.community.flow(url) { getJson(url) }.map { it.value }
+    }
+
+    /**
+     * The per-build listing the mirror retains for a pack, newest first. The
+     * server order is canonical (publish-date across channels); callers must
+     * not re-sort by version tuples.
+     */
+    suspend fun listBuilds(packId: String, forceRefresh: Boolean = false): SmrtManifestVersions {
+        val url = "${packUrl(packId)}/manifest/versions"
+        return caches.versions.read(url, forceRefresh) { getJson(url) }
+    }
+
+    /**
+     * Stale-then-fresh view of the build listing: emits the cached one at once
+     * when it is merely stale, then the reloaded one. A one-shot [listBuilds]
+     * would hand back the stale list and refresh into the void, which is how a
+     * version screen ends up missing the newest builds until it is reopened.
+     */
+    fun buildsStream(packId: String): Flow<SmrtManifestVersions> {
+        val url = "${packUrl(packId)}/manifest/versions"
+        return caches.versions.flow(url) { getJson(url) }.map { it.value }
+    }
+
+    /**
+     * Drop the cached views of [packId] that an applied update makes stale: the
+     * summary's latest-version pointer, the build listing, and the "current"
+     * manifest. Version-pinned manifests are immutable and stay cached.
+     */
+    suspend fun invalidatePack(packId: String) {
+        val pack = packUrl(packId)
+        caches.summary.invalidate(pack)
+        caches.versions.invalidate("$pack/manifest/versions")
+        caches.manifest.invalidate("$pack/manifest")
+    }
+
+    /**
+     * Structured change summary between two retained builds. Display data for
+     * the versions screen (registry-enriched version labels); uncached -- a
+     * (from, to) pair is immutable but the pair space is wide and reads are rare.
+     */
+    override suspend fun fetchDiff(packId: String, from: String, to: String): SmrtBuildDiff {
+        val url = "${packUrl(packId)}/diff?from=${from.encodeURLParameter()}&to=${to.encodeURLParameter()}"
+        return getJson(url)
+    }
+
+    /**
+     * The registry's page for the mod a jar with [sha1] belongs to, or null where
+     * the mirror has never seen the file.
+     *
+     * Uncached: asked once per visit to a file's page, and only for a file the
+     * catalogue could not name, so a cache would hold answers nobody asks twice.
+     */
+    suspend fun modByFile(sha1: String): SmrtModDetail? {
+        val url = "$mirrorBase/v1/mods/sha1:${sha1.encodeURLParameter()}"
+        val resp: HttpResponse = withContext(Dispatchers.IO) {
+            httpProvider.current.get(url) {
+                headers.append("User-Agent", USER_AGENT)
+                headers.append("Accept", "application/json")
+                metadataTimeout()
+            }
+        }
+        if (resp.status == HttpStatusCode.NotFound) return null
+        if (!resp.status.isSuccess()) {
+            val body = runCatching { resp.bodyAsText() }.getOrDefault("")
+            throw IOException("GET $url failed: ${resp.status} body=$body")
+        }
+        return withContext(Dispatchers.IO) { json.decodeFromString<SmrtModDetail>(resp.bodyAsText()) }
+    }
+
+    /**
+     * Where [packId]'s reads start. The id is one path segment and is encoded as
+     * one: a community pack's id is namespaced by its owner, `u/<uid>/<name>`, and
+     * its slashes taken as path separators asked the mirror for a route it does
+     * not have.
+     */
+    private fun packUrl(packId: String): String = "$mirrorBase/v1/packs/${packId.encodeURLParameter()}"
+
+    /** The icon the mirror reads out of a jar it holds, by the jar's [sha1]. Answers 404 where the jar carries none. */
+    fun jarIconUrl(sha1: String): String = "$mirrorBase/v1/cache/icon/$sha1"
+
+    // On IO, request and decode both, so a caller may ask from the UI thread. A
+    // settings pane or a crumb asking straight out of a composition decoded a whole
+    // manifest on the event thread, and a rule that each caller remember to switch
+    // first had already been missed in several.
+    private suspend inline fun <reified T> getJson(url: String): T = withContext(Dispatchers.IO) {
+        val resp: HttpResponse = httpProvider.current.get(url) {
+            headers.append("User-Agent", USER_AGENT)
+            headers.append("Accept", "application/json")
+            metadataTimeout()
+        }
+        if (!resp.status.isSuccess()) {
+            val body = runCatching { resp.bodyAsText() }.getOrDefault("")
+            throw IOException("GET $url failed: ${resp.status} body=$body")
+        }
+        json.decodeFromString<T>(resp.bodyAsText())
+    }
+}

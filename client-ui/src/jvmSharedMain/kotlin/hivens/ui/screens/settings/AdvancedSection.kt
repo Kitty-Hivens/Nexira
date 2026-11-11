@@ -1,0 +1,336 @@
+package hivens.ui.screens.settings
+
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Text
+import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import hivens.config.ExperimentalProtocolOverride
+import hivens.config.Protocol
+import hivens.core.data.AmberUpdatePolicy
+import hivens.core.diag.ActionRing
+import hivens.launcher.platform.PlatformPaths
+import hivens.ui.platform.rememberHostActions
+import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.NxIcon
+import hivens.ui.nx.NxButton
+import hivens.ui.nx.NxButtonStyle
+import hivens.ui.nx.NxChoiceChip
+import hivens.ui.nx.NxField
+import hivens.ui.nx.NxSection
+import hivens.ui.nx.NxToggle
+import hivens.ui.puppet.PuppetClick
+import hivens.ui.puppet.PuppetField
+import hivens.ui.puppet.PuppetToggle
+import hivens.ui.theme.NxTheme
+import hivens.ui.utils.rememberFileDialogSettings
+import io.github.vinceglb.filekit.FileKit
+import io.github.vinceglb.filekit.PlatformFile
+import io.github.vinceglb.filekit.dialogs.openDirectoryPicker
+import io.github.vinceglb.filekit.path
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import org.koin.compose.koinInject
+import org.slf4j.LoggerFactory
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.Paths
+import kotlin.system.exitProcess
+import kotlin.time.Duration.Companion.milliseconds
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.OnFill
+import hivens.ui.theme.Status
+
+private val log = LoggerFactory.getLogger("AdvancedSection")
+
+/**
+ * Everything a user reaches for once the defaults stop fitting, on three planes per
+ * the island model: what updates itself (the launcher and the packs it installed),
+ * what a launch is handed (heap, JVM args, the version string the protocol sees),
+ * and where the data lives.
+ *
+ * These knobs used to sit behind a master switch labelled "experimental", which
+ * defaulted on and therefore said nothing about any of them -- while gating, among
+ * others, the heap every instance launches with. Each one now stands on its own
+ * default. What is genuinely experimental is the SmartyCraft client auto-sync, and
+ * it lives beside the rest of the SmartyCraft controls.
+ *
+ * The data-directory move is scheduled on restart via [DataDirMover] (the copy runs
+ * on next start, before [PlatformPaths] is consulted), so this screen only persists
+ * the intent and prompts to restart.
+ */
+@Composable
+internal fun AdvancedSection(
+    paths: PlatformPaths,
+    form: SettingsFormState,
+    save: () -> Unit,
+) {
+    val s = LocalStrings.current
+    val host = rememberHostActions()
+
+    var pendingTarget by remember { mutableStateOf<Path?>(null) }
+    var showError     by remember { mutableStateOf<String?>(null) }
+    var desktopDone   by remember { mutableStateOf(false) }
+    val moveScope     = rememberCoroutineScope()
+    val dialogSettings = rememberFileDialogSettings(s.settingsDataDirMove)
+    // What each debounced field below last saved, so its effect saves a change and
+    // nothing else. Compared with the settings as the screen opened, a field cleared
+    // after a save matched them again and the clear was never written.
+    var savedMimic    by remember { mutableStateOf(form.mimicVersionText) }
+    var savedNewsFeed by remember { mutableStateOf(form.altNewsFeedUrl) }
+    // Leaving the category, or Settings, cancels those two effects with whatever
+    // they had not written yet, and coming back found nothing to save because the
+    // field already held the text. Written on the way out instead, as the pack
+    // settings sheet does with its own settling edit.
+    val currentSave by rememberUpdatedState(save)
+    DisposableEffect(Unit) {
+        onDispose {
+            if (form.mimicVersionText != savedMimic || form.altNewsFeedUrl != savedNewsFeed) currentSave()
+        }
+    }
+
+    NxSection(s.settingsSectionUpdates) {
+        NxToggle(s.settingsPreReleases, form.preReleasesEnabled, description = s.settingsPreReleasesDesc) {
+            form.preReleasesEnabled = it; save()
+        }
+
+        NxToggle(s.settingsMandatoryUpdates, form.mandatoryUpdates, description = s.settingsMandatoryUpdatesDesc, icon = NxIcon.Update) {
+            form.mandatoryUpdates = it; save()
+        }
+        PuppetToggle("settings.mandatoryUpdates", form.mandatoryUpdates) { form.mandatoryUpdates = it; save() }
+
+        NxToggle(s.settingsAutoUpdatePacks, form.autoUpdatePacks, description = s.settingsAutoUpdatePacksDesc, icon = NxIcon.CloudDownload) {
+            form.autoUpdatePacks = it; save()
+        }
+        PuppetToggle("settings.autoUpdatePacks", form.autoUpdatePacks) { form.autoUpdatePacks = it; save() }
+
+        // Only shown while the unattended pass can run: with auto-update off nothing
+        // classifies a build, so the policy governs nothing. Sits flush with the rest
+        // of the plane, like every other PickerBlock.
+        if (form.autoUpdatePacks) {
+            PickerBlock(s.settingsAmberPolicy, s.settingsAmberPolicyDesc) {
+                NxChoiceChip(s.settingsAmberPolicyAsk, form.amberUpdatePolicy == AmberUpdatePolicy.Ask) {
+                    form.amberUpdatePolicy = AmberUpdatePolicy.Ask; save()
+                }
+                NxChoiceChip(s.settingsAmberPolicyApply, form.amberUpdatePolicy == AmberUpdatePolicy.SnapshotThenApply) {
+                    form.amberUpdatePolicy = AmberUpdatePolicy.SnapshotThenApply; save()
+                }
+                NxChoiceChip(s.settingsAmberPolicyHold, form.amberUpdatePolicy == AmberUpdatePolicy.Hold) {
+                    form.amberUpdatePolicy = AmberUpdatePolicy.Hold; save()
+                }
+            }
+            AmberUpdatePolicy.entries.forEach { policy ->
+                PuppetClick("settings.amberPolicy.${policy.name}") { form.amberUpdatePolicy = policy; save() }
+            }
+        }
+
+        // Carry-over from the removed update-manager window: install a .desktop menu
+        // entry (Linux/AppImage). A plain relocated action, NOT a designed OS-
+        // integration feature -- that redesign is a separate task.
+        if (host.menuEntrySupported) {
+            NxButton(
+                label   = if (desktopDone) s.updateManagerDesktopDone else s.updateManagerInstallDesktop,
+                style   = NxButtonStyle.Secondary,
+                compact = true,
+                enabled = !desktopDone,
+                onClick = {
+                    moveScope.launch {
+                        withContext(Dispatchers.IO) { host.installMenuEntry() }
+                            .onSuccess { desktopDone = true }
+                            .onFailure { log.warn("desktop entry install failed", it) }
+                    }
+                },
+            )
+        }
+    }
+
+    Spacer(Modifier.height(16.dp))
+
+    NxSection(s.settingsSectionLaunch) {
+        NxToggle(s.settingsAdaptiveMemory, form.adaptiveMemoryEnabled, description = s.settingsAdaptiveMemoryDesc, icon = NxIcon.Memory) {
+            form.adaptiveMemoryEnabled = it; save()
+        }
+        PuppetToggle("settings.adaptiveMemory", form.adaptiveMemoryEnabled) { form.adaptiveMemoryEnabled = it; save() }
+
+        NxToggle(s.settingsJvmBuilder, form.jvmBuilderEnabled, description = s.settingsJvmBuilderDesc, icon = NxIcon.Tune) {
+            form.jvmBuilderEnabled = it; save()
+        }
+        PuppetToggle("settings.jvmBuilder", form.jvmBuilderEnabled) { form.jvmBuilderEnabled = it; save() }
+
+        NxToggle(s.settingsMimicVersion, form.mimicOverrideEnabled, description = s.settingsMimicVersionDesc, icon = NxIcon.Tag) {
+            form.mimicOverrideEnabled = it; save()
+        }
+        PuppetToggle("settings.mimicVersion", form.mimicOverrideEnabled) { form.mimicOverrideEnabled = it; save() }
+
+        // The revealed field is debounced (400 ms after the last keystroke) because
+        // save() writes the file and applies the value to live protocol traffic, and
+        // per-keystroke saves would write the disk once per key and push partial
+        // values. The toggle flip persists immediately via its own callback.
+        if (form.mimicOverrideEnabled) {
+            // Filter at every keystroke: the value flows into a User-Agent header, a
+            // JVM system property, and the spawned game's -Dminecraft.launcher.version
+            // argv, all of which reject non-ASCII.
+            NxField(
+                value         = form.mimicVersionText,
+                onValueChange = { newValue ->
+                    form.mimicVersionText = newValue.filter {
+                        @OptIn(ExperimentalProtocolOverride::class)
+                        it in Protocol.MIMIC_VERSION_ALLOWED_CHARS
+                    }
+                },
+                placeholder   = s.settingsMimicVersionPlaceholder(Protocol.DEFAULT_MIMIC_LAUNCHER_VERSION),
+                modifier      = Modifier.fillMaxWidth(),
+            )
+            PuppetField("settings.mimicVersion.text", form.mimicVersionText) { newValue ->
+                form.mimicVersionText = newValue.filter {
+                    @OptIn(ExperimentalProtocolOverride::class)
+                    it in Protocol.MIMIC_VERSION_ALLOWED_CHARS
+                }
+            }
+            LaunchedEffect(form.mimicVersionText) {
+                if (form.mimicVersionText == savedMimic) return@LaunchedEffect
+                delay(400.milliseconds)
+                save()
+                savedMimic = form.mimicVersionText
+            }
+        }
+    }
+
+    Spacer(Modifier.height(16.dp))
+
+    // The news widget's second channel. There is no toggle beside it because the
+    // field IS the switch: blank means the channel is not configured and nothing is
+    // fetched for it. Debounced like the mimic field, so the file is not written
+    // once per keystroke.
+    NxSection(s.settingsSectionNews) {
+        Text(s.settingsAltNewsFeed, color = NxInk.main, fontWeight = FontWeight.Medium)
+        Text(
+            text  = s.settingsAltNewsFeedDesc,
+            style = MaterialTheme.typography.bodySmall,
+            color = NxInk.quiet,
+        )
+        NxField(
+            value         = form.altNewsFeedUrl,
+            onValueChange = { form.altNewsFeedUrl = it },
+            placeholder   = ALT_NEWS_FEED_PLACEHOLDER,
+            modifier      = Modifier.fillMaxWidth(),
+        )
+        PuppetField("settings.altNewsFeed", form.altNewsFeedUrl) { form.altNewsFeedUrl = it }
+        LaunchedEffect(form.altNewsFeedUrl) {
+            if (form.altNewsFeedUrl == savedNewsFeed) return@LaunchedEffect
+            delay(400.milliseconds)
+            save()
+            savedNewsFeed = form.altNewsFeedUrl
+        }
+    }
+
+    Spacer(Modifier.height(16.dp))
+
+    if (host.dataDirMoveSupported) NxSection(s.settingsSectionDataDir) {
+        Text(s.settingsDataDirCurrent, style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
+        Text(
+            text       = paths.dataDir.toAbsolutePath().toString(),
+            color      = NxInk.main,
+            fontWeight = FontWeight.SemiBold,
+            style      = MaterialTheme.typography.bodyMedium,
+        )
+        NxButton(
+            label   = s.settingsDataDirMove,
+            style   = NxButtonStyle.Secondary,
+            compact = true,
+            onClick = {
+                showError = null
+                moveScope.launch {
+                    // filekit uses xdg-desktop-portal on Linux (native Hyprland / KDE /
+                    // GNOME picker), IFileDialog on Windows, NSOpenPanel on macOS. The
+                    // ProGuard keep on io.github.vinceglb.filekit.** is what makes the
+                    // directory-hint overload survive shrinking (the 2.3.1 dead-button bug).
+                    val pickResult = runCatching {
+                        FileKit.openDirectoryPicker(
+                            directory      = PlatformFile(paths.dataDir.toFile()),
+                            dialogSettings = dialogSettings,
+                        )
+                    }
+                    val pickedFile = pickResult.getOrElse { ex ->
+                        // Surface the failure so a "dead button" stops looking dead.
+                        log.warn("openDirectoryPicker failed", ex)
+                        showError = s.settingsDataDirErrorPickerFailed(ex.message ?: ex.javaClass.simpleName)
+                        return@launch
+                    } ?: return@launch
+
+                    val picked = Paths.get(pickedFile.path)
+                    if (picked.toAbsolutePath().normalize() == paths.dataDir.toAbsolutePath().normalize()) {
+                        showError = s.settingsDataDirErrorSamePath
+                        return@launch
+                    }
+                    val populated = withContext(Dispatchers.IO) {
+                        runCatching {
+                            Files.exists(picked) && Files.list(picked).use { it.findAny().isPresent }
+                        }.getOrDefault(false)
+                    }
+                    if (populated) {
+                        showError = s.settingsDataDirErrorNotEmpty
+                        return@launch
+                    }
+                    pendingTarget = picked
+                }
+            },
+        )
+        if (showError != null) {
+            Text(showError!!, style = MaterialTheme.typography.bodySmall, color = NxColor.status(Status.Error))
+        }
+    }
+
+    if (pendingTarget != null) {
+        val target = pendingTarget!!
+        val container = NxTheme.colours.step(NxTheme.colours.topStep)
+        OnFill(container) {
+            AlertDialog(
+                onDismissRequest = { pendingTarget = null },
+                title = { Text(s.settingsDataDirConfirmTitle) },
+                text  = {
+                    Text(s.settingsDataDirConfirmBody(
+                        paths.dataDir.toAbsolutePath().toString(),
+                        target.toAbsolutePath().toString(),
+                    ))
+                },
+                confirmButton = {
+                    NxButton(label = s.settingsDataDirQuitNow, onClick = {
+                        val ok = host.scheduleDataDirMove(paths.dataDir, target)
+                        if (ok) {
+                            ActionRing.record("Data-dir move scheduled: ${paths.dataDir} -> $target -- quitting for restart")
+                            // Hard exit -- user explicitly clicked "Quit now". The pending move
+                            // applies only after restart, so a clean process termination is right.
+                            exitProcess(0)
+                        } else {
+                            // Schedule refused (target validation raced); let the user re-pick.
+                            pendingTarget = null
+                        }
+                    })
+                },
+                dismissButton = {
+                    OutlinedButton(onClick = { pendingTarget = null }, shape = MaterialTheme.shapes.small) {
+                        Text(s.sslWarningCancel)
+                    }
+                },
+                containerColor    = container,
+                titleContentColor = NxInk.main,
+                textContentColor  = NxInk.quiet,
+            )
+        }
+    }
+}
+
+/** What the alternate-feed field shows while empty. A URL needs no translation. */
+private const val ALT_NEWS_FEED_PLACEHOLDER = "https://example.com/rss.xml"

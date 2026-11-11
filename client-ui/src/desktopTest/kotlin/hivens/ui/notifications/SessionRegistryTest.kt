@@ -66,7 +66,7 @@ class SessionRegistryTest {
         // `_active.value = _active.value + ...` would lose updates here;
         // .update {} CAS retry is what we test.
         val keys = (1..40).map { "pack-$it" }
-        keys.map { k ->
+        keys.forEach { k ->
             launch {
                 reg.register(k, "Pack $k", null, abort = {}, showConsole = {})
             }
@@ -74,7 +74,7 @@ class SessionRegistryTest {
         // Drain.
         advanceTimeBy(50)
         assertEquals(40, reg.active.first().size, "no entries lost under concurrent register")
-        keys.map { k -> launch { reg.unregister(k) } }
+        keys.forEach { k -> launch { reg.unregister(k) } }
         advanceTimeBy(50)
         assertTrue(reg.active.first().isEmpty(), "no entries lost under concurrent unregister")
     }

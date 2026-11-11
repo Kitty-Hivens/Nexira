@@ -1,9 +1,9 @@
 ---
 title: Nexira
-description: Неофициальный лаунчер для SMARTYcraft. Работает на Windows, Linux и macOS.
+description: Неофициальный лаунчер SMARTYcraft, который запускает почти любой Minecraft. Windows, Linux и macOS, Android в бете.
 template: splash
 hero:
-  tagline: Неофициальный лаунчер для SMARTYcraft. Работает на Windows, Linux и macOS — без ручной настройки Java.
+  tagline: Неофициальный лаунчер SMARTYcraft, который запускает почти любой Minecraft — серверы проекта, сборки с Modrinth и твои собственные. Windows, Linux и macOS, Android в бете, без ручной настройки Java.
   actions:
     - text: Установка
       link: /Nexira/ru/installation/
@@ -20,10 +20,13 @@ import { Card, CardGrid } from '@astrojs/starlight/components';
 
 <CardGrid stagger>
   <Card title="Все платформы" icon="laptop">
-    Windows, Linux и macOS. Без ручной настройки Java — лаунчер управляет этим автоматически.
+    Windows, Linux и macOS, а ещё Android в бете, где пока запускается меньше версий. Каждая игра получает нужную ей Java, лаунчер сам её скачивает и настраивает.
   </Card>
-  <Card title="Все серверы" icon="puzzle">
-    1.7.10, 1.12.2, 1.21.1 (NeoForge). Автоматическая синхронизация файлов перед каждой сессией.
+  <Card title="Почти любая сборка" icon="puzzle">
+    Minecraft от 1.7.10 до самого нового, на Forge, NeoForge, Fabric, Quilt или Cleanroom. Серверы SMARTYcraft синхронизируются перед каждой сессией, сборки и моды ставятся с Modrinth, а инстансы переезжают из других лаунчеров.
+  </Card>
+  <Card title="Под себя" icon="setting">
+    Главный экран собран из виджетов, которые ты расставляешь и меняешь в размере, плюс темы, обои и модули со своими виджетами.
   </Card>
   <Card title="Автообновление" icon="rocket">
     Лаунчер обновляется сам. SHA256 верификация, установка при выходе.

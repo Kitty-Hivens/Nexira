@@ -1,0 +1,126 @@
+package hivens.core.launch
+
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runTest
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
+import kotlin.test.assertNull
+
+@OptIn(ExperimentalCoroutinesApi::class)
+class InstanceWorkTest {
+
+    @Test
+    fun `work is visible for exactly as long as it runs`() = runTest {
+        val registry = InstanceWorkRegistry()
+        val release = CompletableDeferred<Unit>()
+        launch { registry.during("a", InstanceWork.Update) { release.await() } }
+        advanceUntilIdle()
+
+        assertEquals(InstanceWork.Update, registry.workOn("a"))
+        assertNull(registry.workOn("b"), "another instance is not touched")
+
+        release.complete(Unit)
+        advanceUntilIdle()
+        assertNull(registry.workOn("a"))
+    }
+
+    @Test
+    fun `work that throws still clears its mark`() = runTest {
+        val registry = InstanceWorkRegistry()
+        assertFailsWith<IllegalStateException> {
+            registry.during("a", InstanceWork.Repair) { error("fetch failed") }
+        }
+        assertNull(registry.workOn("a"), "a mark left behind would block Play for the rest of the session")
+    }
+
+    @Test
+    fun `overlapping work on one instance ends in order, not all at once`() = runTest {
+        val registry = InstanceWorkRegistry()
+        val first = CompletableDeferred<Unit>()
+        val second = CompletableDeferred<Unit>()
+        launch { registry.during("a", InstanceWork.Update) { first.await() } }
+        launch { registry.during("a", InstanceWork.ContentUpdate) { second.await() } }
+        advanceUntilIdle()
+        assertEquals(InstanceWork.ContentUpdate, registry.workOn("a"), "the most recent is the one reported")
+
+        second.complete(Unit)
+        advanceUntilIdle()
+        assertEquals(InstanceWork.Update, registry.workOn("a"), "the first one is still running")
+
+        first.complete(Unit)
+        advanceUntilIdle()
+        assertNull(registry.workOn("a"))
+    }
+
+    @Test
+    fun `a claim is refused while other work holds the instance, and names it`() = runTest {
+        val registry = InstanceWorkRegistry()
+        val release = CompletableDeferred<Unit>()
+        launch { registry.during("a", InstanceWork.Update) { release.await() } }
+        advanceUntilIdle()
+
+        assertEquals(InstanceWorkRegistry.Claim.Taken(InstanceWork.Update), registry.claim("a", InstanceWork.ContentInstall))
+        assertEquals(InstanceWork.Update, registry.workOn("a"), "a refused claim leaves no mark")
+
+        release.complete(Unit)
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun `a claim marks at once, shares with what it names, and releases once`() {
+        val registry = InstanceWorkRegistry()
+
+        val first = assertIs<InstanceWorkRegistry.Claim.Held>(registry.claim("a", InstanceWork.ContentInstall))
+        assertEquals(InstanceWork.ContentInstall, registry.workOn("a"), "marked before anything else can look")
+        assertIs<InstanceWorkRegistry.Claim.Taken>(registry.claim("a", InstanceWork.Update))
+        val second = assertIs<InstanceWorkRegistry.Claim.Held>(
+            registry.claim("a", InstanceWork.ContentInstall, alongside = setOf(InstanceWork.ContentInstall)),
+        )
+
+        first.mark.release()
+        first.mark.release()
+        assertEquals(InstanceWork.ContentInstall, registry.workOn("a"), "a second release does not take the other install's mark")
+        second.mark.release()
+        assertNull(registry.workOn("a"))
+    }
+
+    @Test
+    fun `the block says the reason that will resolve itself first`() {
+        assertEquals(
+            LaunchBlock.Busy(InstanceWork.Update),
+            launchBlockFor(hasIdentity = false, work = InstanceWork.Update, instancePresent = false, otherLaunchActive = true, identityResolving = false),
+        )
+        assertEquals(
+            LaunchBlock.Missing,
+            launchBlockFor(hasIdentity = false, work = null, instancePresent = false, otherLaunchActive = true, identityResolving = false),
+        )
+        assertEquals(
+            LaunchBlock.OtherGameRunning,
+            launchBlockFor(hasIdentity = false, work = null, instancePresent = true, otherLaunchActive = true, identityResolving = false),
+        )
+        assertEquals(
+            LaunchBlock.NoIdentity,
+            launchBlockFor(hasIdentity = false, work = null, instancePresent = true, otherLaunchActive = false, identityResolving = false),
+        )
+        assertNull(launchBlockFor(hasIdentity = true, work = null, instancePresent = true, otherLaunchActive = false, identityResolving = false))
+    }
+
+    @Test
+    fun `while the account is still signing in nothing is offered, not the sign-in and not an offline game`() {
+        for (hasIdentity in listOf(false, true)) {
+            assertEquals(
+                LaunchBlock.ResolvingIdentity,
+                launchBlockFor(hasIdentity = hasIdentity, work = null, instancePresent = true, otherLaunchActive = false, identityResolving = true),
+            )
+        }
+        assertEquals(
+            LaunchBlock.OtherGameRunning,
+            launchBlockFor(hasIdentity = false, work = null, instancePresent = true, otherLaunchActive = true, identityResolving = true),
+        )
+    }
+}

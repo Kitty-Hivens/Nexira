@@ -116,7 +116,7 @@ class UnboundedSlotTest {
                 }
             }
             scene.render().close()
-        }.also { runCatching { scene.close() } }
+        }.also { val _ = runCatching { scene.close() } }
     }
 
     @Test
@@ -196,7 +196,7 @@ class UnboundedSlotTest {
                 }
             }
             scene.render().close()
-        }.also { runCatching { scene.close() } }
+        }.also { val _ = runCatching { scene.close() } }
     }
 
     @Test

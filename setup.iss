@@ -25,6 +25,7 @@
 #define MyAppURL       "https://github.com/Kitty-Hivens/Nexira"
 #define MyAppExeName   "Nexira.exe"
 #define MyAppId        "30571060-3129-4503-b09e-716912389146"
+#define MyAppUserModelId "dev.hivens.nexira"
 
 [Setup]
 ; Unique ID — keeps upgrades clean (same GUID as upgradeUuid in build.gradle.kts)
@@ -133,13 +134,17 @@ Source: "client-ui\build\customJpackageImage\Nexira\*"; \
 Type: files; Name: "{app}\app\app.jsa"
 
 [Icons]
-; Start Menu
+; Start Menu. The AppUserModelID is what lets the launcher's notifications show:
+; Windows routes a toast by that id and silently drops one whose id no installed
+; shortcut carries. It matches the id the launcher posts with (NEXIRA_APP_ID).
 Name: "{autoprograms}\{#MyAppName}"; \
-  Filename: "{app}\{#MyAppExeName}"
+  Filename: "{app}\{#MyAppExeName}"; \
+  AppUserModelID: "{#MyAppUserModelId}"
 
 ; Desktop (optional, controlled by task above)
 Name: "{autodesktop}\{#MyAppName}"; \
   Filename: "{app}\{#MyAppExeName}"; \
+  AppUserModelID: "{#MyAppUserModelId}"; \
   Tasks: desktopicon
 
 [Run]

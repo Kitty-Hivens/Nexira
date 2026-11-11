@@ -3,18 +3,20 @@ package hivens.ui.audio
 import dev.hivens.skinema.audio.PcmEncoding
 import dev.hivens.skinema.audio.PcmFormat
 import dev.hivens.skinema.audio.PcmSink
+import dev.hivens.skinema.libav.MediaInput
 import dev.hivens.skinema.player.VideoPlayer
 import hivens.ui.diag.SkinemaGate
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.atomic.AtomicLong
-import kotlin.coroutines.coroutineContext
 import kotlin.math.abs
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
@@ -67,7 +69,7 @@ suspend fun computeWaveform(file: Path, buckets: Int = DEFAULT_BUCKETS): Wavefor
 }
 
 private object WaveformLog {
-    val log = LoggerFactory.getLogger("hivens.ui.audio.Waveform")
+    val log: Logger = LoggerFactory.getLogger("hivens.ui.audio.Waveform")
 }
 
 private suspend fun decodeEnvelope(file: Path, buckets: Int): Waveform? {
@@ -76,7 +78,7 @@ private suspend fun decodeEnvelope(file: Path, buckets: Int): Waveform? {
         // loop = false is load bearing. The default turns the lap at the end of
         // the file, and a sink that never blocks would then read the same track
         // forever at decode speed.
-        VideoPlayer(path = file, loop = false, audio = true, sink = sink)
+        VideoPlayer(input = MediaInput.File(file), loop = false, audio = true, sink = sink)
     } catch (e: Exception) {
         WaveformLog.log.warn("Waveform open failed for {}", file, e)
         return null
@@ -93,7 +95,7 @@ private suspend fun decodeEnvelope(file: Path, buckets: Int): Waveform? {
         // Closing is what guarantees nothing is still writing into the sink, so
         // the fold is only safe to read after this returns. It is bounded at a
         // second by the player's own contract.
-        runCatching { player.close() }
+        val _ = runCatching { player.close() }
     }
     if (!finished) return null
 
@@ -107,7 +109,7 @@ private suspend fun decodeEnvelope(file: Path, buckets: Int): Waveform? {
 
 /** True once the file has played out, false for a decode that failed. */
 private suspend fun awaitEnd(player: VideoPlayer, file: Path): Boolean {
-    while (coroutineContext.isActive) {
+    while (currentCoroutineContext().isActive) {
         when (val st = player.state) {
             VideoPlayer.State.Ended -> return true
             is VideoPlayer.State.Failed -> {
@@ -330,6 +332,7 @@ private const val INITIAL_WINDOWS = 1024
  */
 private const val U8_FULL_SCALE = 128f
 private const val S16_FULL_SCALE = 32768f
+@Suppress("FloatingPointLiteralPrecision")
 private const val S32_FULL_SCALE = 2147483648f
 
 private const val POLL_MS = 20L

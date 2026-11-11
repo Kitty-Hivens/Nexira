@@ -37,7 +37,7 @@ dependencies {
     testImplementation(libs.slf4j.simple)
 
     // MockClientFactory, testTransferEngine and the other shared fixtures.
-    testImplementation(testFixtures(project(":client-core")))
+    testImplementation(project(":client-core-testing"))
 }
 
 tasks.test {

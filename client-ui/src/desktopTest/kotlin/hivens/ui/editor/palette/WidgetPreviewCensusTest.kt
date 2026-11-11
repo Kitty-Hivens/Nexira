@@ -133,7 +133,7 @@ class WidgetPreviewCensusTest {
                 image.close()
             }
             Unit
-        }.also { runCatching { scene.close() } }.exceptionOrNull()
+        }.also { val _ = runCatching { scene.close() } }.exceptionOrNull()
     }
 
     /**

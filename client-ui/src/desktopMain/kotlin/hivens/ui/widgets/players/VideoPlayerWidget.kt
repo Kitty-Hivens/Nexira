@@ -24,7 +24,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import dev.hivens.skinema.compose.VideoScale
-import hivens.ui.components.FullscreenVideo
+import hivens.ui.components.FullscreenVideoWithHandoff
 import hivens.ui.components.VideoHandoff
 import hivens.ui.components.VideoMedia
 import hivens.ui.components.isPlayableVideoUrl
@@ -93,7 +93,7 @@ fun VideoPlayerWidget(instance: WidgetInstance) {
     }
 
     if (expanded) {
-        FullscreenVideo(url = url, handoff = handoff, onDismiss = { expanded = false })
+        FullscreenVideoWithHandoff(url = url, handoff = handoff, onDismiss = { expanded = false })
     }
 }
 

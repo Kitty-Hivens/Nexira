@@ -54,6 +54,14 @@ object GuiBootstrap {
         // -- not a property Skiko reads -- so nothing was ever capped to 60.)
         System.setProperty("skiko.vsync.enabled", "true")
 
+        // A window that grows shows its new part before Skia has drawn a frame
+        // that large. Windows fills that part first, and AWT answers the fill
+        // with the frame's background, white unless told otherwise, so a resize
+        // flashed white squares. Without the fill the gap keeps what was there,
+        // and the frame's background is the theme's page (see AppShell) for
+        // whatever does show through. Read once when the toolkit starts.
+        System.setProperty("sun.awt.noerasebackground", "true")
+
         // X11 WM_CLASS override. See XToolkitOverride doc for the
         // cross-vendor reflection rationale; the JVM must have been
         // launched with `--add-opens=java.desktop/sun.awt.X11=ALL-UNNAMED`.
@@ -108,12 +116,12 @@ object GuiBootstrap {
         // class may no longer work -- a replaced image, a rebuild over a live
         // process. The log this was found in shows exactly that: the crash was
         // reported to disk and then the dialog meant to surface it failed too.
-        runCatching { CrashDialog::class.java.name }
+        val _ = runCatching { CrashDialog::class.java.name }
         // Same reasoning, one layer earlier. ShellRecovery is the enum
         // recordShellCrash returns, and its first executed reference is inside
         // crash handling itself, so a process whose classes have gone out from
         // under it dies deciding how to recover rather than recovering.
-        runCatching { ShellRecovery::class.java.name }
+        val _ = runCatching { ShellRecovery::class.java.name }
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
             val handlerLog = LoggerFactory.getLogger("CrashHandler")
             handlerLog.error("Uncaught exception on thread '${thread.name}'", throwable)

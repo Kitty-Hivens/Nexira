@@ -27,6 +27,8 @@ class LineLayoutCacheTest {
         ImageComposeScene(1, 1) {}.close()
     }
 
+    // The overload that takes a locale list only exists from the next Compose, and this one still works.
+    @Suppress("DEPRECATION")
     private fun measurer() = TextMeasurer(
         defaultFontFamilyResolver = createFontFamilyResolver(),
         defaultDensity = Density(1f),

@@ -42,16 +42,16 @@ class WidgetModulesTest {
     @AfterTest
     fun tearDown() {
         scope.cancel()
-        Files.walk(tmp).use { walk -> walk.sorted(Comparator.reverseOrder()).forEach { runCatching { Files.deleteIfExists(it) } } }
+        Files.walk(tmp).use { walk -> walk.sorted(Comparator.reverseOrder()).forEach { val _ = runCatching { Files.deleteIfExists(it) } } }
     }
 
     private fun modules() = WidgetModules(
         directory = folder,
-        shadowDir = tmp.resolve("shadow"),
         stateFile = tmp.resolve("widget-modules.json"),
         json      = json,
         builtIn   = GeneratedWidgetRegistry,
         scope     = scope,
+        host      = DesktopWidgetModuleHost(folder, shadowDir = tmp.resolve("shadow")),
     )
 
     private fun install() = fixtureJar.copyTo(folder.resolve("fixture.jar"), overwrite = true)
@@ -107,6 +107,50 @@ class WidgetModulesTest {
         m.forget("fixture")
         assertTrue(fixtureKind !in m.knownKinds(), "forgotten, its widgets may be reaped")
         assertEquals(emptyList(), m.state.value.entries)
+    }
+
+    @Test
+    fun `a module's effects are listed with their scope and its words`() {
+        install()
+        val effect = modules().state.value.effects.single()
+
+        assertEquals("fixture/fixture.effect", effect.scope)
+        assertEquals("Fixture Effect", effect.strings.get(effect.item.label, "en"))
+        assertEquals(2, (modules().state.value.entries.single() as WidgetModules.Entry.Loaded).contributions, "the fixture carries an effect and a theme")
+    }
+
+    @Test
+    fun `what is set for an effect is applied at once and survives a restart`() {
+        install()
+        val m = modules()
+        m.setEffectSetting("fixture/fixture.effect", WidgetModules.EFFECT_ENABLED, "true")
+        m.setEffectSetting("fixture/fixture.effect", "amount", "0.75")
+
+        assertEquals(mapOf("enabled" to "true", "amount" to "0.75"), m.settings.value["fixture/fixture.effect"])
+        assertEquals("0.75", modules().settings.value["fixture/fixture.effect"]?.get("amount"))
+    }
+
+    @Test
+    fun `settings are kept for a module that is switched off`() {
+        install()
+        val m = modules()
+        m.setEffectSetting("fixture/fixture.effect", "amount", "0.75")
+        m.setEnabled("fixture", false)
+
+        assertEquals(emptyList(), m.state.value.effects)
+        assertEquals("0.75", m.settings.value["fixture/fixture.effect"]?.get("amount"))
+    }
+
+    @Test
+    fun `forgetting a module forgets what was set for it`() {
+        install()
+        val m = modules()
+        m.setEffectSetting("fixture/fixture.effect", "amount", "0.75")
+        Files.delete(folder.resolve("fixture.jar"))
+        m.reload()
+        m.forget("fixture")
+
+        assertEquals(emptyMap(), m.settings.value)
     }
 
     @Test

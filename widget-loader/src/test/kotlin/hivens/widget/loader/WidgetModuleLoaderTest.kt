@@ -1,5 +1,8 @@
 package hivens.widget.loader
 
+import hivens.widget.api.ModuleValues
+import hivens.widget.api.ScreenEffect
+import hivens.widget.api.ThemeContribution
 import hivens.widget.api.WidgetApi
 import java.nio.file.Files
 import java.nio.file.Path
@@ -48,7 +51,7 @@ class WidgetModuleLoaderTest {
         // A loaded module holds its jar open. Two of the three hosts will unlink an
         // open file and the third will not, so releasing first is what makes this
         // teardown mean the same thing everywhere.
-        opened.forEach { runCatching { it.loader.close() } }
+        opened.forEach { val _ = runCatching { it.loader.close() } }
         opened.clear()
         Files.walk(tmp).use { walk ->
             walk.sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) }
@@ -145,12 +148,153 @@ class WidgetModuleLoaderTest {
     }
 
     @Test
-    fun `a module declaring the API but carrying no registry is refused`() {
+    fun `a module declaring the API but carrying no service at all is refused`() {
         install("empty.jar", withService = false)
 
         val rejected = scan().rejected.single()
 
-        assertTrue("no registry" in rejected.reason, rejected.reason)
+        assertTrue("neither a registry" in rejected.reason, rejected.reason)
+    }
+
+    @Test
+    fun `a module brings its screen effects out of its own jar`() {
+        install("good.jar")
+
+        val effect = scan().loaded.single().effects.single()
+
+        assertEquals("fixture.effect", effect.id)
+        assertEquals("fixture.label", effect.label)
+        assertTrue(effect.javaClass.classLoader !== javaClass.classLoader, "the effect resolved through the parent loader")
+    }
+
+    @Test
+    fun `a module that carries only screen effects is a module with no widgets`() {
+        install("effects-only.jar", withRegistryService = false)
+
+        val scan = scan()
+
+        assertEquals(emptyList(), scan.rejected)
+        val module = scan.loaded.single()
+        assertEquals(emptyMap(), module.registry.all())
+        assertEquals(listOf("fixture.effect"), module.effects.map { it.id })
+    }
+
+    @Test
+    fun `a screen effect with no id is refused, not offered under a blank name`() {
+        install("good.jar")
+        System.setProperty("fixture.effectBlankId", "1")
+        val scan = try {
+            scan()
+        } finally {
+            System.clearProperty("fixture.effectBlankId")
+        }
+
+        assertEquals(emptyList(), scan.loaded)
+        assertTrue("no id" in scan.rejected.single().reason, scan.rejected.single().reason)
+    }
+
+    @Test
+    fun `a screen effect carries its settings with their declared defaults`() {
+        install("good.jar")
+
+        val effect = scan().loaded.single().effects.single()
+
+        assertEquals(listOf("flag", "amount"), effect.settings.map { it.key })
+        assertEquals(0.25f, ModuleValues(effect.settings).amount("amount"))
+    }
+
+    @Test
+    fun `a setting key declared twice refuses the module`() {
+        install("good.jar")
+
+        val scan = withProperty("fixture.effectRepeatedKey") { scan() }
+
+        assertEquals(emptyList(), scan.loaded)
+        assertTrue("share the key 'flag'" in scan.rejected.single().reason, scan.rejected.single().reason)
+    }
+
+    @Test
+    fun `a setting named like the launcher's own key refuses the module`() {
+        install("good.jar")
+
+        val scan = withProperty("fixture.effectReservedKey") { scan() }
+
+        assertEquals(emptyList(), scan.loaded)
+        assertTrue("enabled" in scan.rejected.single().reason, scan.rejected.single().reason)
+    }
+
+    @Test
+    fun `a module brings its words per language, read from its own jar`() {
+        install("good.jar")
+
+        val strings = scan().loaded.single().strings
+
+        assertEquals(setOf("en", "ru"), strings.languages)
+        assertEquals("Тестовый эффект", strings.get("fixture.label", "ru"))
+        assertEquals("Fixture Effect", strings.get("fixture.label", "en"))
+    }
+
+    @Test
+    fun `a key a language lacks is read in English, and a key nobody has as itself`() {
+        install("good.jar")
+
+        val strings = scan().loaded.single().strings
+
+        assertEquals("Flag", strings.get("fixture.flag", "ru"))
+        assertEquals("Flag", strings.get("fixture.flag", "ja"))
+        assertEquals("no.such.key", strings.get("no.such.key", "ru"))
+        assertEquals("Sum 1 and 2", strings.get("fixture.sum", "de", 1, 2))
+    }
+
+    @Test
+    fun `a language file that cannot be read costs the module that language only`() {
+        install("good.jar", extra = mapOf("i18n/de.properties" to "broken=\\uZZZZ\n"))
+
+        val module = scan().loaded.single()
+
+        assertEquals(setOf("en", "ru"), module.strings.languages)
+        assertEquals("fixture", module.id)
+    }
+
+    @Test
+    fun `every kind of contribution is found in the jar, each by its own service file`() {
+        install("good.jar")
+
+        val module = scan().loaded.single()
+
+        assertEquals(listOf("fixture.effect"), module.contributions.filterIsInstance<ScreenEffect>().map { it.id })
+        assertEquals(listOf("fixture.theme"), module.contributions.filterIsInstance<ThemeContribution>().map { it.id })
+    }
+
+    @Test
+    fun `a kind the host did not ask for is not read`() {
+        install("good.jar")
+
+        val module = WidgetModuleLoader(modules, contributionKinds = listOf(ThemeContribution::class.java)).scan()
+            .also { opened += it.loaded }.loaded.single()
+
+        assertEquals(listOf("fixture.theme"), module.contributions.map { it.id })
+    }
+
+    @Test
+    fun `two jars carrying one module id load the first and refuse the second by name`() {
+        install("a.jar")
+        install("b.jar")
+
+        val scan = scan()
+
+        assertEquals(listOf("fixture"), scan.loaded.map { it.id })
+        assertTrue("already carried by a.jar" in scan.rejected.single().reason, scan.rejected.single().reason)
+    }
+
+    @Test
+    fun `a contribution id with a slash is refused`() {
+        install("good.jar")
+
+        val scan = withProperty("fixture.effectSlashId") { scan() }
+
+        assertEquals(emptyList(), scan.loaded)
+        assertTrue("slash" in scan.rejected.single().reason, scan.rejected.single().reason)
     }
 
     @Test
@@ -281,6 +425,15 @@ class WidgetModuleLoaderTest {
      * damaged manifest or its service entry withheld. Everything else about the
      * jar -- the compiled registry, the descriptor it carries -- is genuine.
      */
+    private fun <T> withProperty(name: String, block: () -> T): T {
+        System.setProperty(name, "1")
+        return try {
+            block()
+        } finally {
+            System.clearProperty(name)
+        }
+    }
+
     private fun install(
         fileName: String,
         id: String? = "fixture",
@@ -288,6 +441,8 @@ class WidgetModuleLoaderTest {
         api: Int? = WidgetApi.VERSION,
         apiText: String? = null,
         withService: Boolean = true,
+        withRegistryService: Boolean = true,
+        extra: Map<String, String> = emptyMap(),
     ) {
         val manifest = Manifest().apply {
             mainAttributes[Attributes.Name.MANIFEST_VERSION] = "1.0"
@@ -301,11 +456,17 @@ class WidgetModuleLoaderTest {
                     .filterNot { it.isDirectory }
                     .filterNot { it.name.equals("META-INF/MANIFEST.MF", ignoreCase = true) }
                     .filterNot { !withService && it.name.startsWith("META-INF/services/") }
+                    .filterNot { !withRegistryService && it.name == "META-INF/services/hivens.widget.api.WidgetRegistry" }
                     .forEach { entry ->
                         out.putNextEntry(JarEntry(entry.name))
                         source.getInputStream(entry).use { it.copyTo(out) }
                         out.closeEntry()
                     }
+                extra.forEach { (name, text) ->
+                    out.putNextEntry(JarEntry(name))
+                    out.write(text.toByteArray(Charsets.UTF_8))
+                    out.closeEntry()
+                }
             }
         }
     }

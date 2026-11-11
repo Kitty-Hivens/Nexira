@@ -17,9 +17,9 @@ import org.slf4j.LoggerFactory
  * Where a track's sound leaves.
  *
  * One member, because one is all the player asks for. An interface rather than the
- * class below it for the reason the engine is one: the player closes a stream that
- * an engine refused to take, and that is a path worth being able to drive without
- * a sound server on the machine.
+ * class below it for the reason the engine is one: the engine factory closes a
+ * stream that an engine refused to take, and that is a path worth being able to
+ * drive without a sound server on the machine.
  */
 public fun interface AudioOutput {
     /**
@@ -140,13 +140,13 @@ class SystemAudioOutput : AudioOutput, AutoCloseable {
      */
     private fun releaseOnShutdown() {
         val body: () -> Unit = { close() }
-        val task = Runnable { runCatching(body) }
-        runCatching { Runtime.getRuntime().addShutdownHook(Thread(task, "nexira-audio-output")) }
+        val task = Runnable { val _ = runCatching(body) }
+        val _ = runCatching { Runtime.getRuntime().addShutdownHook(Thread(task, "nexira-audio-output")) }
     }
 
     override fun close() {
         synchronized(lock) {
-            runCatching { backend?.close() }
+            val _ = runCatching { backend?.close() }
             backend = null
         }
     }

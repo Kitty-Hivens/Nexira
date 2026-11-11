@@ -17,7 +17,7 @@ internal class ScheduledInstall(
     fun replace(name: String, action: () -> Unit) {
         // Throws once shutdown has begun, and then the hook already armed is the
         // one that runs either way.
-        hook?.let { runCatching { remove(it) } }
+        hook?.let { val _ = runCatching { remove(it) } }
         val next = Thread(action, name)
         add(next)
         hook = next

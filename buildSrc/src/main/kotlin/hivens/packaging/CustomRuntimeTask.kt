@@ -15,6 +15,7 @@ import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
 import org.gradle.process.ExecOperations
+import java.io.File
 import javax.inject.Inject
 
 /**
@@ -144,6 +145,8 @@ abstract class CustomRuntimeTask : DefaultTask() {
 
         execOperations.exec { commandLine(args) }
 
+        restoreSignatures(out.resolve("bin"), File(jdkHome, "bin"))
+
         // Base archive via the image's own `java -Xshare:dump`, not jlink's
         // --generate-cds-archive: jlink dumps with a bare flag set, and an archive
         // whose recorded jdk.module.* properties differ from the launcher's is
@@ -164,5 +167,49 @@ abstract class CustomRuntimeTask : DefaultTask() {
                 )
             }
         }
+    }
+
+    /**
+     * Puts the JDK vendor's signatures back on the image's Windows binaries.
+     *
+     * jlink takes the native files from the jmods, and the vendor signs only the
+     * finished JDK, so every dll and exe of the image came out unsigned:
+     * `jvm.dll`, `java.exe`, `awt.dll` and the rest. Windows' Smart App Control
+     * blocks an unsigned binary it has no reputation for, whoever loads it. The
+     * same files sit signed in the JDK's own `bin`, so each one that is the same
+     * image apart from its signature (see [PeSignatures]) is replaced by that
+     * copy. One that differs keeps what jlink wrote, and is named in the log.
+     * Measured on Liberica 27.0.1 for Windows: all 124 natives in its jmods match
+     * their signed copies. Off Windows there is nothing to match, and nothing is
+     * touched.
+     */
+    private fun restoreSignatures(imageBin: File, jdkBin: File) {
+        if (!imageBin.isDirectory || !jdkBin.isDirectory) return
+        var restored = 0
+        val unmatched = ArrayList<String>()
+        imageBin.walkTopDown()
+            .filter { it.isFile && it.extension.lowercase() in PE_EXTENSIONS }
+            .forEach { file ->
+                val built = file.readBytes()
+                if (PeSignatures.isSigned(built)) return@forEach
+                val relative = file.relativeTo(imageBin).path
+                val source = jdkBin.resolve(relative)
+                val signed = if (source.isFile) source.readBytes() else null
+                if (signed == null || !PeSignatures.isSigned(signed) || !PeSignatures.sameImage(built, signed)) {
+                    unmatched += relative
+                    return@forEach
+                }
+                source.copyTo(file, overwrite = true)
+                restored++
+            }
+        if (restored == 0 && unmatched.isEmpty()) return
+        logger.lifecycle("customRuntime: restored the JDK's signature on $restored binaries")
+        if (unmatched.isNotEmpty()) {
+            logger.warn("customRuntime: ${unmatched.size} binaries stay unsigned, no signed copy of the same image in $jdkBin: ${unmatched.joinToString()}")
+        }
+    }
+
+    private companion object {
+        val PE_EXTENSIONS = setOf("dll", "exe")
     }
 }

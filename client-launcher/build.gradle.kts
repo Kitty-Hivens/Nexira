@@ -1,58 +1,102 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
-    alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.android.kmp.library)
 }
 
-dependencies {
-    implementation(project(":client-core"))
-    implementation(project(":client-config"))
-    implementation(project(":client-update"))
-    implementation(project(":client-auth"))
-    implementation(project(":client-auth-smartycraft"))
-    implementation(project(":client-auth-microsoft"))
+// The engine: what a launch needs and how it is put together, shared by the desktop
+// and Android builds. What only a desktop has (child processes, the OS keyrings, the
+// single-instance lock, self-update, other launchers to import from) sits in jvmMain;
+// everything else is in jvmSharedMain and asks the host for those through the graph
+// (see hivens.launcher.di.launcherModules).
+kotlin {
+    // KMP modules don't apply the `java` plugin, so the root's toolchain pin
+    // skips them; set it here so org.gradle.jvm.version matches the JDK 27 modules.
+    jvmToolchain(27)
+    jvm()
+    android {
+        namespace = "hivens.launcher"
+        compileSdk = providers.gradleProperty("nexira.android.compileSdk").map(String::toInt).getOrElse(37)
+        minSdk = 31
+        compilerOptions {
+            jvmTarget.set(JvmTarget.JVM_25)
+        }
+    }
 
-    implementation(libs.commons.compress)
-    // XML for the syndication news channel. jsoup's XML parser resolves no DTD and
-    // no external entity, which is what parsing a document from a user-supplied
-    // address requires.
-    implementation(libs.jsoup)
-    implementation(libs.jbsdiff)
-    // Xodus (JetBrains): pure-JVM embedded KV, backs the disk cache. No JNA/JNI --
-    // fits the no-native-in-launcher policy below.
-    implementation(libs.xodus.environment)
-    implementation(libs.koin.core)
-    implementation(libs.slf4j.api)
-    // Secret storage: OS keyring + encrypted-file fallback. CredentialsManager
-    // delegates to it; the in-tree IKeyringStorage + native impls are retained
-    // one release for the migration shim, then deleted.
-    implementation(libs.libvault)
-    // MDCContext for tagging launch-flow coroutines with a stable launchId so
-    // a multi-launch log dump can be sliced per Play-click. Was a client-ui
-    // slf4j-MDC bridge for kotlinx-coroutines lives with the producer of
-    // launch-scoped MDC values (LauncherController).
-    implementation(libs.kotlinx.coroutines.slf4j)
-    // No JNA in client-launcher: Vault keyring and other native bindings
-    // here use Project Panama (`java.lang.foreign.*`, JEP 454). The
-    // remaining JNA presence in the project lives in client-ui,
-    // transitively via filekit (Win32 IFileDialog + GTK fallback); not
-    // our dependency to track.
+    sourceSets {
+        val jvmSharedMain = create("jvmSharedMain") {
+            dependsOn(getByName("commonMain"))
+        }
+        getByName("jvmMain").dependsOn(jvmSharedMain)
+        getByName("androidMain").dependsOn(jvmSharedMain)
 
-    // Ktor Client & Serialization
-    implementation(libs.ktor.client.core)
-    implementation(libs.ktor.client.okhttp)
-    implementation(libs.ktor.client.content.negotiation)
-    implementation(libs.ktor.serialization.json)
+        getByName("jvmSharedMain") {
+            dependencies {
+                implementation(project(":client-core"))
+                implementation(project(":client-config"))
+                implementation(project(":client-auth"))
+                implementation(project(":client-auth-smartycraft"))
+                implementation(project(":client-auth-microsoft"))
 
-    // ─── TEST ────────────────────────────────────────────────────────────────
-    testImplementation(kotlin("test"))
-    testImplementation(libs.ktor.client.mock)
-    testImplementation(libs.okhttp.tls)
-    testImplementation(libs.kotlinx.coroutines.test)
-    testImplementation(libs.mockk)
-    testImplementation(libs.slf4j.simple)
+                // XML for the syndication news channel. jsoup's XML parser resolves no DTD and
+                // no external entity, which is what parsing a document from a user-supplied
+                // address requires.
+                implementation(libs.jsoup)
+                // Xodus (JetBrains): pure-JVM embedded KV, backs the disk cache. No JNA/JNI --
+                // fits the no-native-in-launcher policy below.
+                implementation(libs.xodus.environment)
+                implementation(libs.koin.core)
+                implementation(libs.slf4j.api)
+                // The secret store's contract (SecretVault, VaultConfig). The keyrings behind
+                // it are the host's: libvault on the desktop, libvault-android on a phone.
+                implementation(libs.libvault.core)
+                // MDCContext for tagging launch-flow coroutines with a stable launchId so
+                // a multi-launch log dump can be sliced per Play-click. Was a client-ui
+                // slf4j-MDC bridge for kotlinx-coroutines lives with the producer of
+                // launch-scoped MDC values (LauncherController).
+                implementation(libs.kotlinx.coroutines.slf4j)
+                // No JNA in client-launcher: Vault keyring and other native bindings
+                // here use Project Panama (`java.lang.foreign.*`, JEP 454). The
+                // remaining JNA presence in the project lives in client-ui,
+                // transitively via filekit (Win32 IFileDialog + GTK fallback); not
+                // our dependency to track.
 
-    // MockClientFactory and other test utilities from client-core
-    testImplementation(testFixtures(project(":client-core")))
+                // Ktor Client & Serialization
+                implementation(libs.ktor.client.core)
+                implementation(libs.ktor.client.okhttp)
+                implementation(libs.ktor.client.content.negotiation)
+                implementation(libs.ktor.serialization.json)
+            }
+        }
+
+        getByName("jvmMain") {
+            dependencies {
+                implementation(project(":client-update"))
+                implementation(libs.commons.compress)
+                implementation(libs.jbsdiff)
+                // Secret storage: OS keyring + encrypted-file fallback. CredentialsManager
+                // delegates to it; the in-tree IKeyringStorage + native impls are retained
+                // one release for the migration shim, then deleted.
+                implementation(libs.libvault)
+            }
+        }
+
+        getByName("jvmTest") {
+            dependencies {
+                implementation(kotlin("test"))
+                implementation(libs.ktor.client.mock)
+                implementation(libs.okhttp.tls)
+                implementation(libs.kotlinx.coroutines.test)
+                implementation(libs.mockk)
+                implementation(libs.slf4j.simple)
+
+                // MockClientFactory and other test utilities from client-core
+                implementation(project(":client-core-testing"))
+            }
+        }
+    }
 }
 
 // Tags that the regular `tasks.test` set must NEVER run. The dev/maintenance
@@ -72,7 +116,7 @@ dependencies {
 // pre-emptively at two entries.
 val excludedTestTags = listOf("smoke", "live-keyring", "live-windows-keyring")
 
-tasks.test {
+tasks.named<Test>("jvmTest") {
     useJUnitPlatform {
         excludeTags(*excludedTestTags.toTypedArray())
     }
@@ -95,14 +139,15 @@ fun registerLiveProbeTask(taskName: String, tag: String, taskDescription: String
     tasks.register<Test>(taskName) {
         description = taskDescription
         group = "verification"
-        testClassesDirs = sourceSets.test.get().output.classesDirs
-        classpath = sourceSets.test.get().runtimeClasspath
+        val tests = kotlin.jvm().compilations.getByName("test")
+        testClassesDirs = tests.output.classesDirs
+        classpath = tests.output.allOutputs + (tests.runtimeDependencyFiles ?: files())
         useJUnitPlatform {
             includeTags(tag)
         }
         jvmArgs("--enable-native-access=ALL-UNNAMED")
         outputs.upToDateWhen { false }
-        shouldRunAfter(tasks.test)
+        shouldRunAfter(tasks.named("jvmTest"))
     }
 
 @Suppress("unused") // Gradle task wiring -- accessed via `./gradlew liveKeyringTest`

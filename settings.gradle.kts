@@ -15,6 +15,15 @@
 // a question during code review.
 pluginManagement {
     repositories {
+        // The Android Gradle Plugin is published here and nowhere else; the filter
+        // keeps every other plugin resolving from the portal.
+        google {
+            content {
+                includeGroupByRegex("com\\.android(\\..*)?")
+                includeGroupByRegex("com\\.google\\.android(\\..*)?")
+                includeGroupByRegex("androidx(\\..*)?")
+            }
+        }
         gradlePluginPortal()
         mavenCentral()
     }
@@ -69,6 +78,8 @@ rootProject.name = "nexira"
 include(":experimental:client-boot")
 include(":client-config")
 include(":client-core")
+// Shared test doubles for :client-core and its consumers (stands in for java-test-fixtures).
+include(":client-core-testing")
 // Auth seam carved out of the launcher god-module: :client-auth holds the
 // provider-agnostic AuthProvider SPI, :client-auth-smartycraft the SmartyCraft impl,
 // :client-auth-microsoft the Microsoft (MSA device-code) impl.
@@ -84,8 +95,18 @@ include(":client-update")
 // pipeline (auth -> resolve -> download -> JRE -> runtime -> launch),
 // buildable to a GraalVM / Liberica-NIK native binary for Linux. The GUI
 // (:client-ui) stays on the JVM -- Skiko/AWT block native-image of Compose.
-// See docs/native-image.md.
+// See docs/src/content/docs/dev/native-image.md.
 include(":client-cli")
+// What decides how sound plays: the queue, the repeat modes and the state machine over an
+// engine. Shared by the desktop and Android builds; the engines are handed in.
+include(":client-playback")
+// The Android application: hosts the shared modules on a phone. It cannot even be configured
+// without an SDK, so a machine that has none (the analysis container, a contributor who only
+// builds the desktop launcher) leaves it out instead of failing the whole build.
+val androidSdkKnown = System.getenv("ANDROID_HOME") != null ||
+    System.getenv("ANDROID_SDK_ROOT") != null ||
+    file("local.properties").takeIf { it.isFile }?.readLines().orEmpty().any { it.startsWith("sdk.dir=") }
+if (androidSdkKnown) include(":android-app")
 // Media playback support (yt-dlp + URL video cache) feeding the Skinema player.
 // Its own seam: consumed by the UI only, unknown to the launch engine.
 include(":client-media")
@@ -94,6 +115,11 @@ include(":client-media")
 // and auth are off-limits by construction, so a tray action can never block on
 // them.
 include(":client-tray")
+// The launcher window's state and its frame on each desktop system: one owner for
+// maximised and minimised, the native frame on Windows, the window manager's word
+// on X11, and the record of how the window was left. No Compose: the UI reads it
+// and asks it, and never keeps a view of the window of its own.
+include(":client-window")
 include(":client-ui")
 // Leaf design-system module (NxUI): tokens, primitives, surfaces, Flexible.
 // client-ui depends on it one-way; it depends on nothing in-tree.
@@ -121,6 +147,8 @@ include(":widget-processor")
 // on the kernel and nothing else in-tree -- no client-ui, no nx-ui, no NxTheme.
 // Kept in the build so it keeps compiling against the API it demonstrates.
 include(":examples:widget-pixelplayer")
+include(":examples:widget-screenfx")
+include(":examples:widget-looks")
 // Runtime discovery of widget modules: scans a directory for jars, checks the
 // ABI they declare, and hands back registries. Separate from :widget-api so a
 // module author compiles against the kernel without pulling in its loader.

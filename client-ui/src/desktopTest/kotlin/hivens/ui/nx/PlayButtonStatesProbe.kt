@@ -79,6 +79,7 @@ class PlayButtonStatesProbe {
     private val cells = listOf(
         Cell("play", { it.packDetailPlay }, NxIcon.PlayArrow),
         Cell("sign in", { it.packDetailPlayLoginRequired }, NxIcon.Person),
+        Cell("signing in", { it.launchBlockSigningIn }, NxIcon.Person, busy = true, kind = Kind.Waiting),
         Cell("preparing", { it.packPlayWait }, NxIcon.PlayArrow, busy = true, kind = Kind.Waiting),
         Cell("running", { it.packPlayExit }, NxIcon.Stop),
         Cell("updating 42%", { it.launchBlockUpdating }, NxIcon.Update, busy = true, kind = Kind.Waiting, progress = 0.42f),

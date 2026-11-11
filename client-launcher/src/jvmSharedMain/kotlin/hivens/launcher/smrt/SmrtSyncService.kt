@@ -1,0 +1,1244 @@
+package hivens.launcher.smrt
+
+import hivens.core.api.dto.smrt.SmrtAssetEntry
+import hivens.core.api.dto.smrt.SmrtModEntry
+import hivens.core.api.dto.smrt.SmrtPackManifest
+import hivens.core.api.dto.smrt.SmrtSource
+import hivens.core.api.interfaces.IPackSyncService
+import hivens.core.api.interfaces.RosterInspection
+import hivens.core.api.interfaces.RosterVerdict
+import hivens.core.diag.ActionRing
+import hivens.core.io.AtomicFiles
+import hivens.core.io.InstanceMutationLock
+import hivens.core.io.fileOpRetry
+import hivens.core.io.resolveWithinRoot
+import hivens.core.net.Digest
+import hivens.core.net.RepairReport
+import hivens.core.net.DigestAlgorithm
+import hivens.core.net.of
+import hivens.core.net.Transfer
+import hivens.core.net.TransferEngine
+import hivens.core.update.UpdatePlan
+import hivens.launcher.util.ModArchives
+import hivens.launcher.modrinth.ModrinthClient
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import org.slf4j.LoggerFactory
+import java.io.IOException
+import java.io.InputStream
+import java.net.URI
+import java.nio.file.Files
+import java.nio.file.Path
+import java.security.MessageDigest
+import java.nio.file.StandardCopyOption
+import java.util.Comparator
+
+/**
+ * v2-manifest sync. Speaks the smrt mirror's flat `mods[] + assets[]` shape with
+ * a per-entry source pointer.
+ *
+ * Throws on any download error or sha1 mismatch. The caller does not
+ * get a partial-success indicator: a mirror failure surfaces rather than
+ * leaving an instance that only looks installed.
+ */
+class SmrtSyncService(
+    private val modrinth: ModrinthClient,
+    private val transfers: TransferEngine,
+    /**
+     * How a mod is opened to be hashed. A seam for the case that matters most and
+     * is hardest to arrange: a jar that cannot be read. Mode bits do not bind root
+     * or some filesystems, so a test that made the file unreadable switched itself
+     * off in exactly the containers CI runs in.
+     */
+    private val openForDigest: (Path) -> InputStream = { Files.newInputStream(it) },
+) : IPackSyncService {
+    private val log = LoggerFactory.getLogger(SmrtSyncService::class.java)
+
+    /**
+     * Places [manifest] on disk under [clientDir].
+     *
+     * The build is the caller's to choose, and it is handed over rather than named:
+     * this used to take a packId and fetch the pack's CURRENT manifest itself, so a
+     * user who picked an older build from the version list got that build recorded
+     * everywhere -- the pin, the baseline, the optional-content defaults -- and the
+     * latest build's bytes on disk. Every other manifest read in the launcher
+     * already branches on the pin; this one could not, because it was never told
+     * there was one.
+     *
+     * [enabledState] maps a mod `filename` to whether it should be active.
+     * Required mods are always active regardless; an optional absent from the
+     * map falls back to its manifest `default_enabled`. Empty map = install
+     * every mod at its manifest default (the pre-toggle behaviour).
+     *
+     * [assetState] does the same for the assets the player may switch off, by
+     * `dest`, see [SmrtAssetEntry.toggleable]. Absent is on.
+     */
+    suspend fun sync(
+        manifest: SmrtPackManifest,
+        clientDir: Path,
+        progress: ((current: Int, total: Int, filename: String) -> Unit)? = null,
+        enabledState: Map<String, Boolean> = emptyMap(),
+        assetState: Map<String, Boolean> = emptyMap(),
+    ) = withContext(Dispatchers.IO) {
+        // Serialize against a concurrent structural mutation of this instance (an
+        // optional-content toggle relabel), so a rename can't land between the
+        // existence check and the move below. Reads are not gated -- they open
+        // delete-shared and cannot corrupt a rename.
+        InstanceMutationLock.withLock(clientDir) {
+            log.info(
+                "smrt sync: pack={}, pack_version={}, mods={}, assets={}",
+                manifest.packId, manifest.packVersion,
+                manifest.mods.size, manifest.assets.size,
+            )
+
+            if (manifest.schemaVersion != EXPECTED_SCHEMA) {
+                throw IOException(
+                    "smrt mirror manifest schema_version=${manifest.schemaVersion}, " +
+                        "expected $EXPECTED_SCHEMA. Update Nexira or the mirror version mismatched."
+                )
+            }
+
+            Files.createDirectories(clientDir)
+
+            // Which source laid this instance out last. SC used mods/<mcversion>/,
+            // the mirror uses a flat mods/ -- worth a line in the log when it changes,
+            // since a duplicate coremod from the old layout is a stack overflow rather
+            // than a visible error. The sweep below needs no special case for it: it
+            // removes archives the manifest does not name wherever they sit.
+            val marker = clientDir.resolve(SOURCE_MARKER_FILE)
+            val previousSource = readSourceMarker(marker)
+            if (previousSource != SOURCE_MIRROR) {
+                log.info("smrt sync: source is now {} (was {})", SOURCE_MIRROR, previousSource ?: "<none>")
+            }
+
+            // Planned first, fetched together. A pack is a hundred files of wildly
+            // different sizes, and one request at a time meant a 300 MB resource pack
+            // stalled every mod behind it -- the plan lets the engine overlap them and
+            // split the large ones into blocks.
+            val sink = PlanSink()
+            val stuck = mutableListOf<Path>()
+            for (mod in manifest.mods) {
+                val enabled = enabledState[mod.filename] ?: (mod.required || mod.defaultEnabled)
+                sink.accept("$MODS_PREFIX${mod.filename}", planMod(mod, clientDir, enabled, stuck))
+            }
+            val assetStuck = mutableListOf<Path>()
+            for (asset in manifest.assets) {
+                sink.accept(asset.dest, planAsset(asset, clientDir, assetState[asset.dest] ?: true, assetStuck))
+            }
+            // An install that could not place everything still places the rest, which
+            // is the older decision and the right one. What was missing was anyone
+            // saying so outside the log: the pack then reaches the game short of a mod
+            // and the loader, or the server, is what brings it up.
+            reportUnfetchable(manifest.packId, sink.unfetchable)
+            transfers.fetchAll(sink.transfers) { p -> progress?.invoke(p.filesDone, p.filesTotal, p.current) }
+            settleStuck(clientDir, manifest.packId, stuck, manifest.mods.map { it.filename })
+            settleStuckAssets(manifest.packId, assetStuck)
+
+            // Drop manifest-removed mods and any other archive the manifest
+            // does not name. Only top-level mods/{expected_filename} entries
+            // survive.
+            val expected = manifest.mods.flatMap { listOf(it.filename, "${it.filename}.disabled") }.toSet()
+            // One rule for both cases. The old split -- wipe everything on a source
+            // change, drop stray jars otherwise -- dates from the clients era, where
+            // SC laid mods out under mods/<mcversion>/ and a duplicate coremod loaded
+            // twice. Since the sweep only ever removes archives the manifest does not
+            // name, the migration case needs nothing extra.
+            pruneForeignEntries(clientDir, expected, manifest.mods.associate { it.filename to it.sha1 })
+
+            writeSourceMarker(marker, SOURCE_MIRROR)
+            writeRoster(clientDir, expected)
+        }
+    }
+
+    /**
+     * Checks an installed pack against [manifest] and puts right whatever does not
+     * match, fetching as little as the evidence allows.
+     *
+     * Two stages, and the split is about what a check may cost. Everything is first
+     * measured locally against the manifest's size and sha1 -- the same test a
+     * re-sync uses -- because a `modrinth` entry has to be resolved through an API
+     * call before it even has a URL, and doing that for a hundred intact mods would
+     * put a hundred requests behind a button that should mostly find nothing wrong.
+     * Only what fails that test is handed to the engine, which compares it block by
+     * block against the map taken when the file was installed and pulls just the
+     * blocks that differ.
+     *
+     * The consequence is that a damaged file is read twice: once to notice, once to
+     * locate. For a repair the user asked for, that is the right trade -- the
+     * alternative is an API round trip per entry every time.
+     *
+     * Protected paths are left alone. A config the user edited is not damage.
+     */
+    override suspend fun verifyAndRepair(
+        clientDir: Path,
+        manifest: SmrtPackManifest,
+        enabledState: Map<String, Boolean>,
+        assetState: Map<String, Boolean>,
+        progress: ((current: Int, total: Int, path: String) -> Unit)?,
+    ): RepairReport = withContext(Dispatchers.IO) {
+        InstanceMutationLock.withLock(clientDir) {
+            val total = manifest.mods.size + manifest.assets.size
+            // Keyed the way the engine keys its own half of this report, by the name
+            // of the file that would have landed. One report, one language: a repair
+            // that named some entries by path and others by filename would read as
+            // two different things having gone wrong.
+            val sink = PlanSink()
+            val stuck = mutableListOf<Path>()
+            for (mod in manifest.mods) {
+                val enabled = enabledState[mod.filename] ?: (mod.required || mod.defaultEnabled)
+                val name = if (enabled) mod.filename else "${mod.filename}.disabled"
+                sink.accept(name, planMod(mod, clientDir, enabled, stuck))
+            }
+            val assetStuck = mutableListOf<Path>()
+            for (asset in manifest.assets) {
+                sink.accept(asset.dest.substringAfterLast('/'), planAsset(asset, clientDir, assetState[asset.dest] ?: true, assetStuck))
+            }
+            val suspect = sink.transfers
+            log.info("repair: pack={}, {} of {} entries need a closer look", manifest.packId, suspect.size, total)
+            val report = transfers.verifyAndRepair(suspect) { p ->
+                progress?.invoke(p.filesDone, p.filesTotal, p.current)
+            }
+            settleStuck(clientDir, manifest.packId, stuck, manifest.mods.map { it.filename })
+            settleStuckAssets(manifest.packId, assetStuck)
+            // A verify is a full comparison against the manifest, so it is exactly the
+            // moment the instance can be vouched for -- write the roster here too.
+            // Without this, "verify and repair" checked every file and still left the
+            // instance unverified at launch, which is not a distinction anyone can be
+            // expected to guess.
+            //
+            // Only when the repair actually finished, though: a run that could not
+            // fetch half the pack has not established anything, and vouching for it
+            // would hand the next launch a token over an instance still missing files.
+            //
+            // An entry nothing can fetch counts against the run exactly like one the
+            // transfer could not finish. It is absent from the instance either way,
+            // and the difference (nobody may serve it, rather than the attempt broke)
+            // belongs in the reason beside its name, not in whether the pack is called
+            // whole. Reporting it intact was how a repair told the player their pack
+            // was fine while a mod was missing from it.
+            val failed = report.failed + sink.unfetchable
+            if (failed.isEmpty()) {
+                writeRoster(clientDir, manifest.mods.flatMap { listOf(it.filename, "${it.filename}.disabled") }.toSet())
+            } else {
+                log.warn("repair: {} entr(ies) still unresolved -- instance stays unverified: {}", failed.size, failed.keys)
+            }
+
+            // Everything the local check cleared counts as intact: it was measured
+            // against the same manifest, just without a round trip. What could not be
+            // fetched was measured too, and failed.
+            report.copy(
+                checked = total,
+                intact  = total - suspect.size - sink.unfetchable.size + report.intact,
+                failed  = failed,
+            )
+        }
+    }
+
+    /**
+     * Applies a precomputed [UpdateReconciler] plan against an already-fetched
+     * [manifest]. The CALLER must hold [InstanceMutationLock] for [clientDir]:
+     * this method deliberately does not take it, because [sync] does and the lock
+     * is not reentrant; the update driver holds it across scan + reconcile + apply.
+     *
+     * - toAdd / toUpdate: download the target file. For a mod, [enabledState]
+     *   decides active (`mods/<name>`) vs disabled (`mods/<name>.disabled`) and the
+     *   stale variant is dropped first, so a user's optional-off choice is kept.
+     * - conflicts: the pack's version is written beside the user's edit as
+     *   `<path>.new`; the user's file is never overwritten.
+     * - toDelete: removed (both variants for a mod path).
+     * - skippedProtected: never touched.
+     *
+     * sha1 is verified after every download (a mod mismatch throws and drops the bad
+     * bytes), same as [sync].
+     *
+     * An asset the player may switch off is placed by [assetState] the same way, so
+     * a resource pack they turned off arrives turned off in its new build, and the
+     * `.disabled` copy of one the pack retired goes with it.
+     */
+    suspend fun applyUpdate(
+        clientDir: Path,
+        manifest: SmrtPackManifest,
+        plan: UpdatePlan,
+        enabledState: Map<String, Boolean> = emptyMap(),
+        progress: ((current: Int, total: Int, path: String) -> Unit)? = null,
+        assetState: Map<String, Boolean> = emptyMap(),
+    ) = withContext(Dispatchers.IO) {
+        val index = buildEntryIndex(manifest)
+        val offNamed = manifest.assets.filter { it.hasOffName }.associateBy { it.dest }
+        val assetStuck = mutableListOf<Path>()
+        val total = plan.toAdd.size + plan.toUpdate.size + plan.conflicts.size + plan.toDelete.size
+        var current = 0
+
+        // Same shape as a full sync: the local moves and drops happen while the plan
+        // is built, then everything that needs the network goes in one batch.
+        val sink = PlanSink()
+        val stuck = mutableListOf<Path>()
+        for (path in plan.toAdd + plan.toUpdate) {
+            val entry = index[path] ?: continue
+            if (path.startsWith(MODS_PREFIX)) {
+                val filename = path.removePrefix(MODS_PREFIX)
+                val enabled = enabledState[filename] ?: true
+                val active = resolveSafe(clientDir, path, "mod $filename")
+                val disabled = resolveSafe(clientDir, "$path.disabled", "mod $filename")
+                val dest = if (enabled) active else disabled
+                val stale = if (enabled) disabled else active
+                // Kept, not dropped: see planMod. An update of a mod the player
+                // switched off is exactly where the stale variant IS the active jar.
+                // `add`, not `+=`: a Path is itself an Iterable<Path>, so the operator
+                // resolves to the one that appends its ELEMENTS and returns a new list.
+                runCatching { fileOpRetry("update drop stale $filename") { Files.deleteIfExists(stale) } }
+                    .onFailure { stuck.add(stale) }
+                sink.accept(path, plan(dest, entry.sha1, entry.size, entry.source, "mod $filename"))
+            } else if (path in offNamed) {
+                val enabled = offNamed.getValue(path).let { !it.toggleable || (assetState[path] ?: true) }
+                val active = resolveSafe(clientDir, path, "asset $path")
+                val disabled = resolveSafe(clientDir, "$path$DISABLED", "asset $path")
+                runCatching { fileOpRetry("update drop stale $path") { Files.deleteIfExists(if (enabled) disabled else active) } }
+                    .onFailure { assetStuck.add(if (enabled) disabled else active) }
+                sink.accept(path, plan(if (enabled) active else disabled, entry.sha1, entry.size, entry.source, "asset $path"))
+            } else {
+                val dest = resolveSafe(clientDir, path, "asset $path")
+                sink.accept(path, plan(dest, entry.sha1, entry.size, entry.source, "asset $path"))
+            }
+        }
+
+        for (path in plan.conflicts) {
+            val entry = index[path] ?: continue
+            val dest = resolveSafe(clientDir, "$path.new", "conflict $path")
+            sink.accept("$path.new", plan(dest, entry.sha1, entry.size, entry.source, "conflict $path"))
+        }
+
+        reportUnfetchable(manifest.packId, sink.unfetchable)
+        val fetches = sink.transfers
+        transfers.fetchAll(fetches) { p ->
+            progress?.invoke(p.filesDone, total, p.current)
+        }
+        current = fetches.size
+        // Before the relabel below, which declines while both names exist and would
+        // otherwise leave the switched-off mod loading under its active name.
+        settleStuck(
+            clientDir,
+            manifest.packId,
+            stuck,
+            (plan.toAdd + plan.toUpdate).filter { it.startsWith(MODS_PREFIX) }.map { it.removePrefix(MODS_PREFIX) },
+        )
+
+        for (path in plan.toDelete) {
+            current++
+            progress?.invoke(current, total, path)
+            val target = resolveSafe(clientDir, path, "prune $path")
+            val _ = runCatching { fileOpRetry("update prune $path") { Files.deleteIfExists(target) } }
+            // A retired mod or switchable asset may be sitting under its off name.
+            if (path.startsWith(MODS_PREFIX) || SmrtAssetEntry.isPackArchive(path)) {
+                val disabled = resolveSafe(clientDir, "$path.disabled", "prune $path")
+                val _ = runCatching { fileOpRetry("update prune $path disabled") { Files.deleteIfExists(disabled) } }
+            }
+        }
+        settleStuckAssets(manifest.packId, assetStuck)
+
+        // Place every mod at active / .disabled per enabledState even when its bytes did
+        // not change: an optional flipped to required (or back) has no toAdd/toUpdate entry
+        // but must still move, or a now-required mod would launch missing.
+        relabel(clientDir, manifest.mods, enabledState)
+        relabelAssets(clientDir, manifest.assets, assetState)
+
+        writeRoster(clientDir, manifest.mods.flatMap { listOf(it.filename, "${it.filename}.disabled") }.toSet())
+    }
+
+    /**
+     * See [IPackSyncService.enforceRoster].
+     *
+     * The roster comes off disk rather than from the mirror, so this holds with no
+     * network -- including an offline launch, which is exactly when a hand-placed jar
+     * would otherwise go unchallenged. [sync] and [applyUpdate] write it.
+     *
+     * Only loadable archives are touched. A jar or zip outside the roster is the
+     * whole problem -- it is what a loader would execute -- while everything else
+     * under `mods/` is data: mod caches, Connector's remapped-jar store, our own
+     * block maps. Deleting those protects nothing and costs a rebuild at best.
+     */
+    override suspend fun enforceRoster(clientDir: Path, expected: Map<String, String>?): RosterVerdict = withContext(Dispatchers.IO) {
+        // The baseline outranks the roster file wherever it exists. Both answer
+        // "which names belong here", but only one of them also answers "and with
+        // which bytes", and only one of them lives somewhere its subject cannot
+        // simply edit.
+        val roster = expected?.keys ?: readRoster(clientDir)
+        if (roster.isEmpty()) {
+            log.warn("mods enforce: no roster for {}, mods/ left alone and the launch stays unverified", clientDir.fileName)
+            return@withContext RosterVerdict(verified = false)
+        }
+        val sweep = InstanceMutationLock.withLock(clientDir) {
+            pruneForeignEntries(clientDir, roster, expected.orEmpty())
+        }
+        if (sweep.blocked.isNotEmpty()) {
+            log.warn(
+                "mods enforce: {} entr(ies) could not be removed from {}: {}",
+                sweep.blocked.size, clientDir.fileName, sweep.blocked,
+            )
+        }
+        // The sweep answers by name. With a baseline there is a second question --
+        // whether what kept its name kept its bytes -- and that is where a jar
+        // overwritten in place gets caught, which no name comparison can see.
+        val digests = if (expected == null) DigestScan() else digestScan(clientDir, expected)
+        if (digests.mismatched.isNotEmpty()) {
+            log.warn(
+                "mods enforce: {} file(s) in {} do not match the pack's baseline: {}",
+                digests.mismatched.size, clientDir.fileName, digests.mismatched,
+            )
+        }
+        val unreadable = (digests.unreadable + sweep.unreadable).sorted()
+        if (unreadable.isNotEmpty()) {
+            log.warn(
+                "mods enforce: {} file(s) in {} could not be read to check them: {}",
+                unreadable.size, clientDir.fileName, unreadable,
+            )
+        }
+        RosterVerdict(
+            // Anything left behind means the instance was not brought in line, and a
+            // file that resists deletion is the likeliest thing to have been left on
+            // purpose.
+            verified = sweep.blocked.isEmpty() && digests.mismatched.isEmpty() && unreadable.isEmpty(),
+            removed = sweep.removed,
+            blocked = sweep.blocked,
+            mismatched = digests.mismatched,
+            unreadable = unreadable,
+        )
+    }
+
+    /**
+     * See [IPackSyncService.inspectRoster]. Same roster resolution and the same rule
+     * for what counts as foreign as [enforceRoster] -- shared through
+     * [foreignEntries] and [digestScan] rather than restated, so the two can only
+     * ever agree.
+     */
+    override suspend fun inspectRoster(clientDir: Path, expected: Map<String, String>?): RosterInspection =
+        withContext(Dispatchers.IO) {
+            val roster = expected?.keys ?: readRoster(clientDir)
+            if (roster.isEmpty()) {
+                log.warn("mods inspect: no roster for {}, nothing to hold it to", clientDir.fileName)
+                return@withContext RosterInspection(checkable = false)
+            }
+            val walk = foreignEntries(clientDir, roster, expected.orEmpty())
+            val digests = if (expected == null) DigestScan() else digestScan(clientDir, expected)
+            RosterInspection(
+                foreign = walk.foreign.map { (_, relText) -> relText }.sorted(),
+                mismatched = digests.mismatched,
+                unreadable = (digests.unreadable + walk.unreadable).sorted(),
+            )
+        }
+
+    /** What comparing the pack's declared digests against disk could establish. */
+    private data class DigestScan(
+        val mismatched: List<String> = emptyList(),
+        val unreadable: List<String> = emptyList(),
+    )
+
+    /**
+     * Compares the bytes on disk against the digests the pack declared. A missing
+     * file is neither answer -- that is an incomplete install, which the sync and
+     * repair paths own; this asks only about what is there.
+     *
+     * "Could not read it" is kept apart from "it does not match". They are not the
+     * same claim and the difference is not cosmetic: a read failure is what an
+     * antivirus scanning a jar, or a handle the previous session has not dropped
+     * yet, looks like from here, and folding it into the mismatch list accuses the
+     * player of swapping a mod on the strength of a locked file. The read is
+     * retried on the transient shapes first ([fileOpRetry]), so only a lock that
+     * outlives the backoff is reported at all.
+     */
+    private fun digestScan(clientDir: Path, expected: Map<String, String>): DigestScan {
+        val modsDir = clientDir.resolve("mods")
+        if (!Files.isDirectory(modsDir)) return DigestScan()
+        val mismatched = mutableListOf<String>()
+        val unreadable = mutableListOf<String>()
+        for ((name, sha1) in expected) {
+            if (sha1.isBlank()) continue
+            val file = modsDir.resolve(name)
+            if (!Files.isRegularFile(file)) continue
+            val actual = runCatching { fileOpRetry("roster digest $name") { sha1Of(file) } }
+                .onFailure { log.warn("mods roster: cannot read {}, it stays unchecked: {}", name, it.toString()) }
+                .getOrNull()
+            when {
+                actual == null -> unreadable += name
+                !actual.equals(sha1, ignoreCase = true) -> mismatched += name
+            }
+        }
+        return DigestScan(mismatched.sorted(), unreadable.sorted())
+    }
+
+    private fun sha1Of(file: Path): String {
+        val digest = MessageDigest.getInstance("SHA-1")
+        openForDigest(file).use { input ->
+            val buffer = ByteArray(1 shl 16)
+            while (true) {
+                val read = input.read(buffer)
+                if (read <= 0) break
+                digest.update(buffer, 0, read)
+            }
+        }
+        return digest.digest().joinToString("") { "%02x".format(it) }
+    }
+
+    /**
+     * What one sweep of `mods/` managed to remove, what refused to go, and what it
+     * left because the file would not open to be identified.
+     */
+    private data class Sweep(val removed: List<String>, val blocked: List<String>, val unreadable: List<String>)
+
+    /**
+     * What [foreignEntries] found: the archives the pack does not account for, and
+     * the files it could not read to decide, kept apart for the reason [digestScan]
+     * keeps them apart.
+     */
+    private data class ForeignWalk(val foreign: List<Pair<Path, String>>, val unreadable: List<String>)
+
+    /** What reading a file beside the mods established about it. */
+    private enum class Relocation { PACK_MOD, NOT_PACK_MOD, UNREADABLE }
+
+    private data class ResolvableEntry(val source: SmrtSource, val sha1: String, val size: Long)
+
+    /**
+     * What a pass over one manifest entry decided.
+     *
+     * Three outcomes rather than a nullable transfer, because two of them used to
+     * arrive as the same `null`: the file is already right, and there is no way to
+     * obtain it at all. A repair counted both as intact, so a pack missing a mod
+     * nobody may serve came back reported whole, which is worse than the gap it
+     * was hiding.
+     */
+    private sealed interface Planned {
+        /** Fetch it. */
+        data class Fetch(val transfer: Transfer) : Planned
+
+        /** The bytes on disk are the ones the manifest names. */
+        data object UpToDate : Planned
+
+        /** Nothing here can produce this file, in words a player is meant to read. */
+        data class Unfetchable(val reason: String) : Planned
+    }
+
+    /**
+     * What one pass planned, collected: the transfers to run, and the entries
+     * nothing could produce.
+     *
+     * Every caller has to answer all three outcomes, and they answer them the same
+     * way, so the sorting lives here instead of in each of them. [name] is the
+     * caller's to choose, because the two audiences differ: a repair report has to
+     * name an entry the way the transfer engine names the other half of the same
+     * report, while a log line about an install is read against manifest paths.
+     */
+    private class PlanSink {
+        val transfers = ArrayList<Transfer>()
+        val unfetchable = LinkedHashMap<String, String>()
+
+        fun accept(name: String, planned: Planned) {
+            when (planned) {
+                is Planned.Fetch -> transfers += planned.transfer
+                is Planned.Unfetchable -> unfetchable[name] = planned.reason
+                Planned.UpToDate -> Unit
+            }
+        }
+    }
+
+    private fun buildEntryIndex(manifest: SmrtPackManifest): Map<String, ResolvableEntry> {
+        val index = LinkedHashMap<String, ResolvableEntry>()
+        for (mod in manifest.mods) index["$MODS_PREFIX${mod.filename}"] = ResolvableEntry(mod.source, mod.sha1, mod.sizeBytes)
+        for (asset in manifest.assets) index[asset.dest] = ResolvableEntry(asset.source, asset.sha1, asset.sizeBytes)
+        return index
+    }
+
+    /**
+     * Re-labels already-downloaded optional mods to match [enabledState] with NO
+     * network: an active jar that should be off becomes `.disabled` and vice
+     * versa. The toggle UI calls this -- the bytes are already on disk, only the
+     * name (and thus whether Forge loads it) changes. A variant that is missing
+     * on disk is left for the next full sync to fetch.
+     */
+    override fun relabel(clientDir: Path, mods: List<SmrtModEntry>, enabledState: Map<String, Boolean>): List<String> {
+        val modsDir = clientDir.resolve("mods")
+        if (!Files.isDirectory(modsDir)) return emptyList()
+        val failed = mutableListOf<PendingVariants.Op>()
+        val settled = mutableListOf<String>()
+        for (mod in mods) {
+            val enabled = enabledState[mod.filename] ?: (mod.required || mod.defaultEnabled)
+            val active = resolveSafe(modsDir, mod.filename, "mod ${mod.filename}")
+            val disabled = resolveSafe(modsDir, "${mod.filename}.disabled", "mod ${mod.filename}")
+            val from = if (enabled) disabled else active
+            val to = if (enabled) active else disabled
+            when {
+                Files.exists(from) && !Files.exists(to) -> runCatching {
+                    fileOpRetry("smrt relabel ${mod.filename}") {
+                        Files.move(from, to, StandardCopyOption.REPLACE_EXISTING)
+                    }
+                }.onSuccess { settled += mod.filename }.onFailure {
+                    // A lock that outlives the retry means a holder we can't evict --
+                    // typically the running game's classloader, which on Windows keeps
+                    // the jar open without delete-sharing. Nothing else would ever
+                    // retry it: a launch runs no sync. So it is written down for the
+                    // next launch to carry out, once that game has let go.
+                    failed += PendingVariants.Op.Move(from.fileName.toString(), to.fileName.toString())
+                    log.warn("smrt relabel: {} still held after retries; applies at the next launch", mod.filename)
+                }
+                // Already where the choice wants it, so whatever an earlier attempt
+                // left pending about this mod no longer stands.
+                !Files.exists(from) -> settled += mod.filename
+                // Both names present: the pass that fetched the copy owns that case
+                // and has recorded its own leftover.
+                else -> Unit
+            }
+        }
+        PendingVariants.update(clientDir, set = failed, cleared = settled)
+        return failed.map { it.key }
+    }
+
+    /**
+     * [relabel] for the resource and shader packs a pack ships: one the player may
+     * switch off moved between its name and its `.disabled` one as the choice says,
+     * and a required one found off moved back on, no network.
+     *
+     * A move the game refuses is written down for the next launch, as a mod's is.
+     * The game keeps the zip of a selected resource or shader pack open the way it
+     * keeps a jar, and on Windows that refuses the rename for as long as it runs.
+     */
+    override fun relabelAssets(clientDir: Path, assets: List<SmrtAssetEntry>, assetState: Map<String, Boolean>): List<String> {
+        val failed = mutableListOf<PendingVariants.Op>()
+        val settled = mutableListOf<String>()
+        for (asset in assets) {
+            if (!asset.hasOffName) continue
+            // A required asset is moved back on wherever it is found off, see
+            // [SmrtAssetEntry.hasOffName]: nothing else would ever move it.
+            val enabled = !asset.toggleable || (assetState[asset.dest] ?: true)
+            val active = resolveSafe(clientDir, asset.dest, "asset ${asset.dest}")
+            val disabled = resolveSafe(clientDir, "${asset.dest}$DISABLED", "asset ${asset.dest}")
+            val from = if (enabled) disabled else active
+            val to = if (enabled) active else disabled
+            when {
+                !Files.exists(from) -> settled += asset.dest
+                Files.exists(to) -> Unit
+                else -> runCatching { fileOpRetry("smrt relabel ${asset.dest}") { Files.move(from, to, StandardCopyOption.REPLACE_EXISTING) } }
+                    .onSuccess { settled += asset.dest }
+                    .onFailure {
+                        failed += PendingVariants.Op.Move(
+                            from.fileName.toString(),
+                            to.fileName.toString(),
+                            dir = asset.dest.substringBefore('/'),
+                        )
+                        log.warn("smrt relabel: {} still held after retries; applies at the next launch", asset.dest)
+                    }
+            }
+        }
+        PendingVariants.update(clientDir, set = failed, cleared = settled)
+        return failed.map { it.key }
+    }
+
+    override suspend fun settlePending(clientDir: Path): List<String> = withContext(Dispatchers.IO) {
+        InstanceMutationLock.withLock(clientDir) { PendingVariants.settle(clientDir) }
+    }
+
+
+    /**
+     * Every loadable archive under `mods/` that [expected] does not name, deepest
+     * first, paired with the '/'-joined relative path a person reads in a report,
+     * and apart from them the files that would not open to be identified.
+     *
+     * Pure: it walks and decides, and touches nothing. [pruneForeignEntries] is this
+     * plus a delete, [inspectRoster] is this without one -- the rule for what counts
+     * as foreign has to be the same in both, or a launch would be held to one
+     * standard and the session that follows it to another.
+     */
+    private fun foreignEntries(
+        clientDir: Path,
+        expected: Set<String>,
+        digests: Map<String, String> = emptyMap(),
+    ): ForeignWalk {
+        val modsDir = clientDir.resolve("mods")
+        if (!Files.isDirectory(modsDir)) return ForeignWalk(emptyList(), emptyList())
+        val found = mutableListOf<Pair<Path, String>>()
+        val unreadable = mutableListOf<String>()
+        // Computed on first use and only when something nested is actually being
+        // judged, because building it opens every rostered jar to read one
+        // manifest. An instance with nothing under a subdirectory, which is
+        // almost all of them, never pays for it.
+        val unpacked by lazy { unpackedDepNames(modsDir, expected) }
+        Files.walk(modsDir).use { stream ->
+            stream.sorted(Comparator.reverseOrder()).forEach { p ->
+                if (p == modsDir) return@forEach
+                // Dot-directories are tooling state, not content: Connector keeps its
+                // remapped jars in `.connector`, we keep block maps in
+                // `.nexira-blocks`. Emptying them makes the next launch rebuild
+                // everything and defends against nothing -- no loader reads them as
+                // mods. Directories are never removed, for the same reason.
+                val rel = modsDir.relativize(p)
+                // Inside a dot-DIRECTORY, not merely dot-named: `.connector/x.jar` is
+                // tooling state, while `.cheat.jar` sitting in mods/ is a mod the
+                // loader will happily read (its discovery matches `.+\.jar`, leading
+                // dot and all). Testing the first segment alone let that one through.
+                if (rel.nameCount > 1 && rel.getName(0).toString().startsWith(".")) return@forEach
+                if (Files.isDirectory(p)) {
+                    // A directory is a mod candidate in its own right: FML adds one it
+                    // finds beside the mods as a ContainerType.DIR and reads it as an
+                    // unpacked mod. Archives get all the attention and this shape got
+                    // none, so a mod dropped in unpacked was the one way past the sweep
+                    // that nothing here looked at. Reported, never deleted, for the
+                    // same reason the rest of the directories are not.
+                    if (!p.fileName.toString().startsWith(".") && loaderReads(p, modsDir) && looksLikeMod(p)) {
+                        found += p to rel.joinToString("/")
+                    }
+                    return@forEach
+                }
+                if (!Files.isRegularFile(p)) return@forEach
+                // Only what a loader would execute. A config, or a leftover .tmp
+                // beside the mods, is not a way to run code.
+                if (!ModArchives.isLoadable(p.fileName.toString())) return@forEach
+                // Where the loader actually looks. FML reads `mods/` and, if it
+                // exists, `mods/<mcversion>/`, and neither read recurses: Loader
+                // calls findModDirMods on exactly those two. An archive anywhere
+                // else under `mods/` is a mod's own storage, opened by that mod if
+                // at all, and guarding it means meeting a new mechanism every time
+                // one of them writes something. IndustrialCraft 2 unpacks a library
+                // into `mods/ic2/`, Carpenter's Blocks caches generated textures in
+                // `mods/carpentersblocks/`, and neither is a way to run code that
+                // the pack did not ship.
+                val keep = when {
+                    p.parent == modsDir -> p.fileName.toString() in expected
+                    p.parent.parent == modsDir && isVersionDir(p.parent.fileName.toString()) -> {
+                        // The version directory is read by the loader, so the same
+                        // standard as the top level applies, answered by the pack's
+                        // own contents. Either a jar the roster vouches for declared
+                        // it would unpack that name, which is how FML lays out a
+                        // `ContainedDeps`, and that jar's own bytes are held to the
+                        // pack's digests. Or the file IS one of the pack's mods,
+                        // moved down here by something that runs at startup:
+                        // CodeChickenCore's dependency loader relocates what it
+                        // finds, leaving nothing at the top level. That one is
+                        // matched on bytes, so the move is recognised and a
+                        // substitution under a familiar name is not. A file that
+                        // will not open is neither: it stays, and the instance
+                        // stays unchecked, the way an unreadable top-level jar does.
+                        val name = p.fileName.toString()
+                        name in unpacked || when (relocation(p, rel, name, digests)) {
+                            Relocation.PACK_MOD -> true
+                            Relocation.NOT_PACK_MOD -> false
+                            Relocation.UNREADABLE -> {
+                                unreadable += rel.joinToString("/")
+                                true
+                            }
+                        }
+                    }
+                    else -> true
+                }
+                if (keep) return@forEach
+                // Joined over the path's own segments rather than toString(): the
+                // report is read by a person and matched against manifest paths, both
+                // of which use '/' whatever the host separator is.
+                found += p to rel.joinToString("/")
+            }
+        }
+        return ForeignWalk(found, unreadable)
+    }
+
+    /**
+     * The file names the rostered jars in `mods/` declare they carry inside
+     * themselves, which FML unpacks a level down once the game is running.
+     *
+     * Only jars the roster names are asked. A jar that is itself foreign has no
+     * say in what else may stay, or planting one jar would launder every name it
+     * cared to list. An optional the player turned off is not asked either: it
+     * sits there as `.disabled`, no loader opens it, so nothing of it is unpacked
+     * and anything left under its name is a leftover to sweep.
+     *
+     * Nothing about which names these are is written down here. They are read from
+     * whatever jar is on disk under the rostered name, so a pack that moves to a
+     * different build of the carrier gets that build's names, and the previous
+     * build's unpacked files stop being declared and are swept on the next pass.
+     */
+    private fun unpackedDepNames(modsDir: Path, expected: Set<String>): Set<String> {
+        val names = mutableSetOf<String>()
+        Files.newDirectoryStream(modsDir).use { entries ->
+            for (entry in entries) {
+                if (!Files.isRegularFile(entry)) continue
+                val name = entry.fileName.toString()
+                if (name !in expected || !ModArchives.isLoadable(name)) continue
+                names += ModArchives.containedDeps(entry)
+            }
+        }
+        return names
+    }
+
+    /** Whether the loader reads this directory's contents as mod candidates. */
+    private fun loaderReads(dir: Path, modsDir: Path): Boolean {
+        val parent = dir.parent ?: return false
+        return parent == modsDir ||
+            (parent.parent == modsDir && isVersionDir(parent.fileName.toString()))
+    }
+
+    /**
+     * Whether a directory holds a mod rather than a mod's belongings.
+     *
+     * Metadata first, since that is what a mod is identified by, and then classes,
+     * since Forge will take an `@Mod` annotation without any metadata file at all.
+     * The walk is bounded: this runs on directories a mod fills with its own data,
+     * and reading all of one to answer a question the first few entries settle
+     * would be paid on every launch.
+     */
+    private fun looksLikeMod(dir: Path): Boolean {
+        if (MOD_METADATA.any { Files.isRegularFile(dir.resolve(it)) }) return true
+        return runCatching {
+            Files.walk(dir).use { stream ->
+                stream.limit(MOD_SCAN_LIMIT).anyMatch { it.fileName?.toString()?.endsWith(".class") == true }
+            }
+        }.getOrDefault(false)
+    }
+
+    /**
+     * Whether a directory under `mods/` is the one the loader also reads.
+     *
+     * Named after the Minecraft version and nothing else, so it is recognised by
+     * shape rather than by being told: the callers that hold the manifest and the
+     * callers that hold only a roster have to answer this the same way, and a mod
+     * does not name its own storage directory `1.7.10`.
+     */
+    private fun isVersionDir(name: String): Boolean =
+        name.isNotEmpty() && name.all { it.isDigit() || it == '.' } && name.any { it.isDigit() }
+
+    /**
+     * Whether the file beside the mods is one of the pack's own, put there by
+     * something that moved it rather than by someone adding it.
+     *
+     * Held to the bytes the pack declared, not to the name alone: the name is what
+     * a substitution would copy, and the digest is what it cannot. Not one of the
+     * pack's when the pack shipped no digest for that name, which is the case for
+     * an instance old enough to predate the baseline, so those keep the older and
+     * stricter reading.
+     *
+     * A file that will not open is answered as such and not as a stranger. Whatever
+     * holds it (an antivirus scanning it, a handle the last session has not dropped)
+     * says nothing about its bytes, and the loader that moved the pack's own jar here
+     * is exactly when something else is likely to be reading it.
+     */
+    private fun relocation(file: Path, rel: Path, name: String, digests: Map<String, String>): Relocation {
+        val want = digests[name]?.takeIf { it.isNotBlank() } ?: return Relocation.NOT_PACK_MOD
+        val actual = runCatching { fileOpRetry("roster relocated $name") { sha1Of(file) } }
+            .onFailure {
+                log.warn(
+                    "mods roster: {} in the version directory would not open to be hashed, kept and left unchecked: {}",
+                    rel.joinToString("/"), it.toString(),
+                )
+            }
+            .getOrNull()
+            ?: return Relocation.UNREADABLE
+        return if (actual.equals(want, ignoreCase = true)) Relocation.PACK_MOD else Relocation.NOT_PACK_MOD
+    }
+
+    /**
+     * Removes everything under `mods/` that the manifest does not name, keeping the
+     * files just downloaded. Replaces the old wipe-then-download order: the same end
+     * state, reached without a window in which the instance holds neither the old
+     * content nor the new one.
+     *
+     * Walked deepest-first so a directory is considered after its children; one that
+     * still holds a kept file refuses to delete and is left alone.
+     */
+    private fun pruneForeignEntries(
+        clientDir: Path,
+        expected: Set<String>,
+        digests: Map<String, String> = emptyMap(),
+    ): Sweep {
+        val removed = mutableListOf<String>()
+        val blocked = mutableListOf<String>()
+        val walk = foreignEntries(clientDir, expected, digests)
+        for ((path, relText) in walk.foreign) {
+            // An unpacked mod is reported and left where it is. Deleting a tree the
+            // launcher did not create is a different kind of act from dropping a
+            // stray jar, and the instance is held unverified either way, which is
+            // what actually keeps it from being played.
+            if (Files.isDirectory(path)) {
+                blocked += relText
+                continue
+            }
+            runCatching { fileOpRetry("smrt drop foreign $path") { Files.delete(path) } }
+                .onSuccess { removed += relText }
+                // Only regular files reach this point, so a refusal is always an
+                // obstruction: something is holding the file or denying the delete.
+                .onFailure { blocked += relText }
+        }
+        if (removed.isNotEmpty()) log.info("smrt sync: dropped {} foreign entr(ies) from mods/: {}", removed.size, removed)
+        return Sweep(removed, blocked, walk.unreadable)
+    }
+
+    /**
+     * Says, once per pass, what the pack asked for and nobody could supply.
+     *
+     * The log line is for whoever reads a log. The action ring is the one a player
+     * reaches without being told to look: an install that quietly places less than
+     * the pack describes ends at a loader or a server refusing it, and neither of
+     * those names the mod or says the launcher already knew.
+     */
+    /**
+     * Asks a second time for the variants something was holding while the plan was
+     * built, and answers with whatever still will not go.
+     *
+     * Worth asking twice because the two attempts sit either side of the transfers:
+     * a game still shutting down, or a scanner reading the jar, has had the length
+     * of a download to let go of it. Windows is where this matters, since a running
+     * JVM keeps its mod jars open without delete-sharing.
+     */
+    private fun sweepStale(stale: List<Path>): List<String> {
+        val left = mutableListOf<String>()
+        for (path in stale) {
+            runCatching { fileOpRetry("smrt sync drop stale ${path.fileName}") { Files.deleteIfExists(path) } }
+                .onFailure { left += path.fileName.toString() }
+        }
+        return left
+    }
+
+    /**
+     * [sweepStale], then the pending record brought in line with this pass: what
+     * [placed] names is settled unless its leftover is still here, and a leftover
+     * is written down for the next launch to drop.
+     */
+    private fun settleStuck(clientDir: Path, packId: String, stuck: List<Path>, placed: List<String>) {
+        val left = sweepStale(stuck)
+        PendingVariants.update(clientDir, set = left.map { PendingVariants.Op.Drop(it) }, cleared = placed)
+        reportStuckVariants(packId, left)
+    }
+
+    /**
+     * Says when a mod the player switched off is still the one on disk under its
+     * loadable name.
+     *
+     * Only the active variant is worth a word. A leftover `.disabled` is a file no
+     * loader opens, so it costs disk and nothing else, while an active jar is the
+     * mod running in the game after the player asked for it not to. The wording
+     * matches the toggle path's, because it is the same promise: the choice is
+     * recorded and takes effect once whatever holds the file lets go.
+     */
+    private fun reportStuckVariants(packId: String, stuck: List<String>) {
+        val loadable = stuck.filterNot { it.endsWith(".disabled") }
+        if (loadable.isEmpty()) return
+        log.warn(
+            "smrt sync: pack={} could not drop {} active variant(s) of switched-off mods: {}",
+            packId, loadable.size, loadable,
+        )
+        ActionRing.record(
+            "$packId: ${loadable.size} file(s) held open, the content change applies at the next launch (${loadable.joinToString()})",
+        )
+    }
+
+    /**
+     * [sweepStale] for the assets: the other name of a switchable asset that could
+     * not be dropped while the plan was built. Logged and left, see [relabelAssets].
+     */
+    private fun settleStuckAssets(packId: String, stuck: List<Path>) {
+        val left = sweepStale(stuck)
+        if (left.isNotEmpty()) log.warn("smrt sync: pack={} could not drop {} stale asset variant(s): {}", packId, left.size, left)
+    }
+
+    private fun reportUnfetchable(packId: String, unfetchable: Map<String, String>) {
+        if (unfetchable.isEmpty()) return
+        log.warn(
+            "smrt sync: pack={} placed {} fewer entr(ies) than it names: {}",
+            packId, unfetchable.size, unfetchable,
+        )
+        ActionRing.record(
+            "$packId: ${unfetchable.size} file(s) the pack names could not be fetched (${unfetchable.keys.joinToString()})",
+        )
+    }
+
+    /**
+     * The set of `mods/` names the installed pack consists of, one per line. Written
+     * on every sync and update so a launch can hold the instance to it without asking
+     * the mirror; read back as a set, blank lines dropped.
+     */
+    private fun readRoster(clientDir: Path): Set<String> =
+        clientDir.resolve(ROSTER_FILE).toFile()
+            .takeIf { it.isFile }
+            ?.runCatching { readLines().map(String::trim).filter { line -> line.isNotEmpty() }.toSet() }
+            ?.onFailure { log.warn("mods enforce: unreadable roster, treating as absent", it) }
+            ?.getOrNull()
+            .orEmpty()
+
+    /**
+     * Published whole or not at all, because this file is the next launch's delete
+     * list. A truncating write leaves a window where the roster is a prefix of
+     * itself, and a prefix is indistinguishable from a shorter pack: nothing in it
+     * carries a count or a digest to disagree with. What the sweep then reads is a
+     * list that does not name the rest of the pack's own mods, and it removes them.
+     *
+     * The failure mode this trades for is keeping the PREVIOUS roster, which names
+     * a build that was on disk and is the safe end of the two.
+     */
+    private fun writeRoster(clientDir: Path, expected: Set<String>) {
+        runCatching { AtomicFiles.writeString(clientDir.resolve(ROSTER_FILE), expected.sorted().joinToString("\n")) }
+            .onFailure { log.warn("smrt sync: failed to write mods roster", it) }
+    }
+
+    private fun readSourceMarker(marker: Path): String? =
+        marker.toFile()
+            .takeIf { it.exists() }
+            ?.readText()
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+
+    /** Published the same way as the roster: a half-written marker reads as a different source. */
+    private fun writeSourceMarker(marker: Path, value: String) {
+        runCatching { AtomicFiles.writeString(marker, value) }
+            .onFailure { log.warn("smrt sync: failed to write source marker", it) }
+    }
+
+    /**
+     * Mods land at `mods/{filename}`; an optional mod toggled OFF lands at
+     * `mods/{filename}.disabled` (Forge ignores non-`.jar` names), so flipping a
+     * toggle is a rename rather than a re-download. When the stale variant
+     * already holds the right bytes it is moved into place; otherwise it is
+     * removed and the active variant fetched. Forge 1.12.2 scans both `mods/`
+     * and `mods/{mcversion}/`, so flat placement still loads.
+     */
+    private suspend fun planMod(
+        mod: SmrtModEntry,
+        clientDir: Path,
+        enabled: Boolean,
+        stuck: MutableList<Path> = mutableListOf(),
+    ): Planned = withContext(Dispatchers.IO) {
+        val modsDir = clientDir.resolve("mods")
+        val activeDest = resolveSafe(modsDir, mod.filename, "mod ${mod.filename}")
+        val disabledDest = resolveSafe(modsDir, "${mod.filename}.disabled", "mod ${mod.filename}")
+        val dest = if (enabled) activeDest else disabledDest
+        val stale = if (enabled) disabledDest else activeDest
+
+        if (!isUpToDate(dest, mod.sha1, mod.sizeBytes) && isUpToDate(stale, mod.sha1, mod.sizeBytes)) {
+            Files.createDirectories(dest.parent)
+            fileOpRetry("smrt sync move ${mod.filename}") { Files.move(stale, dest, StandardCopyOption.REPLACE_EXISTING) }
+            return@withContext Planned.UpToDate
+        }
+        // The variant under the other name cannot be the manifest's bytes: the move
+        // above is what claims it when it is. So whatever is left there is stale by
+        // definition, whether or not the entry itself can be fetched.
+        //
+        // The outcome is kept rather than dropped. When this is the ACTIVE jar of a
+        // mod the player turned off, a holder that outlives the retry leaves it
+        // loading: the new copy is fetched beside it under the disabled name, the
+        // relabel step then declines because both names exist, and the roster lists
+        // both on purpose, so the sweep will not take either. The toggle silently
+        // does not happen. [sweepStale] asks again once the transfers are done.
+        runCatching { fileOpRetry("smrt sync drop stale ${mod.filename}") { Files.deleteIfExists(stale) } }
+            .onFailure { stuck.add(stale) }
+        plan(dest, mod.sha1, mod.sizeBytes, mod.source, "mod ${mod.filename}")
+    }
+
+    /**
+     * No name-based exemption here, deliberately.
+     *
+     * The `clients/` path needs one: it downloads whatever the server's manifest
+     * lists, with no record of what it put there last time, so without a list of
+     * names to leave alone it overwrites a player's own settings. The mirror was
+     * built to replace that path and does not have the problem -- it keeps the
+     * installed version's manifest as a baseline, so the reconciler can tell a file
+     * the pack shipped from one the player wrote, and answers each case on its own.
+     *
+     * Carrying the list here made the mirror worse rather than safer: a name on it
+     * was skipped in BOTH directions, so a pack could not deliver its own
+     * `servers.dat` or its JEI settings at all -- the pack ships the server list on
+     * purpose, and the exemption silently dropped it.
+     */
+    private suspend fun planAsset(
+        asset: SmrtAssetEntry,
+        clientDir: Path,
+        enabled: Boolean = true,
+        stuck: MutableList<Path> = mutableListOf(),
+    ): Planned = withContext(Dispatchers.IO) {
+        val active = resolveSafe(clientDir, asset.dest, "asset ${asset.dest}")
+        if (!asset.hasOffName) return@withContext plan(active, asset.sha1, asset.sizeBytes, asset.source, "asset ${asset.dest}")
+        // An asset that can sit under a `.disabled` name is placed the way [planMod]
+        // places a mod: under the name the choice gives it, the bytes moved across
+        // when they are already under the other name rather than fetched again, and
+        // that other name gone. A required one has no off, so it lands on, which is
+        // what moves one switched off before the curator made it required.
+        val disabled = resolveSafe(clientDir, "${asset.dest}$DISABLED", "asset ${asset.dest}")
+        val dest = if (enabled || !asset.toggleable) active else disabled
+        val stale = if (dest == active) disabled else active
+        if (!isUpToDate(dest, asset.sha1, asset.sizeBytes) && isUpToDate(stale, asset.sha1, asset.sizeBytes)) {
+            Files.createDirectories(dest.parent)
+            fileOpRetry("smrt sync move ${asset.dest}") { Files.move(stale, dest, StandardCopyOption.REPLACE_EXISTING) }
+            return@withContext Planned.UpToDate
+        }
+        runCatching { fileOpRetry("smrt sync drop stale ${asset.dest}") { Files.deleteIfExists(stale) } }
+            .onFailure { stuck.add(stale) }
+        plan(dest, asset.sha1, asset.sizeBytes, asset.source, "asset ${asset.dest}")
+    }
+
+    /**
+     * Resolves [relative] against [root] and rejects entries that
+     * escape the root via `..` segments or absolute paths. A hostile
+     * or buggy manifest could otherwise hand the launcher
+     * `../../../etc/cron.d/payload` and end up overwriting arbitrary
+     * files writable by the launcher process. The mirror is trusted
+     * but the boundary check is cheap and means a single bad
+     * manifest entry can never escape the per-instance directory.
+     *
+     * **Threat model**: defends against MANIFEST-DRIVEN traversal
+     * (a bad/hostile mirror manifest entry). Does NOT defend against
+     * a pre-existing symlink inside `root` that points outside --
+     * the lexical [Path.normalize] check is purely string-based, so
+     * `<root>/config -> /opt/shared-configs` followed by manifest
+     * entry `config/foo.cfg` writes to /opt/shared-configs/foo.cfg
+     * even though the lexical check passes. Symlinks under `<root>`
+     * are assumed user-installed and trusted; if the threat model
+     * ever broadens (multi-tenant installs, sandboxed sync), switch
+     * to `toRealPath(NOFOLLOW_LINKS)` per parent component before
+     * the startsWith comparison.
+     */
+    private fun resolveSafe(root: Path, relative: String, label: String): Path =
+        resolveWithinRoot(root, relative, label)
+
+    /**
+     * What one manifest entry needs: see [Planned] for the three answers and why
+     * two of them are not the same one.
+     *
+     * The up-to-date check happens here rather than being left to the engine
+     * because of what sits between: a `modrinth` source needs an API round trip to
+     * turn into a URL, and doing that for the ninety-odd mods already on disk would
+     * put a hundred needless requests in front of every re-sync.
+     */
+    private suspend fun plan(
+        dest: Path,
+        expectedSha1: String,
+        expectedSize: Long,
+        source: SmrtSource,
+        label: String,
+    ): Planned {
+        // Asked before anything about the source, because the file being right is
+        // the end this is all for. An entry nothing here can fetch may still be on
+        // disk: the log for one tells the player to install it by hand, and having
+        // done so they are owed silence rather than a warning and a repair that
+        // reports their pack broken.
+        if (isUpToDate(dest, expectedSha1, expectedSize)) {
+            return Planned.UpToDate
+        }
+        if (source is SmrtSource.Unknown) {
+            // Forward-compat: a source type this launcher version does not
+            // understand. Skip the entry instead of failing the whole sync.
+            log.warn("smrt sync: skipping {} -- unsupported source type; update the launcher to install it", label)
+            return Planned.Unfetchable("the launcher does not understand where this is published")
+        }
+        if (source is SmrtSource.CurseForge && source.url == null) {
+            // Named but not served: the project's author has turned off
+            // third-party distribution, so the mirror may say whose file this
+            // is and may not hand it over. A different thing from a type we do
+            // not know, and the log says which so nobody goes looking for a
+            // launcher update that would not help.
+            log.warn(
+                "smrt sync: skipping {} -- its author disallows third-party distribution (curseforge {}/{}), so it has to be installed by hand",
+                label, source.projectId, source.fileId,
+            )
+            return Planned.Unfetchable("its author disallows third-party distribution, so it has to be installed by hand")
+        }
+        val url = resolveUrl(source)
+        // The address is the manifest's to name and the bytes are pinned by sha1, so
+        // nothing it points at can install the wrong file. The request itself still
+        // happens on its say-so, and in plaintext it tells anyone on the route what
+        // the player is installing and can be aimed at whatever answers http on the
+        // local network. Over https the far end has to hold a certificate for the
+        // name, which nothing on a LAN does.
+        if (!isHttps(url)) {
+            log.warn("smrt sync: skipping {}, the manifest names a non-https address for it", label)
+            return Planned.Unfetchable("the pack names an address that is not https for it")
+        }
+        log.debug("smrt sync: fetching {} <- {}", label, url)
+        return Planned.Fetch(
+            Transfer(
+                url = url,
+                dest = dest,
+                expect = Digest(DigestAlgorithm.SHA1, expectedSha1),
+                size = expectedSize,
+            )
+        )
+    }
+
+    /**
+     * Resolves a [SmrtSource] to an actual download URL. The two
+     * mirror-hosted variants carry the URL inline in the manifest;
+     * `modrinth` needs a round-trip to Modrinth's API to fetch the
+     * version's primary file URL. Picks the file flagged `primary:
+     * true`, falling back to `files[0]` only if no entry is marked
+     * primary -- Modrinth versions often ship multiple artifacts
+     * (sources, deobf, signatures) and the first is not guaranteed
+     * to be the installable one.
+     */
+    private suspend fun resolveUrl(source: SmrtSource): String = when (source) {
+        is SmrtSource.SmrtCache  -> source.url
+        is SmrtSource.SmrtStatic -> source.url
+        // The mirror resolved this at build time, which is why no key is
+        // needed here. `plan` has already skipped the entry when it is absent.
+        is SmrtSource.CurseForge -> source.url
+            ?: error("curseforge ${source.projectId}/${source.fileId} carries no url")
+        // A release asset is public, so the mirror hands over a plain link and
+        // there is nothing to resolve.
+        is SmrtSource.Github     -> source.url
+        is SmrtSource.Modrinth   -> {
+            val v = modrinth.resolveVersion(source.projectId, source.versionId)
+            v.primaryFile().url
+        }
+        // Unreachable: `plan` answers Unfetchable before resolving a URL.
+        // Kept exhaustive so a new SmrtSource variant forces a decision here.
+        is SmrtSource.Unknown    -> error("resolveUrl called on an unsupported source")
+    }
+
+    private fun isHttps(url: String): Boolean =
+        runCatching { URI(url).scheme.equals("https", ignoreCase = true) }.getOrDefault(false)
+
+    /**
+     * Up-to-date check: file exists, right size, right sha1. Cheap
+     * shortcut to skip downloads on re-sync of the same manifest.
+     * Size check first so a totally wrong file fails fast without a
+     * full hash walk.
+     */
+    private fun isUpToDate(dest: Path, expectedSha1: String, expectedSize: Long): Boolean {
+        if (!Files.exists(dest) || !Files.isRegularFile(dest)) return false
+        if (Files.size(dest) != expectedSize) return false
+        return DigestAlgorithm.SHA1.of(dest).equals(expectedSha1, ignoreCase = true)
+    }
+
+
+    companion object {
+        /**
+         * The wire-format generation this client understands. Mirror
+         * may serve a higher schema_version after a wire-incompatible
+         * change; this client must refuse rather than misinterpret.
+         */
+        const val EXPECTED_SCHEMA = 2
+
+        internal const val SOURCE_MARKER_FILE = ".nexira-sync-source"
+
+        /** Names `mods/` may hold, written by sync/update and enforced on launch. */
+        internal const val ROSTER_FILE = ".nexira-mods"
+        private const val SOURCE_MIRROR = "mirror"
+        private const val MODS_PREFIX = "mods/"
+
+        /** The name a switched-off file sits under, beside its own. */
+        private const val DISABLED = ".disabled"
+
+        /**
+         * What the instance says about ITSELF rather than about its content, kept
+         * beside the files instead of in the registry.
+         *
+         * Neither is a manifest path, so an instance scan never sees them and
+         * nothing that works from the manifest can put them back. A snapshot has to
+         * carry them by name or a rollback restores the files of one build under
+         * the roster of another, and where the registry holds no baseline to
+         * outrank it that roster is the next launch's delete list.
+         *
+         * That capture is hardlinked, which is why both of them are published by
+         * replacing the file rather than by truncating it in place: a writer that
+         * reuses the inode rewrites the snapshot's copy along with the live one, and
+         * the rollback then restores the bytes it was supposed to undo.
+         */
+        internal val INSTANCE_STATE_FILES = listOf(ROSTER_FILE, SOURCE_MARKER_FILE, PendingVariants.FILE_NAME)
+
+        /** What a mod is identified by when it sits unpacked in a directory. */
+        private val MOD_METADATA = listOf("mcmod.info", "META-INF/mods.toml", "fabric.mod.json")
+
+        /** How far into such a directory to look for a class before giving up. */
+        private const val MOD_SCAN_LIMIT = 400L
+    }
+}

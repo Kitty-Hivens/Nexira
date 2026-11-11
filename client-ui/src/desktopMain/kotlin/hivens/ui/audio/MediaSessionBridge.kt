@@ -25,6 +25,7 @@ import hivens.ui.widgets.services.MusicPlayerService
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Publishes what the launcher is playing to the desktop, and takes its media
@@ -155,7 +156,7 @@ class MediaSessionBridge(
         // stopped, and that one arrives within a tick. The first snapshot waits the
         // same tick, which nothing observes, since it happens as the bus name is
         // claimed.
-        val volume = player.volume.sample(VOLUME_SAMPLE_MS)
+        val volume = player.volume.sample(VOLUME_SAMPLE_MS.milliseconds)
         val transport = combine(player.state, player.track, volume) { state, track, level ->
             Triple(state, track, level)
         }
@@ -262,14 +263,14 @@ class MediaSessionBridge(
      */
     private fun releaseOnShutdown() {
         val body: () -> Unit = { close() }
-        val task = Runnable { runCatching(body) }
-        runCatching { Runtime.getRuntime().addShutdownHook(Thread(task, "nexira-media-session")) }
+        val task = Runnable { val _ = runCatching(body) }
+        val _ = runCatching { Runtime.getRuntime().addShutdownHook(Thread(task, "nexira-media-session")) }
     }
 
     override fun close() {
         job?.cancel()
         job = null
-        runCatching { session?.close() }
+        val _ = runCatching { session?.close() }
         session = null
     }
 

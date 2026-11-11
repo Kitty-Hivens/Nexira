@@ -84,6 +84,8 @@ object SystemTheme {
      * the collector kills the subprocess.
      */
     private fun portalSignalFlow(): Flow<Boolean?> = callbackFlow {
+        // Runs on IO: the only caller, observe, applies flowOn(Dispatchers.IO).
+        @Suppress("BlockingMethodInNonBlockingContext")
         val process = try {
             ProcessBuilder("gdbus", "monitor", "--session", "--dest", "org.freedesktop.portal.Desktop").start()
         } catch (e: Exception) {

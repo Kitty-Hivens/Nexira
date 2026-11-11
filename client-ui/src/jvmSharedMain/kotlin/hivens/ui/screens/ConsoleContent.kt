@@ -1,0 +1,1639 @@
+package hivens.ui.screens
+
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.gestures.animateScrollBy
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import hivens.ui.nx.NxBasicTextField
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalTextStyle
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.VerticalDivider
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEvent
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isShiftPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import hivens.ui.i18n.AppStrings
+import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
+import hivens.ui.nx.NxButton
+import hivens.ui.nx.NxButtonStyle
+import hivens.ui.nx.NxSteadyText
+import hivens.ui.puppet.PuppetClick
+import hivens.ui.puppet.PuppetField
+import hivens.ui.puppet.PuppetScreen
+import hivens.ui.puppet.PuppetToggle
+import hivens.ui.generated.resources.Res
+import hivens.ui.screens.console.ConsoleContextMenu
+import hivens.ui.screens.console.ConsoleMenuEntry
+import hivens.ui.screens.console.ConsoleScrollbars
+import hivens.ui.screens.console.DocPos
+import hivens.ui.screens.console.copyPlainText
+import hivens.ui.screens.console.deliverConsoleExport
+import hivens.ui.screens.console.onWheelScroll
+import hivens.ui.screens.console.LineModels
+import hivens.ui.screens.console.clampMatchIndex
+import hivens.ui.screens.console.compileSearch
+import hivens.ui.screens.console.copyAllText
+import hivens.ui.screens.console.copyLineText
+import hivens.ui.screens.console.nextMatchIndex
+import hivens.ui.screens.console.previousMatchIndex
+import hivens.ui.screens.console.shouldPageHistory
+import hivens.ui.screens.console.LogCanvas
+import hivens.ui.screens.console.LogSelection
+import hivens.ui.screens.console.buildLineModels
+import hivens.ui.screens.console.rememberLogCanvasState
+import hivens.ui.surface.NxSurface
+import hivens.ui.surface.SurfaceKind
+import hivens.ui.theme.Motion
+import hivens.ui.theme.NxTheme
+import hivens.ui.theme.Status
+import hivens.ui.theme.Theme
+import hivens.ui.theme.LocalMonoFamily
+import hivens.ui.theme.nexiraBrailleFamily
+import hivens.ui.utils.ConsoleSettings
+import hivens.ui.utils.ConsoleSettingsStore
+import hivens.ui.utils.holdFocusOnPress
+import hivens.ui.utils.GameConsoleService
+import hivens.ui.utils.LogEntry
+import hivens.ui.utils.LogType
+import hivens.ui.widgets.toWidgetColorOrNull
+import kotlin.time.Duration.Companion.milliseconds
+import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import org.koin.compose.koinInject
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
+
+// Severity-only highlight + the exception markers that survive Slice A.
+// Class-name / number / null highlights were noisy and lied when log
+// formats shifted; cut. User-extensible rule list arrives with Slice C.
+internal val ERROR_MARKERS = Regex("(Exception|Error|FATAL|SEVERE|Caused by:|\\bat )")
+private val FONT_SIZES = listOf(11, 12, 14)
+
+// Upper bound on search-highlight spans / match offsets kept per render. A broad
+// query ("e") over a 50k-line buffer would otherwise allocate tens of thousands of
+// spans and matches, a memory spike out of all proportion to a highlight aid. Past this, scanning stops: F3 navigates the first
+// MAX_SEARCH_MATCHES hits, which is far more than anyone steps through by hand.
+internal const val MAX_SEARCH_MATCHES = 5000
+
+// ── Palette ──────────────────────────────────────────────────────────────────
+// Theme colours are asked for (NxInk, NxColor) at every composable call site.
+// This small record carries the subset that pure helpers (the per-line layout
+// cache) consume off the composition. Only console-only tokens (the yellow
+// search highlight, the orange pause accent) live as constants. Everything
+// else is a request and follows the user's theme.
+internal data class ConsolePalette(
+    val textPrimary:    Color,
+    val textSecondary:  Color,
+    val severityInfo:   Color,
+    val severityWarn:   Color,
+    val severityError:  Color,
+    val divider:        Color,
+    val searchMatch:    Color,
+    val searchMatchBg:  Color,
+)
+
+// Console-only accents that have no theme counterpart. Yellow
+// search-match background is universally legible on either light or dark
+// surfaces; pause-accent uses warm orange to read as "intentional halt"
+// rather than failure (the error status would conflate with ERROR severity).
+private val CONSOLE_SEARCH_MATCH_BG = Color(0xFFFFEB3B)
+private val CONSOLE_SEARCH_MATCH_FG = Color(0xFF212121)
+private val CONSOLE_PAUSE_ACCENT   = Color(0xFFFFA726)
+
+// Colour role of one span, resolved to an actual SpanStyle only when a line is
+// laid out. Keeping the line models palette-free is what lets a theme change skip
+// the filter/regex pass -- see buildLineModels.
+internal enum class SpanRole { Divider, Info, Warn, Error, Marker, Search }
+
+/**
+ * Where [ConsoleContent] reads its entries from.
+ *
+ * [Live] -- the running GameConsoleService buffer: tailing append,
+ * sliding-window history paging, command input, clear / save. The
+ * standalone ConsoleWindow and the PackDetail Logs tab's "current
+ * session" view use this.
+ *
+ * [FileBacked] -- a static, read-only snapshot parsed from a past
+ * session log file (the Logs tab's file picker). No tailing, no
+ * paging, no command input; search / filter / gutter / copy all still
+ * work on the static list.
+ */
+internal sealed interface ConsoleSource {
+    data object Live : ConsoleSource
+    data class FileBacked(val entries: List<LogEntry>) : ConsoleSource
+}
+
+/** The parts of the console that take the keyboard focus. */
+private enum class ConsoleFocus { Log, Search, Command }
+
+@OptIn(ExperimentalComposeUiApi::class, ExperimentalFoundationApi::class)
+@Composable
+internal fun ConsoleContent(
+    settings: ConsoleSettings,
+    onSettingsChange: (ConsoleSettings) -> Unit,
+    source: ConsoleSource = ConsoleSource.Live,
+) {
+    val isLive = source is ConsoleSource.Live
+    val s = LocalStrings.current
+    val clipboard = LocalClipboard.current
+    val focusManager = LocalFocusManager.current
+    val scope = rememberCoroutineScope()
+    val gameConsole: GameConsoleService = koinInject()
+    val inkMain = NxInk.main
+    val inkQuiet = NxInk.quiet
+    val inkLine = NxInk.line
+    val warnText = NxColor.status(Status.Warning, text = true)
+    val errorText = NxColor.status(Status.Error, text = true)
+
+    // Pure-function helpers (the per-line layout cache) consume a value-type
+    // palette off the composition; build it once per theme change so they stay
+    // @Composable-free.
+    val palette = remember(inkMain, inkQuiet, inkLine, warnText, errorText, settings.infoColor, settings.warnColor, settings.errorColor) {
+        ConsolePalette(
+            textPrimary    = inkMain,
+            textSecondary  = inkQuiet,
+            // Settings > Console severity overrides win. Null or malformed falls back to the theme.
+            severityInfo   = settings.infoColor?.toWidgetColorOrNull() ?: inkMain,
+            severityWarn   = settings.warnColor?.toWidgetColorOrNull() ?: warnText,
+            severityError  = settings.errorColor?.toWidgetColorOrNull() ?: errorText,
+            divider        = inkLine,
+            searchMatch    = CONSOLE_SEARCH_MATCH_FG,
+            searchMatchBg  = CONSOLE_SEARCH_MATCH_BG,
+        )
+    }
+
+    // ── State ──────────────────────────────────────────────────────────────
+    // Settings-derived shorthands. Changes flow back through onSettingsChange
+    // so the persistence file stays the source of truth; local var reads
+    // stay terse for the toolbar / kbd handler / context menu sites.
+    val fontSize        = settings.fontSize.coerceIn(ConsoleSettings.MIN_FONT_SIZE, ConsoleSettings.MAX_FONT_SIZE)
+    val wrapText        = settings.wrapText
+    val showGutter      = settings.showGutterStrip
+    val showTimestamps  = settings.showTimestamps
+
+    // Apply the sliding-window cap to the service eagerly so changes to
+    // the setting take effect on the next append rather than waiting for
+    // the next session start.
+    LaunchedEffect(settings.maxInMemoryLines) {
+        gameConsole.maxLines = settings.maxInMemoryLines.coerceIn(
+            ConsoleSettings.MIN_IN_MEMORY_LINES,
+            ConsoleSettings.MAX_IN_MEMORY_LINES,
+        )
+    }
+
+    var searchQuery     by remember { mutableStateOf("") }
+    var regexMode       by remember { mutableStateOf(false) }
+    var filterInfo      by remember { mutableStateOf(true) }
+    var filterWarn      by remember { mutableStateOf(true) }
+    var filterError     by remember { mutableStateOf(true) }
+    var searchOpen      by remember { mutableStateOf(false) }
+    var searchHasFocus  by remember { mutableStateOf(false) }
+    var pendingSearchFocus by remember { mutableStateOf(false) }
+    var searchAsFilter  by remember { mutableStateOf(false) }
+    var cmdInput        by remember { mutableStateOf("") }
+    var cmdHasFocus     by remember { mutableStateOf(false) }
+    val cmdHistory      = remember { mutableStateListOf<String>() }
+    var cmdHistoryIdx   by remember { mutableIntStateOf(-1) }
+    var currentMatch    by remember { mutableIntStateOf(0) }
+    var flashText       by remember { mutableStateOf<String?>(null) }
+    // The last selection came from a finger, which has no right click to reach the copy with
+    var fingerSelected  by remember { mutableStateOf(false) }
+
+    val canvasState     = rememberLogCanvasState()
+    val selection       = remember { LogSelection() }
+    val searchFocus     = remember { FocusRequester() }
+    val logFocus        = remember { FocusRequester() }
+    val cmdFocus        = remember { FocusRequester() }
+    // Which of the three last held the focus, so a press that left none of them
+    // holding it gives it back there rather than always to the log.
+    var lastFocus       by remember { mutableStateOf(ConsoleFocus.Log) }
+    val density         = LocalDensity.current
+
+    // ── Buffer source ──────────────────────────────────────────────────────
+    // Live source: the service publishes a coalesced, off-thread ConsoleSnapshot
+    // -- ingestion, file IO, and the buffer copy all run on its drainer, never on
+    // Main -- so the consumer just reads the latest immutable list. A modded MC
+    // start floods 5k+ lines in ~2s; those collapse into a handful of snapshots.
+    // File source: a static, parsed list.
+    val liveSnapshot by gameConsole.snapshot.collectAsState()
+    val entries = when (source) {
+        is ConsoleSource.Live       -> liveSnapshot.entries
+        is ConsoleSource.FileBacked -> source.entries
+    }
+    val historyOffset = if (isLive) liveSnapshot.historyOffset else 0
+
+    // ── Search query debounce ──────────────────────────────────────────────
+    // Highlight + match-offset rebuild keys off the debounced value;
+    // counts and the prompt text key off the raw one so the user sees
+    // their typing immediately.
+    var effectiveQuery by remember { mutableStateOf("") }
+    LaunchedEffect(searchQuery) {
+        delay(120.milliseconds)
+        effectiveQuery = searchQuery
+    }
+
+    // Compile regex once per debounced query change. Invalid pattern -> null
+    // (filter falls back to "match nothing" so the user sees an empty buffer
+    // rather than an exception while they are still typing).
+    val searchRegex = remember(effectiveQuery, regexMode) { compileSearch(effectiveQuery, regexMode) }
+
+    // ── Render: filter + counts + annotate, all OFF the UI thread ──────────
+    // The whole O(n) pass -- severity/query filtering, warn/error counts, and
+    // the line models -- runs on Dispatchers.Default and swaps in once
+    // via produceState. Nothing O(n) touches composition, so a 5000-line buffer
+    // (or a live flood) never blocks Main. In-flight builds cancel when any key
+    // changes, so rapid filter/search edits collapse to one final rebuild.
+    // First-render fallback is an empty render; the cold-open gap is sub-frame.
+    //
+    // Two-stage filter: severity gates first, then optional query-narrowing when
+    // search-as-filter is on (the default leaves search a pure highlight + F3
+    // aid). Dividers are kept verbatim so session boundaries stay visible.
+    // Stage 1 -- structural pass, OFF the UI thread and palette-free. The whole
+    // O(n) cost (severity/query filter, regex, warn/error counts, span layout)
+    // runs only when content, filters, search, or timestamps change. A theme
+    // tick does NOT re-run this: palette is deliberately not a key here.
+    val models by produceState(
+        initialValue = remember { LineModels.EMPTY },
+        entries, filterInfo, filterWarn, filterError,
+        searchAsFilter, effectiveQuery, regexMode, searchRegex, showTimestamps,
+        settings.highlightRules, settings.filterRules,
+    ) {
+        value = withContext(Dispatchers.Default) {
+            buildLineModels(
+                all            = entries,
+                filterInfo     = filterInfo,
+                filterWarn     = filterWarn,
+                filterError    = filterError,
+                searchAsFilter = searchAsFilter,
+                rawQuery       = effectiveQuery,
+                regexMode      = regexMode,
+                regexCompiled  = searchRegex,
+                showTimestamps = showTimestamps,
+                highlightRules = settings.highlightRules,
+                filterRules    = settings.filterRules,
+            )
+        }
+    }
+
+    // Styling is per-line and lazy now: the canvas's LineLayoutCache colours each
+    // visible line via the palette when it measures, so a theme tick only
+    // re-measures the viewport (cache invalidate), never the whole buffer.
+
+    // Clamp current match index when the match set shrinks past it.
+    LaunchedEffect(models.matches.size) {
+        currentMatch = clampMatchIndex(currentMatch, models.matches.size)
+    }
+
+    // Initial focus on the log area: BasicTextField is read-only but still
+    // focusable, and onPreviewKeyEvent at the Column root needs SOME node in
+    // its subtree to hold focus before chord events route through. Without
+    // this, Ctrl+F / F3 / j / k / g / G are dead until the user clicks
+    // inside the (visually empty) text field. runCatching swallows the
+    // pre-composition exception in the rare race where the field has not
+    // attached yet -- the next attempt via user click resolves it.
+    LaunchedEffect(Unit) {
+        val _ = runCatching { logFocus.requestFocus() }
+    }
+
+    // Deferred focus request for the search prompt. openSearch() raises a
+    // flag because the FocusRequester target (BasicTextField inside the
+    // search-prompt Row) does not exist on the first composition pass --
+    // requesting focus before the node is attached throws. Once
+    // searchOpen=true triggers the SearchPrompt composable, this effect
+    // fires on the next frame with the target alive.
+    LaunchedEffect(pendingSearchFocus, searchOpen) {
+        if (pendingSearchFocus && searchOpen) {
+            val _ = runCatching { searchFocus.requestFocus() }
+            pendingSearchFocus = false
+        }
+    }
+
+    // ── Sticky-bottom follow ───────────────────────────────────────────────
+    // The canvas keeps following the tail as content grows; this just surfaces
+    // the state for the footer's follow / paused chip.
+    val isAtBottom = canvasState.scroll.atBottom
+
+    // ── Lazy history page-in (sliding window upper edge) ───────────────────
+    // When the user scrolls within 80 px of the top AND the service has
+    // entries dropped past the window, page the older entries back in.
+    // The load is one-shot: a `loading` flag suppresses re-entry while the
+    // batch is in flight, otherwise rapid scroll-to-top events would queue
+    // overlapping reads. The drainer prepends the loaded entries and the next
+    // published snapshot carries them; we shift scrollState by the approximate
+    // height of the loaded block so the user's visual line stays put.
+    var historyLoading by remember { mutableStateOf(false) }
+    val latestHistoryOffset by rememberUpdatedState(historyOffset)
+    // historyOffset comes from the published snapshot (live only); file-backed
+    // views load the whole tail-bounded file up front, so there is nothing to
+    // page. loadHistoryBefore prepends to the buffer on the drainer and the next
+    // snapshot carries the older entries; we only do the scroll-anchor shift.
+    LaunchedEffect(isLive) {
+        // Watched, not keyed on. With the scroll offset in the key this effect was
+        // cancelled and relaunched on every scroll frame, so holding the wheel at
+        // the top started and killed a 500-entry disk read dozens of times a
+        // second and the older lines only arrived once the scrolling stopped --
+        // the finally re-armed the guard each time for the next frame to try again.
+        //
+        // historyOffset reaches the flow through a state holder rather than by
+        // being captured: it is a plain Int derived from the snapshot, and the
+        // effect only restarts when isLive changes, so the captured copy froze at
+        // whatever it was when the window opened -- usually zero, which is the one
+        // value shouldPageHistory refuses. Paging was dead for the whole session.
+        snapshotFlow { shouldPageHistory(isLive, historyLoading, latestHistoryOffset, canvasState.scroll.offsetPx) }
+            .distinctUntilChanged()
+            .filter { it }
+            .collect {
+                historyLoading = true
+                try {
+                    val loaded = gameConsole.loadHistoryBefore(count = 500)
+                    if (loaded.isNotEmpty()) {
+                        // Shift by an approximate line height per prepended entry so the
+                        // user's visual line stays put; exact for no-wrap, off by wrap
+                        // reflow (sub-100 px) until those lines re-measure.
+                        val approxLineHeightPx = with(density) { (fontSize * 1.4f).sp.toPx() }
+                        canvasState.scroll.shiftBy(loaded.size * approxLineHeightPx)
+                    }
+                } finally {
+                    historyLoading = false
+                }
+            }
+    }
+
+    // Selection lives in `selection` (LogSelection); the canvas renders and
+    // hit-tests it, and copy assembles from the model.
+
+    // ── Copy actions ───────────────────────────────────────────────────────
+    fun flash(text: String) {
+        flashText = text
+        scope.launch {
+            delay(900.milliseconds)
+            flashText = null
+        }
+    }
+
+    fun copyAll() {
+        val text = copyAllText(entries)
+        scope.launch { clipboard.copyPlainText(text) }
+        flash(s.consoleCopied)
+    }
+
+    // Copy the logical line under the caret (last click / F3 target). One entry is
+    // one line in the model, so this reads the line text straight from it.
+    fun copyLine() {
+        // No caret yet (e.g. right-click before any left-click) -> first line, matching
+        // the old field-copy behaviour so the menu action always does something.
+        val caret = selection.focus?.line ?: selection.anchor?.line
+        val lineText = copyLineText(models.lines.size, caret) { models.lines[it].text } ?: return
+        scope.launch { clipboard.copyPlainText(lineText) }
+        flash(s.consoleCopied)
+    }
+
+    // Copy the active selection, assembled from the model across lines. No active
+    // selection -> no-op (copy-line covers the caret case via the same menu).
+    fun copySelection() {
+        val text = selection.copyText(models)
+        if (text.isEmpty()) return
+        scope.launch { clipboard.copyPlainText(text) }
+        flash(s.consoleCopied)
+    }
+
+    // ── Match jumping ──────────────────────────────────────────────────────
+    // Matches carry their filtered-line index, so a jump scrolls that line into
+    // view via the height index and selects the matched span -- no dependency on a
+    // text-layout snapshot, so a jump can't race the buffer rebuild.
+    fun scrollToMatch(idx: Int) {
+        if (idx !in models.matches.indices) return
+        val m = models.matches[idx]
+        canvasState.scrollToLine(m.line)
+        selection.select(DocPos(m.line, m.start), DocPos(m.line, m.end))
+    }
+
+    fun jumpNext() {
+        val next = nextMatchIndex(currentMatch, models.matches.size)
+        if (next < 0) return
+        currentMatch = next
+        scrollToMatch(next)
+    }
+
+    fun jumpPrev() {
+        val prev = previousMatchIndex(currentMatch, models.matches.size)
+        if (prev < 0) return
+        currentMatch = prev
+        scrollToMatch(prev)
+    }
+
+    fun openSearch() {
+        searchOpen = true
+        // Compose can't focus a node before its first composition pass; defer
+        // the focus request to the next frame via a side-effect flag.
+        pendingSearchFocus = true
+    }
+    fun closeSearch() {
+        searchOpen = false
+        searchHasFocus = false
+        // Returning focus to the log area (not clearing) keeps the root
+        // onPreviewKeyEvent live so j/k/g/G/Ctrl+End/etc. continue to work
+        // after dismissing the prompt. clearFocus() leaves no owner in the
+        // window's focus tree -- chords go dead until the user clicks.
+        val _ = runCatching { logFocus.requestFocus() }
+    }
+
+    val commandRowShown = isLive && (gameConsole.canSendCommands || gameConsole.hasLocalCommands)
+
+    fun restoreFocus() {
+        val requester = when (lastFocus) {
+            ConsoleFocus.Search -> searchFocus.takeIf { searchOpen }
+            ConsoleFocus.Command -> cmdFocus.takeIf { commandRowShown }
+            ConsoleFocus.Log -> null
+        } ?: logFocus
+        runCatching { requester.requestFocus() }.onFailure { val _ = runCatching { logFocus.requestFocus() } }
+    }
+
+    // ── Puppet hooks ────────────────────────────────────────────────────────
+    // Public contract: existing ids preserved verbatim so older e2e drivers
+    // do not break. New ids for search-open / next-prev added on top.
+    PuppetScreen("Console")
+    PuppetToggle("console.filterInfo",  filterInfo)  { filterInfo = it }
+    PuppetToggle("console.filterWarn",  filterWarn)  { filterWarn = it }
+    PuppetToggle("console.filterError", filterError) { filterError = it }
+    PuppetToggle("console.wrap",        wrapText)    { onSettingsChange(settings.copy(wrapText = it)) }
+    PuppetToggle("console.gutter",      showGutter)  { onSettingsChange(settings.copy(showGutterStrip = it)) }
+    PuppetToggle("console.timestamps",  showTimestamps) { onSettingsChange(settings.copy(showTimestamps = it)) }
+    PuppetToggle("console.regexMode",   regexMode)   { regexMode = it }
+    PuppetToggle("console.searchAsFilter", searchAsFilter) { searchAsFilter = it }
+    PuppetToggle("console.searchOpen",  searchOpen)  { if (it) openSearch() else closeSearch() }
+    PuppetField ("console.search", searchQuery)      { searchQuery = it }
+    PuppetClick ("console.clearSearch", enabled = searchQuery.isNotEmpty()) { searchQuery = "" }
+    PuppetClick ("console.saveToFile")   { gameConsole.exportEntries(entries) }
+    PuppetClick ("console.copyAll")      { copyAll() }
+    PuppetClick ("console.clear", enabled = isLive) { if (isLive) gameConsole.clear() }
+    PuppetClick ("console.jumpToBottom", enabled = models.filteredCount > 0) {
+        scope.launch { canvasState.scroll.animateScrollTo(canvasState.scroll.maxOffset) }
+    }
+    PuppetClick ("console.matchNext",    enabled = models.matches.isNotEmpty()) { jumpNext() }
+    PuppetClick ("console.matchPrev",    enabled = models.matches.isNotEmpty()) { jumpPrev() }
+    FONT_SIZES.forEach { sz ->
+        PuppetClick("console.fontSize.$sz") { onSettingsChange(settings.copy(fontSize = sz)) }
+    }
+
+    // ── Root layout + key handler ───────────────────────────────────────────
+    Column(
+        Modifier
+            .fillMaxSize()
+            // The keys below are read only while something in here holds the focus.
+            // Embedded in a pack's Logs tab, a press on the toolbar's text or the
+            // status line let the shell clear it, and every shortcut went dead.
+            .holdFocusOnPress { restoreFocus() }
+            .onPreviewKeyEvent { ev ->
+                if (ev.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                // Command input owns its own keyboard handling (Enter / Up /
+                // Down / Esc). When it has focus, the root passes ALL keys
+                // through so typing isn't intercepted.
+                if (cmdHasFocus) return@onPreviewKeyEvent false
+                handleKey(
+                    ev          = ev,
+                    searchFocus = searchHasFocus,
+                    matchCount  = models.matches.size,
+                    onOpenSearch = { openSearch() },
+                    onCloseSearch = {
+                        if (searchQuery.isNotEmpty()) searchQuery = "" else closeSearch()
+                    },
+                    onNextMatch  = ::jumpNext,
+                    onPrevMatch  = ::jumpPrev,
+                    onSelectAll  = { selection.selectAll(models) },
+                    // Ctrl+C copies the active selection (no-op when collapsed), as the
+                    // old field-native copy did; Copy line stays a context-menu action.
+                    onCopy       = { copySelection() },
+                    onScrollTop  = { scope.launch { canvasState.scroll.scrollTo(0f) } },
+                    onScrollBottom = { scope.launch { canvasState.scroll.animateScrollTo(canvasState.scroll.maxOffset) } },
+                    onPageUp     = { scope.launch { canvasState.scroll.animateScrollBy(-canvasState.scroll.viewportPx.toFloat() * 0.9f) } },
+                    onPageDown   = { scope.launch { canvasState.scroll.animateScrollBy( canvasState.scroll.viewportPx.toFloat() * 0.9f) } },
+                    onLineUp     = { scope.launch { canvasState.scroll.animateScrollBy(-fontSize.toFloat() * 1.6f) } },
+                    onLineDown   = { scope.launch { canvasState.scroll.animateScrollBy( fontSize.toFloat() * 1.6f) } },
+                )
+            },
+    ) {
+        // ── Toolbar ─────────────────────────────────────────────────────────
+        Toolbar(
+            strings       = s,
+            filtered      = models.filteredCount,
+            total         = entries.size,
+            warnCount     = models.warnCount,
+            errorCount    = models.errorCount,
+            filterInfo    = filterInfo,
+            filterWarn    = filterWarn,
+            filterError   = filterError,
+            onFilterInfo  = { filterInfo = it },
+            onFilterWarn  = { filterWarn = it },
+            onFilterError = { filterError = it },
+            wrapText      = wrapText,
+            onToggleWrap  = { onSettingsChange(settings.copy(wrapText = !wrapText)) },
+            fontSize      = fontSize,
+            onFontSize    = { onSettingsChange(settings.copy(fontSize = it)) },
+            showGutter    = showGutter,
+            onToggleGutter = { onSettingsChange(settings.copy(showGutterStrip = !showGutter)) },
+            showTimestamps = showTimestamps,
+            onToggleTimestamps = { onSettingsChange(settings.copy(showTimestamps = !showTimestamps)) },
+            onCopyAll     = { copyAll() },
+            onOpenSearch  = { if (searchOpen) closeSearch() else openSearch() },
+            // Export what's on screen, not the live buffer: in a file-
+            // backed Logs-tab view the live buffer may hold a different
+            // pack's session, so exportEntries(entries) writes the
+            // session the user is actually looking at.
+            onSave        = {
+                val exported = gameConsole.exportEntries(entries)
+                if (exported != null) {
+                    scope.launch { if (deliverConsoleExport(exported)) flash(s.consoleSaved) }
+                }
+            },
+            // Clear only acts on the live buffer; a file-backed view is
+            // read-only. The control is disabled there rather than looking
+            // live and doing nothing when it is pressed.
+            onClear       = { if (isLive) gameConsole.clear() },
+            canClear      = isLive,
+        )
+
+        HorizontalDivider(thickness = 1.dp, color = NxColor.wash(NxInk.line, 0.4f))
+
+        // ── Log area ────────────────────────────────────────────────────────
+        Box(Modifier.weight(1f).fillMaxWidth()) {
+            // Nothing has been logged yet -> idle easter-egg instead of a blank void.
+            if (models.totalCount == 0) ConsoleEmptyState(settings.customArt)
+
+            val baseStyle = TextStyle(
+                fontFamily = LocalMonoFamily.current,
+                fontSize   = fontSize.sp,
+                color      = inkMain,
+            )
+            val startPadPx    = with(density) { 10.dp.toPx() }
+            val topPadPx      = with(density) { 4.dp.toPx() }
+            val gutterWidthPx = with(density) { 3.dp.toPx() }
+            var hostWidthPx by remember { mutableIntStateOf(0) }
+
+            ConsoleContextMenu(
+                entries = {
+                    listOf(
+                        ConsoleMenuEntry(s.consoleMenuCopyLine) { copyLine() },
+                        ConsoleMenuEntry(s.consoleMenuCopySelection) { copySelection() },
+                        ConsoleMenuEntry(s.consoleCopyAll) { copyAll() },
+                    )
+                },
+            ) {
+                LogCanvas(
+                    state           = canvasState,
+                    lines           = models,
+                    selection       = selection,
+                    palette         = palette,
+                    baseStyle       = baseStyle,
+                    wrap            = wrapText,
+                    showGutter      = showGutter,
+                    warnColor       = NxColor.status(Status.Warning),
+                    errorColor      = NxColor.status(Status.Error),
+                    selectionColor  = NxColor.wash(NxColor.lead(), 0.30f),
+                    startPadPx      = startPadPx,
+                    topPadPx        = topPadPx,
+                    gutterWidthPx   = gutterWidthPx,
+                    // Every render-affecting input except the entries: a change drops
+                    // the layout cache + rebuilds the height index, while a pure
+                    // append leaves them intact.
+                    contentKey      = listOf(
+                        showTimestamps, effectiveQuery, regexMode,
+                        filterInfo, filterWarn, filterError, searchAsFilter,
+                        settings.highlightRules, settings.filterRules,
+                    ),
+                    onInteract      = { val _ = runCatching { logFocus.requestFocus() } },
+                    onTouchSelection = { fingerSelected = true },
+                    onViewportWidth = { hostWidthPx = it },
+                    modifier        = Modifier
+                        .focusRequester(logFocus)
+                        .onFocusChanged { if (it.isFocused) lastFocus = ConsoleFocus.Log }
+                        .focusable(),
+                )
+            }
+
+            ConsoleScrollbars(canvasState = canvasState, wrap = wrapText, hostWidthPx = { hostWidthPx })
+
+            if (fingerSelected && selection.active) {
+                NxButton(
+                    label    = s.consoleMenuCopySelection,
+                    onClick  = {
+                        copySelection()
+                        selection.collapse()
+                        fingerSelected = false
+                    },
+                    style    = NxButtonStyle.Primary,
+                    icon     = NxIcon.ContentCopy,
+                    compact  = true,
+                    modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
+                )
+            }
+
+            // Ephemeral "copied" toast. Crossfade keeps a steady boxshape
+            // while the content swaps between "showing" and "hidden" --
+            // AnimatedVisibility's scope-resolution issue avoided because
+            // Crossfade has no scoped overload. Animation duration mirrors
+            // the interface's idea of a quick microinteraction (mpv-OSD
+            // style: appear on action, dissolve when idle).
+            Crossfade(
+                targetState   = flashText,
+                animationSpec = Motion.fade.of(),
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 12.dp),
+            ) { showing ->
+                if (showing != null) {
+                    val toastFill = NxColor.status(Status.Success)
+                    Surface(color = toastFill) {
+                        Text(
+                            text     = showing,
+                            // The ink is chosen against the success fill, so it
+                            // reads on a light one and on a dark one alike.
+                            color    = NxColor.on(toastFill),
+                            fontSize = 11.sp,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                        )
+                    }
+                } else {
+                    Spacer(Modifier.size(0.dp))
+                }
+            }
+        }
+
+        // ── Footer: search prompt + status ─────────────────────────────────
+        HorizontalDivider(thickness = 1.dp, color = NxColor.wash(NxInk.line, 0.4f))
+
+        if (searchOpen) {
+            SearchPrompt(
+                query          = searchQuery,
+                // Position preserved across query refinements; the
+                // LaunchedEffect(models.matches.size) clamp resets
+                // currentMatch only when the new match set has fewer
+                // entries than the cursor position. Refining 'NullPoint'
+                // to 'NullPointer' keeps the user at hit 5 of 12 instead
+                // of teleporting them back to the top.
+                onQueryChange  = { searchQuery = it },
+                regexMode      = regexMode,
+                regexValid     = !regexMode || searchQuery.isBlank() || searchRegex != null,
+                onToggleRegex  = { regexMode = !regexMode },
+                filterMode     = searchAsFilter,
+                onToggleFilter = { searchAsFilter = !searchAsFilter },
+                onClose        = { closeSearch() },
+                focusRequester = searchFocus,
+                onFocusChanged = {
+                    searchHasFocus = it
+                    if (it) lastFocus = ConsoleFocus.Search
+                },
+                strings        = s,
+                onNext         = ::jumpNext,
+                onPrev         = ::jumpPrev,
+            )
+        }
+
+        // Command-input row: visible only while a game process is alive
+        // (gameConsole.canSendCommands tracks the LaunchDriver's
+        // attach / detach lifecycle). Enter sends the line to the game
+        // process's stdin via gameConsole.sendCommand, pushes it onto
+        // cmdHistory, clears the input. Up / Down step through history
+        // (most-recent first). Esc clears or blurs.
+        if (commandRowShown) {
+            CommandInputRow(
+                value            = cmdInput,
+                onValueChange    = { cmdInput = it; cmdHistoryIdx = -1 },
+                onSubmit         = {
+                    val txt = cmdInput.trim()
+                    if (txt.isNotEmpty()) {
+                        val handled = gameConsole.submitConsoleInput(txt)
+                        // Echo the command into the buffer so the user sees what they
+                        // typed -- the game's stdout reply lands on its own lines.
+                        gameConsole.append("> $txt", LogType.INFO)
+                        if (!handled && !gameConsole.canSendCommands) {
+                            gameConsole.append("no game running -- command ignored", LogType.WARN)
+                        }
+                        cmdHistory.add(0, txt)
+                        if (cmdHistory.size > 200) cmdHistory.removeAt(cmdHistory.size - 1)
+                        cmdInput = ""
+                        cmdHistoryIdx = -1
+                    }
+                },
+                onHistoryPrev    = {
+                    if (cmdHistory.isEmpty()) return@CommandInputRow
+                    val next = (cmdHistoryIdx + 1).coerceAtMost(cmdHistory.size - 1)
+                    cmdHistoryIdx = next
+                    cmdInput = cmdHistory[next]
+                },
+                onHistoryNext    = {
+                    if (cmdHistoryIdx <= 0) {
+                        cmdHistoryIdx = -1
+                        cmdInput = ""
+                    } else {
+                        cmdHistoryIdx -= 1
+                        cmdInput = cmdHistory[cmdHistoryIdx]
+                    }
+                },
+                onEscape         = {
+                    if (cmdInput.isNotEmpty()) {
+                        cmdInput = ""
+                        cmdHistoryIdx = -1
+                    } else {
+                        focusManager.clearFocus()
+                        val _ = runCatching { logFocus.requestFocus() }
+                    }
+                },
+                onFocusChanged   = {
+                    cmdHasFocus = it
+                    if (it) lastFocus = ConsoleFocus.Command
+                },
+                focusRequester   = cmdFocus,
+                strings          = s,
+            )
+        }
+
+        StatusFooter(
+            strings        = s,
+            filtered       = models.filteredCount,
+            total          = entries.size,
+            historyOffset  = historyOffset,
+            warnCount      = models.warnCount,
+            errorCount     = models.errorCount,
+            following      = isAtBottom,
+            searchActive   = effectiveQuery.isNotBlank(),
+            matchCurrent   = if (models.matches.isNotEmpty()) currentMatch + 1 else 0,
+            matchTotal     = models.matches.size,
+            searchCapped   = models.searchCapped,
+            onResumeFollow = {
+                scope.launch { canvasState.scroll.animateScrollTo(canvasState.scroll.maxOffset) }
+            },
+        )
+    }
+}
+
+// ── Toolbar ─────────────────────────────────────────────────────────────────
+
+@OptIn(ExperimentalComposeUiApi::class)
+@Composable
+private fun Toolbar(
+    strings: AppStrings,
+    filtered: Int,
+    total: Int,
+    warnCount: Int,
+    errorCount: Int,
+    filterInfo: Boolean,
+    filterWarn: Boolean,
+    filterError: Boolean,
+    onFilterInfo: (Boolean) -> Unit,
+    onFilterWarn: (Boolean) -> Unit,
+    onFilterError: (Boolean) -> Unit,
+    wrapText: Boolean,
+    onToggleWrap: () -> Unit,
+    fontSize: Int,
+    onFontSize: (Int) -> Unit,
+    showGutter: Boolean,
+    onToggleGutter: () -> Unit,
+    showTimestamps: Boolean,
+    onToggleTimestamps: () -> Unit,
+    onCopyAll: () -> Unit,
+    onOpenSearch: () -> Unit,
+    onSave: () -> Unit,
+    onClear: () -> Unit,
+    /** A file-backed view has no buffer to wipe, and the control says so. */
+    canClear: Boolean,
+) {
+    // Wraps where the count and the controls do not fit one line, and the controls scroll where
+    // they are wider than a line on their own (a phone), instead of running off the edge.
+    FlowRow(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        verticalArrangement   = Arrangement.spacedBy(4.dp),
+        itemVerticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(
+            text       = strings.consoleHeaderCount(filtered, total),
+            color      = NxInk.main,
+            fontWeight = FontWeight.Bold,
+            fontFamily = LocalMonoFamily.current,
+            fontSize   = 11.sp,
+            modifier   = Modifier.padding(start = 4.dp),
+        )
+
+        Row(Modifier.horizontalScroll(rememberScrollState()), verticalAlignment = Alignment.CenterVertically) {
+            SeverityToggle("INFO",  filterInfo,  NxInk.main,                                  null,       onFilterInfo)
+            Spacer(Modifier.width(4.dp))
+            SeverityToggle("WARN",  filterWarn,  NxColor.status(Status.Warning, text = true), warnCount,  onFilterWarn)
+            Spacer(Modifier.width(4.dp))
+            SeverityToggle("ERROR", filterError, NxColor.status(Status.Error, text = true),   errorCount, onFilterError)
+
+            Spacer(Modifier.width(8.dp))
+            VerticalDivider(
+                modifier = Modifier.height(20.dp).width(1.dp),
+                color    = NxColor.wash(NxInk.quiet, 0.3f),
+            )
+            Spacer(Modifier.width(4.dp))
+
+            // Font size: click cycles through FONT_SIZES, scroll-wheel
+            // increments / decrements by 1 sp. Wheel-over-control is the
+            // pattern used by Hyprland / Discord / mpv -- intuitive for
+            // users who reach for the mouse to adjust. The 1-sp step also
+            // exposes the full 8..22 range, not just the three FONT_SIZES
+            // presets.
+            Box(
+                modifier = Modifier
+                    .clip(MaterialTheme.shapes.small)
+                    .clickable {
+                        val idx = FONT_SIZES.indexOf(fontSize).takeIf { it >= 0 } ?: 0
+                        onFontSize(FONT_SIZES[(idx + 1) % FONT_SIZES.size])
+                    }
+                    .onWheelScroll { delta ->
+                        if (delta == 0f) return@onWheelScroll
+                        // scrollDelta.y is positive for wheel-down on most
+                        // platforms; invert so up = bigger text.
+                        val step = if (delta < 0) 1 else -1
+                        onFontSize(
+                            (fontSize + step).coerceIn(
+                                ConsoleSettings.MIN_FONT_SIZE,
+                                ConsoleSettings.MAX_FONT_SIZE,
+                            ),
+                        )
+                    }
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text       = "${fontSize}px",
+                    color      = NxInk.quiet,
+                    fontSize   = 11.sp,
+                    lineHeight = 13.sp,
+                    fontFamily = LocalMonoFamily.current,
+                )
+            }
+
+            // The keys that open the search are not on a touch screen
+            IconButton(onClick = onOpenSearch, modifier = Modifier.size(32.dp)) {
+                Symbol(NxIcon.Search, strings.consoleSearchPlaceholder, tint = NxInk.quiet)
+            }
+            IconButton(onClick = onToggleWrap, modifier = Modifier.size(32.dp)) {
+                Symbol(NxIcon.WrapText,
+                    contentDescription = strings.consoleWrap,
+                    tint = if (wrapText) NxColor.status(Status.Success) else NxInk.quiet,
+                )
+            }
+            IconButton(onClick = onSave, modifier = Modifier.size(32.dp)) {
+                Symbol(NxIcon.Save, strings.consoleSaveToFile, tint = NxInk.quiet)
+            }
+            IconButton(onClick = onCopyAll, modifier = Modifier.size(32.dp)) {
+                Symbol(NxIcon.ContentCopy, strings.consoleCopyAll, tint = NxInk.quiet)
+            }
+            IconButton(onClick = onClear, enabled = canClear, modifier = Modifier.size(32.dp)) {
+                Symbol(
+                    NxIcon.Delete,
+                    strings.consoleClear,
+                    tint = if (canClear) NxInk.quiet else NxInk.off,
+                )
+            }
+
+            // In-window gear: quick-access menu for the persisted toggles
+            // (gutter strip, timestamps) that don't belong on the main
+            // toolbar bar but should be one click away.
+            var gearOpen by remember { mutableStateOf(false) }
+            Box {
+                IconButton(onClick = { gearOpen = true }, modifier = Modifier.size(32.dp)) {
+                    Symbol(NxIcon.Settings, strings.consoleSettingsLabel, tint = NxInk.quiet)
+                }
+                DropdownMenu(
+                    expanded         = gearOpen,
+                    onDismissRequest = { gearOpen = false },
+                ) {
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                text = if (showGutter) strings.consoleHideGutter else strings.consoleShowGutter,
+                                fontFamily = LocalMonoFamily.current,
+                                fontSize   = 11.sp,
+                            )
+                        },
+                        onClick = { onToggleGutter(); gearOpen = false },
+                    )
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                text = if (showTimestamps) strings.consoleHideTimestamps else strings.consoleShowTimestamps,
+                                fontFamily = LocalMonoFamily.current,
+                                fontSize   = 11.sp,
+                            )
+                        },
+                        onClick = { onToggleTimestamps(); gearOpen = false },
+                    )
+                }
+            }
+        }
+    }
+}
+
+// Flat severity toggle. Material3 TextButton injects its own content-color
+// CompositionLocal that overrides Text(color = ...) in this codebase's
+// theme stack, making the labels read as monochrome at low contrast. A
+// raw Box + clickable bypasses that pipeline and gives us full control
+// over both the chip background tint (active state) and the text color.
+// Active chip carries a 14% accent wash so the toggle reads ON without
+// needing a border. The inactive label drops to a 45% wash for clear hierarchy.
+@Composable
+private fun SeverityToggle(
+    label: String,
+    active: Boolean,
+    accent: Color,
+    count: Int?,
+    onToggle: (Boolean) -> Unit,
+) {
+    val text = if (count != null && count > 0) "$label $count" else label
+    val bg   = if (active) NxColor.wash(accent, 0.14f) else Color.Transparent
+    // Wrap-content height + symmetric padding centers the text optically.
+    // The prior fixed 24 dp height pushed all-caps mono labels visually
+    // below the chip center because font ascent reserves space above the
+    // caps that no glyph fills. Letting the box hug the text gives an
+    // even top / bottom margin around the actual ink.
+    Box(
+        modifier = Modifier
+            .clip(MaterialTheme.shapes.small)
+            .background(bg)
+            .clickable { onToggle(!active) }
+            .padding(horizontal = 8.dp, vertical = 3.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        // Measured bold, drawn at its current weight. Toggling a level bolded its
+        // chip, and even in a mono face the bold is wider, so the rest of the row
+        // stepped sideways every time one was switched.
+        NxSteadyText(
+            text   = text,
+            color  = if (active) accent else NxColor.wash(accent, 0.45f),
+            style  = LocalTextStyle.current.copy(
+                fontSize   = 11.sp,
+                lineHeight = 13.sp,
+                fontFamily = LocalMonoFamily.current,
+            ),
+            weight = if (active) FontWeight.Bold else FontWeight.Normal,
+        )
+    }
+}
+
+// ── Search prompt (footer-row, less/helix-style `/` entry) ──────────────────
+
+@Composable
+private fun SearchPrompt(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    regexMode: Boolean,
+    regexValid: Boolean,
+    onToggleRegex: () -> Unit,
+    filterMode: Boolean,
+    onToggleFilter: () -> Unit,
+    onClose: () -> Unit,
+    focusRequester: FocusRequester,
+    onFocusChanged: (Boolean) -> Unit,
+    strings: AppStrings,
+    onNext: () -> Unit,
+    onPrev: () -> Unit,
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text       = "/",
+            color      = NxInk.quiet,
+            fontFamily = LocalMonoFamily.current,
+            fontWeight = FontWeight.Bold,
+            fontSize   = 12.sp,
+            modifier   = Modifier.padding(end = 8.dp),
+        )
+        NxBasicTextField(
+            value         = query,
+            onValueChange = onQueryChange,
+            singleLine    = true,
+            keyboardOptions  = KeyboardOptions(imeAction = ImeAction.Search),
+            onKeyboardAction = { onNext() },
+            textStyle     = TextStyle(
+                color      = NxInk.main,
+                fontSize   = 12.sp,
+                fontFamily = LocalMonoFamily.current,
+            ),
+            cursorBrush   = SolidColor(NxInk.main),
+            modifier      = Modifier
+                .weight(1f)
+                .focusRequester(focusRequester)
+                .onFocusChanged { onFocusChanged(it.isFocused) },
+            decorationBox = { inner ->
+                if (query.isEmpty()) {
+                    Text(
+                        text       = strings.consoleSearchPlaceholder,
+                        color      = NxColor.wash(NxInk.quiet, 0.5f),
+                        fontSize   = 12.sp,
+                        fontFamily = LocalMonoFamily.current,
+                    )
+                }
+                inner()
+            },
+        )
+        val regexTint = when {
+            !regexMode  -> NxColor.wash(NxInk.quiet, 0.4f)
+            !regexValid -> NxColor.status(Status.Error, text = true)
+            else        -> NxColor.status(Status.Success, text = true)
+        }
+        PromptButton(onClick = onToggleRegex) {
+            Text(
+                text       = ".*",
+                color      = regexTint,
+                fontSize   = 12.sp,
+                lineHeight = 14.sp,
+                fontFamily = LocalMonoFamily.current,
+                fontWeight = FontWeight.Bold,
+            )
+        }
+        // Filter toggle: off = search highlights + F3-navigates the full
+        // buffer; on = buffer collapses to only matching lines (plus
+        // dividers). 'f|' glyph reads as "filter on" without needing an
+        // icon import. Active state is the same accent as a confirmed
+        // regex toggle so the two related controls share a visual.
+        PromptButton(onClick = onToggleFilter) {
+            Text(
+                text       = "f|",
+                color      = if (filterMode) NxColor.status(Status.Success, text = true) else NxColor.wash(NxInk.quiet, 0.4f),
+                fontSize   = 12.sp,
+                lineHeight = 14.sp,
+                fontFamily = LocalMonoFamily.current,
+                fontWeight = FontWeight.Bold,
+            )
+        }
+        PromptButton(onClick = onPrev) {
+            Text(
+                text       = "<",
+                color      = NxInk.quiet,
+                fontSize   = 12.sp,
+                lineHeight = 14.sp,
+                fontFamily = LocalMonoFamily.current,
+            )
+        }
+        PromptButton(onClick = onNext) {
+            Text(
+                text       = ">",
+                color      = NxInk.quiet,
+                fontSize   = 12.sp,
+                lineHeight = 14.sp,
+                fontFamily = LocalMonoFamily.current,
+            )
+        }
+        PromptButton(onClick = onClose) {
+            Symbol(icon = NxIcon.Close,
+                contentDescription = null,
+                tint               = NxInk.quiet,
+                modifier           = Modifier.size(14.dp),
+            )
+        }
+    }
+}
+
+// Never focusable: a press on one used to take the focus off the search field, and
+// the next letters typed were read as the log's shortcuts rather than as the query.
+//
+// Material3 TextButton injects a contentColor CompositionLocal that
+// overrides our explicit Text(color = ...) settings in this theme stack;
+// the regex / filter / prev / next labels on the SearchPrompt rendered
+// as illegible smears the same way the severity toggles did. Bare
+// Box + clickable hands us back full control over typography colors and
+// fits the slim 24 dp footer height without TextButton's hidden minWidth.
+@Composable
+private fun PromptButton(
+    onClick: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .clip(MaterialTheme.shapes.small)
+            .focusProperties { canFocus = false }
+            .clickable { onClick() }
+            .padding(horizontal = 6.dp, vertical = 3.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        content()
+    }
+}
+
+// ── Command input row (live while game process is running) ─────────────────
+
+@Composable
+private fun CommandInputRow(
+    value: String,
+    onValueChange: (String) -> Unit,
+    onSubmit: () -> Unit,
+    onHistoryPrev: () -> Unit,
+    onHistoryNext: () -> Unit,
+    onEscape: () -> Unit,
+    onFocusChanged: (Boolean) -> Unit,
+    focusRequester: FocusRequester,
+    strings: AppStrings,
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // Right-arrow prompt glyph reads as "you type here, it goes
+        // into the process". Mirrors the search prompt's '/' affordance
+        // so the two footer rows look like a family.
+        Text(
+            text       = ">",
+            color      = NxColor.status(Status.Success, text = true),
+            fontFamily = LocalMonoFamily.current,
+            fontWeight = FontWeight.Bold,
+            fontSize   = 12.sp,
+            modifier   = Modifier.padding(end = 8.dp),
+        )
+        NxBasicTextField(
+            value         = value,
+            onValueChange = onValueChange,
+            singleLine    = true,
+            // The key on a soft keyboard is an action and not an Enter, so the key handler below never sees it
+            keyboardOptions  = KeyboardOptions(imeAction = ImeAction.Send),
+            onKeyboardAction = { onSubmit() },
+            textStyle     = TextStyle(
+                color      = NxInk.main,
+                fontSize   = 12.sp,
+                fontFamily = LocalMonoFamily.current,
+            ),
+            cursorBrush   = SolidColor(NxInk.main),
+            modifier      = Modifier
+                .weight(1f)
+                .focusRequester(focusRequester)
+                .onFocusChanged { onFocusChanged(it.isFocused) }
+                .onPreviewKeyEvent { ev ->
+                    if (ev.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                    when (ev.key) {
+                        Key.Enter, Key.NumPadEnter -> { onSubmit(); true }
+                        Key.DirectionUp            -> { onHistoryPrev(); true }
+                        Key.DirectionDown          -> { onHistoryNext(); true }
+                        Key.Escape                 -> { onEscape(); true }
+                        else                       -> false
+                    }
+                },
+            decorationBox = { inner ->
+                if (value.isEmpty()) {
+                    Text(
+                        text       = strings.consoleCommandPlaceholder,
+                        color      = NxColor.wash(NxInk.quiet, 0.45f),
+                        fontSize   = 12.sp,
+                        fontFamily = LocalMonoFamily.current,
+                    )
+                }
+                inner()
+            },
+        )
+    }
+}
+
+// ── Status footer (always visible) ──────────────────────────────────────────
+
+@Composable
+private fun StatusFooter(
+    strings: AppStrings,
+    filtered: Int,
+    total: Int,
+    historyOffset: Int,
+    warnCount: Int,
+    errorCount: Int,
+    following: Boolean,
+    searchActive: Boolean,
+    matchCurrent: Int,
+    matchTotal: Int,
+    searchCapped: Boolean = false,
+    onResumeFollow: () -> Unit,
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp, vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // When the sliding window has dropped entries to disk, report
+        // both the live count and the on-disk total so the user knows
+        // scrolling up will reach further than the in-memory size.
+        val linesText = if (historyOffset > 0) {
+            strings.consoleStatusLinesWithHistory(filtered, total, historyOffset)
+        } else {
+            strings.consoleStatusLines(filtered, total)
+        }
+        Text(
+            text       = linesText,
+            color      = NxInk.quiet,
+            fontFamily = LocalMonoFamily.current,
+            fontSize   = 10.sp,
+        )
+        Spacer(Modifier.width(12.dp))
+        Text(
+            text       = strings.consoleStatusFiltered(warnCount, errorCount),
+            color      = NxInk.quiet,
+            fontFamily = LocalMonoFamily.current,
+            fontSize   = 10.sp,
+        )
+
+        Spacer(Modifier.weight(1f))
+
+        if (searchActive) {
+            // "+" suffix marks that matches hit MAX_SEARCH_MATCHES and the rest
+            // were not highlighted -- F3 still steps through the first cap-worth.
+            Text(
+                text       = strings.consoleStatusMatch(matchCurrent, matchTotal) + if (searchCapped) "+" else "",
+                color      = NxInk.quiet,
+                fontFamily = LocalMonoFamily.current,
+                fontSize   = 10.sp,
+            )
+            Spacer(Modifier.width(12.dp))
+        }
+
+        // Follow / paused chip: clickable when paused to resume tailing.
+        // success doubles as "everything is on track"; pause uses warm
+        // orange so the chip reads as a deliberate halt rather than an
+        // error, which the error status would conflate with ERROR severity.
+        val followText  = if (following) strings.consoleStatusFollow else strings.consoleStatusPaused
+        val followColor = if (following) NxColor.status(Status.Success, text = true) else CONSOLE_PAUSE_ACCENT
+        TextButton(onClick = onResumeFollow, modifier = Modifier.height(20.dp)) {
+            Text(
+                text       = followText,
+                color      = followColor,
+                fontFamily = LocalMonoFamily.current,
+                fontWeight = FontWeight.Bold,
+                fontSize   = 10.sp,
+            )
+        }
+    }
+}
+
+// ── Keyboard handler ────────────────────────────────────────────────────────
+// Dispatched from the root `onPreviewKeyEvent` so chords fire regardless of
+// which inner field has focus. The search-focus guard distinguishes "user is
+// typing in the prompt" from "user is navigating the log".
+
+private fun handleKey(
+    ev: KeyEvent,
+    searchFocus: Boolean,
+    matchCount: Int,
+    onOpenSearch:   () -> Unit,
+    onCloseSearch:  () -> Unit,
+    onNextMatch:    () -> Unit,
+    onPrevMatch:    () -> Unit,
+    onSelectAll:    () -> Unit,
+    onCopy:         () -> Unit,
+    onScrollTop:    () -> Unit,
+    onScrollBottom: () -> Unit,
+    onPageUp:       () -> Unit,
+    onPageDown:     () -> Unit,
+    onLineUp:       () -> Unit,
+    onLineDown:     () -> Unit,
+): Boolean {
+    val key = ev.key
+
+    // Search-prompt-focused: only Escape, F3 / Shift+F3 are intercepted.
+    if (searchFocus) {
+        return when (key) {
+            Key.Escape -> { onCloseSearch(); true }
+            Key.F3 if ev.isShiftPressed -> { onPrevMatch(); true }
+            Key.F3 -> { onNextMatch(); true }
+            else -> false
+        }
+    }
+
+    // Log-area-focused chords. Shift-modified keys are passed through so
+    // BasicTextField selection extension (Shift+Arrow, Shift+End, etc.)
+    // continues to work -- a chord with Shift always means "extend
+    // selection" first, "navigate" only when Shift is up.
+    val shift = ev.isShiftPressed
+    val ctrl  = ev.isCtrlPressed
+    return when {
+        // Open search prompt. `?` (Shift+Slash) reserved for future
+        // backward-search; today it falls through to the field.
+        key == Key.F     && ctrl                -> { onOpenSearch(); true }
+        key == Key.Slash && !shift              -> { onOpenSearch(); true }
+
+        // Match nav (when there are matches). F3 + Shift+F3 always work;
+        // bare n/N intercepted only when search has registered matches.
+        key == Key.F3 && shift                            -> { onPrevMatch(); true }
+        key == Key.F3                                     -> { onNextMatch(); true }
+        matchCount > 0 && key == Key.N && shift           -> { onPrevMatch(); true }
+        matchCount > 0 && key == Key.N && !shift          -> { onNextMatch(); true }
+
+        // Copy / select-all: the canvas owns text handling now (no field beneath).
+        key == Key.A && ctrl && !shift         -> { onSelectAll(); true }
+        key == Key.C && ctrl && !shift         -> { onCopy(); true }
+
+        // Scroll anchors. Ctrl+Home / Ctrl+End for top / bottom.
+        key == Key.MoveHome && ctrl && !shift  -> { onScrollTop(); true }
+        key == Key.MoveEnd  && ctrl && !shift  -> { onScrollBottom(); true }
+        key == Key.G        && shift           -> { onScrollBottom(); true }
+        key == Key.G        && !shift          -> { onScrollTop(); true }
+
+        // Pagewise scroll. Page keys with Shift extend selection -- pass
+        // through. Ctrl+u/d are vim-style halfpage; same Shift guard.
+        key == Key.PageUp     && !shift        -> { onPageUp(); true }
+        key == Key.PageDown   && !shift        -> { onPageDown(); true }
+        key == Key.U && ctrl  && !shift        -> { onPageUp(); true }
+        key == Key.D && ctrl  && !shift        -> { onPageDown(); true }
+
+        // Linewise scroll. Arrow keys with Shift are selection-extension
+        // chords -- pass through unmodified. Vim j/k bare-key only.
+        (key == Key.K || key == Key.DirectionUp)   && !shift -> { onLineUp(); true }
+        (key == Key.J || key == Key.DirectionDown) && !shift -> { onLineDown(); true }
+
+        else -> false
+    }
+}
+
+/**
+ * Idle filler for a console with no log lines yet (`totalCount == 0`) -- a friendly
+ * stand-in instead of a blank panel, plus a hint to launch something. ASCII + mono
+ * font so it renders in any theme without glyph gaps.
+ */
+@Composable
+private fun ConsoleEmptyState(extraArts: List<String>) {
+    val s = LocalStrings.current
+    // Built-in shapes + the bundled art file + the user's Settings-managed art
+    // ([extraArts] = ConsoleSettings.customArt). All three pools, one random pick.
+    val arts by produceState(CONSOLE_EMPTY_ARTS + extraArts, extraArts) {
+        value = runCatching {
+            val fileArts = parseArtBlocks(Res.readBytes("files/console_empty_art.txt").decodeToString())
+            (CONSOLE_EMPTY_ARTS + fileArts + extraArts).filter { it.isNotBlank() }
+        }.getOrDefault((CONSOLE_EMPTY_ARTS + extraArts).filter { it.isNotBlank() })
+    }
+    // One random art per appearance -- re-rolls only when the loaded set changes.
+    val art = remember(arts) { arts.random() }
+    Column(
+        modifier            = Modifier.fillMaxSize().padding(24.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        // Left-aligned text, centred as a block: ASCII art keeps its shape and the
+        // whole picture still sits in the middle of the panel.
+        Text(
+            text      = art,
+            // DejaVu Sans (not the mono UI font) -- it carries Braille at a uniform
+            // cell; lineHeight == fontSize so the dot rows stack without gaps.
+            style     = TextStyle(fontFamily = nexiraBrailleFamily(), fontSize = 16.sp, lineHeight = 16.sp),
+            color     = NxColor.wash(NxInk.quiet, 0.5f),
+            textAlign = TextAlign.Start,
+        )
+        Spacer(Modifier.height(16.dp))
+        Text(
+            text      = s.consoleEmptyHint,
+            style     = MaterialTheme.typography.bodySmall,
+            color     = NxColor.wash(NxInk.quiet, 0.7f),
+            textAlign = TextAlign.Center,
+        )
+    }
+}
+
+// Console filler is rendered in the bundled DejaVu Sans (Braille-capable). Art is
+// built from a plain pixel grid ('#' = on) and packed into Braille -- 2x4 dots per
+// cell -- so each picture stays original and provably correct, with no hand-placed
+// Braille code points. Add shapes as grids below; one is shown at random per show.
+private fun brailleArt(rows: List<String>): String {
+    val height = rows.size
+    val width = rows.maxOfOrNull { it.length } ?: 0
+    val grid = rows.map { it.padEnd(width) }
+    fun on(x: Int, y: Int) = y in 0 until height && x in 0 until width && grid[y][x] == '#'
+    // Braille dot bit per (col 0..1, row 0..3): dots 1,2,3,7 then 4,5,6,8.
+    val dotBit = intArrayOf(0x01, 0x02, 0x04, 0x40, 0x08, 0x10, 0x20, 0x80)
+    val out = StringBuilder()
+    var cy = 0
+    while (cy < height) {
+        var cx = 0
+        while (cx < width) {
+            var bits = 0
+            for (col in 0..1) for (row in 0..3) if (on(cx + col, cy + row)) bits = bits or dotBit[col * 4 + row]
+            out.append('⠀' + bits)
+            cx += 2
+        }
+        out.append('\n')
+        cy += 4
+    }
+    return out.toString().trimEnd('\n')
+}
+
+// Parse files/console_empty_art.txt: '#' lines are comments, "---" on its own line
+// separates pictures. Returns the non-blank blocks verbatim (Braille/ASCII preserved).
+private fun parseArtBlocks(text: String): List<String> {
+    val arts = mutableListOf<String>()
+    val cur = StringBuilder()
+    fun flush() { cur.toString().trim('\n').takeIf { it.isNotBlank() }?.let { arts += it }; cur.clear() }
+    for (line in text.lineSequence()) {
+        when {
+            line.trimStart().startsWith("#") -> {}
+            line.trim() == "---" -> flush()
+            else -> cur.append(line).append('\n')
+        }
+    }
+    flush()
+    return arts
+}
+
+private val ART_HEART = listOf(
+    " ###   ### ",
+    "###########",
+    "###########",
+    "###########",
+    " ######### ",
+    "  #######  ",
+    "   #####   ",
+    "    ###    ",
+    "     #     ",
+)
+private val ART_DIAMOND = listOf(
+    "      #      ",
+    "     ###     ",
+    "    #####    ",
+    "   #######   ",
+    "  #########  ",
+    " ########### ",
+    "#############",
+    " ########### ",
+    "  #########  ",
+    "   #######   ",
+    "    #####    ",
+    "     ###     ",
+    "      #      ",
+)
+private val ART_TRIANGLE = listOf(
+    "      #      ",
+    "     ###     ",
+    "     ###     ",
+    "    #####    ",
+    "   #######   ",
+    "  #########  ",
+    " ########### ",
+    "#############",
+    "#############",
+)
+
+private val ART_PLANET = listOf(
+    ".....######.....",
+    "....########....",
+    "...##########...",
+    "..############..",
+    "..############..",
+    "..############..",
+    "..############..",
+    "..############..",
+    "..############..",
+    "...##########...",
+    "....########....",
+    ".....######.....",
+)
+private val ART_RING = listOf(
+    ".....######.....",
+    "....########....",
+    "...##......##...",
+    "..##........##..",
+    "..##........##..",
+    "..##........##..",
+    "..##........##..",
+    "..##........##..",
+    "..##........##..",
+    "...##......##...",
+    "....########....",
+    ".....######.....",
+)
+private val ART_CRESCENT = listOf(
+    ".....######.....",
+    "....#####.......",
+    "...#####........",
+    "..#####.........",
+    "..#####.........",
+    "..#####.........",
+    "..#####.........",
+    "..#####.........",
+    "..#####.........",
+    "...#####........",
+    "....#####.......",
+    ".....######.....",
+)
+private val ART_STAR = listOf(
+    ".......##........",
+    ".......##........",
+    "......####.......",
+    ".##############..",
+    "...##########....",
+    "....########.....",
+    ".....######......",
+    ".....######......",
+    ".....######......",
+    "....###..###.....",
+    "....#......#.....",
+)
+
+private val CONSOLE_EMPTY_ARTS: List<String> = listOf(
+    brailleArt(ART_HEART),
+    brailleArt(ART_DIAMOND),
+    brailleArt(ART_TRIANGLE),
+    brailleArt(ART_PLANET),
+    brailleArt(ART_RING),
+    brailleArt(ART_CRESCENT),
+    brailleArt(ART_STAR),
+)
+
+internal fun spanStyleFor(role: SpanRole, p: ConsolePalette): SpanStyle = when (role) {
+    SpanRole.Divider -> SpanStyle(color = p.divider, fontWeight = FontWeight.Light)
+    SpanRole.Info    -> SpanStyle(color = p.severityInfo)
+    SpanRole.Warn    -> SpanStyle(color = p.severityWarn)
+    SpanRole.Error   -> SpanStyle(color = p.severityError)
+    SpanRole.Marker  -> SpanStyle(color = p.severityError, fontWeight = FontWeight.Bold)
+    SpanRole.Search  -> SpanStyle(color = p.searchMatch, background = p.searchMatchBg, fontWeight = FontWeight.Bold)
+}
+
+internal fun findAllSubstring(text: String, query: String): List<IntRange> {
+    if (query.isEmpty()) return emptyList()
+    val out = mutableListOf<IntRange>()
+    var i = text.indexOf(query, ignoreCase = true)
+    while (i >= 0) {
+        out.add(i until i + query.length)
+        // Non-overlapping (matches less / grep / IDE find semantics):
+        // "aa" in "aaaa" -> hits (0..1) and (2..3), not (0..1)(1..2)(2..3).
+        i = text.indexOf(query, startIndex = i + query.length, ignoreCase = true)
+    }
+    return out
+}
+

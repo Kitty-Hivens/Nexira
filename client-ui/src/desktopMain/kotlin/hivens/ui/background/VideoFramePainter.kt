@@ -19,6 +19,7 @@ import androidx.compose.ui.graphics.skiaCanvas
 import dev.hivens.skinema.audio.PcmSink
 import dev.hivens.skinema.compose.rememberPlayerState
 import dev.hivens.skinema.libav.HwAccel
+import dev.hivens.skinema.libav.MediaInput
 import dev.hivens.skinema.player.VideoPlayer
 import dev.hivens.skinema.player.WhenUnwatched
 import dev.hivens.skinema.skiko.VideoFrameImage
@@ -65,7 +66,7 @@ internal class VideoFramePainter(
     override val intrinsicSize: Size get() = displaySize
 
     override fun DrawScope.onDraw() {
-        frameStamp() // snapshot read -- a new frame invalidates this draw
+        val _ = frameStamp() // snapshot read -- a new frame invalidates this draw
         val image = takeFrame() ?: return
         val w = size.width
         val h = size.height
@@ -212,9 +213,9 @@ private fun openBackgroundPlayer(
 ): VideoPlayer? {
     val sink: PcmSink? = if (audio) output?.sink() else null
     return try {
-        VideoPlayer(path = file.toPath(), loop = loop, audio = audio, sink = sink, hardware = hardware, unwatched = unwatched)
+        VideoPlayer(input = MediaInput.File(file.toPath()), loop = loop, audio = audio, sink = sink, hardware = hardware, unwatched = unwatched)
     } catch (e: LinkageError) {
-        runCatching { sink?.close() }
+        val _ = runCatching { sink?.close() }
         log.error("Background media natives unavailable for {}", file.absolutePath, e)
         null
     }

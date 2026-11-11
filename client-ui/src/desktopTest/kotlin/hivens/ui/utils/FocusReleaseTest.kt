@@ -71,4 +71,37 @@ class FocusReleaseTest {
             scene.close()
         }
     }
+
+    /**
+     * A pane that holds the focus, standing in the corner of the same shell: 200x200
+     * with the focusable element in its own corner.
+     */
+    private fun heldScene(probe: Probe): ImageComposeScene = ImageComposeScene(400, 200, density = Density(1f)) {
+        val requester = remember { FocusRequester() }
+        Box(Modifier.fillMaxSize().releaseFocusOnPress()) {
+            Box(Modifier.size(200.dp).holdFocusOnPress { requester.requestFocus() }) {
+                Box(Modifier.size(100.dp).focusRequester(requester).onFocusChanged { probe.focused = it.isFocused }.focusable())
+            }
+        }
+        LaunchedEffect(Unit) { requester.requestFocus() }
+    }
+
+    @Test
+    fun `a press on a pane's bare chrome gives the focus back, and one outside the pane does not`() = onEdt {
+        val probe = Probe()
+        val scene = heldScene(probe)
+        try {
+            scene.render()
+            scene.render()
+            assertTrue(probe.focused, "the element took the focus")
+
+            scene.press(Offset(150f, 150f))
+            assertTrue(probe.focused, "a press inside the pane, on nothing that takes the focus, keeps its keys working")
+
+            scene.press(Offset(300f, 150f))
+            assertFalse(probe.focused, "a press outside the pane still lets go")
+        } finally {
+            scene.close()
+        }
+    }
 }

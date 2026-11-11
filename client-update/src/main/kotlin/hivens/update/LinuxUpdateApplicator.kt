@@ -106,7 +106,7 @@ class LinuxUpdateApplicator : IUpdateApplicator {
                     logger.error("Update failed, restoring the installed version", e)
                     runCatching { if (Files.exists(backupPath)) restoreBackup(backupPath, exe) }
                         .onFailure { logger.error("Rollback failed!", it) }
-                    runCatching { Files.deleteIfExists(pendingFor(exe)) }
+                    val _ = runCatching { Files.deleteIfExists(pendingFor(exe)) }
                 }
                 // Either way something has to come back up, and only once this JVM is
                 // gone: it still holds the single-instance lock while its hooks run,

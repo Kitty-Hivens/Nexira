@@ -1,5 +1,6 @@
 package hivens.module.pixelplayer
 
+import dev.hivens.skinema.libav.MediaInput
 import dev.hivens.skinema.player.VideoPlayer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -19,6 +20,7 @@ import java.nio.file.Path
 import kotlin.time.Duration.Companion.milliseconds
 
 /** Where the playlist is and what the current track is doing. */
+@Suppress("ArrayInDataClass")
 internal data class PlayerState(
     val tracks: List<Path> = emptyList(),
     val index: Int = -1,
@@ -216,7 +218,7 @@ internal class PixelPlayer private constructor() {
      */
     private fun openCurrent(autoPlay: Boolean, tries: Int = _state.value.tracks.size) {
         val file = _state.value.current ?: return
-        val p = runCatching { VideoPlayer(path = file, loop = false, audio = true) }.getOrElse {
+        val p = runCatching { VideoPlayer(input = MediaInput.File(file), loop = false, audio = true) }.getOrElse {
             _state.value = _state.value.copy(failed = true, playing = false)
             // A file that will not even open is one file as well, the same as one
             // that fails mid-decode below. Stopping here left the queue halted on

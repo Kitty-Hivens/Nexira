@@ -31,7 +31,7 @@ class MediaSessionStreamTest {
 
     @Test
     fun `a volume drag does not become one snapshot per pointer frame`() = runTest {
-        val player = AudioPlayer(scope = backgroundScope)
+        val player = AudioPlayer(scope = backgroundScope, engines = SkinemaEngines())
         val bridge = MediaSessionBridge(MusicPlayerServiceImpl(player), backgroundScope, artDir)
 
         val seen = mutableListOf<Float>()
@@ -58,7 +58,7 @@ class MediaSessionStreamTest {
         // The reason the loudness is combined in at all rather than read off the
         // state: a paused player emits no state, so a slider moved while paused
         // would otherwise reach the desktop only on the next play.
-        val player = AudioPlayer(scope = backgroundScope)
+        val player = AudioPlayer(scope = backgroundScope, engines = SkinemaEngines())
         val bridge = MediaSessionBridge(MusicPlayerServiceImpl(player), backgroundScope, artDir)
 
         val seen = mutableListOf<Float>()

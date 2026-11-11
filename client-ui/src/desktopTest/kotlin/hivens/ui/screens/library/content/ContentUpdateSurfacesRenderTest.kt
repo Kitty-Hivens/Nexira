@@ -19,7 +19,7 @@ import androidx.compose.ui.unit.dp
 import hivens.core.api.dto.modrinth.ModrinthFile
 import hivens.core.api.dto.modrinth.ModrinthHashes
 import hivens.core.api.dto.modrinth.ModrinthVersion
-import hivens.launcher.instance.ContentKind
+import hivens.launcher.content.ContentKind
 import hivens.launcher.instance.ContentRef
 import hivens.launcher.instance.InstalledContent
 import hivens.launcher.instance.InstanceContentUpdater

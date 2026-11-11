@@ -24,7 +24,7 @@ permissions:
 jobs:
   scan:
     name: Motion-scale bypasses
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v7
 

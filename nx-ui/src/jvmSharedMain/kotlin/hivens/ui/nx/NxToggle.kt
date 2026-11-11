@@ -1,0 +1,87 @@
+package hivens.ui.nx
+
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import hivens.ui.icons.IconKey
+import hivens.ui.icons.Symbol
+import hivens.ui.theme.Spacing
+import hivens.ui.theme.NxInk
+
+/**
+ * One label(+ optional [description] / [icon]) and an [NxSwitch], as a single
+ * in-plane settings row. The one toggle row every section composes, so a
+ * boolean setting reads the same everywhere instead of each screen rolling its
+ * own switch row (Rule 0/D04). [enabled] greys the row; [accent] overrides the
+ * checked track for semantic toggles. [trailing] renders between the text and
+ * the switch (a side badge, a meta chip) without the caller re-rolling the row.
+ */
+@Composable
+fun NxToggle(
+    label: String,
+    checked: Boolean,
+    modifier: Modifier = Modifier,
+    description: String? = null,
+    icon: IconKey? = null,
+    enabled: Boolean = true,
+    accent: Color? = null,
+    trailing: (@Composable () -> Unit)? = null,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    val alpha = if (enabled) 1f else 0.4f
+    Row(
+        modifier              = modifier.fillMaxWidth(),
+        verticalAlignment     = Alignment.CenterVertically,
+    ) {
+        Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+            if (icon != null) {
+                // A semantic toggle (accent set) lights its icon with the accent while
+                // checked; the row stays neutral otherwise -- accent as a row state, not
+                // a whole-row wash.
+                val iconTint = if (accent != null && checked) accent else NxInk.quiet
+                Symbol(icon, null, tint = iconTint.copy(alpha = alpha), size = 22.dp)
+                Spacer(Modifier.width(Spacing.s12))
+            }
+            Column {
+                Text(
+                    text       = label,
+                    color      = NxInk.main.copy(alpha = alpha),
+                    fontWeight = FontWeight.Medium,
+                    maxLines   = 2,
+                    overflow   = TextOverflow.Ellipsis,
+                )
+                if (description != null) {
+                    Text(
+                        text     = description,
+                        style    = MaterialTheme.typography.bodySmall,
+                        color    = NxInk.quiet.copy(alpha = alpha),
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.width(Spacing.s12))
+        if (trailing != null) {
+            trailing()
+            Spacer(Modifier.width(Spacing.s12))
+        }
+        NxSwitch(
+            checked         = checked,
+            onCheckedChange = onCheckedChange,
+            enabled         = enabled,
+            accent          = accent,
+        )
+    }
+}

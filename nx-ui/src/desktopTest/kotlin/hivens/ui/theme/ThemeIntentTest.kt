@@ -27,7 +27,7 @@ class ThemeIntentTest {
         for ((name, scheme) in schemes()) {
             val l = scheme.steps.map { it.lstar() }
             val rising = l.last() > l.first()
-            l.zipWithNext { a, b ->
+            val _ = l.zipWithNext { a, b ->
                 assertTrue(if (rising) b > a else b < a, "$name: the ladder turns back on itself at $a -> $b")
                 val gap = abs(b - a)
                 val floor = if (scheme.isDark) DARK_STEP else LIGHT_STEP

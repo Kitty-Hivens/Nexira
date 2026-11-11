@@ -70,9 +70,10 @@ class PackListFitTest {
 
     @Test
     fun `columns leave in the order they are least needed`() {
-        assertEquals(PackListColumns(runsOn = false, played = false), PackListColumns.forWidth(400f))
-        assertEquals(PackListColumns(runsOn = true, played = false), PackListColumns.forWidth(600f))
-        assertEquals(PackListColumns(runsOn = true, played = true), PackListColumns.forWidth(900f))
+        assertEquals(PackListColumns(runsOn = false, played = false, hoursAndUpdate = false), PackListColumns.forWidth(300f))
+        assertEquals(PackListColumns(runsOn = false, played = false, hoursAndUpdate = true), PackListColumns.forWidth(400f))
+        assertEquals(PackListColumns(runsOn = true, played = false, hoursAndUpdate = true), PackListColumns.forWidth(600f))
+        assertEquals(PackListColumns(runsOn = true, played = true, hoursAndUpdate = true), PackListColumns.forWidth(900f))
     }
 
     /**

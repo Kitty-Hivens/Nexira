@@ -18,6 +18,49 @@ verbatim and a hand-wrapped line becomes a staircase of breaks.
 
 ## [Unreleased]
 
+## [2.4.7] - 2026-11-11
+
+2.4.7 finishes what the beta started: Browse finds mods, resource packs and shaders, and installing them into a pack is done properly. Since the beta it has picked up a phone, a window that finally behaves on Windows, and a long list of fixes.
+
+### Android, in beta
+
+Nexira runs on 64-bit ARM phones with Android 12 or newer. The APK is on the release page beside the other downloads. The same home screen, Library, Browse and settings, laid out for a phone held either way, and the games run on the phone itself: the launcher fetches a Java and the graphics libraries made for Android, gives the game a full-screen window, and passes it your fingers, a mouse or a keyboard. With the TouchController mod in the pack you get proper on-screen controls. On the phone a game needs LWJGL 3: Minecraft from 1.14 on, and 1.12.2 and 1.7.10 packs on Cleanroom or lwjgl3ify. Forge from 1.13 on and NeoForge are not offered there yet. It is a beta: expect rough edges, and tell us where they are.
+
+### Browse and installing
+
+Everything the beta brought is here: mods, resource packs and shaders from Modrinth beside packs, filters that work the way Modrinth's do, installing straight into a pack with what it needs, and pages for packs that work like a mod's. On top of that:
+
+- An install that went without a required dependency says so on the card and in the install dialog, not only on the project page.
+- A dependency that is in the pack but switched off is no longer counted as there, and a library already in the pack under another file name is not added a second time.
+- Try again installs the version that failed, not the newest one. A link followed from one project to another keeps the pack you were installing into.
+- A modpack can no longer be installed into a pack as if it were a mod.
+- Coming back to a search shows it as you left it, and a search reads the pack again if it has changed since.
+- Finding out which packs a project fits no longer sends a list of every file in every pack to Modrinth. It is worked out on your computer.
+
+### Hivens packs
+
+Resource and shader packs that come with a pack keep the choice you made through updates, rollbacks and repairs, including one switched while the game had it open, and a pack whose details can't be fetched right now keeps its own files locked instead of offering them for replacement.
+
+### The window
+
+On Windows the launcher window now behaves like any other window: you drag it by the top bar, resize it from any edge and snap it to the side of the screen, and maximised it no longer covers the taskbar. The light strips that flashed along an edge while resizing are gone, the buttons in the corner are drawn crisply, and the window opens the way you left it, maximised or where you put it. Notifications reach the desktop when the launcher is installed with the installer. On Linux, a desktop that moves windows itself now moves and resizes the launcher too, with its own snapping, and the window no longer opens the size of the screen with its top pushed off it.
+
+### Typing
+
+On a slow computer, text fields dropped letters typed at an ordinary pace, and clearing a field could leave some text behind. They keep every letter now.
+
+### Modules
+
+Widget modules can bring more than widgets: full-screen effects, themes and particle fields, each with its own settings and its own words in your language. The example modules carry a kaleidoscope, an old CRT look, a glitch, two themes and two particle fields. The effects come with a warning for anyone sensitive to flashing.
+
+### Everything else
+
+- A download cut off part-way picks up where it stopped instead of starting over.
+- A Java that will not start is caught before it replaces the one you have, and the launcher says why instead of calling the archive damaged.
+- While your saved account is still signing in at startup, Play says so and waits, instead of offering to sign in or to play offline.
+- A press on the edge of a text field reaches the field, clearing Browse's search keeps the cursor in it, and the console keeps its shortcuts after a click on its toolbar.
+- Search results stop piling up on disk forever, and a few dozen smaller things got fixed along the way, as they do, you know how it is.
+
 ## [2.4.7-beta] - 2026-10-09
 
 ### Browse

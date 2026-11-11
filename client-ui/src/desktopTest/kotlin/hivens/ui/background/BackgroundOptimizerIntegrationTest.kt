@@ -77,7 +77,7 @@ class BackgroundOptimizerIntegrationTest {
         val optimizer = BackgroundOptimizer(cacheDir, CoroutineScope(Dispatchers.IO))
 
         runBlocking {
-            val caller = launch { runCatching { optimizer.optimize(src, 480) } }
+            val caller = launch { val _ = runCatching { optimizer.optimize(src, 480) } }
             // Let the encoder actually get going before pulling the rug out.
             withTimeout(30_000) { optimizer.optimizing.first { it != null } }
             delay(2_000)

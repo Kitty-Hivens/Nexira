@@ -4,7 +4,10 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.HorizontalScrollbar
 import androidx.compose.foundation.ScrollbarStyle
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.VerticalScrollbar
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.v2.ScrollbarAdapter
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -41,6 +44,18 @@ fun NxVerticalScrollbar(
     revealed: Boolean,
     modifier: Modifier = Modifier,
 ) = VerticalScrollbar(adapter = adapter, modifier = modifier, style = autoHideStyle(revealed))
+
+@Composable
+actual fun NxVerticalScrollbar(state: ScrollState, revealed: Boolean, modifier: Modifier) =
+    NxVerticalScrollbar(adapter = rememberScrollbarAdapter(state), revealed = revealed, modifier = modifier)
+
+@Composable
+actual fun NxVerticalScrollbar(state: LazyListState, revealed: Boolean, modifier: Modifier) =
+    NxVerticalScrollbar(adapter = rememberScrollbarAdapter(state), revealed = revealed, modifier = modifier)
+
+@Composable
+actual fun NxHorizontalScrollbar(state: ScrollState, revealed: Boolean, modifier: Modifier) =
+    NxHorizontalScrollbar(adapter = rememberScrollbarAdapter(state), revealed = revealed, modifier = modifier)
 
 /** [NxVerticalScrollbar] laid along the bottom edge, for content that scrolls sideways. */
 @Composable

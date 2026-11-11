@@ -74,8 +74,9 @@ fun UpdateDialog(
     val primaryFocus = remember { FocusRequester() }
     LaunchedEffect(downloadState) {
         when (downloadState) {
-            is DownloadState.Idle, is DownloadState.Ready, is DownloadState.Failed ->
-                runCatching { primaryFocus.requestFocus() }
+            is DownloadState.Idle, is DownloadState.Ready, is DownloadState.Failed -> {
+                val _ = runCatching { primaryFocus.requestFocus() }
+            }
             is DownloadState.Downloading, is DownloadState.Installing -> Unit
         }
     }

@@ -32,7 +32,7 @@ import hivens.core.api.dto.modrinth.ModrinthVersion
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackInstance
 import hivens.core.net.TransferEngine
-import hivens.launcher.instance.ContentKind
+import hivens.launcher.content.ContentKind
 import hivens.launcher.instance.InstalledContent
 import hivens.launcher.instance.InstanceContentScanner
 import hivens.launcher.modrinth.ModrinthClient
@@ -212,7 +212,7 @@ class ModPageRenderTest {
         val registry = WidgetDataRegistry().apply {
             register(Sources.OpenProject, flowSource(MutableStateFlow<OpenProject?>(railProject)))
         }
-        val families = SurfaceFamilies().apply { switch(rail, FamilyId("projectView")) }
+        val families = SurfaceFamilies().apply { switch(rail, FamilyId("projectView"), owner = Unit) }
 
         CompositionLocalProvider(
             LocalLayoutGraph provides DefaultLayout.load(),

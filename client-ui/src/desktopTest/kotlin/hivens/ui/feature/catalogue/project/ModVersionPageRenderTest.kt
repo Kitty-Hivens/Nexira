@@ -26,8 +26,10 @@ import hivens.ui.theme.NxTheme
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.serialization.json.Json
+import org.jetbrains.skia.Data
 import org.jetbrains.skia.EncodedImageFormat
 import java.nio.file.Files
+import javax.swing.SwingUtilities
 import java.nio.file.Path
 import kotlin.test.Test
 import kotlin.test.assertTrue
@@ -130,31 +132,58 @@ class ModVersionPageRenderTest {
     }
 
     @Test
-    fun `a build page draws its five sections`() {
-        val out = Path.of("build/render", "modversion-build.png")
+    fun `a build page draws its five sections`() = sheet("modversion-build.png", project(), build())
+
+    /**
+     * A fabric build offered to a NeoForge pack: still installable, since the reader
+     * came for this one, with the line under the button saying which way they step.
+     */
+    @Test
+    fun `a build that does not fit the pack says so under its install`() {
+        val project = project()
+        project.destination = ModDetailState.Destination(name = "Industrial", dir = Path.of("."), mc = "1.21.1", loader = "neoforge")
+        val build = build()
+        build.version = json.decodeFromString<List<ModrinthVersion>>(resource("iris.versions.json")).first { "fabric" in it.loaders }
+        sheet("modversion-build-misfit.png", project, build)
+    }
+
+    /** A build already in the pack: the button says where, and the page still reads as the build's own. */
+    @Test
+    fun `a build already in the pack`() {
+        val project = project()
+        project.install = InstallAction.Present("Industrial")
+        sheet("modversion-build-present.png", project, build())
+    }
+
+    private fun sheet(name: String, project: ModDetailState, build: ModVersionState) {
+        val out = Path.of("build/render", name)
         Files.createDirectories(out.parent)
-        val scene = ImageComposeScene(1160, 900, density = Density(1f)) {
-            NxTheme(dark = true) {
-                CompositionLocalProvider(LocalStrings provides RussianStrings) {
-                    Box(Modifier.fillMaxSize().background(NxColor.page).padding(14.dp)) {
-                        ModVersionBody(
-                            project = project(),
-                            build = build(),
-                            onRetry = {},
-                            modifier = Modifier.fillMaxSize(),
-                        )
+        var png: Data? = null
+        SwingUtilities.invokeAndWait {
+            val scene = ImageComposeScene(1160, 900, density = Density(1f)) {
+                NxTheme(dark = true) {
+                    CompositionLocalProvider(LocalStrings provides RussianStrings) {
+                        Box(Modifier.fillMaxSize().background(NxColor.page).padding(14.dp)) {
+                            ModVersionBody(
+                                project = project,
+                                build = build,
+                                onRetry = {},
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        }
                     }
                 }
             }
+            png = try {
+                var t = 0L
+                repeat(24) { scene.render(t).close(); t += 16_000_000L }
+                scene.render(t).encodeToData(EncodedImageFormat.PNG) ?: error("PNG encode failed")
+            } finally {
+                scene.close()
+            }
         }
-        val png = try {
-            var t = 0L
-            repeat(24) { scene.render(t).close(); t += 16_000_000L }
-            scene.render(t).encodeToData(EncodedImageFormat.PNG) ?: error("PNG encode failed")
-        } finally {
-            scene.close()
-        }
-        Files.write(out, png.bytes)
-        assertTrue(png.bytes.size > 40_000, "the page drew almost nothing (${png.bytes.size} bytes)")
+        val bytes = checkNotNull(png).bytes
+        Files.write(out, bytes)
+        assertTrue(bytes.size > 40_000, "$name drew almost nothing (${bytes.size} bytes)")
     }
 }

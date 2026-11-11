@@ -5,16 +5,16 @@ description: Common issues and how to fix them.
 
 ## Where are the logs?
 
-| | Path |
-|---|---|
-| Crash reports | `<data dir>/crash-reports/` |
-| Session logs | `<data dir>/logs/launcher.log` |
+|                | Path                                  |
+|----------------|---------------------------------------|
+| Crash reports  | `<data dir>/crash-reports/`           |
+| Session logs   | `<data dir>/logs/launcher.log`        |
 | Console output | Wrench icon in sidebar → **Copy All** |
 
 `<data dir>` is `%LOCALAPPDATA%\Nexira` (Windows), `~/Library/Application Support/Nexira` (macOS), or `$XDG_DATA_HOME/nexira` (Linux). See [Installation](/Nexira/installation/) for the full table.
 
 :::tip[Reporting a bug?]
-**Settings → Diagnostics → Create diagnostic bundle** packs redacted logs, crash reports, the action ring and system info into a single ZIP. The companion **Report on GitHub** button copies the ZIP path to clipboard and opens a pre-filled issue form. [Open a bug report directly →](https://github.com/Kitty-Hivens/Nexira/issues/new?template=bug_report.md)
+**Settings → Diagnostics → Create diagnostic bundle** packs redacted logs, crash reports, the action ring and system info into a single ZIP. The companion **Report on GitHub with bundle** button copies the ZIP path to clipboard and opens a pre-filled issue form. [Open a bug report directly →](https://github.com/Kitty-Hivens/Nexira/issues/new?template=bug_report.md)
 :::
 
 ---
@@ -61,7 +61,7 @@ The SMARTYcraft API certificate sometimes expires before the operator renews it.
 - **30 days** -- typical renewal cadence
 - **Always (100 years)** -- if you've given up on upstream's TLS hygiene
 
-Granted bypasses appear in **Settings → Network → SSL bypasses** and can be revoked at any time. Credentials are still only sent to the SMARTYcraft API, just over a connection where the certificate isn't validated.
+Granted bypasses appear in **Settings → Network → Active SSL bypasses** and can be revoked at any time. Credentials are still only sent to the SMARTYcraft API, just over a connection where the certificate isn't validated.
 
 **"Bad login" or "User not found"**
 
@@ -85,12 +85,12 @@ Normal on first launch or after a server update. The launcher verifies file inte
 
 Open the console (wrench icon → Copy All) and look for Java errors. Common causes:
 
-- Not enough RAM -- raise the memory cap in **Server Settings → RAM**
-- Incompatible optional mod -- disable mods one by one in **Server Settings → Mods**
+- Not enough RAM -- raise it in the pack's **Pack settings → Memory**
+- Incompatible mod -- disable mods one by one in the pack's **Mods**
 
 **Custom JVM flags break the launch**
 
-The **JVM args builder** (Settings → Advanced → Launch, then the builder button in a pack's or a server's settings) lets you set custom GC, JIT, CDS and JFR flags. If a configuration breaks the launch, reset to defaults from the same screen.
+The **Visual JVM args builder** (Settings → Advanced → Launch, then the builder button in a pack's settings) lets you set custom GC, JIT, CDS and JFR flags. If a configuration breaks the launch, reset to defaults from the same screen.
 
 ---
 

@@ -30,6 +30,16 @@ repositories {
     mavenCentral()
 }
 
+dependencies {
+    testImplementation(kotlin("test"))
+}
+
+// Gradle builds buildSrc without running its tests, so these run only when asked
+// for: `./gradlew -p buildSrc test`, which CI does.
+tasks.test {
+    useJUnitPlatform()
+}
+
 // Kotlin compiles this to JVM 26, the newest target it knows, while the Java side
 // follows the daemon's JDK 27. There are no Java sources here, so the Java target
 // is held to Kotlin's, which is what the plugin checks the two against.

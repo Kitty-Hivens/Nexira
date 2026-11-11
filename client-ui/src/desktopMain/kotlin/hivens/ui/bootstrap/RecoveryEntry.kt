@@ -1,6 +1,7 @@
 package hivens.ui.bootstrap
 
 import hivens.config.Storage
+import hivens.core.io.writeUtf8
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -33,7 +34,7 @@ object RecoveryEntry {
     /** Arm the next boot to enter recovery -- the in-app "restart into recovery" writes
      *  this, then relaunches; [resolve] consumes it on the fresh process. */
     fun requestOnNextBoot(dataDir: Path) {
-        runCatching { Files.writeString(dataDir.resolve(Storage.RECOVERY_REQUEST_FILE), "") }
+        val _ = runCatching { writeUtf8(dataDir.resolve(Storage.RECOVERY_REQUEST_FILE), "") }
     }
 
     /** True if the marker existed; delete it so recovery fires once, not every boot. */

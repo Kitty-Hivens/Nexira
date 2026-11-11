@@ -1,0 +1,139 @@
+package hivens.launcher.update
+
+import hivens.core.api.interfaces.IPackRepository
+import hivens.core.data.AmberUpdatePolicy
+import hivens.core.data.SettingsData
+import hivens.core.launch.InstanceWork
+import hivens.core.launch.InstanceWorkRegistry
+import hivens.core.update.PackUpdateStatus
+import hivens.core.update.PackUpdateStatusHub
+import hivens.core.update.PackUpdater
+import hivens.core.update.UpdateCheck
+import hivens.core.update.UpdateOutcome
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import org.slf4j.LoggerFactory
+
+/**
+ * Background auto-updater over every installed instance whose source can offer
+ * other builds. On a trigger (startup, or a manual "check
+ * all") it visits each mirror instance that follows latest and updates it per
+ * policy: a green (safe re-sync) update applies automatically; an amber
+ * (structural MC / loader) update applies only under
+ * [AmberUpdatePolicy.SnapshotThenApply], otherwise it is left pending. The two
+ * non-applying policies differ in what the pending state asks of the user:
+ * [AmberUpdatePolicy.Ask] expects a deliberate apply, [AmberUpdatePolicy.Hold]
+ * expects nothing, and the status carries that so ambient surfaces can show the
+ * build without demanding action.
+ *
+ * Per-instance progress is published on [statuses] so the UI can badge a card.
+ * A per-instance failure is recorded and never aborts the rest of the pass.
+ */
+class PackAutoUpdateService(
+    private val repository: IPackRepository,
+    private val updater: PackUpdater,
+    private val settingsProvider: () -> SettingsData,
+    private val work: InstanceWorkRegistry,
+    /** The pack whose game is launching or running, or null. Its files are in use. */
+    private val runningPackId: () -> String?,
+) : PackUpdateStatusHub {
+    private val log = LoggerFactory.getLogger(PackAutoUpdateService::class.java)
+    private val state = MutableStateFlow<Map<String, PackUpdateStatus>>(emptyMap())
+    override val statuses: StateFlow<Map<String, PackUpdateStatus>> = state.asStateFlow()
+
+    override fun report(id: String, status: PackUpdateStatus) = setStatus(id, status)
+
+    /** Run one pass over eligible instances. No-op when auto-update is off in settings. */
+    suspend fun runOnce() {
+        val settings = settingsProvider()
+        if (!settings.autoUpdatePacks) return
+        for (instance in repository.list()) {
+            // A capability question, not a question about where the pack came
+            // from. Asking by origin meant every source that learned to update
+            // had to be added here by hand, and one that had not been was
+            // silently never checked.
+            if (!updater.handles(instance) || !instance.followLatest) continue
+            // Not under a game that is reading these files, and not beside other work
+            // already rewriting them. Nothing is lost by skipping: the next pass asks
+            // again, and the player can apply it by hand from the pack's page.
+            if (runningPackId() == instance.id || work.workOn(instance.id) != null) {
+                log.info("auto-update: {} is in use, left for the next pass", instance.id)
+                continue
+            }
+            setStatus(instance.id, PackUpdateStatus.Checking)
+            try {
+                when (val check = updater.checkForUpdate(instance)) {
+                    UpdateCheck.UpToDate -> setStatus(instance.id, PackUpdateStatus.UpToDate)
+                    is UpdateCheck.Available -> applyOrHold(instance.id, check, settings.amberUpdatePolicy)
+                }
+            } catch (e: CancellationException) {
+                // The pass being cancelled is not a per-pack failure: badging every
+                // instance Failed and carrying on to the next one is how a shutdown
+                // turned into a screen of red packs and a round of network work
+                // nobody asked for.
+                throw e
+            } catch (_: InstanceRemovedException) {
+                // Deleted while the pass was on it. Nothing failed, and there is no
+                // card left to badge.
+                log.info("auto-update: {} was removed during the pass", instance.id)
+                state.update { it - instance.id }
+            } catch (e: Exception) {
+                log.warn("auto-update: failed for {}", instance.id, e)
+                setStatus(instance.id, PackUpdateStatus.Failed(e.message ?: e.toString()))
+            }
+        }
+    }
+
+    private suspend fun applyOrHold(id: String, check: UpdateCheck.Available, amber: AmberUpdatePolicy) {
+        val autoApply = check.compat.isSafe || amber == AmberUpdatePolicy.SnapshotThenApply
+        if (!autoApply) {
+            setStatus(
+                id,
+                PackUpdateStatus.Pending(
+                    check.toVersion,
+                    check.direction,
+                    check.compat,
+                    held = amber == AmberUpdatePolicy.Hold,
+                ),
+            )
+            return
+        }
+        val instance = repository.get(id) ?: return
+        // Taken in one step and only now, with the build known. The look at the start
+        // of the pass is a seconds-old answer by here, after a network round trip:
+        // a Play or a catalogue install accepted in between found the pack free and
+        // ran beside this, and a launch's roster sweep against the old baseline could
+        // delete the jars the update had just put in. The running game is asked again
+        // after the mark is up, the order a launch asks the two in reversed, so one of
+        // the two always sees the other.
+        val mark = when (val c = work.claim(id, InstanceWork.Update)) {
+            is InstanceWorkRegistry.Claim.Held -> c.mark
+            is InstanceWorkRegistry.Claim.Taken -> {
+                log.info("auto-update: {} became busy ({}), left for the next pass", id, c.by)
+                setStatus(id, PackUpdateStatus.Pending(check.toVersion, check.direction, check.compat, held = false))
+                return
+            }
+        }
+        val status = try {
+            if (runningPackId() == id) {
+                log.info("auto-update: {} was launched meanwhile, left for the next pass", id)
+                PackUpdateStatus.Pending(check.toVersion, check.direction, check.compat, held = false)
+            } else {
+                when (updater.applyUpdate(instance)) {
+                    is UpdateOutcome.Applied -> PackUpdateStatus.Updated(check.toVersion)
+                    UpdateOutcome.AlreadyCurrent -> PackUpdateStatus.UpToDate
+                }
+            }
+        } finally {
+            mark.release()
+        }
+        setStatus(id, status)
+    }
+
+    private fun setStatus(id: String, status: PackUpdateStatus) {
+        state.update { it + (id to status) }
+    }
+}

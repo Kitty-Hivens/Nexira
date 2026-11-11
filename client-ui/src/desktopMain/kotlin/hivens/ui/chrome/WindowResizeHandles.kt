@@ -1,6 +1,7 @@
 package hivens.ui.chrome
 
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -12,85 +13,75 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.awt.ComposeWindow
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.WindowPlacement
-import androidx.compose.ui.window.WindowPosition
-import androidx.compose.ui.window.WindowState
+import hivens.window.WindowEdge
+import hivens.window.WindowHost
+import hivens.window.resizedBounds
 import java.awt.Cursor
+import java.awt.MouseInfo
 
 /**
  * Edge/corner resize grips for the undecorated window -- undecorated drops the
- * native resize border, so we synthesize 8 thin hit-zones that mutate
- * [WindowState.size] / [WindowState.position]. Clamped to [minSize]; stand down
- * when [maximized] (a maximized window is not resizable -- our manual maximize
- * keeps placement=Floating, so this flag, not placement, is the real gate).
+ * native resize border, so we synthesize 8 thin hit-zones. Stand down when
+ * [maximized] (a maximized window is not resizable) and when [canResize] says the
+ * window manager does not allow it (see [WindowCapabilities]): there it owns the
+ * size, and grips would let the user drag against it.
+ *
+ * A grip resizes the frame from where the pointer is on the screen relative to
+ * where it was pressed. Not from the drag
+ * delta Compose reports: that is measured inside the grip, and the grip moves
+ * with the edge it resizes, so each step was measured against a frame the last
+ * step had already moved, and the edge jittered back and forth behind the
+ * pointer. The frame is set directly rather than through Compose's window state,
+ * which would cost a recomposition per mouse step; the state follows the frame
+ * on its own.
+ *
+ * A side stops at the frame's own minimum size, read at the press: the one
+ * [WindowHost.keepMinimumSize] cut to the screen the window is on, not the shell's
+ * design minimum, which on a small screen is taller than the screen.
+ *
+ * Where the window manager takes resizes over ([WindowHost.beginResize]) a press
+ * on a grip hands it the resize instead.
  *
  * Best-effort under Wayland/XWayland: AWT setBounds is honored but the compositor
  * owns the surface, so a fast drag can lag. Overlay this LAST so the grips sit
  * above content; the 6dp band is small enough not to steal edge clicks.
  */
 @Composable
-fun WindowResizeHandles(
-    state: WindowState,
-    minSize: DpSize,
+internal fun WindowResizeHandles(
+    window: ComposeWindow?,
+    host: WindowHost,
     maximized: Boolean,
+    canResize: Boolean,
     modifier: Modifier = Modifier,
     thickness: Dp = 6.dp,
 ) {
-    // On a tiling WM the compositor owns sizing (and may fullscreen the surface
-    // without ever setting placement=Maximized) -- client-side grips would let
-    // the user drag-resize a tiled/fullscreen window. Leave resizing to the WM.
-    if (IS_TILING_WM) return
+    if (!canResize || window == null) return
     if (maximized) return
-    if (state.placement != WindowPlacement.Floating) return
-    val density = LocalDensity.current
     Box(modifier.fillMaxSize()) {
         // Edges first, then corners -- corners win where they overlap an edge.
-        Grip(ResizeEdge.N, Alignment.TopCenter, state, minSize, density, thickness)
-        Grip(ResizeEdge.S, Alignment.BottomCenter, state, minSize, density, thickness)
-        Grip(ResizeEdge.W, Alignment.CenterStart, state, minSize, density, thickness)
-        Grip(ResizeEdge.E, Alignment.CenterEnd, state, minSize, density, thickness)
-        Grip(ResizeEdge.NW, Alignment.TopStart, state, minSize, density, thickness)
-        Grip(ResizeEdge.NE, Alignment.TopEnd, state, minSize, density, thickness)
-        Grip(ResizeEdge.SW, Alignment.BottomStart, state, minSize, density, thickness)
-        Grip(ResizeEdge.SE, Alignment.BottomEnd, state, minSize, density, thickness)
+        Grip(WindowEdge.N, Alignment.TopCenter, window, host, thickness)
+        Grip(WindowEdge.S, Alignment.BottomCenter, window, host, thickness)
+        Grip(WindowEdge.W, Alignment.CenterStart, window, host, thickness)
+        Grip(WindowEdge.E, Alignment.CenterEnd, window, host, thickness)
+        Grip(WindowEdge.NW, Alignment.TopStart, window, host, thickness)
+        Grip(WindowEdge.NE, Alignment.TopEnd, window, host, thickness)
+        Grip(WindowEdge.SW, Alignment.BottomStart, window, host, thickness)
+        Grip(WindowEdge.SE, Alignment.BottomEnd, window, host, thickness)
     }
-}
-
-private enum class ResizeEdge(
-    val left: Boolean,
-    val top: Boolean,
-    val right: Boolean,
-    val bottom: Boolean,
-    val cursor: Int,
-) {
-    W(true, false, false, false, Cursor.W_RESIZE_CURSOR),
-    E(false, false, true, false, Cursor.E_RESIZE_CURSOR),
-    N(false, true, false, false, Cursor.N_RESIZE_CURSOR),
-    S(false, false, false, true, Cursor.S_RESIZE_CURSOR),
-    NW(true, true, false, false, Cursor.NW_RESIZE_CURSOR),
-    NE(false, true, true, false, Cursor.NE_RESIZE_CURSOR),
-    SW(true, false, false, true, Cursor.SW_RESIZE_CURSOR),
-    SE(false, false, true, true, Cursor.SE_RESIZE_CURSOR);
-
-    val isCorner: Boolean get() = (left || right) && (top || bottom)
 }
 
 @Composable
 private fun BoxScope.Grip(
-    edge: ResizeEdge,
+    edge: WindowEdge,
     align: Alignment,
-    state: WindowState,
-    minSize: DpSize,
-    density: Density,
+    window: ComposeWindow,
+    host: WindowHost,
     thickness: Dp,
 ) {
     val sizeMod = when {
@@ -103,39 +94,21 @@ private fun BoxScope.Grip(
             .align(align)
             .then(sizeMod)
             .pointerHoverIcon(PointerIcon(Cursor.getPredefinedCursor(edge.cursor)))
-            .pointerInput(edge) {
-                detectDragGestures { change, drag ->
-                    change.consume()
-                    applyResize(edge, drag, state, minSize, density)
+            .pointerInput(edge, window) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val down = awaitFirstDown()
+                        if (host.beginResize(edge)) continue
+                        val startMouse = MouseInfo.getPointerInfo()?.location ?: continue
+                        val start = window.bounds
+                        val min = window.minimumSize
+                        drag(down.id) { change ->
+                            change.consume()
+                            val now = MouseInfo.getPointerInfo()?.location ?: return@drag
+                            window.bounds = resizedBounds(start, edge, now.x - startMouse.x, now.y - startMouse.y, min.width, min.height)
+                        }
+                    }
                 }
             },
     )
-}
-
-private fun applyResize(edge: ResizeEdge, drag: Offset, state: WindowState, minSize: DpSize, density: Density) {
-    val dx = with(density) { drag.x.toDp() }
-    val dy = with(density) { drag.y.toDp() }
-    var w = state.size.width
-    var h = state.size.height
-    val absPos = state.position as? WindowPosition.Absolute
-    val canMove = absPos != null
-    var x = absPos?.x ?: 0.dp
-    var y = absPos?.y ?: 0.dp
-
-    if (edge.right) w += dx
-    if (edge.bottom) h += dy
-    if (edge.left) { w -= dx; if (canMove) x += dx }
-    if (edge.top) { h -= dy; if (canMove) y += dy }
-
-    if (w < minSize.width) {
-        if (edge.left && canMove) x -= (minSize.width - w)
-        w = minSize.width
-    }
-    if (h < minSize.height) {
-        if (edge.top && canMove) y -= (minSize.height - h)
-        h = minSize.height
-    }
-
-    state.size = DpSize(w, h)
-    if ((edge.left || edge.top) && canMove) state.position = WindowPosition(x, y)
 }

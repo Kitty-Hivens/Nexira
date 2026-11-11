@@ -3,6 +3,17 @@ title: Wayland-Native — investigation notes
 description: Current state of Wayland support in Nexira and a roadmap for going from "XWayland-fallback" to "Wayland-native".
 ---
 
+## ── Status as of 2026-11-11 ─────────────────────────────────────────────────
+
+The sections below are the investigation as it was written in May 2026, kept as a record. Since then:
+
+- The JetBrains Runtime was dropped in 2.2.16. The launcher ships on Liberica, which has no Wayland toolkit at all.
+- The trial infrastructure described below is gone: the `AURA_WAYLAND_TRIAL` switch, the trial AppImage workflow and the probe script.
+- The tray moved from dorkbox/SystemTray to libtray, which speaks StatusNotifierItem over D-Bus.
+- The blocker has not moved. Skiko gets its surface through JAWT, which hands out only an X11 one, so a Compose window cannot draw under JBR's WLToolkit. Public reports against Compose 1.11.1 and Skiko 0.144.6 still end in the same `Can't lock DrawingSurface`.
+
+The launcher runs as an XWayland client and waits for upstream: a Wayland toolkit in mainline OpenJDK, or Skiko drawing on one.
+
 ## ── Status as of 2026-05-12 ─────────────────────────────────────────────────
 
 Nexira ships today as an **XWayland client**, not a native Wayland
@@ -60,19 +71,19 @@ Inventory of X11-specific assumptions in our code:
 
 ### `client-ui/src/desktopMain/kotlin/hivens/ui/Main.kt`
 
-| Lines | Code | Wayland behaviour |
-|-------|------|-------------------|
-| 121-137 | `setLinuxXToolkitAppClassName` reflects into `sun.awt.X11.XToolkit.awtAppClassName` | `Class.forName("sun.awt.X11.XToolkit")` succeeds (class is on the classpath) but on `WLToolkit` the field assignment has zero effect — `xdg-shell` `app_id` is set elsewhere. **Silent no-op**. |
-| 437-446 | `isAlwaysOnTop = true → toFront → requestFocus → false` raise trick | X11-specific behaviour: under Wayland compositors raise is gated by `xdg-activation-v1` or compositor policy, often refused entirely (Hyprland by default, GNOME without focus stealing prevention). The pulse trick may visibly flicker `always-on-top` without producing a raise. |
+| Lines   | Code                                                                                | Wayland behaviour                                                                                                                                                                                                                                                                   |
+|---------|-------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 121-137 | `setLinuxXToolkitAppClassName` reflects into `sun.awt.X11.XToolkit.awtAppClassName` | `Class.forName("sun.awt.X11.XToolkit")` succeeds (class is on the classpath) but on `WLToolkit` the field assignment has zero effect — `xdg-shell` `app_id` is set elsewhere. **Silent no-op**.                                                                                     |
+| 437-446 | `isAlwaysOnTop = true → toFront → requestFocus → false` raise trick                 | X11-specific behaviour: under Wayland compositors raise is gated by `xdg-activation-v1` or compositor policy, often refused entirely (Hyprland by default, GNOME without focus stealing prevention). The pulse trick may visibly flicker `always-on-top` without producing a raise. |
 
 ### `client-ui/src/desktopMain/kotlin/hivens/ui/build.gradle.kts`
 
-| Line | Flag | Wayland relevance |
-|------|------|-------------------|
-| 179 | `-Dawt.appClassName=Nexira` | JBR-only; ignored under `WLToolkit`. JBR sets `app_id` differently for Wayland — likely needs a new mechanism. |
-| 180 | `--add-opens=java.desktop/sun.awt.X11=ALL-UNNAMED` | Harmless no-op on Wayland (the package exists but our reflection target doesn't apply). |
-| 184 | `-D_JAVA_AWT_WM_NONREPARENTING=1` | X11-specific Mutter workaround. Harmless under Wayland. |
-| 185 | `-Drobot.need_x11=false` | Hint for `Robot` class init under headless / X11. Wayland Robot uses its own portal-based path. Harmless. |
+| Line | Flag                                               | Wayland relevance                                                                                              |
+|------|----------------------------------------------------|----------------------------------------------------------------------------------------------------------------|
+| 179  | `-Dawt.appClassName=Nexira`                        | JBR-only; ignored under `WLToolkit`. JBR sets `app_id` differently for Wayland — likely needs a new mechanism. |
+| 180  | `--add-opens=java.desktop/sun.awt.X11=ALL-UNNAMED` | Harmless no-op on Wayland (the package exists but our reflection target doesn't apply).                        |
+| 184  | `-D_JAVA_AWT_WM_NONREPARENTING=1`                  | X11-specific Mutter workaround. Harmless under Wayland.                                                        |
+| 185  | `-Drobot.need_x11=false`                           | Hint for `Robot` class init under headless / X11. Wayland Robot uses its own portal-based path. Harmless.      |
 
 ### `client-ui/.../tray/TrayManager.kt`
 
@@ -116,10 +127,10 @@ the following on the user's machine (Arch + Hyprland Wayland session):
 
 **System Liberica JDK 25** (`/usr/bin/java`, OpenJDK 25.0.3):
 
-| Mode | `Toolkit.getDefaultToolkit().getClass().getName()` |
-|------|---------------------------------------------------|
-| auto | `sun.awt.X11.XToolkit` |
-| `-Dawt.toolkit.name=XToolkit` | `sun.awt.X11.XToolkit` |
+| Mode                           | `Toolkit.getDefaultToolkit().getClass().getName()`   |
+|--------------------------------|------------------------------------------------------|
+| auto                           | `sun.awt.X11.XToolkit`                               |
+| `-Dawt.toolkit.name=XToolkit`  | `sun.awt.X11.XToolkit`                               |
 | `-Dawt.toolkit.name=WLToolkit` | `sun.awt.X11.XToolkit` (silently ignored — no class) |
 
 Confirms upstream OpenJDK forks (Liberica, Temurin, Adoptium) **do not
@@ -127,11 +138,11 @@ ship `WLToolkit`** even on JDK 25 / Wayland session.
 
 **Bundled JBR from the v2.2.11 AppImage** (`JBR-25.0.2+10-432.48-nomod`):
 
-| Mode | `Toolkit.getDefaultToolkit().getClass().getName()` |
-|------|---------------------------------------------------|
-| auto (Wayland session) | `sun.awt.X11.XToolkit` — JBR does **not** auto-pick WLToolkit |
-| `-Dawt.toolkit.name=XToolkit` | `sun.awt.X11.XToolkit` |
-| `-Dawt.toolkit.name=WLToolkit` | `sun.awt.wl.WLToolkit` ← **native Wayland reachable** |
+| Mode                           | `Toolkit.getDefaultToolkit().getClass().getName()`            |
+|--------------------------------|---------------------------------------------------------------|
+| auto (Wayland session)         | `sun.awt.X11.XToolkit` — JBR does **not** auto-pick WLToolkit |
+| `-Dawt.toolkit.name=XToolkit`  | `sun.awt.X11.XToolkit`                                        |
+| `-Dawt.toolkit.name=WLToolkit` | `sun.awt.wl.WLToolkit` ← **native Wayland reachable**         |
 
 Two important corollaries:
 
@@ -238,13 +249,13 @@ expose a `sun.awt.wl.*` analogue of the X11 GLX surface that
 
 `skiko-awt-0.144.6.jar` ships these renderer backends:
 
-| Class | API | Platform target |
-|-------|-----|-----------------|
-| `LinuxOpenGLRedrawer` | OpenGL via GLX | X11 only |
-| `LinuxSoftwareRedrawer` | CPU pixmap | Linux generic |
-| `WindowsOpenGLRedrawer` / `Direct3DRedrawer` / `AngleRedrawer` | GL / D3D11 / ANGLE | Windows |
-| `MetalRedrawer` | Metal | macOS |
-| `SoftwareRedrawer` | CPU | any |
+| Class                                                          | API                | Platform target |
+|----------------------------------------------------------------|--------------------|-----------------|
+| `LinuxOpenGLRedrawer`                                          | OpenGL via GLX     | X11 only        |
+| `LinuxSoftwareRedrawer`                                        | CPU pixmap         | Linux generic   |
+| `WindowsOpenGLRedrawer` / `Direct3DRedrawer` / `AngleRedrawer` | GL / D3D11 / ANGLE | Windows         |
+| `MetalRedrawer`                                                | Metal              | macOS           |
+| `SoftwareRedrawer`                                             | CPU                | any             |
 
 Notably absent: `LinuxVulkanRedrawer`, `LinuxWaylandRedrawer`,
 `WaylandRedrawer`, any `Vulkan*Redrawer`.

@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+
+    <application
+        android:name=".NexiraApp"
+        android:label="Nexira"
+        android:allowBackup="false"
+        android:allowNativeHeapPointerTagging="false">
+
+
+        <activity
+            android:name=".NexiraActivity"
+            android:exported="true"
+            android:theme="@android:style/Theme.DeviceDefault.NoActionBar"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|keyboard|navigation|uiMode|density|locale|layoutDirection"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- The game's window: one surface, the game draws into it from its own process. One screen in a task of its own, so the notification comes back to it instead of opening a second. -->
+        <activity
+            android:name=".host.GameActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity="dev.hivens.nexira.game"
+            android:theme="@android:style/Theme.DeviceDefault.NoActionBar.Fullscreen"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|keyboard|navigation|uiMode|density|locale|layoutDirection"
+            android:screenOrientation="sensorLandscape"
+            android:windowSoftInputMode="adjustNothing|stateHidden" />
+
+        <!-- The game's JVM lives here, in a process of its own: it is one per process and cannot be made again. -->
+        <service
+            android:name=".host.GameService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse"
+            android:process=":jvm">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Keeps a running game alive while its screen is not in front" />
+        </service>
+
+        <service
+            android:name=".PlaybackService"
+            android:exported="true"
+            android:foregroundServiceType="mediaPlayback">
+            <intent-filter>
+                <action android:name="androidx.media3.session.MediaSessionService" />
+            </intent-filter>
+        </service>
+    </application>
+</manifest>

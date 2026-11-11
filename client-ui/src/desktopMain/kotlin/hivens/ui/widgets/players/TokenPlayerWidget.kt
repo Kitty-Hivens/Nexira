@@ -238,9 +238,10 @@ internal fun TokenPlayerCard(
                 }
 
                 val middle = side * MIDDLE_SHARE
-                if (showCover && track?.artwork != null) {
+                val artwork = track?.artwork
+                if (showCover && artwork != null) {
                     Image(
-                        bitmap             = track.artwork,
+                        bitmap             = artwork,
                         contentDescription = null,
                         contentScale       = ContentScale.Crop,
                         modifier           = Modifier.size(middle).clip(CircleShape),

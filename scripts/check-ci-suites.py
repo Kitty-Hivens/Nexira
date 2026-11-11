@@ -43,6 +43,7 @@ def module_suites() -> dict[str, tuple[str, int]]:
     out: dict[str, tuple[str, int]] = {}
     for module in source_dirs(ROOT):
         rel = module.relative_to(ROOT).as_posix()
+        # buildSrc runs as a build of its own, see BUILD_LOGIC_RUN.
         if rel == "buildSrc":
             continue
         src = module / "src"
@@ -60,6 +61,24 @@ def module_suites() -> dict[str, tuple[str, int]]:
         if count:
             out[":" + rel.replace("/", ":")] = (task, count)
     return out
+
+
+# buildSrc's suite cannot be named from the root build, so the workflow runs it on
+# its own line, and this is the line it has to have.
+BUILD_LOGIC_RUN = "./gradlew -p buildSrc test"
+
+
+def build_logic_unrun() -> bool:
+    tests = ROOT / "buildSrc" / "src" / "test"
+    if not tests.is_dir():
+        return False
+    has_tests = any(
+        TEST_MARKER.search(f.read_text(encoding="utf-8", errors="replace"))
+        for f in tests.rglob("*")
+        if f.suffix in SOURCE_EXTS and f.is_file()
+    )
+    listed = WORKFLOW.is_file() and BUILD_LOGIC_RUN in WORKFLOW.read_text(encoding="utf-8")
+    return has_tests and not listed
 
 
 def workflow_tasks() -> set[str]:
@@ -85,7 +104,9 @@ def main() -> int:
     known = {f"{p}:{v[0]}" for p, v in suites.items()}
     stale = sorted(t for t in listed if t not in known)
 
-    if not missing and not stale:
+    build_logic = build_logic_unrun()
+
+    if not missing and not stale and not build_logic:
         total = sum(count for _, count in suites.values())
         print(f"check-ci-suites: {len(suites)} module suites, {total} tests, all in the matrix.")
         return 0
@@ -94,6 +115,8 @@ def main() -> int:
         print(f"[unrun] {path}:{task} has {count} test(s) and is not in {WORKFLOW.name}")
     for task in stale:
         print(f"[stale] {task} is listed in {WORKFLOW.name} but that module has no tests")
+    if build_logic:
+        print(f"[unrun] buildSrc has tests and {WORKFLOW.name} has no '{BUILD_LOGIC_RUN}' step")
     return 1 if args.strict else 0
 
 

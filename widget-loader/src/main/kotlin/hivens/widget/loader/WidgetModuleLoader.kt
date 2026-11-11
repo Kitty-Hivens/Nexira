@@ -1,15 +1,21 @@
 package hivens.widget.loader
 
+import hivens.widget.api.ModuleContribution
+import hivens.widget.api.ModuleStrings
+import hivens.widget.api.ScreenEffect
 import hivens.widget.api.WidgetApi
 import hivens.widget.api.WidgetDescriptor
 import hivens.widget.api.WidgetRegistry
 import hivens.widget.api.widgetPropsJson
+import hivens.widget.model.WidgetKind
 import org.slf4j.LoggerFactory
+import java.io.InputStreamReader
 import java.net.URLClassLoader
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
+import java.util.Properties
 import java.util.ServiceLoader
 import java.util.jar.JarFile
 
@@ -31,7 +37,14 @@ data class LoadedWidgetModule(
     val file: Path,
     val registry: WidgetRegistry,
     val loader: URLClassLoader,
-) : WidgetModuleResult
+    /** What it adds besides widgets: effects, themes, particle fields. None for a module that only has widgets. */
+    val contributions: List<ModuleContribution> = emptyList(),
+    /** The words it brought, per language, for what it declares for a person to read. */
+    val strings: ModuleStrings = ModuleStrings.EMPTY,
+) : WidgetModuleResult {
+    /** The screen effects among [contributions]. */
+    val effects: List<ScreenEffect> get() = contributions.filterIsInstance<ScreenEffect>()
+}
 
 /**
  * A module the caller asked not to load. Its manifest was read, so it can be named
@@ -90,6 +103,7 @@ class WidgetModuleLoader(
     private val parent: ClassLoader = WidgetModuleLoader::class.java.classLoader,
     private val shadowDir: Path? = null,
     private val disabled: Set<String> = emptySet(),
+    private val contributionKinds: List<Class<out ModuleContribution>> = ModuleContribution.kinds,
 ) {
 
     private val log = LoggerFactory.getLogger(WidgetModuleLoader::class.java)
@@ -118,7 +132,17 @@ class WidgetModuleLoader(
         val off = mutableListOf<DisabledWidgetModule>()
         jars.forEach { jar ->
             when (val result = load(jar)) {
-                is LoadedWidgetModule -> loaded += result
+                is LoadedWidgetModule -> {
+                    val first = loaded.firstOrNull { it.id == result.id }
+                    if (first == null) {
+                        loaded += result
+                    } else {
+                        // Settings, the on and off switch and the crash record are all kept by id, so
+                        // two jars sharing one would be switched and set as a single module.
+                        result.loader.release()
+                        rejected += RejectedWidgetModule(jar, "its id '${result.id}' is already carried by ${first.file.fileName}")
+                    }
+                }
                 is RejectedWidgetModule -> rejected += result
                 is DisabledWidgetModule -> off += result
             }
@@ -180,17 +204,38 @@ class WidgetModuleLoader(
             return RejectedWidgetModule(jar, "could not instantiate its registry: ${it.message}")
         }
 
-        return when (registries.size) {
-            0 -> {
+        val contributions = mutableListOf<ModuleContribution>()
+        val byKind = mutableListOf<List<ModuleContribution>>()
+        contributionKinds.forEach { kind ->
+            val found = runCatching {
+                ServiceLoader.load(kind, loader).filter { it.javaClass.classLoader === loader }
+            }.getOrElse {
                 loader.release()
-                RejectedWidgetModule(jar, "declares the widget API but carries no registry service")
+                return RejectedWidgetModule(jar, "could not instantiate its ${kind.simpleName} services: ${it.message}")
             }
-            1 -> {
+            byKind += found
+            contributions += found
+        }
+
+        return when {
+            // A module may carry nothing but effects: it is a module all the same, with no widgets.
+            registries.isEmpty() && contributions.isEmpty() -> {
+                loader.release()
+                RejectedWidgetModule(jar, "declares the widget API but carries neither a registry nor a contribution service")
+            }
+            registries.size > 1 -> {
+                // The processor emits exactly one per module. More than one means a
+                // hand-assembled or merged jar, where which registry wins is not
+                // something this can decide for the author.
+                loader.release()
+                RejectedWidgetModule(jar, "carries ${registries.size} registries; a module must carry one")
+            }
+            else -> {
                 // Listed once here, where a failure is this module's alone. Everything
                 // downstream reads the list outside any guard, building the registry
                 // the whole shell resolves from, so a registry that throws there took
                 // the shell down on every start instead of being refused by name.
-                val registry = registries.single()
+                val registry = registries.singleOrNull() ?: NoWidgets
                 val listed = runCatching { registry.all().values.toList() }.getOrElse {
                     loader.release()
                     return RejectedWidgetModule(jar, "its registry failed to list its widgets: ${it.message ?: it.javaClass.simpleName}")
@@ -202,16 +247,41 @@ class WidgetModuleLoader(
                     loader.release()
                     return RejectedWidgetModule(jar, fault)
                 }
-                LoadedWidgetModule(id, name, jar, registry, loader)
-            }
-            // The processor emits exactly one per module. More than one means a
-            // hand-assembled or merged jar, where which registry wins is not
-            // something this can decide for the author.
-            else -> {
-                loader.release()
-                RejectedWidgetModule(jar, "carries ${registries.size} registries; a module must carry one")
+                byKind.firstNotNullOfOrNull { ModuleContribution.faultIn(it) { read -> guarded(read) } }?.let { fault ->
+                    loader.release()
+                    return RejectedWidgetModule(jar, fault)
+                }
+                LoadedWidgetModule(id, name, jar, registry, loader, contributions, readStrings(opened, id))
             }
         }
+    }
+
+    /**
+     * The language files of a module: every `i18n/<tag>.properties` in its jar, read from the jar
+     * itself so the launcher's own resources, which a parent-first loader would answer with, never
+     * stand in for them. A file that cannot be read costs the module that language and nothing more.
+     */
+    private fun readStrings(jar: Path, id: String): ModuleStrings {
+        val tables = HashMap<String, Map<String, String>>()
+        runCatching {
+            JarFile(jar.toFile()).use { file ->
+                file.entries().asSequence().forEach { entry ->
+                    val tag = STRINGS_FILE.matchEntire(entry.name)?.groupValues?.get(1) ?: return@forEach
+                    runCatching {
+                        val properties = Properties()
+                        InputStreamReader(file.getInputStream(entry), Charsets.UTF_8).use { properties.load(it) }
+                        tables[tag] = properties.stringPropertyNames().associateWith { properties.getProperty(it) }
+                    }.onFailure { log.warn("Widget module '{}' has an unreadable language file {}: {}", id, entry.name, it.message) }
+                }
+            }
+        }.onFailure { log.warn("Widget module '{}' language files could not be read: {}", id, it.message) }
+        return if (tables.isEmpty()) ModuleStrings.EMPTY else ModuleStrings(tables)
+    }
+
+    /** What a module with no widgets contributes to the registry. */
+    private object NoWidgets : WidgetRegistry {
+        override fun all(): Map<WidgetKind, WidgetDescriptor> = emptyMap()
+        override fun get(kind: WidgetKind): WidgetDescriptor? = null
     }
 
     /**
@@ -287,6 +357,8 @@ class WidgetModuleLoader(
     companion object {
         /** What a module's class loader is named, ahead of the module's id. */
         const val LOADER_PREFIX = "widget-module:"
+
+        private val STRINGS_FILE = Regex("""i18n/([A-Za-z][A-Za-z0-9_-]*)\.properties""")
 
         /**
          * The module whose code is on [error]'s stack, or null when none is.

@@ -22,7 +22,7 @@ concurrency:
 jobs:
   tag:
     name: Cut nightly tag
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - name: Checkout dev
         uses: actions/checkout@v7

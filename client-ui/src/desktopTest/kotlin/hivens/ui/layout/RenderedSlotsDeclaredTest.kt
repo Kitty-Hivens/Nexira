@@ -18,7 +18,7 @@ import kotlin.test.assertTrue
  */
 class RenderedSlotsDeclaredTest {
 
-    private val sourceRoot = File("src/desktopMain/kotlin")
+    private val sourceRoots = listOf("jvmSharedMain", "desktopMain", "androidMain").map { File("src/$it/kotlin") }
 
     // SlotRenderer(SurfaceId("x") or SurfaceId(CONST), SlotId("y"), ...). A surface
     // held in a variable (a made screen, the rail's live family) is left out: its
@@ -27,7 +27,7 @@ class RenderedSlotsDeclaredTest {
     private val constant = Regex("""const\s+val\s+([A-Z_][A-Z0-9_]*)\s*=\s*"([^"]+)"""")
 
     private fun renderedSlots(): Set<Pair<String, String>> =
-        sourceRoot.walkTopDown()
+        sourceRoots.asSequence().flatMap { it.walkTopDown() }
             .filter { it.isFile && it.extension == "kt" }
             .flatMap { file ->
                 val text = file.readText()
@@ -41,7 +41,7 @@ class RenderedSlotsDeclaredTest {
 
     @Test
     fun `the sources are where this test reads them`() {
-        assertTrue(sourceRoot.isDirectory, "expected the desktop sources at ${sourceRoot.absolutePath}")
+        sourceRoots.forEach { assertTrue(it.isDirectory, "expected sources at ${it.absolutePath}") }
         assertTrue(renderedSlots().isNotEmpty(), "no SlotRenderer call was recognised, so the check below proves nothing")
     }
 

@@ -12,6 +12,7 @@ plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.compose)
     alias(libs.plugins.kotlin.compose.compiler)
+    alias(libs.plugins.android.kmp.library)
 }
 
 group = "hivens"
@@ -24,8 +25,22 @@ kotlin {
     // matches the JDK 27 leaf modules instead of falling back to the daemon JVM.
     jvmToolchain(27)
     jvm("desktop")
+    android {
+        namespace = "hivens.ui.easter"
+        compileSdk = providers.gradleProperty("nexira.android.compileSdk").map(String::toInt).getOrElse(37)
+        minSdk = 31
+        compilerOptions {
+            jvmTarget.set(JvmTarget.JVM_25)
+        }
+    }
 
     sourceSets {
+        val jvmSharedMain = create("jvmSharedMain") {
+            dependsOn(getByName("commonMain"))
+        }
+        getByName("desktopMain").dependsOn(jvmSharedMain)
+        getByName("androidMain").dependsOn(jvmSharedMain)
+
         getByName("commonMain") {
             dependencies {
                 implementation(libs.compose.runtime)
@@ -36,7 +51,7 @@ kotlin {
             }
         }
 
-        getByName("desktopMain") {
+        getByName("jvmSharedMain") {
             dependencies {
                 implementation(project(":nx-ui"))
                 implementation(project(":client-i18n"))
@@ -54,7 +69,7 @@ kotlin {
 
 // jvmTarget is also forced project-wide by the root subprojects {} block; set it
 // explicitly here too, matching nx-ui, so the module is correct in isolation.
-tasks.withType<KotlinJvmCompile>().configureEach {
+tasks.withType<KotlinJvmCompile>().matching { !it.name.contains("Android") }.configureEach {
     compilerOptions {
         jvmTarget.set(JvmTarget.JVM_27)
     }

@@ -1,0 +1,270 @@
+package hivens.ui.screens.settings
+
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import hivens.config.Branding
+import hivens.core.api.interfaces.ISettingsService
+import hivens.launcher.diag.DiagnosticBundle
+import hivens.launcher.diag.IssueReporter
+import hivens.ui.platform.rememberHostActions
+import hivens.launcher.platform.PlatformPaths
+import hivens.ui.diag.RenderBackend
+import hivens.ui.diag.reportPrompts
+import hivens.ui.easter.LocalAprilFools
+import hivens.ui.flexible.Flexible
+import hivens.ui.flexible.FlexibleKind
+import hivens.ui.i18n.LocalStrings
+import hivens.ui.nx.NxButton
+import hivens.ui.nx.NxButtonStyle
+import hivens.ui.nx.NxNavRow
+import hivens.ui.nx.NxSection
+import hivens.ui.icons.NxIcon
+import hivens.ui.platform.SystemActions
+import hivens.ui.puppet.PuppetClick
+import java.nio.file.Path
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.yield
+import org.koin.compose.koinInject
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.Status
+
+/**
+ * Beacon diagnostic surface + About link.
+ *
+ * Diagnostics plane: open logs / crash-reports folders, generate a redacted
+ * diagnostic bundle ZIP (lazy-busy gated so a double-tap doesn't fire two parallel
+ * writes), and after one exists, open the GitHub issue template prefilled with bundle
+ * metadata. Each button goes through the Flexible event layer -- the April Fools
+ * chaos event intercepts during the Apr 1-14 window, otherwise it renders as a
+ * plain button.
+ *
+ * Hidden gesture: tap the DIAGNOSTICS section title 5 times to reveal the AprilFools
+ * debug panel; tap 5 more to hide it. Lets dev exercise the chaos layer without
+ * changing the system date.
+ *
+ * About link at the bottom: a standalone shortcut to the AboutScreen, self-describing
+ * with version + license, so it carries no section header of its own.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+internal fun DiagnosticsSection(
+    paths: PlatformPaths,
+    onOpenAbout: () -> Unit,
+) {
+    val s  = LocalStrings.current
+    val af = LocalAprilFools.current
+    val host = rememberHostActions()
+    // Read at bundle time rather than composition time: recovery can switch a
+    // module off mid-session, and the bundle should say what is off now.
+    val settingsService: ISettingsService = koinInject()
+    val disabledModules = { settingsService.getSettings().disabledModules }
+
+    // April Fools debug panel -- secret unlock. Only wire the 5-tap gesture when the
+    // active impl actually renders a panel: a build that resolves the NoOp has an
+    // empty DebugPanel(), and a 5-tap there would toggle a hidden state that renders
+    // to nothing.
+    var debugTapCount  by remember { mutableStateOf(0) }
+    var showAprilDebug by remember { mutableStateOf(false) }
+    val debugPanelBringIntoView = remember { BringIntoViewRequester() }
+    val titleModifier = if (af.providesDebugPanel) {
+        Modifier.clickable {
+            debugTapCount++
+            if (debugTapCount >= 5) {
+                debugTapCount  = 0
+                showAprilDebug = !showAprilDebug
+            }
+        }
+    } else {
+        Modifier
+    }
+    LaunchedEffect(showAprilDebug) {
+        if (showAprilDebug) {
+            // Wait one frame so the panel is laid out before the scroll request;
+            // bringIntoView() against a not-yet-positioned target is a no-op.
+            yield()
+            val _ = runCatching { debugPanelBringIntoView.bringIntoView() }
+        }
+    }
+
+    // Beacon: one-click ZIP for support -- bundles redacted logs, crash reports, action
+    // ring and system info. Generation runs off the Compose UI thread (a 200 MB log cap
+    // is enough to freeze Settings for a beat); while busy the button is disabled so a
+    // double click doesn't fire two parallel writes. The GitHub-Issue button enables
+    // only after a bundle exists this session.
+    //
+    // The three below live as long as the write does, on the process rather than on
+    // this section (see [BundleState]).
+    var lastBundlePath by BundleState.lastPath
+    var bundleBusy     by BundleState.busy
+    // Why the bundle could not be made. Swallowing it left a button that visibly
+    // did nothing: it re-enabled, no file opened, and the reason -- a full disk,
+    // a read-only data dir -- was known and thrown away.
+    var bundleError    by BundleState.error
+    // The app's scope, not the composition's. Writing the archive does not stop
+    // because the reader switched category, and on the composition's scope that
+    // switch cancelled it mid-ZIP and left a partial file with the flag raised.
+    val bundleScope: CoroutineScope = koinInject()
+
+    // One implementation for the button and the automation hook. They were two,
+    // and had already drifted: the hook reported no failure and revealed nothing.
+    fun createBundle(reveal: Boolean) {
+        if (bundleBusy) return
+        bundleBusy = true
+        bundleError = null
+        bundleScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    runCatching { DiagnosticBundle.create(paths, disabledModules(), RenderBackend.current) }
+                }.onSuccess { zip ->
+                    lastBundlePath = zip
+                    if (reveal) SystemActions.openFile(zip.parent.toFile())
+                }.onFailure { bundleError = it.message ?: it::class.simpleName }
+            } finally {
+                bundleBusy = false
+            }
+        }
+    }
+
+    NxSection(s.settingsSectionDiagnostics, titleModifier = titleModifier) {
+        if (af.providesDebugPanel && showAprilDebug) {
+            Box(Modifier.bringIntoViewRequester(debugPanelBringIntoView)) {
+                af.DebugPanel()
+            }
+        }
+
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Box(Modifier.weight(1f)) {
+                Flexible("settings_open_logs_btn", FlexibleKind.Button) {
+                    NxButton(
+                        label    = s.settingsOpenLogs,
+                        onClick  = { SystemActions.openFolder(paths.logsDir.toString()) },
+                        modifier = Modifier.fillMaxWidth(),
+                        style    = NxButtonStyle.Secondary,
+                    )
+                }
+            }
+            Box(Modifier.weight(1f)) {
+                Flexible("settings_crash_reports_btn", FlexibleKind.Button) {
+                    NxButton(
+                        label    = s.settingsOpenCrashReports,
+                        onClick  = { SystemActions.openFolder(paths.crashDir.toString()) },
+                        modifier = Modifier.fillMaxWidth(),
+                        style    = NxButtonStyle.Secondary,
+                    )
+                }
+            }
+            PuppetClick("settings.openLogsDir")      { SystemActions.openFolder(paths.logsDir.toString()) }
+            PuppetClick("settings.openCrashReports") { SystemActions.openFolder(paths.crashDir.toString()) }
+        }
+
+        // Bundle + GitHub button row, with the hint kept tight to it.
+        Column {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Box(Modifier.weight(1f)) {
+                    Flexible("settings_create_diag_bundle_btn", FlexibleKind.Button) {
+                        NxButton(
+                            label    = s.settingsCreateDiagnosticBundle,
+                            onClick  = { createBundle(reveal = true) },
+                            modifier = Modifier.fillMaxWidth(),
+                            style    = NxButtonStyle.Secondary,
+                            enabled  = !bundleBusy,
+                        )
+                    }
+                }
+                Box(Modifier.weight(1f)) {
+                    Flexible("settings_report_github_btn", FlexibleKind.Button) {
+                        NxButton(
+                            label    = s.settingsReportOnGithub,
+                            onClick  = {
+                                val zip = lastBundlePath ?: return@NxButton
+                                val _ = runCatching {
+                                    // Copy the path so the user can drag-attach from the
+                                    // file manager OR paste it into a comment.
+                                    SystemActions.copyToClipboard(zip.toString())
+                                    SystemActions.openUrl(IssueReporter.bundleIssueUrl(zip, s.reportPrompts()))
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            style    = NxButtonStyle.Secondary,
+                            enabled  = lastBundlePath != null,
+                        )
+                    }
+                }
+                // No reveal under automation: a file manager opening on top of the
+                // window is not something a scripted run can dismiss.
+                PuppetClick("settings.createDiagBundle", enabled = !bundleBusy) { createBundle(reveal = false) }
+                PuppetClick("settings.reportOnGithub", enabled = lastBundlePath != null) {
+                    val zip = lastBundlePath ?: return@PuppetClick
+                    val _ = runCatching {
+                        SystemActions.copyToClipboard(zip.toString())
+                        SystemActions.openUrl(IssueReporter.bundleIssueUrl(zip, s.reportPrompts()))
+                    }
+                }
+            }
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text     = s.settingsDiagnosticBundleHint,
+                style    = MaterialTheme.typography.bodySmall,
+                color    = NxInk.quiet,
+                modifier = Modifier.padding(start = 8.dp),
+            )
+            bundleError?.let { reason ->
+                Text(
+                    text     = reason,
+                    style    = MaterialTheme.typography.bodySmall,
+                    color    = NxColor.status(Status.Error),
+                    modifier = Modifier.padding(start = 8.dp),
+                )
+            }
+        }
+
+        // Restart into the boot recovery surface -- disable a broken module or
+        // reset corrupted state when the shell starts but misbehaves.
+        if (host.restartSupported) {
+            Flexible("settings_restart_recovery_btn", FlexibleKind.Button) {
+                NxButton(
+                    label    = s.recoveryRestartInApp,
+                    onClick  = { host.restartIntoRecovery(paths.dataDir) },
+                    modifier = Modifier.fillMaxWidth(),
+                    style    = NxButtonStyle.Secondary,
+                )
+            }
+            PuppetClick("settings.restartRecovery") { host.restartIntoRecovery(paths.dataDir) }
+        }
+    }
+
+    Spacer(Modifier.height(16.dp))
+
+    PuppetClick("settings.openAbout") { onOpenAbout() }
+    NxNavRow(
+        icon     = NxIcon.Info,
+        title    = Branding.TITLE,
+        subtitle = "v${Branding.VERSION.removePrefix("v")} — GPLv3",
+        onClick  = onOpenAbout,
+    )
+}
+
+/**
+ * What the bundle button knows, held for the process. The write runs on the app
+ * scope so that switching category does not cancel it, and this section's own
+ * remembered state was gone by the time it finished: coming back found the button
+ * enabled with a write still running, so a second ZIP started beside the first,
+ * and the finished one's path landed nowhere, leaving "Report on GitHub" off.
+ */
+private object BundleState {
+    val busy = mutableStateOf(false)
+    val lastPath = mutableStateOf<Path?>(null)
+    val error = mutableStateOf<String?>(null)
+}

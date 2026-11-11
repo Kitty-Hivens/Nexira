@@ -41,7 +41,7 @@ import hivens.core.data.PackReference
 import hivens.core.net.TransferEngine
 import hivens.launcher.catalogue.PackArtResolver
 import hivens.launcher.catalogue.PackCatalogueRegistry
-import hivens.launcher.instance.ContentKind
+import hivens.launcher.content.ContentKind
 import hivens.launcher.modrinth.ModrinthClient
 import hivens.launcher.smrt.SmrtPackClient
 import hivens.ui.i18n.AppLocale
@@ -249,7 +249,7 @@ class BrowseRenderTest {
     private fun Kernel(surface: SurfaceId, family: FamilyId?, content: @Composable () -> Unit) {
         // Switched the way the screen switches it, so the slot resolves in the
         // browse family rather than in the general one that has no such slot.
-        val families = SurfaceFamilies().apply { if (family != null) switch(surface, family) }
+        val families = SurfaceFamilies().apply { if (family != null) switch(surface, family, owner = Unit) }
         CompositionLocalProvider(
             LocalLayoutGraph provides DefaultLayout.load(),
             LocalWidgetRegistry provides GeneratedWidgetRegistry,

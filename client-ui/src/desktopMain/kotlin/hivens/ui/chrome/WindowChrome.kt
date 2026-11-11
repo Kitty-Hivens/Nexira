@@ -8,6 +8,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.awt.ComposeWindow
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.window.WindowState
+import hivens.window.WindowActions
+import hivens.window.WindowHost
 import java.awt.MouseInfo
 
 /**
@@ -20,6 +22,9 @@ import java.awt.MouseInfo
  */
 val LocalWindowState = staticCompositionLocalOf<WindowState?> { null }
 val LocalComposeWindow = staticCompositionLocalOf<ComposeWindow?> { null }
+
+/** The window's state and the way to change it (see [WindowHost]). Null outside the launcher's window. */
+val LocalWindowHost = staticCompositionLocalOf<WindowHost?> { null }
 
 /** The window's real close path (tray-hide-or-exit + chaos dialog). Default no-op
  *  so a widget previewed outside the window does not crash. */
@@ -36,74 +41,35 @@ val LocalChromeClose = staticCompositionLocalOf<() -> Unit> { {} }
  */
 val LocalWindowHide = staticCompositionLocalOf<() -> Unit> { {} }
 
-/**
- * Whether the in-app top bar replaces the OS chrome (undecorated window). Mirrors
- * SettingsData.useCustomChrome, provided from AppShell. When false the OS title
- * bar is shown, so the bar's caption buttons / window-drag must stand down (the
- * OS handles minimize/maximize/close/move). The breadcrumb still renders -- it is
- * app content, not window chrome. Default true (the breadcrumb-only widget preview).
- */
-val LocalUseCustomChrome = staticCompositionLocalOf { true }
-
-/**
- * Whether the caption buttons (minimize / maximize / close) should show by
- * default. On a tiling WM the window manager owns those actions and an in-app
- * copy is redundant clutter, so the default hides them there; on Windows / macOS
- * / a floating DE the user expects them. [WindowControlsMode] lets the user force
- * either way regardless of detection.
- */
-@kotlinx.serialization.Serializable
-enum class WindowControlsMode { Auto, Show, Hide }
-
-fun WindowControlsMode.resolved(): Boolean = when (this) {
-    WindowControlsMode.Show -> true
-    WindowControlsMode.Hide -> false
-    WindowControlsMode.Auto -> !IS_TILING_WM
-}
-
-private val TILING_WM_TOKENS = listOf(
-    "hyprland", "sway", "i3", "river", "bspwm", "dwm", "qtile", "wayfire",
-    "hikari", "awesome", "xmonad", "herbstluft", "spectrwm", "leftwm", "niri",
-)
-
-/** Best-effort tiling-WM detection (Linux only). Floating DEs and Windows/macOS
- *  return false, so caption buttons default on there. */
-val IS_TILING_WM: Boolean = run {
-    if (!System.getProperty("os.name").orEmpty().lowercase().contains("linux")) return@run false
-    val env = System.getenv()
-    if (!env["HYPRLAND_INSTANCE_SIGNATURE"].isNullOrBlank()) return@run true
-    if (!env["SWAYSOCK"].isNullOrBlank()) return@run true
-    if (!env["I3SOCK"].isNullOrBlank()) return@run true
-    val desktop = buildString {
-        append(env["XDG_CURRENT_DESKTOP"].orEmpty()); append(' ')
-        append(env["XDG_SESSION_DESKTOP"].orEmpty()); append(' ')
-        append(env["DESKTOP_SESSION"].orEmpty())
-    }.lowercase()
-    TILING_WM_TOKENS.any { it in desktop }
-}
+/** The window manager's allowed actions as the frame's buttons and grips read them. */
+fun WindowActions.toCapabilities() = WindowCapabilities(move = move, resize = resize, maximize = maximize, minimize = minimize)
 
 /**
  * Drags the OS window when the user drags this region (the bar's empty space).
  * Replaces FrameWindowScope.WindowDraggableArea, which a deep widget can't reach:
  * moves the AWT window by the pointer delta (works under X11 / XWayland).
  * Double-click toggles maximize via [onDoubleClick]. Dragging a maximized window
- * un-maximizes it under the cursor via [maximizer] (OS behavior). No-op when
+ * un-maximizes it under the cursor through [host] (OS behavior). No-op when
  * [window] is null.
+ *
+ * The move happens only when [canMove] says the window manager allows it (see
+ * [WindowCapabilities]). Where it does not, the window manager owns the window's
+ * position, and a client-side move only fights it. Where the window manager takes
+ * the move over itself ([WindowHost.beginMove]), it is handed the drag.
  */
 fun Modifier.windowDragArea(
     window: ComposeWindow?,
-    maximizer: WindowMaximizer? = null,
+    host: WindowHost? = null,
+    canMove: Boolean = true,
     onDoubleClick: (() -> Unit)? = null,
 ): Modifier {
-    // On a tiling WM the compositor owns window position (and maximize) -- a
-    // client-side AWT move fights it. Leave moving to the WM there, same as the
-    // resize grips. Drag-to-move only makes sense for OS-floating windows.
-    if (window == null || IS_TILING_WM) return this
-    return this
-        .pointerInput(window, onDoubleClick) {
-            detectTapGestures(onDoubleTap = { onDoubleClick?.invoke() })
-        }
-        .pointerInput(window, maximizer) {
+    if (window == null) return this
+    val withDoubleClick = if (onDoubleClick == null) this else this.pointerInput(window, onDoubleClick) {
+        detectTapGestures(onDoubleTap = { onDoubleClick() })
+    }
+    if (!canMove) return withDoubleClick
+    return withDoubleClick
+        .pointerInput(window, host) {
             // Anchor the move against the ABSOLUTE screen cursor, not the Compose-local drag
             // delta. Feeding the local delta back into setLocation oscillates: moving the
             // window shifts the very coordinate frame the next delta is measured in, so each
@@ -121,11 +87,32 @@ fun Modifier.windowDragArea(
                     // restore). On that first move, re-anchor to the restored frame so the
                     // move continues smoothly from under the cursor.
                     var restored = false
+                    // Where the window manager can take the move over, the first movement
+                    // hands it the rest of the drag, after a maximised window was restored
+                    // under the pointer as below.
+                    var handedOver = false
+                    var asked = false
+                    // Nothing moves until the pointer has travelled past the touch slop:
+                    // a click that jitters by a pixel stays a click, and the second half
+                    // of a double click is not taken by a window manager's move grab.
+                    var moving = false
+                    val slop = viewConfiguration.touchSlop
                     drag(down.id) { change ->
                         change.consume()
+                        if (handedOver) return@drag
+                        if (!moving) {
+                            if ((change.position - down.position).getDistance() < slop) return@drag
+                            moving = true
+                        }
+                        val maximized = host?.status?.value?.maximized == true
+                        if (host != null && !asked && (restored || !maximized)) {
+                            asked = true
+                            handedOver = host.beginMove()
+                            if (handedOver) return@drag
+                        }
                         val now = MouseInfo.getPointerInfo()?.location ?: return@drag
-                        if (!restored && maximizer?.maximized == true) {
-                            maximizer.unmaximizeUnderCursor(now.x, now.y)
+                        if (!restored && maximized) {
+                            host.unmaximizeUnderCursor(now.x, now.y)
                             startWindow = window.location
                             startMouse = now
                         }

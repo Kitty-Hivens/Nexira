@@ -201,7 +201,7 @@ md5( (currentUnixSeconds / 10) + "|" + uid + "|" + login + "|" + code )
 Response: `{"status":"OK"}` (proceed), `{"status":"CODE"}` (wrong code),
 `{"status":"LOGIN"}` (session expired, restart full login).
 
-Known caveat (per `reference_smartycraft_community.md`): server sometimes
+Known caveat, reported by players: the server sometimes
 returns `OK` for accounts with 2FA configured instead of `TWOAUTH` —
 race condition / cache stale on the server-side PHP. Trust server's call.
 
