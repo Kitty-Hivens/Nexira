@@ -5,31 +5,36 @@ description: Modules, boot pipeline, dependency graph and the seams Nexira is bu
 
 ## Module map
 
-Twenty Gradle modules. The dependency direction is one-way and load-bearing: the engine never sees the UI, and the design system never sees the domain.
+Twenty four Gradle modules make up the launcher. The dependency direction is one-way and load-bearing: the engine never sees the UI, and the design system never sees the domain.
 
-| Module                    | Role                                                                                                                                                                                                                        |
-|---------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `client-config`           | Branding, storage filenames, protocol constants and their runtime overrides.                                                                                                                                                |
-| `client-core`             | Domain models, wire DTOs, the `I*` service interfaces, the cache engine, launch state types.                                                                                                                                |
-| `client-auth`             | Auth SPI: `AuthProvider`, `AuthCapabilities`, the account store, the credential manager.                                                                                                                                    |
-| `client-auth-smartycraft` | SmartyCraft provider.                                                                                                                                                                                                       |
-| `client-auth-microsoft`   | Microsoft (MSA) provider.                                                                                                                                                                                                   |
-| `client-launcher`         | The engine: DI wiring, mirror client and sync, runtime provisioning, loader resolution, the launch flow, pack update apply and rollback.                                                                                    |
-| `client-update`           | The launcher updating itself: release check, delta bundle, binary patch, and the per-platform applicators.                                                                                                                  |
-| `client-cli`              | Headless entry point over the same engine.                                                                                                                                                                                  |
-| `client-media`            | Video cache and yt-dlp resolution for the media surfaces.                                                                                                                                                                   |
-| `client-tray`             | System tray behind one interface, backed by libtray (Panama bindings).                                                                                                                                                      |
-| `client-window`           | The launcher window on each desktop system: the one owner of its maximised and minimised state, the system's own frame on Windows, the window manager's word on X11, and the record of how the window was left. No Compose. |
-| `client-ui`               | The Compose Desktop shell: screens, widgets, editor, console.                                                                                                                                                               |
-| `client-i18n`             | The `AppStrings` interface, the English, Russian and German implementations, and the `LocalStrings` composition local.                                                                                                      |
-| `client-render3d`         | Software 3D: the rasteriser and scene graph, and the Minecraft skin rig built on them.                                                                                                                                      |
-| `client-easter`           | The April Fools engine, behind an SPI that resolves to a no-op unless a provider is registered.                                                                                                                             |
-| `nx-ui`                   | The design system: theme, tokens, surfaces, primitives.                                                                                                                                                                     |
-| `widget-model`            | Layout graph, slot and widget identity, service and command keys. Compose-free.                                                                                                                                             |
-| `widget-api`              | Widget runtime: the slot renderer, the registries, the composition locals.                                                                                                                                                  |
-| `widget-processor`        | KSP processor that generates the widget registry from `@Widget`.                                                                                                                                                            |
-| `authlib-agent`           | Java agent that redirects authlib endpoints for a SmartyCraft-bound join.                                                                                                                                                   |
-| `profiler-agent`          | Java agent that observes heap and GC inside the game JVM.                                                                                                                                                                   |
+| Module                    | Role                                                                                                                                                                                                                           |
+|---------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `client-config`           | Branding, storage filenames, protocol constants and their runtime overrides.                                                                                                                                                   |
+| `client-core`             | Domain models, wire DTOs, the `I*` service interfaces, the cache engine, launch state types.                                                                                                                                   |
+| `client-auth`             | Auth SPI: `AuthProvider`, `AuthCapabilities`, the account store, the credential manager.                                                                                                                                       |
+| `client-auth-smartycraft` | SmartyCraft provider.                                                                                                                                                                                                          |
+| `client-auth-microsoft`   | Microsoft (MSA) provider.                                                                                                                                                                                                      |
+| `client-launcher`         | The engine: DI wiring, mirror client and sync, runtime provisioning, loader resolution, the launch flow, pack update apply and rollback.                                                                                       |
+| `client-update`           | The launcher updating itself: release check, delta bundle, binary patch, and the per-platform applicators.                                                                                                                     |
+| `client-cli`              | Headless entry point over the same engine.                                                                                                                                                                                     |
+| `client-media`            | Video cache and yt-dlp resolution for the media surfaces.                                                                                                                                                                      |
+| `client-playback`         | How sound plays: the queue, the repeat modes and the state machine over an engine. Shared by the desktop and Android builds, the engines are handed in.                                                                        |
+| `client-tray`             | System tray behind one interface, backed by libtray (Panama bindings).                                                                                                                                                         |
+| `client-window`           | The launcher window on each desktop system: the one owner of its maximised and minimised state, the system's own frame on Windows, the window manager's word on X11, and the record of how the window was left. No Compose.    |
+| `client-ui`               | The Compose Desktop shell: screens, widgets, editor, console.                                                                                                                                                                  |
+| `client-i18n`             | The `AppStrings` interface, the English, Russian and German implementations, and the `LocalStrings` composition local.                                                                                                         |
+| `client-render3d`         | Software 3D: the rasteriser and scene graph, and the Minecraft skin rig built on them.                                                                                                                                         |
+| `client-easter`           | The April Fools engine, behind an SPI that resolves to a no-op unless a provider is registered.                                                                                                                                |
+| `nx-ui`                   | The design system: theme, tokens, surfaces, primitives.                                                                                                                                                                        |
+| `widget-model`            | Layout graph, slot and widget identity, service and command keys. Compose-free.                                                                                                                                                |
+| `widget-api`              | Widget runtime: the slot renderer, the registries, the composition locals.                                                                                                                                                     |
+| `widget-processor`        | KSP processor that generates the widget registry from `@Widget`.                                                                                                                                                               |
+| `widget-loader`           | Finds widget modules in the widgets folder at startup, checks the interface version they declare and hands back their registries. Separate from `widget-api`, so a module author builds against the kernel without the loader. |
+| `authlib-agent`           | Java agent that redirects authlib endpoints for a SmartyCraft-bound join.                                                                                                                                                      |
+| `profiler-agent`          | Java agent that observes heap and GC inside the game JVM.                                                                                                                                                                      |
+| `android-app`             | The Android application: hosts the shared modules on a phone. Left out of a build on a machine without an Android SDK.                                                                                                         |
+
+Besides these, `client-core-testing` holds test doubles shared by the modules' tests, `examples/` holds three widget modules built the way an outside author would build one, and `experimental/client-boot` is parked groundwork that is kept compiling.
 
 Two boundaries are worth stating outright, because nothing enforces them mechanically:
 
@@ -61,9 +66,9 @@ A separate recovery entry (environment variable, command-line flag, or a one-sho
 
 Koin is the real map of this project, and static analysis cannot see it: a class asks the container for an interface and never names the implementation.
 
-The engine registers eight modules in `client-launcher/di/Modules.kt` -- `networkModule`, `authModule`, `cacheModule`, `runtimeModule`, `mirrorModule`, `launchPipelineModule`, `updateModule`, `appModule`. Membership is grouping only; all start together.
+The engine registers seven modules shared with Android, listed by `launcherModules()` -- `networkModule`, `authModule`, `cacheModule`, `runtimeModule`, `mirrorModule`, `launchPipelineModule`, `appModule` -- and three that only the desktop has, listed by `desktopModules()` -- `desktopHostModule`, `updateModule`, `desktopImportModule`. Membership is grouping only; all start together.
 
-The UI contributes a ninth, `uiModule` in `hivens.ui.Main`, handed to `GuiBootstrap.completeBoot` as an extra module. That is the direction guard: the engine imports no UI type, and the UI still lands in the same container.
+The UI contributes one more, `uiModule` in `hivens.ui.Main`, handed to `GuiBootstrap.completeBoot` as an extra module. That is the direction guard: the engine imports no UI type, and the UI still lands in the same container.
 
 Five definitions are eager: platform paths, the data directory, the settings restore hook, the shared process-lifetime coroutine scope, and the shutdown hook that cancels it. Everything else resolves on demand.
 
@@ -136,11 +141,12 @@ Structural mutations of an instance serialise on a per-directory lock, so a sync
 
 The shell is itself a widget surface. `AppLayout` ends in a single slot render of `appshell.root`; the left rail, the centre and the right panel are widgets in the layout graph. Navigation is not a surface yet, so the screen router is passed down through the shell context.
 
-Three modules, three roles:
+Four modules, four roles:
 
 - `widget-model` holds the graph (`LayoutGraph`, `SurfaceLayout`, `SlotContent`, `WidgetInstance`, recursive through `children`) and the identity types. It carries no Compose dependency, so a headless consumer can read a layout.
 - `widget-api` holds the runtime: the slot renderer, the widget registry, and the service, data and command registries.
 - `widget-processor` generates the registry from `@Widget` annotations.
+- `widget-loader` finds widget modules in the widgets folder at startup and hands their registries to the runtime.
 
 Extension happens through composition locals with identity defaults. The decorator that wraps every widget, the empty-slot placeholder, the unknown-widget placeholder, the slot chrome modifier and the per-instance backing renderer all default to doing nothing; the editor swaps in real ones. Production pays nothing for an editor it does not mount.
 
@@ -148,29 +154,29 @@ A slot owns its own arrangement: column, row, grid, free canvas, or an addressed
 
 A widget whose kind is absent from the registry keeps its stored props and children; it renders as nothing in production and as a visible placeholder in the editor. Orphans are only reaped after a schema bump.
 
-## Style and palette
+## Themes
 
-Two independent axes, deliberately separate so a palette and a form can be chosen without a combined preset.
+A theme says what the interface may be drawn with, and nothing about where. It is a ladder of steps (the page first, then the planes outward from it), the inks text is set in (a main one and a quiet one, each readable on every step), and the theme's colours in order of emphasis. Which step a card sits on and which colour a status takes is decided in `nx-ui`, not in the theme, so a theme cannot paint one place without the rest.
 
-Palette is colour: a fixed dark or light base, optionally reseeded from the wallpaper through Material colour science, then a preset, then an accent override. Brand and semantic tokens -- source colours, severity accents, the decorative ramp -- are deliberately not derived, because a badge whose colour follows the wallpaper stops identifying its source.
+A theme has a dark scheme, and a light one when its author drew one. A light scheme is never derived: a theme without one stays in its own mode, and the day and night switch says so. Nine ship, `Celestia` with both modes and eight dark ones. The wallpaper can make one more from its colours, widget modules can bring their own, and the user's own are stored beside the selection. A theme a module brought is never saved, so it leaves with the module.
 
-Style is form: corner radii, border weight, surface treatment, a motion multiplier, glow, panel elevation, and the switch and badge shells. Two ship today, `Celestia` (rounded, glass, glow, animated) and `Brut` (square, flat, still).
-
-Adoption of the style tokens is uneven. Corner radius is read widely; motion and glow by a handful of call sites; the surface-treatment token by almost nothing. Rendering the same screen under both styles currently differs by well under a tenth of a percent of pixels, and the difference is concentrated in corners.
+The form is one. Radii, borders and motion are not a choice, and there is no second style to switch to. Beside the theme sit a few switches of the user's: whether surfaces blur, whether motion is reduced, and how the navigation rail marks its selection.
 
 ## Testing and what runs
 
-Roughly 2550 test methods. The engine and the widget model are covered densely. The UI is covered thinly, and its visual output has only a few assertions: most render tests assert that a non-empty image was produced, not what is in it.
+Roughly 3800 test methods. The engine and the widget model are covered densely. The UI is covered thinly, and its visual output has only a few assertions: most render tests assert that a non-empty image was produced, not what is in it.
 
-Continuous integration on a pull request runs every module that has tests -- twenty three suites -- across Linux, macOS and Windows. It used to run eight, and each module left out of that list was one whose regressions reached a release: the widget loader is the runtime half of the validator the KSP processor enforces at build time, and the worked example is the only thing in the tree compiled against the widget ABI from outside, so it is what notices an ABI change the launcher's own modules cannot see.
+Continuous integration on a pull request runs every module that has tests -- twenty seven suites, and the build logic in `buildSrc` as a build of its own -- across Linux, macOS and Windows. It used to run eight, and each module left out of that list was one whose regressions reached a release: the widget loader is the runtime half of the validator the KSP processor enforces at build time, and the worked example is the only thing in the tree compiled against the widget ABI from outside, so it is what notices an ABI change the launcher's own modules cannot see.
 
-Two custom scanners do run strictly on every pull request: one fails on a user-facing string hardcoded outside the localisation layer, the other on process metadata in comments. Neither keeps a module list, because a list is how `nx-ui` went unscanned when it was split out: the comment scanner takes every top-level directory carrying sources, and the string scanner asks each build file whether Compose is applied. A new module is covered the day it lands.
+Four custom scanners run strictly on every pull request: one fails on a user-facing string hardcoded outside the localisation layer, one on process metadata in comments, one on an animation that bypasses the user's motion setting, and one on a test suite missing from the matrix. None of them keeps a module list, because a list is how `nx-ui` went unscanned when it was split out: each takes every top-level directory carrying sources, and the string scanner also asks each build file whether Compose is applied. A new module is covered the day it lands.
 
 ## Packaging
 
 Distribution is assembled by custom Gradle plugins in `buildSrc` rather than by the Compose plugin's defaults: a jlink runtime trimmed to a measured module set, a jpackage image, a macOS disk image, and an AppImage profile assembled by script with desktop-entry and AppStream metadata injected.
 
 A verification task fails the build if the trimmed module set omits a module the runtime actually reads, since the failure it prevents is silent rather than loud.
+
+jlink takes the runtime's native files from the JDK's jmods, where they are unsigned, while the JDK vendor signs only the finished JDK. On Windows each of the runtime's binaries is therefore replaced by the vendor's signed copy from the same JDK, after checking that the two are the same image apart from the signature. Windows' Smart App Control blocks an unsigned binary it has no reputation for, whoever loads it.
 
 ## Protocol constants
 
