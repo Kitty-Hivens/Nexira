@@ -16,6 +16,11 @@ fun commitMinutes(providers: ProviderFactory): Int = try {
     providers.exec { commandLine("git", "log", "-1", "--format=%ct") }
         .standardOutput.asText.get().trim().toLong().div(60).toInt()
 } catch (e: Exception) {
+    // On CI the code reaches players, and a code of 1 would sit below every build
+    // already installed, so Android would refuse the update without a word.
+    if (providers.environmentVariable("CI").orNull == "true") {
+        throw GradleException("Could not read the commit time for the version code", e)
+    }
     println("Git commit time lookup failed: ${e.message}")
     1
 }
