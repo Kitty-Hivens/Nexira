@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.FrameWindowScope
@@ -906,15 +905,14 @@ fun FrameWindowScope.AppShellContent(
             // Recomputes on display crossing (not every pixel of a drag).
             // Wayland peer-init can return non-null GC with zero bounds
             // before the surface negotiates -- guard on positive size.
-            val sizeDensity = LocalDensity.current
-            DisposableEffect(window, sizeDensity) {
+            DisposableEffect(window) {
                 val applyClamp: () -> Unit = {
-                    val designPx = with(sizeDensity) {
-                        Dimension(
-                            MIN_WINDOW_WIDTH_DP.dp.toPx().toInt(),
-                            MIN_WINDOW_HEIGHT_DP.dp.toPx().toInt(),
-                        )
-                    }
+                    // The frame is measured in AWT user space, which is the dp value 1:1
+                    // (see WindowGeometry). Converting to pixels first counted the scale
+                    // twice: at 150% the minimum came out 1440 wide, was cut to 90% of
+                    // the screen, and left a window that could not be made smaller than
+                    // almost the whole screen, nor restored to a size that fit it.
+                    val designPx = Dimension(MIN_WINDOW_WIDTH_DP, MIN_WINDOW_HEIGHT_DP)
                     val gc = window.graphicsConfiguration
                     val gcBounds = gc?.bounds
                     val screen = if (gcBounds != null && gcBounds.width > 0 && gcBounds.height > 0) {
