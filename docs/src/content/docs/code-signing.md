@@ -5,6 +5,8 @@ description: How Nexira's Windows builds are signed, who approves a signature, a
 
 Free code signing provided by [SignPath.io](https://about.signpath.io), certificate by [SignPath Foundation](https://signpath.org).
 
+Signing starts with the first release after the SignPath Foundation accepts the project. Releases published before that are not signed.
+
 ## What is signed
 
 The Windows installer (`Nexira-*-Setup.exe`) and the launcher executable inside both the installer and the portable archive, for every stable and beta release published on [GitHub Releases](https://github.com/Kitty-Hivens/Nexira/releases).
@@ -36,5 +38,6 @@ The launcher connects to other systems only to do what it is used for:
 - **The services of the content you choose to play**: Mojang and Microsoft for the game, your Microsoft or SMARTYcraft account when you sign in, SMARTYcraft and its mirror for SMARTYcraft packs, Modrinth when you browse or install from it, and the repositories of mod loaders a pack uses.
 - **BellSoft**, to download the Java runtime a game needs.
 - **The news sources** shown on the home screen.
+- **The video sites you link to**, when you play a video or set one as a background by its address: the launcher fetches it with yt-dlp, which it downloads from GitHub the first time.
 
 Each of those services has its own privacy policy, which applies to what you do there.

@@ -7,7 +7,7 @@ description: Как установить Nexira на Windows, Linux и macOS.
 
 ## Windows
 
-Релизы для Windows подписаны: бесплатную подпись кода предоставляет [SignPath.io](https://about.signpath.io), сертификат выдан [SignPath Foundation](https://signpath.org). Подробнее в [политике подписи кода](../code-signing/).
+Релизы для Windows будут подписываться: бесплатную подпись кода предоставляет [SignPath.io](https://about.signpath.io), сертификат выдан [SignPath Foundation](https://signpath.org). Подробнее в [политике подписи кода](../code-signing/).
 
 **Установщик (рекомендуется)**
 
