@@ -21,11 +21,11 @@ of section 8.
 Three Gradle modules, ~2.4k lines, and the only part of the UI with a stated
 contract.
 
-| module | what it holds | dependencies |
-|---|---|---|
-| `widget-model` | the persisted model + the `@Widget` annotation + prop metadata | none (deliberately Compose-free) |
-| `widget-api` | the renderer, the registries, the composition locals | Compose runtime + `widget-model` |
-| `widget-processor` | the KSP processor that generates the registry | KSP + `widget-model` |
+| module             | what it holds                                                  | dependencies                     |
+|--------------------|----------------------------------------------------------------|----------------------------------|
+| `widget-model`     | the persisted model + the `@Widget` annotation + prop metadata | none (deliberately Compose-free) |
+| `widget-api`       | the renderer, the registries, the composition locals           | Compose runtime + `widget-model` |
+| `widget-processor` | the KSP processor that generates the registry                  | KSP + `widget-model`             |
 
 `widget-model` staying Compose-free is load-bearing, not hygiene: the CLI entry
 point and the launcher read layouts without a Compose runtime, and the annotation
@@ -66,12 +66,12 @@ means anything in the slot it sits in. `FlowPlacement` states the precedence in 
 place (it used to exist twice, once per flow branch, inside a composable where
 nothing could test it):
 
-| slot | honoured | ignored |
-|---|---|---|
+| slot         | honoured                                               | ignored                |
+|--------------|--------------------------------------------------------|------------------------|
 | Row / Column | `weight`, else `canvas` width/height as an upper BOUND | `canvas` x/y/z, `cell` |
-| Grid | nothing -- cells are uniform | all three |
-| Canvas | `canvas` offset, exact size, z | `weight`, `cell` |
-| CubeGrid | `cell` address and span | `weight`, `canvas` |
+| Grid         | nothing -- cells are uniform                           | all three              |
+| Canvas       | `canvas` offset, exact size, z                         | `weight`, `cell`       |
+| CubeGrid     | `cell` address and span                                | `weight`, `canvas`     |
 
 The ignored fields are kept rather than cleared, so flipping a slot's orientation
 and back does not cost the user their arrangement. In a flow slot a resize is a
@@ -126,12 +126,12 @@ from outside a compilation.
 This is the part that matters most for the modular work, because only three of the
 four survive being moved.
 
-| channel | shape | lifetime | portable? |
-|---|---|---|---|
-| props | `@Serializable` class, `instance.rememberProps<T>()` | persisted in the layout graph | yes |
-| widget state | `instance.rememberWidgetState { default }` | persisted per `instanceId`, outside the graph | yes |
-| sources / commands | `rememberSource(SourceKey)` / `rememberCommand(CommandKey)` | app-static, registered once at startup | yes |
-| services | `provideService` / `useService<T>()` | registered while the provider composable is mounted | only while the provider is on screen |
+| channel            | shape                                                       | lifetime                                            | portable?                            |
+|--------------------|-------------------------------------------------------------|-----------------------------------------------------|--------------------------------------|
+| props              | `@Serializable` class, `instance.rememberProps<T>()`        | persisted in the layout graph                       | yes                                  |
+| widget state       | `instance.rememberWidgetState { default }`                  | persisted per `instanceId`, outside the graph       | yes                                  |
+| sources / commands | `rememberSource(SourceKey)` / `rememberCommand(CommandKey)` | app-static, registered once at startup              | yes                                  |
+| services           | `provideService` / `useService<T>()`                        | registered while the provider composable is mounted | only while the provider is on screen |
 
 Props and widget state are deliberately separate: props are the editor's static
 config, state is what the widget itself mutates at runtime (a note's text, a
@@ -211,10 +211,10 @@ root, not a per-widget catch.
 
 Two files, two stores, deliberately not one.
 
-| file | store | keyed by | write cadence |
-|---|---|---|---|
-| `layout.json` | `LayoutGraphRepository` | surface / slot / instance tree | debounced 200ms |
-| `widget-state.json` | `WidgetStateStore` | `instanceId` | debounced 200ms, 64 KB cap per entry |
+| file                | store                   | keyed by                       | write cadence                        |
+|---------------------|-------------------------|--------------------------------|--------------------------------------|
+| `layout.json`       | `LayoutGraphRepository` | surface / slot / instance tree | debounced 200ms                      |
+| `widget-state.json` | `WidgetStateStore`      | `instanceId`                   | debounced 200ms, 64 KB cap per entry |
 
 They are split because the lifecycles differ: a layout undo must not revert a
 note's text, and state is written per keystroke while layout is written per edit.
@@ -247,13 +247,13 @@ that record into the sticky "changes made now will not be kept" notice.
 one step at a time, and a version below 1 throws rather than spinning through two
 billion no-op iterations.
 
-| step | what |
-|---|---|
-| 1 -> 2 | identity (`children` gained a default) |
-| 2 -> 3 | identity (`chrome` gained a default) |
-| 3 -> 4 | the nav rail unified onto one `nav.entry` kind -- rewrites the retired monolith into six entries and converts the per-item kinds |
-| 4 -> 5 | inserts the Wardrobe nav entry after Profile, idempotent, skipped on a rail with no Profile entry |
-| 5 -> 6 | the shell gained a top bar: the three regions relocate into a new `appshell.body` sub-surface and `regions` becomes a Column of [top, body] |
+| step   | what                                                                                                                                                  |
+|--------|-------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 1 -> 2 | identity (`children` gained a default)                                                                                                                |
+| 2 -> 3 | identity (`chrome` gained a default)                                                                                                                  |
+| 3 -> 4 | the nav rail unified onto one `nav.entry` kind -- rewrites the retired monolith into six entries and converts the per-item kinds                      |
+| 4 -> 5 | inserts the Wardrobe nav entry after Profile, idempotent, skipped on a rail with no Profile entry                                                     |
+| 5 -> 6 | the shell gained a top bar: the three regions relocate into a new `appshell.body` sub-surface and `regions` becomes a Column of [top, body]           |
 | 6 -> 7 | the new home's default swapped quicklaunch for the hero card -- applied ONLY when the slot still holds the exact four bundled v6 ids in bundled order |
 
 Two rules are visible across them. A migration that reshapes a slot has to do it
@@ -586,19 +586,19 @@ Ten surface contexts, each a `staticCompositionLocalOf { error(...) }` provided 
 one surface composable and read by that surface's widgets. This is the layer that
 does not survive a widget being moved, so it is worth having in full.
 
-| context | provided by | carries |
-|---|---|---|
-| `LocalLeftRailContext` | `AppSidebar` | current screen, auth flag, navigate, logout |
-| `LocalRightRailContext` | `RightPanel` | app state, login, logout, ssl-bypass flag |
-| `LocalShellContext` | `AppLayout` | the above plus `centerBody`, the breadcrumb trail and its five nav callbacks |
-| `LocalHomeClassicContext` | `DashboardScreen` | session, selected server, four callbacks |
-| `LocalHomeNewContext` | `NewHomeScreen` | app state, navigate, session-updated |
-| `LocalLibraryContext` | `LibraryScreen` | app state, navigate |
-| `LocalProfileContext` | `ProfileSurface` | session, selected category, accounts revision, login, logout |
-| `LocalAboutContext` | `AboutSurface` | update state, dialog flag, trigger, and pre-measured RAM / swap / CPU / display / renderer |
-| `LocalBgSettingsContext` | `BgSettingsSurface` | the live settings buffer + one commit lambda |
-| `LocalServerDetailsContext` | `ServerDetailsSurface` | the server, its assets dir, description and banner holders |
-| `LocalThemePickerContext` | `ThemePickerSurface` | preset list, pending selection, apply, back |
+| context                     | provided by            | carries                                                                                    |
+|-----------------------------|------------------------|--------------------------------------------------------------------------------------------|
+| `LocalLeftRailContext`      | `AppSidebar`           | current screen, auth flag, navigate, logout                                                |
+| `LocalRightRailContext`     | `RightPanel`           | app state, login, logout, ssl-bypass flag                                                  |
+| `LocalShellContext`         | `AppLayout`            | the above plus `centerBody`, the breadcrumb trail and its five nav callbacks               |
+| `LocalHomeClassicContext`   | `DashboardScreen`      | session, selected server, four callbacks                                                   |
+| `LocalHomeNewContext`       | `NewHomeScreen`        | app state, navigate, session-updated                                                       |
+| `LocalLibraryContext`       | `LibraryScreen`        | app state, navigate                                                                        |
+| `LocalProfileContext`       | `ProfileSurface`       | session, selected category, accounts revision, login, logout                               |
+| `LocalAboutContext`         | `AboutSurface`         | update state, dialog flag, trigger, and pre-measured RAM / swap / CPU / display / renderer |
+| `LocalBgSettingsContext`    | `BgSettingsSurface`    | the live settings buffer + one commit lambda                                               |
+| `LocalServerDetailsContext` | `ServerDetailsSurface` | the server, its assets dir, description and banner holders                                 |
+| `LocalThemePickerContext`   | `ThemePickerSurface`   | preset list, pending selection, apply, back                                                |
 
 Sorted by what they actually contain, they are three different things:
 
@@ -662,35 +662,35 @@ where the file sits, because two families live in a package named after neither 
 and one widget does not live in `widgets/` at all: `appshell.activity.pill` is
 declared in `activity/ActivityPillWidget.kt`, beside the registry it renders.
 
-| family | kinds | what they are |
-|---|---|---|
-| shell | 8 | the five regions, `nav.entry`, the breadcrumb, the compact news panel |
-| background settings | 15 | one control each: enable, seven effect sliders, position x/y, scale, loop, tint, picker, reset |
-| sample / generic | 9 | clock, music, playback mini, video, progress, launch tile, spacer, and the two containers |
-| about | 6 | logo, system card, links card, update panel, credits, check-again |
-| profile | 4 | nav, account section, skin section, sign-in |
-| server details | 4 | title, tag bar, description, banner |
-| home (new) | 4 | welcome, hero, quicklaunch, recent |
-| library | 2 | header, body |
-| notes | 2 | scratchpad, checklist |
-| theme picker | 2 | grid, preview |
-| notifications | 1 | history panel |
-| home (classic) | 1 | the whole legacy dashboard, wrapped as one widget |
-| activity | 1 | the floating pill that narrates what the launcher is doing |
+| family              | kinds | what they are                                                                                  |
+|---------------------|-------|------------------------------------------------------------------------------------------------|
+| shell               | 8     | the five regions, `nav.entry`, the breadcrumb, the compact news panel                          |
+| background settings | 15    | one control each: enable, seven effect sliders, position x/y, scale, loop, tint, picker, reset |
+| sample / generic    | 9     | clock, music, playback mini, video, progress, launch tile, spacer, and the two containers      |
+| about               | 6     | logo, system card, links card, update panel, credits, check-again                              |
+| profile             | 4     | nav, account section, skin section, sign-in                                                    |
+| server details      | 4     | title, tag bar, description, banner                                                            |
+| home (new)          | 4     | welcome, hero, quicklaunch, recent                                                             |
+| library             | 2     | header, body                                                                                   |
+| notes               | 2     | scratchpad, checklist                                                                          |
+| theme picker        | 2     | grid, preview                                                                                  |
+| notifications       | 1     | history panel                                                                                  |
+| home (classic)      | 1     | the whole legacy dashboard, wrapped as one widget                                              |
+| activity            | 1     | the floating pill that narrates what the launcher is doing                                     |
 
 ### The four data channels, counted
 
 The kernel offers props, widget state, sources/commands and services. What the
 widgets in this build actually use:
 
-| channel | widget files using it |
-|---|---|
-| props | 26 |
-| surface context (`Local*Context.current`) | 36 |
-| direct `koinInject()` | 12 |
-| sources / commands | 2 (`notifications.history`, `home.new.progress`) |
-| widget state | 2 (`notes.scratch`, `checklist`) |
-| services | 1 provider, 1 consumer (the music pair, and nothing else) |
+| channel                                   | widget files using it                                     |
+|-------------------------------------------|-----------------------------------------------------------|
+| props                                     | 26                                                        |
+| surface context (`Local*Context.current`) | 36                                                        |
+| direct `koinInject()`                     | 12                                                        |
+| sources / commands                        | 2 (`notifications.history`, `home.new.progress`)          |
+| widget state                              | 2 (`notes.scratch`, `checklist`)                          |
+| services                                  | 1 provider, 1 consumer (the music pair, and nothing else) |
 
 Surface context is the dominant channel by a wide margin, and it is the one channel
 that does not survive the widget being moved. Direct `koinInject` is second, and it
@@ -787,19 +787,19 @@ router has a surface.
 screens are the ones section 5 counted as surfaces. Everything else is ordinary
 Compose: a composable the router calls, laying itself out in code.
 
-| screen | lines | surface? |
-|---|---|---|
-| Console (window + canvas + model) | ~2.9k | no |
-| Pack detail (hero, tabs, settings window, versions) | ~2.5k | no |
-| Content tab (scan, filters, mod browser) | ~2.0k | no |
-| Settings (orchestrator + six sections) | ~1.4k | no |
-| Browse + catalogue detail | ~1.0k | no |
-| Server settings (state + screen) | ~0.9k | no |
-| Files / worlds panes | ~0.8k | no |
-| Wardrobe | 0.6k | no |
-| Version picker | 0.5k | no |
-| Migration | 0.3k | no |
-| Dashboard / new home / library bridges | 0.5k | yes |
+| screen                                              | lines | surface? |
+|-----------------------------------------------------|-------|----------|
+| Console (window + canvas + model)                   | ~2.9k | no       |
+| Pack detail (hero, tabs, settings window, versions) | ~2.5k | no       |
+| Content tab (scan, filters, mod browser)            | ~2.0k | no       |
+| Settings (orchestrator + six sections)              | ~1.4k | no       |
+| Browse + catalogue detail                           | ~1.0k | no       |
+| Server settings (state + screen)                    | ~0.9k | no       |
+| Files / worlds panes                                | ~0.8k | no       |
+| Wardrobe                                            | 0.6k  | no       |
+| Version picker                                      | 0.5k  | no       |
+| Migration                                           | 0.3k  | no       |
+| Dashboard / new home / library bridges              | 0.5k  | yes      |
 
 ### What a bridge screen actually is
 
@@ -837,11 +837,11 @@ it.
 
 ### Three different ways to edit persisted state
 
-| screen | model |
-|---|---|
-| Settings | `SettingsFormState`: one `mutableStateOf` per field, `mergeInto(current)` overlays them onto a freshly-read snapshot, every control calls `save()` |
+| screen               | model                                                                                                                                                                                                       |
+|----------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Settings             | `SettingsFormState`: one `mutableStateOf` per field, `mergeInto(current)` overlays them onto a freshly-read snapshot, every control calls `save()`                                                          |
 | Pack settings window | the instance record IS the form; each control hands `pack.copy(...)` to `save`, which shows it as an overlay and persists after a 250ms settle, with a dispose hook on the app scope for the unwritten tail |
-| Server settings | `ServerSettingsState`: a `@Stable` holder that loads the profile, owns the fields, and rebuilds it through the pure `assembleProfile` |
+| Server settings      | `ServerSettingsState`: a `@Stable` holder that loads the profile, owns the fields, and rebuilds it through the pure `assembleProfile`                                                                       |
 
 All three are defensible in isolation. Together they mean that "how does an editing
 surface persist a change" has no answer in this codebase, which is the first
@@ -948,12 +948,12 @@ Three things, and they are the substance of section 5's Wardrobe case:
 
 Two layers claim to be shared UI. Only one of them is a library.
 
-| | `nx-ui` | `client-ui/components` |
-|---|---|---|
-| lines | ~6.1k + 1.4k tests | 4.9k, no tests |
-| project dependencies | none | client-core, client-launcher, client-auth, client-update, media |
-| what it names | levels, roles, tones, motion roles | servers, packs, mods, sessions, updates |
-| how a caller reaches it | `NxSurface(level = ...)`, `NxButton(style = ...)` | by calling the composable |
+|                         | `nx-ui`                                           | `client-ui/components`                                          |
+|-------------------------|---------------------------------------------------|-----------------------------------------------------------------|
+| lines                   | ~6.1k + 1.4k tests                                | 4.9k, no tests                                                  |
+| project dependencies    | none                                              | client-core, client-launcher, client-auth, client-update, media |
+| what it names           | levels, roles, tones, motion roles                | servers, packs, mods, sessions, updates                         |
+| how a caller reaches it | `NxSurface(level = ...)`, `NxButton(style = ...)` | by calling the composable                                       |
 
 ### `nx-ui` is a leaf on purpose, and pays for it explicitly
 
@@ -1049,17 +1049,17 @@ most of the interface kept animating at whatever each site had hardcoded.
 
 Measured across `client-ui`:
 
-| | count |
-|---|---|
-| `NxButton` call sites | 71 |
-| raw Material `Button` / `OutlinedButton` / `TextButton` call sites | 42 |
-| files using `NxSurface` / `NxCard` | 26 |
-| files using `glassSurfaceAlpha` | 29 |
-| files reading `LocalStyle.current` | 29 |
-| literal `RoundedCornerShape(<number>)` | 76 |
-| hardcoded `Color(0x...)` literals | 26 |
-| files reading `Motion.*` | 15 |
-| files reading `Spacing.s*` | **0** |
+|                                                                    | count |
+|--------------------------------------------------------------------|-------|
+| `NxButton` call sites                                              | 71    |
+| raw Material `Button` / `OutlinedButton` / `TextButton` call sites | 42    |
+| files using `NxSurface` / `NxCard`                                 | 26    |
+| files using `glassSurfaceAlpha`                                    | 29    |
+| files reading `LocalStyle.current`                                 | 29    |
+| literal `RoundedCornerShape(<number>)`                             | 76    |
+| hardcoded `Color(0x...)` literals                                  | 26    |
+| files reading `Motion.*`                                           | 15    |
+| files reading `Spacing.s*`                                         | **0** |
 
 The spacing scale is the sharpest case. It is documented in detail, its rungs were
 derived from what the codebase already does, and `s14` is described as the inner
@@ -1125,18 +1125,18 @@ the others.
 
 The UI is already seven Gradle modules, not one, and the split is not arbitrary:
 
-| module | lines | depends on the project? |
-|---|---|---|
-| `widget-model` | ~0.9k | nothing (Compose-free) |
-| `widget-api` | ~1.2k | Compose + `widget-model` |
-| `widget-processor` | ~0.3k | KSP + `widget-model` |
-| `nx-ui` | ~6.1k + 1.4k tests | nothing |
-| `client-i18n` | ~5.9k | nothing |
-| `client-render3d` | ~1.7k + 1.2k tests | `nx-ui` (for `LocalStyle`) |
-| `client-easter` | ~1.9k | Compose only |
-| `client-media` | ~0.6k | `client-core` (transfer engine) |
-| `client-tray` | ~0.2k | nothing (libtray) |
-| `client-ui` | ~46k | everything |
+| module             | lines              | depends on the project?         |
+|--------------------|--------------------|---------------------------------|
+| `widget-model`     | ~0.9k              | nothing (Compose-free)          |
+| `widget-api`       | ~1.2k              | Compose + `widget-model`        |
+| `widget-processor` | ~0.3k              | KSP + `widget-model`            |
+| `nx-ui`            | ~6.1k + 1.4k tests | nothing                         |
+| `client-i18n`      | ~5.9k              | nothing                         |
+| `client-render3d`  | ~1.7k + 1.2k tests | `nx-ui` (for `LocalStyle`)      |
+| `client-easter`    | ~1.9k              | Compose only                    |
+| `client-media`     | ~0.6k              | `client-core` (transfer engine) |
+| `client-tray`      | ~0.2k              | nothing (libtray)               |
+| `client-ui`        | ~46k               | everything                      |
 
 Nine leaves and one trunk. `client-ui` is the only module that knows the launcher
 exists, and it is ten times the size of the largest leaf.
