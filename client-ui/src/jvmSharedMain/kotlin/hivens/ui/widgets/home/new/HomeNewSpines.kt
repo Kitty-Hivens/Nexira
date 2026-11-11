@@ -200,7 +200,7 @@ private fun ClosedFace(pack: PackInstance, modifier: Modifier) {
         Text(
             text       = pack.displayName,
             fontFamily = familyForText(pack.displayName),
-            fontSize   = 22.sp,
+            style      = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.SemiBold,
             color      = Color.White,
             maxLines   = 1,

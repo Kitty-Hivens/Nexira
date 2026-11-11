@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -18,7 +19,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import hivens.config.Branding
 import hivens.core.data.ReleaseChannel
 import hivens.ui.components.channelColor
@@ -71,12 +71,12 @@ fun AboutUpdatePanelWidget(instance: WidgetInstance) {
 
         // Current version.
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(s.aboutCurrentVersion, color = NxInk.quiet, fontSize = 13.sp)
+            Text(s.aboutCurrentVersion, color = NxInk.quiet, style = MaterialTheme.typography.bodyMedium)
             Spacer(Modifier.width(12.dp))
             Text(
                 text       = versionText,
                 color      = accent,
-                fontSize   = 13.sp,
+                style      = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Medium,
                 fontFamily = LocalMonoFamily.current,
                 textAlign  = TextAlign.End,

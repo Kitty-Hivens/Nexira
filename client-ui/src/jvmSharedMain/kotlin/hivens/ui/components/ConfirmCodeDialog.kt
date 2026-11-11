@@ -36,7 +36,6 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import hivens.ui.i18n.LocalStrings
@@ -234,9 +233,8 @@ private fun CodeCells(code: String, hasError: Boolean, dimmed: Boolean) {
                 ) {
                     Text(
                         text = if (filled) code[index].toString() else "",
-                        style = TextStyle(
+                        style = MaterialTheme.typography.headlineSmall.copy(
                             fontFamily = LocalMonoFamily.current,
-                            fontSize = 24.sp,
                             textAlign = TextAlign.Center,
                             color = if (hasError) NxColor.status(Status.Error, text = true) else NxInk.main,
                         ),

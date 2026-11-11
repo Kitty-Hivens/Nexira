@@ -46,7 +46,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import hivens.core.data.PackOrigin
 import hivens.launcher.catalogue.PackCatalogueRegistry
 import hivens.launcher.modrinth.FilterField
@@ -230,8 +229,7 @@ private fun FilterBlock(group: FilterGroup, instance: WidgetInstance) {
         ) {
             Text(
                 group.title(s),
-                style = MaterialTheme.typography.titleSmall,
-                fontSize = 16.sp,
+                style = MaterialTheme.typography.titleMedium,
                 color = NxInk.main,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.weight(1f),

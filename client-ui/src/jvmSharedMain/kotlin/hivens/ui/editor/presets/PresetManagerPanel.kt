@@ -29,11 +29,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import hivens.ui.i18n.LocalStrings
@@ -164,9 +162,8 @@ fun PresetManagerPanel(
                             value         = newName,
                             onValueChange = { newName = it },
                             singleLine    = true,
-                            textStyle     = TextStyle(
-                                color    = NxInk.main,
-                                fontSize = 14.sp,
+                            textStyle     = MaterialTheme.typography.bodyMedium.copy(
+                                color = NxInk.main,
                             ),
                             cursorBrush   = SolidColor(NxColor.lead()),
                             modifier      = Modifier.weight(1f),

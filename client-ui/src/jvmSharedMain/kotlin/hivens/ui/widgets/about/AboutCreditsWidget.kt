@@ -21,7 +21,6 @@ import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import hivens.ui.BuildConfig
 import hivens.ui.easter.GibberishMode
@@ -122,13 +121,13 @@ fun AboutCreditsWidget(instance: WidgetInstance) {
                     text       = af.maybeGibberish(name, probability = 0.20f, mode = GibberishMode.ZALGO),
                     fontWeight = FontWeight.Medium,
                     color      = NxInk.main,
-                    fontSize   = 13.sp,
+                    style      = MaterialTheme.typography.bodyMedium,
                 )
                 Spacer(Modifier.width(6.dp))
                 Text(
                     text     = "— ${af.maybeGibberish(desc, probability = 0.40f, mode = GibberishMode.JARGON)}",
                     color    = NxInk.quiet,
-                    fontSize = 13.sp,
+                    style    = MaterialTheme.typography.bodyMedium,
                 )
             }
         }

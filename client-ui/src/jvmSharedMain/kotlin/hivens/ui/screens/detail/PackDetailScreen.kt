@@ -52,7 +52,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import coil3.compose.SubcomposeAsyncImage
 import hivens.core.data.CachedManifestSnapshot
@@ -450,7 +449,7 @@ private fun LogSessionPicker(
             Text(
                 text     = s.consoleSessionPickerLabel(currentLabel),
                 color    = NxInk.quiet,
-                fontSize = 11.sp,
+                style    = MaterialTheme.typography.labelSmall,
             )
             Symbol(
                 icon               = NxIcon.ExpandMore,

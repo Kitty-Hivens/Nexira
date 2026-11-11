@@ -22,11 +22,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import hivens.ui.customization.sliderKeyboardAdjust
 import hivens.ui.nx.NxRow
 import hivens.ui.nx.NxSliderTrack
@@ -137,10 +135,9 @@ internal fun HexField(
                         }
                     },
                     singleLine    = true,
-                    textStyle     = TextStyle(
+                    textStyle     = MaterialTheme.typography.bodyMedium.copy(
                         color      = NxInk.main,
                         fontFamily = LocalMonoFamily.current,
-                        fontSize   = 13.sp,
                     ),
                     cursorBrush   = SolidColor(NxColor.lead()),
                     modifier      = Modifier.fillMaxWidth(),

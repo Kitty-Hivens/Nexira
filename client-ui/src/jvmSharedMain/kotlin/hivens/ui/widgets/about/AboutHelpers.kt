@@ -54,12 +54,12 @@ internal fun InfoRow(icon: IconKey, label: String, value: String) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Symbol(icon, null, tint = NxInk.quiet.copy(alpha = 0.4f), modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text(label, color = NxInk.quiet, fontSize = 13.sp)
+                    Text(label, color = NxInk.quiet, style = MaterialTheme.typography.bodyMedium)
                 }
                 Text(
                     text       = value,
                     color      = NxInk.main,
-                    fontSize   = 13.sp,
+                    style      = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Medium,
                     fontFamily = LocalMonoFamily.current,
                     modifier   = Modifier.padding(start = 24.dp),
@@ -72,12 +72,12 @@ internal fun InfoRow(icon: IconKey, label: String, value: String) {
             ) {
                 Symbol(icon, null, tint = NxInk.quiet.copy(alpha = 0.4f), modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(8.dp))
-                Text(label, color = NxInk.quiet, fontSize = 13.sp)
+                Text(label, color = NxInk.quiet, style = MaterialTheme.typography.bodyMedium)
                 Spacer(Modifier.width(12.dp))
                 Text(
                     text       = value,
                     color      = NxInk.main,
-                    fontSize   = 13.sp,
+                    style      = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Medium,
                     fontFamily = LocalMonoFamily.current,
                     textAlign  = TextAlign.End,

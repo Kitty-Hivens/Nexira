@@ -16,7 +16,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import hivens.core.jvm.*
@@ -136,7 +135,7 @@ fun JvmArgsBuilderDialog(
                         Tab(
                             selected = selectedTabIdx == idx,
                             onClick = { selectedTabIdx = idx },
-                            text = { Text(label, fontSize = 13.sp) },
+                            text = { Text(label, style = MaterialTheme.typography.titleSmall) },
                             icon = { Symbol(icon, null, modifier = Modifier.size(18.dp)) },
                             selectedContentColor = NxColor.lead(text = true),
                             unselectedContentColor = NxInk.quiet,
@@ -214,7 +213,7 @@ private fun PresetPickerRow(
                 FilterChip(
                     selected = isSelected,
                     onClick = { onSelected(preset) },
-                    label = { Text(preset.displayName.substringBefore(" ("), fontSize = 12.sp) },
+                    label = { Text(preset.displayName.substringBefore(" ("), style = MaterialTheme.typography.labelMedium) },
                     colors = FilterChipDefaults.filterChipColors(
                         selectedContainerColor = NxColor.wash(NxColor.lead(), 0.2f),
                         selectedLabelColor = NxColor.lead(text = true),
@@ -612,7 +611,7 @@ private fun ArgsPreviewBox(config: JvmConfig, javaMajor: Int?) {
                     args.joinToString(" "),
                     color = NxInk.main,
                     fontFamily = LocalMonoFamily.current,
-                    fontSize = 11.sp,
+                    style = MaterialTheme.typography.bodySmall,
                 )
             }
         }

@@ -14,7 +14,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import hivens.core.data.OptionalMod
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
@@ -80,7 +79,7 @@ fun ModItemCard(
                     if (!mod.category.isNullOrBlank()) {
                         Spacer(Modifier.width(8.dp))
                         Box(Modifier.clip(MaterialTheme.shapes.extraSmall).background(NxColor.lead().copy(alpha = 0.15f)).padding(horizontal = 6.dp, vertical = 2.dp)) {
-                            Text(mod.category!!, fontSize = 10.sp, color = NxColor.lead(), fontWeight = FontWeight.Bold)
+                            Text(mod.category!!, style = MaterialTheme.typography.labelSmall, color = NxColor.lead(), fontWeight = FontWeight.Bold)
                         }
                     }
                 }
