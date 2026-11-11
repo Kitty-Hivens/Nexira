@@ -95,10 +95,8 @@ include(":client-update")
 // pipeline (auth -> resolve -> download -> JRE -> runtime -> launch),
 // buildable to a GraalVM / Liberica-NIK native binary for Linux. The GUI
 // (:client-ui) stays on the JVM -- Skiko/AWT block native-image of Compose.
-// See docs/native-image.md.
+// See docs/src/content/docs/dev/native-image.md.
 include(":client-cli")
-// Media playback support (yt-dlp + URL video cache) feeding the Skinema player.
-// Its own seam: consumed by the UI only, unknown to the launch engine.
 // What decides how sound plays: the queue, the repeat modes and the state machine over an
 // engine. Shared by the desktop and Android builds; the engines are handed in.
 include(":client-playback")
@@ -109,6 +107,8 @@ val androidSdkKnown = System.getenv("ANDROID_HOME") != null ||
     System.getenv("ANDROID_SDK_ROOT") != null ||
     file("local.properties").takeIf { it.isFile }?.readLines().orEmpty().any { it.startsWith("sdk.dir=") }
 if (androidSdkKnown) include(":android-app")
+// Media playback support (yt-dlp + URL video cache) feeding the Skinema player.
+// Its own seam: consumed by the UI only, unknown to the launch engine.
 include(":client-media")
 // Tray seam carved out of client-ui: :client-tray holds the TrayController SPI
 // and its libtray-backed impl. It depends only on libtray -- the launch engine
