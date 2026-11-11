@@ -1146,6 +1146,7 @@ fun FrameWindowScope.AppShellContent(
             if (settings.useCustomChrome) {
                 WindowResizeHandles(
                     state     = windowState,
+                    window    = window,
                     minSize   = DpSize(MIN_WINDOW_WIDTH_DP.dp, MIN_WINDOW_HEIGHT_DP.dp),
                     maximized = maximizer.maximized,
                     canResize = windowCapabilities.current.resize,
