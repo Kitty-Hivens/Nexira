@@ -16,7 +16,7 @@ nicht gelesen werden, um eine Version zu verstehen.
 
 ### Android, in der Beta
 
-Nexira läuft auf Handys mit 64-Bit-ARM. Die APK liegt auf der Release-Seite neben den anderen Downloads. Derselbe Startbildschirm, dieselbe Bibliothek, Durchsuchen und dieselben Einstellungen, für ein Handy in jeder Haltung angeordnet, und die Spiele laufen auf dem Handy selbst: Der Launcher holt ein Java und die Grafikbibliotheken für Android, gibt dem Spiel ein Vollbildfenster und reicht ihm deine Finger, eine Maus oder eine Tastatur weiter. Mit dem Mod TouchController im Pack bekommst du richtige Bildschirmsteuerung. Spiele vor 1.17 laufen auch. Es ist eine Beta: Rechne mit Ecken und Kanten und sag uns, wo sie sind.
+Nexira läuft auf Handys mit 64-Bit-ARM und Android 12 oder neuer. Die APK liegt auf der Release-Seite neben den anderen Downloads. Derselbe Startbildschirm, dieselbe Bibliothek, Durchsuchen und dieselben Einstellungen, für ein Handy in jeder Haltung angeordnet, und die Spiele laufen auf dem Handy selbst: Der Launcher holt ein Java und die Grafikbibliotheken für Android, gibt dem Spiel ein Vollbildfenster und reicht ihm deine Finger, eine Maus oder eine Tastatur weiter. Mit dem Mod TouchController im Pack bekommst du richtige Bildschirmsteuerung. Auf dem Handy braucht ein Spiel LWJGL 3: Minecraft ab 1.14, dazu Packs für 1.12.2 und 1.7.10 mit Cleanroom oder lwjgl3ify. Forge ab 1.13 und NeoForge gibt es dort noch nicht. Es ist eine Beta: Rechne mit Ecken und Kanten und sag uns, wo sie sind.
 
 ### Durchsuchen und Installieren
 
@@ -35,7 +35,7 @@ Ressourcenpakete und Shader, die mit einem Pack kommen, behalten deine Wahl übe
 
 ### Das Fenster
 
-Unter Windows benimmt sich das Launcher-Fenster jetzt wie jedes andere: Du ziehst es an der oberen Leiste, änderst die Größe an jeder Kante und dockst es an den Bildschirmrand an, und maximiert bleibt es über der Taskleiste. Die hellen Streifen, die beim Größeändern an einer Kante aufblitzten, sind weg, die Knöpfe in der Ecke sind scharf gezeichnet, und das Fenster öffnet sich so, wie du es verlassen hast, maximiert oder da, wo du es hingestellt hast. Benachrichtigungen erreichen den Desktop, wenn der Launcher mit dem Installer installiert ist. Unter Linux bewegt ein Desktop, der Fenster selbst bewegt, jetzt auch den Launcher und ändert seine Größe, mit seinem eigenen Andocken, und das Fenster öffnet sich nicht mehr bildschirmgroß mit der Oberkante über dem Rand.
+Unter Windows benimmt sich das Launcher-Fenster jetzt wie jedes andere: Du ziehst es an der oberen Leiste, änderst die Größe an jeder Kante und dockst es an den Bildschirmrand an, und maximiert verdeckt es die Taskleiste nicht mehr. Die hellen Streifen, die beim Größeändern an einer Kante aufblitzten, sind weg, die Knöpfe in der Ecke sind scharf gezeichnet, und das Fenster öffnet sich so, wie du es verlassen hast, maximiert oder da, wo du es hingestellt hast. Benachrichtigungen erreichen den Desktop, wenn der Launcher mit dem Installer installiert ist. Unter Linux bewegt ein Desktop, der Fenster selbst bewegt, jetzt auch den Launcher und ändert seine Größe, mit seinem eigenen Andocken, und das Fenster öffnet sich nicht mehr bildschirmgroß mit der Oberkante über dem Rand.
 
 ### Tippen
 

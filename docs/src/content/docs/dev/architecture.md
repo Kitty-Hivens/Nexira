@@ -22,7 +22,7 @@ Twenty four Gradle modules make up the launcher. The dependency direction is one
 | `client-tray`             | System tray behind one interface, backed by libtray (Panama bindings).                                                                                                                                                         |
 | `client-window`           | The launcher window on each desktop system: the one owner of its maximised and minimised state, the system's own frame on Windows, the window manager's word on X11, and the record of how the window was left. No Compose.    |
 | `client-ui`               | The Compose Desktop shell: screens, widgets, editor, console.                                                                                                                                                                  |
-| `client-i18n`             | The `AppStrings` interface, the English, Russian and German implementations, and the `LocalStrings` composition local.                                                                                                         |
+| `client-i18n`             | The `AppStrings` interface, the English, Russian, German and Japanese implementations, and the `LocalStrings` composition local.                                                                                               |
 | `client-render3d`         | Software 3D: the rasteriser and scene graph, and the Minecraft skin rig built on them.                                                                                                                                         |
 | `client-easter`           | The April Fools engine, behind an SPI that resolves to a no-op unless a provider is registered.                                                                                                                                |
 | `nx-ui`                   | The design system: theme, tokens, surfaces, primitives.                                                                                                                                                                        |
@@ -70,7 +70,7 @@ The engine registers seven modules shared with Android, listed by `launcherModul
 
 The UI contributes one more, `uiModule` in `hivens.ui.Main`, handed to `GuiBootstrap.completeBoot` as an extra module. That is the direction guard: the engine imports no UI type, and the UI still lands in the same container.
 
-Five definitions are eager: platform paths, the data directory, the settings restore hook, the shared process-lifetime coroutine scope, and the shutdown hook that cancels it. Everything else resolves on demand.
+Six definitions are eager: platform paths, the data directory, the settings restore hook, the shared process-lifetime coroutine scope, the shutdown hook that cancels it, and a pass that puts back any `fml.toml` a session left changed because the launcher closed before its game did. Everything else resolves on demand.
 
 Some bindings alias one instance rather than construct a second. The credential manager is bound as both the read-only credential store and the account store; the pack update service is bound as the updater contract, and the background auto-updater as the status hub the UI reads.
 

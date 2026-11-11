@@ -24,7 +24,7 @@ verbatim and a hand-wrapped line becomes a staircase of breaks.
 
 ### Android, in beta
 
-Nexira runs on 64-bit ARM phones. The APK is on the release page beside the other downloads. The same home screen, Library, Browse and settings, laid out for a phone held either way, and the games run on the phone itself: the launcher fetches a Java and the graphics libraries made for Android, gives the game a full-screen window, and passes it your fingers, a mouse or a keyboard. With the TouchController mod in the pack you get proper on-screen controls. Games older than 1.17 work too. It is a beta: expect rough edges, and tell us where they are.
+Nexira runs on 64-bit ARM phones with Android 12 or newer. The APK is on the release page beside the other downloads. The same home screen, Library, Browse and settings, laid out for a phone held either way, and the games run on the phone itself: the launcher fetches a Java and the graphics libraries made for Android, gives the game a full-screen window, and passes it your fingers, a mouse or a keyboard. With the TouchController mod in the pack you get proper on-screen controls. On the phone a game needs LWJGL 3: Minecraft from 1.14 on, and 1.12.2 and 1.7.10 packs on Cleanroom or lwjgl3ify. Forge from 1.13 on and NeoForge are not offered there yet. It is a beta: expect rough edges, and tell us where they are.
 
 ### Browse and installing
 
@@ -32,7 +32,7 @@ Everything the beta brought is here: mods, resource packs and shaders from Modri
 
 - An install that went without a required dependency says so on the card and in the install dialog, not only on the project page.
 - A dependency that is in the pack but switched off is no longer counted as there, and a library already in the pack under another file name is not added a second time.
-- Retry installs the version that failed, not the newest one. A link followed from one project to another keeps the pack you were installing into.
+- Try again installs the version that failed, not the newest one. A link followed from one project to another keeps the pack you were installing into.
 - A modpack can no longer be installed into a pack as if it were a mod.
 - Coming back to a search shows it as you left it, and a search reads the pack again if it has changed since.
 - Finding out which packs a project fits no longer sends a list of every file in every pack to Modrinth. It is worked out on your computer.
@@ -43,7 +43,7 @@ Resource and shader packs that come with a pack keep the choice you made through
 
 ### The window
 
-On Windows the launcher window now behaves like any other window: you drag it by the top bar, resize it from any edge and snap it to the side of the screen, and maximised it stays above the taskbar. The light strips that flashed along an edge while resizing are gone, the buttons in the corner are drawn crisply, and the window opens the way you left it, maximised or where you put it. Notifications reach the desktop when the launcher is installed with the installer. On Linux, a desktop that moves windows itself now moves and resizes the launcher too, with its own snapping, and the window no longer opens the size of the screen with its top pushed off it.
+On Windows the launcher window now behaves like any other window: you drag it by the top bar, resize it from any edge and snap it to the side of the screen, and maximised it no longer covers the taskbar. The light strips that flashed along an edge while resizing are gone, the buttons in the corner are drawn crisply, and the window opens the way you left it, maximised or where you put it. Notifications reach the desktop when the launcher is installed with the installer. On Linux, a desktop that moves windows itself now moves and resizes the launcher too, with its own snapping, and the window no longer opens the size of the screen with its top pushed off it.
 
 ### Typing
 
