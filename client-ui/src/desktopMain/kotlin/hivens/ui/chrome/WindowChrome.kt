@@ -53,6 +53,7 @@ fun Modifier.windowDragArea(
     maximizer: WindowMaximizer? = null,
     canMove: Boolean = true,
     onDoubleClick: (() -> Unit)? = null,
+    systemMove: (() -> Boolean)? = null,
 ): Modifier {
     if (window == null) return this
     val withDoubleClick = if (onDoubleClick == null) this else this.pointerInput(window, onDoubleClick) {
@@ -78,8 +79,28 @@ fun Modifier.windowDragArea(
                     // restore). On that first move, re-anchor to the restored frame so the
                     // move continues smoothly from under the cursor.
                     var restored = false
+                    // Where the window manager can take the move over (see
+                    // X11SystemDrag), the first movement hands it the rest of the drag,
+                    // after a maximised window was restored under the pointer as below.
+                    var handedOver = false
+                    var asked = false
+                    // Nothing moves until the pointer has travelled past the touch slop:
+                    // a click that jitters by a pixel stays a click, and the second half
+                    // of a double click is not taken by a window manager's move grab.
+                    var moving = false
+                    val slop = viewConfiguration.touchSlop
                     drag(down.id) { change ->
                         change.consume()
+                        if (handedOver) return@drag
+                        if (!moving) {
+                            if ((change.position - down.position).getDistance() < slop) return@drag
+                            moving = true
+                        }
+                        if (systemMove != null && !asked && (restored || maximizer?.maximized != true)) {
+                            asked = true
+                            handedOver = systemMove()
+                            if (handedOver) return@drag
+                        }
                         val now = MouseInfo.getPointerInfo()?.location ?: return@drag
                         if (!restored && maximizer?.maximized == true) {
                             maximizer.unmaximizeUnderCursor(now.x, now.y)

@@ -37,6 +37,7 @@ class DesktopWindowFrame(
             maximizer = maximizer,
             canMove = allowed.move,
             onDoubleClick = if (allowed.maximize) maximizer::toggle else null,
+            systemMove = { X11SystemDrag.begin(capabilities.clientWindow, X11SystemDrag.MOVE) },
         )
     }
 

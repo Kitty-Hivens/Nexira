@@ -75,6 +75,8 @@ import hivens.ui.chrome.Win32Frame
 import hivens.ui.chrome.WindowMaximizer
 import hivens.ui.chrome.WindowResizeHandles
 import hivens.ui.chrome.WindowSessionWriter
+import hivens.ui.chrome.ResizeEdge
+import hivens.ui.chrome.X11SystemDrag
 import hivens.ui.chrome.fillUnpainted
 import hivens.ui.components.UpdateManager
 import hivens.core.io.AtomicFiles
@@ -288,6 +290,10 @@ fun FrameWindowScope.AppShellContent(
     val captionRegions = remember { CaptionRegions() }
     val nativeFrame = remember { settings.useCustomChrome && WindowManagerProbe.allowsCustomFrame && Win32Frame.install(window, captionRegions) }
     SideEffect { captionRegions.resizable = windowCapabilities.current.resize }
+    // Where the X11 window manager takes resizes over, a grip hands them to it (see X11SystemDrag).
+    val systemResize: (ResizeEdge) -> Boolean = remember(windowCapabilities) {
+        { edge -> X11SystemDrag.begin(windowCapabilities.clientWindow, edge.ewmh) }
+    }
 
     // Remembers how the window is left, for the next start to open it that way.
     // Only where the window manager lets the window place itself: elsewhere the
@@ -1157,6 +1163,7 @@ fun FrameWindowScope.AppShellContent(
                     minSize   = DpSize(MIN_WINDOW_WIDTH_DP.dp, MIN_WINDOW_HEIGHT_DP.dp),
                     maximized = maximizer.maximized,
                     canResize = windowCapabilities.current.resize && !nativeFrame,
+                    systemResize = systemResize,
                 )
             }
             } // end Box(window resize overlay)

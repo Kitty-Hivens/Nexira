@@ -67,6 +67,37 @@ internal class X11Display private constructor(private val display: MemorySegment
         }
     }
 
+    /** Where the pointer is on the root window, or null when the server will not say. */
+    fun pointer(): Pair<Int, Int>? = Arena.ofConfined().use { a ->
+        val rootOut = a.allocate(JAVA_LONG)
+        val childOut = a.allocate(JAVA_LONG)
+        val rootX = a.allocate(JAVA_INT)
+        val rootY = a.allocate(JAVA_INT)
+        val winX = a.allocate(JAVA_INT)
+        val winY = a.allocate(JAVA_INT)
+        val mask = a.allocate(JAVA_INT)
+        val ok = F.queryPointer.invoke(display, root, rootOut, childOut, rootX, rootY, winX, winY, mask) as Int
+        if (ok == 0) null else rootX.get(JAVA_INT, 0) to rootY.get(JAVA_INT, 0)
+    }
+
+    /**
+     * Sends the root window a format-32 ClientMessage about [window], the way
+     * EWMH asks a client to address the window manager, and flushes it.
+     */
+    fun sendToRoot(window: Long, messageType: Long, data: LongArray) {
+        Arena.ofConfined().use { a ->
+            val event = a.allocate(XEVENT_SIZE)
+            event.set(JAVA_INT, 0, CLIENT_MESSAGE)
+            event.set(JAVA_INT, XCLIENT_SEND_EVENT, 1)
+            event.set(JAVA_LONG, XCLIENT_WINDOW, window)
+            event.set(JAVA_LONG, XCLIENT_MESSAGE_TYPE, messageType)
+            event.set(JAVA_INT, XCLIENT_FORMAT, 32)
+            data.forEachIndexed { i, v -> event.set(JAVA_LONG, XCLIENT_DATA + i * 8L, v) }
+            F.sendEvent.invoke(display, root, 0, SUBSTRUCTURE_REDIRECT_MASK or SUBSTRUCTURE_NOTIFY_MASK, event)
+            F.flush.invoke(display)
+        }
+    }
+
     /** Asks for a PropertyNotify on this connection whenever a property of [window] changes. */
     fun watchProperties(window: Long) {
         F.selectInput.invoke(display, window, PROPERTY_CHANGE_MASK)
@@ -149,6 +180,17 @@ internal class X11Display private constructor(private val display: MemorySegment
         private const val XEVENT_SIZE = 24L * 8
         private const val XPROPERTY_WINDOW = 32L
         private const val XPROPERTY_ATOM = 40L
+
+        // XClientMessageEvent: int type, unsigned long serial, Bool send_event,
+        // Display *display, Window window, Atom message_type, int format, long data[5].
+        private const val CLIENT_MESSAGE = 33
+        private const val XCLIENT_SEND_EVENT = 16L
+        private const val XCLIENT_WINDOW = 32L
+        private const val XCLIENT_MESSAGE_TYPE = 40L
+        private const val XCLIENT_FORMAT = 48L
+        private const val XCLIENT_DATA = 56L
+        private const val SUBSTRUCTURE_NOTIFY_MASK = 1L shl 19
+        private const val SUBSTRUCTURE_REDIRECT_MASK = 1L shl 20
     }
 
     /** Resolved once: libX11 is already in the process for AWT, so this only finds it. */
@@ -174,6 +216,12 @@ internal class X11Display private constructor(private val display: MemorySegment
         val pending = x("XPending", FunctionDescriptor.of(JAVA_INT, ADDRESS))
         val nextEvent = x("XNextEvent", FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS))
         val connectionNumber = x("XConnectionNumber", FunctionDescriptor.of(JAVA_INT, ADDRESS))
+        val queryPointer = x(
+            "XQueryPointer",
+            FunctionDescriptor.of(JAVA_INT, ADDRESS, JAVA_LONG, ADDRESS, ADDRESS, ADDRESS, ADDRESS, ADDRESS, ADDRESS, ADDRESS),
+        )
+        val sendEvent = x("XSendEvent", FunctionDescriptor.of(JAVA_INT, ADDRESS, JAVA_LONG, JAVA_INT, JAVA_LONG, ADDRESS))
+        val flush = x("XFlush", FunctionDescriptor.of(JAVA_INT, ADDRESS))
         val poll: MethodHandle = linker.downcallHandle(
             linker.defaultLookup().find("poll").orElseThrow(),
             FunctionDescriptor.of(JAVA_INT, ADDRESS, JAVA_LONG, JAVA_INT),

@@ -42,12 +42,15 @@ import java.awt.Rectangle
  * would cost a recomposition per mouse step; the state follows the frame on its
  * own.
  *
+ * Where the window manager takes resizes over ([systemResize], see
+ * [X11SystemDrag]) a press on a grip hands it the resize instead.
+ *
  * Best-effort under Wayland/XWayland: AWT setBounds is honored but the compositor
  * owns the surface, so a fast drag can lag. Overlay this LAST so the grips sit
  * above content; the 6dp band is small enough not to steal edge clicks.
  */
 @Composable
-fun WindowResizeHandles(
+internal fun WindowResizeHandles(
     state: WindowState,
     window: ComposeWindow?,
     minSize: DpSize,
@@ -55,20 +58,21 @@ fun WindowResizeHandles(
     canResize: Boolean,
     modifier: Modifier = Modifier,
     thickness: Dp = 6.dp,
+    systemResize: ((ResizeEdge) -> Boolean)? = null,
 ) {
     if (!canResize || window == null) return
     if (maximized) return
     if (state.placement != WindowPlacement.Floating) return
     Box(modifier.fillMaxSize()) {
         // Edges first, then corners -- corners win where they overlap an edge.
-        Grip(ResizeEdge.N, Alignment.TopCenter, window, minSize, thickness)
-        Grip(ResizeEdge.S, Alignment.BottomCenter, window, minSize, thickness)
-        Grip(ResizeEdge.W, Alignment.CenterStart, window, minSize, thickness)
-        Grip(ResizeEdge.E, Alignment.CenterEnd, window, minSize, thickness)
-        Grip(ResizeEdge.NW, Alignment.TopStart, window, minSize, thickness)
-        Grip(ResizeEdge.NE, Alignment.TopEnd, window, minSize, thickness)
-        Grip(ResizeEdge.SW, Alignment.BottomStart, window, minSize, thickness)
-        Grip(ResizeEdge.SE, Alignment.BottomEnd, window, minSize, thickness)
+        Grip(ResizeEdge.N, Alignment.TopCenter, window, minSize, thickness, systemResize)
+        Grip(ResizeEdge.S, Alignment.BottomCenter, window, minSize, thickness, systemResize)
+        Grip(ResizeEdge.W, Alignment.CenterStart, window, minSize, thickness, systemResize)
+        Grip(ResizeEdge.E, Alignment.CenterEnd, window, minSize, thickness, systemResize)
+        Grip(ResizeEdge.NW, Alignment.TopStart, window, minSize, thickness, systemResize)
+        Grip(ResizeEdge.NE, Alignment.TopEnd, window, minSize, thickness, systemResize)
+        Grip(ResizeEdge.SW, Alignment.BottomStart, window, minSize, thickness, systemResize)
+        Grip(ResizeEdge.SE, Alignment.BottomEnd, window, minSize, thickness, systemResize)
     }
 }
 
@@ -78,15 +82,17 @@ internal enum class ResizeEdge(
     val right: Boolean,
     val bottom: Boolean,
     val cursor: Int,
+    /** The EWMH `_NET_WM_MOVERESIZE` direction for this edge. */
+    val ewmh: Int,
 ) {
-    W(true, false, false, false, Cursor.W_RESIZE_CURSOR),
-    E(false, false, true, false, Cursor.E_RESIZE_CURSOR),
-    N(false, true, false, false, Cursor.N_RESIZE_CURSOR),
-    S(false, false, false, true, Cursor.S_RESIZE_CURSOR),
-    NW(true, true, false, false, Cursor.NW_RESIZE_CURSOR),
-    NE(false, true, true, false, Cursor.NE_RESIZE_CURSOR),
-    SW(true, false, false, true, Cursor.SW_RESIZE_CURSOR),
-    SE(false, false, true, true, Cursor.SE_RESIZE_CURSOR);
+    W(true, false, false, false, Cursor.W_RESIZE_CURSOR, 7),
+    E(false, false, true, false, Cursor.E_RESIZE_CURSOR, 3),
+    N(false, true, false, false, Cursor.N_RESIZE_CURSOR, 1),
+    S(false, false, false, true, Cursor.S_RESIZE_CURSOR, 5),
+    NW(true, true, false, false, Cursor.NW_RESIZE_CURSOR, 0),
+    NE(false, true, true, false, Cursor.NE_RESIZE_CURSOR, 2),
+    SW(true, false, false, true, Cursor.SW_RESIZE_CURSOR, 6),
+    SE(false, false, true, true, Cursor.SE_RESIZE_CURSOR, 4);
 
     val isCorner: Boolean get() = (left || right) && (top || bottom)
 }
@@ -98,6 +104,7 @@ private fun BoxScope.Grip(
     window: ComposeWindow,
     minSize: DpSize,
     thickness: Dp,
+    systemResize: ((ResizeEdge) -> Boolean)?,
 ) {
     val sizeMod = when {
         edge.isCorner            -> Modifier.size(thickness)
@@ -113,6 +120,7 @@ private fun BoxScope.Grip(
                 awaitPointerEventScope {
                     while (true) {
                         val down = awaitFirstDown()
+                        if (systemResize?.invoke(edge) == true) continue
                         val startMouse = MouseInfo.getPointerInfo()?.location ?: continue
                         val start = window.bounds
                         // AWT user space is the dp value 1:1 for frame geometry, see WindowGeometry.

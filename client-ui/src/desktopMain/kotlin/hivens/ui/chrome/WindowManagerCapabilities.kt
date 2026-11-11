@@ -94,6 +94,10 @@ class WindowCapabilitiesSource {
     var maximized by mutableStateOf<Boolean?>(null)
         private set
 
+    /** The window's X11 client window, or 0 off X11 or before it was found. */
+    @Volatile var clientWindow: Long = 0L
+        private set
+
     @Volatile private var stopped = false
 
     fun attach(window: ComposeWindow) {
@@ -127,6 +131,7 @@ class WindowCapabilitiesSource {
             )
             return false
         }
+        clientWindow = client
         val allowedActions = x.atom("_NET_WM_ALLOWED_ACTIONS")
         val actionAtoms = ACTION_NAMES.associateBy { x.atom(it) }.filterKeys { it != 0L }
         fun read(): WindowCapabilities? = x.longs(client, allowedActions)?.let { atoms ->
