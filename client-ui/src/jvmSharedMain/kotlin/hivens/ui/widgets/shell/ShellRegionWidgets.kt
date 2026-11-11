@@ -659,7 +659,9 @@ fun ShellTopRegion(instance: WidgetInstance) {
                 .then(if (editing || !useCustomChrome || frame == null) Modifier else with(frame) { Modifier.dragArea() }),
             contentAlignment = Alignment.Center,
         ) {
-            SlotRenderer(SurfaceId(TOPBAR_SURFACE), SlotId("center"), spacing = 4.dp)
+            Box(if (frame == null) Modifier else with(frame) { Modifier.dragExclusion() }) {
+                SlotRenderer(SurfaceId(TOPBAR_SURFACE), SlotId("center"), spacing = 4.dp)
+            }
         }
     }
 

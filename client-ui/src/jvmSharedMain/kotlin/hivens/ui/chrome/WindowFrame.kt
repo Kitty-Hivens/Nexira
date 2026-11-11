@@ -22,6 +22,12 @@ interface WindowFrame {
 
     /** Makes the region this modifier is on drag the window, a double click toggling maximise. */
     fun Modifier.dragArea(): Modifier
+
+    /**
+     * Keeps clicks on this element inside a [dragArea] for the element, where the
+     * system decides what a press on the window does before the app sees it.
+     */
+    fun Modifier.dragExclusion(): Modifier = this
 }
 
 /** The window's frame, or null where the system owns it. */

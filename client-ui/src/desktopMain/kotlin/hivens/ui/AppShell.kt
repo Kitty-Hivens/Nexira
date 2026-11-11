@@ -70,7 +70,9 @@ import hivens.ui.chrome.LocalCustomChromeAvailable
 import hivens.ui.chrome.LocalWindowCapabilities
 import hivens.ui.chrome.WindowCapabilitiesSource
 import hivens.ui.chrome.WindowManagerProbe
+import hivens.ui.chrome.CaptionRegions
 import hivens.ui.chrome.OpeningFrame
+import hivens.ui.chrome.Win32Frame
 import hivens.ui.chrome.WindowMaximizer
 import hivens.ui.chrome.WindowResizeHandles
 import hivens.ui.chrome.WindowSessionWriter
@@ -280,6 +282,13 @@ fun FrameWindowScope.AppShellContent(
     // listener; we never fake it. Detach the listener on dispose.
     val maximizer = remember { WindowMaximizer(windowState, windowCapabilities, opening.normal).also { it.attach(window) } }
     DisposableEffect(window) { onDispose { maximizer.detach() } }
+
+    // On Windows the system drives the app's own frame: resizing from the edges,
+    // moving from the bar, snapping (see Win32Frame). The drawn grips and the
+    // hand-made drag stand down where it does.
+    val captionRegions = remember { CaptionRegions() }
+    val nativeFrame = remember { settings.useCustomChrome && WindowManagerProbe.allowsCustomFrame && Win32Frame.install(window, captionRegions) }
+    SideEffect { captionRegions.resizable = windowCapabilities.current.resize }
 
     // Remembers how the window is left, for the next start to open it that way.
     // Only where the window manager lets the window place itself: elsewhere the
@@ -954,7 +963,7 @@ fun FrameWindowScope.AppShellContent(
             // switch can come from outside the composition.
             val surfaceFamilies: SurfaceFamilies = koinInject()
             val windowFrame = remember(windowState, window, maximizer, onCloseChrome) {
-                DesktopWindowFrame(windowState, window, maximizer, windowCapabilities, onCloseChrome)
+                DesktopWindowFrame(windowState, window, maximizer, windowCapabilities, onCloseChrome, captionRegions, nativeFrame)
             }
             CompositionLocalProvider(
                 LocalCustomization                       provides customization,
@@ -1149,7 +1158,7 @@ fun FrameWindowScope.AppShellContent(
                     window    = window,
                     minSize   = DpSize(MIN_WINDOW_WIDTH_DP.dp, MIN_WINDOW_HEIGHT_DP.dp),
                     maximized = maximizer.maximized,
-                    canResize = windowCapabilities.current.resize,
+                    canResize = windowCapabilities.current.resize && !nativeFrame,
                 )
             }
             } // end Box(window resize overlay)
