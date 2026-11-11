@@ -7,6 +7,8 @@ Download the latest release from [GitHub Releases](https://github.com/Kitty-Hive
 
 ## Windows
 
+Releases for Windows are code signed: free code signing provided by [SignPath.io](https://about.signpath.io), certificate by [SignPath Foundation](https://signpath.org). See the [code signing policy](../code-signing/).
+
 **Installer (recommended)**
 
 1. Download `Nexira-*-Setup.exe`
