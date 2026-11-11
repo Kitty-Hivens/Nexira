@@ -609,7 +609,7 @@ jobs:
 
       # The runner image carries an SDK but not necessarily the platforms and NDK
       # this build pins, so they are installed by the names the build scripts use:
-      # 37.1 for the app, 37 for the library modules.
+      # 37.1 for the app, 37.0 (compileSdk 37) for the library modules.
       - name: Install the SDK platform and NDK
         run: |
           if [ -z "${ANDROID_HOME:-}" ]; then
@@ -618,7 +618,7 @@ jobs:
           fi
           sdkmanager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
           yes | "$sdkmanager" --licenses > /dev/null || true
-          "$sdkmanager" --install "platforms;android-37.1" "platforms;android-37" "ndk;28.2.13676358" "build-tools;36.1.0" > /dev/null
+          "$sdkmanager" --install "platforms;android-37.1" "platforms;android-37.0" "ndk;28.2.13676358" "build-tools;36.1.0" > /dev/null
 
       - name: Build the signed APK
         env:
