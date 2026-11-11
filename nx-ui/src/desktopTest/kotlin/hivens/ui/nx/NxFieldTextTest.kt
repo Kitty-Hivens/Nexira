@@ -38,7 +38,8 @@ class NxFieldTextTest {
             settle()
         }
 
-        fun settle() = repeat(4) { scene.render() }
+        // Past the frames a caller is given to take an edit before it counts as refused.
+        fun settle() = repeat(12) { scene.render() }
 
         fun close() = scene.close()
     }

@@ -13,6 +13,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
@@ -77,26 +78,84 @@ fun NxField(
 /**
  * The text state a field edits, kept in step with the caller's string.
  *
- * The caller changed the text from outside: the state follows. Typing goes to the caller, and a
- * frame later the caller's answer is read back, because an edit it did not keep would otherwise
- * stay on screen over a value that never took it.
+ * The caller changed the text from outside: the state follows. Typing goes to the caller, and once
+ * the caller has had time to answer, an edit it did not keep is taken back, because it would
+ * otherwise stay on screen over a value that never took it. Which of the caller's values are only
+ * catching up with the typing is [FieldEcho]'s to tell.
  */
 @Composable
 fun rememberFieldState(value: String, onValueChange: (String) -> Unit): TextFieldState {
     val state = rememberTextFieldState(value)
     val latestValue = rememberUpdatedState(value)
     val latestChange = rememberUpdatedState(onValueChange)
+    val echo = remember { FieldEcho() }
 
     LaunchedEffect(value) {
-        if (state.text.toString() != value) state.setTextAndPlaceCursorAtEnd(value)
+        echo.onValue(value, state.text.toString())?.let(state::setTextAndPlaceCursorAtEnd)
     }
     LaunchedEffect(state) {
         snapshotFlow { state.text.toString() }.collect { typed ->
-            if (typed == latestValue.value) return@collect
+            // Compared with what the caller is about to hold, not with the value it
+            // shows yet: erasing back to a value it has not caught up from must still
+            // be sent, or the caller keeps the longer text the field no longer shows.
+            if (typed == (echo.lastSent() ?: latestValue.value)) return@collect
+            val before = latestValue.value
+            echo.sending(typed)
             latestChange.value(typed)
-            withFrameNanos { }
-            if (latestValue.value != typed) state.setTextAndPlaceCursorAtEnd(latestValue.value)
+            // The caller gets a few frames to take the edit before it counts as
+            // refused. The first frame resumes this before it recomposes the caller,
+            // and a caller that answers through a flow takes longer still.
+            for (frame in 0 until ANSWER_FRAMES) {
+                withFrameNanos { }
+                if (latestValue.value != before) break
+            }
+            echo.settle(typed, before, latestValue.value, state.text.toString())?.let(state::setTextAndPlaceCursorAtEnd)
         }
     }
     return state
 }
+
+/**
+ * What a field has handed its caller and not yet seen come back.
+ *
+ * The caller's value trails the typing by at least a recomposition. A value that is one of the
+ * field's own earlier edits is the caller catching up, and setting the field to it erased whatever
+ * was typed in between: on a machine slow to draw, a word typed at an ordinary pace lost letters.
+ * Only a value the field never sent, a rewrite or a change from outside, replaces what it shows.
+ */
+internal class FieldEcho {
+    private val sent = ArrayDeque<String>()
+
+    /** The newest edit handed to the caller that it has not answered yet, or null. */
+    fun lastSent(): String? = sent.lastOrNull()
+
+    /** The field is handing [typed] to the caller. */
+    fun sending(typed: String) {
+        sent.addLast(typed)
+    }
+
+    /** The caller's value became [value] while the field shows [shown]: the text to show instead, or null to keep it. */
+    fun onValue(value: String, shown: String): String? {
+        val i = sent.indexOf(value)
+        if (i >= 0) {
+            repeat(i + 1) { sent.removeFirst() }
+            return null
+        }
+        sent.clear()
+        return if (shown != value) value else null
+    }
+
+    /**
+     * After the caller had time to answer [typed], sent while its value was [before]: the text to
+     * take the field back to when the caller refused the edit, or null. Nothing is taken back once
+     * more has been typed, since that edit is on its way to the caller too.
+     */
+    fun settle(typed: String, before: String, value: String, shown: String): String? {
+        if (shown != typed || value != before || sent.lastOrNull() != typed) return null
+        sent.clear()
+        return before
+    }
+}
+
+/** How many frames a caller has to take an edit before it counts as refused. */
+private const val ANSWER_FRAMES = 8
