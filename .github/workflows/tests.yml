@@ -107,6 +107,13 @@ jobs:
           :experimental:client-boot:test :examples:widget-pixelplayer:test :examples:widget-screenfx:test :examples:widget-looks:test
           --continue
 
+      # The build logic in buildSrc: what the packaging tasks decide, such as which
+      # of the runtime's Windows binaries take the JDK vendor's signed copies. Gradle
+      # builds buildSrc without its tests and the root build cannot name its tasks,
+      # so the suite runs as a build of its own.
+      - name: Run build logic tests
+        run: ./gradlew -p buildSrc test
+
       # The runtime-module guard is a config-time read with no compilation behind
       # it, so it costs nothing here and fails a bad module list at PR time rather
       # than when a tag is cut and the packaging tasks finally run it.
