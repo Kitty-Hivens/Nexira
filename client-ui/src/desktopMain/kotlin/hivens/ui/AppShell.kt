@@ -172,9 +172,9 @@ private const val MIN_WINDOW_HEIGHT_DP = 600
 
 // Windows Application User Model ID for toast routing (libnotify / SystemNotifier).
 // Matches the macOS bundleID for a single cross-platform identity; ignored on
-// Linux. A toast needs this AUMID registered (a Start-menu shortcut carrying
-// it), which a plain install may lack -- the tray hint then no-ops on Windows,
-// by design, while Linux (the primary desktop) shows it.
+// Linux. Windows shows a toast only for an AUMID an installed shortcut carries:
+// the installer's shortcuts carry this one (setup.iss), and the portable build,
+// which has no shortcut, gets no toasts while Windows still reports them shown.
 private const val NEXIRA_APP_ID = "dev.hivens.nexira"
 
 // ─── App Shell ───────────────────────────────────────────────────────────────
