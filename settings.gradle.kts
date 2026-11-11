@@ -115,6 +115,11 @@ include(":client-media")
 // and auth are off-limits by construction, so a tray action can never block on
 // them.
 include(":client-tray")
+// The launcher window's state and its frame on each desktop system: one owner for
+// maximised and minimised, the native frame on Windows, the window manager's word
+// on X11, and the record of how the window was left. No Compose: the UI reads it
+// and asks it, and never keeps a view of the window of its own.
+include(":client-window")
 include(":client-ui")
 // Leaf design-system module (NxUI): tokens, primitives, surfaces, Flexible.
 // client-ui depends on it one-way; it depends on nothing in-tree.

@@ -173,6 +173,7 @@ kotlin {
 
                 implementation(project(":client-update"))
                 implementation(project(":client-tray"))
+                implementation(project(":client-window"))
 
                 // SVG for pack descriptions, which are full of shields.io badges.
                 // Deliberately NOT coil-svg: its renderer on this platform is Skia's

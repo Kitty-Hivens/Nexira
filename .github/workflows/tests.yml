@@ -99,7 +99,7 @@ jobs:
           ./gradlew
           :client-config:test :client-core:test :client-launcher:test :client-update:test
           :client-auth:test :client-auth-smartycraft:test :client-auth-microsoft:test
-          :client-cli:test :client-media:test :client-playback:test :client-tray:test
+          :client-cli:test :client-media:test :client-playback:test :client-tray:test :client-window:test
           :client-ui:desktopTest :client-i18n:desktopTest :client-render3d:desktopTest
           :client-easter:desktopTest :nx-ui:desktopTest
           :widget-api:test :widget-model:test :widget-processor:test :widget-loader:test

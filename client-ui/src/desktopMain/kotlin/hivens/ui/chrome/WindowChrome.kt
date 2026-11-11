@@ -8,6 +8,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.awt.ComposeWindow
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.window.WindowState
+import hivens.window.WindowActions
+import hivens.window.WindowHost
 import java.awt.MouseInfo
 
 /**
@@ -20,6 +22,9 @@ import java.awt.MouseInfo
  */
 val LocalWindowState = staticCompositionLocalOf<WindowState?> { null }
 val LocalComposeWindow = staticCompositionLocalOf<ComposeWindow?> { null }
+
+/** The window's state and the way to change it (see [WindowHost]). Null outside the launcher's window. */
+val LocalWindowHost = staticCompositionLocalOf<WindowHost?> { null }
 
 /** The window's real close path (tray-hide-or-exit + chaos dialog). Default no-op
  *  so a widget previewed outside the window does not crash. */
@@ -36,24 +41,27 @@ val LocalChromeClose = staticCompositionLocalOf<() -> Unit> { {} }
  */
 val LocalWindowHide = staticCompositionLocalOf<() -> Unit> { {} }
 
+/** The window manager's allowed actions as the frame's buttons and grips read them. */
+fun WindowActions.toCapabilities() = WindowCapabilities(move = move, resize = resize, maximize = maximize, minimize = minimize)
+
 /**
  * Drags the OS window when the user drags this region (the bar's empty space).
  * Replaces FrameWindowScope.WindowDraggableArea, which a deep widget can't reach:
  * moves the AWT window by the pointer delta (works under X11 / XWayland).
  * Double-click toggles maximize via [onDoubleClick]. Dragging a maximized window
- * un-maximizes it under the cursor via [maximizer] (OS behavior). No-op when
+ * un-maximizes it under the cursor through [host] (OS behavior). No-op when
  * [window] is null.
  *
  * The move happens only when [canMove] says the window manager allows it (see
  * [WindowCapabilities]). Where it does not, the window manager owns the window's
- * position, and a client-side move only fights it.
+ * position, and a client-side move only fights it. Where the window manager takes
+ * the move over itself ([WindowHost.beginMove]), it is handed the drag.
  */
 fun Modifier.windowDragArea(
     window: ComposeWindow?,
-    maximizer: WindowMaximizer? = null,
+    host: WindowHost? = null,
     canMove: Boolean = true,
     onDoubleClick: (() -> Unit)? = null,
-    systemMove: (() -> Boolean)? = null,
 ): Modifier {
     if (window == null) return this
     val withDoubleClick = if (onDoubleClick == null) this else this.pointerInput(window, onDoubleClick) {
@@ -61,7 +69,7 @@ fun Modifier.windowDragArea(
     }
     if (!canMove) return withDoubleClick
     return withDoubleClick
-        .pointerInput(window, maximizer) {
+        .pointerInput(window, host) {
             // Anchor the move against the ABSOLUTE screen cursor, not the Compose-local drag
             // delta. Feeding the local delta back into setLocation oscillates: moving the
             // window shifts the very coordinate frame the next delta is measured in, so each
@@ -79,9 +87,9 @@ fun Modifier.windowDragArea(
                     // restore). On that first move, re-anchor to the restored frame so the
                     // move continues smoothly from under the cursor.
                     var restored = false
-                    // Where the window manager can take the move over (see
-                    // X11SystemDrag), the first movement hands it the rest of the drag,
-                    // after a maximised window was restored under the pointer as below.
+                    // Where the window manager can take the move over, the first movement
+                    // hands it the rest of the drag, after a maximised window was restored
+                    // under the pointer as below.
                     var handedOver = false
                     var asked = false
                     // Nothing moves until the pointer has travelled past the touch slop:
@@ -96,14 +104,15 @@ fun Modifier.windowDragArea(
                             if ((change.position - down.position).getDistance() < slop) return@drag
                             moving = true
                         }
-                        if (systemMove != null && !asked && (restored || maximizer?.maximized != true)) {
+                        val maximized = host?.status?.value?.maximized == true
+                        if (host != null && !asked && (restored || !maximized)) {
                             asked = true
-                            handedOver = systemMove()
+                            handedOver = host.beginMove()
                             if (handedOver) return@drag
                         }
                         val now = MouseInfo.getPointerInfo()?.location ?: return@drag
-                        if (!restored && maximizer?.maximized == true) {
-                            maximizer.unmaximizeUnderCursor(now.x, now.y)
+                        if (!restored && maximized) {
+                            host.unmaximizeUnderCursor(now.x, now.y)
                             startWindow = window.location
                             startMouse = now
                         }

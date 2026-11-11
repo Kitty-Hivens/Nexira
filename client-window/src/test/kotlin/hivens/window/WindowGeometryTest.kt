@@ -1,7 +1,6 @@
-package hivens.ui.chrome
+package hivens.window
 
-import androidx.compose.ui.unit.DpSize
-import androidx.compose.ui.unit.dp
+import java.awt.Dimension
 import java.awt.Rectangle
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -20,58 +19,47 @@ import kotlin.test.assertTrue
  */
 class WindowGeometryTest {
 
-    private val restore = DpSize(1100.dp, 720.dp)
+    private val restore = Dimension(1100, 720)
+    private val floor = Dimension(800, 600)
 
     @Test
     fun `the window is born at the work area`() {
         // 2560x1440 minus a 48px panel.
-        assertEquals(
-            DpSize(2560.dp, 1392.dp),
-            initialWindowSize(Rectangle(0, 0, 2560, 1392), restore),
-        )
+        assertEquals(Dimension(2560, 1392), initialWindowSize(Rectangle(0, 0, 2560, 1392), restore, floor))
     }
 
     @Test
     fun `a work area smaller than the shell can lay out still yields a usable window`() {
         assertEquals(
-            DpSize(MIN_WINDOW_WIDTH_DP.dp, MIN_WINDOW_HEIGHT_DP.dp),
-            initialWindowSize(Rectangle(0, 0, 800, 480), restore),
+            floor,
+            initialWindowSize(Rectangle(0, 0, 800, 480), restore, floor),
             "obeying a tiny work area would open a window the rails do not fit in",
         )
     }
 
     @Test
     fun `only the axis that is too small is raised`() {
-        assertEquals(
-            DpSize(1920.dp, MIN_WINDOW_HEIGHT_DP.dp),
-            initialWindowSize(Rectangle(0, 0, 1920, 400), restore),
-        )
+        assertEquals(Dimension(1920, floor.height), initialWindowSize(Rectangle(0, 0, 1920, 400), restore, floor))
     }
 
     @Test
     fun `a work area a peer has not negotiated yet falls back to the restore size`() {
         // Wayland can report a zero-sized bounds before the surface settles;
         // guessing a window from that is worse than the size we already have.
-        assertEquals(restore, initialWindowSize(Rectangle(0, 0, 0, 0), restore))
-        assertEquals(restore, initialWindowSize(Rectangle(0, 0, 1920, 0), restore))
+        assertEquals(restore, initialWindowSize(Rectangle(0, 0, 0, 0), restore, floor))
+        assertEquals(restore, initialWindowSize(Rectangle(0, 0, 1920, 0), restore, floor))
     }
 
     @Test
     fun `where the work area starts does not reach its size`() {
         // A panel on the left shifts the origin; the window is sized by extent,
         // and the desktop decides where it sits.
-        assertEquals(
-            DpSize(2000.dp, 1400.dp),
-            initialWindowSize(Rectangle(560, 40, 2000, 1400), restore),
-        )
+        assertEquals(Dimension(2000, 1400), initialWindowSize(Rectangle(560, 40, 2000, 1400), restore, floor))
     }
 
     @Test
     fun `the restored frame is the restore size centred on the work area`() {
-        assertEquals(
-            Rectangle(730, 336, 1100, 720),
-            restoredBounds(Rectangle(0, 0, 2560, 1392), restore),
-        )
+        assertEquals(Rectangle(730, 336, 1100, 720), restoredBounds(Rectangle(0, 0, 2560, 1392), restore))
     }
 
     @Test

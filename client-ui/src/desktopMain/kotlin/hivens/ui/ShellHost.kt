@@ -24,13 +24,7 @@ import hivens.core.platform.OS
 import hivens.launcher.platform.AppRelauncher
 import hivens.ui.bootstrap.GuiBootstrap
 import hivens.ui.bootstrap.RecoveryEntry
-import hivens.ui.chrome.RESTORE_WINDOW_SIZE
-import hivens.ui.chrome.SavedWindow
-import hivens.ui.chrome.WindowManagerProbe
-import hivens.ui.chrome.currentWorkAreas
-import hivens.ui.chrome.fillUnpainted
-import hivens.ui.chrome.openingFrame
-import hivens.ui.chrome.screenWorkArea
+import hivens.ui.chrome.OPENING_FLOOR
 import hivens.ui.generated.resources.Res
 import hivens.ui.generated.resources.icon
 import hivens.ui.i18n.AppLocale
@@ -39,6 +33,13 @@ import hivens.ui.threshold.BootOutcome
 import hivens.ui.threshold.BootStage
 import hivens.ui.threshold.ThresholdOverlay
 import hivens.ui.threshold.ThresholdPalette
+import hivens.window.RESTORE_WINDOW_SIZE
+import hivens.window.SavedWindow
+import hivens.window.WindowManagerProbe
+import hivens.window.currentWorkAreas
+import hivens.window.fillUnpainted
+import hivens.window.openingFrame
+import hivens.window.screenWorkArea
 import kotlinx.coroutines.flow.StateFlow
 import org.jetbrains.compose.resources.painterResource
 import java.awt.Color as AwtColor
@@ -95,6 +96,7 @@ fun ApplicationScope.ShellHost(
             workAreas = areas,
             primary   = areas.firstOrNull() ?: screenWorkArea(null),
             restore   = RESTORE_WINDOW_SIZE,
+            floor     = OPENING_FLOOR,
             placeable = WindowManagerProbe.allowsCustomFrame,
         )
     }

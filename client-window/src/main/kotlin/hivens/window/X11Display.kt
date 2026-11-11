@@ -1,4 +1,4 @@
-package hivens.ui.chrome
+package hivens.window
 
 import java.lang.foreign.Arena
 import java.lang.foreign.FunctionDescriptor
@@ -14,7 +14,7 @@ import java.lang.invoke.MethodHandle
 /**
  * A connection of the launcher's own to the X server, for reading what the window
  * manager publishes about windows: the handful of Xlib calls that needs, through
- * Panama, the way [hivens.ui.bootstrap.HoldKeyProbe] reads the keymap.
+ * Panama.
  *
  * Its own connection rather than AWT's, because AWT exposes no way to read a
  * property it did not ask for. Event masks are per connection, so selecting

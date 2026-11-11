@@ -1,7 +1,6 @@
-package hivens.ui.chrome
+package hivens.window
 
-import androidx.compose.ui.unit.DpSize
-import androidx.compose.ui.unit.dp
+import java.awt.Dimension
 import java.awt.Rectangle
 import java.nio.file.Files
 import kotlin.io.path.writeText
@@ -16,10 +15,11 @@ class WindowSessionTest {
     // A 1920x1080 monitor with a 48 px taskbar at the bottom, and a second one to its right.
     private val left = Rectangle(0, 0, 1920, 1032)
     private val right = Rectangle(1920, 0, 2560, 1400)
-    private val restore = DpSize(1100.dp, 720.dp)
+    private val restore = Dimension(1100, 720)
+    private val floor = Dimension(800, 600)
 
     private fun open(saved: SavedWindow?, areas: List<Rectangle> = listOf(left, right), placeable: Boolean = true) =
-        openingFrame(saved, areas, areas.first(), restore, placeable)
+        openingFrame(saved, areas, areas.first(), restore, floor, placeable)
 
     @Test
     fun `a first run opens maximised over the primary work area`() {

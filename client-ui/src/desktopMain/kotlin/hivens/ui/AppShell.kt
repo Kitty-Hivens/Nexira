@@ -3,9 +3,7 @@ package hivens.ui
 import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.withTimeoutOrNull
-import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
 import hivens.ui.components.QuitWithGameHost
 import hivens.ui.components.QuitGate
@@ -13,8 +11,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.DpSize
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.FrameWindowScope
 import androidx.compose.ui.window.WindowState
 import coil3.disk.directory
@@ -52,7 +48,6 @@ import hivens.ui.diag.UiRecoverySignal
 import hivens.auth.AccountStore
 import hivens.core.launch.LaunchState
 import hivens.launcher.launch.LauncherController
-import hivens.ui.chrome.computeSafeWindowMinSize
 import hivens.tray.TrayController
 import hivens.tray.TrayStrings
 import hivens.ui.chrome.LocalChromeClose
@@ -61,23 +56,20 @@ import hivens.ui.chrome.LocalWindowHide
 import hivens.ui.chrome.ShellChord
 import hivens.ui.chrome.resolveShellChord
 import hivens.ui.chrome.LocalUseCustomChrome
-import hivens.ui.chrome.LocalWindowMaximizer
+import hivens.ui.chrome.LocalWindowHost
 import hivens.ui.chrome.DesktopWindowFrame
 import hivens.ui.chrome.LocalWindowFrame
 import hivens.ui.chrome.LocalWindowState
 import hivens.ui.chrome.LocalCustomChromeAvailable
 import hivens.ui.chrome.LocalWindowCapabilities
-import hivens.ui.chrome.WindowCapabilitiesSource
-import hivens.ui.chrome.WindowManagerProbe
-import hivens.ui.chrome.CaptionRegions
-import hivens.ui.chrome.OpeningFrame
-import hivens.ui.chrome.Win32Frame
-import hivens.ui.chrome.WindowMaximizer
+import hivens.ui.chrome.MIN_SHELL_SIZE
 import hivens.ui.chrome.WindowResizeHandles
-import hivens.ui.chrome.WindowSessionWriter
-import hivens.ui.chrome.ResizeEdge
-import hivens.ui.chrome.X11SystemDrag
-import hivens.ui.chrome.fillUnpainted
+import hivens.ui.chrome.toCapabilities
+import hivens.window.OpeningFrame
+import hivens.window.WindowHost
+import hivens.window.WindowManagerProbe
+import hivens.window.WindowSessionRecorder
+import hivens.window.fillUnpainted
 import hivens.ui.components.UpdateManager
 import hivens.core.io.AtomicFiles
 import hivens.ui.customization.CustomizationManager
@@ -159,18 +151,9 @@ import org.slf4j.LoggerFactory
 import androidx.compose.ui.graphics.toArgb
 import hivens.ui.theme.NxColor
 import java.awt.Color as AwtColor
-import java.awt.Dimension
-import java.awt.Toolkit
 import javax.swing.SwingUtilities
 import kotlin.system.exitProcess
 import kotlin.time.Duration.Companion.milliseconds
-
-// 2-column Library + sidebar starts collapsing visibly below this width;
-// 600dp of height keeps PackDetail hero + sidebar both reachable. Held
-// as file-level consts so the prophylactic min-size effect inside
-// AppShell stays a one-liner.
-private const val MIN_WINDOW_WIDTH_DP  = 960
-private const val MIN_WINDOW_HEIGHT_DP = 600
 
 // Windows Application User Model ID for toast routing (libnotify / SystemNotifier).
 // Matches the macOS bundleID for a single cross-platform identity; ignored on
@@ -273,49 +256,31 @@ fun FrameWindowScope.AppShellContent(
         )
     }
 
-    // What the window manager allows for this window: moving, resizing, maximizing,
-    // minimizing. Every piece of the custom frame asks this before it offers itself.
-    val windowCapabilities = remember { WindowCapabilitiesSource().also { it.attach(window) } }
-    DisposableEffect(window) { onDispose { windowCapabilities.detach() } }
-
-    // Native maximize/restore for the undecorated window -- the WM owns the
-    // geometry and reports the real maximized state back through WindowMaximizer's
-    // listener; we never fake it. Detach the listener on dispose.
-    val maximizer = remember { WindowMaximizer(windowState, windowCapabilities, opening.normal).also { it.attach(window) } }
-    DisposableEffect(window) { onDispose { maximizer.detach() } }
-
-    // On Windows the system drives the app's own frame: resizing from the edges,
-    // moving from the bar, snapping (see Win32Frame). The drawn grips and the
-    // hand-made drag stand down where it does.
-    val captionRegions = remember { CaptionRegions() }
-    val nativeFrame = remember { settings.useCustomChrome && WindowManagerProbe.allowsCustomFrame && Win32Frame.install(window, captionRegions) }
-    SideEffect { captionRegions.resizable = windowCapabilities.current.resize }
-    // Where the X11 window manager takes resizes over, a grip hands them to it (see X11SystemDrag).
-    val systemResize: (ResizeEdge) -> Boolean = remember(windowCapabilities) {
-        { edge -> X11SystemDrag.begin(windowCapabilities.clientWindow, edge.ewmh) }
+    // The window's state and the one way to change it: maximised and minimised as
+    // the system reports them, what the window manager allows, and the system's own
+    // frame where there is one, which moves, resizes and snaps the window itself
+    // (see WindowHost). Every piece of the custom frame asks it before it offers
+    // itself, and nothing here keeps a view of the window of its own.
+    val windowHost = remember {
+        WindowHost.attach(
+            window       = window,
+            handle       = window.windowHandle,
+            customFrame  = settings.useCustomChrome && WindowManagerProbe.allowsCustomFrame,
+            firstRestore = opening.normal,
+        ).also { it.keepMinimumSize(MIN_SHELL_SIZE) }
     }
+    DisposableEffect(windowHost) { onDispose { windowHost.close() } }
+    val windowStatus by windowHost.status.collectAsState()
+    val windowActions = windowHost.actions.collectAsState()
+    val windowCapabilities = remember(windowActions) { derivedStateOf { windowActions.value.toCapabilities() } }
 
     // Remembers how the window is left, for the next start to open it that way.
     // Only where the window manager lets the window place itself: elsewhere the
     // next start ignores the record anyway (see openingFrame).
     if (WindowManagerProbe.allowsCustomFrame) {
-        val session = remember { WindowSessionWriter(boot.paths.dataDir, maximizer, opening.normal) }
-        DisposableEffect(window) {
-            session.attach(window)
-            onDispose {
-                // On the way out, in place: the process may be gone before a coroutine runs.
-                session.snapshot()?.let(session::save)
-                session.detach()
-            }
-        }
-        LaunchedEffect(session) {
-            snapshotFlow { session.changes to maximizer.maximized }
-                .drop(1)
-                .collectLatest {
-                    delay(WindowSessionWriter.SETTLE_MS.milliseconds)
-                    val record = session.snapshot() ?: return@collectLatest
-                    withContext(Dispatchers.IO) { session.save(record) }
-                }
+        DisposableEffect(windowHost) {
+            val recorder = WindowSessionRecorder.start(windowHost, boot.paths.dataDir, opening.normal)
+            onDispose { recorder.close() }
         }
     }
 
@@ -346,7 +311,7 @@ fun FrameWindowScope.AppShellContent(
     // alone leaves a window that was taskbar-minimized before it was hidden
     // minimized, so the tray click that asked for it reads as doing nothing.
     val revealWindow: () -> Unit = {
-        if (windowState.isMinimized) windowState.isMinimized = false
+        windowHost.unminimize()
         isWindowVisible = true
     }
 
@@ -529,7 +494,7 @@ fun FrameWindowScope.AppShellContent(
             // The close button prefers canBeReady because its alternative is
             // quitting the launcher; here the alternative is the taskbar.
             trayReady       = tray.isSupported,
-            windowMinimized = windowState.isMinimized,
+            windowMinimized = windowStatus.minimized,
         )
         // Recorded, because the decision is otherwise invisible: "the launcher did
         // not hide" and "it hid into a tray that is not there" and "it asked the
@@ -548,9 +513,9 @@ fun FrameWindowScope.AppShellContent(
             PostLaunchMove.Minimize   -> {
                 ActionRing.record("Game started: no tray icon is up, minimizing the window instead")
                 LoggerFactory.getLogger("PostLaunch").info("Game running: no tray icon, minimizing the window")
-                windowState.isMinimized = true
+                windowHost.minimize()
             }
-            PostLaunchMove.Restore    -> windowState.isMinimized = false
+            PostLaunchMove.Restore    -> windowHost.unminimize()
         }
     }
 
@@ -907,47 +872,6 @@ fun FrameWindowScope.AppShellContent(
                 }
             }
 
-            // Prophylactic min-size clamped against the current display.
-            // Recomputes on display crossing (not every pixel of a drag).
-            // Wayland peer-init can return non-null GC with zero bounds
-            // before the surface negotiates -- guard on positive size.
-            DisposableEffect(window) {
-                val applyClamp: () -> Unit = {
-                    // The frame is measured in AWT user space, which is the dp value 1:1
-                    // (see WindowGeometry). Converting to pixels first counted the scale
-                    // twice: at 150% the minimum came out 1440 wide, was cut to 90% of
-                    // the screen, and left a window that could not be made smaller than
-                    // almost the whole screen, nor restored to a size that fit it.
-                    val designPx = Dimension(MIN_WINDOW_WIDTH_DP, MIN_WINDOW_HEIGHT_DP)
-                    val gc = window.graphicsConfiguration
-                    val gcBounds = gc?.bounds
-                    val screen = if (gcBounds != null && gcBounds.width > 0 && gcBounds.height > 0) {
-                        Dimension(gcBounds.width, gcBounds.height)
-                    } else {
-                        Toolkit.getDefaultToolkit().screenSize
-                    }
-                    val safe = computeSafeWindowMinSize(designPx.width, designPx.height, screen)
-                    SwingUtilities.invokeLater { window.minimumSize = safe }
-                }
-
-                var lastDeviceId: String? = window.graphicsConfiguration?.device?.iDstring
-                val moveListener = object : java.awt.event.ComponentAdapter() {
-                    override fun componentMoved(e: java.awt.event.ComponentEvent) {
-                        val current = window.graphicsConfiguration?.device?.iDstring
-                        if (current != lastDeviceId) {
-                            lastDeviceId = current
-                            applyClamp()
-                        }
-                    }
-                }
-                window.addComponentListener(moveListener)
-                applyClamp()
-
-                onDispose {
-                    window.removeComponentListener(moveListener)
-                }
-            }
-
             // Remembered: observe() hands out a new flow per call, and collecting a new
             // one cancels the collector and starts it again on every recomposition.
             val layoutGraph by remember(layoutGraphRepo) { layoutGraphRepo.observe() }.collectAsState()
@@ -966,8 +890,8 @@ fun FrameWindowScope.AppShellContent(
             // Which family each surface shows. From Koin, not remembered here, so a
             // switch can come from outside the composition.
             val surfaceFamilies: SurfaceFamilies = koinInject()
-            val windowFrame = remember(windowState, window, maximizer, onCloseChrome) {
-                DesktopWindowFrame(windowState, window, maximizer, windowCapabilities, onCloseChrome, captionRegions, nativeFrame)
+            val windowFrame = remember(window, windowHost, onCloseChrome) {
+                DesktopWindowFrame(window, windowHost, windowCapabilities, onCloseChrome)
             }
             CompositionLocalProvider(
                 LocalCustomization                       provides customization,
@@ -994,13 +918,13 @@ fun FrameWindowScope.AppShellContent(
                 LocalViewportScrollbar                   provides NxViewportScrollbar,
                 LocalMapControls                         provides NxMapControls,
                 LocalWindowState                         provides windowState,
-                LocalWindowMaximizer                     provides maximizer,
+                LocalWindowHost                          provides windowHost,
                 LocalComposeWindow                       provides window,
                 LocalChromeClose                         provides onCloseChrome,
                 LocalWindowHide                          provides { isWindowVisible = false },
                 LocalUseCustomChrome                     provides settings.useCustomChrome,
                 LocalWindowFrame                         provides windowFrame,
-                LocalWindowCapabilities                  provides windowCapabilities.current,
+                LocalWindowCapabilities                  provides windowCapabilities.value,
                 LocalCustomChromeAvailable               provides WindowManagerProbe.allowsCustomFrame,
             ) {
 
@@ -1158,12 +1082,11 @@ fun FrameWindowScope.AppShellContent(
             // transparent, so it's otherwise harmless.
             if (settings.useCustomChrome) {
                 WindowResizeHandles(
-                    state     = windowState,
                     window    = window,
-                    minSize   = DpSize(MIN_WINDOW_WIDTH_DP.dp, MIN_WINDOW_HEIGHT_DP.dp),
-                    maximized = maximizer.maximized,
-                    canResize = windowCapabilities.current.resize && !nativeFrame,
-                    systemResize = systemResize,
+                    host      = windowHost,
+                    minSize   = MIN_SHELL_SIZE,
+                    maximized = windowStatus.maximized,
+                    canResize = windowCapabilities.value.resize && !windowHost.nativeFrame,
                 )
             }
             } // end Box(window resize overlay)

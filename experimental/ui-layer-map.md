@@ -512,18 +512,26 @@ closest to both.
 
 ### Everything about window management is measured, not assumed
 
-`WindowMaximizer` never fakes its own state: `maximized` is recomputed only from
-what the system did -- the WM's `extendedState` and the frame actually filling the
-work area -- and maximise/restore command AWT directly rather than going through
-`WindowState.placement`, whose "apply only on change" caching swallows a request
-when Compose's observed placement has drifted. `supported` asks the toolkit, and
-the caller hides the button when the WM cannot do it.
+The window's state has one owner, `WindowHost` in `:client-window`, which has no
+Compose in it. Its `status` is what the system says, one source per fact: maximised
+comes from WM_SIZE through the native frame on Windows, from `_NET_WM_STATE` on an
+X11 window manager that declares its allowed actions, and from the frame's
+`extendedState` elsewhere. Minimised is `extendedState` everywhere. Nothing sets
+either on a click, and nothing infers them from the frame's size. The commands
+(maximise, restore, minimise, a drag handed to the window manager) go to the frame
+and the system answers through `status`. Compose's `WindowState` is only where the
+window is created, and follows the frame on its own after that.
 
-`IS_TILING_WM` (env probe over a token list) gates three separate behaviours:
-custom chrome is off there (an undecorated AWT window ignores the WM's fullscreen
-state), the drag-to-move area stands down, and the synthetic resize grips stand
-down. The rule is consistent: where the compositor owns geometry, the launcher does
-not fight it.
+The UI reads the host and asks it: the caption buttons, the drag lane and the grips
+in `hivens.ui.chrome` keep no view of the window of their own. The host also keeps
+the minimum size per screen, and `WindowSessionRecorder` writes `window.json` from
+it.
+
+`WindowManagerProbe.allowsCustomFrame` decides at creation whether the window draws
+its own frame: on X11 it is whether the window manager lists
+`_NET_WM_ALLOWED_ACTIONS` in `_NET_SUPPORTED`. Where it does not (Hyprland), custom
+chrome is off, the drag lane and the grips stand down, and the window manager owns
+the geometry. The launcher does not fight it.
 
 Window drag anchors against the ABSOLUTE screen cursor rather than the Compose-local
 delta, because moving the window shifts the frame the next delta is measured in and

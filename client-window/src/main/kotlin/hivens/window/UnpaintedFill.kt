@@ -1,4 +1,4 @@
-package hivens.ui.chrome
+package hivens.window
 
 import java.awt.Color
 import java.awt.Container

@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -21,11 +22,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.WindowState
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.Status
+import hivens.window.WindowHost
 import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.roundToInt
@@ -43,10 +44,10 @@ import kotlin.math.roundToInt
  * fell between pixels and smeared into two grey lines, and a square stroked on
  * its outline drew heavier than the cross beside it.
  *
- * Maximize/restore is driven by [maximizer], not [WindowState.placement]: the
- * undecorated frame's AWT placement round-trip is unreliable on Windows, so the
- * glyph reads our own state (see [WindowMaximizer]). Placement (which end of the
- * bar) is the caller's job; on macOS use [HOST_IS_MAC] to put these on the left.
+ * Every button acts through [host], and the maximise glyph shows the state the
+ * system reports there (see [WindowHost]), never one the click assumed. Placement
+ * (which end of the bar) is the caller's job; on macOS use [HOST_IS_MAC] to put
+ * these on the left.
  *
  * Minimize and maximize show only when the window manager allows them for this
  * window ([capabilities]), so no button stands there doing nothing. Close is the
@@ -54,14 +55,13 @@ import kotlin.math.roundToInt
  */
 @Composable
 fun WindowControls(
-    state: WindowState,
-    maximizer: WindowMaximizer,
+    host: WindowHost,
     capabilities: WindowCapabilities,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val s = LocalStrings.current
-    val maximized = maximizer.maximized
+    val maximized = host.status.collectAsState().value.maximized
     val ink = NxInk.main
     val plain = CaptionColours(
         glyph = ink.copy(alpha = GLYPH_ALPHA),
@@ -79,7 +79,7 @@ fun WindowControls(
 
     Row(modifier.fillMaxHeight()) {
         if (capabilities.minimize) {
-            CaptionButton(s.windowMinimize, plain, onClick = { state.isMinimized = true }) { c ->
+            CaptionButton(s.windowMinimize, plain, onClick = host::minimize) { c ->
                 val stroke = glyphStroke()
                 val y = snap(size.height / 2f, stroke)
                 drawLine(c, Offset(0f, y), Offset(size.width, y), stroke, StrokeCap.Butt)
@@ -88,8 +88,8 @@ fun WindowControls(
 
         // The toolkit's answer stays in as well: on Windows and macOS it is the
         // only one there is.
-        if (maximizer.supported && capabilities.maximize) {
-            CaptionButton(if (maximized) s.windowRestore else s.windowMaximize, plain, onClick = { maximizer.toggle() }) { c ->
+        if (host.maximizeSupported && capabilities.maximize) {
+            CaptionButton(if (maximized) s.windowRestore else s.windowMaximize, plain, onClick = host::toggleMaximize) { c ->
                 val stroke = glyphStroke()
                 if (maximized) {
                     // The window in front, and the edges of the one behind it that show.

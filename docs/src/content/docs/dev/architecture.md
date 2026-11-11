@@ -7,28 +7,29 @@ description: Modules, boot pipeline, dependency graph and the seams Nexira is bu
 
 Twenty Gradle modules. The dependency direction is one-way and load-bearing: the engine never sees the UI, and the design system never sees the domain.
 
-| Module                    | Role                                                                                                                                     |
-|---------------------------|------------------------------------------------------------------------------------------------------------------------------------------|
-| `client-config`           | Branding, storage filenames, protocol constants and their runtime overrides.                                                             |
-| `client-core`             | Domain models, wire DTOs, the `I*` service interfaces, the cache engine, launch state types.                                             |
-| `client-auth`             | Auth SPI: `AuthProvider`, `AuthCapabilities`, the account store, the credential manager.                                                 |
-| `client-auth-smartycraft` | SmartyCraft provider.                                                                                                                    |
-| `client-auth-microsoft`   | Microsoft (MSA) provider.                                                                                                                |
-| `client-launcher`         | The engine: DI wiring, mirror client and sync, runtime provisioning, loader resolution, the launch flow, pack update apply and rollback. |
-| `client-update`           | The launcher updating itself: release check, delta bundle, binary patch, and the per-platform applicators.                               |
-| `client-cli`              | Headless entry point over the same engine.                                                                                               |
-| `client-media`            | Video cache and yt-dlp resolution for the media surfaces.                                                                                |
-| `client-tray`             | System tray behind one interface, backed by libtray (Panama bindings).                                                                   |
-| `client-ui`               | The Compose Desktop shell: screens, widgets, editor, console.                                                                            |
-| `client-i18n`             | The `AppStrings` interface, the English, Russian and German implementations, and the `LocalStrings` composition local.                   |
-| `client-render3d`         | Software 3D: the rasteriser and scene graph, and the Minecraft skin rig built on them.                                                   |
-| `client-easter`           | The April Fools engine, behind an SPI that resolves to a no-op unless a provider is registered.                                          |
-| `nx-ui`                   | The design system: theme, tokens, surfaces, primitives.                                                                                  |
-| `widget-model`            | Layout graph, slot and widget identity, service and command keys. Compose-free.                                                          |
-| `widget-api`              | Widget runtime: the slot renderer, the registries, the composition locals.                                                               |
-| `widget-processor`        | KSP processor that generates the widget registry from `@Widget`.                                                                         |
-| `authlib-agent`           | Java agent that redirects authlib endpoints for a SmartyCraft-bound join.                                                                |
-| `profiler-agent`          | Java agent that observes heap and GC inside the game JVM.                                                                                |
+| Module                    | Role                                                                                                                                                                                                                        |
+|---------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `client-config`           | Branding, storage filenames, protocol constants and their runtime overrides.                                                                                                                                                |
+| `client-core`             | Domain models, wire DTOs, the `I*` service interfaces, the cache engine, launch state types.                                                                                                                                |
+| `client-auth`             | Auth SPI: `AuthProvider`, `AuthCapabilities`, the account store, the credential manager.                                                                                                                                    |
+| `client-auth-smartycraft` | SmartyCraft provider.                                                                                                                                                                                                       |
+| `client-auth-microsoft`   | Microsoft (MSA) provider.                                                                                                                                                                                                   |
+| `client-launcher`         | The engine: DI wiring, mirror client and sync, runtime provisioning, loader resolution, the launch flow, pack update apply and rollback.                                                                                    |
+| `client-update`           | The launcher updating itself: release check, delta bundle, binary patch, and the per-platform applicators.                                                                                                                  |
+| `client-cli`              | Headless entry point over the same engine.                                                                                                                                                                                  |
+| `client-media`            | Video cache and yt-dlp resolution for the media surfaces.                                                                                                                                                                   |
+| `client-tray`             | System tray behind one interface, backed by libtray (Panama bindings).                                                                                                                                                      |
+| `client-window`           | The launcher window on each desktop system: the one owner of its maximised and minimised state, the system's own frame on Windows, the window manager's word on X11, and the record of how the window was left. No Compose. |
+| `client-ui`               | The Compose Desktop shell: screens, widgets, editor, console.                                                                                                                                                               |
+| `client-i18n`             | The `AppStrings` interface, the English, Russian and German implementations, and the `LocalStrings` composition local.                                                                                                      |
+| `client-render3d`         | Software 3D: the rasteriser and scene graph, and the Minecraft skin rig built on them.                                                                                                                                      |
+| `client-easter`           | The April Fools engine, behind an SPI that resolves to a no-op unless a provider is registered.                                                                                                                             |
+| `nx-ui`                   | The design system: theme, tokens, surfaces, primitives.                                                                                                                                                                     |
+| `widget-model`            | Layout graph, slot and widget identity, service and command keys. Compose-free.                                                                                                                                             |
+| `widget-api`              | Widget runtime: the slot renderer, the registries, the composition locals.                                                                                                                                                  |
+| `widget-processor`        | KSP processor that generates the widget registry from `@Widget`.                                                                                                                                                            |
+| `authlib-agent`           | Java agent that redirects authlib endpoints for a SmartyCraft-bound join.                                                                                                                                                   |
+| `profiler-agent`          | Java agent that observes heap and GC inside the game JVM.                                                                                                                                                                   |
 
 Two boundaries are worth stating outright, because nothing enforces them mechanically:
 

@@ -1,10 +1,10 @@
-package hivens.ui.chrome
+package hivens.window
 
-import androidx.compose.ui.awt.ComposeWindow
 import hivens.core.platform.OS
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.awt.Dimension
+import java.awt.Window
 import java.lang.foreign.Arena
 import java.lang.foreign.FunctionDescriptor
 import java.lang.foreign.Linker
@@ -42,6 +42,10 @@ import kotlin.math.roundToInt
  *   AWT gives a borderless frame the whole monitor, taskbar included, and the
  *   system's resize stops at the window's minimum size.
  *
+ * It also reads WM_SIZE on the way past, which is where Windows says the window
+ * was maximised or restored, whoever did it, and hands that on as the window's
+ * maximised state (see [WindowHost]).
+ *
  * Everything else goes to the procedure AWT installed. A failure inside the
  * wrapper hands that message to AWT unchanged as well.
  *
@@ -51,7 +55,7 @@ internal object Win32Frame {
 
     private val log: Logger = LoggerFactory.getLogger(Win32Frame::class.java)
 
-    private class Installed(val previous: Long, val regions: CaptionRegions) {
+    private class Installed(val previous: Long, val regions: CaptionRegions, val onZoomed: (Boolean) -> Unit) {
         /**
          * The window's minimum size in AWT user space, kept here from the event
          * thread. Read on the toolkit thread, where asking the window for it would
@@ -70,18 +74,31 @@ internal object Win32Frame {
         OS.isWindows && System.getProperty("nexira.window.nativeFrame")?.toBooleanStrictOrNull() != false
     }
 
-    /** Wraps [window]'s procedure once. False where it is off or could not be done; the window then keeps the drawn frame. */
-    fun install(window: ComposeWindow, regions: CaptionRegions): Boolean {
+    /**
+     * Wraps the procedure of [window], whose native handle is [hwnd], once. False
+     * where it is off or could not be done; the window then keeps the drawn frame.
+     * [onZoomed] hears whether the window is maximised, once now and then on every
+     * WM_SIZE that says, on the toolkit thread.
+     *
+     * A window wrapped already keeps its procedure and answers from [regions] and
+     * to [onZoomed] from now on. The window outlives the shell inside it: a shell
+     * brought back after a crash attaches again, and the frame kept answering from
+     * the regions of the shell that was gone, so the bar stopped moving the window.
+     */
+    fun install(window: Window, hwnd: Long, regions: CaptionRegions, onZoomed: (Boolean) -> Unit): Boolean {
         if (!enabled) return false
-        val hwnd = window.windowHandle
         if (hwnd == 0L) return false
-        if (windows.containsKey(hwnd)) return true
         val handle = MemorySegment.ofAddress(hwnd)
+        windows[hwnd]?.let { existing ->
+            windows[hwnd] = Installed(existing.previous, regions, onZoomed).also { it.minimum = existing.minimum }
+            reportZoomed(handle, onZoomed)
+            return true
+        }
         val installed = runCatching {
             val previous = F.getWindowLongPtr.invoke(handle, GWLP_WNDPROC) as Long
-            val entry = Installed(previous, regions)
+            val entry = Installed(previous, regions, onZoomed)
             entry.minimum = if (window.isMinimumSizeSet) window.minimumSize else null
-            window.addPropertyChangeListener("minimumSize") { entry.minimum = it.newValue as? Dimension }
+            window.addPropertyChangeListener("minimumSize") { windows[hwnd]?.minimum = it.newValue as? Dimension }
             windows[hwnd] = entry
             // The procedure goes in last: once it is in, the frame answers for the
             // window, and nothing after it may leave the window without one.
@@ -100,8 +117,14 @@ internal object Win32Frame {
             // Makes Windows ask WM_NCCALCSIZE again, now that it is answered here.
             F.setWindowPos.invoke(handle, MemorySegment.NULL, 0, 0, 0, 0, SWP_FRAMECHANGED or SWP_NOMOVE or SWP_NOSIZE or SWP_NOZORDER or SWP_NOACTIVATE)
         }.onFailure { log.warn("The native frame is only partly in place", it) }
+        reportZoomed(handle, onZoomed)
         log.info("window frame: native frame installed")
         return true
+    }
+
+    private fun reportZoomed(handle: MemorySegment, onZoomed: (Boolean) -> Unit) {
+        runCatching { onZoomed(F.isZoomed.invoke(handle) as Int != 0) }
+            .onFailure { log.warn("Could not read whether the window is maximised", it) }
     }
 
     @JvmStatic
@@ -122,9 +145,17 @@ internal object Win32Frame {
                     return result
                 }
                 WM_PARENTNOTIFY -> if ((wParam and 0xFFFF) == WM_CREATE.toLong()) wrapChild(lParam, hwnd.address())
-                // AWT creates its canvases without parent notification, so one made
-                // after the frame went in is found here instead, on the next resize.
-                WM_SIZE -> wrapChildren(hwnd.address(), hwnd.address())
+                WM_SIZE -> {
+                    // A minimised window says nothing about whether it is maximised:
+                    // it comes back the way it went down.
+                    when (wParam) {
+                        SIZE_RESTORED -> installed.onZoomed(false)
+                        SIZE_MAXIMIZED -> installed.onZoomed(true)
+                    }
+                    // AWT creates its canvases without parent notification, so one made
+                    // after the frame went in is found here instead, on the next resize.
+                    wrapChildren(hwnd.address(), hwnd.address())
+                }
                 WM_NCDESTROY -> windows.remove(hwnd.address())
             }
         } catch (t: Throwable) {
@@ -312,6 +343,8 @@ internal object Win32Frame {
     private const val SWP_FRAMECHANGED = 0x0020
     private const val WM_CREATE = 0x0001
     private const val WM_SIZE = 0x0005
+    private const val SIZE_RESTORED = 0L
+    private const val SIZE_MAXIMIZED = 2L
     private const val WM_PARENTNOTIFY = 0x0210
     private const val GW_HWNDNEXT = 2
     private const val GW_CHILD = 5

@@ -1,253 +1,250 @@
-package hivens.ui.chrome
+package hivens.window
 
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.staticCompositionLocalOf
-import androidx.compose.ui.awt.ComposeWindow
-import androidx.compose.ui.window.WindowState
-import java.awt.EventQueue
-import java.awt.Frame
-import java.awt.GraphicsConfiguration
-import java.awt.Rectangle
-import java.awt.Toolkit
-import java.awt.event.ComponentAdapter
-import java.awt.event.ComponentEvent
-import java.awt.event.WindowStateListener
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+import java.awt.Dimension
+import java.awt.Frame
+import java.awt.Rectangle
+import java.awt.Toolkit
+import java.util.concurrent.CopyOnWriteArrayList
 
 /**
- * Work area of [gc] -- the monitor's bounds minus the screen insets the WM
- * reports (taskbar / panel / menu bar + dock). AWT user space is numerically the
- * Compose Dp value 1:1 here (density scales the render, never the frame geometry).
- * A Wayland peer can report a non-null gc with zero bounds before the surface
- * negotiates; fall back to the toolkit screen size then.
- */
-fun screenWorkArea(gc: GraphicsConfiguration?): Rectangle {
-    val tk = Toolkit.getDefaultToolkit()
-    val b = gc?.bounds
-    if (gc == null || b == null || b.width <= 0 || b.height <= 0) {
-        val s = tk.screenSize
-        val i = gc?.let { tk.getScreenInsets(it) }
-        return if (i != null) Rectangle(i.left, i.top, s.width - i.left - i.right, s.height - i.top - i.bottom)
-        else Rectangle(0, 0, s.width, s.height)
-    }
-    val i = tk.getScreenInsets(gc)
-    return Rectangle(b.x + i.left, b.y + i.top, b.width - i.left - i.right, b.height - i.top - i.bottom)
-}
-
-/**
- * Maximize / restore driven end-to-end by the window manager.
+ * The one owner of the launcher window's state, and the one way to change it.
  *
- * The window never fakes its own maximized state. On X11 and XWayland
- * [maximized] is the EWMH `_NET_WM_STATE_MAXIMIZED` atoms as the window manager
- * writes them, read by [WindowCapabilitiesSource] over its own connection. The
- * frame's extendedState is not that: AWT sets it the moment the launcher asks,
- * before the window manager has answered, so clicks in quick succession read an
- * answer that had not come yet and sent the window manager contradicting
- * requests, and a request it dropped left the button showing the wrong state for
- * good. Where nothing watches the window, on Windows and macOS whose systems
- * change it at once, [maximized] is extendedState as [WindowStateListener]
- * reports it. It is never set when a button is pressed, and never inferred from
- * how big the frame is. A frame that merely fills the screen is not maximized,
- * and treating it as one left the button offering a restore the window manager
- * had nothing to do for, so the click went nowhere until the window was resized
- * by hand.
+ * [status] is what the system says, from one source per fact. Maximised is the
+ * word of whoever decides it on this system: Windows through WM_SIZE where the
+ * app's frame is the system's (see [Win32Frame]), an X11 window manager through
+ * `_NET_WM_STATE` (see [X11Watcher]), and the frame's extended state elsewhere,
+ * on macOS and wherever nothing better answers. Minimised is the frame's
+ * extended state everywhere: every system tells AWT that one directly. The
+ * launcher never sets either itself, nor infers them from how big the frame is:
+ * a click before the system answers the last one would read its own guess, and a
+ * frame that merely fills the screen is not maximised.
  *
- * [maximize] / [restore] COMMAND the system directly via [Frame.setExtendedState]
- * (MAXIMIZED_BOTH), NOT through WindowState.placement, whose "apply only on change"
- * caching swallows the request whenever Compose's observed placement has drifted to
- * the target value already (a WM that maximizes without confirming the frame state
- * leaves placement out of sync, so the button would silently no-op). [supported]
- * asks the toolkit whether the WM supports the state at all; the caller hides the
- * button when not.
+ * The commands go to the frame, and the system answers through [status]. The UI
+ * keeps no view of its own: Compose's `WindowState` follows the frame on its own,
+ * and is only where the window is created.
  *
- * Leaving the maximized state hands the frame back at the normal size the window
- * manager remembers for it. Until the window has been restored once, that is the
- * work area, since it is born there (see [initialWindowSize]), so the first restore
- * would look exactly like a maximized window. That first restore is given
+ * Leaving the maximised state hands the frame back at the normal size the system
+ * remembers for it. Until the window has been restored once, that is the work
+ * area, since it is born there (see [initialWindowSize]), so the first restore
+ * would look exactly like a maximised window. That first restore is given
  * [firstRestore], the frame the window had when it was last closed (see
- * [WindowSessionWriter]), or [RESTORE_WINDOW_SIZE] where nothing was saved, and
- * from then on the window manager remembers a real normal size and every later
- * restore is left to it. Windows offers no way
- * to set that size while the frame stays maximized: a reshape of a zoomed frame
- * drops the maximized bit. A window manager that does not allow the window to be
- * resized (see [WindowCapabilities]) owns the geometry outright and is never
- * handed a size.
+ * [WindowSessionRecorder]), or [RESTORE_WINDOW_SIZE] where nothing was saved, and
+ * from then on the system remembers a real normal size. Windows offers no way to
+ * set that size while the frame stays maximised: a reshape of a zoomed frame
+ * drops the maximised bit. A window manager that does not allow the window to be
+ * resized owns the geometry outright and is never handed a size.
  *
- * With `-Dnexira.puppet.port` set, every event dumps the full window state (raw
- * extendedState, Compose placement, observed flag, bounds vs work area) under the
- * `WINDBG` tag, so a run can be correlated line-by-line against the WM's own view.
+ * Everything here runs on the AWT event thread, the commands included. A system
+ * that reports from a thread of its own is heard on the event thread.
+ *
+ * With `-Dnexira.puppet.port` set, every event dumps the full window state under
+ * the `WINDBG` tag, so a run can be correlated line by line against the system's
+ * own view.
  */
-class WindowMaximizer(
-    private val state: WindowState,
-    private val capabilities: WindowCapabilitiesSource,
-    private val firstRestore: Rectangle? = null,
-) {
-    /** The frame's extendedState, recomputed only from system events, never on click. */
-    private var frameMaximized by mutableStateOf(false)
+class WindowHost internal constructor(
+    internal val frame: FrameOps,
+    private val backend: Backend,
+    private val firstRestore: Rectangle?,
+) : AutoCloseable {
+    private var frameState = frame.extendedState
 
-    /** Real WM-reported state: the window manager's own word where it is watched, the frame's elsewhere. */
-    val maximized: Boolean get() = capabilities.maximized ?: frameMaximized
+    /** What the system's own source says about maximised, or null before it has said anything. */
+    @Volatile private var reported: Boolean? = null
 
-    /** Whether the running WM supports programmatic maximize, per the toolkit. */
-    var supported by mutableStateOf(true)
-        private set
+    private val _status = MutableStateFlow(compute())
+    val status: StateFlow<WindowStatus> = _status.asStateFlow()
 
-    /** True while a window born maximized has not left it yet and been given a normal size. */
-    private var firstRestorePending = true
+    val actions: StateFlow<WindowActions> get() = backend.actions
 
-    private var window: ComposeWindow? = null
-    private var stateListener: WindowStateListener? = null
-    private var sizeListener: ComponentAdapter? = null
+    /** Whether the system's own frame moves and resizes the window. */
+    val nativeFrame: Boolean get() = backend.nativeFrame
 
-    fun attach(w: ComposeWindow) {
-        window = w
-        supported = Toolkit.getDefaultToolkit().isFrameStateSupported(Frame.MAXIMIZED_BOTH)
-        // Only a window born maximized has a normal size nobody chose. One that
-        // opened as a window already has the size it was left at, and the window
-        // manager remembers whatever it is moved to after that.
-        firstRestorePending = isMax(w.extendedState)
-        refresh(w)
-        val sl = WindowStateListener { e ->
-            dump(w, "WM-state-event old=${decode(e.oldState)} new=${decode(e.newState)}")
-            refresh(w)
-            // Resize after the one this same transition posts, or the WM's would land on top of it.
-            if (firstRestorePending && isMax(e.oldState) && !isMax(e.newState)) EventQueue.invokeLater { giveRestoredSize(w) }
+    /** Where a press moves the window, for the system's frame; null without one. */
+    val captions: CaptionRegions? get() = backend.captions
+
+    /** Whether the toolkit can maximise a frame here at all. */
+    val maximizeSupported: Boolean = frame.maximizeSupported
+
+    /** True while a window born maximised has not left it yet and been given a normal size. */
+    private var firstRestorePending = false
+
+    private val statusListeners = CopyOnWriteArrayList<(WindowStatus) -> Unit>()
+    private val removals = ArrayList<() -> Unit>()
+
+    internal fun start() {
+        removals += frame.onStateChanged { old, new ->
+            dump("frame-state old=${decode(old)} new=${decode(new)}")
+            frameState = frame.extendedState
+            publish("frame")
         }
-        w.addWindowStateListener(sl)
-        stateListener = sl
-        if (DEBUG) {
-            val cl = object : ComponentAdapter() {
-                override fun componentResized(e: ComponentEvent) = dump(w, "resize-event")
-            }
-            w.addComponentListener(cl)
-            sizeListener = cl
+        backend.start { maximized ->
+            reported = maximized
+            frame.later { publish("system") }
         }
-        log.info("window maximize: WM support={}, initial maximized={}", supported, maximized)
-        dump(w, "attach")
+        frameState = frame.extendedState
+        _status.value = compute()
+        // Only a window born maximised has a normal size nobody chose. One that
+        // opened as a window already has the size it was left at, and the system
+        // remembers whatever it is moved to after that.
+        firstRestorePending = _status.value.maximized
+        log.info("window: maximize support={}, native frame={}, initial {}", maximizeSupported, nativeFrame, _status.value)
+        dump("attach")
     }
 
-    fun detach() {
-        stateListener?.let { window?.removeWindowStateListener(it) }
-        sizeListener?.let { window?.removeComponentListener(it) }
-        stateListener = null
-        sizeListener = null
-        window = null
+    fun maximize() {
+        val _ = runCatching { frame.setMaximizedBounds(frame.workArea) }
+        log.info("window state -> system: requesting maximize")
+        dump("cmd maximize")
+        frame.extendedState = frame.extendedState or Frame.MAXIMIZED_BOTH
+    }
+
+    fun restore() {
+        log.info("window state -> system: requesting restore")
+        dump("cmd restore")
+        frame.extendedState = frame.extendedState and Frame.MAXIMIZED_BOTH.inv()
+    }
+
+    // Decided by what the system has said, so a click before it answers the last
+    // one repeats that request instead of sending the opposite.
+    fun toggleMaximize() {
+        if (_status.value.maximized) restore() else maximize()
+    }
+
+    fun minimize() {
+        frame.extendedState = frame.extendedState or Frame.ICONIFIED
+    }
+
+    fun unminimize() {
+        if (frame.extendedState and Frame.ICONIFIED != 0) frame.extendedState = frame.extendedState and Frame.ICONIFIED.inv()
+    }
+
+    /** Hands a drag of the caption to the window manager. False leaves the move to the caller. */
+    fun beginMove(): Boolean = backend.beginMove()
+
+    /** Hands a drag of [edge] to the window manager. False leaves the resize to the caller. */
+    fun beginResize(edge: WindowEdge): Boolean = backend.beginResize(edge)
+
+    /**
+     * Un-maximise for a caption drag the caller moves by hand: request a restore,
+     * then re-anchor so the pointer stays at the same share of the bar's width.
+     * On the first restore the normal size is given right here rather than after
+     * the event, so the drag carries the window it will end up with. The restored
+     * bounds settle asynchronously on some systems, so this reads what it can and
+     * the caller re-reads the frame's location afterward.
+     */
+    fun unmaximizeUnderCursor(pointerX: Int, pointerY: Int) {
+        if (!_status.value.maximized) return
+        val cur = frame.bounds
+        val first = firstRestorePending && actions.value.resize
+        firstRestorePending = false
+        restore()
+        val restored = if (first) firstRestoreBounds() else frame.bounds
+        val ratioX = if (cur.width > 0) ((pointerX - cur.x).toFloat() / cur.width).coerceIn(0f, 1f) else 0.5f
+        frame.bounds = Rectangle(pointerX - (ratioX * restored.width).toInt(), cur.y, restored.width, restored.height)
     }
 
     /**
-     * Recomputes the flag, and says what it decided from.
-     *
-     * The numbers go in the line because this flag is the only timestamped signal
-     * the launcher produces when the window's geometry moves under it, and it used
-     * to record the conclusion and throw the evidence away. A tear across the lower
-     * part of the window after a resume left exactly one line in the log saying the
-     * window had stopped being maximized, with nothing to say whether the frame had
-     * really shrunk, whether the work area had grown, or whether the two had simply
-     * stopped agreeing. The full dump beside this carries all of it and is behind a
-     * debug property, which is the wrong side of the fence for something that
-     * happens on a laptop lid and not on demand.
-     *
-     * It costs a line per change, and a change is rare: a handful in an hour of
-     * ordinary use, since it only fires when the answer actually moves.
+     * Keeps the frame's minimum size at [design], cut to 90% of the screen the
+     * window is on, and works it out again when the window crosses to another
+     * screen. A minimum bigger than a small screen would leave a window that
+     * cannot be made to fit it.
      */
-    private fun refresh(w: ComposeWindow) {
-        val now = isMax(w.extendedState)
-        if (now != frameMaximized) {
-            frameMaximized = now
-            val b = w.bounds
-            val wa = screenWorkArea(w.graphicsConfiguration)
-            log.info(
-                "window state <- frame reports maximized={} (ext={} bounds={}x{} at {},{} work={}x{} at {},{})",
-                frameMaximized, decode(w.extendedState),
-                b.width, b.height, b.x, b.y,
-                wa.width, wa.height, wa.x, wa.y,
-            )
+    fun keepMinimumSize(design: Dimension) {
+        var screen = frame.screenId
+        fun apply() {
+            val bounds = frame.screenBounds
+            val size = if (bounds != null) Dimension(bounds.width, bounds.height) else Toolkit.getDefaultToolkit().screenSize
+            val safe = computeSafeWindowMinSize(design.width, design.height, size)
+            frame.later { frame.setMinimumSize(safe) }
         }
+        removals += frame.onGeometryChanged {
+            val now = frame.screenId
+            if (now != screen) {
+                screen = now
+                apply()
+            }
+        }
+        apply()
+    }
+
+    /** Calls [listener] with every change of [status], on the event thread. Returns the removal. */
+    internal fun onStatusChanged(listener: (WindowStatus) -> Unit): () -> Unit {
+        statusListeners += listener
+        return { statusListeners -= listener }
+    }
+
+    override fun close() {
+        removals.forEach { it() }
+        removals.clear()
+        statusListeners.clear()
+        backend.close()
+    }
+
+    private fun compute() = WindowStatus(
+        maximized = reported ?: isMax(frameState),
+        minimized = frameState and Frame.ICONIFIED != 0,
+    )
+
+    /**
+     * Publishes the state the sources say now, and says what it decided from.
+     *
+     * The numbers go in the line because this is the only timestamped signal the
+     * launcher produces when the window's geometry moves under it. A tear across
+     * the lower part of the window after a resume once left exactly one line in
+     * the log saying the window had stopped being maximised, with nothing to say
+     * whether the frame had really shrunk, whether the work area had grown, or
+     * whether the two had simply stopped agreeing. A change is rare: a handful in
+     * an hour of ordinary use.
+     */
+    private fun publish(source: String) {
+        val previous = _status.value
+        val next = compute()
+        if (next == previous) return
+        _status.value = next
+        val b = frame.bounds
+        val wa = frame.workArea
+        log.info(
+            "window state <- {}: maximized={} minimized={} (ext={} bounds={}x{} at {},{} work={}x{} at {},{})",
+            source, next.maximized, next.minimized, decode(frameState),
+            b.width, b.height, b.x, b.y, wa.width, wa.height, wa.x, wa.y,
+        )
+        // Resize after the one this same transition posts, or the system's would land on top of it.
+        if (previous.maximized && !next.maximized && firstRestorePending) frame.later { giveRestoredSize() }
+        statusListeners.forEach { it(next) }
     }
 
     /**
      * Gives the window its first normal size, on the first time it leaves
-     * maximized. Waits for the next restore when the window went straight back
-     * to maximized in between.
+     * maximised. Waits for the next restore when the window went straight back
+     * to maximised in between.
      */
-    private fun giveRestoredSize(w: ComposeWindow) {
-        if (window !== w || !firstRestorePending || isMax(w.extendedState)) return
+    private fun giveRestoredSize() {
+        if (!firstRestorePending || _status.value.maximized) return
         firstRestorePending = false
-        if (!capabilities.current.resize) return
-        val target = firstRestoreBounds(w)
-        log.info(
-            "window state -> first restore, normal size {}x{} at {},{}",
-            target.width, target.height, target.x, target.y,
-        )
-        w.bounds = target
-        dump(w, "first-restore-size")
+        if (!actions.value.resize) return
+        val target = firstRestoreBounds()
+        log.info("window state -> first restore, normal size {}x{} at {},{}", target.width, target.height, target.x, target.y)
+        frame.bounds = target
+        dump("first-restore-size")
     }
 
-    fun maximize() {
-        val w = window ?: return
-        val _ = runCatching { w.maximizedBounds = screenWorkArea(w.graphicsConfiguration) }
-        log.info("window state -> WM: requesting maximize")
-        dump(w, "cmd maximize PRE")
-        w.extendedState = w.extendedState or Frame.MAXIMIZED_BOTH
-        dump(w, "cmd maximize POST")
-    }
-
-    fun restore() {
-        val w = window ?: return
-        log.info("window state -> WM: requesting restore")
-        dump(w, "cmd restore PRE")
-        w.extendedState = w.extendedState and Frame.MAXIMIZED_BOTH.inv()
-        dump(w, "cmd restore POST")
-    }
-
-    // Decided by what the window manager has said, so a click before it answers
-    // the last one repeats that request instead of sending the opposite.
-    fun toggle() {
-        val w = window ?: return
-        if (capabilities.maximized ?: isMax(w.extendedState)) restore() else maximize()
-    }
-
-    /**
-     * Un-maximize for a title-bar drag on an undecorated frame: request a native
-     * restore, then best-effort re-anchor so the cursor stays proportionally over
-     * the bar. On the first restore the normal size is given right here rather
-     * than after the event, so the drag carries the window it will end up with.
-     * The restored bounds settle asynchronously on some WMs, so this reads what it
-     * can and the drag loop re-reads `window.location` afterward.
-     */
-    fun unmaximizeUnderCursor(mouseX: Int, mouseY: Int) {
-        val w = window ?: return
-        if (!maximized) return
-        val cur = w.bounds
-        val first = firstRestorePending && capabilities.current.resize
-        firstRestorePending = false
-        restore()
-        val restored = if (first) firstRestoreBounds(w) else w.bounds
-        val ratioX = if (cur.width > 0) ((mouseX - cur.x).toFloat() / cur.width).coerceIn(0f, 1f) else 0.5f
-        w.setBounds(mouseX - (ratioX * restored.width).toInt(), cur.y, restored.width, restored.height)
-    }
-
-    private fun firstRestoreBounds(w: ComposeWindow): Rectangle =
-        firstRestore ?: restoredBounds(screenWorkArea(w.graphicsConfiguration), RESTORE_WINDOW_SIZE)
+    private fun firstRestoreBounds(): Rectangle = firstRestore ?: restoredBounds(frame.workArea, RESTORE_WINDOW_SIZE)
 
     private fun isMax(s: Int) = (s and Frame.MAXIMIZED_BOTH) == Frame.MAXIMIZED_BOTH
 
-    // ---- window-management diagnostics (WINDBG) --------------------------------
-    // Enabled with -Dnexira.puppet.port so a debug run correlates the launcher's
-    // view against the WM's. Off (and free) in production.
-
-    private fun dump(w: ComposeWindow, event: String) {
+    private fun dump(event: String) {
         if (!DEBUG) return
-        val es = w.extendedState
-        val b = w.bounds
-        val wa = screenWorkArea(w.graphicsConfiguration)
+        val b = frame.bounds
+        val wa = frame.workArea
         log.info(
-            "WINDBG | $event | ext=${decode(es)} placement=${state.placement} observed.max=$maximized " +
+            "WINDBG | $event | ext=${decode(frame.extendedState)} reported=$reported status=${_status.value} " +
                 "bounds=[${b.x},${b.y} ${b.width}x${b.height}] work=[${wa.x},${wa.y} ${wa.width}x${wa.height}] " +
-                "firstRestorePending=$firstRestorePending supported=$supported",
+                "firstRestorePending=$firstRestorePending supported=$maximizeSupported",
         )
     }
 
@@ -265,10 +262,17 @@ class WindowMaximizer(
         if (isEmpty()) append("NORMAL")
     }
 
-    private companion object {
-        val log: Logger = LoggerFactory.getLogger(WindowMaximizer::class.java)
-        val DEBUG = System.getProperty("nexira.puppet.port") != null
+    companion object {
+        private val log: Logger = LoggerFactory.getLogger(WindowHost::class.java)
+        private val DEBUG = System.getProperty("nexira.puppet.port") != null
+
+        /**
+         * Takes [window] over, on the AWT event thread, once it has a native
+         * peer. [handle] is the peer's native window, [customFrame] says the
+         * window is undecorated and draws its own frame, and [firstRestore] is
+         * the normal frame a window born maximised gets on its first restore.
+         */
+        fun attach(window: Frame, handle: Long, customFrame: Boolean, firstRestore: Rectangle?): WindowHost =
+            WindowHost(AwtFrameOps(window), Backend.choose(window, handle, customFrame), firstRestore).also { it.start() }
     }
 }
-
-val LocalWindowMaximizer = staticCompositionLocalOf<WindowMaximizer?> { null }

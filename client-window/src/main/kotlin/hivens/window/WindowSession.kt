@@ -1,24 +1,19 @@
-package hivens.ui.chrome
+package hivens.window
 
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.awt.ComposeWindow
-import androidx.compose.ui.unit.DpSize
 import hivens.core.io.AtomicFiles
 import hivens.core.io.readUtf8
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-import java.awt.Frame
-import java.awt.GraphicsEnvironment
+import java.awt.Dimension
 import java.awt.Point
 import java.awt.Rectangle
-import java.awt.event.ComponentAdapter
-import java.awt.event.ComponentEvent
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+import javax.swing.Timer
 
 /**
  * How the window was left: maximised or not, and the frame it had the last time
@@ -62,7 +57,7 @@ data class SavedWindow(
 /**
  * What the window opens as. [bounds] is the frame it is created with, [normal]
  * the frame its first restore gives it, or null where nothing was saved and the
- * first restore picks a size of its own (see [WindowMaximizer]).
+ * first restore picks a size of its own (see [WindowHost]).
  */
 data class OpeningFrame(val bounds: Rectangle, val maximized: Boolean, val normal: Rectangle?)
 
@@ -77,27 +72,28 @@ data class OpeningFrame(val bounds: Rectangle, val maximized: Boolean, val norma
  * survives is shrunk to the screen it is on and pulled in until that strip is
  * reachable. A frame that does not falls back to the restore size, centred on
  * [primary]. A maximised window opens maximised on the screen its normal frame
- * is on.
+ * is on. [floor] is what [initialWindowSize] raises a small work area to.
  */
 fun openingFrame(
     saved: SavedWindow?,
     workAreas: List<Rectangle>,
     primary: Rectangle,
-    restore: DpSize,
+    restore: Dimension,
+    floor: Dimension,
     placeable: Boolean,
 ): OpeningFrame {
-    if (saved == null || !placeable) return OpeningFrame(maximizedFrame(primary, restore), maximized = true, normal = null)
+    if (saved == null || !placeable) return OpeningFrame(maximizedFrame(primary, restore, floor), maximized = true, normal = null)
     val normal = fitToScreens(saved.normalBounds, workAreas) ?: restoredBounds(primary, restore)
     if (!saved.maximized) return OpeningFrame(normal, maximized = false, normal = normal)
     val centre = Point(normal.centerX.toInt(), normal.centerY.toInt())
     val area = workAreas.firstOrNull { it.contains(centre) } ?: primary
-    return OpeningFrame(maximizedFrame(area, restore), maximized = true, normal = normal)
+    return OpeningFrame(maximizedFrame(area, restore, floor), maximized = true, normal = normal)
 }
 
 /** The frame a maximised window is born with: its work area, at the size [initialWindowSize] gives it. */
-private fun maximizedFrame(area: Rectangle, restore: DpSize): Rectangle {
-    val size = initialWindowSize(area, restore)
-    return Rectangle(area.x, area.y, size.width.value.toInt(), size.height.value.toInt())
+private fun maximizedFrame(area: Rectangle, restore: Dimension, floor: Dimension): Rectangle {
+    val size = initialWindowSize(area, restore, floor)
+    return Rectangle(area.x, area.y, size.width, size.height)
 }
 
 internal fun fitToScreens(frame: Rectangle, workAreas: List<Rectangle>): Rectangle? {
@@ -112,74 +108,68 @@ internal fun fitToScreens(frame: Rectangle, workAreas: List<Rectangle>): Rectang
     return Rectangle(x, y, w, h)
 }
 
-/** The work area of every screen attached now, the primary first. Empty when headless. */
-fun currentWorkAreas(): List<Rectangle> = runCatching {
-    val env = GraphicsEnvironment.getLocalGraphicsEnvironment()
-    val primary = env.defaultScreenDevice
-    (listOf(primary) + env.screenDevices.filter { it !== primary })
-        .map { screenWorkArea(it.defaultConfiguration) }
-        .filter { it.width > 0 && it.height > 0 }
-}.getOrDefault(emptyList())
-
 /**
  * Writes [SavedWindow] as the window changes, so the next start opens it the
  * way it was left.
  *
- * Moves and resizes only mark the record dirty. It is read back from the frame
- * [SETTLE_MS] later, once the window has stopped changing: entering and leaving
- * maximised fires resize events at sizes that belong to neither state, and on
- * some systems before the state itself has flipped, so a frame recorded at the
- * event could store the maximised rectangle as the normal one. A minimised or
- * hidden frame is never recorded.
+ * A move, a resize or a change of state only restarts a wait of [SETTLE_MS]. The
+ * record is read from the frame once the window has stopped changing: entering
+ * and leaving maximised fires resize events at sizes that belong to neither
+ * state, and on some systems before the state itself has flipped, so a frame
+ * recorded at the event could store the maximised rectangle as the normal one.
+ * A minimised or hidden frame never gives its frame as the normal one. The file
+ * is written off the event thread, except by [close], which writes in place on
+ * the way out, since the process may be gone before another thread runs.
  */
-class WindowSessionWriter(
-    private val dataDir: Path,
-    private val maximizer: WindowMaximizer,
+class WindowSessionRecorder internal constructor(
+    private val host: WindowHost,
     initialNormal: Rectangle?,
-) {
+    private val write: (SavedWindow) -> Unit,
+) : AutoCloseable {
     private var normal: Rectangle? = initialNormal
-
-    /** Bumped on every move or resize, watched by the caller to time the write. */
-    var changes by mutableStateOf(0)
-        private set
-
-    private var window: ComposeWindow? = null
-    private val listener = object : ComponentAdapter() {
-        override fun componentMoved(e: ComponentEvent) { changes++ }
-        override fun componentResized(e: ComponentEvent) { changes++ }
+    private val writer: ExecutorService = Executors.newSingleThreadExecutor { r ->
+        Thread(r, "window-session").apply { isDaemon = true }
     }
-
-    fun attach(w: ComposeWindow) {
-        window = w
-        w.addComponentListener(listener)
-    }
-
-    fun detach() {
-        window?.removeComponentListener(listener)
-        window = null
-    }
+    private val settle = Timer(SETTLE_MS) { flushLater() }.apply { isRepeats = false }
+    private val removals = listOf(
+        host.frame.onGeometryChanged { settle.restart() },
+        host.onStatusChanged { settle.restart() },
+    )
 
     /**
      * The record as the frame is now, or null before the window has had a
      * normal frame at all. Reads the frame, so call it on the AWT thread.
      */
-    fun snapshot(): SavedWindow? {
-        val w = window ?: return null
-        val maximized = maximizer.maximized
-        val minimized = (w.extendedState and Frame.ICONIFIED) != 0
-        if (!maximized && !minimized && w.isShowing) normal = w.bounds
-        return normal?.let { SavedWindow.of(maximized, it) }
+    internal fun snapshot(): SavedWindow? {
+        val status = host.status.value
+        if (!status.maximized && !status.minimized && host.frame.showing) normal = host.frame.bounds
+        return normal?.let { SavedWindow.of(status.maximized, it) }
     }
 
-    /** Writes [record]. A file write, so off the AWT thread except on the way out. */
-    fun save(record: SavedWindow) {
-        runCatching { SavedWindow.write(dataDir, record) }
+    private fun flushLater() {
+        val record = snapshot() ?: return
+        writer.execute { save(record) }
+    }
+
+    private fun save(record: SavedWindow) {
+        runCatching { write(record) }
             .onFailure { log.warn("Could not save the window's size and position", it) }
     }
 
+    override fun close() {
+        settle.stop()
+        removals.forEach { it() }
+        writer.shutdown()
+        snapshot()?.let(::save)
+    }
+
     companion object {
-        const val SETTLE_MS = 400L
-        private val log: Logger = LoggerFactory.getLogger(WindowSessionWriter::class.java)
+        const val SETTLE_MS = 400
+        private val log: Logger = LoggerFactory.getLogger(WindowSessionRecorder::class.java)
+
+        /** Starts recording [host]'s window into `window.json` under [dataDir]. Call on the AWT thread. */
+        fun start(host: WindowHost, dataDir: Path, initialNormal: Rectangle?): WindowSessionRecorder =
+            WindowSessionRecorder(host, initialNormal) { SavedWindow.write(dataDir, it) }
     }
 }
 
