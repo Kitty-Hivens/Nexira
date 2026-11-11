@@ -13,6 +13,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import javax.swing.Timer
 
 /**
@@ -160,11 +161,15 @@ class WindowSessionRecorder internal constructor(
         settle.stop()
         removals.forEach { it() }
         writer.shutdown()
+        // A write already queued goes first: both go through the same temporary file,
+        // and two at once could leave the record broken.
+        val _ = runCatching { writer.awaitTermination(CLOSE_WAIT_MS, TimeUnit.MILLISECONDS) }
         snapshot()?.let(::save)
     }
 
     companion object {
         const val SETTLE_MS = 400
+        private const val CLOSE_WAIT_MS = 2000L
         private val log: Logger = LoggerFactory.getLogger(WindowSessionRecorder::class.java)
 
         /** Starts recording [host]'s window into `window.json` under [dataDir]. Call on the AWT thread. */

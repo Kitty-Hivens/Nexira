@@ -88,6 +88,7 @@ class WindowHost internal constructor(
         }
         frameState = frame.extendedState
         _status.value = compute()
+        captions?.resizable = actions.value.resize
         // Only a window born maximised has a normal size nobody chose. One that
         // opened as a window already has the size it was left at, and the system
         // remembers whatever it is moved to after that.

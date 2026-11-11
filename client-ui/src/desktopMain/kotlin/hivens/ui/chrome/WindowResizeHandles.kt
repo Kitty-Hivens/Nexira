@@ -23,7 +23,6 @@ import hivens.window.WindowEdge
 import hivens.window.WindowHost
 import hivens.window.resizedBounds
 import java.awt.Cursor
-import java.awt.Dimension
 import java.awt.MouseInfo
 
 /**
@@ -42,6 +41,10 @@ import java.awt.MouseInfo
  * which would cost a recomposition per mouse step; the state follows the frame
  * on its own.
  *
+ * A side stops at the frame's own minimum size, read at the press: the one
+ * [WindowHost.keepMinimumSize] cut to the screen the window is on, not the shell's
+ * design minimum, which on a small screen is taller than the screen.
+ *
  * Where the window manager takes resizes over ([WindowHost.beginResize]) a press
  * on a grip hands it the resize instead.
  *
@@ -53,7 +56,6 @@ import java.awt.MouseInfo
 internal fun WindowResizeHandles(
     window: ComposeWindow?,
     host: WindowHost,
-    minSize: Dimension,
     maximized: Boolean,
     canResize: Boolean,
     modifier: Modifier = Modifier,
@@ -63,14 +65,14 @@ internal fun WindowResizeHandles(
     if (maximized) return
     Box(modifier.fillMaxSize()) {
         // Edges first, then corners -- corners win where they overlap an edge.
-        Grip(WindowEdge.N, Alignment.TopCenter, window, host, minSize, thickness)
-        Grip(WindowEdge.S, Alignment.BottomCenter, window, host, minSize, thickness)
-        Grip(WindowEdge.W, Alignment.CenterStart, window, host, minSize, thickness)
-        Grip(WindowEdge.E, Alignment.CenterEnd, window, host, minSize, thickness)
-        Grip(WindowEdge.NW, Alignment.TopStart, window, host, minSize, thickness)
-        Grip(WindowEdge.NE, Alignment.TopEnd, window, host, minSize, thickness)
-        Grip(WindowEdge.SW, Alignment.BottomStart, window, host, minSize, thickness)
-        Grip(WindowEdge.SE, Alignment.BottomEnd, window, host, minSize, thickness)
+        Grip(WindowEdge.N, Alignment.TopCenter, window, host, thickness)
+        Grip(WindowEdge.S, Alignment.BottomCenter, window, host, thickness)
+        Grip(WindowEdge.W, Alignment.CenterStart, window, host, thickness)
+        Grip(WindowEdge.E, Alignment.CenterEnd, window, host, thickness)
+        Grip(WindowEdge.NW, Alignment.TopStart, window, host, thickness)
+        Grip(WindowEdge.NE, Alignment.TopEnd, window, host, thickness)
+        Grip(WindowEdge.SW, Alignment.BottomStart, window, host, thickness)
+        Grip(WindowEdge.SE, Alignment.BottomEnd, window, host, thickness)
     }
 }
 
@@ -80,7 +82,6 @@ private fun BoxScope.Grip(
     align: Alignment,
     window: ComposeWindow,
     host: WindowHost,
-    minSize: Dimension,
     thickness: Dp,
 ) {
     val sizeMod = when {
@@ -100,10 +101,11 @@ private fun BoxScope.Grip(
                         if (host.beginResize(edge)) continue
                         val startMouse = MouseInfo.getPointerInfo()?.location ?: continue
                         val start = window.bounds
+                        val min = window.minimumSize
                         drag(down.id) { change ->
                             change.consume()
                             val now = MouseInfo.getPointerInfo()?.location ?: return@drag
-                            window.bounds = resizedBounds(start, edge, now.x - startMouse.x, now.y - startMouse.y, minSize.width, minSize.height)
+                            window.bounds = resizedBounds(start, edge, now.x - startMouse.x, now.y - startMouse.y, min.width, min.height)
                         }
                     }
                 }

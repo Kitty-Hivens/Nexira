@@ -29,7 +29,7 @@ import kotlin.math.roundToInt
  * that to a popup: it resizes only a window with a sizing border, and a message
  * asking it to start a move or resize on the popup was answered with nothing.
  * So the window gets the sizing border, and its window procedure is wrapped
- * through an FFM upcall to answer two questions before AWT sees them:
+ * through an FFM upcall to answer three messages before AWT sees them:
  *
  * - WM_NCCALCSIZE: the border takes no room, so the client area is the whole
  *   window and nothing of a frame is drawn. A maximised window, which Windows

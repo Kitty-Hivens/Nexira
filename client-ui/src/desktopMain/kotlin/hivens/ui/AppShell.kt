@@ -1084,7 +1084,6 @@ fun FrameWindowScope.AppShellContent(
                 WindowResizeHandles(
                     window    = window,
                     host      = windowHost,
-                    minSize   = MIN_SHELL_SIZE,
                     maximized = windowStatus.maximized,
                     canResize = windowCapabilities.value.resize && !windowHost.nativeFrame,
                 )
