@@ -5,32 +5,43 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.WindowState
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxColor
+import hivens.ui.theme.NxInk
 import hivens.ui.theme.Status
+import kotlin.math.floor
+import kotlin.math.max
+import kotlin.math.roundToInt
 
 /**
  * Custom caption buttons for the undecorated window: minimize, maximize/restore,
- * close. Glyphs are vector-drawn (not font icons) so they stay crisp and need no
- * font-subset entry. Close routes through [onClose] -- pass the SAME lambda the
- * window's onCloseRequest uses so tray-hide / chaos-dialog behavior is preserved.
+ * close. Glyphs are vector-drawn (not font icons) so they need no font-subset
+ * entry. Close routes through [onClose] -- pass the SAME lambda the window's
+ * onCloseRequest uses so tray-hide / chaos-dialog behavior is preserved.
+ *
+ * Each button takes the full height of the bar it sits in, as the system's own
+ * caption buttons do, so its hover fill reads as a button and not as a patch
+ * floating in the bar. The glyphs are laid on whole device pixels with one
+ * stroke width for all three (see [glyphStroke]): a stroke of 1.2dp at 100%
+ * fell between pixels and smeared into two grey lines, and a square stroked on
+ * its outline drew heavier than the cross beside it.
  *
  * Maximize/restore is driven by [maximizer], not [WindowState.placement]: the
  * undecorated frame's AWT placement round-trip is unreliable on Windows, so the
@@ -50,84 +61,111 @@ fun WindowControls(
     modifier: Modifier = Modifier,
 ) {
     val s = LocalStrings.current
-    val tint = NxInk.quiet
-    val hover = NxInk.main.copy(alpha = 0.12f)
-    val closeHover = NxColor.status(Status.Error)
     val maximized = maximizer.maximized
+    val ink = NxInk.main
+    val plain = CaptionColours(
+        glyph = ink.copy(alpha = GLYPH_ALPHA),
+        glyphHover = ink,
+        hover = ink.copy(alpha = HOVER_ALPHA),
+        pressed = ink.copy(alpha = PRESSED_ALPHA),
+    )
+    val closeFill = NxColor.status(Status.Error)
+    val close = CaptionColours(
+        glyph = ink.copy(alpha = GLYPH_ALPHA),
+        glyphHover = NxColor.on(closeFill),
+        hover = closeFill,
+        pressed = closeFill.copy(alpha = CLOSE_PRESSED_ALPHA),
+    )
 
-    Row(modifier) {
+    Row(modifier.fillMaxHeight()) {
         if (capabilities.minimize) {
-            CaptionButton(
-                label = s.windowMinimize,
-                tint = tint,
-                hoverBg = hover,
-                onClick = { state.isMinimized = true },
-                glyph = { c ->
-                    drawLine(
-                        color = c,
-                        start = Offset(0f, size.height / 2f),
-                        end = Offset(size.width, size.height / 2f),
-                        strokeWidth = strokePx(),
-                        cap = StrokeCap.Round,
-                    )
-                },
-            )
+            CaptionButton(s.windowMinimize, plain, onClick = { state.isMinimized = true }) { c ->
+                val stroke = glyphStroke()
+                val y = snap(size.height / 2f, stroke)
+                drawLine(c, Offset(0f, y), Offset(size.width, y), stroke, StrokeCap.Butt)
+            }
         }
 
         // The toolkit's answer stays in as well: on Windows and macOS it is the
         // only one there is.
         if (maximizer.supported && capabilities.maximize) {
-            CaptionButton(
-                label = if (maximized) s.windowRestore else s.windowMaximize,
-                tint = tint,
-                hoverBg = hover,
-                onClick = { maximizer.toggle() },
-                glyph = { c ->
-                    if (maximized) {
-                        val o = size.minDimension * 0.24f
-                        val side = size.minDimension - o
-                        drawRect(c, Offset(o, 0f), Size(side, side), style = Stroke(strokePx()))
-                        drawRect(c, Offset(0f, o), Size(side, side), style = Stroke(strokePx()))
-                    } else {
-                        drawRect(c, Offset.Zero, Size(size.minDimension, size.minDimension), style = Stroke(strokePx()))
-                    }
-                },
-            )
+            CaptionButton(if (maximized) s.windowRestore else s.windowMaximize, plain, onClick = { maximizer.toggle() }) { c ->
+                val stroke = glyphStroke()
+                if (maximized) {
+                    // The window in front, and the edges of the one behind it that show.
+                    val back = floor(size.width * RESTORE_OFFSET)
+                    outline(c, Offset(0f, back), size.width - back, stroke)
+                    val top = stroke / 2f
+                    val right = size.width - stroke / 2f
+                    drawLine(c, Offset(back, top), Offset(right, top), stroke, StrokeCap.Square)
+                    drawLine(c, Offset(right, top), Offset(right, size.height - back), stroke, StrokeCap.Square)
+                } else {
+                    outline(c, Offset.Zero, size.width, stroke)
+                }
+            }
         }
 
-        CaptionButton(
-            label = s.windowClose,
-            tint = tint,
-            hoverBg = closeHover,
-            onClick = onClose,
-            glyph = { c ->
-                drawLine(c, Offset(0f, 0f), Offset(size.width, size.height), strokePx(), cap = StrokeCap.Round)
-                drawLine(c, Offset(size.width, 0f), Offset(0f, size.height), strokePx(), cap = StrokeCap.Round)
-            },
-        )
+        CaptionButton(s.windowClose, close, onClick = onClose) { c ->
+            val stroke = glyphStroke()
+            drawLine(c, Offset(0f, 0f), Offset(size.width, size.height), stroke, StrokeCap.Butt)
+            drawLine(c, Offset(size.width, 0f), Offset(0f, size.height), stroke, StrokeCap.Butt)
+        }
     }
 }
 
-/** A 46x32 hover-highlighted hit target with a 10dp vector glyph centered. */
+private class CaptionColours(val glyph: Color, val glyphHover: Color, val hover: Color, val pressed: Color)
+
+/** A full-height hit target with a 10dp glyph centred, filled while the pointer is on it. */
 @Composable
 private fun CaptionButton(
     label: String,
-    tint: Color,
-    hoverBg: Color,
+    colours: CaptionColours,
     onClick: () -> Unit,
     glyph: DrawScope.(Color) -> Unit,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
+    val pressed by interaction.collectIsPressedAsState()
+    val fill = when {
+        pressed -> colours.pressed
+        hovered -> colours.hover
+        else -> Color.Transparent
+    }
     Box(
         modifier = Modifier
-            .size(46.dp, 32.dp)
-            .background(if (hovered) hoverBg else Color.Transparent)
+            .width(BUTTON_WIDTH)
+            .fillMaxHeight()
+            .background(fill)
             .clickable(interactionSource = interaction, indication = null, onClickLabel = label, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Canvas(Modifier.size(10.dp)) { glyph(tint) }
+        Canvas(Modifier.size(GLYPH_SIZE)) { glyph(if (hovered || pressed) colours.glyphHover else colours.glyph) }
     }
 }
 
-private fun DrawScope.strokePx(): Float = 1.2.dp.toPx()
+/** One device pixel per 100% of scale, and never less than one: the width every glyph is drawn with. */
+private fun DrawScope.glyphStroke(): Float = max(1f, density.roundToInt().toFloat())
+
+/** [v] moved to where a line of width [stroke] covers whole pixels. */
+private fun snap(v: Float, stroke: Float): Float = floor(v - stroke / 2f) + stroke / 2f
+
+/** A square of side [side] whose stroke lies inside it, starting at [topLeft]. */
+private fun DrawScope.outline(c: Color, topLeft: Offset, side: Float, stroke: Float) {
+    val h = stroke / 2f
+    val l = topLeft.x + h
+    val t = topLeft.y + h
+    val r = topLeft.x + side - h
+    val b = topLeft.y + side - h
+    drawLine(c, Offset(l, t), Offset(r, t), stroke, StrokeCap.Square)
+    drawLine(c, Offset(r, t), Offset(r, b), stroke, StrokeCap.Square)
+    drawLine(c, Offset(r, b), Offset(l, b), stroke, StrokeCap.Square)
+    drawLine(c, Offset(l, b), Offset(l, t), stroke, StrokeCap.Square)
+}
+
+private val BUTTON_WIDTH = 40.dp
+private val GLYPH_SIZE = 10.dp
+private const val RESTORE_OFFSET = 0.2f
+private const val GLYPH_ALPHA = 0.82f
+private const val HOVER_ALPHA = 0.10f
+private const val PRESSED_ALPHA = 0.18f
+private const val CLOSE_PRESSED_ALPHA = 0.8f

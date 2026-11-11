@@ -679,8 +679,17 @@ fun ShellTopRegion(instance: WidgetInstance) {
             SurfaceKind.Chrome, barModifier, shape,
             opacity = props.opacityPct.regionOpacity(), blurDp = props.blurDp.toFloat(),
         ) {
+            // The caption buttons run to the window's edge, so the close button sits
+            // in the corner, where a maximised window's close is hit by throwing the
+            // pointer there. The gutter stays on the side that has none.
+            val captionEnd = showControls && !HOST_IS_MAC
+            val captionStart = showControls && HOST_IS_MAC
             Row(
-                Modifier.fillMaxSize().padding(top = topEdge, start = 6.dp + edge.start, end = 6.dp + edge.end),
+                Modifier.fillMaxSize().padding(
+                    top = topEdge,
+                    start = (if (captionStart) 0.dp else 6.dp) + edge.start,
+                    end = (if (captionEnd) 0.dp else 6.dp) + edge.end,
+                ),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (HOST_IS_MAC) Caption()
