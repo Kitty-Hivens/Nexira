@@ -10,6 +10,49 @@ nicht gelesen werden, um eine Version zu verstehen.
 
 ## [Unreleased]
 
+## [2.4.7] - 2026-11-11
+
+2.4.7 bringt zu Ende, was die Beta angefangen hat: Durchsuchen findet Mods, Ressourcenpakete und Shader, und das Installieren in ein Pack wird ordentlich erledigt. Seit der Beta sind ein Handy, ein Fenster, das sich unter Windows endlich benimmt, und eine lange Liste von Korrekturen dazugekommen.
+
+### Android, in der Beta
+
+Nexira läuft auf Handys mit 64-Bit-ARM. Die APK liegt auf der Release-Seite neben den anderen Downloads. Derselbe Startbildschirm, dieselbe Bibliothek, Durchsuchen und dieselben Einstellungen, für ein Handy in jeder Haltung angeordnet, und die Spiele laufen auf dem Handy selbst: Der Launcher holt ein Java und die Grafikbibliotheken für Android, gibt dem Spiel ein Vollbildfenster und reicht ihm deine Finger, eine Maus oder eine Tastatur weiter. Mit dem Mod TouchController im Pack bekommst du richtige Bildschirmsteuerung. Spiele vor 1.17 laufen auch. Es ist eine Beta: Rechne mit Ecken und Kanten und sag uns, wo sie sind.
+
+### Durchsuchen und Installieren
+
+Alles, was die Beta gebracht hat, ist da: Mods, Ressourcenpakete und Shader von Modrinth neben Packs, Filter wie bei Modrinth selbst, Installieren direkt in ein Pack mit allem, was es braucht, und Pack-Seiten, die wie die eines Mods funktionieren. Dazu kommt:
+
+- Eine Installation, der eine benötigte Abhängigkeit fehlt, sagt das auf der Karte und im Installationsdialog, nicht nur auf der Projektseite.
+- Eine Abhängigkeit, die im Pack ist, aber ausgeschaltet, zählt nicht mehr als vorhanden, und eine Bibliothek, die schon unter einem anderen Dateinamen im Pack liegt, wird nicht ein zweites Mal hinzugefügt.
+- „Erneut versuchen“ installiert die Version, die fehlgeschlagen ist, nicht die neueste. Ein Link von einem Projekt zum nächsten behält das Pack, in das du installiert hast.
+- Ein Modpack lässt sich nicht mehr als Mod in ein Pack installieren.
+- Wer zu einer Suche zurückkehrt, findet sie so vor, wie er sie verlassen hat, und hat sich das Pack inzwischen geändert, liest die Suche es neu.
+- Um herauszufinden, in welche Packs ein Projekt passt, schickt der Launcher Modrinth keine Liste aller Dateien aller Packs mehr. Das wird auf deinem Rechner ausgerechnet.
+
+### Hivens-Packs
+
+Ressourcenpakete und Shader, die mit einem Pack kommen, behalten deine Wahl über Updates, Rückrollen und Reparaturen hinweg, auch eine Wahl, die du getroffen hast, während das Spiel die Datei offen hatte. Und ein Pack, über das sich gerade nichts Näheres erfahren lässt, hält seine eigenen Dateien gesperrt, statt sie zum Ersetzen anzubieten.
+
+### Das Fenster
+
+Unter Windows benimmt sich das Launcher-Fenster jetzt wie jedes andere: Du ziehst es an der oberen Leiste, änderst die Größe an jeder Kante und dockst es an den Bildschirmrand an, und maximiert bleibt es über der Taskleiste. Die hellen Streifen, die beim Größeändern an einer Kante aufblitzten, sind weg, die Knöpfe in der Ecke sind scharf gezeichnet, und das Fenster öffnet sich so, wie du es verlassen hast, maximiert oder da, wo du es hingestellt hast. Benachrichtigungen erreichen den Desktop, wenn der Launcher mit dem Installer installiert ist. Unter Linux bewegt ein Desktop, der Fenster selbst bewegt, jetzt auch den Launcher und ändert seine Größe, mit seinem eigenen Andocken, und das Fenster öffnet sich nicht mehr bildschirmgroß mit der Oberkante über dem Rand.
+
+### Tippen
+
+Auf einem langsamen Rechner verloren Textfelder Buchstaben, die in normalem Tempo getippt wurden, und das Leeren eines Feldes konnte Text übrig lassen. Jetzt bleibt jeder Buchstabe.
+
+### Module
+
+Widget-Module bringen jetzt mehr als Widgets: Vollbildeffekte, Themes und Partikelfelder, jedes mit eigenen Einstellungen und eigenen Worten in deiner Sprache. Die Beispielmodule bringen ein Kaleidoskop, einen alten Röhrenmonitor-Look, einen Glitch, zwei Themes und zwei Partikelfelder mit. Die Effekte kommen mit einer Warnung für alle, die empfindlich auf Flackern reagieren.
+
+### Alles andere
+
+- Ein Download, der mittendrin abbricht, macht dort weiter, wo er stehen geblieben ist, statt von vorn anzufangen.
+- Ein Java, das nicht startet, wird erkannt, bevor es deins ersetzt, und der Launcher sagt, warum, statt das Archiv für beschädigt zu erklären.
+- Solange sich dein gespeichertes Konto beim Start noch anmeldet, sagt „Spielen“ genau das und wartet, statt eine Anmeldung oder ein Offline-Spiel anzubieten.
+- Ein Klick auf den Rand eines Textfelds landet im Feld, das Leeren der Suche in Durchsuchen lässt den Cursor drin, und die Konsole behält ihre Tastenkürzel nach einem Klick auf ihre Leiste.
+- Suchergebnisse stapeln sich nicht mehr ewig auf der Platte, und ein paar Dutzend kleinere Dinge sind unterwegs auch repariert worden, wie das halt so ist, kennst du ja.
+
 ## [2.4.7-beta] - 2026-10-09
 
 ### Durchsuchen
