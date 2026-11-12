@@ -191,6 +191,21 @@ class NavBackStackTest {
     }
 
     @Test
+    fun historyHoldsWhatBothArrowsReachAndNothingASwitchDropped() {
+        val nav = NavBackStack(Screen.Browse)
+        nav.navigate(Screen.CataloguePackDetail(PackOrigin.Mirror, "X"))
+        nav.navigate(Screen.PackDetail("i1"))
+        nav.back()
+        assertEquals(
+            listOf(Screen.Browse, Screen.CataloguePackDetail(PackOrigin.Mirror, "X"), Screen.PackDetail("i1")),
+            nav.history,
+            "a screen Back stepped off is still reachable by Forward",
+        )
+        nav.switchTo(Screen.Library)
+        assertEquals(listOf(Screen.Library), nav.history)
+    }
+
+    @Test
     fun forwardIsNoOpWhenEmpty() {
         val nav = NavBackStack(Screen.Home)
         assertFalse(nav.canGoForward)

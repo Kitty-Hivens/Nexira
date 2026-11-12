@@ -20,6 +20,7 @@ import hivens.ui.background.hasUsableImage
 import hivens.ui.customization.CustomizationSettings
 import hivens.ui.editor.EditorSurfaceHost
 import hivens.ui.i18n.AppLocale
+import androidx.compose.runtime.saveable.SaveableStateHolder
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import hivens.ui.nx.NxSwap
 import hivens.ui.puppet.PuppetClick
@@ -56,8 +57,13 @@ import hivens.ui.feature.catalogue.project.ModVersionScreen
 import hivens.ui.screens.custom.CustomScreen
 import hivens.ui.widgets.home.new.HomeNewContext
 import hivens.ui.widgets.home.new.LocalHomeNewContext
+import hivens.ui.widgets.ChildLevel
+import hivens.ui.widgets.LevelHost
 import hivens.widget.api.LocalLayoutGraph
+import hivens.widget.api.LocalScope
+import hivens.widget.api.PageLevels
 import hivens.widget.api.SlotRenderer
+import hivens.widget.model.ScopeLevel
 import hivens.widget.model.SlotId
 import hivens.widget.model.SurfaceId
 import org.koin.compose.koinInject
@@ -78,6 +84,7 @@ fun AppLayout(
     canGoForward: Boolean,
     onForward: () -> Unit,
     trail: List<Screen>,
+    history: List<Screen> = trail,
     onPopTo: (Screen) -> Unit,
     onLogin: (SessionData) -> Unit,
     onLogout: () -> Unit,
@@ -125,13 +132,20 @@ fun AppLayout(
         // arranged -- a scroll position, an open tab, a chosen category -- died with
         // the visit and came back at its default. Held per destination here instead.
         val retention = rememberSaveableStateHolder()
+        // And a page level per destination, for what a page makes and is handed. It
+        // lives while the destination is anywhere in the history, back or forward,
+        // and goes once it has left the history and stopped drawing. The composition's
+        // level keeps them, so they go with it even if this router leaves first.
+        val pages = LocalScope.current?.nearest(ScopeLevel.Composition)?.pages
+        val historyKeys = history.mapTo(HashSet()) { it.retentionKey }
+        LaunchedEffect(pages, historyKeys) { pages?.keep(historyKeys) }
         // How a screen replaces another is the swap primitive's business, not the
         // router's. A still style collapses it without this site knowing.
         NxSwap(
             target = currentScreen,
             label  = "screen",
         ) { screen ->
-            retention.SaveableStateProvider(screen.retentionKey) {
+            Destination(retention, pages, screen.retentionKey) {
                 when (screen) {
                     // One home. The classic dashboard WAS the SmartyCraft server
                     // list, and SmartyCraft arrives as mirror packs now, so the
@@ -306,6 +320,8 @@ fun AppLayout(
         HomeNewContext(appState = appState, onScreenChange = onScreenChange)
     }
 
+    // The composition's level, around everything it draws, the editor included.
+    ChildLevel(ScopeLevel.Composition) {
     EditorSurfaceHost(
         currentScreen          = currentScreen,
         customization          = customization,
@@ -330,6 +346,29 @@ fun AppLayout(
                 modifier = Modifier.fillMaxSize().background(rowBackground).releaseFocusOnPress(),
             )
         }
+    }
+    } // end ChildLevel(Composition)
+}
+
+/**
+ * One destination of the router: its saveable state and its page level, both held
+ * under [key]. The content holds its level from the moment it composes, so a
+ * destination that left the history keeps its level until it has finished fading
+ * out, and one that just arrived cannot be swept by another leaving in its first frame.
+ */
+@Composable
+private fun Destination(
+    retention: SaveableStateHolder,
+    pages: PageLevels?,
+    key: String,
+    content: @Composable () -> Unit,
+) {
+    retention.SaveableStateProvider(key) {
+        val level = pages?.let {
+            val _ = remember(it, key) { it.hold(key) }
+            it.levelFor(key)
+        }
+        LevelHost(level, content)
     }
 }
 

@@ -78,6 +78,7 @@ import hivens.ui.utils.GameConsoleService
 import hivens.ui.utils.PreferenceWriter
 import hivens.ui.chrome.LocalRightRailSheet
 import hivens.ui.chrome.LocalUseCustomChrome
+import hivens.ui.widgets.ChildLevel
 import hivens.ui.widgets.NxMapControls
 import hivens.ui.widgets.NxViewportScrollbar
 import hivens.ui.widgets.PlayedWidgetEntrance
@@ -86,6 +87,7 @@ import hivens.ui.widgets.modules.WidgetModules
 import hivens.ui.widgets.state.WidgetStateStore
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.LocalMapControls
+import hivens.widget.api.LocalScope
 import hivens.widget.api.LocalSlotChromeModifier
 import hivens.widget.api.LocalSurfaceFamilies
 import hivens.widget.api.LocalViewportScrollbar
@@ -100,9 +102,11 @@ import hivens.widget.api.LocalWidgetSurfaceRenderer
 import hivens.widget.api.SurfaceFamilies
 import hivens.widget.api.WidgetCommandRegistry
 import hivens.widget.api.WidgetDataRegistry
+import hivens.widget.api.WidgetScope
 import hivens.widget.api.WidgetServiceRegistry
 import hivens.widget.api.WidgetSurfaceRenderer
 import hivens.widget.model.DefaultLayout
+import hivens.widget.model.ScopeLevel
 import hivens.widget.model.walkInstances
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -129,6 +133,7 @@ fun AndroidShell() {
     val widgetModules: WidgetModules = koinInject()
     val widgetServiceRegistry: WidgetServiceRegistry = koinInject()
     val widgetDataRegistry: WidgetDataRegistry = koinInject()
+    val appLevel: WidgetScope = koinInject()
     val widgetCommandRegistry: WidgetCommandRegistry = koinInject()
     val widgetStateStore: WidgetStateStore = koinInject()
     val surfaceFamilies: SurfaceFamilies = koinInject()
@@ -243,6 +248,7 @@ fun AndroidShell() {
                 LocalWidgetRegistry provides modules.registry,
                 LocalWidgetServiceRegistry provides widgetServiceRegistry,
                 LocalWidgetDataRegistry provides widgetDataRegistry,
+                LocalScope provides appLevel,
                 LocalWidgetCommandRegistry provides widgetCommandRegistry,
                 LocalWidgetStateHost provides widgetStateStore,
                 LocalSurfaceFamilies provides surfaceFamilies,
@@ -255,6 +261,8 @@ fun AndroidShell() {
                 LocalUseCustomChrome provides false,
                 LocalRightRailSheet provides true,
             ) {
+              // The one window a phone has, for as long as this shell draws it.
+              ChildLevel(ScopeLevel.Window) {
                 val themeReveal = rememberThemeReveal()
                 NxTheme(theme = themeLibrary.active, dark = isDarkTheme, uiFamily = uiFamily) {
                     ThemeRevealHost(themeReveal) {
@@ -351,6 +359,7 @@ fun AndroidShell() {
                         CertificatePromptHost()
                     }
                 }
+              }
             }
         }
     }

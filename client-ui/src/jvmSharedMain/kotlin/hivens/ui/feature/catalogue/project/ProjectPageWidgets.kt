@@ -6,22 +6,24 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import hivens.ui.feature.catalogue.project.Header
-import hivens.ui.feature.catalogue.project.LocalProjectPage
 import hivens.ui.feature.catalogue.project.ProjectPageBody
+import hivens.ui.feature.catalogue.project.ProjectPageSource
 import hivens.ui.feature.catalogue.project.Tabs
+import hivens.widget.api.rememberScopedSource
+import hivens.widget.api.valueOrNull
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 
 /**
  * The project page's widgets: the header, the tabs and the pane under them. Each
- * reads the page it is drawn on through [LocalProjectPage] and draws nothing where
+ * reads the page it is drawn on through [ProjectPageSource] and draws nothing where
  * there is none.
  */
 
 @Widget(id = "project.header", displayName = "widget.project.header")
 @Composable
 fun ProjectHeaderWidget(instance: WidgetInstance) {
-    val page = LocalProjectPage.current ?: return
+    val page = rememberScopedSource(ProjectPageSource).valueOrNull() ?: return
     Header(page.state)
 }
 
@@ -33,7 +35,7 @@ fun ProjectHeaderWidget(instance: WidgetInstance) {
 @Widget(id = "project.tabs", displayName = "widget.project.tabs")
 @Composable
 fun ProjectTabsWidget(instance: WidgetInstance) {
-    val page = LocalProjectPage.current ?: return
+    val page = rememberScopedSource(ProjectPageSource).valueOrNull() ?: return
     Tabs(
         active = page.tab,
         onSelect = { page.tab = it },
@@ -52,6 +54,6 @@ fun ProjectTabsWidget(instance: WidgetInstance) {
 )
 @Composable
 fun ProjectBodyWidget(instance: WidgetInstance) {
-    val page = LocalProjectPage.current ?: return
+    val page = rememberScopedSource(ProjectPageSource).valueOrNull() ?: return
     ProjectPageBody(page, Modifier.fillMaxSize())
 }

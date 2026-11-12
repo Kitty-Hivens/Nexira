@@ -387,6 +387,7 @@ fun AppRoot(
                   canGoForward = backStack.canGoForward,
                   onForward = { backStack.forward() },
                   trail = backStack.trail,
+                  history = backStack.history,
                   onPopTo = backStack::popTo,
                   onLogin = { session -> appState = AppState.Authenticated(session) },
                   onLogout = { pendingLogout = true },

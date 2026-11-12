@@ -16,7 +16,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -64,6 +63,7 @@ import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import hivens.widget.api.LocalSurfaceFamilies
 import hivens.widget.api.SlotRenderer
+import hivens.widget.api.ProvideScoped
 import hivens.widget.model.SlotId
 import hivens.widget.model.SurfaceId
 import kotlinx.coroutines.CoroutineScope
@@ -161,8 +161,9 @@ fun ModDetailScreen(
     }
 
     // A widget surface: the header and the tabs in `header`, the tab's pane in
-    // `body`, each slot on the panel it always sat on.
-    CompositionLocalProvider(LocalProjectPage provides page) {
+    // `body`, each slot on the panel it always sat on. The widgets read the page
+    // over this page's level, where nothing outside the page can reach it.
+    ProvideScoped(ProjectPageSource, page) {
         Column(modifier.fillMaxSize()) {
             // The header and the tabs sit on a panel of their own, like the body under
             // them. On the bare page they lay over whatever the wallpaper had there, and

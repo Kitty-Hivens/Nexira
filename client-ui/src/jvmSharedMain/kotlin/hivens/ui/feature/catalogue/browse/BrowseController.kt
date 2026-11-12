@@ -54,8 +54,10 @@ internal fun BrowseSort.label(s: AppStrings): String = when (this) {
  * the other. Both read and write this, the way the project page and its rail meet
  * at [hivens.ui.feature.catalogue.project.OpenProjectState].
  *
- * Kept for the life of the process, so leaving Browse for a project page and
- * coming back finds it as it was left.
+ * One per window, made by the window's level and kept for its life, so leaving
+ * Browse for a project page and coming back finds it as it was left, and a second
+ * window browses on its own. Injected anywhere below a window, it resolves to that
+ * window's.
  */
 @Stable
 class BrowseController {

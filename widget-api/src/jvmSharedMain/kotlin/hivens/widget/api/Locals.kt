@@ -162,6 +162,15 @@ val LocalWidgetDataRegistry: ProvidableCompositionLocal<WidgetDataRegistry> =
         error("LocalWidgetDataRegistry not provided -- wire WidgetDataRegistry in Koin and at the composition root")
     }
 
+/**
+ * The nearest live level of the scope tree above the caller, or null outside any.
+ *
+ * Each owner provides the level it made around what it draws, so a widget climbs
+ * from here to the level a key declares (see [rememberScopedSource]). Static: a
+ * level changes only when its owner replaces it, and that is a whole-subtree event.
+ */
+val LocalScope: ProvidableCompositionLocal<WidgetScope?> = staticCompositionLocalOf { null }
+
 // App-provided commands widgets fire via rememberCommand(key) / rememberAction(key)
 // -- the write counterpart of LocalWidgetDataRegistry. Provided once at the
 // composition root from the Koin-bound singleton. Static for the same reason: the

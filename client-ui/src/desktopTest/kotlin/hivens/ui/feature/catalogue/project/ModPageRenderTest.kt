@@ -45,6 +45,7 @@ import hivens.ui.theme.NxTheme
 import hivens.ui.widgets.Sources
 import hivens.ui.widgets.WidgetSurface
 import hivens.widget.api.LocalLayoutGraph
+import hivens.widget.api.LocalScope
 import hivens.widget.api.LocalSurfaceFamilies
 import hivens.widget.api.LocalWidgetDataRegistry
 import hivens.widget.api.LocalWidgetRegistry
@@ -52,12 +53,17 @@ import hivens.widget.api.LocalWidgetSurfaceRenderer
 import hivens.widget.api.SlotRenderer
 import hivens.widget.api.SurfaceFamilies
 import hivens.widget.api.WidgetDataRegistry
+import hivens.widget.api.WidgetScope
 import hivens.widget.api.flowSource
+import hivens.widget.api.ProvideScoped
 import hivens.widget.generated.GeneratedWidgetRegistry
 import hivens.widget.model.DefaultLayout
 import hivens.widget.model.FamilyId
+import hivens.widget.model.ScopeLevel
 import hivens.widget.model.SlotId
 import hivens.widget.model.SurfaceId
+import org.koin.dsl.koinApplication
+import org.koin.dsl.module
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.serialization.json.Json
@@ -227,11 +233,13 @@ class ModPageRenderTest {
                 Box(Modifier.width(56.dp).fillMaxHeight().background(NxColor.page.copy(alpha = 0.35f)))
 
                 // The page as the screen draws it: its surface's two slots on their
-                // panels, the widgets reading the page through its local.
+                // panels, the widgets reading the page from the page's own level.
                 val page = remember(pageState) {
                     ProjectPage(pageState, mutableStateOf(ModPageTab.Description), emptyList(), onOpenVersion = {}, onReload = {})
                 }
-                CompositionLocalProvider(LocalProjectPage provides page) {
+                val level = remember { pageLevel(registry) }
+                CompositionLocalProvider(LocalScope provides level) {
+                  ProvideScoped(ProjectPageSource, page) {
                     Column(Modifier.weight(1f).fillMaxHeight()) {
                         NxSurface(
                             kind = SurfaceKind.Panel,
@@ -251,6 +259,7 @@ class ModPageRenderTest {
                             SlotRenderer(SurfaceId(PROJECT_SURFACE), SlotId("body"), Modifier.fillMaxSize())
                         }
                     }
+                  }
                 }
 
                 NxSurface(
@@ -273,6 +282,12 @@ class ModPageRenderTest {
             }
         }
     }
+
+    /** A page level under an app level of its own, which is all the page's widgets climb to. */
+    private fun pageLevel(registry: WidgetDataRegistry): WidgetScope =
+        koinApplication {
+            modules(module { single { WidgetScope.app(registry, this, Dispatchers.Unconfined) } })
+        }.koin.get<WidgetScope>().child(ScopeLevel.Page)
 
     private fun sheet(slug: String, name: String, local: Boolean = false) {
         val out = Path.of("build/render", name)

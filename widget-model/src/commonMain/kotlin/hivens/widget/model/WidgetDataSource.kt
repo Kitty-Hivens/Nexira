@@ -15,6 +15,9 @@ import kotlinx.coroutines.flow.StateFlow
  *
  * Read-only by design: a source is data the widget observes. Driving a service
  * (a command / write) is a separate concern, not this contract.
+ *
+ * A source a level made from a factory is disposed with that level. One that holds
+ * something to release implements [AutoCloseable], and the level closes it.
  */
 interface WidgetDataSource<out T> {
     val state: StateFlow<T>
@@ -29,9 +32,17 @@ interface WidgetDataSource<out T> {
  * String-keyed (not type-keyed like [WidgetService] lookups) on purpose: two
  * sources can share a Kotlin type (two `StateFlow<List<Server>>`), and a
  * declarative rule references a source by a stable name, not a class.
+ *
+ * [level] is where the source lives. A widget reading the key is served by the
+ * nearest level of that kind above it, so one key cannot be answered from two
+ * places. [ScopeLevel.App], the default, is the app-wide registry every key
+ * declared before levels existed reads from.
+ *
+ * Equality stays on the id alone, because the id is the wire identity: two keys
+ * with one id and different levels are a wiring bug, not two sources.
  */
-class SourceKey<out T>(val id: String) {
+class SourceKey<out T>(val id: String, val level: ScopeLevel = ScopeLevel.App) {
     override fun equals(other: Any?): Boolean = other is SourceKey<*> && other.id == id
     override fun hashCode(): Int = id.hashCode()
-    override fun toString(): String = "SourceKey($id)"
+    override fun toString(): String = "SourceKey($id, $level)"
 }

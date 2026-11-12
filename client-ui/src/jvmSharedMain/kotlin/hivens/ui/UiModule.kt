@@ -52,15 +52,33 @@ import hivens.widget.api.SurfaceFamilies
 import hivens.widget.api.WidgetCommandRegistry
 import hivens.widget.api.WidgetDataRegistry
 import hivens.widget.api.WidgetRegistry
+import hivens.widget.api.WidgetScope
 import hivens.widget.api.WidgetServiceRegistry
 import hivens.widget.api.command
 import hivens.widget.api.flowSource
+import hivens.widget.api.levelServices
 import hivens.widget.model.DefaultLayout
+import hivens.widget.model.ScopeLevel
+import kotlinx.coroutines.CoroutineScope
 import org.koin.core.module.Module
 import org.koin.core.scope.Scope
 import org.koin.dsl.module
 import java.nio.file.Path
 import kotlin.time.Duration.Companion.seconds
+
+/**
+ * What each level of the scope tree makes for itself: one per level, closed with it,
+ * and what anything injected under that level resolves to.
+ */
+val levelServicesModule: Module = module {
+    // What Browse is searching and where its installs go. Shared by the screen's
+    // own widgets and the rail's browse family, which have no composition in
+    // common, and kept so a trip to a project page comes back to the same search.
+    // One per window, so a second window browses something else.
+    levelServices(ScopeLevel.Window) {
+        scoped { BrowseController() }
+    }
+}
 
 /**
  * The Koin singletons the screens and widgets ask for, whatever the host.
@@ -113,10 +131,7 @@ fun uiCoreModule(
     single { BrowseSession() }
     single { ProjectBrowseSession() }
 
-    // What Browse is searching and where its installs go. Shared by the screen's
-    // own widgets and the rail's browse family, which have no composition in
-    // common, and kept so a trip to a project page comes back to the same search.
-    single { BrowseController() }
+    includes(levelServicesModule)
 
     // The catalogue's own lists the filter rail is built from, read once a run.
     single { BrowseTags(get(), get()) }
@@ -170,6 +185,13 @@ fun uiCoreModule(
             register(Sources.DoNotDisturb, flowSource(get<NotificationCenter>().doNotDisturb))
             register(Sources.OpenProject, flowSource(get<OpenProjectState>().open))
         }
+    }
+
+    // The root of the scope tree. Its app values are the registry above, and the
+    // windows, compositions and pages below it are made by their owners. Under the
+    // app's coroutine scope, so a level's work stops at shutdown whoever forgot it.
+    single {
+        WidgetScope.app(registry = get(), services = this, context = get<CoroutineScope>().coroutineContext)
     }
 
     // Reactive write side: commands widgets fire via rememberCommand /

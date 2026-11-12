@@ -124,6 +124,7 @@ import hivens.ui.widgets.NxViewportScrollbar
 import hivens.ui.widgets.PlayedWidgetEntrance
 import hivens.widget.api.WidgetSurfaceRenderer
 import androidx.compose.foundation.background
+import hivens.ui.widgets.ChildLevel
 import hivens.ui.widgets.WidgetSurface
 import hivens.ui.widgets.modules.WidgetModules
 import hivens.ui.widgets.modules.toThemes
@@ -136,9 +137,12 @@ import hivens.widget.api.LocalWidgetStateHost
 import hivens.widget.api.SurfaceFamilies
 import hivens.widget.api.WidgetCommandRegistry
 import hivens.widget.api.WidgetDataRegistry
+import hivens.widget.api.LocalScope
+import hivens.widget.api.WidgetScope
 import hivens.widget.api.WidgetServiceRegistry
 import hivens.widget.api.WidgetRegistry
 import hivens.widget.model.DefaultLayout
+import hivens.widget.model.ScopeLevel
 import hivens.widget.model.walkInstances
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -209,6 +213,7 @@ fun FrameWindowScope.AppShellContent(
     val widgetModules: WidgetModules           = koinInject()
     val widgetServiceRegistry: WidgetServiceRegistry = koinInject()
     val widgetDataRegistry: WidgetDataRegistry = koinInject()
+    val appLevel: WidgetScope = koinInject()
     val widgetCommandRegistry: WidgetCommandRegistry = koinInject()
     val widgetStateStore: WidgetStateStore = koinInject()
     val editModeController: EditModeController  = koinInject()
@@ -901,6 +906,7 @@ fun FrameWindowScope.AppShellContent(
                 LocalWidgetRegistry                      provides modules.registry,
                 LocalWidgetServiceRegistry               provides widgetServiceRegistry,
                 LocalWidgetDataRegistry                  provides widgetDataRegistry,
+                LocalScope                               provides appLevel,
                 LocalWidgetCommandRegistry               provides widgetCommandRegistry,
                 LocalWidgetStateHost                     provides widgetStateStore,
                 LocalSurfaceFamilies                     provides surfaceFamilies,
@@ -944,6 +950,9 @@ fun FrameWindowScope.AppShellContent(
                 )
             }
 
+            // The main window's level, for as long as this shell draws it. The console
+            // stays outside: it is a window of its own and has no level yet.
+            ChildLevel(ScopeLevel.Window) {
             Box(Modifier.fillMaxSize()) {
             val themeReveal = rememberThemeReveal()
             NxTheme(
@@ -1091,6 +1100,7 @@ fun FrameWindowScope.AppShellContent(
                 )
             }
             } // end Box(window resize overlay)
+            } // end ChildLevel(Window)
             } // end CompositionLocalProvider(LocalCustomization)
         }
     }

@@ -41,6 +41,12 @@ class NavBackStack(root: Screen) {
      */
     val trail: List<Screen> get() = entries.toList()
 
+    /**
+     * Every screen still reachable by the arrows: the [trail], then what [forward]
+     * would re-apply. A screen that leaves this has left the history for good.
+     */
+    val history: List<Screen> get() = entries + forwardStack
+
     /** True when [back] has somewhere to pop to. */
     val canGoBack: Boolean get() = entries.size > 1
 
