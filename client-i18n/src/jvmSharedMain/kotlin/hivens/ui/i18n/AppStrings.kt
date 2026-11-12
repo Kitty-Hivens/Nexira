@@ -1591,6 +1591,8 @@ interface AppStrings {
     val editorToBack: String
     // Edit-mode placeholder for a widget whose kind is no longer in the registry.
     val editorUnsupportedWidget: String
+    /** On a widget drawn on samples because what it reads has no answer where it stands. */
+    val editorNotAvailableHere: String
 
     // --- Widget palette / prop-editor labels (key-indirection) ---
     // @Widget(displayName) and @PropLabel carry a key; the palette and prop

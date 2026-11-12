@@ -493,6 +493,7 @@ public final class hivens/widget/api/WidgetCommandRegistry {
 	public final fun keys ()Ljava/util/Set;
 	public final fun register (Lhivens/widget/model/CommandKey;Lhivens/widget/model/WidgetCommand;)V
 	public final fun registerFactory (Lhivens/widget/model/CommandKey;Lkotlin/jvm/functions/Function1;)V
+	public final fun sampleOf (Ljava/lang/String;)Lkotlin/jvm/functions/Function0;
 }
 
 public final class hivens/widget/api/WidgetDataHelpersKt {
@@ -508,11 +509,14 @@ public final class hivens/widget/api/WidgetDataRegistry {
 	public fun <init> ()V
 	public final fun declarationOf (Ljava/lang/String;)Lhivens/widget/api/KeyDeclaration;
 	public final fun declare (Lhivens/widget/model/SourceKey;)V
+	public final fun declare (Lhivens/widget/model/SourceKey;Lkotlin/jvm/functions/Function0;)V
 	public final fun find (Lhivens/widget/model/SourceKey;)Lhivens/widget/model/WidgetDataSource;
 	public final fun get (Lhivens/widget/model/SourceKey;)Lhivens/widget/model/WidgetDataSource;
 	public final fun keys ()Ljava/util/Set;
 	public final fun register (Lhivens/widget/model/SourceKey;Lhivens/widget/model/WidgetDataSource;)V
+	public final fun registerFactory (Lhivens/widget/model/SourceKey;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;)V
 	public final fun registerFactory (Lhivens/widget/model/SourceKey;Lkotlin/jvm/functions/Function1;)V
+	public final fun sampleOf (Ljava/lang/String;)Lkotlin/jvm/functions/Function0;
 }
 
 public abstract interface class hivens/widget/api/WidgetDescriptor {
@@ -578,6 +582,7 @@ public final class hivens/widget/api/WidgetScope : hivens/widget/api/LevelContex
 	public final fun provide (Lhivens/widget/model/SourceKey;Ljava/lang/Object;)Ljava/lang/AutoCloseable;
 	public final fun provideCommand (Lhivens/widget/model/CommandKey;Lhivens/widget/model/WidgetCommand;)Ljava/lang/AutoCloseable;
 	public final fun provideSource (Lhivens/widget/model/SourceKey;Lhivens/widget/model/WidgetDataSource;)Ljava/lang/AutoCloseable;
+	public final fun sampleOf (Ljava/lang/String;)Lkotlin/jvm/functions/Function0;
 }
 
 public final class hivens/widget/api/WidgetScope$Companion {
@@ -586,8 +591,10 @@ public final class hivens/widget/api/WidgetScope$Companion {
 }
 
 public final class hivens/widget/api/WidgetScopeHelpersKt {
+	public static final fun ProvideSamples (Ljava/util/List;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;I)V
 	public static final fun ProvideScoped (Lhivens/widget/model/SourceKey;Ljava/lang/Object;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;I)V
 	public static final fun ProvideScopedCommand (Lhivens/widget/model/CommandKey;Lhivens/widget/model/WidgetCommand;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;I)V
+	public static final fun hasSamples (Lhivens/widget/api/WidgetScope;Ljava/util/List;)Z
 	public static final fun missingNeeds (Ljava/util/List;Landroidx/compose/runtime/Composer;I)Ljava/util/List;
 	public static final fun rememberChildScope (Lhivens/widget/api/WidgetScope;Lhivens/widget/model/ScopeLevel;Landroidx/compose/runtime/Composer;I)Lhivens/widget/api/WidgetScope;
 	public static final fun rememberLatestCommand (Lkotlin/jvm/functions/Function1;Landroidx/compose/runtime/Composer;I)Lhivens/widget/model/WidgetCommand;

@@ -30,6 +30,7 @@ import hivens.ui.editor.ShellChromeBounds
 import hivens.ui.editor.LocalShellChromeBounds
 import hivens.ui.widgets.ChildLevel
 import hivens.widget.api.LocalMisplacedWidget
+import hivens.widget.api.ProvideSamples
 import hivens.widget.api.WidgetDataRegistry
 import hivens.widget.api.LocalWidgetDecorator
 import hivens.widget.api.LocalUnknownWidgetDecorator
@@ -372,8 +373,9 @@ private const val MIN_INK = 0.004f
  * A page of its own, for the same reason: what a page makes for itself, the
  * profile's chosen section say, is made fresh for the preview and goes with it
  * rather than being read off, or written into, a page the person is looking at.
- * What a page's screen hands its widgets is not there, and a widget that needs it
- * declines to draw, which the tile shows as its letter.
+ * What a page's screen hands its widgets is not there, so [PreviewSubject] draws the
+ * widget on the samples those keys declare, and only a widget needing a key with no
+ * sample declines to draw and keeps its letter.
  */
 @Composable
 internal fun PreviewEnvironment(data: WidgetDataRegistry, content: @Composable () -> Unit) {
@@ -425,11 +427,16 @@ private fun PreviewSubject(descriptor: WidgetDescriptor, kind: WidgetKind, box: 
         LocalWidgetFootprintDp provides box,
     ) {
         Box(Modifier.size(box.width.dp, box.height.dp)) {
-            val surface = descriptor.resolveSurface(instance)
-            if (surface == null) {
-                descriptor.Render(instance)
-            } else {
-                LocalWidgetSurfaceRenderer.current(surface) { descriptor.Render(instance) }
+            // On the samples its keys declare for whatever the gallery does not have,
+            // which is what a page hands its own widgets. What the composition does
+            // have it keeps, so a rail entry shows the screen that is open.
+            ProvideSamples(descriptor.needs) {
+                val surface = descriptor.resolveSurface(instance)
+                if (surface == null) {
+                    descriptor.Render(instance)
+                } else {
+                    LocalWidgetSurfaceRenderer.current(surface) { descriptor.Render(instance) }
+                }
             }
         }
     }

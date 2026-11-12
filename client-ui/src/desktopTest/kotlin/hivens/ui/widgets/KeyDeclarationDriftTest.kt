@@ -50,6 +50,17 @@ class KeyDeclarationDriftTest {
     }
 
     @Test
+    fun `every key a built-in widget needs below the app has a sample to be shown on`() {
+        val bare = GeneratedWidgetRegistry.all().values.flatMap { descriptor ->
+            descriptor.needs
+                .filter { id -> declarationOf(id)?.level?.let { it != ScopeLevel.App } == true }
+                .filter { id -> (data.sampleOf(id) ?: commands.sampleOf(id)) == null }
+                .map { "${descriptor.kind.value} needs '$it'" }
+        }
+        assertEquals(emptyList(), bare, "the palette would show these as a letter, and the editor as a warning card")
+    }
+
+    @Test
     fun `every key a page hands its widgets is listed on the surface of that page, and only those`() {
         val handedOver = declared.filter { it.level == ScopeLevel.Page && it.origin == KeyOrigin.Owner }.map { it.id }.toSet()
         val listed = EditorSurfaces.all.flatMap { it.provides }

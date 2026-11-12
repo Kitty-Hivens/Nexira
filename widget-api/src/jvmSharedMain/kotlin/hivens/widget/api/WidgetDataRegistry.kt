@@ -28,6 +28,8 @@ class WidgetDataRegistry {
 
     private val declared = HashMap<String, ScopeLevel>()
 
+    private val samples = HashMap<String, () -> Any?>()
+
     private class Factory<T>(val level: ScopeLevel, val make: SourceFactory<T>)
 
     fun <T> register(key: SourceKey<T>, source: WidgetDataSource<T>) {
@@ -66,6 +68,28 @@ class WidgetDataRegistry {
         requireNew(key.id)
         declared[key.id] = key.level
     }
+
+    /**
+     * Declares [key] as [declare] does, with a [sample] of what its owner hands over.
+     *
+     * A sample is display data and nothing else: what the palette draws a widget on,
+     * and what the editor draws a widget on where its own data is not there. It never
+     * reaches a widget drawn for use. A producer rather than a value, so each drawing
+     * gets its own and nothing one of them changes leaks into another.
+     */
+    fun <T> declare(key: SourceKey<T>, sample: () -> T) {
+        declare(key)
+        samples[key.id] = sample
+    }
+
+    /** Registers a factory as [registerFactory] does, with a [sample] in the sense of [declare]. */
+    fun <T> registerFactory(key: SourceKey<T>, sample: () -> T, factory: SourceFactory<T>) {
+        registerFactory(key, factory)
+        samples[key.id] = sample
+    }
+
+    /** The sample declared for the source [id], or null when it has none. */
+    fun sampleOf(id: String): (() -> Any?)? = samples[id]
 
     private fun requireNew(id: String) {
         require(id !in sources && id !in factories && id !in declared) { "duplicate widget data source id '$id'" }

@@ -24,6 +24,12 @@ sealed class UpdateCheckState {
  */
 internal val AboutUpdateSource: SourceKey<UpdateCheckState> = SourceKey("about.update", ScopeLevel.Page)
 
+/**
+ * What the update panel is shown on where no About page runs a check: up to date,
+ * which draws the version this build really is and invents no update.
+ */
+internal fun sampleUpdateCheck(): UpdateCheckState = UpdateCheckState.UpToDate
+
 /** Opens the About page's update dialog, which the page draws so it outlives the panel that asked. */
 internal val OpenUpdateDialog: CommandKey<Unit> = CommandKey("about.update.open", ScopeLevel.Page)
 

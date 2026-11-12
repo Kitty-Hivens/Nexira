@@ -9,6 +9,7 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import hivens.widget.model.CommandKey
@@ -207,6 +208,67 @@ fun missingNeeds(needs: List<String>): List<String> {
         val level = scope.nearest(declaration.level) ?: return@filterNot false
         val overlay = if (declaration.kind == KeyKind.Source) sources else commands
         overlay?.find(level, id) != null || scope.answers(declaration)
+    }
+}
+
+/**
+ * Whether every id in [ids] has a sample, so [ProvideSamples] can stand in for all
+ * of them. An id nothing declares has none.
+ */
+fun WidgetScope.hasSamples(ids: List<String>): Boolean = ids.all { sampleOf(it) != null }
+
+/**
+ * Draws [content] with each id of [ids] that has no answer here answered by its
+ * declared sample, put over a level of the key's kind made for [content] alone where
+ * the caller stands under none. What does answer here is left as it is, so a live
+ * value still wins over a sample. An id with no sample stays missing.
+ *
+ * For the palette and the editor, which show what a widget looks like. A sample is
+ * display data, and a widget drawn for use is never drawn through this.
+ */
+@Composable
+fun ProvideSamples(ids: List<String>, content: @Composable () -> Unit) {
+    val scope = LocalScope.current
+    val missing = missingNeeds(ids)
+    if (scope == null || missing.isEmpty()) {
+        content()
+        return
+    }
+    val sampled = missing.mapNotNull { scope.declarationOf(it) }.filter { scope.sampleOf(it.id) != null }
+    val host = rememberSampleLevels(scope, sampled.mapTo(HashSet()) { it.level })
+    CompositionLocalProvider(LocalScope provides host) { SampleOverlays(sampled, content) }
+}
+
+/**
+ * [scope], with a level of each of [kinds] made under it where none is above, in
+ * the order the levels nest. A kind that would sit above the caller's own level and
+ * is not there cannot be made, and its keys stay missing.
+ */
+@Composable
+private fun rememberSampleLevels(scope: WidgetScope, kinds: Set<ScopeLevel>): WidgetScope {
+    var at = scope
+    for (kind in ScopeLevel.entries) {
+        val parent = at
+        at = key(kind) {
+            if (kind in kinds && parent.nearest(kind) == null && kind > parent.level) rememberChildScope(parent, kind) else parent
+        }
+    }
+    return at
+}
+
+/** Puts the sample of each of [rest] over its level, one overlay inside the next. */
+@Composable
+private fun SampleOverlays(rest: List<KeyDeclaration>, content: @Composable () -> Unit) {
+    val first = rest.firstOrNull()
+    if (first == null) {
+        content()
+        return
+    }
+    val scope = LocalScope.current
+    val sample = remember(first.id) { scope?.sampleOf(first.id)?.invoke() }
+    val local = if (first.kind == KeyKind.Source) LocalOverlay else LocalCommandOverlay
+    CompositionLocalProvider(local provides rememberOverlay(local.current, first.level, first.id, sample)) {
+        SampleOverlays(rest.drop(1), content)
     }
 }
 

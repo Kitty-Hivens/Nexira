@@ -11,6 +11,10 @@ import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Density
 import hivens.ui.Screen
+import hivens.ui.editor.EditModeController
+import hivens.ui.editor.EditModeState
+import hivens.ui.editor.LocalEditMode
+import hivens.ui.layout.LayoutGraphRepository
 import hivens.ui.i18n.AppLocale
 import hivens.ui.i18n.LocaleProvider
 import hivens.ui.navigation.NavState
@@ -50,8 +54,12 @@ import hivens.widget.model.SurfaceId
 import hivens.widget.model.SurfaceLayout
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.serialization.json.Json
+import java.nio.file.Files
 import org.jetbrains.skia.Bitmap
 import org.koin.dsl.koinApplication
 import org.koin.dsl.module
@@ -229,6 +237,14 @@ class ScopedKeysTest {
 
     // ── The placeholder ───────────────────────────────────────────────
 
+    /** A controller over a layout file of its own, for an editor that is on. */
+    private fun editController(): EditModeController {
+        val dir = Files.createTempDirectory("scoped-keys-test")
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        val repo = LayoutGraphRepository(dir.resolve("layout-graph.json"), Json { ignoreUnknownKeys = true }, scope) { LayoutGraph.EMPTY }
+        return EditModeController(repo, scope)
+    }
+
     private val kind = WidgetKind("test.needy")
 
     /** A widget whose body must never run where its page is not: it throws if it does. */
@@ -297,7 +313,8 @@ class ScopedKeysTest {
     }
 
     @Test
-    fun `the launcher's placeholder draws in the theme, and nothing throws`() {
+    fun `the launcher's warning card draws in the theme in the editor, and nothing throws`() {
+        val editing = EditModeState.On(SurfaceId("s"), editController())
         val inked = onEventThread {
             val scene = ImageComposeScene(240, 80, density = Density(1f)) {
                 LocaleProvider(AppLocale.ENGLISH) {
@@ -309,6 +326,7 @@ class ScopedKeysTest {
                             LocalLayoutGraph provides graph,
                             LocalWidgetRegistry provides registry,
                             LocalMisplacedWidget provides MisplacedWidget,
+                            LocalEditMode provides editing,
                         ) {
                             Box(Modifier.fillMaxSize()) { SlotRenderer(SurfaceId("s"), SlotId("main")) }
                         }

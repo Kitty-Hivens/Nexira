@@ -272,6 +272,10 @@ class WidgetScope private constructor(
     /** Where [id] lives and what answers it, as the registries of this tree have it. Sources first. */
     fun declarationOf(id: String): KeyDeclaration? = registry.declarationOf(id) ?: commands.declarationOf(id)
 
+    /** The sample declared for [id], in the sense of [WidgetDataRegistry.declare], or null. Sources first. */
+    fun sampleOf(id: String): (() -> Any?)? =
+        if (registry.declarationOf(id) != null) registry.sampleOf(id) else commands.sampleOf(id)
+
     /**
      * Whether the level of [declaration]'s kind nearest this one answers it, short
      * of a [ProvideScoped] overlay, which only the composition can see. A factory is

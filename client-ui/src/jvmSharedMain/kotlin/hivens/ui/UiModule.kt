@@ -4,6 +4,7 @@ import hivens.config.Storage
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.activity.Activity
 import hivens.core.activity.ActivityRegistry
+import hivens.core.data.SessionData
 import hivens.core.security.SslBypassStore
 import hivens.core.update.PackUpdateStatusHub
 import hivens.launcher.PackInstallService
@@ -25,9 +26,13 @@ import hivens.ui.feature.catalogue.browse.BrowseSession
 import hivens.ui.feature.catalogue.browse.BrowseTags
 import hivens.ui.feature.catalogue.browse.CataloguePackPageSource
 import hivens.ui.feature.catalogue.browse.ProjectBrowseSession
+import hivens.ui.feature.catalogue.browse.sampleCataloguePackPage
 import hivens.ui.feature.catalogue.project.OpenProject
 import hivens.ui.feature.catalogue.project.OpenProjectState
 import hivens.ui.feature.catalogue.project.ProjectPageSource
+import hivens.ui.feature.catalogue.project.sampleProjectPage
+import hivens.ui.navigation.NavState
+import hivens.ui.theme.ThemeLibrary
 import hivens.ui.i18n.AppLocale
 import hivens.ui.i18n.stringsFor
 import hivens.ui.identity.ClanRoleProvider
@@ -55,6 +60,7 @@ import hivens.ui.widgets.Sources
 import hivens.ui.widgets.about.AboutUpdateSource
 import hivens.ui.widgets.about.OpenUpdateDialog
 import hivens.ui.widgets.about.SystemFacts
+import hivens.ui.widgets.about.sampleUpdateCheck
 import hivens.ui.widgets.modules.WidgetModuleHost
 import hivens.ui.widgets.modules.WidgetModules
 import hivens.ui.widgets.profile.AccountChanges
@@ -64,6 +70,7 @@ import hivens.ui.widgets.state.WidgetStateFlushHook
 import hivens.ui.widgets.state.WidgetStateGc
 import hivens.ui.widgets.state.WidgetStateStore
 import hivens.ui.widgets.themepicker.ThemeSelectionSource
+import hivens.ui.widgets.themepicker.sampleThemeSelection
 import hivens.widget.api.SurfaceFamilies
 import hivens.widget.api.WidgetCommandRegistry
 import hivens.widget.api.WidgetDataRegistry
@@ -453,17 +460,19 @@ internal fun uiDataRegistry(
     registerFactory(Sources.SystemInfo) { flowSource(MutableStateFlow(SystemFacts.read())) }
     // One per page, so a profile page kept in the history comes back on the section
     // it was left on.
-    registerFactory(ProfileSelectionSource) { flowSource(MutableStateFlow(ProfileSelection())) }
-    // What the composition's owner provides around every surface it draws.
-    declare(Sources.Navigation)
-    declare(Sources.Session)
-    declare(Sources.ThemeLibrary)
-    declare(Sources.DarkTheme)
+    registerFactory(ProfileSelectionSource, sample = ::ProfileSelection) { flowSource(MutableStateFlow(ProfileSelection())) }
+    // What the composition's owner provides around every surface it draws. Each with
+    // the sample the palette and the editor show a widget on where no composition
+    // provides it: display data, never handed to a widget drawn for use.
+    declare(Sources.Navigation) { NavState(Screen.Home, listOf(Screen.Home), canGoBack = false, canGoForward = false) }
+    declare(Sources.Session) { AppState.Authenticated(SessionData(playerName = "Steve")) }
+    declare(Sources.ThemeLibrary) { ThemeLibrary() }
+    declare(Sources.DarkTheme) { true }
     // What a page provides for its own widgets, on that page and nowhere else.
-    declare(ProjectPageSource)
-    declare(CataloguePackPageSource)
-    declare(ThemeSelectionSource)
-    declare(AboutUpdateSource)
+    declare(ProjectPageSource, ::sampleProjectPage)
+    declare(CataloguePackPageSource, ::sampleCataloguePackPage)
+    declare(ThemeSelectionSource, ::sampleThemeSelection)
+    declare(AboutUpdateSource, ::sampleUpdateCheck)
 }
 
 /**

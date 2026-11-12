@@ -320,6 +320,37 @@ internal class CataloguePackPage(
  */
 internal val CataloguePackPageSource: SourceKey<CataloguePackPage> = SourceKey("catalogue.pack.page", ScopeLevel.Page)
 
+/**
+ * A pack page to show the page's widgets on where there is no pack: the palette, and
+ * the editor drawing one of them off its page. Display data only, and its install
+ * and retry do nothing.
+ */
+internal fun sampleCataloguePackPage(): CataloguePackPage {
+    val build = CataloguePackVersion(id = "1.0.0", name = "1.0.0", versionNumber = "1.0.0")
+    val details = CataloguePackDetails(
+        origin = PackOrigin.Mirror,
+        id = "sample",
+        title = "Sample Pack",
+        tagline = "A pack as this page shows one.",
+        versions = listOf(build),
+        latestVersionId = build.id,
+        gameVersions = listOf("1.21.1"),
+        loaders = listOf("neoforge"),
+        bodyMarkdown = "What a pack says about itself appears here.",
+    )
+    return CataloguePackPage(
+        packId = details.id,
+        detail = DetailState.Loaded(details),
+        tab = mutableStateOf(PackTab.Description),
+        tabs = listOf(PackTab.Description, PackTab.Versions),
+        gameVersionTags = emptyList(),
+        installingVersion = null,
+        installError = null,
+        onInstall = { _, _ -> },
+        onRetry = {},
+    )
+}
+
 /** The page's header: the pack's mark, name, line, counts and tags, and its install. */
 @Composable
 internal fun CataloguePackPageHeader(page: CataloguePackPage) {

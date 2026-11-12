@@ -1387,6 +1387,7 @@ object RussianStrings : AppStrings {
     override val editorDelete  = "Удалить"
     override val editorReset   = "Сбросить"
     override val editorUnsupportedWidget = "Неподдерживаемый виджет"
+    override val editorNotAvailableHere = "Здесь не работает"
     override val editorResetAll = "Сбросить всё"
     override val editorToFront = "На передний план"
     override val editorToBack = "На задний план"

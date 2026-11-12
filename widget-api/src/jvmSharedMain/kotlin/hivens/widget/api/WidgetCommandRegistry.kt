@@ -95,5 +95,18 @@ class WidgetCommandRegistry {
         return declared[id]?.let { KeyDeclaration(id, it, KeyKind.Command, KeyOrigin.Owner) }
     }
 
+    /**
+     * The sample of the command [id] in the sense of [WidgetDataRegistry.declare]: one
+     * that does nothing, for every command that lives below the app. A widget drawn on
+     * samples is there to be looked at, so whatever it fires has to go nowhere. Null
+     * for an app command, which is always there, and for an id nothing here names.
+     */
+    fun sampleOf(id: String): (() -> Any?)? = if (id in factories || id in declared) SAMPLE else null
+
     fun keys(): Set<String> = commands.keys + factories.keys + declared.keys
+
+    private companion object {
+        val NOTHING: WidgetCommand<Any?> = WidgetCommand { }
+        val SAMPLE: () -> Any? = { NOTHING }
+    }
 }

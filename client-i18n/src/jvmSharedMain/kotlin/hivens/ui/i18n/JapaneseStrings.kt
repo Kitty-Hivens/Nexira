@@ -1380,6 +1380,7 @@ object JapaneseStrings : AppStrings {
     override val editorDelete = "削除"
     override val editorReset = "初期化"
     override val editorUnsupportedWidget = "対応していないウィジェット"
+    override val editorNotAvailableHere = "ここでは使えません"
     override val editorResetAll = "すべて初期化"
     override val editorToFront = "最前面へ"
     override val editorToBack = "最背面へ"
