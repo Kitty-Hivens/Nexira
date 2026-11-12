@@ -25,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.onPreviewKeyEvent
+import hivens.ui.chrome.EscapeClaim
 import hivens.ui.chrome.ShellChord
 import hivens.ui.chrome.resolveShellChord
 import hivens.ui.editor.EditModeController
@@ -138,6 +139,7 @@ fun AndroidShell() {
     val updateRecovery: ApplyRecovery = koinInject()
     val packAutoUpdates: PackAutoUpdateService = koinInject()
     val editModeController: EditModeController = koinInject()
+    val escapeClaim = remember(editModeController) { EscapeClaim { editModeController.claimsEscape } }
 
     val settings = remember { settingsService.getSettings() }
 
@@ -269,7 +271,7 @@ fun AndroidShell() {
                                 .focusRequester(focus)
                                 .focusable()
                                 .onPreviewKeyEvent { ev ->
-                                    val resolved = resolveShellChord(ev, false, editModeController.isEditing)
+                                    val resolved = resolveShellChord(ev, false, editModeController.isEditing, escapeClaim)
                                     when (resolved.chord) {
                                         ShellChord.ToggleEditMode -> editModeController.requestEditToggle()
                                         ShellChord.ToggleRightRail -> editModeController.requestRightRailToggle()
@@ -330,7 +332,7 @@ fun AndroidShell() {
                             )
 
                             // After AppRoot, so it is asked before the navigation's own Back.
-                            BackHandler(enabled = editModeController.isEditing) { editModeController.requestEditorEscape() }
+                            BackHandler(enabled = editModeController.claimsEscape) { editModeController.requestEditorEscape() }
 
                             if (gameConsole.shouldShowConsole) {
                                 BackHandler { gameConsole.hide() }

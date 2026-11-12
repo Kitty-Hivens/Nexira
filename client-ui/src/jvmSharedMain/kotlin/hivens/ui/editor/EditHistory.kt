@@ -65,6 +65,25 @@ class EditHistory(
         while (past.size > limit) past.removeFirst()
     }
 
+    /**
+     * Notes that [before] became [after] by putting back what the last step had
+     * changed, the way a gesture cut short puts its widget back where it started.
+     *
+     * When [after] is the graph that step started from, the step goes with it: a
+     * gesture that came to nothing leaves nothing to undo. Anything else is
+     * recorded like an edit of its own, because the graph did not end up where any
+     * step began and undoing has to be able to reach it.
+     */
+    fun recordRestore(before: LayoutGraph, after: LayoutGraph) {
+        if (before == after) return
+        if (past.lastOrNull() == after) {
+            past.removeLast()
+            openKey = null
+            return
+        }
+        record(key = null, before = before, after = after)
+    }
+
     /** The graph to go back to, or null when there is nothing to take back. */
     fun undo(current: LayoutGraph): LayoutGraph? {
         val previous = past.removeLastOrNull() ?: return null
@@ -83,7 +102,7 @@ class EditHistory(
         return next
     }
 
-    /** Drops everything, for a reset that is not meant to be stepped back through. */
+    /** Drops everything, for an edit session that has ended and cannot be stepped back into. */
     fun clear() {
         past.clear()
         future.clear()

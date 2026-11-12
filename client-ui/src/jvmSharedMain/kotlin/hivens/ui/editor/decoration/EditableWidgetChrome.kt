@@ -500,6 +500,9 @@ fun EditableWidgetChrome(
                                     // Esc or Ctrl+E, ran nothing after its drag, and the ghost,
                                     // the hidden cursor and the overlap warning stayed up with
                                     // the editor closed. A cut-off gesture commits nothing.
+                                    // This branch and the flow reorder commit on release only.
+                                    // The free move and the resize handles write on every
+                                    // frame, so they put back the placement they started from.
                                     try {
                                         drag(down.id) { change ->
                                             acc += change.positionChange()
@@ -547,15 +550,18 @@ fun EditableWidgetChrome(
                                         p?.y ?: 0f, clampSlot(false, vBias, slot0.height), widgetLayoutSize.height / density, vBias,
                                     )
                                     var pointer = widgetOrigin + down.position
+                                    var wrote = false
+                                    var released = false
                                     // The page moved under the held widget: the widget keeps
                                     // to the pointer, which on the page is that much further on.
                                     autoScroll.start(pointer) { moved ->
                                         curX += moved.x / density * signX
                                         curY += moved.y / density * signY
                                         editController.setWidgetOffset(path, instance.instanceId, curX, curY)
+                                        wrote = true
                                     }
                                     try {
-                                        drag(down.id) { change ->
+                                        released = drag(down.id) { change ->
                                             pointer += change.positionChange()
                                             autoScroll.move(pointer)
                                             val slot = liveSlotSize.value
@@ -574,6 +580,7 @@ fun EditableWidgetChrome(
                                             curX = nx
                                             curY = ny
                                             editController.setWidgetOffset(path, instance.instanceId, nx, ny)
+                                            wrote = true
                                             // Who this is currently on top of, said while the
                                             // gesture is live. The bounds are a frame behind the
                                             // write, which for a warning colour is close enough
@@ -586,6 +593,7 @@ fun EditableWidgetChrome(
                                     } finally {
                                         autoScroll.stop()
                                         registry.publishOverlap(emptySet())
+                                        if (wrote && !released) editController.restoreWidgetPlacement(path, instance.instanceId, p)
                                     }
                                 }
                                 else -> {
@@ -717,7 +725,10 @@ fun EditableWidgetChrome(
                                     )
                                     var accX = 0f
                                     var accY = 0f
+                                    var wrote = false
+                                    var released = false
                                     fun apply() {
+                                        wrote = true
                                         if (geo != null) {
                                             // One gesture, two units: a lattice slot sizes in
                                             // whole cells, so the same drag quantises instead
@@ -777,7 +788,7 @@ fun EditableWidgetChrome(
                                         apply()
                                     }
                                     try {
-                                        drag(down.id) { change ->
+                                        released = drag(down.id) { change ->
                                             accX += change.positionChange().x
                                             accY += change.positionChange().y
                                             pointer += change.positionChange()
@@ -789,6 +800,7 @@ fun EditableWidgetChrome(
                                         autoScroll.stop()
                                         resizing = false
                                         registry.publishOverlap(emptySet())
+                                        if (wrote && !released) editController.restoreWidgetPlacement(path, instance.instanceId, p)
                                     }
                                 }
                             },

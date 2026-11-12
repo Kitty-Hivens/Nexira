@@ -52,11 +52,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onKeyEvent
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.isSecondaryPressed
@@ -162,8 +157,11 @@ import hivens.ui.theme.Status
 //     chrome only while edit mode is on)
 //   * paints the optional "Edit layout" pill at the top
 //   * paints the drag ghost following the pointer when a drag is active
-//   * consumes Escape to exit edit mode (Ctrl+E, window-level in AppShell,
-//     toggles it on/off; there is no edit-mode button)
+//   * backs out of edit mode a step at a time on Escape, and toggles it on Ctrl+E,
+//     both claimed at window level (see ShellChord) and handed over through the
+//     controller's signals. There is no edit-mode button, and no key handler of its
+//     own: the window sees every press first, and a second handler here acted again
+//     on the release of an Escape whose press had just closed a dialog.
 
 // Which widget instance the prop panel is currently editing.
 private data class PropTarget(val path: SlotPath, val instanceId: String)
@@ -286,21 +284,40 @@ fun EditorSurfaceHost(
         if (availableSurfaces.isEmpty()) editing = false
     }
 
-    // One Escape backs out one step: an open slot menu first, then the slot
-    // selection, then edit mode itself. Named because two paths run it -- the
-    // Box's own key handler for when focus happens to be inside, and the
-    // window-level chord for every other time, which is most of them.
+    // One Escape backs out one step, from the top: a reset confirmation, then
+    // preview, then an open slot menu, then the slot selection, then edit mode
+    // itself. Preview comes before the slot steps because it hides them, and an
+    // Escape spent on a menu nobody can see looks like an Escape that did nothing.
+    // The window-level chord is the one path that runs this. It is not claimed
+    // while a confirmation is up (see the report below), so the dialog closes
+    // itself on the press, and the two dialog steps here only matter in the frame
+    // before that report lands.
     fun backOutOneStep() {
         when {
+            resetAllConfirm                          -> resetAllConfirm = false
+            resetSurfaceConfirm                      -> resetSurfaceConfirm = false
+            previewing                               -> previewing = false
             handleMenuOpen || slotMenuCursor != null -> { handleMenuOpen = false; slotMenuCursor = null }
             selectedSlotState.value != null          -> { selectedSlotState.value = null; selectedSlotRect = null }
             else                                     -> editing = false
         }
     }
-    // Any edit-mode exit (FAB / Escape / Ctrl+E) drops the prop target, the surface
-    // settings panel, and any slot selection, so re-entering does not silently reopen
-    // the last panel with the palette still hidden.
-    LaunchedEffect(editing) { if (!editing) { propTarget = null; surfaceSettingsOpen = false; clearSlotSelection() } }
+    // Every way out of edit mode ends here: Escape, Ctrl+E and the editor running out
+    // of surfaces alike. Whatever the session opened goes with it, so the next entry
+    // starts clean rather than in preview, behind a confirmation, or with a panel open
+    // and the palette still hidden behind it.
+    LaunchedEffect(editing) {
+        if (!editing) {
+            propTarget = null
+            surfaceSettingsOpen = false
+            clearSlotSelection()
+            previewing = false
+            resetSurfaceConfirm = false
+            resetAllConfirm = false
+            presetPanelOpen = false
+            modulesPanelOpen = false
+        }
+    }
 
     // A window this short is a phone on its side, where the palette would cover the slots it
     // is there to fill. It opens from the toolbar instead.
@@ -393,23 +410,35 @@ fun EditorSurfaceHost(
     // state. `seen` initialises to the current tick before collecting
     // so navigating into a fresh host (new remember, but the singleton
     // tick may already be > 0) does not spuriously toggle on mount.
-    // Only editable surfaces react; leaving edit mode drops preview,
-    // matching the FAB + Escape paths.
+    // Only editable surfaces react. What leaving resets is the exit
+    // clean-up's business, the same for this path as for every other.
     //
     // The signal sits on the singleton controller, so every mounted
     // host observes it. Safe because AppLayout mounts exactly one host
     // (its Crossfade swaps screen content *inside* the host, not the
     // host itself) -- there is never a second, hidden host to flip into
     // edit mode behind the user's back.
-    // The window's key handler claims Escape only while this is true, so it has to
-    // be reported rather than inferred; cleared on dispose so a host that leaves the
-    // tree while editing does not leave Escape claimed behind it.
+    // The edit session: the window's key handler claims Ctrl+Z only while it is on,
+    // and the undo history lives and dies with it, so it has to be reported rather
+    // than inferred. Cleared on dispose so a host that leaves the tree while editing
+    // does not leave the session open behind it.
     DisposableEffect(editing) {
         controller.reportEditing(editing)
         onDispose { controller.reportEditing(false) }
     }
 
-    // Window-level Escape (AppShell onPreviewKeyEvent, gated on the flag above)
+    // Escape is claimed at window scope only while the editor is on and none of its
+    // confirmations is up. A dialog closes itself on Escape, and claimed over it the
+    // key never reached it: the back-out ran behind the dialog instead and left it
+    // standing over an editor that was gone.
+    val escapeToDialog = resetAllConfirm || (resetSurfaceConfirm && selectedSurface != null)
+    val claimsEscape = editing && !escapeToDialog
+    DisposableEffect(claimsEscape) {
+        controller.reportEscapeClaim(claimsEscape)
+        onDispose { controller.reportEscapeClaim(false) }
+    }
+
+    // Window-level Escape (AppShell onPreviewKeyEvent, gated on the claim above)
     // bumps the signal; the same staged back-out runs here. `seen` initialises to
     // the current tick for the same reason the toggle observer does.
     LaunchedEffect(availableSurfaces) {
@@ -427,10 +456,7 @@ fun EditorSurfaceHost(
         snapshotFlow { controller.editToggleSignal.value }.collect { tick ->
             if (tick != seen) {
                 seen = tick
-                if (availableSurfaces.isNotEmpty()) {
-                    editing = !editing
-                    if (!editing) previewing = false
-                }
+                if (availableSurfaces.isNotEmpty()) editing = !editing
             }
         }
     }
@@ -709,17 +735,6 @@ fun EditorSurfaceHost(
                             }
                         }
                     }
-                }
-                .onKeyEvent { ev ->
-                    // Escape exits edit mode. Ctrl+E entry/toggle is
-                    // handled at Window scope (see AppShell) so it works
-                    // regardless of which descendant holds focus -- a
-                    // Box-level handler misses the chord when the side
-                    // rails own focus.
-                    if (editing && ev.type == KeyEventType.KeyUp && ev.key == Key.Escape) {
-                        backOutOneStep()
-                        true
-                    } else false
                 },
         ) {
             // While in edit mode the pane is framed in a thin line of the lead
@@ -754,7 +769,7 @@ fun EditorSurfaceHost(
 
             if (availableSurfaces.isNotEmpty()) {
                 val surfaceForReset = selectedSurface
-                if (resetSurfaceConfirm && surfaceForReset != null) {
+                if (editing && resetSurfaceConfirm && surfaceForReset != null) {
                     AlertDialog(
                         onDismissRequest = { resetSurfaceConfirm = false },
                         title            = { Text(s.editorResetSurfaceTitle) },
@@ -785,7 +800,7 @@ fun EditorSurfaceHost(
                         },
                     )
                 }
-                if (resetAllConfirm) {
+                if (editing && resetAllConfirm) {
                     AlertDialog(
                         onDismissRequest = { resetAllConfirm = false },
                         title            = { Text(s.editorResetAllTitle) },

@@ -50,6 +50,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonObject
 import java.util.UUID
 
@@ -81,6 +82,13 @@ class EditModeController(
     // deques inside need no locking of their own.
     private val history = EditHistory()
 
+    // Whether an edit session is open, as the write thread sees it. Set by a write
+    // queued behind every edit submitted before the session changed, so an edit
+    // made while editing is recorded and then dropped with the session, and one
+    // made outside it, the right rail folded with Ctrl+N say, never reaches the
+    // history a later session undoes through.
+    private var recording = false
+
     // What the history holds, mirrored into snapshot state so a toolbar can grey
     // its buttons. The deques themselves stay on the write thread: a Compose read
     // of an ArrayDeque being mutated elsewhere is a race the UI would lose rarely
@@ -105,13 +113,28 @@ class EditModeController(
     ) {
         val before = repo.value()
         repo.update(validate, transform)
-        history.record(key, before, repo.value())
+        note(key, before, repo.value())
+    }
+
+    private fun note(key: String?, before: LayoutGraph, after: LayoutGraph) {
+        if (!recording) return
+        history.record(key, before, after)
         publishHistory()
     }
 
     private fun publishHistory() {
         _canUndo.value = history.canUndo
         _canRedo.value = history.canRedo
+    }
+
+    /**
+     * Returns once every write submitted before the call has landed, history and
+     * all. For a caller that reads back what it just wrote, which is a test: the
+     * writes are fire-and-forget, and a check that something was NOT recorded has
+     * nothing else to wait on.
+     */
+    internal suspend fun awaitWrites() {
+        withContext(writeDispatcher) {}
     }
 
     /** Steps back to the graph before the last edit. Nothing to undo is a no-op. */
@@ -147,17 +170,33 @@ class EditModeController(
         _editToggleSignal.value++
     }
 
-    // Whether a host is currently in edit mode. Reported by the host and read by the
-    // window's key handler, which is what lets Escape be claimed only while there is
-    // an editor to back out of -- every dialog keeps its own Escape the rest of the
-    // time. A boolean rather than a count because exactly one host is mounted (see
-    // EditorSurfaceHost: the screen crossfade swaps content inside it, not the host).
+    // Whether a host is currently in edit mode, which is the edit session. Reported by
+    // the host. The window's key handler reads it to claim Ctrl+Z only while there is
+    // an editor to undo in, and the history records only while it is on and is
+    // emptied when it goes off. A boolean rather than a count because exactly one
+    // host is mounted (see EditorSurfaceHost: the screen crossfade swaps content
+    // inside it, not the host).
     private val _editing = mutableStateOf(false)
     val isEditing: Boolean get() = _editing.value
 
     fun reportEditing(on: Boolean) {
         _editing.value = on
         if (!on) _touchSelected.value = null
+        scope.launch(writeDispatcher) {
+            recording = on
+            if (!on) history.clear()
+            publishHistory()
+        }
+    }
+
+    // Whether the window may take Escape for the editor. Narrower than [isEditing]:
+    // while one of the editor's own dialogs is up, Escape belongs to the dialog and
+    // the session behind it carries on, so the two cannot share one flag.
+    private val _claimsEscape = mutableStateOf(false)
+    val claimsEscape: Boolean get() = _claimsEscape.value
+
+    fun reportEscapeClaim(on: Boolean) {
+        _claimsEscape.value = on
     }
 
     // The widget a finger last pressed. A pointer reveals a widget's resize handles by hovering
@@ -364,6 +403,25 @@ class EditModeController(
         }
     }
 
+    /**
+     * Puts a widget's placement back to [placement], what it was when a gesture
+     * that writes as it goes began, because the gesture was cut short.
+     *
+     * Only the placement: anything else written to the widget meanwhile stays. In
+     * the history the restore cancels the gesture's own step rather than adding one,
+     * so undo does not lead back into the move that was abandoned.
+     */
+    fun restoreWidgetPlacement(path: SlotPath, instanceId: String, placement: Placement?) {
+        scope.launch(writeDispatcher) {
+            val before = repo.value()
+            repo.update(validate = false) { g -> g.withWidgetPlacement(path, instanceId, placement) }
+            if (recording) {
+                history.recordRestore(before, repo.value())
+                publishHistory()
+            }
+        }
+    }
+
     // Held in place while the slot scrolls or is moved, or let go.
     fun setWidgetPinned(path: SlotPath, instanceId: String, pinned: Boolean) {
         scope.launch(writeDispatcher) { edit(key = null) { it.setWidgetPinned(path, instanceId, pinned) } }
@@ -422,8 +480,7 @@ class EditModeController(
         scope.launch(writeDispatcher) {
             val before = repo.value()
             repo.resetSurface(surface)
-            history.record(key = null, before = before, after = repo.value())
-            publishHistory()
+            note(key = null, before = before, after = repo.value())
         }
     }
 
@@ -435,8 +492,7 @@ class EditModeController(
             val before = repo.value()
             repo.resetAll()
             repo.update { ScreenLinks.ensureLinks(it) }
-            history.record(key = null, before = before, after = repo.value())
-            publishHistory()
+            note(key = null, before = before, after = repo.value())
         }
     }
 
@@ -513,4 +569,15 @@ class EditModeController(
     // UUID minting on palette drop. Matches NotificationCenter.kt's
     // UUID.randomUUID() pattern -- no kotlinx.uuid dep for one call.
     private fun newInstanceId(): String = UUID.randomUUID().toString()
+}
+
+// The model has no transform that sets a placement outright, and its placement
+// writer will not turn a placement back into none, so the widget is put back in its
+// own place in the slot carrying the placement it had. Identity when there is
+// nothing to put back.
+private fun LayoutGraph.withWidgetPlacement(path: SlotPath, instanceId: String, placement: Placement?): LayoutGraph {
+    val widgets = traverse(path)?.widgets ?: return this
+    val index = widgets.indexOfFirst { it.instanceId == instanceId }
+    if (index < 0 || widgets[index].placement == placement) return this
+    return removeWidget(path, instanceId).insertWidget(path, widgets[index].copy(placement = placement), index)
 }

@@ -53,6 +53,7 @@ import hivens.tray.TrayStrings
 import hivens.ui.chrome.LocalChromeClose
 import hivens.ui.chrome.LocalComposeWindow
 import hivens.ui.chrome.LocalWindowHide
+import hivens.ui.chrome.EscapeClaim
 import hivens.ui.chrome.ShellChord
 import hivens.ui.chrome.resolveShellChord
 import hivens.ui.chrome.LocalUseCustomChrome
@@ -834,6 +835,7 @@ fun FrameWindowScope.AppShellContent(
         // shell mounts. Plain assignments -- the window reads the hooks at
         // event time, and recomposition keeps them pointing at fresh captures.
         chrome.onCloseRequest = onCloseChrome
+        val escapeClaim = remember(editModeController) { EscapeClaim { editModeController.claimsEscape } }
         chrome.onPreviewKey = { ev ->
             // Window-scoped chords (preview = before focus dispatch) so they fire
             // no matter which composable holds focus -- the side rails own focus,
@@ -841,7 +843,7 @@ fun FrameWindowScope.AppShellContent(
             // what was pressed and whether to swallow it; the observers of these
             // signals gate on their own state (EditorSurfaceHost on the surface
             // being editable, ShellRightRegion on the rail).
-            val resolved = resolveShellChord(ev, debugOverlay.available, editModeController.isEditing)
+            val resolved = resolveShellChord(ev, debugOverlay.available, editModeController.isEditing, escapeClaim)
             when (resolved.chord) {
                 ShellChord.ToggleEditMode     -> editModeController.requestEditToggle()
                 ShellChord.ToggleRightRail    -> editModeController.requestRightRailToggle()

@@ -151,6 +151,47 @@ class EditHistoryTest {
         assertEquals(graph(9), h.undo(graph(10)))
     }
 
+    // A drag cut short puts its widget back. Undo must not then lead into the move
+    // that was abandoned, which is what a restore recorded as a step of its own did.
+    @Test
+    fun `a gesture put back where it began leaves nothing to undo`() {
+        val h = history()
+        h.record(key = null, before = graph(5), after = graph(6))
+        h.record("offset:w0", graph(6), graph(7))
+        clock += 16
+        h.record("offset:w0", graph(7), graph(8))
+
+        h.recordRestore(before = graph(8), after = graph(6))
+
+        assertEquals(1, h.depth, "the gesture's step went, the edit before it stayed")
+        assertEquals(graph(5), h.undo(graph(6)))
+    }
+
+    @Test
+    fun `a restore that lands where no step began is a step of its own`() {
+        val h = history()
+        h.record(key = null, before = graph(0), after = graph(1))
+
+        h.recordRestore(before = graph(1), after = graph(4))
+
+        assertEquals(2, h.depth)
+        assertEquals(graph(1), h.undo(graph(4)), "undo can still reach the graph before the restore")
+    }
+
+    @Test
+    fun `a session that ends takes its history with it`() {
+        val h = history()
+        h.record(key = null, before = graph(0), after = graph(1))
+        h.undo(graph(1))
+        h.record(key = null, before = graph(0), after = graph(2))
+        h.undo(graph(2))
+
+        h.clear()
+
+        assertFalse(h.canUndo)
+        assertFalse(h.canRedo)
+    }
+
     @Test
     fun `nothing to undo or redo is a no-op rather than a throw`() {
         val h = history()

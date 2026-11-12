@@ -95,6 +95,46 @@ class ShellChordTest {
         assertFalse(idle.consume, "taking Ctrl+Z at window scope would take it from every text field in the shell")
     }
 
+    // One of the editor's own dialogs is up: Escape is the dialog's, and claimed over
+    // it the back-out ran behind the dialog and left it standing.
+    @Test
+    fun `Escape is left to a dialog open over the editor while Ctrl Z stays the editor's`() {
+        val escape = resolveChord(Key.Escape, ctrl = false, released = false, debugOverlayAvailable = false, editing = true, claimEscape = false)
+        assertNull(escape.chord)
+        assertFalse(escape.consume, "the dialog closes on the press, so the press has to reach it")
+
+        val undo = resolveChord(Key.Z, ctrl = true, released = true, debugOverlayAvailable = false, editing = true, claimEscape = false)
+        assertEquals(ShellChord.UndoEdit, undo.chord)
+    }
+
+    @Test
+    fun `an Escape release is taken only when its press was`() {
+        var open = false
+        val claim = EscapeClaim { open }
+
+        // The press closes a dialog, and by the release the editor behind it is ready
+        // to take Escape again. Taking that release would back the editor out a step
+        // as well, on the same press.
+        assertFalse(claim.takes(released = false))
+        open = true
+        assertFalse(claim.takes(released = true), "one press, one thing done")
+
+        assertTrue(claim.takes(released = false))
+        assertTrue(claim.takes(released = true))
+    }
+
+    @Test
+    fun `an Escape press taken stays taken through its release`() {
+        var open = true
+        val claim = EscapeClaim { open }
+
+        assertTrue(claim.takes(released = false))
+        // Whatever changes between the two edges, the release follows its press, so
+        // the half of an Escape the editor took never falls through to anything else.
+        open = false
+        assertTrue(claim.takes(released = true))
+    }
+
     @Test
     fun `an unrelated chord is left alone`() {
         val resolved = resolveChord(Key.S, ctrl = true, released = true, debugOverlayAvailable = true, editing = false)

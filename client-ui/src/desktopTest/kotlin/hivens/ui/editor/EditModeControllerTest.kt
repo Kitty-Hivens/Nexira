@@ -4,6 +4,7 @@ import hivens.ui.layout.LayoutGraphRepository
 import hivens.widget.model.FlowSpec
 import hivens.widget.model.GRID_MAX
 import hivens.widget.model.LayoutGraph
+import hivens.widget.model.Placement
 import hivens.widget.model.ScreenSpec
 import hivens.widget.model.SlotContent
 import hivens.widget.model.SlotId
@@ -31,6 +32,8 @@ import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 // Pins the keybind bridge contract: requestEditToggle() is the only
@@ -152,6 +155,7 @@ class EditModeControllerTest {
             scope,
         ) { LayoutGraph.EMPTY }
         val ctl = EditModeController(repo, scope)
+        ctl.reportEditing(true)
         val rail = SurfaceId("appshell.leftrail")
         val home = SurfaceId("home.new")
         val note = WidgetInstance(WidgetKind("note"), "note-1", JsonObject(emptyMap()))
@@ -186,6 +190,125 @@ class EditModeControllerTest {
 
         ctl.undo()
         withTimeout(3000) { while (repo.value() != before) delay(5) }
+    }
+
+    // The undo history belongs to an edit session: what is done while editing can be
+    // taken back until the editor closes, and nothing done outside it is in there.
+    private val main = SlotPath(SurfaceId("home.new"), SlotId("main"))
+    private val start = Placement(x = 10f, y = 10f)
+
+    private suspend fun sessionFixture(): Pair<LayoutGraphRepository, EditModeController> {
+        val repo = LayoutGraphRepository(
+            tmpDir.resolve("layout-graph.json"),
+            Json { ignoreUnknownKeys = true; encodeDefaults = true },
+            scope,
+        ) { LayoutGraph.EMPTY }
+        repo.update {
+            LayoutGraph(surfaces = mapOf(
+                SurfaceId("home.new") to SurfaceLayout(slots = mapOf(
+                    SlotId("main") to SlotContent(
+                        widgets = listOf(WidgetInstance(WidgetKind("a"), "i1", JsonObject(emptyMap()), placement = start)),
+                        flow    = null,
+                    ),
+                )),
+            ))
+        }
+        return repo to EditModeController(repo, scope)
+    }
+
+    private fun LayoutGraphRepository.placementOf(id: String): Placement? =
+        value().traverse(main)?.widgets?.firstOrNull { it.instanceId == id }?.placement
+
+    private fun LayoutGraphRepository.collapsed(): JsonPrimitive? =
+        value().traverse(main)?.widgets?.single()?.props?.get("collapsed") as? JsonPrimitive
+
+    @Test
+    fun `an edit made outside a session is not recorded`() = runBlocking {
+        val (repo, ctl) = sessionFixture()
+
+        ctl.setWidgetOffset(main, "i1", 40f, 40f)
+        ctl.awaitWrites()
+
+        assertEquals(40f, repo.placementOf("i1")?.x, "the edit itself still lands")
+        assertFalse(ctl.canUndo)
+    }
+
+    // Ctrl+N folds the right rail through the same props write the editor uses. A
+    // fold made before the editor opened was the first thing its Ctrl+Z took back.
+    @Test
+    fun `a rail folded outside a session is not undone by the next one`() = runBlocking {
+        val (repo, ctl) = sessionFixture()
+
+        ctl.updatePropsFrom(main, "i1", historyKey = "collapsed") { JsonObject(it + ("collapsed" to JsonPrimitive(true))) }
+        ctl.awaitWrites()
+        ctl.reportEditing(true)
+        ctl.awaitWrites()
+
+        assertFalse(ctl.canUndo, "the session opens with nothing to undo")
+        ctl.undo()
+        ctl.awaitWrites()
+        assertEquals(JsonPrimitive(true), repo.collapsed(), "the fold stays")
+    }
+
+    @Test
+    fun `a rail folded inside a session can be undone`() = runBlocking {
+        val (repo, ctl) = sessionFixture()
+        ctl.reportEditing(true)
+
+        ctl.updatePropsFrom(main, "i1", historyKey = "collapsed") { JsonObject(it + ("collapsed" to JsonPrimitive(true))) }
+        ctl.awaitWrites()
+        assertTrue(ctl.canUndo)
+
+        ctl.undo()
+        ctl.awaitWrites()
+        assertNull(repo.collapsed())
+    }
+
+    @Test
+    fun `the history goes when the session ends`() = runBlocking {
+        val (repo, ctl) = sessionFixture()
+        ctl.reportEditing(true)
+        ctl.setWidgetOffset(main, "i1", 40f, 40f)
+        ctl.awaitWrites()
+        assertTrue(ctl.canUndo)
+
+        ctl.reportEditing(false)
+        ctl.reportEditing(true)
+        ctl.awaitWrites()
+
+        assertFalse(ctl.canUndo, "a new session cannot step back into the last one")
+        ctl.undo()
+        ctl.awaitWrites()
+        assertEquals(40f, repo.placementOf("i1")?.x)
+    }
+
+    // A drag cut short writes its frames as it goes and then puts the widget back.
+    @Test
+    fun `a placement put back leaves the widget where it began and nothing to undo`() = runBlocking {
+        val (repo, ctl) = sessionFixture()
+        ctl.reportEditing(true)
+
+        ctl.setWidgetOffset(main, "i1", 20f, 20f)
+        ctl.setWidgetOffset(main, "i1", 30f, 30f)
+        ctl.restoreWidgetPlacement(main, "i1", start)
+        ctl.awaitWrites()
+
+        assertEquals(start, repo.placementOf("i1"))
+        assertFalse(ctl.canUndo, "undo would only lead back into the move that was abandoned")
+    }
+
+    @Test
+    fun `a placement put back after the session ended is not recorded`() = runBlocking {
+        val (repo, ctl) = sessionFixture()
+        ctl.reportEditing(true)
+
+        ctl.setWidgetOffset(main, "i1", 30f, 30f)
+        ctl.reportEditing(false)
+        ctl.restoreWidgetPlacement(main, "i1", start)
+        ctl.awaitWrites()
+
+        assertEquals(start, repo.placementOf("i1"))
+        assertFalse(ctl.canUndo)
     }
 
     private suspend fun awaitWrap(repo: LayoutGraphRepository, path: SlotPath, expected: Int) {
