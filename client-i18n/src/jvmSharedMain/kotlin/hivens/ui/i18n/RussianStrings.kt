@@ -331,7 +331,7 @@ object RussianStrings : AppStrings {
     override val aboutLinkGithub           = "GitHub"
     override val aboutLinkBugReport        = "Сообщить о баге"
     override val aboutLinkReleases         = "Релизы"
-    override val settingsSectionAbout      = "О ПРОГРАММЕ"
+    override val settingsSectionAbout      = "О программе"
 
     // Tech stack descriptions
     override val techKotlinDesc  = "Основной язык"

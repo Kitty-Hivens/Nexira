@@ -102,7 +102,7 @@ object GermanStrings : AppStrings {
     override val settingsLanguage           = "Sprache"
 
     // Theme Picker
-    override val themePickerTitle           = "DESIGN WÄHLEN"
+    override val themePickerTitle           = "Design wählen"
     override val themePickerApply           = "Anwenden"
     override val themePickerPreview         = "Vorschau"
     override val themePickerSelected        = "Ausgewählt"
@@ -144,7 +144,7 @@ object GermanStrings : AppStrings {
     // Update
     override val updateTitle           = "Update verfügbar"
     override val updateTitleCritical   = "Kritisches Update"
-    override val updateTitleMandatory  = "PFLICHT-UPDATE"
+    override val updateTitleMandatory  = "Pflicht-Update"
     override val updateCriticalBanner  = "Dieses Update enthält kritische Sicherheitskorrekturen."
     override val updateMandatoryBanner =
         "Die Server-Kompatibilität älterer Versionen ist gebrochen. Der Launcher kann ohne dieses Update nicht starten."
@@ -292,7 +292,7 @@ object GermanStrings : AppStrings {
     override val backgroundParallax       = "Parallaxe"
     override val backgroundVignette       = "Vignette"
     override val backgroundAnimationSpeed = "Animationsgeschwindigkeit"
-    override val backgroundSectionTint    = "FARBTÖNUNG"
+    override val backgroundSectionTint    = "Farbtönung"
     override val backgroundTintNone       = "Keine"
     override val backgroundTintNavy       = "Dunkelblau"
     override val backgroundTintViolet     = "Violett"
@@ -331,7 +331,7 @@ object GermanStrings : AppStrings {
     override val aboutLinkGithub           = "GitHub"
     override val aboutLinkBugReport        = "Fehler melden"
     override val aboutLinkReleases         = "Veröffentlichungen"
-    override val settingsSectionAbout      = "ÜBER"
+    override val settingsSectionAbout      = "Über"
 
     // Tech stack descriptions
     override val techKotlinDesc  = "Hauptsprache"
@@ -641,7 +641,7 @@ object GermanStrings : AppStrings {
 
     override val customizationAccentClear     = "Überschreibung löschen"
     override val customizationSectionVisual   = "Visuell"
-    override val customizationSectionColors   = "FARBÜBERSCHREIBUNGEN"
+    override val customizationSectionColors   = "Farbüberschreibungen"
     override val customizationHexInvalid      = "Ungültiger Hex"
 
     override val browseTitle             = "Katalog"
