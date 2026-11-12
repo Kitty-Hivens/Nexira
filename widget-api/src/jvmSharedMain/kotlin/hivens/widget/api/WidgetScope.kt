@@ -2,8 +2,10 @@ package hivens.widget.api
 
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
+import hivens.widget.model.CommandKey
 import hivens.widget.model.ScopeLevel
 import hivens.widget.model.SourceKey
+import hivens.widget.model.WidgetCommand
 import hivens.widget.model.WidgetDataSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -43,6 +45,9 @@ interface LevelContext {
 
     /** Another key's source as this level sees it, read at that key's own level. Null where it is missing. */
     fun <T> find(key: SourceKey<T>): WidgetDataSource<T>?
+
+    /** A command as this level sees it, fired at that key's own level. Null where it is missing. */
+    fun <P> findCommand(key: CommandKey<P>): WidgetCommand<P>?
 }
 
 /**
@@ -62,6 +67,10 @@ interface LevelContext {
  * subtree put over a level with [ProvideScoped] lives in the composition and is
  * seen by [rememberScopedSource] only, not by [find].
  *
+ * Commands live on the same tree by the same rules: [findCommand] climbs to the
+ * key's level and answers with what the owner provided there, the app registry's
+ * command at the app level, or one the registry's factory made for this level.
+ *
  * Safe to read from any thread. A factory runs outside the level's lock, so it may
  * read other keys of the same level, and one that fails or reads its own key
  * leaves the key missing in this level and says so in the log once.
@@ -70,6 +79,7 @@ class WidgetScope private constructor(
     override val level: ScopeLevel,
     val parent: WidgetScope?,
     private val registry: WidgetDataRegistry,
+    private val commands: WidgetCommandRegistry,
     override val services: Scope,
     context: CoroutineContext,
 ) : LevelContext, AutoCloseable {
@@ -82,6 +92,10 @@ class WidgetScope private constructor(
 
     private val made = HashMap<String, WidgetDataSource<*>>()
 
+    private val madeCommands = HashMap<String, WidgetCommand<*>>()
+
+    // Ids of both kinds, a command's carrying COMMAND_MARK, so a source and a
+    // command that share an id fail apart.
     private val failed = HashSet<String>()
 
     private val children = ArrayList<WidgetScope>()
@@ -91,6 +105,8 @@ class WidgetScope private constructor(
     // One snapshot state per key rather than one map, so a widget reading a key
     // recomposes when that key is provided or withdrawn and not on every other.
     private val provided = ConcurrentHashMap<String, MutableState<WidgetDataSource<*>?>>()
+
+    private val providedCommands = ConcurrentHashMap<String, MutableState<WidgetCommand<*>?>>()
 
     // The keys this thread is making a source for right now, to catch a factory
     // that reads its own key before it recurses into a stack overflow.
@@ -109,7 +125,7 @@ class WidgetScope private constructor(
             val own = services.getKoin().createScope(nextScopeId(level), level.servicesQualifier)
             // Koin links every new scope to its root already, so only a parent below the app needs it.
             if (!services.isRoot) own.linkTo(services)
-            return WidgetScope(level, this, registry, own, coroutineScope.coroutineContext).also { children += it }
+            return WidgetScope(level, this, registry, commands, own, coroutineScope.coroutineContext).also { children += it }
         }
     }
 
@@ -204,6 +220,76 @@ class WidgetScope private constructor(
         if (first) log.error("No source for '{}' in a {} level: its factory failed", key.id, level, cause)
     }
 
+    override fun <P> findCommand(key: CommandKey<P>): WidgetCommand<P>? = nearest(key.level)?.commandAt(key)
+
+    /**
+     * Provides [command] for [key] in this level until the returned handle is
+     * closed, the way [provideSource] does for a source: for an owner outside the
+     * composition. A subtree uses [ProvideScopedCommand] instead.
+     */
+    fun <P> provideCommand(key: CommandKey<P>, command: WidgetCommand<P>): AutoCloseable {
+        require(key.level == level) { "widget command '${key.id}' lives at ${key.level}, not at $level" }
+        require(level != ScopeLevel.App) { "app-wide command '${key.id}' belongs in the WidgetCommandRegistry" }
+        require(commands.factoryFor(key) == null) { "widget command '${key.id}' is made by its factory" }
+        val slot = commandSlotOf(key.id)
+        synchronized(lock) {
+            check(!closed) { "widget command '${key.id}' provided to a $level level that was disposed" }
+            slot.value = command
+        }
+        return AutoCloseable {
+            synchronized(lock) { if (slot.value === command) slot.value = null }
+        }
+    }
+
+    private fun commandSlotOf(id: String): MutableState<WidgetCommand<*>?> =
+        providedCommands.computeIfAbsent(id) { mutableStateOf(null) }
+
+    // The same three answers in the same order as sourceAt, under the same cast seam.
+    @Suppress("UNCHECKED_CAST")
+    private fun <P> commandAt(key: CommandKey<P>): WidgetCommand<P>? {
+        if (closed) return null
+        (commandSlotOf(key.id).value as WidgetCommand<P>?)?.let { return it }
+        if (level == ScopeLevel.App) commands.find(key)?.let { return it }
+        val factory = commands.factoryFor(key) ?: return null
+        val marked = COMMAND_MARK + key.id
+        synchronized(lock) {
+            if (closed) return null
+            madeCommands[key.id]?.let { return it as WidgetCommand<P> }
+            if (marked in failed) return null
+        }
+        val fresh = try {
+            factory(this)
+        } catch (e: Exception) {
+            val first = synchronized(lock) { failed.add(marked) }
+            if (first) log.error("No command for '{}' in a {} level: its factory failed", key.id, level, e)
+            return null
+        }
+        val kept = synchronized(lock) { if (closed) null else madeCommands.getOrPut(key.id) { fresh } }
+        if (kept !== fresh && fresh is AutoCloseable) fresh.closeLogged("a duplicate command for '${key.id}'")
+        return kept as WidgetCommand<P>?
+    }
+
+    /** Where [id] lives and what answers it, as the registries of this tree have it. Sources first. */
+    fun declarationOf(id: String): KeyDeclaration? = registry.declarationOf(id) ?: commands.declarationOf(id)
+
+    /**
+     * Whether the level of [declaration]'s kind nearest this one answers it, short
+     * of a [ProvideScoped] overlay, which only the composition can see. A factory is
+     * taken at its word rather than run. Reads the provided slot as snapshot state,
+     * so a composable asking is told again when the owner provides or withdraws it.
+     */
+    internal fun answers(declaration: KeyDeclaration): Boolean {
+        val at = nearest(declaration.level) ?: return false
+        if (at.closed) return false
+        return when (declaration.origin) {
+            KeyOrigin.Registered, KeyOrigin.Factory -> true
+            KeyOrigin.Owner -> when (declaration.kind) {
+                KeyKind.Source -> at.slotOf(declaration.id).value != null
+                KeyKind.Command -> at.commandSlotOf(declaration.id).value != null
+            }
+        }
+    }
+
     /**
      * Disposes this level and everything it made. Every part is attempted even
      * when one fails, and the first failure is thrown afterwards with the rest
@@ -213,15 +299,17 @@ class WidgetScope private constructor(
      */
     override fun close() {
         val kids: List<WidgetScope>
-        val sources: List<WidgetDataSource<*>>
+        val sources: List<Any>
         synchronized(lock) {
             if (closed) return
             closed = true
             kids = children.toList()
             children.clear()
-            sources = made.values.toList()
+            sources = made.values.toList() + madeCommands.values.toList()
             made.clear()
+            madeCommands.clear()
             provided.values.forEach { it.value = null }
+            providedCommands.values.forEach { it.value = null }
         }
         val failures = ArrayList<Throwable>()
         // Newest first, the way they were stacked on.
@@ -250,20 +338,24 @@ class WidgetScope private constructor(
 
         /**
          * The root of a tree: the app level, answering app keys from [registry] and
-         * the app factories in it. [services] is Koin's root scope, and [context]
-         * the coroutine context every level's coroutines run under, so cancelling
-         * its job stops them all.
+         * the app factories in it, and app commands from [commands]. [services] is
+         * Koin's root scope, and [context] the coroutine context every level's
+         * coroutines run under, so cancelling its job stops them all.
          */
         fun app(
             registry: WidgetDataRegistry,
             services: Scope,
             context: CoroutineContext = Dispatchers.Default,
+            commands: WidgetCommandRegistry = WidgetCommandRegistry(),
         ): WidgetScope {
             require(services.isRoot) { "the app level's services are Koin's root scope" }
-            return WidgetScope(ScopeLevel.App, null, registry, services, context)
+            return WidgetScope(ScopeLevel.App, null, registry, commands, services, context)
         }
     }
 }
+
+/** Prefixed to a command's id where it shares a set with source ids. */
+private const val COMMAND_MARK = "command:"
 
 /**
  * Closes this and logs a failure instead of throwing it, for an owner that

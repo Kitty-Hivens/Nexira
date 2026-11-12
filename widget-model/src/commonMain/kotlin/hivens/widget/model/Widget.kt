@@ -91,4 +91,10 @@ annotation class Widget(
     // it does not know, so a typo is a build error rather than a widget that
     // quietly fades.
     val enter: String = "",
+    // The ids of the sources and commands this widget reads, each a SourceKey or a
+    // CommandKey id. The editor will not place the widget where one of them has no
+    // answer, and a layout that puts it there anyway draws a placeholder in its
+    // place instead of a widget that reads nothing. The processor checks the ids are
+    // non-blank and listed once.
+    val needs: Array<String> = [],
 )

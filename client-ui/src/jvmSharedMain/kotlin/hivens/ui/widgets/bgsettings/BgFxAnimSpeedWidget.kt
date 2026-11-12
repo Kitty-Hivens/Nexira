@@ -4,7 +4,7 @@ import androidx.compose.runtime.Composable
 import hivens.ui.i18n.LocalStrings
 import hivens.widget.model.Widget
 
-@Widget(id = "bg.fx.animspeed", displayName = "widget.bg.fx.animspeed")
+@Widget(id = "bg.fx.animspeed", displayName = "widget.bg.fx.animspeed", needs = ["background.settings", "background.update"])
 @Composable
 fun BgFxAnimSpeedWidget() {
     val s = LocalStrings.current

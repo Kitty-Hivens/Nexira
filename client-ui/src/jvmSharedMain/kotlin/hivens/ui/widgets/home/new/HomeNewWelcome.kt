@@ -13,7 +13,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.ui.AppState
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.widgets.Sources
 import hivens.widget.api.rememberProps
+import hivens.widget.api.rememberScopedSource
+import hivens.widget.api.valueOrNull
 import hivens.widget.model.PropLabel
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
@@ -37,13 +40,14 @@ data class WelcomeProps(
     displayName = "widget.home.new.welcome",
     propsClass = WelcomeProps::class,
     surface = """{"fill":"panel"}""",
+    needs = ["app.state"],
 )
 @Composable
 fun HomeNewWelcome(instance: WidgetInstance) {
     val p = instance.rememberProps<WelcomeProps>()
-    val ctx = LocalHomeNewContext.current
+    val appState = rememberScopedSource(Sources.Session).valueOrNull() ?: return
     val s = LocalStrings.current
-    val playerName = (ctx.appState as? AppState.Authenticated)?.session?.playerName
+    val playerName = (appState as? AppState.Authenticated)?.session?.playerName
 
     // No plane of its own. The widget's surface is declared in the layout and painted
     // by the kernel, so the editor's surface rows move THIS card rather than adding a

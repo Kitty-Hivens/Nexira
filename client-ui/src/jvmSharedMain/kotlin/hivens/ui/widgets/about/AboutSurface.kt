@@ -8,22 +8,22 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import hivens.core.jvm.SystemHardware
-import hivens.core.jvm.SystemMemory
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.nx.AdaptiveWidth
 import hivens.ui.nx.WidthClass
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.platform.rememberHostActions
+import hivens.widget.api.ProvideScoped
+import hivens.widget.api.ProvideScopedCommand
 import hivens.widget.api.SlotRenderer
+import hivens.widget.api.rememberLatestCommand
 import hivens.widget.model.SlotId
 import hivens.widget.model.SurfaceId
 import kotlinx.coroutines.delay
@@ -39,15 +39,11 @@ private const val SURFACE = "about"
 // screen.
 //
 // Surface owns the per-screen state (updateState, showUpdateDialog)
-// and the asynchronous check it runs on a timer; widgets observe the
-// MutableState holders in the context and re-render. The full
-// UpdateDialog modal lives at the surface level so it survives even
-// if the user removes the update.panel widget via the editor.
-//
-// Pre-computed values (systemRam lookup, displayRes AWT toolkit
-// call) happen once at surface mount and pass into the
-// context -- per-widget recomputation would re-read these on every
-// recomposition.
+// and the asynchronous check it runs on a timer. It puts the state and
+// the way to open the dialog over its page level, where the update
+// panel reads them. The full UpdateDialog modal lives at the surface
+// level so it survives even if the user removes the update.panel widget
+// via the editor.
 //
 // No verticalScroll on the slot containers; the credits widget
 // self-scrolls its long body text. Lazy widgets the user may drop
@@ -60,15 +56,7 @@ fun AboutSurface(onBack: () -> Unit) {
 
     val updateState       = remember { mutableStateOf<UpdateCheckState>(UpdateCheckState.Idle) }
     val showUpdateDialog  = remember { mutableStateOf(false) }
-
-    // OrNull (not the sizing fallback): the System-info card shows "Unknown" on a 0,
-    // so a broken runtime reads as unknown rather than a fabricated 16 GB.
-    val systemRam = remember { SystemMemory.totalPhysicalMbOrNull() ?: 0 }
-    val swapMb    = remember { SystemHardware.swapTotalMb }
-    val cpu       = remember { SystemHardware.cpu }
-
-    val displayInfo = rememberDisplayInfo()
-    val renderer    = rememberRendererInfo()
+    val openDialog        = rememberLatestCommand<Unit> { showUpdateDialog.value = true }
 
     val unknownErrorText = s.updateErrorUnknown
     val triggerUpdateCheck: () -> Unit = remember(scope, host, unknownErrorText) {
@@ -84,18 +72,6 @@ fun AboutSurface(onBack: () -> Unit) {
                 }
             }
         }
-    }
-
-    val ctx = remember(updateState, showUpdateDialog, systemRam, swapMb, cpu, displayInfo, renderer) {
-        AboutContext(
-            updateState        = updateState,
-            showUpdateDialog   = showUpdateDialog,
-            systemRam          = systemRam,
-            swapMb             = swapMb,
-            cpu                = cpu,
-            displayInfo        = displayInfo,
-            renderer           = renderer,
-        )
     }
 
     // Background auto-check every 5 minutes while the About screen is open,
@@ -143,7 +119,8 @@ fun AboutSurface(onBack: () -> Unit) {
         showUpdateDialog.value = true
     }
 
-    CompositionLocalProvider(LocalAboutContext provides ctx) {
+    ProvideScoped(AboutUpdateSource, updateState.value) {
+    ProvideScopedCommand(OpenUpdateDialog, openDialog) {
         AdaptiveWidth(Modifier.fillMaxSize()) { widthClass, _ ->
             val pad = when (widthClass) {
                 WidthClass.Expanded -> 24.dp
@@ -188,5 +165,6 @@ fun AboutSurface(onBack: () -> Unit) {
                 }
             }
         }
+    }
     }
 }

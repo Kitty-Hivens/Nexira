@@ -54,6 +54,12 @@ import hivens.ui.puppet.PuppetClick
 import hivens.ui.skin3d.Cycles
 import hivens.ui.skin3d.rememberSkinViewState
 import hivens.ui.utils.rememberReadOffMain
+import hivens.ui.widgets.Commands
+import hivens.ui.widgets.Sources
+import hivens.widget.api.rememberScopedAction
+import hivens.widget.api.rememberScopedCommand
+import hivens.widget.api.rememberScopedSource
+import hivens.widget.api.valueOrNull
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -74,20 +80,26 @@ private val SIDE_BY_SIDE_FROM = 420.dp
 // in the shell via another provider) it shows the SmartyCraft sign-in form.
 // Resolves the SmartyCraft account directly rather than the shell face, since the
 // face may belong to a different provider; Microsoft lives in its own section.
-@Widget(id = "profile.account.section", displayName = "widget.profile.account.section")
+@Widget(
+    id = "profile.account.section",
+    displayName = "widget.profile.account.section",
+    needs = ["app.state", "accounts.revision", "accounts.changed", "auth.signIn", "auth.signOut"],
+)
 @Composable
 fun ProfileAccountSectionWidget() {
-    val ctx = LocalProfileContext.current
+    val face = rememberSession()
+    val signIn = rememberScopedCommand(Commands.SignIn) ?: return
+    val changed = rememberScopedAction(Commands.AccountsChanged) ?: return
     val credentials: AccountStore = koinInject()
     val settingsService: ISettingsService = koinInject()
     val scope = rememberCoroutineScope()
 
-    // The surface's revision rather than a key of this section's own: the nav's
-    // face picker has to hear about a sign-out that happens here.
-    val revision = ctx.accountsRevision
+    // The app's revision rather than a key of this section's own: the nav's face
+    // picker has to hear about a sign-out that happens here.
+    val revision = rememberScopedSource(Sources.AccountsRevision).valueOrNull() ?: return
     // Nothing until the store has answered: drawing the sign-in form meanwhile
     // would offer to sign in an account that is signed in.
-    val scSession = (rememberReadOffMain(revision.value, ctx.session) { credentials.accountFor(SC_KEY) } ?: return).value
+    val scSession = (rememberReadOffMain(revision, face) { credentials.accountFor(SC_KEY) } ?: return).value
 
     Box(Modifier.fillMaxWidth()) {
         Column(Modifier.widthIn(max = 520.dp)) {
@@ -99,20 +111,20 @@ fun ProfileAccountSectionWidget() {
                         // An offline identity is never stored as an account, so looking
                         // the face up again would find nothing and drop the sign-in.
                         if (session.offline) {
-                            ctx.onLogin(session)
-                            revision.value++
+                            signIn(session)
+                            changed()
                         } else {
                             scope.launch {
                                 withContext(Dispatchers.IO) { credentials.faceSession(settingsService) }
-                                    ?.let { ctx.onLogin(it) }
-                                revision.value++
+                                    ?.let(signIn)
+                                changed()
                             }
                         }
                     },
                     showMicrosoft = false,
                 )
             } else {
-                SmartyCraftAccount(scSession) { revision.value++ }
+                SmartyCraftAccount(scSession, changed)
             }
         }
     }
@@ -120,7 +132,8 @@ fun ProfileAccountSectionWidget() {
 
 @Composable
 private fun SmartyCraftAccount(session: SessionData, onChanged: () -> Unit) {
-    val ctx = LocalProfileContext.current
+    val signIn = rememberScopedCommand(Commands.SignIn) ?: return
+    val signOutAll = rememberScopedAction(Commands.SignOut) ?: return
     val credentials: AccountStore = koinInject()
     val settingsService: ISettingsService = koinInject()
     val s = LocalStrings.current
@@ -144,7 +157,7 @@ private fun SmartyCraftAccount(session: SessionData, onChanged: () -> Unit) {
             try {
                 val accounts = withContext(Dispatchers.IO) { credentials.listAccounts() }
                 if (accounts.size <= 1) {
-                    ctx.onLogout()
+                    signOutAll()
                     return@launch
                 }
                 val face = withContext(Dispatchers.IO) {
@@ -154,7 +167,7 @@ private fun SmartyCraftAccount(session: SessionData, onChanged: () -> Unit) {
                     settingsService.updateSettings { it.releasingFace(SC_KEY) }
                     credentials.faceSession(settingsService)
                 }
-                face?.let { ctx.onLogin(it) } ?: ctx.onLogout()
+                face?.let(signIn) ?: signOutAll()
                 onChanged()
             } finally {
                 signingOut = false
@@ -206,7 +219,7 @@ private fun SmartyCraftAccount(session: SessionData, onChanged: () -> Unit) {
             )
         }
         PuppetClick("account.signout.smartycraft") { signOut() }
-        PuppetClick("account.logout") { ctx.onLogout() }
+        PuppetClick("account.logout") { signOutAll() }
     }
 }
 

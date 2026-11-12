@@ -76,6 +76,13 @@ interface WidgetDescriptor {
     val defaultEntrance: Entrance?
         get() = null
 
+    // The source and command ids this widget reads. Populated by the KSP processor
+    // from @Widget(needs = ...). The editor will not place the widget where one of
+    // them has no answer, and the slot renderer draws [LocalMisplacedWidget] in its
+    // place where a layout put it anyway. See [missingNeeds].
+    val needs: List<String>
+        get() = emptyList()
+
     @Composable
     fun Render(instance: WidgetInstance)
 }

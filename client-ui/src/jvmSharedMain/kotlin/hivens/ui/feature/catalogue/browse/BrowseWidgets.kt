@@ -47,6 +47,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import hivens.core.api.catalogue.CataloguePack
 import hivens.core.data.PackOrigin
 import hivens.launcher.catalogue.PackCatalogueRegistry
 import hivens.launcher.content.ContentKind
@@ -70,7 +71,6 @@ import hivens.ui.puppet.PuppetField
 import hivens.ui.feature.catalogue.browse.BROWSE_KINDS
 import hivens.ui.feature.catalogue.browse.BrowseController
 import hivens.ui.feature.catalogue.browse.BrowseSort
-import hivens.ui.feature.catalogue.browse.LocalBrowseContext
 import hivens.ui.feature.catalogue.browse.PackBrowse
 import hivens.ui.feature.catalogue.browse.PackMark
 import hivens.ui.feature.catalogue.browse.ProjectResults
@@ -82,6 +82,7 @@ import hivens.ui.feature.catalogue.browse.chosenChips
 import hivens.ui.feature.catalogue.browse.kindLabel
 import hivens.ui.feature.catalogue.browse.label
 import hivens.ui.feature.catalogue.browse.originLabel
+import hivens.ui.feature.catalogue.project.ModTarget
 import hivens.ui.feature.catalogue.project.loaderLabel
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
@@ -91,7 +92,9 @@ import hivens.ui.theme.NxInk
 import hivens.ui.theme.Status
 import hivens.ui.widgets.RailBlock
 import hivens.ui.widgets.RailGroup
+import hivens.ui.widgets.Commands
 import hivens.ui.widgets.RailLabel
+import hivens.widget.api.rememberScopedCommand
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 import org.koin.compose.koinInject
@@ -200,12 +203,19 @@ private fun SortPicker(c: BrowseController, wordless: Boolean) {
     displayName = "widget.browse.results",
     minWidth = 320, minHeight = 200,
     maxWidth = 2400, maxHeight = 1600,
+    needs = ["nav.open"],
 )
 @Composable
 fun BrowseResultsWidget(instance: WidgetInstance) {
     val c: BrowseController = koinInject()
     val registry: PackCatalogueRegistry = koinInject()
-    val ctx = LocalBrowseContext.current
+    val navigate = rememberScopedCommand(Commands.Navigate) ?: return
+    // A result leaves Browse for its page: a catalogue pack's, or a project's, which
+    // carries the target pack so the page can install into it.
+    val openPack: (CataloguePack) -> Unit = remember(navigate) {
+        { pack -> navigate(Screen.CataloguePackDetail(pack.origin, pack.id)) }
+    }
+    val openProject: (ModTarget) -> Unit = remember(navigate) { { navigate(Screen.ModDetail(it)) } }
     val fade = Motion.fade
     val origin = activeOrigin(c.origin, registry.origins)
     // Each kind is its own list, so a change of kind crossfades one list into the
@@ -218,7 +228,7 @@ fun BrowseResultsWidget(instance: WidgetInstance) {
     ) { (kind, from) ->
         val type = catalogueTypeOf(kind, from)
         if (type == null) {
-            PackBrowse(from, c.query, ctx.onOpenPack, shown = c::shows)
+            PackBrowse(from, c.query, openPack, shown = c::shows)
         } else {
             ProjectResults(
                 type          = type,
@@ -228,8 +238,8 @@ fun BrowseResultsWidget(instance: WidgetInstance) {
                 target        = c.target,
                 filters       = c.searchFiltersFor(type, kind),
                 hideInstalled = c.hideInstalled,
-                onOpenProject = ctx.onOpenProject,
-                onOpenPack    = ctx.onOpenPack,
+                onOpenProject = openProject,
+                onOpenPack    = openPack,
             )
         }
     }

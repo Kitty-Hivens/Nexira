@@ -20,6 +20,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.ProvidableCompositionLocal
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -53,11 +54,9 @@ import androidx.compose.foundation.layout.union
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import hivens.core.data.SessionData
 import hivens.ui.AppSidebar
 import hivens.ui.AppState
 import hivens.ui.RightPanel
-import hivens.ui.Screen
 import hivens.ui.chrome.HOST_IS_MAC
 import hivens.ui.SheetBackHandler
 import hivens.ui.nx.NxIconButton
@@ -75,9 +74,15 @@ import hivens.ui.editor.reportsContentPane
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.surface.NxSurface
+import hivens.ui.widgets.Commands
+import hivens.ui.widgets.Sources
 import hivens.widget.api.LocalSlotPath
 import hivens.widget.api.SlotRenderer
 import hivens.widget.api.rememberProps
+import hivens.widget.api.rememberScopedAction
+import hivens.widget.api.rememberScopedCommand
+import hivens.widget.api.rememberScopedSource
+import hivens.widget.api.valueOrNull
 import hivens.widget.model.PropLabel
 import hivens.widget.model.PropRange
 import hivens.widget.model.SlotId
@@ -160,38 +165,15 @@ data class ShellLeftRegionProps(
 )
 
 /**
- * Everything the three shell regions need, provided once by [hivens.ui.AppLayout]
- * so the region widgets (which render through SlotRenderer and take no params)
- * can build the rails + center. `compositionLocalOf` so only the region readers
- * recompose when the shell state changes, not the whole subtree.
+ * The screen router the centre region draws, provided by [hivens.ui.AppLayout].
+ * Supplied here rather than stored in the layout graph because the navigation tree
+ * is not (yet) a widget surface. Everything else the regions read is a source or a
+ * command of the composition.
  *
- * [centerBody] is the screen router; it is supplied here rather than stored in
- * the layout graph because the navigation tree is not (yet) a widget surface.
+ * Nothing by default, which is what a region drawn outside the shell, in the
+ * palette say, has to route.
  */
-class ShellContext(
-    val currentScreen: Screen,
-    val isAuthenticated: Boolean,
-    val onScreenChange: (Screen) -> Unit,
-    /** What the nav rail does: a fresh context rather than a push. See NavBackStack. */
-    val onSwitchTab: (Screen) -> Unit,
-    val onLogout: () -> Unit,
-    val appState: AppState,
-    val onLogin: (SessionData) -> Unit,
-    val sslBypass: Boolean,
-    val centerBody: @Composable () -> Unit,
-    // Top-bar breadcrumb: the root-to-current path + back / forward / segment-jump,
-    // sourced from the NavBackStack in AppRoot (navigation is not yet a widget surface).
-    val trail: List<Screen>,
-    val canGoBack: Boolean,
-    val canGoForward: Boolean,
-    val onBack: () -> Unit,
-    val onForward: () -> Unit,
-    val onPopTo: (Screen) -> Unit,
-)
-
-val LocalShellContext = compositionLocalOf<ShellContext> {
-    error("LocalShellContext not provided -- AppLayout must wrap the shell surface")
-}
+val LocalCenterBody: ProvidableCompositionLocal<@Composable () -> Unit> = compositionLocalOf { {} }
 
 /**
  * What the system keeps for itself at each edge: the bars, a cutout, the keyboard. The regions
@@ -236,7 +218,15 @@ private fun CollapsedRegionStrip() {
  * Left region: the navigation rail plus the divider that separates it from the
  * center. removable=false -- losing the rail would navigation-lock the launcher.
  */
-@Widget(id = "appshell.region.left", enter = "none", displayName = "widget.appshell.region.left", removable = false, propsClass = ShellLeftRegionProps::class, drawsOwnSurface = true)
+@Widget(
+    id = "appshell.region.left",
+    enter = "none",
+    displayName = "widget.appshell.region.left",
+    removable = false,
+    propsClass = ShellLeftRegionProps::class,
+    drawsOwnSurface = true,
+    needs = ["app.state", "nav.switch", "auth.signOut"],
+)
 @Composable
 fun ShellLeftRegion(instance: WidgetInstance) {
     val props = instance.rememberProps<ShellLeftRegionProps>()
@@ -244,7 +234,9 @@ fun ShellLeftRegion(instance: WidgetInstance) {
         if (LocalEditMode.current is EditModeState.On) CollapsedRegionStrip()
         return
     }
-    val ctx = LocalShellContext.current
+    val appState = rememberScopedSource(Sources.Session).valueOrNull() ?: return
+    val switchTab = rememberScopedCommand(Commands.SwitchTab) ?: return
+    val signOut = rememberScopedAction(Commands.SignOut) ?: return
     Row(Modifier.fillMaxHeight()) {
         // The width lands on the rail, not on the row that also holds the divider.
         // On the row, the surface took whatever the divider left, so a named width
@@ -266,11 +258,9 @@ fun ShellLeftRegion(instance: WidgetInstance) {
             opacity = props.opacityPct.regionOpacity(), blurDp = props.blurDp.toFloat(),
         ) {
             AppSidebar(
-                currentScreen   = ctx.currentScreen,
-                isAuthenticated = ctx.isAuthenticated,
-                onScreenChange  = ctx.onScreenChange,
-                onSwitchTab     = ctx.onSwitchTab,
-                onLogout        = ctx.onLogout,
+                isAuthenticated = appState is AppState.Authenticated,
+                onSwitchTab     = switchTab,
+                onLogout        = signOut,
                 modifier        = Modifier.fillMaxSize().padding(start = edge.start, bottom = edge.bottom),
             )
         }
@@ -330,7 +320,7 @@ fun ShellCenterRegion(instance: WidgetInstance) {
         SlotRenderer(SurfaceId(BACKDROP_SURFACE), SlotId("layers"), Modifier.matchParentSize())
         val edge = rememberEdgeInsets()
         Box(Modifier.fillMaxSize().padding(end = edge.end, bottom = edge.bottom)) {
-        LocalShellContext.current.centerBody()
+        LocalCenterBody.current()
         // Nestle the content's top-start corner into the chrome (Modrinth-style).
         // A chrome-colored wedge, not a clip -- clipping the (transparent over a
         // wallpaper) content would be invisible; the wedge reads either way.
@@ -457,13 +447,8 @@ fun ShellRightRegion(instance: WidgetInstance) {
     // RightPanel as a movableContentOf so the editing <-> non-editing branch swap below
     // (driven by the static LocalEditMode) MOVES the panel -- and its news SlotRenderer's
     // loaded state -- instead of disposing and reloading it on every Ctrl+E.
-    val ctx = LocalShellContext.current
-    val ctxState = rememberUpdatedState(ctx)
     val rightPanelMovable = remember {
-        movableContentOf {
-            val c = ctxState.value
-            RightPanel(c.appState, c.onLogin, c.onLogout, c.sslBypass, Modifier.fillMaxSize())
-        }
+        movableContentOf { RightPanel(Modifier.fillMaxSize()) }
     }
 
     val panelShape = MaterialTheme.shapes.large

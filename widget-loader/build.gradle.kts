@@ -33,7 +33,7 @@ val fixtureModuleJar = tasks.register<Jar>("fixtureModuleJar") {
     from(fixtureModule.output)
     manifest {
         attributes(
-            "Nexira-Widget-Api" to 1,
+            "Nexira-Widget-Api" to providers.gradleProperty("nexira.widgetApi").get(),
             "Nexira-Module-Id" to "fixture",
             "Nexira-Module-Name" to "Fixture Module",
         )

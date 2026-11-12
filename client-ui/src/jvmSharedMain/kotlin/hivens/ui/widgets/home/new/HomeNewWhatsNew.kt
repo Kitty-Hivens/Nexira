@@ -26,6 +26,8 @@ import hivens.ui.icons.Symbol
 import hivens.ui.nx.NxRow
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
+import hivens.ui.widgets.Commands
+import hivens.widget.api.rememberScopedCommand
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 import org.koin.compose.koinInject
@@ -45,11 +47,12 @@ import org.koin.compose.koinInject
     surface = """{"fill":"panel"}""",
     minWidth = 240, minHeight = 60,
     maxWidth = 2400, maxHeight = 800,
+    needs = ["nav.open"],
 )
 @Composable
 @Suppress("UNUSED_PARAMETER")
 fun HomeNewWhatsNew(instance: WidgetInstance) {
-    val ctx = LocalHomeNewContext.current
+    val navigate = rememberScopedCommand(Commands.Navigate) ?: return
     val s = LocalStrings.current
     val updateState: LauncherUpdateState = koinInject()
     val launcher by updateState.available.collectAsState()
@@ -96,7 +99,7 @@ fun HomeNewWhatsNew(instance: WidgetInstance) {
                     else -> NxIcon.Update
                 },
                 iconTint = NxColor.lead(),
-                onClick  = { ctx.onScreenChange(Screen.PackVersions(pack.id)) },
+                onClick  = { navigate(Screen.PackVersions(pack.id)) },
                 trailing = { Symbol(NxIcon.ChevronRight, null, tint = NxInk.quiet) },
             )
         }

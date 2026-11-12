@@ -45,6 +45,12 @@ import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.theme.LocalMonoFamily
 import hivens.ui.utils.rememberReadOffMain
+import hivens.ui.widgets.Commands
+import hivens.ui.widgets.Sources
+import hivens.widget.api.rememberScopedAction
+import hivens.widget.api.rememberScopedCommand
+import hivens.widget.api.rememberScopedSource
+import hivens.widget.api.valueOrNull
 import hivens.widget.model.Widget
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -63,10 +69,17 @@ private const val MS_KEY = PackAuthRequirement.Microsoft.PROVIDER_KEY
 //
 // Skin and cape management (upload, cape selection via the Mojang API) is the
 // next, deeper pass -- this section is the identity + auth foundation.
-@Widget(id = "profile.signin", displayName = "widget.profile.signin", removable = false)
+@Widget(
+    id = "profile.signin",
+    displayName = "widget.profile.signin",
+    removable = false,
+    needs = ["app.state", "accounts.revision", "accounts.changed", "auth.signIn", "auth.signOut"],
+)
 @Composable
 fun ProfileSignInSectionWidget() {
-    val ctx = LocalProfileContext.current
+    val face = rememberSession()
+    val signIn = rememberScopedCommand(Commands.SignIn) ?: return
+    val changed = rememberScopedAction(Commands.AccountsChanged) ?: return
     val credentials: AccountStore = koinInject()
     val authRegistry: AuthProviderRegistry = koinInject()
     val settingsService: ISettingsService = koinInject()
@@ -74,11 +87,11 @@ fun ProfileSignInSectionWidget() {
 
     // The device-code provider is registered only when a client id is configured.
     val msaConfigured = remember { authRegistry.hasDeviceCodeProvider() }
-    // Shared with the account section and the nav's face picker -- see
-    // ProfileContext.accountsRevision.
-    val revision = ctx.accountsRevision
+    // Shared with the account section and the nav's face picker, see
+    // Sources.AccountsRevision.
+    val revision = rememberScopedSource(Sources.AccountsRevision).valueOrNull() ?: return
     // Nothing until the store has answered, as in the SmartyCraft section.
-    val msSession = (rememberReadOffMain(revision.value, ctx.session) { credentials.accountFor(MS_KEY) } ?: return).value
+    val msSession = (rememberReadOffMain(revision, face) { credentials.accountFor(MS_KEY) } ?: return).value
 
     // Microsoft / multi-account is deferred to a later release. With no Microsoft
     // client id configured the provider never registers, so there is nothing to
@@ -94,14 +107,14 @@ fun ProfileSignInSectionWidget() {
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             if (msSession != null) {
-                MicrosoftAccount(msSession) { revision.value++ }
+                MicrosoftAccount(msSession, changed)
             } else {
                 MicrosoftSignInButton(
                     onSignedIn = {
                         scope.launch {
                             withContext(Dispatchers.IO) { credentials.faceSession(settingsService) }
-                                ?.let { ctx.onLogin(it) }
-                            revision.value++
+                                ?.let(signIn)
+                            changed()
                         }
                     },
                     puppetId = "account.signin.microsoft",
@@ -113,7 +126,8 @@ fun ProfileSignInSectionWidget() {
 
 @Composable
 private fun MicrosoftAccount(session: SessionData, onChanged: () -> Unit) {
-    val ctx = LocalProfileContext.current
+    val signIn = rememberScopedCommand(Commands.SignIn) ?: return
+    val signOutAll = rememberScopedAction(Commands.SignOut) ?: return
     val credentials: AccountStore = koinInject()
     val settingsService: ISettingsService = koinInject()
     val s = LocalStrings.current
@@ -131,7 +145,7 @@ private fun MicrosoftAccount(session: SessionData, onChanged: () -> Unit) {
             try {
                 val accounts = withContext(Dispatchers.IO) { credentials.listAccounts() }
                 if (accounts.size <= 1) {
-                    ctx.onLogout()
+                    signOutAll()
                     return@launch
                 }
                 val face = withContext(Dispatchers.IO) {
@@ -141,7 +155,7 @@ private fun MicrosoftAccount(session: SessionData, onChanged: () -> Unit) {
                     settingsService.updateSettings { it.releasingFace(MS_KEY) }
                     credentials.faceSession(settingsService)
                 }
-                face?.let { ctx.onLogin(it) } ?: ctx.onLogout()
+                face?.let(signIn) ?: signOutAll()
                 onChanged()
             } finally {
                 signingOut = false

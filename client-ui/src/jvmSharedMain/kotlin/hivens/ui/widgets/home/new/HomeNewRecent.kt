@@ -53,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackInstance
+import hivens.ui.AppState
 import hivens.ui.Screen
 import hivens.ui.effects.pixelArtBackground
 import hivens.ui.i18n.LocalStrings
@@ -63,7 +64,12 @@ import hivens.ui.screens.library.rememberPackArt
 import hivens.ui.feature.catalogue.project.loaderLabel
 import hivens.ui.theme.familyForText
 import hivens.ui.theme.decorativePair
+import hivens.ui.widgets.Commands
+import hivens.ui.widgets.Sources
 import hivens.widget.api.rememberProps
+import hivens.widget.api.rememberScopedCommand
+import hivens.widget.api.rememberScopedSource
+import hivens.widget.api.valueOrNull
 import hivens.widget.model.PropLabel
 import hivens.widget.model.PropRange
 import hivens.widget.model.Widget
@@ -105,17 +111,19 @@ data class RecentProps(
     surface = """{"fill":"panel"}""",
     minWidth = 240, minHeight = 120,
     maxWidth = 2400, maxHeight = 1600,
+    needs = ["app.state", "nav.open"],
 )
 @Composable
 fun HomeNewRecent(instance: WidgetInstance) {
     val p = instance.rememberProps<RecentProps>()
-    val ctx = LocalHomeNewContext.current
+    val appState = rememberScopedSource(Sources.Session).valueOrNull() ?: return
+    val navigate = rememberScopedCommand(Commands.Navigate) ?: return
     val s = LocalStrings.current
     val repo: IPackRepository = koinInject()
     val all by remember { repo.observe() }.collectAsState()
 
     if (all.isEmpty()) {
-        EmptyPacksCta(onBrowse = { ctx.onScreenChange(Screen.Browse) })
+        EmptyPacksCta(onBrowse = { navigate(Screen.Browse) })
         return
     }
 
@@ -145,7 +153,8 @@ fun HomeNewRecent(instance: WidgetInstance) {
                         row.forEach { pack ->
                             PackTile(
                                 pack     = pack,
-                                onClick  = { ctx.onScreenChange(Screen.PackDetail(pack.id)) },
+                                appState = appState,
+                                onClick  = { navigate(Screen.PackDetail(pack.id)) },
                                 modifier = Modifier.width(tileWidth).aspectRatio(TILE_ASPECT),
                             )
                         }
@@ -185,8 +194,7 @@ internal fun tileBudget(columns: Int, rows: Int, maxTiles: Int): Int {
 // launch that is under way keeps its control showing, so a tile does not hide
 // that its pack is starting the moment the pointer leaves.
 @Composable
-private fun PackTile(pack: PackInstance, onClick: () -> Unit, modifier: Modifier) {
-    val ctx = LocalHomeNewContext.current
+private fun PackTile(pack: PackInstance, appState: AppState, onClick: () -> Unit, modifier: Modifier) {
     val (hueA, hueB) = decorativePair(pack.id)
     val art = rememberPackArt(pack)
     val interaction = remember { MutableInteractionSource() }
@@ -195,7 +203,7 @@ private fun PackTile(pack: PackInstance, onClick: () -> Unit, modifier: Modifier
         targetValue   = if (hovered) 1f else 0f,
         animationSpec = spring(dampingRatio = LIFT_DAMPING, stiffness = Spring.StiffnessMediumLow),
     )
-    val control = rememberLaunchControl(pack, ctx.appState)
+    val control = rememberLaunchControl(pack, appState)
     val runsOn = pack.cachedManifest?.let { m ->
         listOfNotNull(
             m.minecraftVersion.takeIf { it.isNotBlank() },

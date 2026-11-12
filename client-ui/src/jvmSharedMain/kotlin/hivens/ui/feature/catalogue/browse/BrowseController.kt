@@ -1,13 +1,11 @@
 package hivens.ui.feature.catalogue.browse
 
-import androidx.compose.runtime.ProvidableCompositionLocal
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.staticCompositionLocalOf
 import hivens.core.api.catalogue.CataloguePack
 import hivens.core.data.PackOrigin
 import hivens.launcher.content.ContentKind
@@ -15,7 +13,6 @@ import hivens.launcher.modrinth.FilterField
 import hivens.launcher.modrinth.SearchFilter
 import hivens.launcher.modrinth.acceptedLoaders
 import hivens.ui.i18n.AppStrings
-import hivens.ui.feature.catalogue.project.ModTarget
 
 /** Every kind Browse searches, in the order the rail lists them. Null stands for packs. */
 internal val BROWSE_KINDS: List<ContentKind?> =
@@ -234,15 +231,3 @@ private val PACK_FIELDS = setOf(FilterField.GameVersion, FilterField.Loader)
 internal class BrowseTarget(val destination: BrowseDestination, val kinds: List<ContentKind>) {
     fun takes(kind: ContentKind?): Boolean = kind != null && kind in kinds
 }
-
-/** How the screen's widgets leave it: to a catalogue pack's page, or to a project's. */
-class BrowseContext(
-    val onOpenPack: (CataloguePack) -> Unit,
-    val onOpenProject: (ModTarget) -> Unit,
-)
-
-val LocalBrowseContext: ProvidableCompositionLocal<BrowseContext> =
-    staticCompositionLocalOf { error("LocalBrowseContext not provided -- mount inside BrowseScreen") }
-
-/** What the editor hands Browse's widgets when they are drawn somewhere else. */
-internal val STUB_BROWSE = BrowseContext(onOpenPack = {}, onOpenProject = {})

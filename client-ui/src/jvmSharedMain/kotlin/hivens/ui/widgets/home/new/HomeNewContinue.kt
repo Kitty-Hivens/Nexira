@@ -39,7 +39,9 @@ import hivens.ui.feature.catalogue.project.loaderLabel
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.decorativePair
 import hivens.ui.theme.familyForText
+import hivens.ui.widgets.Commands
 import hivens.widget.api.rememberProps
+import hivens.widget.api.rememberScopedCommand
 import hivens.widget.model.PropLabel
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
@@ -69,17 +71,18 @@ data class ContinueProps(
     surface = """{"fill":"panel"}""",
     minWidth = 280, minHeight = 160,
     maxWidth = 2400, maxHeight = 640,
+    needs = ["app.state", "nav.open"],
 )
 @Composable
 fun HomeNewContinue(instance: WidgetInstance) {
     val p = instance.rememberProps<ContinueProps>()
-    val ctx = LocalHomeNewContext.current
+    val navigate = rememberScopedCommand(Commands.Navigate) ?: return
     val s = LocalStrings.current
     val quickLaunch = rememberQuickLaunchTarget(s.homeQuickButton) ?: return
     val pack = quickLaunch.target
     val art = rememberPackArt(pack)
     val (hueA, hueB) = decorativePair(pack.id)
-    val openDetail = { ctx.onScreenChange(Screen.PackDetail(pack.id)) }
+    val openDetail = { navigate(Screen.PackDetail(pack.id)) }
 
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         // The name is the picture here, so it takes its size from the room it has:

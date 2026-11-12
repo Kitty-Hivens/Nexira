@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -42,12 +41,12 @@ import java.nio.file.Path
  * the picker hands over a handle that is only good for the moment, and the background is read
  * again on every launch.
  */
-@Widget(id = "bg.image.picker", displayName = "widget.bg.image.picker")
+@Widget(id = "bg.image.picker", displayName = "widget.bg.image.picker", needs = ["background.settings", "background.update"])
 @Composable
 fun BgImagePickerWidget() {
-    val ctx = LocalBgSettingsContext.current
+    val bg = rememberBgSettings() ?: return
     val s = LocalStrings.current
-    val settings by ctx.settings
+    val settings = bg.value
     val scope = rememberCoroutineScope()
     val appScope = koinInject<CoroutineScope>()
     val backgrounds = koinInject<BackgroundManager>()
@@ -90,7 +89,7 @@ fun BgImagePickerWidget() {
             if (settings.imagePath != null) {
                 NxIconButton(
                     NxIcon.Delete, null,
-                    onClick = { ctx.update { copy(imagePath = null, enabled = false) } },
+                    onClick = { bg.update { copy(imagePath = null, enabled = false) } },
                     tint    = NxColor.status(Status.Error),
                 )
             }

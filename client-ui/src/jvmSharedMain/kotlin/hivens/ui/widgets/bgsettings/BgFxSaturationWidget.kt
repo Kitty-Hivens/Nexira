@@ -4,7 +4,7 @@ import androidx.compose.runtime.Composable
 import hivens.ui.i18n.LocalStrings
 import hivens.widget.model.Widget
 
-@Widget(id = "bg.fx.saturation", displayName = "widget.bg.fx.saturation")
+@Widget(id = "bg.fx.saturation", displayName = "widget.bg.fx.saturation", needs = ["background.settings", "background.update"])
 @Composable
 fun BgFxSaturationWidget() {
     val s = LocalStrings.current

@@ -1349,7 +1349,12 @@ private fun RenderWidget(descriptor: WidgetDescriptor, instance: WidgetInstance,
     // the widget draws at from being two numbers.
     CompositionLocalProvider(LocalWidgetSizing provides descriptor.sizing) {
         val body = @Composable {
-            if (surface == null) {
+            // Asked before the body runs, so a widget whose sources have no answer
+            // here is never composed against them, and draws no plane of its own.
+            val missing = missingNeeds(descriptor.needs)
+            if (missing.isNotEmpty()) {
+                LocalMisplacedWidget.current(descriptor, instance, missing)
+            } else if (surface == null) {
                 descriptor.Render(instance)
             } else {
                 LocalWidgetSurfaceRenderer.current(surface) { descriptor.Render(instance) }

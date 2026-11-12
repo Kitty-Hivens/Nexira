@@ -8,8 +8,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -65,12 +63,8 @@ fun BgSettingsSurface(
     // The shell's value, not a copy taken on the way in. The screen is not the
     // only writer: the player's volume and a transcode that finishes after the
     // screen closed change it too, and a copy put back what they had changed the
-    // next time a slider here moved.
+    // next time a toggle here moved. The widgets read the same value as a source.
     val settings = rememberUpdatedState(currentSettings)
-
-    val ctx = remember(settings, onSettingsChanged) {
-        BgSettingsContext(settings = settings, update = onSettingsChanged)
-    }
 
     PuppetScreen("BackgroundSettings")
     PuppetClick("background.back") { onBack() }
@@ -82,37 +76,35 @@ fun BgSettingsSurface(
     PuppetToggle("background.reduceMotion", reduceMotion, onValueChange = onReduceMotionChanged)
     PuppetClick("background.reset") { onSettingsChanged { BackgroundSettings() } }
 
-    CompositionLocalProvider(LocalBgSettingsContext provides ctx) {
-        Row(Modifier.fillMaxSize().padding(16.dp)) {
-            NxSurface(SurfaceKind.Panel, Modifier.width(PANEL_WIDTH).fillMaxHeight()) {
-                // Scrolls because the slot says so (the bundled layout sets it), not
-                // because this screen wraps it: the kernel is what knows how each
-                // widget is measured once the column has no end.
-                SlotRenderer(
-                    SurfaceId(SURFACE),
-                    SlotId("controls"),
-                    modifier       = Modifier.fillMaxSize(),
-                    spacing        = 16.dp,
-                    contentPadding = PaddingValues(20.dp),
-                )
-            }
-
-            Spacer(Modifier.weight(1f))
-
-            AppearanceThemeIsland(
-                isDarkTheme          = isDarkTheme,
-                onToggleDarkTheme    = onToggleDarkTheme,
-                themeMode            = themeMode,
-                onThemeModeChanged   = onThemeModeChanged,
-                systemThemeAvailable = systemThemeAvailable,
-                activeTheme          = activeTheme,
-                surfaceBlur          = surfaceBlur,
-                onSurfaceBlurChanged = onSurfaceBlurChanged,
-                reduceMotion         = reduceMotion,
-                onReduceMotionChanged = onReduceMotionChanged,
-                onOpenThemePicker    = onOpenThemePicker,
-                modifier             = Modifier.width(THEME_PANEL_WIDTH).fillMaxHeight(),
+    Row(Modifier.fillMaxSize().padding(16.dp)) {
+        NxSurface(SurfaceKind.Panel, Modifier.width(PANEL_WIDTH).fillMaxHeight()) {
+            // Scrolls because the slot says so (the bundled layout sets it), not
+            // because this screen wraps it: the kernel is what knows how each
+            // widget is measured once the column has no end.
+            SlotRenderer(
+                SurfaceId(SURFACE),
+                SlotId("controls"),
+                modifier       = Modifier.fillMaxSize(),
+                spacing        = 16.dp,
+                contentPadding = PaddingValues(20.dp),
             )
         }
+
+        Spacer(Modifier.weight(1f))
+
+        AppearanceThemeIsland(
+            isDarkTheme          = isDarkTheme,
+            onToggleDarkTheme    = onToggleDarkTheme,
+            themeMode            = themeMode,
+            onThemeModeChanged   = onThemeModeChanged,
+            systemThemeAvailable = systemThemeAvailable,
+            activeTheme          = activeTheme,
+            surfaceBlur          = surfaceBlur,
+            onSurfaceBlurChanged = onSurfaceBlurChanged,
+            reduceMotion         = reduceMotion,
+            onReduceMotionChanged = onReduceMotionChanged,
+            onOpenThemePicker    = onOpenThemePicker,
+            modifier             = Modifier.width(THEME_PANEL_WIDTH).fillMaxHeight(),
+        )
     }
 }

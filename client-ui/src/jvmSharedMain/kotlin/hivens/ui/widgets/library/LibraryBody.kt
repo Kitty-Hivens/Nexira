@@ -34,7 +34,9 @@ import hivens.ui.screens.library.PackCard
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import androidx.compose.foundation.layout.padding
+import hivens.ui.widgets.Commands
 import hivens.widget.api.rememberProps
+import hivens.widget.api.rememberScopedCommand
 import hivens.widget.model.PropLabel
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
@@ -65,11 +67,12 @@ data class LibraryBodyProps(
     propsClass = LibraryBodyProps::class,
     minWidth = 320, minHeight = 200,
     maxWidth = 2400, maxHeight = 1600,
+    needs = ["nav.open"],
 )
 @Composable
 fun LibraryBody(instance: WidgetInstance) {
     val p = instance.rememberProps<LibraryBodyProps>()
-    val ctx = LocalLibraryContext.current
+    val navigate = rememberScopedCommand(Commands.Navigate) ?: return
     val s = LocalStrings.current
     val repo: IPackRepository = koinInject()
     val paths: PlatformPaths = koinInject()
@@ -84,12 +87,12 @@ fun LibraryBody(instance: WidgetInstance) {
         LibraryEmpty(
             title    = p.emptyTitle.ifBlank { s.libraryEmptyTitle },
             body     = p.emptyText.ifBlank { s.libraryEmptyBody },
-            onBrowse = { ctx.onScreenChange(Screen.Browse) },
+            onBrowse = { navigate(Screen.Browse) },
         )
     } else {
         LibraryList(
             instances    = instances,
-            onOpenDetail = { ctx.onScreenChange(Screen.PackDetail(it.id)) },
+            onOpenDetail = { navigate(Screen.PackDetail(it.id)) },
             onOpenFolder = { SystemActions.openFolder(instanceDirOf(paths, it).toString()) },
             onDelete     = { pendingDelete = it },
         )

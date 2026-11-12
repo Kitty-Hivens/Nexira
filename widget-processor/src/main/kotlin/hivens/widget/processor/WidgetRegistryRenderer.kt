@@ -53,6 +53,8 @@ internal data class WidgetModel(
     val sizing: SizingArgs = SizingArgs(),
     /** The declared arrival as an Entrance constant name, or null for the default. */
     val enter: String? = null,
+    /** The source and command ids the widget reads, already checked to be non-blank and distinct. */
+    val needs: List<String> = emptyList(),
 )
 
 /**
@@ -160,6 +162,9 @@ internal fun renderRegistry(
         if (entry.injects.isNotEmpty()) {
             appendLine("            override val injects: Set<String> = ${entry.injects.toStringSetLiteral()}")
         }
+        if (entry.needs.isNotEmpty()) {
+            appendLine("            override val needs: List<String> = ${entry.needs.toStringListLiteral()}")
+        }
         // Lazy, all three. The registry is built in full at class-init because the
         // palette lists every kind, but these are the expensive members and none of
         // them is needed to list one: a surface is read when a placed widget draws,
@@ -233,6 +238,9 @@ private fun SizingArgs.toLiteral(): String {
 
 private fun List<String>.toStringSetLiteral(): String =
     joinToString(prefix = "setOf(", postfix = ")") { "\"${it.kotlinEscape()}\"" }
+
+private fun List<String>.toStringListLiteral(): String =
+    joinToString(prefix = "listOf(", postfix = ")") { "\"${it.kotlinEscape()}\"" }
 
 private fun List<String>.toSlotIdListLiteral(): String =
     if (isEmpty()) "emptyList()"

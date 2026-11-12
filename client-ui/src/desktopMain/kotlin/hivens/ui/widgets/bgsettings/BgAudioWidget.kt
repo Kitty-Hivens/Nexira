@@ -27,12 +27,12 @@ import hivens.ui.theme.NxColor
 // no audio stream to decode and no playhead for a transport to address, so neither
 // setting has anything to act on, and both are withheld with the reason rather than
 // accepting a click that would do nothing.
-@Widget(id = "bg.audio", displayName = "widget.bg.audio")
+@Widget(id = "bg.audio", displayName = "widget.bg.audio", needs = ["background.settings", "background.update"])
 @Composable
 fun BgAudioWidget() {
-    val ctx = LocalBgSettingsContext.current
+    val bg = rememberBgSettings() ?: return
     val s = LocalStrings.current
-    val settings by ctx.settings
+    val settings = bg.value
 
     // Asked of the decoders rather than of the file name, off the UI thread,
     // because that is what answering it costs. Null until known, and unknown reads
@@ -52,7 +52,7 @@ fun BgAudioWidget() {
             icon            = if (settings.audio && available) NxIcon.VolumeUp else NxIcon.VolumeOff,
             enabled         = available,
             accent          = NxColor.lead(),
-            onCheckedChange = { ctx.update { copy(audio = it, linkToPlayers = linkToPlayers && it) } },
+            onCheckedChange = { bg.update { copy(audio = it, linkToPlayers = linkToPlayers && it) } },
         )
 
         if (settings.audio && available) {
@@ -62,7 +62,7 @@ fun BgAudioWidget() {
                 value         = level,
                 range         = 0f..1f,
                 valueText     = "%.0f%%".format(level * 100),
-                onValueChange = { ctx.update { copy(audioVolume = it) } },
+                onValueChange = { bg.update { copy(audioVolume = it) } },
             )
 
             // Only under the sound, because that is the requirement rather than a
@@ -74,7 +74,7 @@ fun BgAudioWidget() {
                 description     = s.backgroundLinkDesc,
                 icon            = NxIcon.MusicNote,
                 accent          = NxColor.lead(),
-                onCheckedChange = { ctx.update { copy(linkToPlayers = it) } },
+                onCheckedChange = { bg.update { copy(linkToPlayers = it) } },
             )
         }
     }

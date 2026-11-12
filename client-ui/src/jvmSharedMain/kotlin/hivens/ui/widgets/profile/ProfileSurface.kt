@@ -13,8 +13,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -28,6 +26,8 @@ import hivens.ui.platform.SystemActions
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
 import hivens.widget.api.SlotRenderer
+import hivens.widget.api.rememberScopedSource
+import hivens.widget.api.valueOrNull
 import hivens.widget.model.SlotId
 import hivens.widget.model.SurfaceId
 import org.koin.compose.koinInject
@@ -70,27 +70,12 @@ private val STACK_BELOW = 560.dp
 fun ProfileSurface(
     session: SessionData?,
     authResolving: Boolean,
-    onLogin: (SessionData) -> Unit,
-    onLogout: () -> Unit,
 ) {
     val s = LocalStrings.current
     val skinManager: SkinManager = koinInject()
-    // Per-provider sections each own their signed-in/out state, so the category
-    // no longer flips with the session; default to the SmartyCraft section.
-    val selectedCategory = remember { mutableStateOf(ProfileCategory.SmartyCraft) }
-    // Shared by every section that adds or removes an account, and by the face
-    // picker that has to stop offering one that is gone.
-    val accountsRevision = remember { mutableStateOf(0) }
-
-    val ctx = remember(session, selectedCategory, accountsRevision) {
-        ProfileContext(
-            session          = session,
-            selectedCategory = selectedCategory,
-            accountsRevision = accountsRevision,
-            onLogin          = onLogin,
-            onLogout         = onLogout,
-        )
-    }
+    // The page's own, shared with the nav that picks it. Drawn outside any page,
+    // which only a test does, the surface keeps one of its own.
+    val selection = rememberScopedSource(ProfileSelectionSource).valueOrNull() ?: remember { ProfileSelection() }
 
     // Puppet handlers stay at surface scope so automation drivers can invoke
     // them regardless of the active tab. Skin refresh / top-up are signed-in
@@ -99,44 +84,42 @@ fun ProfileSurface(
     PuppetClick("profile.refreshSkin") { session?.let { skinManager.invalidate(it.playerName) } }
     PuppetClick("profile.topUp")       { SystemActions.openUrl("https://smartycraft.ru/cabinet") }
 
-    CompositionLocalProvider(LocalProfileContext provides ctx) {
-        Column(Modifier.fillMaxSize().padding(16.dp)) {
-            // Title lives in the top-bar breadcrumb now -- no in-screen duplicate.
-            NxSurface(
-                kind     = SurfaceKind.Panel,
-                modifier = Modifier.weight(1f).fillMaxWidth(),
-            ) {
-                if (authResolving && session == null) {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(
-                            color       = NxColor.wash(NxColor.lead(), 0.35f),
-                            modifier    = Modifier.size(28.dp),
-                            strokeWidth = 2.dp,
-                        )
+    Column(Modifier.fillMaxSize().padding(16.dp)) {
+        // Title lives in the top-bar breadcrumb now -- no in-screen duplicate.
+        NxSurface(
+            kind     = SurfaceKind.Panel,
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+        ) {
+            if (authResolving && session == null) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(
+                        color       = NxColor.wash(NxColor.lead(), 0.35f),
+                        modifier    = Modifier.size(28.dp),
+                        strokeWidth = 2.dp,
+                    )
+                }
+            } else {
+                // By the room the pane has: a 200dp list beside a section leaves the section
+                // a hundred and a bit on a phone, so below this the list goes on top of it.
+                BoxWithConstraints(Modifier.fillMaxSize().padding(16.dp)) {
+                    val stacked = maxWidth < STACK_BELOW
+                    // The slot ids are historical: "account" hosts the SmartyCraft
+                    // section, "signin" the Microsoft one. Reused as-is so the
+                    // bundled layout + reconcile stay untouched.
+                    @Composable
+                    fun Section(modifier: Modifier) = when (selection.category) {
+                        ProfileCategory.SmartyCraft -> SlotRenderer(SurfaceId(SURFACE), SlotId("account"), modifier)
+                        ProfileCategory.Microsoft -> SlotRenderer(SurfaceId(SURFACE), SlotId("signin"), modifier)
                     }
-                } else {
-                    // By the room the pane has: a 200dp list beside a section leaves the section
-                    // a hundred and a bit on a phone, so below this the list goes on top of it.
-                    BoxWithConstraints(Modifier.fillMaxSize().padding(16.dp)) {
-                        val stacked = maxWidth < STACK_BELOW
-                        // The slot ids are historical: "account" hosts the SmartyCraft
-                        // section, "signin" the Microsoft one. Reused as-is so the
-                        // bundled layout + reconcile stay untouched.
-                        @Composable
-                        fun Section(modifier: Modifier) = when (selectedCategory.value) {
-                            ProfileCategory.SmartyCraft -> SlotRenderer(SurfaceId(SURFACE), SlotId("account"), modifier)
-                            ProfileCategory.Microsoft -> SlotRenderer(SurfaceId(SURFACE), SlotId("signin"), modifier)
+                    if (stacked) {
+                        Column(Modifier.fillMaxSize()) {
+                            SlotRenderer(SurfaceId(SURFACE), SlotId("nav"), Modifier.fillMaxWidth().height(IntrinsicSize.Min))
+                            Section(Modifier.weight(1f).fillMaxWidth())
                         }
-                        if (stacked) {
-                            Column(Modifier.fillMaxSize()) {
-                                SlotRenderer(SurfaceId(SURFACE), SlotId("nav"), Modifier.fillMaxWidth().height(IntrinsicSize.Min))
-                                Section(Modifier.weight(1f).fillMaxWidth())
-                            }
-                        } else {
-                            Row(Modifier.fillMaxSize()) {
-                                SlotRenderer(SurfaceId(SURFACE), SlotId("nav"), Modifier.width(200.dp).fillMaxHeight())
-                                Section(Modifier.weight(1f).fillMaxHeight())
-                            }
+                    } else {
+                        Row(Modifier.fillMaxSize()) {
+                            SlotRenderer(SurfaceId(SURFACE), SlotId("nav"), Modifier.width(200.dp).fillMaxHeight())
+                            Section(Modifier.weight(1f).fillMaxHeight())
                         }
                     }
                 }

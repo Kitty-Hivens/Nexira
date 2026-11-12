@@ -1,18 +1,17 @@
 package hivens.ui.widgets.bgsettings
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import hivens.ui.background.ScaleMode
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.nx.NxChoiceChip
 import hivens.widget.model.Widget
 
-@Widget(id = "bg.scale.mode", displayName = "widget.bg.scale.mode")
+@Widget(id = "bg.scale.mode", displayName = "widget.bg.scale.mode", needs = ["background.settings", "background.update"])
 @Composable
 fun BgScaleModeWidget() {
-    val ctx = LocalBgSettingsContext.current
+    val bg = rememberBgSettings() ?: return
     val s = LocalStrings.current
-    val settings by ctx.settings
+    val settings = bg.value
 
     val modes = listOf(
         ScaleMode.COVER    to s.backgroundScaleCover,
@@ -26,7 +25,7 @@ fun BgScaleModeWidget() {
             NxChoiceChip(
                 label    = label,
                 selected = settings.scaleMode == mode,
-                onToggle = { ctx.update { withScaleMode(mode) } },
+                onToggle = { bg.update { withScaleMode(mode) } },
             )
         }
     }

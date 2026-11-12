@@ -8,7 +8,10 @@ import hivens.launcher.news.CuratedNewsFeed
 import hivens.launcher.news.SyndicationNewsFeed
 import hivens.ui.CompactNewsFeed
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.widgets.Sources
 import hivens.widget.api.rememberProps
+import hivens.widget.api.rememberScopedSource
+import hivens.widget.api.valueOrNull
 import hivens.widget.model.PropLabel
 import hivens.widget.model.PropRange
 import hivens.widget.model.Widget
@@ -63,10 +66,11 @@ data class CompactNewsProps(
     id = "appshell.rightrail.compactnews",
     displayName = "widget.appshell.rightrail.compactnews",
     propsClass = CompactNewsProps::class,
+    needs = ["ssl.bypass"],
 )
 @Composable
 fun RightRailCompactNews(instance: WidgetInstance) {
-    val ctx = LocalRightRailContext.current
+    val sslBypass = rememberScopedSource(Sources.SslBypass).valueOrNull() ?: return
     val props = instance.rememberProps<CompactNewsProps>()
     val s = LocalStrings.current
     // Each resolved by its own concrete type: registering either as a second
@@ -75,7 +79,7 @@ fun RightRailCompactNews(instance: WidgetInstance) {
     val curated: CuratedNewsFeed = koinInject()
     val custom: SyndicationNewsFeed = koinInject()
     CompactNewsFeed(
-        sslBypass   = ctx.sslBypass,
+        sslBypass   = sslBypass,
         maxItems    = props.maxItems,
         showTitle   = props.showTitle,
         imageSource = props.imageSource,

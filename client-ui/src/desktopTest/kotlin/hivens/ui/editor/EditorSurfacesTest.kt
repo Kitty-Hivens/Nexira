@@ -82,9 +82,11 @@ class EditorSurfacesTest {
     }
 
     @Test
-    fun `every stub belongs to a surface that declares one`() {
-        val declared = EditorSurfaces.all.count { it.stub != null }
-        assertEquals(declared, EditorSurfaces.stubs.size, "the spread must carry exactly the declared stubs")
+    fun `a screen's surface is on a page and a shell surface is not`() {
+        assertEquals(emptySet(), EditorSurfaces.pageProvides(SurfaceId("home.new"), bundled))
+        assertEquals(setOf("project.page"), EditorSurfaces.pageProvides(SurfaceId("project"), bundled))
+        assertNull(EditorSurfaces.pageProvides(SurfaceId("appshell.topbar"), bundled), "the shell is drawn outside any page")
+        assertNull(EditorSurfaces.pageProvides(SurfaceId("nowhere.known"), bundled), "a surface nobody describes is not assumed to be on one")
     }
 
     // ── What is on screen right now ──────────────────────────────────

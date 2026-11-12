@@ -6,11 +6,15 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.FlowRowScope
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.unit.dp
 import hivens.ui.background.BackgroundSettings
 import hivens.ui.nx.NxSectionHeader
 import hivens.ui.nx.NxSlider
+import hivens.ui.widgets.Commands
+import hivens.ui.widgets.Sources
+import hivens.widget.api.rememberScopedCommand
+import hivens.widget.api.rememberScopedSource
+import hivens.widget.api.valueOrNull
 
 /**
  * The library's section header, so a heading on this surface is set like a heading
@@ -41,10 +45,29 @@ internal fun BgPicker(title: String, chips: @Composable FlowRowScope.() -> Unit)
     }
 }
 
-// Every background slider was the same five lines: take the surface context, read
-// one float off the live settings, hand the change back through update. Nine
-// widgets carried a private copy of that wiring, so the way a slider reaches the
-// settings was written nine times and could drift eight ways.
+/**
+ * The wallpaper settings as they are now, and the change that writes them. The
+ * value is the background manager's own rather than a copy taken by the screen:
+ * the player's volume and a transcode finishing after the screen closed change it
+ * too, and a copy put back what they had changed the next time a control moved.
+ */
+internal class BgSettings(
+    val value: BackgroundSettings,
+    val update: (BackgroundSettings.() -> BackgroundSettings) -> Unit,
+)
+
+/** What a background widget reads and writes, or null where either has no answer. */
+@Composable
+internal fun rememberBgSettings(): BgSettings? {
+    val value = rememberScopedSource(Sources.Background).valueOrNull() ?: return null
+    val update = rememberScopedCommand(Commands.UpdateBackground) ?: return null
+    return BgSettings(value, update)
+}
+
+// Every background slider was the same five lines: read one float off the live
+// settings, hand the change back through update. Nine widgets carried a private
+// copy of that wiring, so the way a slider reaches the settings was written nine
+// times and could drift eight ways.
 //
 // What actually distinguishes one slider from another stays at the call site: the
 // label, the range it moves through, how its number reads, and the field it is.
@@ -56,14 +79,13 @@ internal fun BgSlider(
     format: (Float) -> String,
     write: BackgroundSettings.(Float) -> BackgroundSettings,
 ) {
-    val ctx = LocalBgSettingsContext.current
-    val settings by ctx.settings
-    val value = settings.read()
+    val bg = rememberBgSettings() ?: return
+    val value = bg.value.read()
     NxSlider(
         label         = label,
         value         = value,
         range         = range,
         valueText     = format(value),
-        onValueChange = { next -> ctx.update { write(next) } },
+        onValueChange = { next -> bg.update { write(next) } },
     )
 }

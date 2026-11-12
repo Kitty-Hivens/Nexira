@@ -53,6 +53,8 @@ internal object WidgetValidator {
         val sizing: SizingArgs,
         /** The declared arrival as an [hivens.widget.model.Entrance] constant name, or null for none. */
         val enter: String? = null,
+        /** The source and command ids the widget reads, in the order declared. */
+        val needs: List<String> = emptyList(),
     )
 
     // KSP entry point. Returns the extracted annotation args, or null
@@ -247,6 +249,12 @@ internal object WidgetValidator {
             return null
         }
 
+        val needs = (args["needs"] as? List<*>).orEmpty().filterIsInstance<String>()
+        needsFault(needs)?.let {
+            env.logger.error("@Widget '$id' $it", symbol)
+            return null
+        }
+
         // Until now nothing in the processor referenced the two service
         // annotations, so a widget could claim a contract it never registers,
         // or read one no widget provides, and the build stayed quiet either
@@ -264,7 +272,22 @@ internal object WidgetValidator {
             surfaceJson = surface,
             sizing = sizing,
             enter = Entrance.parse(rawEnter)?.name,
+            needs = needs,
         )
+    }
+
+    /**
+     * What is wrong with a widget's declared needs, or null when nothing is. A blank
+     * id names no key and so is missing everywhere, which would keep the widget off
+     * every surface. A repeated one is a slip that reads as two needs. Whether an
+     * id names a key that exists is a question for the running app, whose modules
+     * register keys this build has never seen.
+     */
+    internal fun needsFault(needs: List<String>): String? {
+        if (needs.any { it.isBlank() }) return "declares a blank need"
+        val repeated = needs.groupingBy { it }.eachCount().filterValues { it > 1 }.keys
+        if (repeated.isNotEmpty()) return "declares the need ${repeated.joinToString { "'$it'" }} more than once"
+        return null
     }
 
     /**

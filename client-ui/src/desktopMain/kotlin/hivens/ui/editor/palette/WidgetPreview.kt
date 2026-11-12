@@ -28,6 +28,8 @@ import androidx.compose.ui.unit.dp
 import hivens.widget.api.LocalSlotPath
 import hivens.ui.editor.ShellChromeBounds
 import hivens.ui.editor.LocalShellChromeBounds
+import hivens.ui.widgets.ChildLevel
+import hivens.widget.api.LocalMisplacedWidget
 import hivens.widget.api.WidgetDataRegistry
 import hivens.widget.api.LocalWidgetDecorator
 import hivens.widget.api.LocalUnknownWidgetDecorator
@@ -45,6 +47,7 @@ import hivens.widget.api.WidgetDescriptor
 import hivens.widget.api.WidgetServiceRegistry
 import hivens.widget.api.WidgetStateHost
 import hivens.widget.api.resolveSurface
+import hivens.widget.model.ScopeLevel
 import hivens.widget.model.SlotId
 import hivens.widget.model.SlotPath
 import hivens.widget.model.SurfaceId
@@ -362,7 +365,15 @@ private const val MIN_INK = 0.004f
  * The command registry is deliberately left live. An empty one would not silence
  * a dispatch, it would throw from it, and a widget that fires on mount does so
  * inside the scene's own coroutine scope where the render's net cannot reach.
- * Nothing in the registry dispatches without input, and a preview gets none.
+ * Nothing in the registry dispatches without input, and a preview gets none. The
+ * same holds for the composition's own commands the captured locals carry, which
+ * are live too: a preview could navigate or sign out, and only input fires either.
+ *
+ * A page of its own, for the same reason: what a page makes for itself, the
+ * profile's chosen section say, is made fresh for the preview and goes with it
+ * rather than being read off, or written into, a page the person is looking at.
+ * What a page's screen hands its widgets is not there, and a widget that needs it
+ * declines to draw, which the tile shows as its letter.
  */
 @Composable
 internal fun PreviewEnvironment(data: WidgetDataRegistry, content: @Composable () -> Unit) {
@@ -377,9 +388,11 @@ internal fun PreviewEnvironment(data: WidgetDataRegistry, content: @Composable (
         LocalSlotChromeModifier provides { _, _ -> Modifier },
         LocalWidgetDecorator provides { _, _, _, _, inner -> inner() },
         LocalUnknownWidgetDecorator provides { _, _, _ -> },
+        LocalMisplacedWidget provides { _, _, _ -> },
         LocalShellChromeBounds provides ownBounds,
-        content = content,
-    )
+    ) {
+        ChildLevel(ScopeLevel.Page, content)
+    }
 }
 
 /**

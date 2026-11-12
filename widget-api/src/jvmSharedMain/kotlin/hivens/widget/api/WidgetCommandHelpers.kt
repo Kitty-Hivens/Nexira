@@ -3,6 +3,7 @@ package hivens.widget.api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import hivens.widget.model.CommandKey
+import hivens.widget.model.ScopeLevel
 import hivens.widget.model.WidgetCommand
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -24,9 +25,14 @@ fun <P> suspendCommand(scope: CoroutineScope, block: suspend (P) -> Unit): Widge
  * what it wants to happen, not which service does it. Memoized on the id. Errors
  * if the key is unregistered -- a command is app-static, so a miss is a wiring
  * bug, the same contract as [rememberSource].
+ *
+ * App keys only, for the reason [rememberSource] takes only those: a command of
+ * another level can be missing where a widget stands, and [rememberScopedCommand]
+ * is the read that says so instead of failing.
  */
 @Composable
 fun <P> rememberCommand(key: CommandKey<P>): (P) -> Unit {
+    requireApp(key)
     val registry = LocalWidgetCommandRegistry.current
     return remember(key.id) { { payload: P -> registry.dispatch(key, payload) } }
 }
@@ -39,6 +45,13 @@ fun <P> rememberCommand(key: CommandKey<P>): (P) -> Unit {
  */
 @Composable
 fun rememberAction(key: CommandKey<Unit>): () -> Unit {
+    requireApp(key)
     val registry = LocalWidgetCommandRegistry.current
     return remember(key.id) { { registry.dispatch(key) } }
+}
+
+private fun requireApp(key: CommandKey<*>) {
+    require(key.level == ScopeLevel.App) {
+        "widget command '${key.id}' lives at ${key.level}: read it with rememberScopedCommand"
+    }
 }

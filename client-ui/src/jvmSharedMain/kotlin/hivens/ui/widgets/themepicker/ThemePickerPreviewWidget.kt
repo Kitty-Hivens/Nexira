@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
@@ -28,6 +27,9 @@ import hivens.ui.surface.NxCard
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxTheme
+import hivens.ui.widgets.Sources
+import hivens.widget.api.rememberScopedSource
+import hivens.widget.api.valueOrNull
 import hivens.widget.model.Widget
 import androidx.compose.ui.graphics.Color
 
@@ -45,17 +47,19 @@ import androidx.compose.ui.graphics.Color
     minWidth = 240, minHeight = 300,
     prefWidth = 320, prefHeight = 432,
     maxWidth = 720, maxHeight = 760,
+    needs = ["theme.dark", "theme.picker.selection"],
 )
 @Composable
 fun ThemePickerPreviewWidget() {
-    val ctx = LocalThemePickerContext.current
+    val dark = rememberScopedSource(Sources.DarkTheme).valueOrNull() ?: return
+    val selection = rememberScopedSource(ThemeSelectionSource).valueOrNull() ?: return
     val s = LocalStrings.current
-    val theme by ctx.selected
-    val scheme = theme.scheme(ctx.isDark)
+    val theme = selection.theme
+    val scheme = theme.scheme(dark)
     val face = MaterialTheme.typography.bodyMedium.fontFamily
 
     Box(Modifier.fillMaxSize().clip(MaterialTheme.shapes.large)) {
-        NxTheme(theme, dark = ctx.isDark, uiFamily = face) {
+        NxTheme(theme, dark = dark, uiFamily = face) {
             Column(
                 modifier            = Modifier.fillMaxSize().background(NxColor.page).padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),

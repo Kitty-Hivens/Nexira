@@ -1,18 +1,17 @@
 package hivens.ui.widgets.bgsettings
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import hivens.ui.background.BackgroundLoopMode
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.nx.NxChoiceChip
 import hivens.widget.model.Widget
 
-@Widget(id = "bg.loop.mode", displayName = "widget.bg.loop.mode")
+@Widget(id = "bg.loop.mode", displayName = "widget.bg.loop.mode", needs = ["background.settings", "background.update"])
 @Composable
 fun BgLoopModeWidget() {
-    val ctx = LocalBgSettingsContext.current
+    val bg = rememberBgSettings() ?: return
     val s = LocalStrings.current
-    val settings by ctx.settings
+    val settings = bg.value
 
     val modes = listOf(
         BackgroundLoopMode.UseCodec    to s.backgroundLoopUseCodec,
@@ -24,7 +23,7 @@ fun BgLoopModeWidget() {
             NxChoiceChip(
                 label    = label,
                 selected = settings.loopMode == mode,
-                onToggle = { ctx.update { withLoopMode(mode) } },
+                onToggle = { bg.update { withLoopMode(mode) } },
             )
         }
     }

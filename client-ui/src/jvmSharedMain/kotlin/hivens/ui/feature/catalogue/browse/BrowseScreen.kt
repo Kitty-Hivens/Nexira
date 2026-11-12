@@ -33,7 +33,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableIntStateOf
@@ -56,7 +55,6 @@ import hivens.core.data.PackOrigin
 import hivens.core.api.interfaces.IPackRepository
 import hivens.ui.RIGHT_RAIL_SURFACE
 import hivens.ui.RailFamily
-import hivens.ui.feature.catalogue.project.ModTarget
 import java.nio.file.Path
 import hivens.launcher.catalogue.PackCatalogueRegistry
 import hivens.ui.i18n.LocalStrings
@@ -101,9 +99,6 @@ import hivens.ui.theme.NxColor
  */
 @Composable
 fun BrowseScreen(
-    onOpenPack: (CataloguePack) -> Unit,
-    /** Opens a project's page. Carries the target pack, when there is one, so the page can install into it. */
-    onOpenProject: (ModTarget) -> Unit = {},
     /**
      * The pack this browse was opened from. It becomes the install target, and the
      * search moves to a kind the pack takes each time the reader asks for this browse
@@ -139,20 +134,17 @@ fun BrowseScreen(
         readTarget(c, id, repo, dataDir)
     }
 
-    val ctx = remember(onOpenPack, onOpenProject) { BrowseContext(onOpenPack, onOpenProject) }
-    CompositionLocalProvider(LocalBrowseContext provides ctx) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-            // Past a point the extra width of a wide monitor stops being room and
-            // starts stretching the search field and the cards.
-            Column(
-                Modifier.fillMaxHeight()
-                    .widthIn(max = Dimens.contentMaxWidth)
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 20.dp),
-            ) {
-                SlotRenderer(SurfaceId(BROWSE_SURFACE), SlotId("header"), Modifier.fillMaxWidth(), spacing = 8.dp)
-                SlotRenderer(SurfaceId(BROWSE_SURFACE), SlotId("body"), Modifier.weight(1f).fillMaxWidth(), spacing = 8.dp)
-            }
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+        // Past a point the extra width of a wide monitor stops being room and
+        // starts stretching the search field and the cards.
+        Column(
+            Modifier.fillMaxHeight()
+                .widthIn(max = Dimens.contentMaxWidth)
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 20.dp),
+        ) {
+            SlotRenderer(SurfaceId(BROWSE_SURFACE), SlotId("header"), Modifier.fillMaxWidth(), spacing = 8.dp)
+            SlotRenderer(SurfaceId(BROWSE_SURFACE), SlotId("body"), Modifier.weight(1f).fillMaxWidth(), spacing = 8.dp)
         }
     }
 }

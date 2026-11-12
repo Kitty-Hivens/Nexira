@@ -31,9 +31,14 @@ fun interface WidgetCommand<P> {
  * read side's get cast -- one id maps to exactly one [P]. String-keyed for the
  * same reason as [SourceKey]: two commands can share a Kotlin type, and a
  * declarative rule references a command by a stable name, not a class.
+ *
+ * [level] is where the command lives, the way [SourceKey.level] says it for a
+ * source. A command that drives one window's history has an answer per window and
+ * cannot be one value for the whole app. [ScopeLevel.App], the default, is the
+ * app-wide registry every key declared before levels existed fires through.
  */
-class CommandKey<P>(val id: String) {
+class CommandKey<P>(val id: String, val level: ScopeLevel = ScopeLevel.App) {
     override fun equals(other: Any?): Boolean = other is CommandKey<*> && other.id == id
     override fun hashCode(): Int = id.hashCode()
-    override fun toString(): String = "CommandKey($id)"
+    override fun toString(): String = "CommandKey($id, $level)"
 }

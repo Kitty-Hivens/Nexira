@@ -14,10 +14,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.ProvidableCompositionLocal
-import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -89,8 +86,11 @@ import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.Status
 import hivens.widget.api.LocalSurfaceFamilies
+import hivens.widget.api.ProvideScoped
 import hivens.widget.api.SlotRenderer
+import hivens.widget.model.ScopeLevel
 import hivens.widget.model.SlotId
+import hivens.widget.model.SourceKey
 import hivens.widget.model.SurfaceId
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -252,7 +252,9 @@ fun CataloguePackDetailScreen(
 
     // A widget surface, the way the project page is: the header and the tabs in
     // `header`, the tab's pane in `body`, each slot on the panel it always sat on.
-    CompositionLocalProvider(LocalCataloguePackPage provides page) {
+    // The widgets read the page over this page's level, where nothing outside the
+    // page can reach it.
+    ProvideScoped(CataloguePackPageSource, page) {
         Column(Modifier.fillMaxSize()) {
             NxSurface(
                 kind = SurfaceKind.Panel,
@@ -311,8 +313,12 @@ internal class CataloguePackPage(
     val details: CataloguePackDetails? get() = (detail as? DetailState.Loaded)?.details
 }
 
-/** The catalogue pack page the widgets are drawn for, or null on any other surface. */
-internal val LocalCataloguePackPage: ProvidableCompositionLocal<CataloguePackPage?> = compositionLocalOf { null }
+/**
+ * The catalogue pack page the widgets are drawn for, put over the page's own level
+ * by the screen. Each of the two pages on screen during a fade carries its own down
+ * its own subtree. Anywhere else the key is missing.
+ */
+internal val CataloguePackPageSource: SourceKey<CataloguePackPage> = SourceKey("catalogue.pack.page", ScopeLevel.Page)
 
 /** The page's header: the pack's mark, name, line, counts and tags, and its install. */
 @Composable

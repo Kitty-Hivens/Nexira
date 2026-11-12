@@ -52,7 +52,10 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonObject
+import org.slf4j.LoggerFactory
 import java.util.UUID
+
+private val log = LoggerFactory.getLogger("EditModeController")
 
 // Single mutation entry point for the editor. Every operation resolves
 // to one LayoutGraphRepository.update { transform } call -- the repo
@@ -67,7 +70,15 @@ import java.util.UUID
 class EditModeController(
     private val repo: LayoutGraphRepository,
     private val scope: CoroutineScope,
+    /** Whether a widget may stand on a surface. Asked by every write that puts one somewhere. */
+    private val admission: WidgetAdmission = WidgetAdmission.Open,
 ) {
+    /**
+     * Whether [kind] may be placed on [surface] as the layout stands now, for the
+     * palette to offer only what a drop would take.
+     */
+    fun admits(kind: WidgetKind, surface: SurfaceId): Boolean = admission.admits(kind, surface, repo.value())
+
     // Editor mutations run on a single-thread view of Default so per-frame
     // canvas writes (offset / size during a drag) reach the repo in submission
     // order. The shared [scope] is Dispatchers.IO (multi-threaded): fire-and-
@@ -266,6 +277,7 @@ class EditModeController(
                 // No plane of its own: the widget's declared one is read through
                 // resolveSurface until somebody edits it, as for a bundled widget.
             )
+            if (refuses(widget, path.surface, repo.value())) return@launch
             edit(key = null) { it.insertWidget(path, widget, index) }
         }
     }
@@ -464,8 +476,22 @@ class EditModeController(
 
     fun moveWidget(from: SlotPath, to: SlotPath, instanceId: String, toIndex: Int, staysOnSurface: Boolean = false) {
         scope.launch(writeDispatcher) {
+            val graph = repo.value()
+            // The whole subtree, because the widgets inside a container move with it.
+            val moved = graph.traverse(from)?.widgets?.firstOrNull { it.instanceId == instanceId }
+            if (moved != null && from.surface != to.surface && refuses(moved, to.surface, graph)) return@launch
             edit(key = null) { it.moveWidget(from, to, instanceId, toIndex, staysOnSurface) }
         }
+    }
+
+    // A refusal is not an error: the editor offered a drop the widget cannot take,
+    // and the arrangement stays as it was. Logged, because a drop that does nothing
+    // and says nothing is otherwise impossible to tell from one that was lost.
+    private fun refuses(widget: WidgetInstance, surface: SurfaceId, graph: LayoutGraph): Boolean {
+        val missing = admission.missing(widget, surface, graph)
+        if (missing.isEmpty()) return false
+        log.info("Not placing {} on {}: nothing there answers {}", widget.kind.value, surface.value, missing)
+        return true
     }
 
     // Surface reset = restore from bundled default. Escape hatch for

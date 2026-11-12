@@ -4,7 +4,7 @@ import androidx.compose.runtime.Composable
 import hivens.ui.i18n.LocalStrings
 import hivens.widget.model.Widget
 
-@Widget(id = "bg.fx.opacity", displayName = "widget.bg.fx.opacity")
+@Widget(id = "bg.fx.opacity", displayName = "widget.bg.fx.opacity", needs = ["background.settings", "background.update"])
 @Composable
 fun BgFxOpacityWidget() {
     val s = LocalStrings.current

@@ -4,7 +4,7 @@ import androidx.compose.runtime.Composable
 import hivens.ui.i18n.LocalStrings
 import hivens.widget.model.Widget
 
-@Widget(id = "bg.fx.vignette", displayName = "widget.bg.fx.vignette")
+@Widget(id = "bg.fx.vignette", displayName = "widget.bg.fx.vignette", needs = ["background.settings", "background.update"])
 @Composable
 fun BgFxVignetteWidget() {
     val s = LocalStrings.current

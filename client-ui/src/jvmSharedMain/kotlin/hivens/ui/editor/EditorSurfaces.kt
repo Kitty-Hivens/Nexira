@@ -1,26 +1,15 @@
 package hivens.ui.editor
 
-import androidx.compose.runtime.ProvidedValue
 import hivens.ui.Screen
 import hivens.ui.i18n.AppStrings
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
-import hivens.ui.feature.catalogue.browse.LocalBrowseContext
-import hivens.ui.feature.catalogue.browse.STUB_BROWSE
+import hivens.ui.feature.catalogue.browse.CataloguePackPageSource
+import hivens.ui.feature.catalogue.project.ProjectPageSource
 import hivens.ui.screens.custom.ScreenIcons
-import hivens.ui.widgets.about.LocalAboutContext
-import hivens.ui.widgets.about.STUB_ABOUT
-import hivens.ui.widgets.bgsettings.LocalBgSettingsContext
-import hivens.ui.widgets.bgsettings.STUB_BG_SETTINGS
-import hivens.ui.widgets.home.new.LocalHomeNewContext
-import hivens.ui.widgets.library.LocalLibraryContext
-import hivens.ui.widgets.profile.LocalProfileContext
-import hivens.ui.widgets.profile.STUB_PROFILE
-import hivens.ui.widgets.shell.LocalLeftRailContext
-import hivens.ui.widgets.shell.LocalRightRailContext
-import hivens.ui.widgets.shell.LocalShellContext
-import hivens.ui.widgets.themepicker.LocalThemePickerContext
-import hivens.ui.widgets.themepicker.STUB_THEME_PICKER
+import hivens.ui.widgets.about.AboutUpdateSource
+import hivens.ui.widgets.about.OpenUpdateDialog
+import hivens.ui.widgets.themepicker.ThemeSelectionSource
 import hivens.widget.model.FamilyId
 import hivens.widget.model.LayoutGraph
 import hivens.widget.model.ScreenSpec
@@ -37,14 +26,8 @@ import kotlinx.serialization.json.jsonPrimitive
  *
  * Everything the host used to answer with a `when` of its own -- which screen
  * mounts it, its icon, its two names, whether it carries surface settings, and
- * the stand-in context its widgets read when dragged somewhere foreign. Six
- * disjoint spots that had to move together; a surface added to five of them
- * looked fine and behaved wrong in the sixth.
- *
- * [stub] is the reason the set had to become open. It was a fixed wall of
- * providers in the host, so a new surface with a context of its own fell
- * through it silently -- no missing branch, no compile error, just widgets
- * reading a local nobody provided.
+ * what its page hands its widgets. Disjoint spots that had to move together, and a
+ * surface added to all but one of them looked fine and behaved wrong in the last.
  */
 internal class EditorSurfaceSpec(
     val id: SurfaceId,
@@ -53,8 +36,12 @@ internal class EditorSurfaceSpec(
     val shortName: (AppStrings) -> String,
     /** True when the surface exposes its own settings panel beside the widget props. */
     val hasSettings: Boolean = false,
-    /** The no-op context a foreign-dropped widget falls through to, if this surface has one. */
-    val stub: ProvidedValue<*>? = null,
+    /**
+     * The page-level keys the screen mounting this surface provides for its own
+     * widgets, by id: the ones no factory makes, so a page has them only where its
+     * owner put them. See [WidgetAdmission].
+     */
+    val provides: Set<String> = emptySet(),
     /**
      * Whether this screen mounts the surface as its centre pane. Null for the
      * shell surfaces, which are present on every screen.
@@ -92,7 +79,6 @@ internal object EditorSurfaces {
             icon      = NxIcon.Home,
             name      = { it.editorSurfHomeNew },
             shortName = { it.editorSurfShortHome },
-            stub      = LocalHomeNewContext provides STUB_HOME_NEW,
             mountedOn = { screen -> screen == Screen.Home },
             ownerRegion = "appshell.region.center",
         ),
@@ -101,7 +87,6 @@ internal object EditorSurfaces {
             icon      = NxIcon.Home,
             name      = { it.editorSurfLibrary },
             shortName = { it.editorSurfShortLibrary },
-            stub      = LocalLibraryContext provides STUB_LIBRARY,
             mountedOn = { screen -> screen == Screen.Library },
             ownerRegion = "appshell.region.center",
         ),
@@ -110,17 +95,17 @@ internal object EditorSurfaces {
             icon      = NxIcon.Search,
             name      = { it.editorSurfBrowse },
             shortName = { it.editorSurfShortBrowse },
-            stub      = LocalBrowseContext provides STUB_BROWSE,
             mountedOn = { screen -> screen == Screen.Browse || screen is Screen.BrowseInto },
             ownerRegion = "appshell.region.center",
         ),
-        // Both pages give their widgets a context of their own per visit, absent
-        // anywhere else, where the widgets draw nothing: no stub is needed.
+        // Both pages give their widgets the page they are drawn for, per visit and
+        // nowhere else.
         EditorSurfaceSpec(
             id        = SurfaceId("project"),
             icon      = NxIcon.Description,
             name      = { it.editorSurfProject },
             shortName = { it.editorSurfShortProject },
+            provides  = setOf(ProjectPageSource.id),
             mountedOn = { screen -> screen is Screen.ModDetail },
             ownerRegion = "appshell.region.center",
         ),
@@ -129,6 +114,7 @@ internal object EditorSurfaces {
             icon      = NxIcon.Inventory2,
             name      = { it.editorSurfCataloguePack },
             shortName = { it.editorSurfShortCataloguePack },
+            provides  = setOf(CataloguePackPageSource.id),
             mountedOn = { screen -> screen is Screen.CataloguePackDetail },
             ownerRegion = "appshell.region.center",
         ),
@@ -137,7 +123,7 @@ internal object EditorSurfaces {
             icon      = NxIcon.Home,
             name      = { it.editorSurfAbout },
             shortName = { it.editorSurfShortAbout },
-            stub      = LocalAboutContext provides STUB_ABOUT,
+            provides  = setOf(AboutUpdateSource.id, OpenUpdateDialog.id),
             mountedOn = { screen -> screen == Screen.About },
             ownerRegion = "appshell.region.center",
         ),
@@ -146,7 +132,6 @@ internal object EditorSurfaces {
             icon      = NxIcon.Home,
             name      = { it.editorSurfBg },
             shortName = { it.editorSurfShortBg },
-            stub      = LocalBgSettingsContext provides STUB_BG_SETTINGS,
             mountedOn = { screen -> screen == Screen.BackgroundSettings },
             ownerRegion = "appshell.region.center",
         ),
@@ -155,7 +140,6 @@ internal object EditorSurfaces {
             icon      = NxIcon.Home,
             name      = { it.editorSurfProfile },
             shortName = { it.editorSurfShortProfile },
-            stub      = LocalProfileContext provides STUB_PROFILE,
             mountedOn = { screen -> screen == Screen.Profile },
             ownerRegion = "appshell.region.center",
         ),
@@ -164,7 +148,7 @@ internal object EditorSurfaces {
             icon      = NxIcon.Home,
             name      = { it.editorSurfTheme },
             shortName = { it.editorSurfShortTheme },
-            stub      = LocalThemePickerContext provides STUB_THEME_PICKER,
+            provides  = setOf(ThemeSelectionSource.id),
             mountedOn = { screen -> screen == Screen.ThemePicker },
             ownerRegion = "appshell.region.center",
         ),
@@ -178,11 +162,6 @@ internal object EditorSurfaces {
             icon      = NxIcon.Layers,
             name      = { it.editorSurfTopBar },
             shortName = { it.editorSurfShortTopBar },
-            // Stands the shell context down for the palette's off-surface preview
-            // (the breadcrumb reads it). One entry covers every shell reader: the
-            // stubs array is spread globally, and it sits below the real provider so
-            // on-screen widgets still see live data.
-            stub        = LocalShellContext provides STUB_SHELL,
             ownerRegion = "appshell.region.top",
         ),
         EditorSurfaceSpec(
@@ -203,7 +182,6 @@ internal object EditorSurfaces {
             name        = { it.editorSurfLeftRail },
             shortName   = { it.editorSurfShortLeftRail },
             hasSettings = true,
-            stub        = LocalLeftRailContext provides STUB_LEFTRAIL,
             ownerRegion = "appshell.region.left",
         ),
         EditorSurfaceSpec(
@@ -211,7 +189,6 @@ internal object EditorSurfaces {
             icon      = NxIcon.ViewQuilt,
             name      = { it.editorSurfRightRail },
             shortName = { it.editorSurfShortRightRail },
-            stub      = LocalRightRailContext provides STUB_RIGHTRAIL,
             ownerRegion = "appshell.region.right",
         ),
         EditorSurfaceSpec(
@@ -251,8 +228,8 @@ internal object EditorSurfaces {
      * What the editor knows about a made screen, read off its record.
      *
      * Settings, because a made screen has its own: its name, its icon, and the way
-     * to delete it. No stub, because a made screen provides no context of its own;
-     * whatever its widgets read, the shell provides.
+     * to delete it. It provides nothing of its own to its page: whatever its widgets
+     * read, the composition provides or a page makes for itself.
      */
     private fun madeScreen(spec: ScreenSpec): EditorSurfaceSpec = EditorSurfaceSpec(
         id          = spec.surface,
@@ -265,11 +242,20 @@ internal object EditorSurfaces {
     )
 
     /**
-     * Every no-op context the editor stands in for, in one array the host
-     * spreads into its provider. Derived from the registry, so a surface that
-     * declares a stub gets it mounted by existing.
+     * The page-level keys a widget finds on [surface], or null where the surface is
+     * not drawn on a page at all.
+     *
+     * A screen's own surface sits in the page the router made for the screen, so it
+     * has every key a page makes for itself and the ones its screen hands it. A shell
+     * surface is drawn once for the whole composition, outside any page, and so is a
+     * surface this build does not know: refusing there is the answer that never puts
+     * a widget where it then draws the placeholder.
      */
-    val stubs: Array<ProvidedValue<*>> = all.mapNotNull { it.stub }.toTypedArray()
+    fun pageProvides(surface: SurfaceId, graph: LayoutGraph): Set<String>? {
+        if (isShell(surface)) return null
+        val spec = specIn(surface, graph) ?: return null
+        return if (spec.mountedOn == null) null else spec.provides
+    }
 
     /**
      * The surfaces editable on this screen: the centre one this screen mounts,

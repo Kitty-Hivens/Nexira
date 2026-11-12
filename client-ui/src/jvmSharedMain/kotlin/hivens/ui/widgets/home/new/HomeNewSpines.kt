@@ -46,6 +46,7 @@ import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackInstance
 import hivens.core.update.PackUpdateStatus
 import hivens.core.update.PackUpdateStatusHub
+import hivens.ui.AppState
 import hivens.ui.Screen
 import hivens.ui.components.rememberLaunchControl
 import hivens.ui.effects.pixelArtBackground
@@ -59,6 +60,11 @@ import hivens.ui.feature.catalogue.project.loaderLabel
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.decorativePair
 import hivens.ui.theme.familyForText
+import hivens.ui.widgets.Commands
+import hivens.ui.widgets.Sources
+import hivens.widget.api.rememberScopedCommand
+import hivens.widget.api.rememberScopedSource
+import hivens.widget.api.valueOrNull
 import hivens.widget.model.Widget
 import org.koin.compose.koinInject
 
@@ -77,9 +83,12 @@ import org.koin.compose.koinInject
     displayName = "widget.home.new.spines",
     minWidth = 480, minHeight = 240,
     maxWidth = 2400, maxHeight = 1600,
+    needs = ["app.state", "nav.open"],
 )
 @Composable
 fun HomeNewSpines() {
+    val appState = rememberScopedSource(Sources.Session).valueOrNull() ?: return
+    val navigate = rememberScopedCommand(Commands.Navigate) ?: return
     val repo: IPackRepository = koinInject()
     val all by remember { repo.observe() }.collectAsState()
     val packs = remember(all) {
@@ -104,6 +113,8 @@ fun HomeNewSpines() {
                 Spine(
                     pack     = pack,
                     open     = isOpen,
+                    appState = appState,
+                    onOpenPage = { navigate(Screen.PackDetail(pack.id)) },
                     onChoose = { chosen = pack.id },
                     modifier = Modifier.width(width).fillMaxHeight(),
                 )
@@ -120,8 +131,14 @@ internal fun spinesThatFit(width: Dp, packs: Int): Int {
 }
 
 @Composable
-private fun Spine(pack: PackInstance, open: Boolean, onChoose: () -> Unit, modifier: Modifier) {
-    val ctx = LocalHomeNewContext.current
+private fun Spine(
+    pack: PackInstance,
+    open: Boolean,
+    appState: AppState,
+    onOpenPage: () -> Unit,
+    onChoose: () -> Unit,
+    modifier: Modifier,
+) {
     val s = LocalStrings.current
     val art = rememberPackArt(pack)
     val (hueA, hueB) = decorativePair(pack.id)
@@ -150,7 +167,7 @@ private fun Spine(pack: PackInstance, open: Boolean, onChoose: () -> Unit, modif
         )
         if (face < 1f) ClosedFace(pack, Modifier.align(Alignment.BottomCenter).alpha(1f - face))
         if (face > 0f) {
-            val control = rememberLaunchControl(pack, ctx.appState)
+            val control = rememberLaunchControl(pack, appState)
             Column(
                 Modifier.align(Alignment.BottomStart).padding(28.dp).alpha(face),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -172,7 +189,7 @@ private fun Spine(pack: PackInstance, open: Boolean, onChoose: () -> Unit, modif
                     color      = Color.White,
                     maxLines   = 2,
                     overflow   = TextOverflow.Ellipsis,
-                    modifier   = Modifier.clickable { ctx.onScreenChange(Screen.PackDetail(pack.id)) },
+                    modifier   = Modifier.clickable(onClick = onOpenPage),
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(32.dp)) {
                     val hours = pack.playtimeSeconds / 3600

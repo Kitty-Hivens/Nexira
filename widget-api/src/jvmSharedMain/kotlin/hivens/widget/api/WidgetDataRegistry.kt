@@ -18,12 +18,15 @@ import hivens.widget.model.WidgetDataSource
 // It is also the one place that says which sources exist at all. A source that
 // lives below the app level cannot be a value here, there is one per window or per
 // page, so it is registered as a factory that each level of the key's kind runs
-// the first time the key is read there (see WidgetScope).
+// the first time the key is read there (see WidgetScope), or declared as one the
+// level's owner provides.
 class WidgetDataRegistry {
 
     private val sources = HashMap<String, WidgetDataSource<*>>()
 
     private val factories = HashMap<String, Factory<*>>()
+
+    private val declared = HashMap<String, ScopeLevel>()
 
     private class Factory<T>(val level: ScopeLevel, val make: SourceFactory<T>)
 
@@ -36,7 +39,7 @@ class WidgetDataRegistry {
         // Duplicate id = a wiring bug (two providers claiming one name). Unlike
         // WidgetServiceRegistry, which replaces on duplicate because providers
         // legitimately churn, app sources are registered once -- reject loudly.
-        require(key.id !in sources && key.id !in factories) { "duplicate widget data source id '${key.id}'" }
+        requireNew(key.id)
         sources[key.id] = source
     }
 
@@ -46,8 +49,26 @@ class WidgetDataRegistry {
      * it made when the level itself goes.
      */
     fun <T> registerFactory(key: SourceKey<T>, factory: SourceFactory<T>) {
-        require(key.id !in sources && key.id !in factories) { "duplicate widget data source id '${key.id}'" }
+        requireNew(key.id)
         factories[key.id] = Factory(key.level, factory)
+    }
+
+    /**
+     * Declares [key] as one the owner of each level of its kind provides, with
+     * [WidgetScope.provideSource] or [ProvideScoped], because only the owner has
+     * what it is made of: the screen a page was opened for, the history a
+     * composition keeps. Nothing is made here. The declaration is what lets a
+     * reader with no level to ask, the editor deciding where a widget may stand,
+     * know the key exists and where it lives.
+     */
+    fun declare(key: SourceKey<*>) {
+        require(key.level != ScopeLevel.App) { "app-wide source '${key.id}' is registered with a value" }
+        requireNew(key.id)
+        declared[key.id] = key.level
+    }
+
+    private fun requireNew(id: String) {
+        require(id !in sources && id !in factories && id !in declared) { "duplicate widget data source id '$id'" }
     }
 
     // Unchecked cast: register ties SourceKey<T> to WidgetDataSource<T> at the
@@ -75,7 +96,27 @@ class WidgetDataRegistry {
         return if (factory.level == key.level) factory.make as SourceFactory<T> else null
     }
 
-    // Enumerates registered source ids, values and factories alike, for a future
-    // editor "pick a source" dropdown and the rule-engine's source picker.
-    fun keys(): Set<String> = sources.keys + factories.keys
+    /** Where the source [id] lives and what answers it, or null when nothing here names it. */
+    fun declarationOf(id: String): KeyDeclaration? {
+        if (id in sources) return KeyDeclaration(id, ScopeLevel.App, KeyKind.Source, KeyOrigin.Registered)
+        factories[id]?.let { return KeyDeclaration(id, it.level, KeyKind.Source, KeyOrigin.Factory) }
+        return declared[id]?.let { KeyDeclaration(id, it, KeyKind.Source, KeyOrigin.Owner) }
+    }
+
+    // Enumerates every source id, values, factories and declarations alike, for a
+    // future editor "pick a source" dropdown and the rule-engine's source picker.
+    fun keys(): Set<String> = sources.keys + factories.keys + declared.keys
 }
+
+/** Whether an id names a source or a command. */
+enum class KeyKind { Source, Command }
+
+/**
+ * What answers a key: [Registered] one value for the whole app, [Factory] one made
+ * by each level of the key's kind, [Owner] one the owner of each such level hands
+ * it, which a level of that kind has only where its owner did.
+ */
+enum class KeyOrigin { Registered, Factory, Owner }
+
+/** A key as the registries know it, for a reader that has only its id. */
+data class KeyDeclaration(val id: String, val level: ScopeLevel, val kind: KeyKind, val origin: KeyOrigin)

@@ -43,12 +43,12 @@ import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.Status
 
-@Widget(id = "bg.image.picker", displayName = "widget.bg.image.picker")
+@Widget(id = "bg.image.picker", displayName = "widget.bg.image.picker", needs = ["background.settings", "background.update"])
 @Composable
 fun BgImagePickerWidget() {
-    val ctx = LocalBgSettingsContext.current
+    val bg = rememberBgSettings() ?: return
     val s = LocalStrings.current
-    val settings by ctx.settings
+    val settings = bg.value
     val scope = rememberCoroutineScope()
     // Process singleton: a transcode runs in the app scope and outlives this screen,
     // so the handle to it has to outlive the screen as well.
@@ -115,7 +115,7 @@ fun BgImagePickerWidget() {
                 NxIconButton(
                     NxIcon.Delete, null,
                     onClick = {
-                        ctx.update { copy(imagePath = null, enabled = false) }
+                        bg.update { copy(imagePath = null, enabled = false) }
                         optimizer.evictUnused(keep = null)
                     },
                     tint    = NxColor.status(Status.Error),
@@ -124,7 +124,7 @@ fun BgImagePickerWidget() {
         }
         if (settings.imagePath != null) {
             Text(
-                text  = settings.imagePath!!.substringAfterLast("/").substringAfterLast("\\"),
+                text  = settings.imagePath.substringAfterLast("/").substringAfterLast("\\"),
                 style = MaterialTheme.typography.labelSmall,
                 color = NxInk.quiet.copy(alpha = 0.5f),
             )

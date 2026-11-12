@@ -255,7 +255,6 @@ class BrowseRenderTest {
             LocalWidgetRegistry provides GeneratedWidgetRegistry,
             LocalSurfaceFamilies provides families,
             LocalWidgetSurfaceRenderer provides { spec, body -> WidgetSurface(spec, body) },
-            LocalBrowseContext provides STUB_BROWSE,
         ) { content() }
     }
 

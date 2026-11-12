@@ -121,6 +121,20 @@ typealias UnknownWidgetDecorator = @Composable (address: SlotAddress, index: Int
 val LocalUnknownWidgetDecorator: ProvidableCompositionLocal<UnknownWidgetDecorator> =
     staticCompositionLocalOf { { _, _, _ -> } }
 
+/**
+ * Drawn by the slot renderer in place of a widget that stands where something it
+ * needs has no answer: a hand-edited layout put it on a surface it was never
+ * meant for. [missing] names the ids, in the order the widget declared them.
+ *
+ * The kernel draws nothing by default, because it knows nothing of how a theme
+ * looks. The app provides one that says what is missing, so the widget is not
+ * simply absent with nobody able to tell why.
+ */
+typealias MisplacedWidgetDecorator = @Composable (descriptor: WidgetDescriptor, instance: WidgetInstance, missing: List<String>) -> Unit
+
+val LocalMisplacedWidget: ProvidableCompositionLocal<MisplacedWidgetDecorator> =
+    staticCompositionLocalOf { { _, _, _ -> } }
+
 // Phase G / Tier 2: a zero-footprint Modifier the editor applies to each slot's
 // flow root (and the empty Box). It lets the editor highlight the slot, select it,
 // and open its orientation menu WITHOUT being a layout child -- the old in-flow

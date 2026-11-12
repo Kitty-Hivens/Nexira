@@ -13,12 +13,14 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
+import hivens.ui.widgets.Commands
+import hivens.widget.api.rememberScopedCommand
 import hivens.widget.model.Widget
 
-@Widget(id = "bg.reset", displayName = "widget.bg.reset")
+@Widget(id = "bg.reset", displayName = "widget.bg.reset", needs = ["background.update"])
 @Composable
 fun BgResetWidget() {
-    val ctx = LocalBgSettingsContext.current
+    val update = rememberScopedCommand(Commands.UpdateBackground) ?: return
     val s = LocalStrings.current
     var confirming by remember { mutableStateOf(false) }
 
@@ -35,7 +37,7 @@ fun BgResetWidget() {
             title        = s.backgroundResetConfirmTitle,
             body         = s.backgroundResetConfirmBody,
             confirmLabel = s.backgroundReset,
-            onConfirm    = { ctx.update { BackgroundSettings() } },
+            onConfirm    = { update { BackgroundSettings() } },
             onDismiss    = { confirming = false },
         )
     }

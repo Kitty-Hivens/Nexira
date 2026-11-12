@@ -4,7 +4,7 @@ import androidx.compose.runtime.Composable
 import hivens.ui.i18n.LocalStrings
 import hivens.widget.model.Widget
 
-@Widget(id = "bg.fx.parallax", displayName = "widget.bg.fx.parallax")
+@Widget(id = "bg.fx.parallax", displayName = "widget.bg.fx.parallax", needs = ["background.settings", "background.update"])
 @Composable
 fun BgFxParallaxWidget() {
     val s = LocalStrings.current

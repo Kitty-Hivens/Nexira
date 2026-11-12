@@ -4,7 +4,7 @@ import androidx.compose.runtime.Composable
 import hivens.ui.i18n.LocalStrings
 import hivens.widget.model.Widget
 
-@Widget(id = "bg.fx.darken", displayName = "widget.bg.fx.darken")
+@Widget(id = "bg.fx.darken", displayName = "widget.bg.fx.darken", needs = ["background.settings", "background.update"])
 @Composable
 fun BgFxDarkenWidget() {
     val s = LocalStrings.current

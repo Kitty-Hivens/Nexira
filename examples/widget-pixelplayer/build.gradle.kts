@@ -54,11 +54,12 @@ tasks.test {
 // What the loader reads before it opens a single class. The API version is the
 // honest half: a module compiled against a different widget kernel may link and
 // then misbehave, so the launcher refuses it by version rather than finding out
-// on a frame. Keep it in step with hivens.widget.api.WidgetApi.VERSION.
+// on a frame. The number is the root's nexira.widgetApi, held equal to
+// hivens.widget.api.WidgetApi.VERSION by a test.
 tasks.jar {
     manifest {
         attributes(
-            "Nexira-Widget-Api" to 1,
+            "Nexira-Widget-Api" to providers.gradleProperty("nexira.widgetApi").get(),
             "Nexira-Module-Id" to "pixelplayer",
             "Nexira-Module-Name" to "Pixel Player",
         )

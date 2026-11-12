@@ -28,6 +28,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
+import hivens.ui.AppState
 import hivens.ui.Screen
 import hivens.ui.customization.LocalCustomization
 import hivens.ui.customization.NavSelectionStyle
@@ -36,8 +37,14 @@ import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.utils.GameConsoleService
+import hivens.ui.widgets.Commands
+import hivens.ui.widgets.Sources
 import hivens.ui.widgets.toWidgetColorOrNull
 import hivens.widget.api.rememberProps
+import hivens.widget.api.rememberScopedAction
+import hivens.widget.api.rememberScopedCommand
+import hivens.widget.api.rememberScopedSource
+import hivens.widget.api.valueOrNull
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 import kotlin.math.sin
@@ -65,12 +72,17 @@ data class NavEntryProps(
     val target: NavTarget = NavTarget.Home,
 )
 
-@Widget(id = "nav.entry", displayName = "widget.nav.entry", propsClass = NavEntryProps::class)
+@Widget(
+    id = "nav.entry",
+    displayName = "widget.nav.entry",
+    propsClass = NavEntryProps::class,
+    needs = ["nav.state", "nav.switch", "app.state", "auth.signOut"],
+)
 @Composable
 fun NavEntry(instance: WidgetInstance) {
     val p = instance.rememberProps<NavEntryProps>()
-    val ctx = LocalLeftRailContext.current
-    val screen = ctx.currentScreen
+    val screen = rememberScopedSource(Sources.Navigation).valueOrNull()?.current ?: return
+    val switchTab = rememberScopedCommand(Commands.SwitchTab) ?: return
 
     when (p.target) {
         NavTarget.Home -> NavSlot(
@@ -78,7 +90,7 @@ fun NavEntry(instance: WidgetInstance) {
             outlineSwap  = true,
             phase        = 0.0f,
             active       = screen is Screen.Home,
-            onClick      = { ctx.onSwitchTab(Screen.Home) },
+            onClick      = { switchTab(Screen.Home) },
         )
         NavTarget.Library -> NavSlot(
             icon         = NxIcon.Star,
@@ -89,28 +101,28 @@ fun NavEntry(instance: WidgetInstance) {
             // followed a mod out of the pack they were standing in.
             active       = screen is Screen.Library || screen is Screen.PackDetail ||
                 screen is Screen.PackVersions || screen is Screen.ModDetail || screen is Screen.ModVersion,
-            onClick      = { ctx.onSwitchTab(Screen.Library) },
+            onClick      = { switchTab(Screen.Library) },
         )
         NavTarget.Browse -> NavSlot(
             icon         = NxIcon.Search,
             outlineSwap  = true,
             phase        = 1.65f,
             active       = screen is Screen.Browse || screen is Screen.CataloguePackDetail,
-            onClick      = { ctx.onSwitchTab(Screen.Browse) },
+            onClick      = { switchTab(Screen.Browse) },
         )
         NavTarget.Profile -> NavSlot(
             icon         = NxIcon.Person,
             outlineSwap  = true,
             phase        = 1.1f,
             active       = screen is Screen.Profile,
-            onClick      = { ctx.onSwitchTab(Screen.Profile) },
+            onClick      = { switchTab(Screen.Profile) },
         )
         NavTarget.Wardrobe -> NavSlot(
             icon         = NxIcon.Palette,
             outlineSwap  = true,
             phase        = 1.6f,
             active       = screen is Screen.Wardrobe,
-            onClick      = { ctx.onSwitchTab(Screen.Wardrobe) },
+            onClick      = { switchTab(Screen.Wardrobe) },
         )
         NavTarget.Settings -> NavSlot(
             icon         = NxIcon.Settings,
@@ -118,14 +130,14 @@ fun NavEntry(instance: WidgetInstance) {
             phase        = 2.2f,
             active       = screen is Screen.Settings || screen is Screen.ThemePicker ||
                 screen is Screen.BackgroundSettings,
-            onClick      = { ctx.onSwitchTab(Screen.Settings) },
+            onClick      = { switchTab(Screen.Settings) },
         )
         NavTarget.About -> NavSlot(
             icon         = NxIcon.Info,
             outlineSwap  = true,
             phase        = 3.3f,
             active       = screen is Screen.About,
-            onClick      = { ctx.onSwitchTab(Screen.About) },
+            onClick      = { switchTab(Screen.About) },
         )
         NavTarget.Console -> {
             val gameConsole: GameConsoleService = koinInject()
@@ -141,14 +153,16 @@ fun NavEntry(instance: WidgetInstance) {
             // Self-gates on the session: render nothing when unauthenticated
             // so the slot lists the entry unconditionally and the graph stays
             // free of auth-state vocabulary.
-            if (!ctx.isAuthenticated) return
+            val appState = rememberScopedSource(Sources.Session).valueOrNull()
+            if (appState !is AppState.Authenticated) return
+            val signOut = rememberScopedAction(Commands.SignOut) ?: return
             NavSlot(
                 icon          = NxIcon.ExitToApp,
                 phase         = 0.0f,
                 active        = false,
                 chaosEligible = false,
                 iconTint      = NxColor.status(Status.Error).copy(alpha = 0.75f),
-                onClick       = ctx.onLogout,
+                onClick       = signOut,
             )
         }
     }

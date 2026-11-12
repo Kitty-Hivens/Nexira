@@ -44,6 +44,7 @@ import coil3.compose.AsyncImage
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackInstance
 import hivens.core.launch.LaunchControlMode
+import hivens.ui.AppState
 import hivens.ui.Screen
 import hivens.ui.components.rememberLaunchControl
 import hivens.ui.effects.pixelArtBackground
@@ -59,7 +60,12 @@ import hivens.ui.feature.catalogue.project.loaderLabel
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.decorativePair
 import hivens.ui.theme.familyForText
+import hivens.ui.widgets.Commands
+import hivens.ui.widgets.Sources
 import hivens.widget.api.rememberProps
+import hivens.widget.api.rememberScopedCommand
+import hivens.widget.api.rememberScopedSource
+import hivens.widget.api.valueOrNull
 import hivens.widget.model.PropLabel
 import hivens.widget.model.PropRange
 import hivens.widget.model.Widget
@@ -97,11 +103,13 @@ data class PackListProps(
     surface = """{"fill":"panel"}""",
     minWidth = 280, minHeight = 120,
     maxWidth = 2400, maxHeight = 1600,
+    needs = ["app.state", "nav.open"],
 )
 @Composable
 fun HomeNewPackList(instance: WidgetInstance) {
     val p = instance.rememberProps<PackListProps>()
-    val ctx = LocalHomeNewContext.current
+    val appState = rememberScopedSource(Sources.Session).valueOrNull() ?: return
+    val navigate = rememberScopedCommand(Commands.Navigate) ?: return
     val s = LocalStrings.current
     val repo: IPackRepository = koinInject()
     val all by remember { repo.observe() }.collectAsState()
@@ -109,7 +117,7 @@ fun HomeNewPackList(instance: WidgetInstance) {
 
     // An empty library is where somebody starts, and this is the widget that says how.
     if (all.isEmpty()) {
-        EmptyPacksCta(onBrowse = { ctx.onScreenChange(Screen.Browse) })
+        EmptyPacksCta(onBrowse = { navigate(Screen.Browse) })
         return
     }
 
@@ -133,7 +141,7 @@ fun HomeNewPackList(instance: WidgetInstance) {
             ScrollingRows(bounded = maxHeight != Dp.Infinity) {
                 rows.forEachIndexed { i, pack ->
                     if (i > 0) Box(Modifier.fillMaxWidth().height(RULE).background(NxInk.line))
-                    PackRow(pack, columns)
+                    PackRow(pack, columns, appState, navigate)
                 }
             }
         }
@@ -193,12 +201,11 @@ internal data class PackListColumns(val runsOn: Boolean, val played: Boolean, va
 }
 
 @Composable
-private fun PackRow(pack: PackInstance, columns: PackListColumns) {
-    val ctx = LocalHomeNewContext.current
+private fun PackRow(pack: PackInstance, columns: PackListColumns, appState: AppState, navigate: (Screen) -> Unit) {
     val s = LocalStrings.current
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
-    val control = rememberLaunchControl(pack, ctx.appState)
+    val control = rememberLaunchControl(pack, appState)
 
     Row(
         modifier = Modifier
@@ -207,7 +214,7 @@ private fun PackRow(pack: PackInstance, columns: PackListColumns) {
             .clip(RoundedCornerShape(8.dp))
             .background(NxInk.main.copy(alpha = if (hovered) HOVER_ALPHA else 0f))
             .hoverable(interaction)
-            .clickable(interactionSource = interaction, indication = null) { ctx.onScreenChange(Screen.PackDetail(pack.id)) }
+            .clickable(interactionSource = interaction, indication = null) { navigate(Screen.PackDetail(pack.id)) }
             .padding(horizontal = 8.dp),
         verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(16.dp),

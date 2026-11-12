@@ -1,0 +1,1104 @@
+public final class hivens/widget/model/BundledPresets {
+	public static final field INSTANCE Lhivens/widget/model/BundledPresets;
+	public final fun getIDS ()Ljava/util/List;
+	public final fun load (Ljava/lang/String;Lkotlinx/serialization/json/Json;)Lhivens/widget/model/LayoutGraph;
+	public static synthetic fun load$default (Lhivens/widget/model/BundledPresets;Ljava/lang/String;Lkotlinx/serialization/json/Json;ILjava/lang/Object;)Lhivens/widget/model/LayoutGraph;
+}
+
+public final class hivens/widget/model/BundledPresetsKt {
+	public static final fun withSurfacesFrom (Lhivens/widget/model/LayoutGraph;Lhivens/widget/model/LayoutGraph;)Lhivens/widget/model/LayoutGraph;
+}
+
+public final class hivens/widget/model/CommandKey {
+	public fun <init> (Ljava/lang/String;Lhivens/widget/model/ScopeLevel;)V
+	public synthetic fun <init> (Ljava/lang/String;Lhivens/widget/model/ScopeLevel;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getId ()Ljava/lang/String;
+	public final fun getLevel ()Lhivens/widget/model/ScopeLevel;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/widget/model/DefaultLayout {
+	public static final field INSTANCE Lhivens/widget/model/DefaultLayout;
+	public final fun load (Lkotlinx/serialization/json/Json;)Lhivens/widget/model/LayoutGraph;
+	public static synthetic fun load$default (Lhivens/widget/model/DefaultLayout;Lkotlinx/serialization/json/Json;ILjava/lang/Object;)Lhivens/widget/model/LayoutGraph;
+}
+
+public final class hivens/widget/model/DefaultLayoutKt {
+	public static final field LAYOUT_SCHEMA I
+}
+
+public final class hivens/widget/model/Entrance : java/lang/Enum {
+	public static final field Companion Lhivens/widget/model/Entrance$Companion;
+	public static final field Fade Lhivens/widget/model/Entrance;
+	public static final field None Lhivens/widget/model/Entrance;
+	public static final field Rise Lhivens/widget/model/Entrance;
+	public static final field Settle Lhivens/widget/model/Entrance;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun getId ()Ljava/lang/String;
+	public static fun valueOf (Ljava/lang/String;)Lhivens/widget/model/Entrance;
+	public static fun values ()[Lhivens/widget/model/Entrance;
+}
+
+public final class hivens/widget/model/Entrance$Companion {
+	public final fun getDEFAULT ()Lhivens/widget/model/Entrance;
+	public final fun parse (Ljava/lang/String;)Lhivens/widget/model/Entrance;
+}
+
+public final class hivens/widget/model/FamilyId {
+	public static final field Companion Lhivens/widget/model/FamilyId$Companion;
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lhivens/widget/model/FamilyId;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
+}
+
+public final synthetic class hivens/widget/model/FamilyId$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lhivens/widget/model/FamilyId$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun deserialize-ZVWSRtc (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/String;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public final fun serialize-AikbNSo (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/String;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class hivens/widget/model/FamilyId$Companion {
+	public final fun getGENERAL-zSLUku4 ()Ljava/lang/String;
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class hivens/widget/model/FamilyLayout {
+	public static final field Companion Lhivens/widget/model/FamilyLayout$Companion;
+	public fun <init> ()V
+	public fun <init> (Ljava/util/Map;Lhivens/widget/model/SurfaceSpec;)V
+	public synthetic fun <init> (Ljava/util/Map;Lhivens/widget/model/SurfaceSpec;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/util/Map;
+	public final fun component2 ()Lhivens/widget/model/SurfaceSpec;
+	public final fun copy (Ljava/util/Map;Lhivens/widget/model/SurfaceSpec;)Lhivens/widget/model/FamilyLayout;
+	public static synthetic fun copy$default (Lhivens/widget/model/FamilyLayout;Ljava/util/Map;Lhivens/widget/model/SurfaceSpec;ILjava/lang/Object;)Lhivens/widget/model/FamilyLayout;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getSlots ()Ljava/util/Map;
+	public final fun getSurface ()Lhivens/widget/model/SurfaceSpec;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class hivens/widget/model/FamilyLayout$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lhivens/widget/model/FamilyLayout$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lhivens/widget/model/FamilyLayout;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lhivens/widget/model/FamilyLayout;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class hivens/widget/model/FamilyLayout$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public abstract interface class hivens/widget/model/FillSource {
+}
+
+public final class hivens/widget/model/FillSource$Inherit : hivens/widget/model/FillSource {
+	public static final field INSTANCE Lhivens/widget/model/FillSource$Inherit;
+}
+
+public final class hivens/widget/model/FillSource$Literal : hivens/widget/model/FillSource {
+	public fun <init> (I)V
+	public final fun component1 ()I
+	public final fun copy (I)Lhivens/widget/model/FillSource$Literal;
+	public static synthetic fun copy$default (Lhivens/widget/model/FillSource$Literal;IILjava/lang/Object;)Lhivens/widget/model/FillSource$Literal;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getArgb ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/widget/model/FillSource$Named : hivens/widget/model/FillSource {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lhivens/widget/model/FillSource$Named;
+	public static synthetic fun copy$default (Lhivens/widget/model/FillSource$Named;Ljava/lang/String;ILjava/lang/Object;)Lhivens/widget/model/FillSource$Named;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getName ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class hivens/widget/model/FlowPlacement {
+}
+
+public final class hivens/widget/model/FlowPlacement$Bounded : hivens/widget/model/FlowPlacement {
+	public fun <init> (FF)V
+	public final fun component1 ()F
+	public final fun component2 ()F
+	public final fun copy (FF)Lhivens/widget/model/FlowPlacement$Bounded;
+	public static synthetic fun copy$default (Lhivens/widget/model/FlowPlacement$Bounded;FFILjava/lang/Object;)Lhivens/widget/model/FlowPlacement$Bounded;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getHeightDp ()F
+	public final fun getWidthDp ()F
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/widget/model/FlowPlacement$Natural : hivens/widget/model/FlowPlacement {
+	public static final field INSTANCE Lhivens/widget/model/FlowPlacement$Natural;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/widget/model/FlowPlacement$Weighted : hivens/widget/model/FlowPlacement {
+	public fun <init> (F)V
+	public final fun component1 ()F
+	public final fun copy (F)Lhivens/widget/model/FlowPlacement$Weighted;
+	public static synthetic fun copy$default (Lhivens/widget/model/FlowPlacement$Weighted;FILjava/lang/Object;)Lhivens/widget/model/FlowPlacement$Weighted;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getWeight ()F
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/widget/model/FlowPlacementKt {
+	public static final fun flowPlacement (Lhivens/widget/model/WidgetInstance;)Lhivens/widget/model/FlowPlacement;
+}
+
+public final class hivens/widget/model/FlowSpec {
+	public static final field Companion Lhivens/widget/model/FlowSpec$Companion;
+	public static final field HORIZONTAL Ljava/lang/String;
+	public static final field VERTICAL Ljava/lang/String;
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/String;IZ)V
+	public synthetic fun <init> (Ljava/lang/String;IZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()I
+	public final fun component3 ()Z
+	public final fun copy (Ljava/lang/String;IZ)Lhivens/widget/model/FlowSpec;
+	public static synthetic fun copy$default (Lhivens/widget/model/FlowSpec;Ljava/lang/String;IZILjava/lang/Object;)Lhivens/widget/model/FlowSpec;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDirection ()Ljava/lang/String;
+	public final fun getHorizontal ()Z
+	public final fun getRowLike ()Z
+	public final fun getUniform ()Z
+	public final fun getUniformGrid ()Z
+	public final fun getWrap ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class hivens/widget/model/FlowSpec$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lhivens/widget/model/FlowSpec$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lhivens/widget/model/FlowSpec;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lhivens/widget/model/FlowSpec;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class hivens/widget/model/FlowSpec$Companion {
+	public final fun getColumn ()Lhivens/widget/model/FlowSpec;
+	public final fun getRow ()Lhivens/widget/model/FlowSpec;
+	public final fun grid (I)Lhivens/widget/model/FlowSpec;
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public abstract interface annotation class hivens/widget/model/InjectService : java/lang/annotation/Annotation {
+	public abstract fun services ()[Ljava/lang/Class;
+}
+
+public final class hivens/widget/model/LayoutGraph {
+	public static final field Companion Lhivens/widget/model/LayoutGraph$Companion;
+	public fun <init> ()V
+	public fun <init> (Ljava/util/Map;Ljava/util/List;)V
+	public synthetic fun <init> (Ljava/util/Map;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/util/Map;
+	public final fun component2 ()Ljava/util/List;
+	public final fun copy (Ljava/util/Map;Ljava/util/List;)Lhivens/widget/model/LayoutGraph;
+	public static synthetic fun copy$default (Lhivens/widget/model/LayoutGraph;Ljava/util/Map;Ljava/util/List;ILjava/lang/Object;)Lhivens/widget/model/LayoutGraph;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getScreens ()Ljava/util/List;
+	public final fun getSurfaces ()Ljava/util/Map;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class hivens/widget/model/LayoutGraph$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lhivens/widget/model/LayoutGraph$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lhivens/widget/model/LayoutGraph;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lhivens/widget/model/LayoutGraph;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class hivens/widget/model/LayoutGraph$Companion {
+	public final fun getEMPTY ()Lhivens/widget/model/LayoutGraph;
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class hivens/widget/model/LayoutGraphKt {
+	public static final field GRID_MAX I
+	public static final fun SurfaceLayout (Ljava/util/Map;)Lhivens/widget/model/SurfaceLayout;
+	public static final fun ensureFamily-EB7AabE (Lhivens/widget/model/LayoutGraph;Ljava/lang/String;Ljava/lang/String;)Lhivens/widget/model/LayoutGraph;
+	public static final fun flatMapInstances (Lhivens/widget/model/LayoutGraph;Lkotlin/jvm/functions/Function1;)Lhivens/widget/model/LayoutGraph;
+	public static final fun insertWidget (Lhivens/widget/model/LayoutGraph;Lhivens/widget/model/SlotPath;Lhivens/widget/model/WidgetInstance;I)Lhivens/widget/model/LayoutGraph;
+	public static final fun instanceIds (Lhivens/widget/model/SurfaceLayout;)Ljava/util/Set;
+	public static final fun moveWidget (Lhivens/widget/model/LayoutGraph;Lhivens/widget/model/SlotPath;Lhivens/widget/model/SlotPath;Ljava/lang/String;IZ)Lhivens/widget/model/LayoutGraph;
+	public static synthetic fun moveWidget$default (Lhivens/widget/model/LayoutGraph;Lhivens/widget/model/SlotPath;Lhivens/widget/model/SlotPath;Ljava/lang/String;IZILjava/lang/Object;)Lhivens/widget/model/LayoutGraph;
+	public static final fun placeInGrid (Lhivens/widget/model/SlotContent;Ljava/lang/String;Lhivens/widget/model/Placement;I)Lhivens/widget/model/SlotContent;
+	public static final fun placeWidgetInGrid (Lhivens/widget/model/LayoutGraph;Lhivens/widget/model/SlotPath;Ljava/lang/String;Lhivens/widget/model/Placement;I)Lhivens/widget/model/LayoutGraph;
+	public static final fun removeInstanceIds (Lhivens/widget/model/SurfaceLayout;Ljava/util/Set;)Lhivens/widget/model/SurfaceLayout;
+	public static final fun removeWidget (Lhivens/widget/model/LayoutGraph;Lhivens/widget/model/SlotPath;Ljava/lang/String;)Lhivens/widget/model/LayoutGraph;
+	public static final fun reorderInSlot (Lhivens/widget/model/LayoutGraph;Lhivens/widget/model/SlotPath;II)Lhivens/widget/model/LayoutGraph;
+	public static final fun resetSurface-RLNxNG4 (Lhivens/widget/model/LayoutGraph;Ljava/lang/String;Lhivens/widget/model/SurfaceLayout;)Lhivens/widget/model/LayoutGraph;
+	public static final fun resizeInGrid (Lhivens/widget/model/SlotContent;Ljava/lang/String;FFI)Lhivens/widget/model/SlotContent;
+	public static final fun resizeWidgetInGrid (Lhivens/widget/model/LayoutGraph;Lhivens/widget/model/SlotPath;Ljava/lang/String;FFI)Lhivens/widget/model/LayoutGraph;
+	public static final fun seedPlacement (IILjava/util/List;Z)Lhivens/widget/model/Placement;
+	public static synthetic fun seedPlacement$default (IILjava/util/List;ZILjava/lang/Object;)Lhivens/widget/model/Placement;
+	public static final fun seedPlacements (Ljava/util/List;IZ)Ljava/util/List;
+	public static synthetic fun seedPlacements$default (Ljava/util/List;IZILjava/lang/Object;)Ljava/util/List;
+	public static final fun setFlow (Lhivens/widget/model/LayoutGraph;Lhivens/widget/model/SlotPath;Lhivens/widget/model/FlowSpec;)Lhivens/widget/model/LayoutGraph;
+	public static final fun setGrid (Lhivens/widget/model/LayoutGraph;Lhivens/widget/model/SlotPath;I)Lhivens/widget/model/LayoutGraph;
+	public static final fun setViewport (Lhivens/widget/model/LayoutGraph;Lhivens/widget/model/SlotPath;Lhivens/widget/model/ViewportSpec;)Lhivens/widget/model/LayoutGraph;
+	public static final fun setWidgetAnchor (Lhivens/widget/model/LayoutGraph;Lhivens/widget/model/SlotPath;Ljava/lang/String;Ljava/lang/String;)Lhivens/widget/model/LayoutGraph;
+	public static final fun setWidgetBounds (Lhivens/widget/model/LayoutGraph;Lhivens/widget/model/SlotPath;Ljava/lang/String;FFFF)Lhivens/widget/model/LayoutGraph;
+	public static final fun setWidgetOffset (Lhivens/widget/model/LayoutGraph;Lhivens/widget/model/SlotPath;Ljava/lang/String;FF)Lhivens/widget/model/LayoutGraph;
+	public static final fun setWidgetPadding (Lhivens/widget/model/LayoutGraph;Lhivens/widget/model/SlotPath;Ljava/lang/String;Lhivens/widget/model/SurfaceInsets;)Lhivens/widget/model/LayoutGraph;
+	public static final fun setWidgetPinned (Lhivens/widget/model/LayoutGraph;Lhivens/widget/model/SlotPath;Ljava/lang/String;Z)Lhivens/widget/model/LayoutGraph;
+	public static final fun setWidgetSize (Lhivens/widget/model/LayoutGraph;Lhivens/widget/model/SlotPath;Ljava/lang/String;FF)Lhivens/widget/model/LayoutGraph;
+	public static final fun setWidgetWeight (Lhivens/widget/model/LayoutGraph;Lhivens/widget/model/SlotPath;Ljava/lang/String;F)Lhivens/widget/model/LayoutGraph;
+	public static final fun setWidgetZ (Lhivens/widget/model/LayoutGraph;Lhivens/widget/model/SlotPath;Ljava/lang/String;I)Lhivens/widget/model/LayoutGraph;
+	public static final fun traverse (Lhivens/widget/model/LayoutGraph;Lhivens/widget/model/SlotPath;)Lhivens/widget/model/SlotContent;
+	public static final fun updateFamilySurface-LKsPR6A (Lhivens/widget/model/LayoutGraph;Ljava/lang/String;Ljava/lang/String;Lhivens/widget/model/SurfaceSpec;)Lhivens/widget/model/LayoutGraph;
+	public static final fun updateWidgetMotion (Lhivens/widget/model/LayoutGraph;Lhivens/widget/model/SlotPath;Ljava/lang/String;Lhivens/widget/model/WidgetMotion;)Lhivens/widget/model/LayoutGraph;
+	public static final fun updateWidgetProps (Lhivens/widget/model/LayoutGraph;Lhivens/widget/model/SlotPath;Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;)Lhivens/widget/model/LayoutGraph;
+	public static final fun updateWidgetSurface (Lhivens/widget/model/LayoutGraph;Lhivens/widget/model/SlotPath;Ljava/lang/String;Lhivens/widget/model/SurfaceSpec;)Lhivens/widget/model/LayoutGraph;
+	public static final fun walkInstances (Lhivens/widget/model/LayoutGraph;)Lkotlin/sequences/Sequence;
+}
+
+public final class hivens/widget/model/NestedSegment {
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2-L9LzkC8 ()Ljava/lang/String;
+	public final fun copy-BYtZEss (Ljava/lang/String;Ljava/lang/String;)Lhivens/widget/model/NestedSegment;
+	public static synthetic fun copy-BYtZEss$default (Lhivens/widget/model/NestedSegment;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lhivens/widget/model/NestedSegment;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getParentInstanceId ()Ljava/lang/String;
+	public final fun getSlot-L9LzkC8 ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/widget/model/Placement {
+	public static final field BOTTOM_CENTER Ljava/lang/String;
+	public static final field BOTTOM_END Ljava/lang/String;
+	public static final field BOTTOM_START Ljava/lang/String;
+	public static final field CENTER Ljava/lang/String;
+	public static final field CENTER_END Ljava/lang/String;
+	public static final field CENTER_START Ljava/lang/String;
+	public static final field Companion Lhivens/widget/model/Placement$Companion;
+	public static final field TOP_CENTER Ljava/lang/String;
+	public static final field TOP_END Ljava/lang/String;
+	public static final field TOP_START Ljava/lang/String;
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/String;FFFFIFLhivens/widget/model/SurfaceInsets;Z)V
+	public synthetic fun <init> (Ljava/lang/String;FFFFIFLhivens/widget/model/SurfaceInsets;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()F
+	public final fun component3 ()F
+	public final fun component4 ()F
+	public final fun component5 ()F
+	public final fun component6 ()I
+	public final fun component7 ()F
+	public final fun component8 ()Lhivens/widget/model/SurfaceInsets;
+	public final fun component9 ()Z
+	public final fun copy (Ljava/lang/String;FFFFIFLhivens/widget/model/SurfaceInsets;Z)Lhivens/widget/model/Placement;
+	public static synthetic fun copy$default (Lhivens/widget/model/Placement;Ljava/lang/String;FFFFIFLhivens/widget/model/SurfaceInsets;ZILjava/lang/Object;)Lhivens/widget/model/Placement;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAnchor ()Ljava/lang/String;
+	public final fun getHeight ()F
+	public final fun getPadding ()Lhivens/widget/model/SurfaceInsets;
+	public final fun getPinned ()Z
+	public final fun getWeight ()F
+	public final fun getWidth ()F
+	public final fun getX ()F
+	public final fun getY ()F
+	public final fun getZ ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class hivens/widget/model/Placement$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lhivens/widget/model/Placement$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lhivens/widget/model/Placement;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lhivens/widget/model/Placement;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class hivens/widget/model/Placement$Companion {
+	public final fun getANCHORS ()Ljava/util/List;
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class hivens/widget/model/PlacementKt {
+	public static final field GRAB_MARGIN_DP F
+	public static final fun anchorDragSignX (Ljava/lang/String;)F
+	public static final fun anchorDragSignY (Ljava/lang/String;)F
+	public static final fun anchorHorizontalBias (Ljava/lang/String;)F
+	public static final fun anchorVerticalBias (Ljava/lang/String;)F
+	public static final fun clampPlacementAxis (FFFFF)F
+	public static synthetic fun clampPlacementAxis$default (FFFFFILjava/lang/Object;)F
+	public static final fun parseAnchor (Ljava/lang/String;)Ljava/lang/String;
+}
+
+public abstract interface annotation class hivens/widget/model/PropChoice : java/lang/annotation/Annotation {
+	public abstract fun options ()[Ljava/lang/String;
+}
+
+public final synthetic class hivens/widget/model/PropChoice$Impl : hivens/widget/model/PropChoice {
+	public fun <init> ([Ljava/lang/String;)V
+	public final synthetic fun options ()[Ljava/lang/String;
+}
+
+public abstract interface annotation class hivens/widget/model/PropColor : java/lang/annotation/Annotation {
+}
+
+public final synthetic class hivens/widget/model/PropColor$Impl : hivens/widget/model/PropColor {
+	public fun <init> ()V
+}
+
+public abstract interface annotation class hivens/widget/model/PropHidden : java/lang/annotation/Annotation {
+}
+
+public final synthetic class hivens/widget/model/PropHidden$Impl : hivens/widget/model/PropHidden {
+	public fun <init> ()V
+}
+
+public abstract interface annotation class hivens/widget/model/PropLabel : java/lang/annotation/Annotation {
+	public abstract fun value ()Ljava/lang/String;
+}
+
+public final synthetic class hivens/widget/model/PropLabel$Impl : hivens/widget/model/PropLabel {
+	public fun <init> (Ljava/lang/String;)V
+	public final synthetic fun value ()Ljava/lang/String;
+}
+
+public abstract interface annotation class hivens/widget/model/PropRange : java/lang/annotation/Annotation {
+	public abstract fun max ()D
+	public abstract fun min ()D
+	public abstract fun step ()D
+}
+
+public final synthetic class hivens/widget/model/PropRange$Impl : hivens/widget/model/PropRange {
+	public fun <init> (DDD)V
+	public synthetic fun <init> (DDDILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final synthetic fun max ()D
+	public final synthetic fun min ()D
+	public final synthetic fun step ()D
+}
+
+public final class hivens/widget/model/PropsDeltaKt {
+	public static final fun propsDelta (Lkotlinx/serialization/json/JsonObject;Ljava/util/Map;)Lkotlinx/serialization/json/JsonObject;
+	public static final fun propsWith (Lkotlinx/serialization/json/JsonObject;Ljava/util/Map;Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;)Lkotlinx/serialization/json/JsonObject;
+}
+
+public abstract interface annotation class hivens/widget/model/ProvidesService : java/lang/annotation/Annotation {
+	public abstract fun classes ()[Ljava/lang/Class;
+}
+
+public final class hivens/widget/model/ScopeLevel : java/lang/Enum {
+	public static final field App Lhivens/widget/model/ScopeLevel;
+	public static final field Composition Lhivens/widget/model/ScopeLevel;
+	public static final field Page Lhivens/widget/model/ScopeLevel;
+	public static final field Window Lhivens/widget/model/ScopeLevel;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lhivens/widget/model/ScopeLevel;
+	public static fun values ()[Lhivens/widget/model/ScopeLevel;
+}
+
+public final class hivens/widget/model/ScreenSpec {
+	public static final field Companion Lhivens/widget/model/ScreenSpec$Companion;
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4-eg-a43s ()Ljava/lang/String;
+	public final fun copy-nDPq4ME (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lhivens/widget/model/ScreenSpec;
+	public static synthetic fun copy-nDPq4ME$default (Lhivens/widget/model/ScreenSpec;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lhivens/widget/model/ScreenSpec;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getIcon ()Ljava/lang/String;
+	public final fun getId ()Ljava/lang/String;
+	public final fun getSurface-eg-a43s ()Ljava/lang/String;
+	public final fun getTitle ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class hivens/widget/model/ScreenSpec$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lhivens/widget/model/ScreenSpec$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lhivens/widget/model/ScreenSpec;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lhivens/widget/model/ScreenSpec;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class hivens/widget/model/ScreenSpec$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class hivens/widget/model/ScreensKt {
+	public static final fun addScreen (Lhivens/widget/model/LayoutGraph;Lhivens/widget/model/ScreenSpec;)Lhivens/widget/model/LayoutGraph;
+	public static final fun blankScreenSurface ()Lhivens/widget/model/SurfaceLayout;
+	public static final fun getSCREEN_MAIN_SLOT ()Ljava/lang/String;
+	public static final fun normalizeScreens (Lhivens/widget/model/LayoutGraph;)Lhivens/widget/model/LayoutGraph;
+	public static final fun removeScreen (Lhivens/widget/model/LayoutGraph;Ljava/lang/String;)Lhivens/widget/model/LayoutGraph;
+	public static final fun resetScreenSurface-XFPuj1E (Lhivens/widget/model/LayoutGraph;Ljava/lang/String;)Lhivens/widget/model/LayoutGraph;
+	public static final fun screen (Lhivens/widget/model/LayoutGraph;Ljava/lang/String;)Lhivens/widget/model/ScreenSpec;
+	public static final fun screenOn-XFPuj1E (Lhivens/widget/model/LayoutGraph;Ljava/lang/String;)Lhivens/widget/model/ScreenSpec;
+	public static final fun updateScreen (Lhivens/widget/model/LayoutGraph;Ljava/lang/String;Lkotlin/jvm/functions/Function1;)Lhivens/widget/model/LayoutGraph;
+	public static final fun withScreensFrom (Lhivens/widget/model/LayoutGraph;Lhivens/widget/model/LayoutGraph;)Lhivens/widget/model/LayoutGraph;
+}
+
+public final class hivens/widget/model/SlotAddress {
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-eg-a43s ()Ljava/lang/String;
+	public final fun component2-L9LzkC8 ()Ljava/lang/String;
+	public final fun copy-fMVjg7M (Ljava/lang/String;Ljava/lang/String;)Lhivens/widget/model/SlotAddress;
+	public static synthetic fun copy-fMVjg7M$default (Lhivens/widget/model/SlotAddress;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lhivens/widget/model/SlotAddress;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getSlot-L9LzkC8 ()Ljava/lang/String;
+	public final fun getSurface-eg-a43s ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/widget/model/SlotContent {
+	public static final field Companion Lhivens/widget/model/SlotContent$Companion;
+	public fun <init> ()V
+	public fun <init> (Ljava/util/List;Lhivens/widget/model/FlowSpec;ILhivens/widget/model/ViewportSpec;)V
+	public synthetic fun <init> (Ljava/util/List;Lhivens/widget/model/FlowSpec;ILhivens/widget/model/ViewportSpec;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun component2 ()Lhivens/widget/model/FlowSpec;
+	public final fun component3 ()I
+	public final fun component4 ()Lhivens/widget/model/ViewportSpec;
+	public final fun copy (Ljava/util/List;Lhivens/widget/model/FlowSpec;ILhivens/widget/model/ViewportSpec;)Lhivens/widget/model/SlotContent;
+	public static synthetic fun copy$default (Lhivens/widget/model/SlotContent;Ljava/util/List;Lhivens/widget/model/FlowSpec;ILhivens/widget/model/ViewportSpec;ILjava/lang/Object;)Lhivens/widget/model/SlotContent;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getFlow ()Lhivens/widget/model/FlowSpec;
+	public final fun getGrid ()I
+	public final fun getViewport ()Lhivens/widget/model/ViewportSpec;
+	public final fun getWidgets ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class hivens/widget/model/SlotContent$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lhivens/widget/model/SlotContent$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lhivens/widget/model/SlotContent;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lhivens/widget/model/SlotContent;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class hivens/widget/model/SlotContent$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class hivens/widget/model/SlotId {
+	public static final field Companion Lhivens/widget/model/SlotId$Companion;
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lhivens/widget/model/SlotId;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
+}
+
+public final synthetic class hivens/widget/model/SlotId$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lhivens/widget/model/SlotId$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun deserialize-q5dM6Zc (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/String;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public final fun serialize-BYtZEss (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/String;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class hivens/widget/model/SlotId$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class hivens/widget/model/SlotPath {
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun child-BYtZEss (Ljava/lang/String;Ljava/lang/String;)Lhivens/widget/model/SlotPath;
+	public final fun component1-eg-a43s ()Ljava/lang/String;
+	public final fun component2-L9LzkC8 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/util/List;
+	public final fun component4-zSLUku4 ()Ljava/lang/String;
+	public final fun copy-Qa0KMVA (Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;)Lhivens/widget/model/SlotPath;
+	public static synthetic fun copy-Qa0KMVA$default (Lhivens/widget/model/SlotPath;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;ILjava/lang/Object;)Lhivens/widget/model/SlotPath;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getFamily-zSLUku4 ()Ljava/lang/String;
+	public final fun getLeafAddress ()Lhivens/widget/model/SlotAddress;
+	public final fun getLeafSlot-L9LzkC8 ()Ljava/lang/String;
+	public final fun getNested ()Ljava/util/List;
+	public final fun getParentPath ()Lhivens/widget/model/SlotPath;
+	public final fun getRootSlot-L9LzkC8 ()Ljava/lang/String;
+	public final fun getSurface-eg-a43s ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/widget/model/SlotPathKt {
+	public static final fun toPath (Lhivens/widget/model/SlotAddress;)Lhivens/widget/model/SlotPath;
+}
+
+public final class hivens/widget/model/SourceKey {
+	public fun <init> (Ljava/lang/String;Lhivens/widget/model/ScopeLevel;)V
+	public synthetic fun <init> (Ljava/lang/String;Lhivens/widget/model/ScopeLevel;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getId ()Ljava/lang/String;
+	public final fun getLevel ()Lhivens/widget/model/ScopeLevel;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/widget/model/SurfaceBorder {
+	public static final field Companion Lhivens/widget/model/SurfaceBorder$Companion;
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/Float;Ljava/lang/String;Ljava/lang/Float;)V
+	public synthetic fun <init> (Ljava/lang/Float;Ljava/lang/String;Ljava/lang/Float;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/Float;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/Float;
+	public final fun copy (Ljava/lang/Float;Ljava/lang/String;Ljava/lang/Float;)Lhivens/widget/model/SurfaceBorder;
+	public static synthetic fun copy$default (Lhivens/widget/model/SurfaceBorder;Ljava/lang/Float;Ljava/lang/String;Ljava/lang/Float;ILjava/lang/Object;)Lhivens/widget/model/SurfaceBorder;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getColor ()Ljava/lang/String;
+	public final fun getOpacity ()Ljava/lang/Float;
+	public final fun getWidthDp ()Ljava/lang/Float;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class hivens/widget/model/SurfaceBorder$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lhivens/widget/model/SurfaceBorder$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lhivens/widget/model/SurfaceBorder;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lhivens/widget/model/SurfaceBorder;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class hivens/widget/model/SurfaceBorder$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class hivens/widget/model/SurfaceCorners {
+	public static final field Companion Lhivens/widget/model/SurfaceCorners$Companion;
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/Float;Ljava/lang/Float;Ljava/lang/Float;Ljava/lang/Float;Ljava/lang/Float;)V
+	public synthetic fun <init> (Ljava/lang/Float;Ljava/lang/Float;Ljava/lang/Float;Ljava/lang/Float;Ljava/lang/Float;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun bottomEnd (F)F
+	public final fun bottomStart (F)F
+	public final fun component1 ()Ljava/lang/Float;
+	public final fun component2 ()Ljava/lang/Float;
+	public final fun component3 ()Ljava/lang/Float;
+	public final fun component4 ()Ljava/lang/Float;
+	public final fun component5 ()Ljava/lang/Float;
+	public final fun copy (Ljava/lang/Float;Ljava/lang/Float;Ljava/lang/Float;Ljava/lang/Float;Ljava/lang/Float;)Lhivens/widget/model/SurfaceCorners;
+	public static synthetic fun copy$default (Lhivens/widget/model/SurfaceCorners;Ljava/lang/Float;Ljava/lang/Float;Ljava/lang/Float;Ljava/lang/Float;Ljava/lang/Float;ILjava/lang/Object;)Lhivens/widget/model/SurfaceCorners;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAll ()Ljava/lang/Float;
+	public final fun getBottomEnd ()Ljava/lang/Float;
+	public final fun getBottomStart ()Ljava/lang/Float;
+	public final fun getTopEnd ()Ljava/lang/Float;
+	public final fun getTopStart ()Ljava/lang/Float;
+	public fun hashCode ()I
+	public final fun isUniform (F)Z
+	public fun toString ()Ljava/lang/String;
+	public final fun topEnd (F)F
+	public final fun topStart (F)F
+}
+
+public final synthetic class hivens/widget/model/SurfaceCorners$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lhivens/widget/model/SurfaceCorners$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lhivens/widget/model/SurfaceCorners;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lhivens/widget/model/SurfaceCorners;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class hivens/widget/model/SurfaceCorners$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class hivens/widget/model/SurfaceId {
+	public static final field Companion Lhivens/widget/model/SurfaceId$Companion;
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lhivens/widget/model/SurfaceId;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
+}
+
+public final synthetic class hivens/widget/model/SurfaceId$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lhivens/widget/model/SurfaceId$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun deserialize-tAZVOQg (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/String;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public final fun serialize-XFPuj1E (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/String;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class hivens/widget/model/SurfaceId$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class hivens/widget/model/SurfaceInsets {
+	public static final field Companion Lhivens/widget/model/SurfaceInsets$Companion;
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/Float;Ljava/lang/Float;Ljava/lang/Float;Ljava/lang/Float;Ljava/lang/Float;)V
+	public synthetic fun <init> (Ljava/lang/Float;Ljava/lang/Float;Ljava/lang/Float;Ljava/lang/Float;Ljava/lang/Float;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun bottom (F)F
+	public final fun component1 ()Ljava/lang/Float;
+	public final fun component2 ()Ljava/lang/Float;
+	public final fun component3 ()Ljava/lang/Float;
+	public final fun component4 ()Ljava/lang/Float;
+	public final fun component5 ()Ljava/lang/Float;
+	public final fun copy (Ljava/lang/Float;Ljava/lang/Float;Ljava/lang/Float;Ljava/lang/Float;Ljava/lang/Float;)Lhivens/widget/model/SurfaceInsets;
+	public static synthetic fun copy$default (Lhivens/widget/model/SurfaceInsets;Ljava/lang/Float;Ljava/lang/Float;Ljava/lang/Float;Ljava/lang/Float;Ljava/lang/Float;ILjava/lang/Object;)Lhivens/widget/model/SurfaceInsets;
+	public final fun end (F)F
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAll ()Ljava/lang/Float;
+	public final fun getBottom ()Ljava/lang/Float;
+	public final fun getEnd ()Ljava/lang/Float;
+	public final fun getStart ()Ljava/lang/Float;
+	public final fun getTop ()Ljava/lang/Float;
+	public fun hashCode ()I
+	public final fun start (F)F
+	public fun toString ()Ljava/lang/String;
+	public final fun top (F)F
+}
+
+public final synthetic class hivens/widget/model/SurfaceInsets$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lhivens/widget/model/SurfaceInsets$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lhivens/widget/model/SurfaceInsets;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lhivens/widget/model/SurfaceInsets;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class hivens/widget/model/SurfaceInsets$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class hivens/widget/model/SurfaceLayout {
+	public static final field Companion Lhivens/widget/model/SurfaceLayout$Companion;
+	public fun <init> ()V
+	public fun <init> (Ljava/util/Map;)V
+	public synthetic fun <init> (Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun allSlots ()Lkotlin/sequences/Sequence;
+	public final fun component1 ()Ljava/util/Map;
+	public final fun copy (Ljava/util/Map;)Lhivens/widget/model/SurfaceLayout;
+	public static synthetic fun copy$default (Lhivens/widget/model/SurfaceLayout;Ljava/util/Map;ILjava/lang/Object;)Lhivens/widget/model/SurfaceLayout;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun family-ot1u5ZU (Ljava/lang/String;)Lhivens/widget/model/FamilyLayout;
+	public final fun getFamilies ()Ljava/util/Map;
+	public fun hashCode ()I
+	public final fun mapFamilies (Lkotlin/jvm/functions/Function1;)Lhivens/widget/model/SurfaceLayout;
+	public final fun slotsOf-ot1u5ZU (Ljava/lang/String;)Ljava/util/Map;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class hivens/widget/model/SurfaceLayout$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lhivens/widget/model/SurfaceLayout$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lhivens/widget/model/SurfaceLayout;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lhivens/widget/model/SurfaceLayout;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class hivens/widget/model/SurfaceLayout$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class hivens/widget/model/SurfaceShape {
+	public static final field Companion Lhivens/widget/model/SurfaceShape$Companion;
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/String;Lhivens/widget/model/SurfaceCorners;Ljava/lang/Float;Ljava/lang/Integer;Ljava/lang/Float;Ljava/lang/Float;)V
+	public synthetic fun <init> (Ljava/lang/String;Lhivens/widget/model/SurfaceCorners;Ljava/lang/Float;Ljava/lang/Integer;Ljava/lang/Float;Ljava/lang/Float;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Lhivens/widget/model/SurfaceCorners;
+	public final fun component3 ()Ljava/lang/Float;
+	public final fun component4 ()Ljava/lang/Integer;
+	public final fun component5 ()Ljava/lang/Float;
+	public final fun component6 ()Ljava/lang/Float;
+	public final fun copy (Ljava/lang/String;Lhivens/widget/model/SurfaceCorners;Ljava/lang/Float;Ljava/lang/Integer;Ljava/lang/Float;Ljava/lang/Float;)Lhivens/widget/model/SurfaceShape;
+	public static synthetic fun copy$default (Lhivens/widget/model/SurfaceShape;Ljava/lang/String;Lhivens/widget/model/SurfaceCorners;Ljava/lang/Float;Ljava/lang/Integer;Ljava/lang/Float;Ljava/lang/Float;ILjava/lang/Object;)Lhivens/widget/model/SurfaceShape;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCorners ()Lhivens/widget/model/SurfaceCorners;
+	public final fun getInnerRadius ()Ljava/lang/Float;
+	public final fun getKind ()Ljava/lang/String;
+	public final fun getPointRounding ()Ljava/lang/Float;
+	public final fun getPoints ()Ljava/lang/Integer;
+	public final fun getSmoothing ()Ljava/lang/Float;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class hivens/widget/model/SurfaceShape$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lhivens/widget/model/SurfaceShape$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lhivens/widget/model/SurfaceShape;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lhivens/widget/model/SurfaceShape;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class hivens/widget/model/SurfaceShape$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class hivens/widget/model/SurfaceSpec {
+	public static final field Companion Lhivens/widget/model/SurfaceSpec$Companion;
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/String;Ljava/lang/Float;Ljava/lang/Float;Lhivens/widget/model/SurfaceShape;Lhivens/widget/model/SurfaceBorder;Ljava/lang/Float;Lhivens/widget/model/SurfaceInsets;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/Float;Ljava/lang/Float;Lhivens/widget/model/SurfaceShape;Lhivens/widget/model/SurfaceBorder;Ljava/lang/Float;Lhivens/widget/model/SurfaceInsets;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/Float;
+	public final fun component3 ()Ljava/lang/Float;
+	public final fun component4 ()Lhivens/widget/model/SurfaceShape;
+	public final fun component5 ()Lhivens/widget/model/SurfaceBorder;
+	public final fun component6 ()Ljava/lang/Float;
+	public final fun component7 ()Lhivens/widget/model/SurfaceInsets;
+	public final fun copy (Ljava/lang/String;Ljava/lang/Float;Ljava/lang/Float;Lhivens/widget/model/SurfaceShape;Lhivens/widget/model/SurfaceBorder;Ljava/lang/Float;Lhivens/widget/model/SurfaceInsets;)Lhivens/widget/model/SurfaceSpec;
+	public static synthetic fun copy$default (Lhivens/widget/model/SurfaceSpec;Ljava/lang/String;Ljava/lang/Float;Ljava/lang/Float;Lhivens/widget/model/SurfaceShape;Lhivens/widget/model/SurfaceBorder;Ljava/lang/Float;Lhivens/widget/model/SurfaceInsets;ILjava/lang/Object;)Lhivens/widget/model/SurfaceSpec;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBlurDp ()Ljava/lang/Float;
+	public final fun getBorder ()Lhivens/widget/model/SurfaceBorder;
+	public final fun getFill ()Ljava/lang/String;
+	public final fun getOpacity ()Ljava/lang/Float;
+	public final fun getPadding ()Lhivens/widget/model/SurfaceInsets;
+	public final fun getShadowDp ()Ljava/lang/Float;
+	public final fun getShape ()Lhivens/widget/model/SurfaceShape;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class hivens/widget/model/SurfaceSpec$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lhivens/widget/model/SurfaceSpec$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lhivens/widget/model/SurfaceSpec;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lhivens/widget/model/SurfaceSpec;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class hivens/widget/model/SurfaceSpec$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class hivens/widget/model/SurfaceSpecKt {
+	public static final fun getSURFACE_WORDS ()Ljava/util/List;
+	public static final fun parseFill (Ljava/lang/String;)Lhivens/widget/model/FillSource;
+}
+
+public final class hivens/widget/model/ViewportKt {
+	public static final fun getLatticeTransposed (Lhivens/widget/model/SlotContent;)Z
+	public static final fun getViewportMode (Lhivens/widget/model/SlotContent;)Lhivens/widget/model/ViewportMode;
+}
+
+public abstract interface class hivens/widget/model/ViewportMode {
+}
+
+public final class hivens/widget/model/ViewportMode$Map : hivens/widget/model/ViewportMode {
+	public static final field INSTANCE Lhivens/widget/model/ViewportMode$Map;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/widget/model/ViewportMode$Scroll : hivens/widget/model/ViewportMode {
+	public fun <init> (ZZ)V
+	public synthetic fun <init> (ZZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Z
+	public final fun component2 ()Z
+	public final fun copy (ZZ)Lhivens/widget/model/ViewportMode$Scroll;
+	public static synthetic fun copy$default (Lhivens/widget/model/ViewportMode$Scroll;ZZILjava/lang/Object;)Lhivens/widget/model/ViewportMode$Scroll;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getHorizontal ()Z
+	public final fun getPaged ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/widget/model/ViewportMode$Static : hivens/widget/model/ViewportMode {
+	public static final field INSTANCE Lhivens/widget/model/ViewportMode$Static;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/widget/model/ViewportSpec {
+	public static final field Companion Lhivens/widget/model/ViewportSpec$Companion;
+	public static final field HORIZONTAL Ljava/lang/String;
+	public static final field MAP Ljava/lang/String;
+	public static final field PAGES Ljava/lang/String;
+	public static final field SCROLL Ljava/lang/String;
+	public static final field STATIC Ljava/lang/String;
+	public static final field VERTICAL Ljava/lang/String;
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Z)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Z
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Z)Lhivens/widget/model/ViewportSpec;
+	public static synthetic fun copy$default (Lhivens/widget/model/ViewportSpec;Ljava/lang/String;Ljava/lang/String;ZILjava/lang/Object;)Lhivens/widget/model/ViewportSpec;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAxis ()Ljava/lang/String;
+	public final fun getKind ()Ljava/lang/String;
+	public final fun getMode ()Lhivens/widget/model/ViewportMode;
+	public final fun getScrollbar ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class hivens/widget/model/ViewportSpec$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lhivens/widget/model/ViewportSpec$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lhivens/widget/model/ViewportSpec;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lhivens/widget/model/ViewportSpec;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class hivens/widget/model/ViewportSpec$Companion {
+	public final fun getMap ()Lhivens/widget/model/ViewportSpec;
+	public final fun getScrollDown ()Lhivens/widget/model/ViewportSpec;
+	public final fun getScrollRight ()Lhivens/widget/model/ViewportSpec;
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public abstract interface annotation class hivens/widget/model/Widget : java/lang/annotation/Annotation {
+	public abstract fun displayName ()Ljava/lang/String;
+	public abstract fun drawsOwnSurface ()Z
+	public abstract fun enter ()Ljava/lang/String;
+	public abstract fun id ()Ljava/lang/String;
+	public abstract fun maxHeight ()I
+	public abstract fun maxWidth ()I
+	public abstract fun minHeight ()I
+	public abstract fun minWidth ()I
+	public abstract fun needs ()[Ljava/lang/String;
+	public abstract fun prefHeight ()I
+	public abstract fun prefWidth ()I
+	public abstract fun propsClass ()Ljava/lang/Class;
+	public abstract fun removable ()Z
+	public abstract fun slots ()[Ljava/lang/String;
+	public abstract fun surface ()Ljava/lang/String;
+}
+
+public abstract interface class hivens/widget/model/WidgetCommand {
+	public abstract fun run (Ljava/lang/Object;)V
+}
+
+public abstract interface class hivens/widget/model/WidgetDataSource {
+	public abstract fun getState ()Lkotlinx/coroutines/flow/StateFlow;
+}
+
+public final class hivens/widget/model/WidgetInstance {
+	public static final field Companion Lhivens/widget/model/WidgetInstance$Companion;
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Ljava/util/Map;Lhivens/widget/model/Placement;Lhivens/widget/model/SurfaceSpec;Lhivens/widget/model/WidgetMotion;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Ljava/util/Map;Lhivens/widget/model/Placement;Lhivens/widget/model/SurfaceSpec;Lhivens/widget/model/WidgetMotion;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-8SAbBEg ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Lkotlinx/serialization/json/JsonObject;
+	public final fun component4 ()Ljava/util/Map;
+	public final fun component5 ()Lhivens/widget/model/Placement;
+	public final fun component6 ()Lhivens/widget/model/SurfaceSpec;
+	public final fun component7 ()Lhivens/widget/model/WidgetMotion;
+	public final fun copy-lKPf3AY (Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Ljava/util/Map;Lhivens/widget/model/Placement;Lhivens/widget/model/SurfaceSpec;Lhivens/widget/model/WidgetMotion;)Lhivens/widget/model/WidgetInstance;
+	public static synthetic fun copy-lKPf3AY$default (Lhivens/widget/model/WidgetInstance;Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Ljava/util/Map;Lhivens/widget/model/Placement;Lhivens/widget/model/SurfaceSpec;Lhivens/widget/model/WidgetMotion;ILjava/lang/Object;)Lhivens/widget/model/WidgetInstance;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getChildren ()Ljava/util/Map;
+	public final fun getInstanceId ()Ljava/lang/String;
+	public final fun getKind-8SAbBEg ()Ljava/lang/String;
+	public final fun getMotion ()Lhivens/widget/model/WidgetMotion;
+	public final fun getPlacement ()Lhivens/widget/model/Placement;
+	public final fun getProps ()Lkotlinx/serialization/json/JsonObject;
+	public final fun getSurface ()Lhivens/widget/model/SurfaceSpec;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class hivens/widget/model/WidgetInstance$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lhivens/widget/model/WidgetInstance$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lhivens/widget/model/WidgetInstance;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lhivens/widget/model/WidgetInstance;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class hivens/widget/model/WidgetInstance$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class hivens/widget/model/WidgetKind {
+	public static final field Companion Lhivens/widget/model/WidgetKind$Companion;
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lhivens/widget/model/WidgetKind;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
+}
+
+public final synthetic class hivens/widget/model/WidgetKind$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lhivens/widget/model/WidgetKind$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun deserialize-g-hn6xA (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/String;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public final fun serialize-6LNcxko (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/String;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class hivens/widget/model/WidgetKind$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class hivens/widget/model/WidgetMotion {
+	public static final field Companion Lhivens/widget/model/WidgetMotion$Companion;
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/String;Ljava/lang/Integer;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/Integer;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/Integer;
+	public final fun copy (Ljava/lang/String;Ljava/lang/Integer;)Lhivens/widget/model/WidgetMotion;
+	public static synthetic fun copy$default (Lhivens/widget/model/WidgetMotion;Ljava/lang/String;Ljava/lang/Integer;ILjava/lang/Object;)Lhivens/widget/model/WidgetMotion;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDelayMs ()Ljava/lang/Integer;
+	public final fun getEnter ()Ljava/lang/String;
+	public fun hashCode ()I
+	public final fun isEmpty ()Z
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class hivens/widget/model/WidgetMotion$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lhivens/widget/model/WidgetMotion$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lhivens/widget/model/WidgetMotion;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lhivens/widget/model/WidgetMotion;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class hivens/widget/model/WidgetMotion$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public abstract interface class hivens/widget/model/WidgetService {
+}
+
+public final class hivens/widget/model/WidgetSizing {
+	public static final field Companion Lhivens/widget/model/WidgetSizing$Companion;
+	public fun <init> ()V
+	public fun <init> (IIIIII)V
+	public synthetic fun <init> (IIIIIIILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun boundHeight (F)F
+	public final fun boundWidth (F)F
+	public final fun component1 ()I
+	public final fun component2 ()I
+	public final fun component3 ()I
+	public final fun component4 ()I
+	public final fun component5 ()I
+	public final fun component6 ()I
+	public final fun copy (IIIIII)Lhivens/widget/model/WidgetSizing;
+	public static synthetic fun copy$default (Lhivens/widget/model/WidgetSizing;IIIIIIILjava/lang/Object;)Lhivens/widget/model/WidgetSizing;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getMaxHeight ()I
+	public final fun getMaxWidth ()I
+	public final fun getMinHeight ()I
+	public final fun getMinWidth ()I
+	public final fun getPrefHeight ()I
+	public final fun getPrefWidth ()I
+	public final fun getUndeclared ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/widget/model/WidgetSizing$Companion {
+	public final fun getUNDECLARED ()Lhivens/widget/model/WidgetSizing;
+}
+

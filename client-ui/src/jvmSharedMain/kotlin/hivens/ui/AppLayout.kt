@@ -11,8 +11,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import hivens.core.data.SessionData
 import hivens.core.data.ThemeMode
-import hivens.core.security.SslBypassStore
-import hivens.launcher.network.ServerProtocolConfig
 import hivens.ui.background.BackgroundSettings
 import hivens.ui.chrome.LocalWindowClass
 import hivens.ui.chrome.rememberWindowClass
@@ -45,24 +43,27 @@ import hivens.ui.widgets.about.AboutSurface
 import hivens.ui.widgets.bgsettings.BgSettingsSurface
 import hivens.ui.widgets.profile.ProfileSurface
 import hivens.ui.widgets.wardrobe.WardrobeSurface
-import hivens.ui.widgets.shell.LeftRailContext
-import hivens.ui.widgets.shell.LocalLeftRailContext
-import hivens.ui.widgets.shell.LocalShellContext
-import hivens.ui.widgets.shell.ShellContext
+import hivens.ui.widgets.shell.LocalCenterBody
 import hivens.ui.widgets.themepicker.ThemePickerSurface
 import hivens.ui.feature.catalogue.project.LocalLinkFollower
 import hivens.ui.feature.catalogue.project.ModDetailScreen
 import hivens.ui.feature.catalogue.project.rememberNavigatingLinkFollower
 import hivens.ui.feature.catalogue.project.ModVersionScreen
 import hivens.ui.screens.custom.CustomScreen
-import hivens.ui.widgets.home.new.HomeNewContext
-import hivens.ui.widgets.home.new.LocalHomeNewContext
+import hivens.ui.navigation.NavState
 import hivens.ui.widgets.ChildLevel
+import hivens.ui.widgets.Commands
 import hivens.ui.widgets.LevelHost
+import hivens.ui.widgets.MisplacedWidget
+import hivens.ui.widgets.Sources
 import hivens.widget.api.LocalLayoutGraph
+import hivens.widget.api.LocalMisplacedWidget
 import hivens.widget.api.LocalScope
 import hivens.widget.api.PageLevels
+import hivens.widget.api.ProvideScoped
+import hivens.widget.api.ProvideScopedCommand
 import hivens.widget.api.SlotRenderer
+import hivens.widget.api.rememberLatestCommand
 import hivens.widget.model.ScopeLevel
 import hivens.widget.model.SlotId
 import hivens.widget.model.SurfaceId
@@ -102,7 +103,6 @@ fun AppLayout(
     customization: CustomizationSettings = CustomizationSettings(),
     onCustomizationChanged: (CustomizationSettings) -> Unit = {},
 ) {
-    val protocolConfig: ServerProtocolConfig = koinInject()
     val windowClass = rememberWindowClass()
     val browse: BrowseController = koinInject()
 
@@ -118,11 +118,6 @@ fun AppLayout(
     val overWallpaper = backgroundSettings.hasUsableImage()
     val rowBackground = if (overWallpaper) Color.Transparent else NxColor.page
     val page = Plane(step = 0, color = NxColor.page, over = if (overWallpaper) Backdrop.Wallpaper else Backdrop.Page)
-
-    val bypassHost = protocolConfig.sslBypassHost
-    val bypassStore: SslBypassStore = koinInject()
-    val bypassesList by bypassStore.bypasses.collectAsState()
-    val sslBypass = remember(bypassesList, bypassHost) { bypassStore.isBypassed(bypassHost) }
 
     // The center region's screen router. Defined here (not in the layout graph)
     // because navigation is not yet a widget surface; the center region widget
@@ -156,8 +151,6 @@ fun AppLayout(
                         ProfileSurface(
                             session       = currentSession,
                             authResolving = appState is AppState.Loading,
-                            onLogin       = onLogin,
-                            onLogout      = onLogout,
                         )
 
                     Screen.Wardrobe ->
@@ -174,16 +167,7 @@ fun AppLayout(
                             onOpenAbout                  = { onScreenChange(Screen.About) },
                         )
 
-                    Screen.ThemePicker ->
-                        ThemePickerSurface(
-                            library         = themeLibrary,
-                            isDarkTheme     = isDarkTheme,
-                            onThemeSelected = { id ->
-                                onThemeSelected(id)
-                                onBack()
-                            },
-                            onBack          = onBack,
-                        )
+                    Screen.ThemePicker -> ThemePickerSurface(library = themeLibrary)
 
                     Screen.About ->
                         AboutSurface(onBack = onBack)
@@ -206,25 +190,11 @@ fun AppLayout(
                             onOpenThemePicker = { onScreenChange(Screen.ThemePicker) },
                         )
 
-                    Screen.Library -> LibraryScreen(
-                        appState       = appState,
-                        onScreenChange = onScreenChange,
-                    )
+                    Screen.Library -> LibraryScreen(onScreenChange = onScreenChange)
 
-                    Screen.Browse  -> BrowseScreen(
-                        onOpenPack = { pack ->
-                            onScreenChange(Screen.CataloguePackDetail(pack.origin, pack.id))
-                        },
-                        onOpenProject = { onScreenChange(Screen.ModDetail(it)) },
-                    )
+                    Screen.Browse  -> BrowseScreen()
 
-                    is Screen.BrowseInto -> BrowseScreen(
-                        onOpenPack = { pack ->
-                            onScreenChange(Screen.CataloguePackDetail(pack.origin, pack.id))
-                        },
-                        onOpenProject = { onScreenChange(Screen.ModDetail(it)) },
-                        intoInstanceId = screen.instanceId,
-                    )
+                    is Screen.BrowseInto -> BrowseScreen(intoInstanceId = screen.instanceId)
 
                     is Screen.CataloguePackDetail ->
                         CataloguePackDetailScreen(
@@ -290,38 +260,34 @@ fun AppLayout(
         }
     } // end centerBody
 
-    val shellCtx = ShellContext(
-        currentScreen   = currentScreen,
-        isAuthenticated = appState is AppState.Authenticated,
-        onScreenChange  = onScreenChange,
-        onSwitchTab     = onSwitchTab,
-        onLogout        = onLogout,
-        appState        = appState,
-        onLogin         = onLogin,
-        sslBypass       = sslBypass,
-        centerBody      = centerBody,
-        trail           = trail,
-        canGoBack       = canGoBack,
-        canGoForward    = canGoForward,
-        onBack          = onBack,
-        onForward       = onForward,
-        onPopTo         = onPopTo,
-    )
-
+    // The composition's level, around everything it draws, the editor included.
+    ChildLevel(ScopeLevel.Composition) {
+    // What this composition's widgets read and fire: its history, who it is signed in
+    // as, the themes it draws with. Put over its level around the editor too, so a
+    // widget the palette draws reads the same answers as one on a surface, and a
+    // widget anywhere in the shell finds them, where a context provided by one screen
+    // pinned its widgets to that screen.
+    ProvideComposition(
+        nav          = NavState(currentScreen, trail, canGoBack, canGoForward),
+        appState     = appState,
+        themeLibrary = themeLibrary,
+        isDarkTheme  = isDarkTheme,
+        navigate     = onScreenChange,
+        switchTab    = onSwitchTab,
+        back         = onBack,
+        forward      = onForward,
+        popTo        = onPopTo,
+        signIn       = onLogin,
+        signOut      = onLogout,
+        applyTheme   = { id ->
+            onThemeSelected(id)
+            onBack()
+        },
+    ) {
     // The editor host wraps the WHOLE shell (rails included) so its decorators
     // reach rail widgets; it puts its own chrome back over the content pane from
     // what the centre region reports. The shell itself is a widget surface:
     // appshell.root lays its three region widgets in a Row.
-    // What Home's widgets read, provided around the whole shell rather than by the
-    // Home screen alone. Both halves are the shell's anyway, and provided only on
-    // Home they pinned every one of those widgets there: dropped on a screen
-    // somebody made, they read a context nobody had provided and took the shell down.
-    val homeCtx = remember(appState, onScreenChange) {
-        HomeNewContext(appState = appState, onScreenChange = onScreenChange)
-    }
-
-    // The composition's level, around everything it draws, the editor included.
-    ChildLevel(ScopeLevel.Composition) {
     EditorSurfaceHost(
         currentScreen          = currentScreen,
         customization          = customization,
@@ -333,8 +299,7 @@ fun AppLayout(
         // at the shell rather than per surface, so a markdown body, a page header and
         // a rail widget follow the same rule.
         CompositionLocalProvider(
-            LocalShellContext provides shellCtx,
-            LocalHomeNewContext provides homeCtx,
+            LocalCenterBody provides centerBody,
             LocalLinkFollower provides rememberNavigatingLinkFollower(),
             LocalCatalogueSearch provides rememberShellCatalogueSearch(currentScreen, onScreenChange),
             LocalPlane provides page,
@@ -347,7 +312,68 @@ fun AppLayout(
             )
         }
     }
+    } // end ProvideComposition
     } // end ChildLevel(Composition)
+}
+
+/**
+ * Puts the composition's own sources and commands over its level for [content]:
+ * the keys [Sources] and [Commands] declare at the composition level. Each command is
+ * one object for the composition's life that runs the latest lambda it was handed,
+ * so a reader does not recompose because the shell did.
+ *
+ * Widgets that cannot stand without one of them draw the placeholder for a widget
+ * that stands where something it reads has no answer, which is also put here.
+ */
+@Composable
+private fun ProvideComposition(
+    nav: NavState,
+    appState: AppState,
+    themeLibrary: ThemeLibrary,
+    isDarkTheme: Boolean,
+    navigate: (Screen) -> Unit,
+    switchTab: (Screen) -> Unit,
+    back: () -> Unit,
+    forward: () -> Unit,
+    popTo: (Screen) -> Unit,
+    signIn: (SessionData) -> Unit,
+    signOut: () -> Unit,
+    applyTheme: (String) -> Unit,
+    content: @Composable () -> Unit,
+) {
+    val navigateCommand = rememberLatestCommand(navigate)
+    val switchTabCommand = rememberLatestCommand(switchTab)
+    val backCommand = rememberLatestCommand<Unit> { back() }
+    val forwardCommand = rememberLatestCommand<Unit> { forward() }
+    val popToCommand = rememberLatestCommand(popTo)
+    val signInCommand = rememberLatestCommand(signIn)
+    val signOutCommand = rememberLatestCommand<Unit> { signOut() }
+    val applyThemeCommand = rememberLatestCommand(applyTheme)
+    ProvideScoped(Sources.Navigation, nav) {
+    ProvideScoped(Sources.Session, appState) {
+    ProvideScoped(Sources.ThemeLibrary, themeLibrary) {
+    ProvideScoped(Sources.DarkTheme, isDarkTheme) {
+    ProvideScopedCommand(Commands.Navigate, navigateCommand) {
+    ProvideScopedCommand(Commands.SwitchTab, switchTabCommand) {
+    ProvideScopedCommand(Commands.Back, backCommand) {
+    ProvideScopedCommand(Commands.Forward, forwardCommand) {
+    ProvideScopedCommand(Commands.PopTo, popToCommand) {
+    ProvideScopedCommand(Commands.SignIn, signInCommand) {
+    ProvideScopedCommand(Commands.SignOut, signOutCommand) {
+    ProvideScopedCommand(Commands.ApplyTheme, applyThemeCommand) {
+        CompositionLocalProvider(LocalMisplacedWidget provides MisplacedWidget, content = content)
+    }
+    }
+    }
+    }
+    }
+    }
+    }
+    }
+    }
+    }
+    }
+    }
 }
 
 /**
@@ -376,9 +402,7 @@ private fun Destination(
 
 @Composable
 fun AppSidebar(
-    currentScreen: Screen,
     isAuthenticated: Boolean,
-    onScreenChange: (Screen) -> Unit,
     onSwitchTab: (Screen) -> Unit,
     onLogout: () -> Unit,
     modifier: Modifier = Modifier.width(64.dp).fillMaxHeight(),
@@ -407,44 +431,33 @@ fun AppSidebar(
         key(spec.id) { PuppetClick("nav.screen.${spec.id}") { onSwitchTab(Screen.Custom(spec.id)) } }
     }
 
-    val ctx = remember(currentScreen, isAuthenticated, onScreenChange, onSwitchTab, onLogout) {
-        LeftRailContext(
-            currentScreen   = currentScreen,
-            isAuthenticated = isAuthenticated,
-            onScreenChange  = onScreenChange,
-            onSwitchTab     = onSwitchTab,
-            onLogout        = onLogout,
-        )
-    }
-    CompositionLocalProvider(LocalLeftRailContext provides ctx) {
-        NavigationRail(
-            modifier       = modifier,
-            // Transparent: the rail's NxSurface wrapper (ShellLeftRegion) owns the
-            // background now, so its own opacity and blur drive the matte.
-            containerColor = Color.Transparent,
-            contentColor   = NxInk.quiet,
-            // The rail's own system insets would stack on the ones the region already applies.
-            windowInsets   = WindowInsets(0.dp),
-        ) {
-            // Items sit flush (spacing 0) so the rail is one contiguous column
-            // of clickable slots with no dead gap between buttons. Each NavSlot
-            // is taller than its icon and centers it, so the breathing room is
-            // the slot's own padding -- and stays clickable. No leading spacer
-            // for the same reason; fillMaxWidth keeps the slot's Column at rail
-            // width so items center.
-            // Scrolls when the window is shorter than the rail's content, which a phone held
-            // sideways is: the bottom group was cut off with no way to reach it. When it fits,
-            // the minimum height keeps the top group up and the bottom group down as before.
-            BoxWithConstraints(Modifier.fillMaxSize()) {
-                Column(
-                    Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).heightIn(min = maxHeight),
-                    verticalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    SlotRenderer(SurfaceId(SIDEBAR_SURFACE), SlotId("top"), Modifier.fillMaxWidth(), spacing = 0.dp)
-                    Column(Modifier.fillMaxWidth()) {
-                        SlotRenderer(SurfaceId(SIDEBAR_SURFACE), SlotId("bottom"), Modifier.fillMaxWidth(), spacing = 0.dp)
-                        Spacer(Modifier.height(8.dp))
-                    }
+    NavigationRail(
+        modifier       = modifier,
+        // Transparent: the rail's NxSurface wrapper (ShellLeftRegion) owns the
+        // background now, so its own opacity and blur drive the matte.
+        containerColor = Color.Transparent,
+        contentColor   = NxInk.quiet,
+        // The rail's own system insets would stack on the ones the region already applies.
+        windowInsets   = WindowInsets(0.dp),
+    ) {
+        // Items sit flush (spacing 0) so the rail is one contiguous column
+        // of clickable slots with no dead gap between buttons. Each NavSlot
+        // is taller than its icon and centers it, so the breathing room is
+        // the slot's own padding -- and stays clickable. No leading spacer
+        // for the same reason; fillMaxWidth keeps the slot's Column at rail
+        // width so items center.
+        // Scrolls when the window is shorter than the rail's content, which a phone held
+        // sideways is: the bottom group was cut off with no way to reach it. When it fits,
+        // the minimum height keeps the top group up and the bottom group down as before.
+        BoxWithConstraints(Modifier.fillMaxSize()) {
+            Column(
+                Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).heightIn(min = maxHeight),
+                verticalArrangement = Arrangement.SpaceBetween,
+            ) {
+                SlotRenderer(SurfaceId(SIDEBAR_SURFACE), SlotId("top"), Modifier.fillMaxWidth(), spacing = 0.dp)
+                Column(Modifier.fillMaxWidth()) {
+                    SlotRenderer(SurfaceId(SIDEBAR_SURFACE), SlotId("bottom"), Modifier.fillMaxWidth(), spacing = 0.dp)
+                    Spacer(Modifier.height(8.dp))
                 }
             }
         }

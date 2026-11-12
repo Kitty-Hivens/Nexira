@@ -4,7 +4,7 @@ import androidx.compose.runtime.Composable
 import hivens.ui.i18n.LocalStrings
 import hivens.widget.model.Widget
 
-@Widget(id = "bg.position.y", displayName = "widget.bg.position.y")
+@Widget(id = "bg.position.y", displayName = "widget.bg.position.y", needs = ["background.settings", "background.update"])
 @Composable
 fun BgPositionYWidget() {
     val s = LocalStrings.current

@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -22,27 +21,30 @@ import hivens.auth.AuthProviderRegistry
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.nx.NxNavRowContent
 import hivens.ui.puppet.PuppetClick
+import hivens.widget.api.rememberScopedSource
+import hivens.widget.api.valueOrNull
 import hivens.widget.model.Widget
 import org.koin.compose.koinInject
 import hivens.ui.theme.NxColor
 
-// Vertical category nav for the profile surface. Writes
-// `selectedCategory.value` on tap; the surface composable reads it
-// to pick which content slot to render. Removing this widget locks
-// the user on whichever category was last selected -- reset the
-// surface to bring nav back.
+// Vertical category nav for the profile surface. Writes the page's
+// selection on tap, and the surface composable reads it to pick which
+// content slot to render. Removing this widget locks the user on
+// whichever category was last selected, and resetting the surface
+// brings the nav back.
 @Widget(
     id = "profile.nav",
     displayName = "widget.profile.nav",
     minWidth = 150, minHeight = 160,
     maxWidth = 360, maxHeight = 1200,
+    needs = ["profile.category", "app.state", "accounts.revision", "auth.signIn"],
 )
 @Composable
 fun ProfileNavWidget() {
-    val ctx = LocalProfileContext.current
+    val selection = rememberScopedSource(ProfileSelectionSource).valueOrNull() ?: return
     val s = LocalStrings.current
     val authRegistry: AuthProviderRegistry = koinInject()
-    val current by ctx.selectedCategory
+    val current = selection.category
 
     // Microsoft / multi-account is deferred: its category shows only when a client
     // id is configured (the device-code provider registers only then). Without one
@@ -63,7 +65,7 @@ fun ProfileNavWidget() {
             val isSelected = category == current
             val label = category.label(s)
             PuppetClick("profile.category.${category.name}") {
-                ctx.selectedCategory.value = category
+                selection.category = category
             }
             Row(
                 modifier = Modifier
@@ -73,7 +75,7 @@ fun ProfileNavWidget() {
                         if (isSelected) NxColor.lead().copy(alpha = 0.18f)
                         else NxColor.page.copy(alpha = 0.0f),
                     )
-                    .clickable { ctx.selectedCategory.value = category }
+                    .clickable { selection.category = category }
                     .padding(horizontal = 12.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {

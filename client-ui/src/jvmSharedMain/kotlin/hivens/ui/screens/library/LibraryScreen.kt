@@ -27,7 +27,6 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -47,7 +46,6 @@ import hivens.launcher.PackImportService
 import hivens.launcher.PackInstallService
 import hivens.launcher.imports.LocalPackCreator
 import hivens.launcher.runtime.RuntimeProvisioner
-import hivens.ui.AppState
 import hivens.ui.Screen
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
@@ -69,8 +67,6 @@ import hivens.ui.theme.Motion
 import hivens.ui.theme.Dimens
 import hivens.ui.utils.pickFile
 import hivens.ui.utils.rememberFileDialogSettings
-import hivens.ui.widgets.library.LibraryContext
-import hivens.ui.widgets.library.LocalLibraryContext
 import hivens.widget.api.SlotRenderer
 import hivens.widget.model.SlotId
 import hivens.widget.model.SurfaceId
@@ -97,7 +93,6 @@ import hivens.ui.theme.Status
  */
 @Composable
 fun LibraryScreen(
-    appState: AppState,
     onScreenChange: (Screen) -> Unit,
 ) {
     PuppetScreen("Library")
@@ -195,67 +190,62 @@ fun LibraryScreen(
         }
     }
 
-    val ctx = remember(appState, onScreenChange) {
-        LibraryContext(appState = appState, onScreenChange = onScreenChange)
-    }
-    CompositionLocalProvider(LocalLibraryContext provides ctx) {
-        Box(Modifier.fillMaxSize()) {
-            // Centred under the same ceiling Browse uses: past a point the extra
-            // width of a wide monitor stops being room and starts stretching the
-            // rows, which keep their height while their width tracks the window.
-            // Its own Box so the error overlay below keeps its own alignment.
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-                Column(
-                    Modifier.fillMaxHeight()
-                        .widthIn(max = Dimens.contentMaxWidth)
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 20.dp),
-                ) {
-                    SlotRenderer(SurfaceId(SURFACE), SlotId("header"), modifier = Modifier.fillMaxWidth(), spacing = 8.dp)
-                    SlotRenderer(SurfaceId(SURFACE), SlotId("body"), modifier = Modifier.weight(1f).fillMaxWidth(), spacing = 8.dp)
-                }
+    Box(Modifier.fillMaxSize()) {
+        // Centred under the same ceiling Browse uses: past a point the extra
+        // width of a wide monitor stops being room and starts stretching the
+        // rows, which keep their height while their width tracks the window.
+        // Its own Box so the error overlay below keeps its own alignment.
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+            Column(
+                Modifier.fillMaxHeight()
+                    .widthIn(max = Dimens.contentMaxWidth)
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 20.dp),
+            ) {
+                SlotRenderer(SurfaceId(SURFACE), SlotId("header"), modifier = Modifier.fillMaxWidth(), spacing = 8.dp)
+                SlotRenderer(SurfaceId(SURFACE), SlotId("body"), modifier = Modifier.weight(1f).fillMaxWidth(), spacing = 8.dp)
             }
+        }
 
-            (importError ?: createError)?.let { err ->
-                Text(
-                    text = err,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = NxColor.status(Status.Error, text = true),
-                    modifier = Modifier.align(Alignment.BottomStart)
-                        .padding(start = 24.dp, end = 96.dp, bottom = 34.dp)
-                        .clickable {
-                            if (importError != null) {
-                                importKey?.let(installService::dismiss)
-                                importKey = null
-                            } else {
-                                createKey?.let(installService::dismiss)
-                                createKey = null
-                            }
-                        },
-                )
-            }
+        (importError ?: createError)?.let { err ->
+            Text(
+                text = err,
+                style = MaterialTheme.typography.bodySmall,
+                color = NxColor.status(Status.Error, text = true),
+                modifier = Modifier.align(Alignment.BottomStart)
+                    .padding(start = 24.dp, end = 96.dp, bottom = 34.dp)
+                    .clickable {
+                        if (importError != null) {
+                            importKey?.let(installService::dismiss)
+                            importKey = null
+                        } else {
+                            createKey?.let(installService::dismiss)
+                            createKey = null
+                        }
+                    },
+            )
+        }
 
-            Box(Modifier.align(Alignment.BottomEnd).padding(24.dp)) {
-                val lead = NxColor.lead()
-                val onLead = NxColor.on(lead)
-                FloatingActionButton(
-                    onClick = { menuOpen = true },
-                    containerColor = lead,
-                    contentColor = onLead,
-                ) {
-                    if (importing || creating) {
-                        CircularProgressIndicator(color = onLead, strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
-                    } else {
-                        Symbol(NxIcon.Add, contentDescription = s.libraryAddAction)
-                    }
+        Box(Modifier.align(Alignment.BottomEnd).padding(24.dp)) {
+            val lead = NxColor.lead()
+            val onLead = NxColor.on(lead)
+            FloatingActionButton(
+                onClick = { menuOpen = true },
+                containerColor = lead,
+                contentColor = onLead,
+            ) {
+                if (importing || creating) {
+                    CircularProgressIndicator(color = onLead, strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
+                } else {
+                    Symbol(NxIcon.Add, contentDescription = s.libraryAddAction)
                 }
-                NxContextMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                    NxMenuItem(label = s.libraryNewLocalPack, icon = NxIcon.Add) { menuOpen = false; showCreate = true }
-                    NxMenuItem(label = s.libraryImportPack, icon = NxIcon.Download) { menuOpen = false; startImport() }
-                }
-                PuppetClick("library.newLocalPack") { menuOpen = false; showCreate = true }
-                PuppetClick("library.importPack") { menuOpen = false; startImport() }
             }
+            NxContextMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                NxMenuItem(label = s.libraryNewLocalPack, icon = NxIcon.Add) { menuOpen = false; showCreate = true }
+                NxMenuItem(label = s.libraryImportPack, icon = NxIcon.Download) { menuOpen = false; startImport() }
+            }
+            PuppetClick("library.newLocalPack") { menuOpen = false; showCreate = true }
+            PuppetClick("library.importPack") { menuOpen = false; startImport() }
         }
     }
 

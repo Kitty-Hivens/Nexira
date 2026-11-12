@@ -12,6 +12,9 @@ import hivens.ui.components.rememberLaunchControl
 import hivens.ui.nx.PlayButton
 import hivens.ui.nx.PlayGround
 import hivens.ui.nx.PlayLayout
+import hivens.ui.widgets.Sources
+import hivens.widget.api.rememberScopedSource
+import hivens.widget.api.valueOrNull
 import org.koin.compose.koinInject
 
 /**
@@ -36,13 +39,13 @@ internal class QuickLaunchTarget(
  */
 @Composable
 internal fun rememberQuickLaunchTarget(playLabel: String? = null): QuickLaunchTarget? {
-    val ctx = LocalHomeNewContext.current
+    val appState = rememberScopedSource(Sources.Session).valueOrNull() ?: return null
     val repo: IPackRepository = koinInject()
     val all by remember { repo.observe() }.collectAsState()
 
     val target: PackInstance = remember(all) { all.minWithOrNull(RecentFirst) } ?: return null
 
-    return QuickLaunchTarget(target, rememberLaunchControl(target, ctx.appState, playLabel))
+    return QuickLaunchTarget(target, rememberLaunchControl(target, appState, playLabel))
 }
 
 /**

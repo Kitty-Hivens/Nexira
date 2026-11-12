@@ -16,19 +16,30 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
-import hivens.ui.editor.EditorSurfaces
 import hivens.ui.i18n.AppLocale
 import hivens.ui.i18n.LocaleProvider
 import hivens.ui.theme.NxTheme
+import hivens.ui.theme.ThemeLibrary
+import hivens.ui.theme.Themes
+import hivens.ui.widgets.ChildLevel
+import hivens.ui.widgets.Sources
 import hivens.ui.widgets.WidgetSurface
+import hivens.ui.widgets.themepicker.ThemeSelection
+import hivens.ui.widgets.themepicker.ThemeSelectionSource
 import hivens.widget.api.LocalLayoutGraph
+import hivens.widget.api.LocalScope
+import hivens.widget.api.LocalWidgetDataRegistry
 import hivens.widget.api.LocalWidgetRegistry
 import hivens.widget.api.LocalWidgetSurfaceRenderer
+import hivens.widget.api.ProvideScoped
 import hivens.widget.api.SlotRenderer
+import hivens.widget.api.WidgetDataRegistry
 import hivens.widget.api.WidgetDescriptor
 import hivens.widget.api.WidgetRegistry
+import hivens.widget.api.WidgetScope
 import hivens.widget.model.LayoutGraph
 import hivens.widget.model.Placement
+import hivens.widget.model.ScopeLevel
 import hivens.widget.model.SlotContent
 import hivens.widget.model.SlotId
 import hivens.widget.model.SurfaceId
@@ -37,6 +48,9 @@ import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
 import hivens.widget.generated.GeneratedWidgetRegistry
 import hivens.widget.model.WidgetSizing
+import kotlinx.coroutines.Dispatchers
+import org.koin.dsl.koinApplication
+import org.koin.dsl.module
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
@@ -171,6 +185,18 @@ class UnboundedSlotTest {
      * declaration it took the shell down wherever it landed in a slot with no
      * height to give.
      */
+    // What the theme grid reads, declared where the launcher declares it, so the grid
+    // below draws itself rather than the placeholder for a widget missing them.
+    private val data = WidgetDataRegistry().apply {
+        declare(Sources.ThemeLibrary)
+        declare(Sources.DarkTheme)
+        declare(ThemeSelectionSource)
+    }
+
+    private val app: WidgetScope = koinApplication {
+        modules(module { single { WidgetScope.app(data, this, Dispatchers.Unconfined) } })
+    }.koin.get()
+
     private fun renderReal(kind: WidgetKind): Result<Unit> {
         val content = SlotContent(
             widgets = listOf(WidgetInstance(kind = kind, instanceId = "real", placement = Placement())),
@@ -186,10 +212,21 @@ class UnboundedSlotTest {
                             LocalLayoutGraph provides graph,
                             LocalWidgetRegistry provides GeneratedWidgetRegistry,
                             LocalWidgetSurfaceRenderer provides { spec, inner -> WidgetSurface(spec, inner) },
-                            *EditorSurfaces.stubs,
+                            LocalWidgetDataRegistry provides data,
+                            LocalScope provides app,
                         ) {
-                            Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-                                SlotRenderer(surface, slot, Modifier.fillMaxWidth())
+                            ChildLevel(ScopeLevel.Composition) {
+                                ChildLevel(ScopeLevel.Page) {
+                                    ProvideScoped(Sources.ThemeLibrary, ThemeLibrary()) {
+                                        ProvideScoped(Sources.DarkTheme, true) {
+                                            ProvideScoped(ThemeSelectionSource, ThemeSelection(Themes.default)) {
+                                                Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                                                    SlotRenderer(surface, slot, Modifier.fillMaxWidth())
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }

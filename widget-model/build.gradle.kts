@@ -1,4 +1,5 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.dsl.abi.ExperimentalAbiValidation
 
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
@@ -18,6 +19,12 @@ kotlin {
     // KMP modules don't apply the `java` plugin, so the root's toolchain pin
     // skips them; set it here so org.gradle.jvm.version matches the JDK 27 modules.
     jvmToolchain(27)
+
+    // Part of what a module jar is compiled against, so its public surface is
+    // checked against the dump in api/ the way :widget-api's is.
+    @OptIn(ExperimentalAbiValidation::class)
+    abiValidation()
+
     jvm()
     android {
         namespace = "hivens.widget.model"

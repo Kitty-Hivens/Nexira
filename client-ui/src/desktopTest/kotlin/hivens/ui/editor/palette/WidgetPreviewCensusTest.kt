@@ -9,7 +9,6 @@ import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
-import hivens.ui.editor.EditorSurfaces
 import hivens.ui.i18n.AppLocale
 import hivens.ui.i18n.LocaleProvider
 import hivens.ui.widgets.WidgetSurface
@@ -73,11 +72,12 @@ class WidgetPreviewCensusTest {
     /**
      * What a preview scene can reasonably be handed.
      *
-     * The registries and the graph a surface would have, the stub surface contexts
-     * the editor already keeps for a widget dragged somewhere foreign, and a slot
-     * path, which several widgets read and which errors when absent. Everything
-     * here is cheap and process-local. What is NOT here is the part that costs:
-     * live services behind Koin, and any data a widget draws from.
+     * The registries and the graph a surface would have, and a slot path, which
+     * several widgets read and which errors when absent. Everything here is cheap
+     * and process-local. What is NOT here is the part that costs: live services
+     * behind Koin, any data a widget draws from, and the scope tree a widget reads
+     * its composition's and its page's keys from. A widget that needs one of those
+     * declines to draw, which the census counts as blank.
      */
     @Composable
     private fun Environment(content: @Composable () -> Unit) {
@@ -90,7 +90,6 @@ class WidgetPreviewCensusTest {
             LocalWidgetStateHost provides NoState,
             LocalSlotPath provides SlotPath(SurfaceId("home.new"), SlotId("main")),
             LocalWidgetSurfaceRenderer provides { spec, inner -> WidgetSurface(spec, inner) },
-            *EditorSurfaces.stubs,
         ) {
             content()
         }

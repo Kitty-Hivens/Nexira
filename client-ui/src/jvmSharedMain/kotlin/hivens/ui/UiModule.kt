@@ -2,24 +2,32 @@ package hivens.ui
 
 import hivens.config.Storage
 import hivens.core.api.interfaces.ISettingsService
+import hivens.core.activity.Activity
 import hivens.core.activity.ActivityRegistry
+import hivens.core.security.SslBypassStore
 import hivens.core.update.PackUpdateStatusHub
 import hivens.launcher.PackInstallService
 import hivens.launcher.instance.InstanceContentUpdater
+import hivens.launcher.network.ServerProtocolConfig
 import hivens.launcher.platform.PlatformPaths
 import hivens.ui.activity.ActivityCommands
 import hivens.ui.activity.ActivityDriver
 import hivens.ui.activity.SelectionRegistry
 import hivens.ui.background.BackgroundManager
+import hivens.ui.background.BackgroundSettings
 import hivens.ui.components.LauncherUpdateState
 import hivens.ui.debug.DebugOverlayState
 import hivens.ui.editor.EditModeController
+import hivens.ui.editor.WidgetAdmission
 import hivens.ui.editor.presets.PresetRepository
 import hivens.ui.feature.catalogue.browse.BrowseController
 import hivens.ui.feature.catalogue.browse.BrowseSession
 import hivens.ui.feature.catalogue.browse.BrowseTags
+import hivens.ui.feature.catalogue.browse.CataloguePackPageSource
 import hivens.ui.feature.catalogue.browse.ProjectBrowseSession
+import hivens.ui.feature.catalogue.project.OpenProject
 import hivens.ui.feature.catalogue.project.OpenProjectState
+import hivens.ui.feature.catalogue.project.ProjectPageSource
 import hivens.ui.i18n.AppLocale
 import hivens.ui.i18n.stringsFor
 import hivens.ui.identity.ClanRoleProvider
@@ -32,6 +40,7 @@ import hivens.ui.navigation.NavRequests
 import hivens.ui.notifications.IndicationCenter
 import hivens.ui.notifications.NotificationArchiveStore
 import hivens.ui.notifications.NotificationCenter
+import hivens.ui.notifications.PersistedNotification
 import hivens.ui.notifications.SessionRegistry
 import hivens.ui.notifications.drivers.InstallDriver
 import hivens.ui.notifications.drivers.LaunchDriver
@@ -43,11 +52,18 @@ import hivens.ui.utils.LogRetention
 import hivens.ui.utils.PreferenceWriter
 import hivens.ui.widgets.Commands
 import hivens.ui.widgets.Sources
+import hivens.ui.widgets.about.AboutUpdateSource
+import hivens.ui.widgets.about.OpenUpdateDialog
+import hivens.ui.widgets.about.SystemFacts
 import hivens.ui.widgets.modules.WidgetModuleHost
 import hivens.ui.widgets.modules.WidgetModules
+import hivens.ui.widgets.profile.AccountChanges
+import hivens.ui.widgets.profile.ProfileSelection
+import hivens.ui.widgets.profile.ProfileSelectionSource
 import hivens.ui.widgets.state.WidgetStateFlushHook
 import hivens.ui.widgets.state.WidgetStateGc
 import hivens.ui.widgets.state.WidgetStateStore
+import hivens.ui.widgets.themepicker.ThemeSelectionSource
 import hivens.widget.api.SurfaceFamilies
 import hivens.widget.api.WidgetCommandRegistry
 import hivens.widget.api.WidgetDataRegistry
@@ -59,7 +75,13 @@ import hivens.widget.api.flowSource
 import hivens.widget.api.levelServices
 import hivens.widget.model.DefaultLayout
 import hivens.widget.model.ScopeLevel
+import hivens.widget.model.WidgetDataSource
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import org.koin.core.module.Module
 import org.koin.core.scope.Scope
 import org.koin.dsl.module
@@ -175,23 +197,35 @@ fun uiCoreModule(
     // LocalWidgetServiceRegistry resolves before any @Widget renders.
     single { WidgetServiceRegistry() }
 
+    // Who signed in or out since the start, for every list of accounts to hear it.
+    single { AccountChanges() }
+
     // Reactive data sources widgets bind to via rememberSource -- decouples a
     // widget from the concrete service backing its data. Populated eagerly so
     // the registry is complete before the first widget composes.
     single {
-        WidgetDataRegistry().apply {
-            register(Sources.Activity, flowSource(get<ActivityRegistry>().activities))
-            register(Sources.Notifications, flowSource(get<NotificationArchiveStore>().log))
-            register(Sources.DoNotDisturb, flowSource(get<NotificationCenter>().doNotDisturb))
-            register(Sources.OpenProject, flowSource(get<OpenProjectState>().open))
-        }
+        val appScope: CoroutineScope = get()
+        uiDataRegistry(
+            activity         = get<ActivityRegistry>().activities,
+            notifications    = get<NotificationArchiveStore>().log,
+            doNotDisturb     = get<NotificationCenter>().doNotDisturb,
+            openProject      = get<OpenProjectState>().open,
+            sslBypass        = sslBypassSource(get(), get<ServerProtocolConfig>().sslBypassHost, appScope),
+            background       = get<BackgroundManager>().settings,
+            accountsRevision = get<AccountChanges>().revision,
+        )
     }
 
-    // The root of the scope tree. Its app values are the registry above, and the
+    // The root of the scope tree. Its app values are the registries here, and the
     // windows, compositions and pages below it are made by their owners. Under the
     // app's coroutine scope, so a level's work stops at shutdown whoever forgot it.
     single {
-        WidgetScope.app(registry = get(), services = this, context = get<CoroutineScope>().coroutineContext)
+        WidgetScope.app(
+            registry = get(),
+            services = this,
+            context  = get<CoroutineScope>().coroutineContext,
+            commands = get(),
+        )
     }
 
     // Reactive write side: commands widgets fire via rememberCommand /
@@ -201,12 +235,15 @@ fun uiCoreModule(
     single {
         val archive: NotificationArchiveStore = get()
         val center: NotificationCenter = get()
+        val backgrounds: BackgroundManager = get()
+        val accounts: AccountChanges = get()
         val scope: Scope = this
-        WidgetCommandRegistry().apply {
-            register(Commands.ClearNotifications, command { archive.clear() })
-            register(Commands.SetDoNotDisturb, command { center.setDoNotDisturb(it) })
-            scope.platformCommands(this)
-        }
+        uiCommandRegistry(
+            clearNotifications = { archive.clear() },
+            setDoNotDisturb    = { center.setDoNotDisturb(it) },
+            updateBackground   = { change -> backgrounds.update(change) },
+            accountsChanged    = { accounts.changed() },
+        ).apply { scope.platformCommands(this) }
     }
 
     // Widget layout graph persistence. Default graph lives at
@@ -258,8 +295,17 @@ fun uiCoreModule(
 
     // Editor mutation facade. Holds no state itself; fires LayoutGraph
     // updates into the shared CoroutineScope so callers stay
-    // fire-and-forget.
-    single { EditModeController(repo = get(), scope = get()) }
+    // fire-and-forget. It refuses a widget where what it reads has no answer,
+    // asking the scope tree's registries where each key lives.
+    single {
+        val appLevel: WidgetScope = get()
+        val widgets: WidgetRegistry = get()
+        EditModeController(
+            repo      = get(),
+            scope     = get(),
+            admission = WidgetAdmission(appLevel::declarationOf) { kind -> widgets[kind]?.needs.orEmpty() },
+        )
+    }
 
 
     // Preset storage. One file per preset under <dataDir>/presets/.
@@ -380,3 +426,78 @@ fun uiCoreModule(
         ).also { it.start() }
     }
 }
+
+/**
+ * The app's data registry as the launcher builds it, from the flows the services
+ * behind each source hold. Apart from the module so a test builds the very same
+ * registry from stand-in flows and checks every widget's needs against it.
+ */
+internal fun uiDataRegistry(
+    activity: StateFlow<List<Activity>>,
+    notifications: StateFlow<List<PersistedNotification>>,
+    doNotDisturb: StateFlow<Boolean>,
+    openProject: StateFlow<OpenProject?>,
+    sslBypass: WidgetDataSource<Boolean>,
+    background: StateFlow<BackgroundSettings>,
+    accountsRevision: StateFlow<Int>,
+): WidgetDataRegistry = WidgetDataRegistry().apply {
+    register(Sources.Activity, flowSource(activity))
+    register(Sources.Notifications, flowSource(notifications))
+    register(Sources.DoNotDisturb, flowSource(doNotDisturb))
+    register(Sources.OpenProject, flowSource(openProject))
+    register(Sources.SslBypass, sslBypass)
+    register(Sources.Background, flowSource(background))
+    register(Sources.AccountsRevision, flowSource(accountsRevision))
+    // Read the first time a card asks rather than at startup: asking the OS is slow,
+    // and most runs never open the page that shows it.
+    registerFactory(Sources.SystemInfo) { flowSource(MutableStateFlow(SystemFacts.read())) }
+    // One per page, so a profile page kept in the history comes back on the section
+    // it was left on.
+    registerFactory(ProfileSelectionSource) { flowSource(MutableStateFlow(ProfileSelection())) }
+    // What the composition's owner provides around every surface it draws.
+    declare(Sources.Navigation)
+    declare(Sources.Session)
+    declare(Sources.ThemeLibrary)
+    declare(Sources.DarkTheme)
+    // What a page provides for its own widgets, on that page and nowhere else.
+    declare(ProjectPageSource)
+    declare(CataloguePackPageSource)
+    declare(ThemeSelectionSource)
+    declare(AboutUpdateSource)
+}
+
+/**
+ * The app's command registry as the launcher builds it, before a host adds what
+ * only it can run. Apart from the module for the reason [uiDataRegistry] is.
+ */
+internal fun uiCommandRegistry(
+    clearNotifications: () -> Unit,
+    setDoNotDisturb: (Boolean) -> Unit,
+    updateBackground: (BackgroundSettings.() -> BackgroundSettings) -> Unit,
+    accountsChanged: () -> Unit,
+): WidgetCommandRegistry = WidgetCommandRegistry().apply {
+    register(Commands.ClearNotifications, command { clearNotifications() })
+    register(Commands.SetDoNotDisturb, command(setDoNotDisturb))
+    register(Commands.UpdateBackground, command(updateBackground))
+    register(Commands.AccountsChanged, command { accountsChanged() })
+    // What the composition's owner provides: its history, its sign-in, its theme.
+    declare(Commands.Navigate)
+    declare(Commands.SwitchTab)
+    declare(Commands.Back)
+    declare(Commands.Forward)
+    declare(Commands.PopTo)
+    declare(Commands.SignIn)
+    declare(Commands.SignOut)
+    declare(Commands.ApplyTheme)
+    // What the About page provides for its update panel.
+    declare(OpenUpdateDialog)
+}
+
+/**
+ * Whether the launcher's own server is reached past its certificate. The store
+ * keeps every grant and answers per host, so its grants are read through the one
+ * host the protocol names, and a grant expiring is heard on the next change to them,
+ * the way the rail heard it before it read this.
+ */
+private fun sslBypassSource(store: SslBypassStore, host: String, scope: CoroutineScope): WidgetDataSource<Boolean> =
+    flowSource(store.bypasses.map { store.isBypassed(host) }.stateIn(scope, SharingStarted.Eagerly, store.isBypassed(host)))

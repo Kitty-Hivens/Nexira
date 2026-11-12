@@ -22,19 +22,23 @@ import kotlinx.serialization.Serializable
 // dormant -- the Skin nav tab is disabled and the skin leads the Account tab
 // instead (see ProfileAccountSectionWidget) -- but the widget stays registered
 // and seeded in the `skin` slot so the editor palette and a future dedicated
-// skin screen can re-home it without a layout migration. Reads session from
-// LocalProfileContext.
+// skin screen can re-home it without a layout migration. Reads the session the
+// composition is signed in as.
 @Serializable
 data class ProfileSkinProps(
     @PropLabel("widget.profile.skin.section.previewHeight") @PropRange(200.0, 480.0) val previewHeight: Int = 360,
 )
 
-@Widget(id = "profile.skin.section", displayName = "widget.profile.skin.section", propsClass = ProfileSkinProps::class)
+@Widget(
+    id = "profile.skin.section",
+    displayName = "widget.profile.skin.section",
+    propsClass = ProfileSkinProps::class,
+    needs = ["app.state"],
+)
 @Composable
 fun ProfileSkinSectionWidget(instance: WidgetInstance) {
     val p = instance.rememberProps<ProfileSkinProps>()
-    val ctx = LocalProfileContext.current
-    val session = ctx.session ?: return
+    val session = rememberSession() ?: return
 
     var refreshKey by remember { mutableIntStateOf(0) }
 

@@ -65,6 +65,7 @@ import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import hivens.ui.editor.props.PANEL_SHADOW_DP
 import hivens.widget.api.LocalWidgetRegistry
+import hivens.widget.model.SurfaceId
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxColor
 
@@ -78,6 +79,8 @@ fun WidgetPalettePanel(
     controller: DragController,
     registry: DropTargetRegistry,
     editController: EditModeController,
+    /** The surface being arranged. The palette offers only what can stand on it. */
+    surface: SurfaceId?,
     modifier: Modifier = Modifier,
 ) {
     val s = LocalStrings.current
@@ -100,9 +103,12 @@ fun WidgetPalettePanel(
     val labels = LocalWidgetLabels.current
     val locale = LocalAppLocale.current
     val nameOf = { d: WidgetDescriptor -> labels.of(d.kind, d.displayName, s, locale) }
-    val descriptors = remember(registry0, s, labels, locale) {
+    // And only what the surface being arranged can hold: a widget reading what that
+    // surface does not have would only draw the placeholder for a misplaced one.
+    val descriptors = remember(registry0, s, labels, locale, surface) {
         registry0.all().values
             .filter { it.removable }
+            .filter { surface == null || editController.admits(it.kind, surface) }
             .sortedBy { nameOf(it).lowercase() }
     }
     // Above the search branch: remembered inside it, a query matching nothing

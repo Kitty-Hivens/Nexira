@@ -51,6 +51,7 @@ class WidgetRegistryProcessor(
                     surfaceJson = extracted.surfaceJson,
                     sizing = extracted.sizing,
                     enter = extracted.enter,
+                    needs = extracted.needs,
                 ),
                 containingFile = symbol.containingFile,
                 symbol = symbol,

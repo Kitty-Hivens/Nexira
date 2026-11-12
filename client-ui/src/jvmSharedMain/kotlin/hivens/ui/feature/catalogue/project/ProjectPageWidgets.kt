@@ -16,11 +16,11 @@ import hivens.widget.model.WidgetInstance
 
 /**
  * The project page's widgets: the header, the tabs and the pane under them. Each
- * reads the page it is drawn on through [ProjectPageSource] and draws nothing where
- * there is none.
+ * reads the page it is drawn on through [ProjectPageSource], and a slot anywhere
+ * else draws the placeholder for a widget whose page is not there.
  */
 
-@Widget(id = "project.header", displayName = "widget.project.header")
+@Widget(id = "project.header", displayName = "widget.project.header", needs = ["project.page"])
 @Composable
 fun ProjectHeaderWidget(instance: WidgetInstance) {
     val page = rememberScopedSource(ProjectPageSource).valueOrNull() ?: return
@@ -32,7 +32,7 @@ fun ProjectHeaderWidget(instance: WidgetInstance) {
  * the first thing inside it, so opening a long description and reading two screens
  * down left no way back to Versions without scrolling to the top first.
  */
-@Widget(id = "project.tabs", displayName = "widget.project.tabs")
+@Widget(id = "project.tabs", displayName = "widget.project.tabs", needs = ["project.page"])
 @Composable
 fun ProjectTabsWidget(instance: WidgetInstance) {
     val page = rememberScopedSource(ProjectPageSource).valueOrNull() ?: return
@@ -51,6 +51,7 @@ fun ProjectTabsWidget(instance: WidgetInstance) {
     displayName = "widget.project.body",
     minWidth = 320, minHeight = 200,
     maxWidth = 2400, maxHeight = 1600,
+    needs = ["project.page"],
 )
 @Composable
 fun ProjectBodyWidget(instance: WidgetInstance) {

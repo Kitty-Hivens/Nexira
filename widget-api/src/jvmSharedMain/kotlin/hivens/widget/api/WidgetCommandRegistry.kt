@@ -1,13 +1,21 @@
 package hivens.widget.api
 
 import hivens.widget.model.CommandKey
+import hivens.widget.model.ScopeLevel
 import hivens.widget.model.WidgetCommand
+
+/** How a level makes its own command for a key. Run once per level, the first time the key is fired or asked for there. */
+typealias CommandFactory<P> = (LevelContext) -> WidgetCommand<P>
 
 // App-provided commands widgets fire (the write counterpart of WidgetDataRegistry,
 // and of the QML "call a service method"). Same shape and contract as the read
-// side: commands are app-static, registered once at startup, so this is a plain
+// side: app commands are app-static, registered once at startup, so this is a plain
 // map and a missing or duplicate id is a wiring bug that fails loudly rather than
 // a normal null state (unlike WidgetServiceRegistry, whose providers churn).
+//
+// A command below the app level has an answer per level, the way a source does:
+// a factory each level runs for itself, or a declaration that the level's owner
+// provides it (see WidgetScope.provideCommand and ProvideScopedCommand).
 //
 // find() and keys() are discovery seams -- they let a future editor / rule-engine
 // list the available command ids. Firing a command by raw string id (the headless
@@ -18,9 +26,42 @@ class WidgetCommandRegistry {
 
     private val commands = HashMap<String, WidgetCommand<*>>()
 
+    private val factories = HashMap<String, Factory<*>>()
+
+    private val declared = HashMap<String, ScopeLevel>()
+
+    private class Factory<P>(val level: ScopeLevel, val make: CommandFactory<P>)
+
     fun <P> register(key: CommandKey<P>, command: WidgetCommand<P>) {
-        require(key.id !in commands) { "duplicate widget command id '${key.id}'" }
+        require(key.level == ScopeLevel.App) {
+            "widget command '${key.id}' lives at ${key.level}: register a factory for it"
+        }
+        requireNew(key.id)
         commands[key.id] = command
+    }
+
+    /**
+     * Registers how a level of [key]'s kind makes its own command for [key], made
+     * the first time it is asked for there and closed with the level if it holds
+     * something to release.
+     */
+    fun <P> registerFactory(key: CommandKey<P>, factory: CommandFactory<P>) {
+        requireNew(key.id)
+        factories[key.id] = Factory(key.level, factory)
+    }
+
+    /**
+     * Declares [key] as one the owner of each level of its kind provides. See
+     * [WidgetDataRegistry.declare], which this mirrors.
+     */
+    fun declare(key: CommandKey<*>) {
+        require(key.level != ScopeLevel.App) { "app-wide command '${key.id}' is registered with a value" }
+        requireNew(key.id)
+        declared[key.id] = key.level
+    }
+
+    private fun requireNew(id: String) {
+        require(id !in commands && id !in factories && id !in declared) { "duplicate widget command id '$id'" }
     }
 
     // Unchecked cast: register ties CommandKey<P> to WidgetCommand<P> at the call
@@ -40,5 +81,19 @@ class WidgetCommandRegistry {
     fun <P> find(key: CommandKey<P>): WidgetCommand<P>? =
         commands[key.id] as WidgetCommand<P>?
 
-    fun keys(): Set<String> = commands.keys.toSet()
+    /** The factory registered for [key] at its own level, or null. Same cast seam as [dispatch]. */
+    @Suppress("UNCHECKED_CAST")
+    internal fun <P> factoryFor(key: CommandKey<P>): CommandFactory<P>? {
+        val factory = factories[key.id] ?: return null
+        return if (factory.level == key.level) factory.make as CommandFactory<P> else null
+    }
+
+    /** Where the command [id] lives and what answers it, or null when nothing here names it. */
+    fun declarationOf(id: String): KeyDeclaration? {
+        if (id in commands) return KeyDeclaration(id, ScopeLevel.App, KeyKind.Command, KeyOrigin.Registered)
+        factories[id]?.let { return KeyDeclaration(id, it.level, KeyKind.Command, KeyOrigin.Factory) }
+        return declared[id]?.let { KeyDeclaration(id, it, KeyKind.Command, KeyOrigin.Owner) }
+    }
+
+    fun keys(): Set<String> = commands.keys + factories.keys + declared.keys
 }

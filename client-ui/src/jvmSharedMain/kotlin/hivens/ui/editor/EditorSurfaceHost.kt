@@ -701,14 +701,6 @@ fun EditorSurfaceHost(
         // A press on empty map selects the slot while arranging; the middle button
         // moves the map then.
         LocalMapPanOnPrimary provides !(state is EditModeState.On && !previewing),
-        // Stub surface contexts, spread from the registry. Surface composables
-        // that mount under content() override with the real values; widgets
-        // dropped on a foreign surface fall through to the stubs and render
-        // with no-op callbacks instead of crashing the launcher. Derived rather
-        // than listed, so a surface that declares a stub is provided one by
-        // existing -- the closed wall this replaced let a new surface fall
-        // through it without a word.
-        *EditorSurfaces.stubs,
     ) {
         Box(
             modifier = Modifier
@@ -926,6 +918,7 @@ fun EditorSurfaceHost(
                     controller     = dragController,
                     registry       = registry,
                     editController = controller,
+                    surface        = selectedSurface,
                     modifier       = Modifier.align(Alignment.TopEnd),
                 )
 

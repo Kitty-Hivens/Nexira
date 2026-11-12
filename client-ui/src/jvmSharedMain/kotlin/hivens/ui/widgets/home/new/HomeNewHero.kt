@@ -43,7 +43,9 @@ import hivens.ui.screens.library.rememberPackArt
 import androidx.compose.ui.zIndex
 import hivens.ui.theme.familyForText
 import hivens.ui.theme.decorativePair
+import hivens.ui.widgets.Commands
 import hivens.widget.api.rememberProps
+import hivens.widget.api.rememberScopedCommand
 import hivens.widget.model.PropLabel
 import hivens.widget.model.PropRange
 import hivens.widget.model.Widget
@@ -78,11 +80,12 @@ data class HeroProps(
     propsClass = HeroProps::class,
     minWidth = 280, minHeight = 140,
     maxWidth = 1600, maxHeight = 640,
+    needs = ["app.state", "nav.open"],
 )
 @Composable
 fun HomeNewHero(instance: WidgetInstance) {
     val p = instance.rememberProps<HeroProps>()
-    val ctx = LocalHomeNewContext.current
+    val navigate = rememberScopedCommand(Commands.Navigate) ?: return
     val s = LocalStrings.current
     val quickLaunch = rememberQuickLaunchTarget(s.homeQuickButton) ?: return
     val target = quickLaunch.target
@@ -90,7 +93,7 @@ fun HomeNewHero(instance: WidgetInstance) {
     val art = rememberPackArt(target)
 
     val eyebrow = if (target.lastPlayedEpochOrZero > 0L) s.homeQuickContinue else s.homeQuickStart
-    val openDetail = { ctx.onScreenChange(Screen.PackDetail(target.id)) }
+    val openDetail = { navigate(Screen.PackDetail(target.id)) }
 
     BoxWithConstraints(Modifier.fillMaxWidth().padding(top = 12.dp)) {
         val height = when {

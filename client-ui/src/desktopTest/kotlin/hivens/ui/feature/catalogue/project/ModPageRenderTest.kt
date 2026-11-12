@@ -217,6 +217,9 @@ class ModPageRenderTest {
         val rail = SurfaceId("appshell.rightrail")
         val registry = WidgetDataRegistry().apply {
             register(Sources.OpenProject, flowSource(MutableStateFlow<OpenProject?>(railProject)))
+            // Declared the way the launcher declares it, so the page's widgets know
+            // the key they need lives on the page and find it there.
+            declare(ProjectPageSource)
         }
         val families = SurfaceFamilies().apply { switch(rail, FamilyId("projectView"), owner = Unit) }
 

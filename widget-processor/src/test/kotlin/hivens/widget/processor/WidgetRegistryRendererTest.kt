@@ -383,3 +383,55 @@ class WidgetEntranceDeclarationTest {
         assertEquals("a\\${'$'}b\\nc\\\"d\\\\e", "a${'$'}b\nc\"d\\e".kotlinEscape())
     }
 }
+
+/** What a widget reads reaches the descriptor, and a malformed list never builds. */
+class WidgetNeedsDeclarationTest {
+
+    private fun widget(id: String, needs: List<String>) = WidgetModel(
+        id = id,
+        displayName = "Display",
+        removable = true,
+        drawsOwnSurface = false,
+        slots = emptyList(),
+        propsClassFqn = null,
+        functionFqn = "hivens.ui.widgets.Sample",
+        needs = needs,
+    )
+
+    @Test
+    fun `declared needs are emitted in their order`() {
+        val src = renderRegistry(listOf(widget("nav.entry", needs = listOf("nav.state", "nav.switch"))))
+        assertContains(src, """override val needs: List<String> = listOf("nav.state", "nav.switch")""")
+    }
+
+    @Test
+    fun `a widget that needs nothing emits nothing about it`() {
+        val src = renderRegistry(listOf(widget("home.clock", needs = emptyList())))
+        assertFalse("needs" in src, src)
+    }
+
+    @Test
+    fun `an id is escaped into its literal`() {
+        val src = renderRegistry(listOf(widget("x", needs = listOf("a\"b"))))
+        assertContains(src, """listOf("a\"b")""")
+    }
+
+    @Test
+    fun `distinct non-blank ids pass`() {
+        assertNull(WidgetValidator.needsFault(emptyList()))
+        assertNull(WidgetValidator.needsFault(listOf("nav.state", "app.state", "nav.open")))
+    }
+
+    @Test
+    fun `a blank id is refused, because it names no key and keeps the widget off every surface`() {
+        assertNotNull(WidgetValidator.needsFault(listOf("nav.state", "")))
+        assertNotNull(WidgetValidator.needsFault(listOf("  ")))
+    }
+
+    @Test
+    fun `an id listed twice is refused and named`() {
+        val fault = assertNotNull(WidgetValidator.needsFault(listOf("nav.state", "app.state", "nav.state")))
+        assertContains(fault, "'nav.state'")
+        assertFalse("app.state" in fault, fault)
+    }
+}

@@ -13,8 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,46 +29,38 @@ import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.ThemeLibrary
+import hivens.ui.widgets.Commands
+import hivens.widget.api.ProvideScoped
 import hivens.widget.api.SlotRenderer
+import hivens.widget.api.rememberScopedAction
+import hivens.widget.api.rememberScopedCommand
 import hivens.widget.model.SlotId
 import hivens.widget.model.SurfaceId
 
 private const val SURFACE = "theme.picker"
 
-// theme.picker surface composable. AppLayout routes Screen.ThemePicker here. Provides
-// LocalThemePickerContext for the child widgets and lays out two slots side by side
-// (grid and preview). The title and Apply are surface chrome rather than widgets:
-// without them the screen loses its whole purpose.
+// theme.picker surface composable. AppLayout routes Screen.ThemePicker here. Puts the
+// pending choice over its page for the child widgets and lays out two slots side by
+// side (grid and preview). The title and Apply are surface chrome rather than
+// widgets: without them the screen loses its whole purpose.
 @Composable
-fun ThemePickerSurface(
-    library: ThemeLibrary,
-    isDarkTheme: Boolean,
-    onThemeSelected: (String) -> Unit,
-    onBack: () -> Unit,
-) {
+fun ThemePickerSurface(library: ThemeLibrary) {
     val s = LocalStrings.current
     val themes = library.all
     // Keyless remember: the pending selection survives an outside change of the
     // active theme. Only Apply commits it.
-    val selected = remember { mutableStateOf(library.active) }
-
-    val ctx = remember(themes, selected, isDarkTheme, onBack) {
-        ThemePickerContext(
-            themes   = themes,
-            selected = selected,
-            isDark   = isDarkTheme,
-            onBack   = onBack,
-        )
-    }
+    val selected = remember { ThemeSelection(library.active) }
+    val apply = rememberScopedCommand(Commands.ApplyTheme)
+    val back = rememberScopedAction(Commands.Back)
 
     PuppetScreen("ThemePicker")
-    PuppetClick("themePicker.back") { onBack() }
-    PuppetClick("themePicker.apply") { onThemeSelected(selected.value.id) }
+    PuppetClick("themePicker.back") { back?.invoke() }
+    PuppetClick("themePicker.apply") { apply?.invoke(selected.theme.id) }
     themes.forEach { theme ->
-        PuppetClick("themePicker.select.${theme.id}") { selected.value = theme }
+        PuppetClick("themePicker.select.${theme.id}") { selected.theme = theme }
     }
 
-    CompositionLocalProvider(LocalThemePickerContext provides ctx) {
+    ProvideScoped(ThemeSelectionSource, selected) {
         Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
             // On a panel of its own, like the grid and the preview under it: the title
             // is text, and on the bare page it lay over whatever the wallpaper had there.
@@ -93,7 +83,7 @@ fun ThemePickerSurface(
                     Flexible("theme_picker_apply_btn", FlexibleKind.Button) {
                         NxButton(
                             label = s.themePickerApply,
-                            onClick = { onThemeSelected(selected.value.id) },
+                            onClick = { apply?.invoke(selected.theme.id) },
                             style = NxButtonStyle.Primary,
                         )
                     }

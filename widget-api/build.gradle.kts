@@ -1,4 +1,5 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.dsl.abi.ExperimentalAbiValidation
 
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
@@ -18,6 +19,14 @@ kotlin {
     // KMP modules don't apply the `java` plugin, so the root's toolchain pin
     // skips them; set it here so org.gradle.jvm.version matches the JDK 27 modules.
     jvmToolchain(27)
+
+    // A module jar is compiled against this API and is refused by version when it
+    // changes, so every change to the public surface has to show: the dump in api/
+    // is checked by `check`, and updateKotlinAbi rewrites it on purpose. Calling it
+    // is what switches it on.
+    @OptIn(ExperimentalAbiValidation::class)
+    abiValidation()
+
     jvm()
     android {
         namespace = "hivens.widget.api"
@@ -66,4 +75,7 @@ kotlin {
 
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
+    // What the module builds stamp into their manifests, for the test that holds it
+    // equal to WidgetApi.VERSION.
+    systemProperty("nexira.widgetApi", providers.gradleProperty("nexira.widgetApi").get())
 }

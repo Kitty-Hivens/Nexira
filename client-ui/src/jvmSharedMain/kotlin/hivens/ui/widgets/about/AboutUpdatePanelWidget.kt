@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,6 +30,9 @@ import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.theme.LocalMonoFamily
 import hivens.widget.api.rememberProps
+import hivens.widget.api.rememberScopedAction
+import hivens.widget.api.rememberScopedSource
+import hivens.widget.api.valueOrNull
 import hivens.widget.model.PropLabel
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
@@ -53,13 +55,14 @@ data class AboutUpdateProps(
     displayName = "widget.about.update.panel",
     propsClass = AboutUpdateProps::class,
     surface = """{"fill":"card","border":{"widthDp":1.0}}""",
+    needs = ["about.update", "about.update.open"],
 )
 @Composable
 fun AboutUpdatePanelWidget(instance: WidgetInstance) {
     val p = instance.rememberProps<AboutUpdateProps>()
-    val ctx = LocalAboutContext.current
+    val state = rememberScopedSource(AboutUpdateSource).valueOrNull() ?: return
+    val openDialog = rememberScopedAction(OpenUpdateDialog) ?: return
     val s = LocalStrings.current
-    val state by ctx.updateState
 
     val versionText = remember { "v${Branding.VERSION.removePrefix("v")}" }
     val channel = remember { ReleaseChannel.classify(Branding.VERSION.removePrefix("v")) }
@@ -106,7 +109,7 @@ fun AboutUpdatePanelWidget(instance: WidgetInstance) {
             Flexible("about_open_update_btn", FlexibleKind.Button) {
                 NxButton(
                     label = if (current.update.isCritical) s.updateDownloadNow else s.updateDownload,
-                    onClick = { ctx.showUpdateDialog.value = true },
+                    onClick = openDialog,
                     modifier = Modifier.fillMaxWidth(),
                     style = if (current.update.isCritical) NxButtonStyle.Destructive else NxButtonStyle.Secondary,
                 )

@@ -22,9 +22,15 @@ import androidx.compose.ui.unit.dp
 import hivens.auth.AccountStore
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.data.SessionData
+import hivens.ui.AppState
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.utils.rememberReadOffMain
+import hivens.ui.widgets.Commands
+import hivens.ui.widgets.Sources
+import hivens.widget.api.rememberScopedCommand
+import hivens.widget.api.rememberScopedSource
+import hivens.widget.api.valueOrNull
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -44,6 +50,11 @@ import hivens.ui.theme.NxColor
 internal fun AccountStore.faceSession(settingsService: ISettingsService): SessionData? =
     primarySession(settingsService.getSettings().preferredFaceProvider)
 
+/** The session the composition is signed in as, null when nobody is or nothing says. */
+@Composable
+internal fun rememberSession(): SessionData? =
+    (rememberScopedSource(Sources.Session).valueOrNull() as? AppState.Authenticated)?.session
+
 /**
  * Which signed-in account fronts the shell, when more than one is signed in.
  *
@@ -61,22 +72,23 @@ internal fun AccountStore.faceSession(settingsService: ISettingsService): Sessio
  */
 @Composable
 internal fun FacePicker(modifier: Modifier = Modifier) {
-    val ctx = LocalProfileContext.current
+    val session = rememberSession()
+    val signIn = rememberScopedCommand(Commands.SignIn) ?: return
     val credentials: AccountStore = koinInject()
     val settingsService: ISettingsService = koinInject()
     val s = LocalStrings.current
     val scope = rememberCoroutineScope()
 
-    // Keyed on the surface's account revision as well as the session: the picker's
-    // whole job is to name one of the accounts that exist now, and signing out of
-    // one that was not fronting the shell leaves the session structurally
-    // identical -- so on that alone the picker went on offering a provider that
-    // had just been removed, and choosing it wrote the preference for it.
-    val revision = ctx.accountsRevision.value
-    val accounts = rememberReadOffMain(revision, ctx.session) { credentials.listAccounts() }?.value ?: return
+    // Keyed on the account revision as well as the session: the picker's whole job
+    // is to name one of the accounts that exist now, and signing out of one that
+    // was not fronting the shell leaves the session structurally identical. On that
+    // alone the picker went on offering a provider that had just been removed, and
+    // choosing it wrote the preference for it.
+    val revision = rememberScopedSource(Sources.AccountsRevision).valueOrNull() ?: 0
+    val accounts = rememberReadOffMain(revision, session) { credentials.listAccounts() }?.value ?: return
     if (accounts.size < 2) return
 
-    var preferred by remember(revision, ctx.session) {
+    var preferred by remember(revision, session) {
         mutableStateOf(settingsService.getSettings().preferredFaceProvider)
     }
 
@@ -90,7 +102,7 @@ internal fun FacePicker(modifier: Modifier = Modifier) {
                 settingsService.updateSettings { it.copy(preferredFaceProvider = providerKey) }
                 credentials.faceSession(settingsService)
             }
-            face?.let { ctx.onLogin(it) }
+            face?.let(signIn)
         }
     }
 

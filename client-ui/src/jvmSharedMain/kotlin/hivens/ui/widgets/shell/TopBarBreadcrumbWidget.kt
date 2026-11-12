@@ -21,32 +21,46 @@ import hivens.ui.chrome.rememberCrumbLabel
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
+import hivens.ui.widgets.Commands
+import hivens.ui.widgets.Sources
+import hivens.widget.api.rememberScopedAction
+import hivens.widget.api.rememberScopedCommand
+import hivens.widget.api.rememberScopedSource
+import hivens.widget.api.valueOrNull
 import hivens.widget.model.Widget
 import hivens.ui.theme.NxInk
 
 /**
  * Clickable breadcrumb of the current location (Modrinth-style). Back button +
- * the root-to-current trail from [ShellContext]; non-last segments jump back via
- * onPopTo. Labels resolve through [rememberCrumbLabel] (pack/server names included).
+ * the root-to-current trail of the composition's history; non-last segments jump
+ * back to themselves. Labels resolve through [rememberCrumbLabel] (pack/server
+ * names included).
  */
-@Widget(id = "appshell.topbar.breadcrumb", displayName = "widget.appshell.topbar.breadcrumb")
+@Widget(
+    id = "appshell.topbar.breadcrumb",
+    displayName = "widget.appshell.topbar.breadcrumb",
+    needs = ["nav.state", "nav.back", "nav.forward", "nav.popTo"],
+)
 @Composable
 fun TopBarBreadcrumbWidget() {
-    val ctx = LocalShellContext.current
+    val nav = rememberScopedSource(Sources.Navigation).valueOrNull() ?: return
+    val back = rememberScopedAction(Commands.Back) ?: return
+    val forward = rememberScopedAction(Commands.Forward) ?: return
+    val popTo = rememberScopedCommand(Commands.PopTo) ?: return
     val s = LocalStrings.current
     Row(verticalAlignment = Alignment.CenterVertically) {
         // Back / forward are always present so the breadcrumb never shifts; each
         // greys out and stops responding when there is nowhere to go that way.
-        NavArrow(enabled = ctx.canGoBack, mirrored = false, contentDescription = s.navBack, onClick = ctx.onBack)
+        NavArrow(enabled = nav.canGoBack, mirrored = false, contentDescription = s.navBack, onClick = back)
         // Forward: the back arrow mirrored, so the pair matches exactly.
-        NavArrow(enabled = ctx.canGoForward, mirrored = true, contentDescription = s.navForward, onClick = ctx.onForward)
-        val trail = ctx.trail
+        NavArrow(enabled = nav.canGoForward, mirrored = true, contentDescription = s.navForward, onClick = forward)
+        val trail = nav.trail
         trail.forEachIndexed { i, screen ->
             val isLast = i == trail.lastIndex
             CrumbSegment(
                 label = rememberCrumbLabel(screen),
                 isLast = isLast,
-                onClick = { if (!isLast) ctx.onPopTo(screen) },
+                onClick = { if (!isLast) popTo(screen) },
                 // Where you ARE takes the remaining room and the places you came
                 // through give way first. A trail four deep ending in a build
                 // number -- Library, the pack, the project, 1.8.14-beta.1+1.21.1-neoforge

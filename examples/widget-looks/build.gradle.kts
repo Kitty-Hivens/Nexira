@@ -27,7 +27,7 @@ tasks.test {
 tasks.jar {
     manifest {
         attributes(
-            "Nexira-Widget-Api" to 1,
+            "Nexira-Widget-Api" to providers.gradleProperty("nexira.widgetApi").get(),
             "Nexira-Module-Id" to "looks",
             "Nexira-Module-Name" to "Looks",
         )
