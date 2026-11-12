@@ -16,14 +16,16 @@ data class PackArt(val iconUrl: String?, val bannerUrl: String?) {
 }
 
 /**
- * Native cover (icon + banner) for an installed instance. Art captured at install
- * time ([PackInstance.iconUrl]/[PackInstance.bannerUrl]) wins with no network.
- * Instances created before that field existed carry neither, so the source is
- * asked once per `(origin, id)` -- a cached Modrinth project or mirror summary
- * lookup, NOT the full catalogue `details()` (which also lists versions) -- and
- * an answer is memoised for the resolver's life. This is what swaps the pixel
- * placeholder for a pack's real cover; a failed or source-less lookup returns
- * [PackArt.NONE] and the UI keeps the pixel art.
+ * Native cover (icon + banner) for an installed instance.
+ *
+ * Art captured at install time ([PackInstance.iconUrl]/[PackInstance.bannerUrl])
+ * is what shows first, with no network, but it is not the last word: the source is
+ * still asked once per `(origin, id)` per resolver life, and a field it answers
+ * replaces the captured one. A pack that gained an icon after it was installed, or
+ * whose author swapped the banner, otherwise kept what it had on the day of the
+ * install. The lookup is a cached Modrinth project or mirror summary, NOT the full
+ * catalogue `details()` (which also lists versions). A failed or source-less lookup
+ * leaves the captured art, or [PackArt.NONE], and the UI keeps the pixel art.
  *
  * Only an answer is memoised. A lookup that failed, or was cancelled because the
  * card scrolled away, says nothing about the pack, and written down as NONE it
@@ -46,24 +48,29 @@ class PackArtResolver(
      * every mount, for art that was never in doubt.
      */
     fun cached(instance: PackInstance): PackArt? {
-        if (instance.iconUrl != null || instance.bannerUrl != null) {
-            return PackArt(instance.iconUrl, instance.bannerUrl)
-        }
-        return cache[keyOf(instance)]
+        cache[keyOf(instance)]?.let { return it.over(instance) }
+        return captured(instance)
     }
+
+    /** Whether the source has answered for this pack, so [resolve] would not ask again. */
+    fun answered(instance: PackInstance): Boolean = cache.containsKey(keyOf(instance))
 
     /** One expression, so the reader and the writer cannot drift apart. */
     private fun keyOf(instance: PackInstance): String =
         "${instance.packRef.origin}:${instance.packRef.id}"
 
-    suspend fun resolve(instance: PackInstance): PackArt {
-        if (instance.iconUrl != null || instance.bannerUrl != null) {
-            return PackArt(instance.iconUrl, instance.bannerUrl)
-        }
-        val key = keyOf(instance)
-        cache[key]?.let { return it }
+    private fun captured(instance: PackInstance): PackArt? =
+        if (instance.iconUrl != null || instance.bannerUrl != null) PackArt(instance.iconUrl, instance.bannerUrl) else null
 
-        return try {
+    /** The source's answer field by field, falling back to what the record captured where it has none. */
+    private fun PackArt.over(instance: PackInstance): PackArt =
+        PackArt(iconUrl ?: instance.iconUrl, bannerUrl ?: instance.bannerUrl)
+
+    suspend fun resolve(instance: PackInstance): PackArt {
+        val key = keyOf(instance)
+        cache[key]?.let { return it.over(instance) }
+
+        val fromSource = try {
             when (instance.packRef.origin) {
                 PackOrigin.Modrinth -> modrinth.resolveProject(instance.packRef.id).let { p ->
                     PackArt(
@@ -79,7 +86,8 @@ class PackArtResolver(
             throw e
         } catch (e: Exception) {
             log.warn("Pack art lookup failed for {} ({}): {}", instance.packRef.id, instance.packRef.origin, e.message)
-            PackArt.NONE
+            return captured(instance) ?: PackArt.NONE
         }
+        return fromSource.over(instance)
     }
 }

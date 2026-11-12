@@ -128,6 +128,7 @@ kotlin {
                 val coilV     = libs.versions.coil.get()
                 implementation("$coilCoord:coil-compose:$coilV")        { exclude(group = "org.jetbrains.skiko") }
                 implementation("$coilCoord:coil-network-okhttp:$coilV") { exclude(group = "org.jetbrains.skiko") }
+                implementation("$coilCoord:coil-network-cache-control:$coilV") { exclude(group = "org.jetbrains.skiko") }
                 implementation(libs.ktor.serialization.json)
             }
         }

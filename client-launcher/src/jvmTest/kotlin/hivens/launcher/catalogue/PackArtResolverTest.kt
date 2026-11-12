@@ -69,4 +69,28 @@ class PackArtResolverTest {
 
         assertEquals("https://cdn/icon.png", art.resolve(instance).iconUrl)
     }
+
+    @Test
+    fun `art captured at install is shown first and replaced by what the source answers`() = runBlocking {
+        val installed = instance.copy(iconUrl = "https://cdn/old-icon.png", bannerUrl = "https://cdn/banner.png")
+        val art = resolver(AtomicInteger()) {}
+
+        assertEquals(PackArt("https://cdn/old-icon.png", "https://cdn/banner.png"), art.cached(installed))
+        assertEquals(false, art.answered(installed), "captured art alone does not count as the source answering")
+
+        val fresh = art.resolve(installed)
+        assertEquals("https://cdn/icon.png", fresh.iconUrl, "the source's icon wins")
+        assertEquals("https://cdn/banner.png", fresh.bannerUrl, "a field the source leaves empty keeps the captured one")
+        assertEquals(true, art.answered(installed))
+        assertEquals(fresh, art.cached(installed))
+    }
+
+    @Test
+    fun `a failed lookup keeps the art captured at install`() = runBlocking {
+        val installed = instance.copy(bannerUrl = "https://cdn/banner.png")
+        val art = resolver(AtomicInteger()) { throw java.io.IOException("offline") }
+
+        assertEquals(PackArt(null, "https://cdn/banner.png"), art.resolve(installed))
+        assertEquals(false, art.answered(installed))
+    }
 }

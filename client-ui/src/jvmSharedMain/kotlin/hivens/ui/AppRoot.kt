@@ -18,6 +18,9 @@ import coil3.SingletonImageLoader
 import coil3.disk.DiskCache
 import coil3.disk.directory
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
+import coil3.annotation.ExperimentalCoilApi
+import coil3.network.NetworkFetcher
+import coil3.network.cachecontrol.CacheControlCacheStrategy
 import hivens.auth.AccountStore
 import hivens.auth.AuthProvider
 import hivens.auth.AuthProviderRegistry
@@ -134,7 +137,11 @@ fun AppRoot(
                         .build()
                 }
                 .components {
-                    add(OkHttpNetworkFetcherFactory(callFactory = { routingCallFactory }))
+                    // Art on the mirror keeps one address when the picture behind it
+                    // changes, and the default strategy never asks the server again,
+                    // so an icon cached once stayed for good. This one revalidates by
+                    // the ETag and Last-Modified the server sends.
+                    add(revalidatingFetcherFactory(routingCallFactory))
                     // Pack descriptions carry rows of shields.io badges, and
                     // shields.io answers with SVG.
                     addPlatformDecoders()
@@ -426,3 +433,10 @@ fun AppRoot(
     }
 }
 
+/** Experimental in Coil, so the opt-in is kept to this one factory rather than to the whole shell. */
+@OptIn(ExperimentalCoilApi::class)
+private fun revalidatingFetcherFactory(callFactory: Call.Factory): NetworkFetcher.Factory =
+    OkHttpNetworkFetcherFactory(
+        callFactory = { callFactory },
+        cacheStrategy = { CacheControlCacheStrategy() },
+    )
