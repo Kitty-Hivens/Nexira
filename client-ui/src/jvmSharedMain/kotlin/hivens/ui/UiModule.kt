@@ -27,7 +27,7 @@ import hivens.ui.feature.catalogue.browse.BrowseTags
 import hivens.ui.feature.catalogue.browse.CataloguePackPageSource
 import hivens.ui.feature.catalogue.browse.ProjectBrowseSession
 import hivens.ui.feature.catalogue.browse.sampleCataloguePackPage
-import hivens.ui.feature.catalogue.project.OpenProject
+import hivens.ui.editor.palette.sampleOpenProject
 import hivens.ui.feature.catalogue.project.OpenProjectState
 import hivens.ui.feature.catalogue.project.ProjectPageSource
 import hivens.ui.feature.catalogue.project.sampleProjectPage
@@ -41,6 +41,10 @@ import hivens.ui.identity.SkinLibrary
 import hivens.ui.identity.SkinManager
 import hivens.ui.layout.LayoutGraphFlushHook
 import hivens.ui.layout.LayoutGraphRepository
+import hivens.ui.host.HostWindowState
+import hivens.ui.host.WindowPolicy
+import hivens.ui.host.WindowRegistry
+import hivens.ui.navigation.MainWindowRequests
 import hivens.ui.navigation.NavRequests
 import hivens.ui.notifications.IndicationCenter
 import hivens.ui.notifications.NotificationArchiveStore
@@ -100,12 +104,25 @@ import kotlin.time.Duration.Companion.seconds
  * and what anything injected under that level resolves to.
  */
 val levelServicesModule: Module = module {
-    // What Browse is searching and where its installs go. Shared by the screen's
-    // own widgets and the rail's browse family, which have no composition in
-    // common, and kept so a trip to a project page comes back to the same search.
-    // One per window, so a second window browses something else.
+    // One per window each, so a second window has a state of its own and the two
+    // stay independent. Everything injected inside a window resolves to its own.
     levelServices(ScopeLevel.Window) {
+        // What Browse is searching and where its installs go. Shared by the screen's
+        // own widgets and the rail's browse family, which have no composition in
+        // common, and kept so a trip to a project page comes back to the same search.
         scoped { BrowseController() }
+        // What the mod page is looking at, which the right rail's project-view family
+        // reads: the page that writes it and the rail that reads it are different
+        // surfaces with no composition in common, both in this window.
+        scoped { OpenProjectState() }
+        // Which family each surface is showing. Kept out of the composition because
+        // a switch is something the window does, a navigation or a pack opening.
+        // Deliberately not persisted: it describes the moment, not the arrangement.
+        scoped { SurfaceFamilies() }
+        // A screen asked for from inside the window, by a card or a link, lands in
+        // the window's own history. One from outside every window goes through
+        // MainWindowRequests instead.
+        scoped { NavRequests() }
     }
 }
 
@@ -113,14 +130,22 @@ val levelServicesModule: Module = module {
  * The Koin singletons the screens and widgets ask for, whatever the host.
  *
  * What differs between hosts comes in as arguments: the registry of widgets compiled into
- * the build (generated per target), how modules are loaded from the widgets directory, and
- * any commands only that host can run. Everything else a host binds on its own.
+ * the build (generated per target), how modules are loaded from the widgets directory, any
+ * commands only that host can run, and how many windows it can show. Everything else a
+ * host binds on its own.
  */
 fun uiCoreModule(
     builtIn: WidgetRegistry,
     moduleHost: (widgetsDir: Path, dataDir: Path) -> WidgetModuleHost,
     platformCommands: Scope.(WidgetCommandRegistry) -> Unit = {},
+    windowPolicy: WindowPolicy = WindowPolicy.Unlimited,
 ): Module = module {
+    // The windows the launcher has open. One for the process: it outlives a shell
+    // restarted after a crash, and each window leaves it as its shell goes.
+    single { WindowRegistry(windowPolicy) }
+    // Notification actions and drivers navigate here, into the main window.
+    single { MainWindowRequests() }
+
     single { SkinManager(get(), get()) }
     single { ClanRoleProvider(get()) }
     single { SkinLibrary(get<Path>().resolve("skins"), get()) }
@@ -216,7 +241,6 @@ fun uiCoreModule(
             activity         = get<ActivityRegistry>().activities,
             notifications    = get<NotificationArchiveStore>().log,
             doNotDisturb     = get<NotificationCenter>().doNotDisturb,
-            openProject      = get<OpenProjectState>().open,
             sslBypass        = sslBypassSource(get(), get<ServerProtocolConfig>().sslBypassHost, appScope),
             background       = get<BackgroundManager>().settings,
             accountsRevision = get<AccountChanges>().revision,
@@ -288,17 +312,6 @@ fun uiCoreModule(
     // The wallpaper settings, one per process because the manager carries the
     // shutdown flush for its debounced writes.
     single { BackgroundManager(get<Path>(), get()) }
-
-    // What the mod page is looking at, which the right rail's project-view family
-    // reads. A singleton because the page that writes it and the rail that reads
-    // it are different surfaces with no composition in common.
-    single { OpenProjectState() }
-
-    // Which family each surface is showing. A singleton rather than shell state
-    // because switching one is something the app DOES -- a navigation, a pack
-    // opening, a future plugin -- and not all of that runs inside a composition.
-    // Deliberately not persisted: it describes the moment, not the arrangement.
-    single { SurfaceFamilies() }
 
     // Editor mutation facade. Holds no state itself; fires LayoutGraph
     // updates into the shared CoroutineScope so callers stay
@@ -414,9 +427,6 @@ fun uiCoreModule(
             appScope   = get(),
         ).also { it.start() }
     }
-    // Navigation requests from outside the composition (notification actions,
-    // drivers). AppRoot collects and feeds them into the back stack.
-    single { NavRequests() }
     single { LauncherUpdateState() }
     // Surfaces pack-update outcomes (background auto-updater + manual flows via
     // the status hub) into the notification center. Same lifecycle rationale as
@@ -443,7 +453,6 @@ internal fun uiDataRegistry(
     activity: StateFlow<List<Activity>>,
     notifications: StateFlow<List<PersistedNotification>>,
     doNotDisturb: StateFlow<Boolean>,
-    openProject: StateFlow<OpenProject?>,
     sslBypass: WidgetDataSource<Boolean>,
     background: StateFlow<BackgroundSettings>,
     accountsRevision: StateFlow<Int>,
@@ -451,7 +460,12 @@ internal fun uiDataRegistry(
     register(Sources.Activity, flowSource(activity))
     register(Sources.Notifications, flowSource(notifications))
     register(Sources.DoNotDisturb, flowSource(doNotDisturb))
-    register(Sources.OpenProject, flowSource(openProject))
+    // Read off the window's own state, the one its pages publish into.
+    registerFactory(Sources.OpenProject, sample = ::sampleOpenProject) { window ->
+        flowSource(window.services.get<OpenProjectState>().open)
+    }
+    // What the window's owner provides when it opens the window: its state as the host reads it.
+    declare(Sources.Window) { HostWindowState.Sample }
     register(Sources.SslBypass, sslBypass)
     register(Sources.Background, flowSource(background))
     register(Sources.AccountsRevision, flowSource(accountsRevision))
@@ -500,6 +514,11 @@ internal fun uiCommandRegistry(
     declare(Commands.ApplyTheme)
     // What the About page provides for its update panel.
     declare(OpenUpdateDialog)
+    // What each window provides of the commands it takes.
+    declare(Commands.MaximizeWindow)
+    declare(Commands.MinimizeWindow)
+    declare(Commands.RestoreWindow)
+    declare(Commands.CloseWindow)
 }
 
 /**

@@ -83,7 +83,11 @@ import hivens.ui.utils.GameConsoleService
 import hivens.ui.utils.PreferenceWriter
 import hivens.ui.chrome.LocalRightRailSheet
 import hivens.ui.chrome.LocalUseCustomChrome
-import hivens.ui.widgets.ChildLevel
+import hivens.ui.host.HostedWindow
+import hivens.ui.host.MainWindowNavigation
+import hivens.ui.host.WindowId
+import hivens.ui.host.WindowOwner
+import hivens.ui.host.rememberActivityWindow
 import hivens.ui.widgets.NxMapControls
 import hivens.ui.widgets.NxViewportScrollbar
 import hivens.ui.widgets.PlayedWidgetEntrance
@@ -94,7 +98,6 @@ import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.LocalMapControls
 import hivens.widget.api.LocalScope
 import hivens.widget.api.LocalSlotChromeModifier
-import hivens.widget.api.LocalSurfaceFamilies
 import hivens.widget.api.LocalViewportScrollbar
 import hivens.widget.api.LocalWidgetCommandRegistry
 import hivens.widget.api.LocalWidgetDataRegistry
@@ -104,14 +107,12 @@ import hivens.widget.api.LocalWidgetRegistry
 import hivens.widget.api.LocalWidgetServiceRegistry
 import hivens.widget.api.LocalWidgetStateHost
 import hivens.widget.api.LocalWidgetSurfaceRenderer
-import hivens.widget.api.SurfaceFamilies
 import hivens.widget.api.WidgetCommandRegistry
 import hivens.widget.api.WidgetDataRegistry
 import hivens.widget.api.WidgetScope
 import hivens.widget.api.WidgetServiceRegistry
 import hivens.widget.api.WidgetSurfaceRenderer
 import hivens.widget.model.DefaultLayout
-import hivens.widget.model.ScopeLevel
 import hivens.widget.model.walkInstances
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -142,7 +143,6 @@ fun AndroidShell() {
     val appLevel: WidgetScope = koinInject()
     val widgetCommandRegistry: WidgetCommandRegistry = koinInject()
     val widgetStateStore: WidgetStateStore = koinInject()
-    val surfaceFamilies: SurfaceFamilies = koinInject()
     val applicationScope: CoroutineScope = koinInject()
     val preferences: PreferenceWriter = koinInject()
     val accountStore: AccountStore = koinInject()
@@ -256,7 +256,6 @@ fun AndroidShell() {
                 LocalScope provides appLevel,
                 LocalWidgetCommandRegistry provides widgetCommandRegistry,
                 LocalWidgetStateHost provides widgetStateStore,
-                LocalSurfaceFamilies provides surfaceFamilies,
                 LocalWidgetDecorator provides IdentityWidgetDecorator,
                 LocalSlotChromeModifier provides IdentitySlotChromeModifier,
                 LocalWidgetSurfaceRenderer provides surfaceRenderer,
@@ -266,8 +265,12 @@ fun AndroidShell() {
                 LocalUseCustomChrome provides false,
                 LocalRightRailSheet provides true,
             ) {
-              // The one window a phone has, for as long as this shell draws it.
-              ChildLevel(ScopeLevel.Window) {
+              // The one window a phone has, the Activity, registered with the host and
+              // given its level for as long as this shell draws it.
+              HostedWindow(WindowId.Main, WindowOwner.Launcher, rememberActivityWindow()) {
+                // A notification action opens here. The Activity is in front whenever
+                // one can be tapped, so there is nothing to raise.
+                MainWindowNavigation(raise = {})
                 // The window's layers and its dismiss stack, at the root of its level and around
                 // the theme, as on the desktop: the host belongs to the window, and a layer takes
                 // its theme from where it is opened.

@@ -3,6 +3,7 @@ package hivens.ui.utils
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import hivens.ui.chrome.LocalComposeWindow
+import hivens.ui.host.LocalHostWindow
 import io.github.vinceglb.filekit.dialogs.FileKitDialogParent
 import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
 
@@ -17,11 +18,12 @@ import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
  * already publishes through [LocalComposeWindow].
  */
 @Composable
-actual fun rememberFileDialogSettings(title: String?): FileKitDialogSettings {
+actual fun rememberFileDialogSettings(title: String?): FileDialogSettings {
     // A window that is not displayable has no native handle to hand over, and
     // FileKit reads that handle rather than falling back.
     val window = LocalComposeWindow.current?.takeIf { it.isDisplayable }
-    return remember(title, window) {
-        FileKitDialogSettings(title = title, parent = window?.let(FileKitDialogParent::awt))
+    val host = LocalHostWindow.current
+    return remember(title, window, host) {
+        FileDialogSettings(FileKitDialogSettings(title = title, parent = window?.let(FileKitDialogParent::awt)), host)
     }
 }

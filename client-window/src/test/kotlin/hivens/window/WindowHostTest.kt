@@ -22,10 +22,19 @@ class WindowHostTest {
     private class FakeFrame(state: Int = 0, var frameBounds: Rectangle = Rectangle(0, 0, 1920, 1032)) : FrameOps {
         private val stateListeners = ArrayList<(Int, Int) -> Unit>()
         private val geometryListeners = ArrayList<() -> Unit>()
+        private val focusListeners = ArrayList<(Boolean) -> Unit>()
         private val queued = ArrayList<() -> Unit>()
         var minimum: Dimension? = null
         var screen: String = "screen-1"
         var obeys = true
+        var raised = 0
+        override var focused = false
+
+        /** What the toolkit does when the window gains or loses the focus. */
+        fun focus(gained: Boolean) {
+            focused = gained
+            focusListeners.toList().forEach { it(gained) }
+        }
 
         private var state = state
         override var extendedState: Int
@@ -62,6 +71,13 @@ class WindowHostTest {
             return { geometryListeners -= listener }
         }
 
+        override fun onFocusChanged(listener: (Boolean) -> Unit): () -> Unit {
+            focusListeners += listener
+            return { focusListeners -= listener }
+        }
+
+        override fun raise() { raised++ }
+
         override fun later(block: () -> Unit) { queued += block }
 
         /** Runs what was queued for the event thread, and what that queued in turn. */
@@ -83,8 +99,11 @@ class WindowHostTest {
         override fun start(report: (Boolean) -> Unit) { this.report = report }
     }
 
-    private fun host(frame: FakeFrame, backend: Backend = PlainBackend(WindowActions.Everything), firstRestore: Rectangle? = null) =
-        WindowHost(frame, backend, firstRestore).also { it.start() }
+    private fun host(
+        frame: FakeFrame,
+        backend: Backend = PlainBackend(WindowActions.Everything),
+        firstRestore: Rectangle? = null,
+    ) = WindowHost(frame, backend, firstRestore).also { it.start() }
 
     @Test
     fun `where nothing else answers the frame's extended state is the state`() {
@@ -98,6 +117,42 @@ class WindowHostTest {
         host.unminimize()
         host.restore()
         assertEquals(WindowStatus(maximized = false, minimized = false), host.status.value)
+    }
+
+    @Test
+    fun `focus and size are the frame's, and follow it`() {
+        val frame = FakeFrame(frameBounds = Rectangle(10, 10, 1200, 800))
+        val host = host(frame)
+        assertEquals(WindowSize(1200, 800), host.size.value)
+        assertFalse(host.focused.value)
+        frame.focus(true)
+        assertTrue(host.focused.value)
+        frame.bounds = Rectangle(10, 10, 1000, 700)
+        assertEquals(WindowSize(1000, 700), host.size.value)
+        frame.focus(false)
+        assertFalse(host.focused.value)
+    }
+
+    @Test
+    fun `focus and size alone leave the state as it was`() {
+        val frame = FakeFrame()
+        val host = host(frame)
+        val heard = ArrayList<WindowStatus>()
+        val _ = host.onStatusChanged { heard += it }
+        frame.focus(true)
+        frame.bounds = Rectangle(0, 0, 800, 600)
+        assertTrue(heard.isEmpty(), "the session record and the caption buttons wait for a change of state, not a click into the window")
+        host.maximize()
+        assertEquals(1, heard.size)
+    }
+
+    @Test
+    fun `raising a minimised window asks the frame and leaves the state to the system`() {
+        val frame = FakeFrame(state = Frame.ICONIFIED)
+        val host = host(frame)
+        host.raise()
+        assertEquals(1, frame.raised)
+        assertTrue(host.status.value.minimized, "a raise is a request, and the system says when the window came back")
     }
 
     @Test

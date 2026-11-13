@@ -29,7 +29,6 @@ class KeyDeclarationDriftTest {
         activity         = MutableStateFlow(emptyList()),
         notifications    = MutableStateFlow(emptyList()),
         doNotDisturb     = MutableStateFlow(false),
-        openProject      = MutableStateFlow(null),
         sslBypass        = flowSource(MutableStateFlow(false)),
         background       = MutableStateFlow(BackgroundSettings()),
         accountsRevision = MutableStateFlow(0),

@@ -64,7 +64,8 @@ import hivens.ui.widgets.RailBlock
 import hivens.ui.widgets.RailGroup
 import hivens.ui.widgets.RailLabel
 import hivens.ui.widgets.Sources
-import hivens.widget.api.rememberSource
+import hivens.widget.api.rememberScopedSource
+import hivens.widget.api.valueOrNull
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 import hivens.ui.theme.NxInk
@@ -80,8 +81,9 @@ import hivens.ui.theme.Status
  * news. The blocks go here instead and the page keeps the header, the tabs and
  * the body.
  *
- * Each one reads [Sources.OpenProject] and draws nothing when it is null, which
- * is every screen but the page. That is what makes them ordinary widgets: the
+ * Each one reads [Sources.OpenProject] from the window it is drawn in and draws
+ * nothing when it is null or missing, which is every screen but the page. That is
+ * what makes them ordinary widgets: the
  * reader can move them between the rail's two project slots, or take one out, and
  * nothing anywhere has to know they are gone.
  */
@@ -114,8 +116,7 @@ private const val PENDING = "…"
 )
 @Composable
 fun ProjectCompatibilityWidget(instance: WidgetInstance) {
-    val project by rememberSource(Sources.OpenProject)
-    val p = project ?: return
+    val p = rememberScopedSource(Sources.OpenProject).valueOrNull() ?: return
     val s = LocalStrings.current
 
     RailBlock(s.modRailCompatibility) {
@@ -242,8 +243,7 @@ private fun environmentIcon(environment: Environment): IconKey = when (environme
 )
 @Composable
 fun ProjectTagsWidget(instance: WidgetInstance) {
-    val project by rememberSource(Sources.OpenProject)
-    val p = project ?: return
+    val p = rememberScopedSource(Sources.OpenProject).valueOrNull() ?: return
     val s = LocalStrings.current
     if (p.categories.isEmpty()) return
 
@@ -279,8 +279,7 @@ fun ProjectTagsWidget(instance: WidgetInstance) {
 )
 @Composable
 fun ProjectLinksWidget(instance: WidgetInstance) {
-    val project by rememberSource(Sources.OpenProject)
-    val p = project ?: return
+    val p = rememberScopedSource(Sources.OpenProject).valueOrNull() ?: return
     val s = LocalStrings.current
     val follow = rememberLinkFollower(p.packId)
     if (p.links.isEmpty()) return
@@ -360,8 +359,7 @@ private fun linkIcon(kind: ProjectLinkKind): IconKey = when (kind) {
 )
 @Composable
 fun ProjectCreatorsWidget(instance: WidgetInstance) {
-    val project by rememberSource(Sources.OpenProject)
-    val p = project ?: return
+    val p = rememberScopedSource(Sources.OpenProject).valueOrNull() ?: return
     val s = LocalStrings.current
     if (p.creators.isEmpty()) return
 
@@ -451,8 +449,7 @@ private fun CreatorAvatar(creator: ProjectCreator) {
 )
 @Composable
 fun ProjectDetailsWidget(instance: WidgetInstance) {
-    val project by rememberSource(Sources.OpenProject)
-    val p = project ?: return
+    val p = rememberScopedSource(Sources.OpenProject).valueOrNull() ?: return
     val s = LocalStrings.current
 
     RailBlock(s.modRailDetails) {

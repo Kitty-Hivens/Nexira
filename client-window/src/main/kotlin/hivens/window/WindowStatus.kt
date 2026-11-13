@@ -1,11 +1,17 @@
 package hivens.window
 
 /**
- * The launcher window's state, as [WindowHost] reads it from the system. Never
+ * A launcher window's state, as [WindowHost] reads it from the system. Never
  * set by the launcher itself: a command goes to the system, and this changes
  * when the system says the window changed.
  */
 data class WindowStatus(val maximized: Boolean, val minimized: Boolean)
+
+/**
+ * A window's size in AWT user space, which is the Compose Dp value 1:1 (see
+ * [initialWindowSize]).
+ */
+data class WindowSize(val width: Int, val height: Int)
 
 /**
  * What the window manager lets the user do with the launcher's window, as the

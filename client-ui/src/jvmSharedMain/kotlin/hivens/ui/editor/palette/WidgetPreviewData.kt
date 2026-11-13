@@ -43,13 +43,18 @@ import kotlinx.coroutines.flow.MutableStateFlow
  * Names here are roles rather than people, and the project is openly invented.
  * It carries no project type, so its tags stay labels: a tile in the gallery is
  * not a way into the catalogue.
+ *
+ * The open project lives on the window rather than in this registry, so the
+ * gallery puts [sampleOpenProject] over the window it is drawn in instead.
  */
 internal fun previewDataRegistry(): WidgetDataRegistry = WidgetDataRegistry().apply {
     register(Sources.Activity, flowSource(MutableStateFlow(SAMPLE_ACTIVITY)))
     register(Sources.Notifications, flowSource(MutableStateFlow(SAMPLE_NOTIFICATIONS)))
     register(Sources.DoNotDisturb, flowSource(MutableStateFlow(false)))
-    register(Sources.OpenProject, flowSource(MutableStateFlow<OpenProject?>(SAMPLE_PROJECT)))
 }
+
+/** The project the gallery and the editor draw the project rail's widgets on. */
+internal fun sampleOpenProject(): OpenProject = SAMPLE_PROJECT
 
 // Read per call rather than once per class load, which is what a `val` here did:
 // the first palette of the session froze the clock, and a launcher left open for

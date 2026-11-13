@@ -29,8 +29,10 @@ import hivens.widget.api.LocalSlotPath
 import hivens.ui.editor.ShellChromeBounds
 import hivens.ui.editor.LocalShellChromeBounds
 import hivens.ui.widgets.ChildLevel
+import hivens.ui.widgets.Sources
 import hivens.widget.api.LocalMisplacedWidget
 import hivens.widget.api.ProvideSamples
+import hivens.widget.api.ProvideScoped
 import hivens.widget.api.WidgetDataRegistry
 import hivens.widget.api.LocalWidgetDecorator
 import hivens.widget.api.LocalUnknownWidgetDecorator
@@ -376,6 +378,10 @@ private const val MIN_INK = 0.004f
  * What a page's screen hands its widgets is not there, so [PreviewSubject] draws the
  * widget on the samples those keys declare, and only a widget needing a key with no
  * sample declines to draw and keeps its letter.
+ *
+ * The open project is the window's and not a registry's, so it is put over the
+ * window for the preview alone: the rail's blocks show the sample project rather
+ * than whatever page the person has open.
  */
 @Composable
 internal fun PreviewEnvironment(data: WidgetDataRegistry, content: @Composable () -> Unit) {
@@ -393,7 +399,9 @@ internal fun PreviewEnvironment(data: WidgetDataRegistry, content: @Composable (
         LocalMisplacedWidget provides { _, _, _ -> },
         LocalShellChromeBounds provides ownBounds,
     ) {
-        ChildLevel(ScopeLevel.Page, content)
+        ProvideScoped(Sources.OpenProject, sampleOpenProject()) {
+            ChildLevel(ScopeLevel.Page, content)
+        }
     }
 }
 

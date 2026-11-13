@@ -216,12 +216,14 @@ class ModPageRenderTest {
         val railProject = if (local) openLocal() else open(slug)
         val rail = SurfaceId("appshell.rightrail")
         val registry = WidgetDataRegistry().apply {
-            register(Sources.OpenProject, flowSource(MutableStateFlow<OpenProject?>(railProject)))
+            // The rail reads the open project off its window, which the page publishes into.
+            registerFactory(Sources.OpenProject) { flowSource(MutableStateFlow<OpenProject?>(railProject)) }
             // Declared the way the launcher declares it, so the page's widgets know
             // the key they need lives on the page and find it there.
             declare(ProjectPageSource)
         }
         val families = SurfaceFamilies().apply { switch(rail, FamilyId("projectView"), owner = Unit) }
+        val window = remember { windowLevel(registry) }
 
         CompositionLocalProvider(
             LocalLayoutGraph provides DefaultLayout.load(),
@@ -229,6 +231,7 @@ class ModPageRenderTest {
             LocalWidgetDataRegistry provides registry,
             LocalSurfaceFamilies provides families,
             LocalWidgetSurfaceRenderer provides { spec, content -> WidgetSurface(spec, content) },
+            LocalScope provides window,
         ) {
             Row(Modifier.fillMaxSize().background(NxColor.page)) {
                 // Stand-in for appshell.leftrail, here only so the page is measured
@@ -240,7 +243,7 @@ class ModPageRenderTest {
                 val page = remember(pageState) {
                     ProjectPage(pageState, mutableStateOf(ModPageTab.Description), emptyList(), onOpenVersion = {}, onReload = {})
                 }
-                val level = remember { pageLevel(registry) }
+                val level = remember { window.child(ScopeLevel.Page) }
                 CompositionLocalProvider(LocalScope provides level) {
                   ProvideScoped(ProjectPageSource, page) {
                     Column(Modifier.weight(1f).fillMaxHeight()) {
@@ -286,11 +289,11 @@ class ModPageRenderTest {
         }
     }
 
-    /** A page level under an app level of its own, which is all the page's widgets climb to. */
-    private fun pageLevel(registry: WidgetDataRegistry): WidgetScope =
+    /** A window level under an app level of its own: the rail reads its window, the page's widgets climb through it. */
+    private fun windowLevel(registry: WidgetDataRegistry): WidgetScope =
         koinApplication {
             modules(module { single { WidgetScope.app(registry, this, Dispatchers.Unconfined) } })
-        }.koin.get<WidgetScope>().child(ScopeLevel.Page)
+        }.koin.get<WidgetScope>().child(ScopeLevel.Window)
 
     private fun sheet(slug: String, name: String, local: Boolean = false) {
         val out = Path.of("build/render", name)

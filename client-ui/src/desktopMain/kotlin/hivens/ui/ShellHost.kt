@@ -29,6 +29,7 @@ import hivens.ui.generated.resources.Res
 import hivens.ui.generated.resources.icon
 import hivens.ui.i18n.AppLocale
 import hivens.ui.i18n.stringsFor
+import hivens.ui.screens.ConsoleWindow
 import hivens.ui.threshold.BootOutcome
 import hivens.ui.threshold.BootStage
 import hivens.ui.threshold.ThresholdOverlay
@@ -59,7 +60,8 @@ class WindowChromeHooks(defaultClose: () -> Unit) {
 }
 
 /**
- * The ONE window, owned from the first frame to process exit. Boot happens
+ * The main window, owned from the first frame to process exit, and once the boot
+ * is done the console window beside it. Boot happens
  * BEHIND it: while the boot thread runs, the [ThresholdOverlay] covers the
  * canvas; when [outcomeFlow] flips to Ready the shell content mounts UNDER
  * the still-opaque overlay (masking its expensive first composition), and
@@ -69,6 +71,11 @@ class WindowChromeHooks(defaultClose: () -> Unit) {
  *
  * Window-creation-time values that normally live behind Koin (undecorated
  * chrome, locale) come from the pre-Koin [GuiBootstrap.PreBoot.peek].
+ *
+ * The console is a window of the application in its own right, a sibling of the
+ * main window here rather than a part of its content: hiding the main window to
+ * the tray leaves it open, and quitting ends the application and both windows with
+ * it. It draws in the look the main shell publishes to [ShellLook].
  */
 @Composable
 fun ApplicationScope.ShellHost(
@@ -121,6 +128,7 @@ fun ApplicationScope.ShellHost(
     val chrome = remember { WindowChromeHooks(defaultClose = { exitApplication() }) }
     val windowIcon = painterResource(Res.drawable.icon)
     val thresholdStrings = remember { stringsFor(AppLocale.fromTag(pre.peek.locale)) }
+    val look = remember { ShellLook(dark = pre.peek.isDarkTheme, locale = AppLocale.fromTag(pre.peek.locale)) }
 
     // A recovery restart with boot already done skips the threshold entirely
     // (no black frame). The restart flag is EXPLICIT, not inferred from the
@@ -172,6 +180,7 @@ fun ApplicationScope.ShellHost(
                     visibleState    = visibleState,
                     chrome          = chrome,
                     opening         = opening,
+                    look            = look,
                     exitApp         = { exitApplication() },
                 )
             }
@@ -192,4 +201,6 @@ fun ApplicationScope.ShellHost(
             }
         }
     }
+    // Koin is up once the boot is ready, and the console asks it for its service.
+    if (outcome is BootOutcome.Ready) ConsoleWindow(look)
 }

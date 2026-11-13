@@ -3,6 +3,7 @@ package hivens.ui
 import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import hivens.ui.components.QuitWithGameHost
@@ -88,7 +89,6 @@ import hivens.ui.notifications.Kind
 import hivens.ui.notifications.NotificationCenter
 import hivens.ui.notifications.Severity
 import hivens.ui.notifications.render.NotificationStack
-import hivens.ui.screens.ConsoleWindow
 import hivens.ui.screens.MigrationScreen
 import hivens.ui.theme.NxTheme
 import hivens.ui.text.needsCjkFace
@@ -124,7 +124,13 @@ import hivens.ui.widgets.NxViewportScrollbar
 import hivens.ui.widgets.PlayedWidgetEntrance
 import hivens.widget.api.WidgetSurfaceRenderer
 import androidx.compose.foundation.background
-import hivens.ui.widgets.ChildLevel
+import hivens.ui.host.DesktopWindowBackend
+import hivens.ui.host.HostedWindow
+import hivens.ui.host.MainWindowNavigation
+import hivens.ui.host.WindowCommand
+import hivens.ui.host.WindowId
+import hivens.ui.host.WindowOwner
+import hivens.ui.host.WindowRegistry
 import hivens.ui.widgets.WidgetSurface
 import hivens.ui.widgets.modules.WidgetModules
 import hivens.ui.widgets.modules.toThemes
@@ -132,9 +138,7 @@ import hivens.ui.widgets.state.WidgetStateStore
 import hivens.widget.api.LocalWidgetCommandRegistry
 import hivens.widget.api.LocalWidgetDataRegistry
 import hivens.widget.api.LocalWidgetServiceRegistry
-import hivens.widget.api.LocalSurfaceFamilies
 import hivens.widget.api.LocalWidgetStateHost
-import hivens.widget.api.SurfaceFamilies
 import hivens.widget.api.WidgetCommandRegistry
 import hivens.widget.api.WidgetDataRegistry
 import hivens.widget.api.LocalScope
@@ -142,7 +146,6 @@ import hivens.widget.api.WidgetScope
 import hivens.widget.api.WidgetServiceRegistry
 import hivens.widget.api.WidgetRegistry
 import hivens.widget.model.DefaultLayout
-import hivens.widget.model.ScopeLevel
 import hivens.widget.model.walkInstances
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -186,6 +189,7 @@ fun FrameWindowScope.AppShellContent(
     visibleState: MutableState<Boolean>,
     chrome: WindowChromeHooks,
     opening: OpeningFrame,
+    look: ShellLook,
     exitApp: () -> Unit,
 ) {
     // Tray teardown is composition-scoped: the tray is re-init'd per
@@ -276,6 +280,7 @@ fun FrameWindowScope.AppShellContent(
         ).also { it.keepMinimumSize(MIN_SHELL_SIZE) }
     }
     DisposableEffect(windowHost) { onDispose { windowHost.close() } }
+    val windowRegistry: WindowRegistry = koinInject()
     val windowStatus by windowHost.status.collectAsState()
     val windowActions = windowHost.actions.collectAsState()
     val windowCapabilities = remember(windowActions) { derivedStateOf { windowActions.value.toCapabilities() } }
@@ -808,11 +813,17 @@ fun FrameWindowScope.AppShellContent(
             }
         }
 
-        // Console window moved inside the CompositionLocalProvider /
-        // NxTheme block below so it inherits the active theme and the
-        // customization. The window
-        // itself is a separate OS surface, but Compose Desktop propagates
-        // CompositionLocals down through the Window composable.
+        // The console is a window of its own beside this one (see ShellHost) and
+        // draws in what this shell decided, published for it here.
+        SideEffect {
+            look.update(
+                theme         = themeLibrary.active,
+                dark          = isDarkTheme,
+                locale        = currentLocale,
+                uiFamily      = uiFamily,
+                customization = customization,
+            )
+        }
 
         // ── Main window ────────────────────────────────────────────────
         // af.requestCloseDialog dispatches: chaos active -> pop the torturous
@@ -840,6 +851,23 @@ fun FrameWindowScope.AppShellContent(
         // shell mounts. Plain assignments -- the window reads the hooks at
         // event time, and recomposition keeps them pointing at fresh captures.
         chrome.onCloseRequest = onCloseChrome
+        // The main window as the host has it: what its WindowHost reads, every window
+        // command, its own close path, and a raise that also brings it back from the
+        // tray, the same two steps a second launch takes.
+        val closeMain by rememberUpdatedState(onCloseChrome)
+        val backendScope = rememberCoroutineScope()
+        val mainBackend = remember(windowHost) {
+            DesktopWindowBackend(
+                host     = MutableStateFlow(windowHost),
+                scope    = backendScope,
+                commands = WindowCommand.entries.toSet(),
+                onClose  = { closeMain() },
+                onRaise  = {
+                    revealWindow()
+                    raiseTick++
+                },
+            )
+        }
         // The window's layers and its dismiss stack, mounted at the root of the
         // window's level below. Escape that nothing focused used becomes back, which
         // a Compose popup or dialog opened later takes before the stack does. The two
@@ -872,16 +900,7 @@ fun FrameWindowScope.AppShellContent(
             // user was doing when the launcher started.
             LaunchedEffect(raiseTick) {
                 if (raiseTick == 0) return@LaunchedEffect
-                SwingUtilities.invokeLater {
-                    // The isAlwaysOnTop trick is the only cross-WM way to
-                    // force a raise on X11 (KDE / Hyprland / GNOME all
-                    // ignore plain toFront() to discourage focus-stealing).
-                    // Pulse it: enable -> toFront -> requestFocus -> disable.
-                    window.isAlwaysOnTop = true
-                    window.toFront()
-                    window.requestFocus()
-                    window.isAlwaysOnTop = false
-                }
+                SwingUtilities.invokeLater { windowHost.raise() }
             }
 
             // Remembered: observe() hands out a new flow per call, and collecting a new
@@ -899,9 +918,6 @@ fun FrameWindowScope.AppShellContent(
             // fresh identity each recompose would invalidate the whole content
             // subtree rather than just the widgets that have a surface.
             val surfaceRenderer: WidgetSurfaceRenderer = remember { { spec, content -> WidgetSurface(spec, content) } }
-            // Which family each surface shows. From Koin, not remembered here, so a
-            // switch can come from outside the composition.
-            val surfaceFamilies: SurfaceFamilies = koinInject()
             val windowFrame = remember(window, windowHost, onCloseChrome) {
                 DesktopWindowFrame(window, windowHost, windowCapabilities, onCloseChrome)
             }
@@ -914,7 +930,6 @@ fun FrameWindowScope.AppShellContent(
                 LocalScope                               provides appLevel,
                 LocalWidgetCommandRegistry               provides widgetCommandRegistry,
                 LocalWidgetStateHost                     provides widgetStateStore,
-                LocalSurfaceFamilies                     provides surfaceFamilies,
                 // Dev UI-debug seams: report-only bounds instrumentation, mounted
                 // ONLY while a non-release build has the overlay on AND a facet needs
                 // it -- else identity, so a dev build with the overlay off runs the
@@ -941,23 +956,11 @@ fun FrameWindowScope.AppShellContent(
                 LocalCustomChromeAvailable               provides WindowManagerProbe.allowsCustomFrame,
             ) {
 
-            // Console runs as its own OS window but is composed from here so
-            // it inherits LocalCustomization via the composition tree. Its own
-            // NxTheme wrap is what projects the theme into the window's surface.
-            // This site only ensures the composition locals are in scope.
-            if (gameConsole.shouldShowConsole) {
-                // Console preferences are the store's; the window collects them
-                // itself so a slider drag does not recompose the shell.
-                ConsoleWindow(
-                    isDarkTheme    = isDarkTheme,
-                    onClose        = { gameConsole.hide() },
-                    theme          = themeLibrary.active,
-                )
-            }
-
-            // The main window's level, for as long as this shell draws it. The console
-            // stays outside: it is a window of its own and has no level yet.
-            ChildLevel(ScopeLevel.Window) {
+            // The main window in the host's registry, and its level, for as long as
+            // this shell draws it. The console is a window of its own beside it.
+            HostedWindow(WindowId.Main, WindowOwner.Launcher, mainBackend, windowRegistry) {
+            // A notification action opens here, in the main window, and raises it.
+            MainWindowNavigation(raise = mainBackend::raise)
             LayerHost(windowLayers, Modifier.fillMaxSize()) {
             val themeReveal = rememberThemeReveal()
             NxTheme(
@@ -1106,7 +1109,7 @@ fun FrameWindowScope.AppShellContent(
                 )
             }
             } // end LayerHost
-            } // end ChildLevel(Window)
+            } // end HostedWindow(Main)
             } // end CompositionLocalProvider(LocalCustomization)
         }
     }

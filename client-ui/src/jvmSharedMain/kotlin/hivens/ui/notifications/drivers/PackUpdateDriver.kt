@@ -5,7 +5,7 @@ import hivens.core.update.PackUpdateStatus
 import hivens.core.update.PackUpdateStatusHub
 import hivens.ui.Screen
 import hivens.ui.i18n.AppStrings
-import hivens.ui.navigation.NavRequests
+import hivens.ui.navigation.MainWindowRequests
 import hivens.ui.notifications.Kind
 import hivens.ui.notifications.NotifAction
 import hivens.ui.notifications.NotifGlyph
@@ -22,14 +22,14 @@ import kotlinx.coroutines.launch
  * the whole map on any instance's change, and an auto-update pass re-deriving
  * the same Pending must not re-toast it) and not at all while it is held by
  * policy; `Checking` is noise and stays quiet.
- * Actions navigate through [NavRequests] -- a toast has no place in the
- * composition to reach the back stack directly.
+ * Actions navigate through [MainWindowRequests]: a toast has no place in the
+ * composition to reach the back stack directly, so it opens in the main window.
  */
 class PackUpdateDriver(
     private val hub: PackUpdateStatusHub,
     private val repository: IPackRepository,
     private val notifications: NotificationCenter,
-    private val nav: NavRequests,
+    private val nav: MainWindowRequests,
     private val appScope: CoroutineScope,
     private val stringsProvider: () -> AppStrings,
 ) {

@@ -31,10 +31,9 @@ import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetField
 import hivens.ui.puppet.PuppetToggle
 import hivens.ui.theme.NxTheme
+import hivens.ui.utils.pickDirectory
 import hivens.ui.utils.rememberFileDialogSettings
-import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.PlatformFile
-import io.github.vinceglb.filekit.dialogs.openDirectoryPicker
 import io.github.vinceglb.filekit.path
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -257,10 +256,7 @@ internal fun AdvancedSection(
                     // ProGuard keep on io.github.vinceglb.filekit.** is what makes the
                     // directory-hint overload survive shrinking (the 2.3.1 dead-button bug).
                     val pickResult = runCatching {
-                        FileKit.openDirectoryPicker(
-                            directory      = PlatformFile(paths.dataDir.toFile()),
-                            dialogSettings = dialogSettings,
-                        )
+                        pickDirectory(settings = dialogSettings, directory = PlatformFile(paths.dataDir.toFile()))
                     }
                     val pickedFile = pickResult.getOrElse { ex ->
                         // Surface the failure so a "dead button" stops looking dead.

@@ -51,4 +51,16 @@ object Commands {
 
     /** Puts the theme of this id in use and leaves the picker. */
     val ApplyTheme = CommandKey<String>("theme.apply", ScopeLevel.Composition)
+
+    // What a widget may ask of the window it is drawn in, each offered only by a
+    // window that takes it. One the window manager does not allow at the moment
+    // does nothing, the way the caption buttons stand down. Paired with [Sources.Window].
+    val MaximizeWindow = CommandKey<Unit>("window.maximize", ScopeLevel.Window)
+    val MinimizeWindow = CommandKey<Unit>("window.minimize", ScopeLevel.Window)
+
+    /** Brings a minimised window back and a maximised one to its normal size. */
+    val RestoreWindow = CommandKey<Unit>("window.restore", ScopeLevel.Window)
+
+    /** Closes the window the way its own close button does: the main window may hide to the tray. */
+    val CloseWindow = CommandKey<Unit>("window.close", ScopeLevel.Window)
 }

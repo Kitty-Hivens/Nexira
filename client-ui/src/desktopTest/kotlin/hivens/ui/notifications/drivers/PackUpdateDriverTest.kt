@@ -9,7 +9,7 @@ import hivens.core.update.PackUpdateStatus
 import hivens.core.update.PackUpdateStatusHub
 import hivens.core.update.UpdateDirection
 import hivens.ui.i18n.EnglishStrings
-import hivens.ui.navigation.NavRequests
+import hivens.ui.navigation.MainWindowRequests
 import hivens.ui.notifications.Kind
 import hivens.ui.notifications.NotificationCenter
 import kotlinx.coroutines.CoroutineScope
@@ -68,7 +68,7 @@ class PackUpdateDriverTest {
      */
     private fun TestScope.startDriver(hub: FakeHub, center: NotificationCenter): CoroutineScope {
         val scope = CoroutineScope(StandardTestDispatcher(testScheduler))
-        PackUpdateDriver(hub, FakeRepo(instance), center, NavRequests(), scope) { EnglishStrings }.start()
+        PackUpdateDriver(hub, FakeRepo(instance), center, MainWindowRequests(), scope) { EnglishStrings }.start()
         advanceUntilIdle()
         return scope
     }

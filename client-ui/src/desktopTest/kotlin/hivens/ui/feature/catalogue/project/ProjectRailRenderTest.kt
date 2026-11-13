@@ -14,6 +14,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Density
@@ -25,24 +26,30 @@ import hivens.core.api.dto.modrinth.ModrinthProject
 import hivens.ui.components.formatBuildTimestamp
 import hivens.ui.surface.NxSurface
 import hivens.ui.theme.NxTheme
+import hivens.ui.widgets.ChildLevel
 import hivens.ui.widgets.Sources
 import hivens.ui.widgets.WidgetSurface
 import hivens.widget.api.LocalLayoutGraph
-import hivens.widget.api.LocalWidgetDataRegistry
+import hivens.widget.api.LocalScope
 import hivens.widget.api.LocalSurfaceFamilies
 import hivens.widget.api.LocalWidgetRegistry
 import hivens.widget.api.LocalWidgetSurfaceRenderer
 import hivens.widget.api.SlotRenderer
 import hivens.widget.api.SurfaceFamilies
 import hivens.widget.api.WidgetDataRegistry
+import hivens.widget.api.WidgetScope
 import hivens.widget.api.flowSource
 import hivens.widget.generated.GeneratedWidgetRegistry
 import hivens.widget.model.DefaultLayout
 import hivens.widget.model.FamilyId
+import hivens.widget.model.ScopeLevel
 import hivens.widget.model.SlotId
 import hivens.widget.model.SurfaceId
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.serialization.json.Json
+import org.koin.dsl.koinApplication
+import org.koin.dsl.module
 import org.jetbrains.skia.EncodedImageFormat
 import java.nio.file.Files
 import java.nio.file.Path
@@ -119,11 +126,27 @@ class ProjectRailRenderTest {
         )
     }
 
+    /** An app level whose windows answer the open project with [project], the way a window's page publishes it. */
+    private fun app(project: OpenProject): WidgetScope {
+        val registry = WidgetDataRegistry().apply {
+            registerFactory(Sources.OpenProject) { flowSource(MutableStateFlow<OpenProject?>(project)) }
+        }
+        return koinApplication {
+            modules(module { single { WidgetScope.app(registry, this, Dispatchers.Unconfined) } })
+        }.koin.get()
+    }
+
     @Composable
     private fun Rail(project: OpenProject) {
-        val registry = WidgetDataRegistry().apply {
-            register(Sources.OpenProject, flowSource(MutableStateFlow<OpenProject?>(project)))
+        val app = remember(project) { app(project) }
+        CompositionLocalProvider(LocalScope provides app) {
+            // The rail reads the project off the window it is drawn in.
+            ChildLevel(ScopeLevel.Window) { RailInWindow() }
         }
+    }
+
+    @Composable
+    private fun RailInWindow() {
         val surface = SurfaceId("appshell.rightrail")
         // Switched the way the page switches it. Without this the sheet drew three
         // empty columns, because SlotRenderer resolves the family from the holder
@@ -134,7 +157,6 @@ class ProjectRailRenderTest {
         CompositionLocalProvider(
             LocalLayoutGraph provides DefaultLayout.load(),
             LocalWidgetRegistry provides GeneratedWidgetRegistry,
-            LocalWidgetDataRegistry provides registry,
             LocalSurfaceFamilies provides families,
             LocalWidgetSurfaceRenderer provides { spec, content -> WidgetSurface(spec, content) },
         ) {

@@ -38,8 +38,8 @@ import hivens.launcher.instance.swapFor
 import hivens.launcher.launch.LauncherController
 import hivens.launcher.modrinth.ModrinthClient
 import hivens.launcher.platform.PlatformPaths
+import hivens.ui.utils.FileDialogSettings
 import hivens.ui.utils.pickFiles
-import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
 import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.path
 import kotlinx.coroutines.CancellationException
@@ -696,7 +696,7 @@ internal class ContentTabState(
      * thing the picker helper's callers are meant to avoid. Once files are chosen,
      * the copy is the disk's business and runs to the end wherever the reader goes.
      */
-    fun addFiles(dialogSettings: FileKitDialogSettings) {
+    fun addFiles(dialogSettings: FileDialogSettings) {
         scope.launch {
             val kind = filter.kind ?: ContentKind.Mod
             val extensions = if (kind == ContentKind.Mod) listOf("jar") else listOf("zip")

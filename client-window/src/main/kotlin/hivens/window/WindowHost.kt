@@ -12,7 +12,8 @@ import java.awt.Toolkit
 import java.util.concurrent.CopyOnWriteArrayList
 
 /**
- * The one owner of the launcher window's state, and the one way to change it.
+ * The one owner of a launcher window's state, and the one way to change it. Every
+ * OS window the launcher opens gets one: the main window and the console alike.
  *
  * [status] is what the system says, from one source per fact. Maximised is the
  * word of whoever decides it on this system: Windows through WM_SIZE where the
@@ -23,6 +24,11 @@ import java.util.concurrent.CopyOnWriteArrayList
  * launcher never sets either itself, nor infers them from how big the frame is:
  * a click before the system answers the last one would read its own guess, and a
  * frame that merely fills the screen is not maximised.
+ *
+ * [focused] and [size] are apart from [status]: they change by the dozen in a
+ * minute and say nothing about which state the window is in, so whatever follows
+ * the state (the caption buttons, the session record) is not woken by them.
+ * Focus is the toolkit's focus events, and the size is the frame's own.
  *
  * The commands go to the frame, and the system answers through [status]. The UI
  * keeps no view of its own: Compose's `WindowState` follows the frame on its own,
@@ -59,6 +65,16 @@ class WindowHost internal constructor(
     private val _status = MutableStateFlow(compute())
     val status: StateFlow<WindowStatus> = _status.asStateFlow()
 
+    private val _focused = MutableStateFlow(frame.focused)
+
+    /** Whether the window holds the keyboard focus. */
+    val focused: StateFlow<Boolean> = _focused.asStateFlow()
+
+    private val _size = MutableStateFlow(sizeOf(frame.bounds))
+
+    /** The frame's size, in AWT user space. */
+    val size: StateFlow<WindowSize> = _size.asStateFlow()
+
     val actions: StateFlow<WindowActions> get() = backend.actions
 
     /** Whether the system's own frame moves and resizes the window. */
@@ -82,12 +98,16 @@ class WindowHost internal constructor(
             frameState = frame.extendedState
             publish("frame")
         }
+        removals += frame.onFocusChanged { gained -> _focused.value = gained }
+        removals += frame.onGeometryChanged { _size.value = sizeOf(frame.bounds) }
         backend.start { maximized ->
             reported = maximized
             frame.later { publish("system") }
         }
         frameState = frame.extendedState
         _status.value = compute()
+        _focused.value = frame.focused
+        _size.value = sizeOf(frame.bounds)
         captions?.resizable = actions.value.resize
         // Only a window born maximised has a normal size nobody chose. One that
         // opened as a window already has the size it was left at, and the system
@@ -122,6 +142,11 @@ class WindowHost internal constructor(
 
     fun unminimize() {
         if (frame.extendedState and Frame.ICONIFIED != 0) frame.extendedState = frame.extendedState and Frame.ICONIFIED.inv()
+    }
+
+    /** Brings the window to the front and asks for the focus, the way a second launch does (see [FrameOps.raise]). */
+    fun raise() {
+        frame.raise()
     }
 
     /** Hands a drag of the caption to the window manager. False leaves the move to the caller. */
@@ -190,6 +215,8 @@ class WindowHost internal constructor(
         maximized = reported ?: isMax(frameState),
         minimized = frameState and Frame.ICONIFIED != 0,
     )
+
+    private fun sizeOf(bounds: Rectangle) = WindowSize(bounds.width, bounds.height)
 
     /**
      * Publishes the state the sources say now, and says what it decided from.

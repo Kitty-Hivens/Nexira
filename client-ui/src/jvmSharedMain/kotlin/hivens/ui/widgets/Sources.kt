@@ -6,6 +6,7 @@ import hivens.ui.background.BackgroundSettings
 import hivens.ui.navigation.NavState
 import hivens.ui.notifications.PersistedNotification
 import hivens.ui.feature.catalogue.project.OpenProject
+import hivens.ui.host.HostWindowState
 import hivens.ui.theme.ThemeLibrary
 import hivens.ui.widgets.about.SystemFacts
 import hivens.widget.model.ScopeLevel
@@ -36,10 +37,18 @@ object Sources {
     // "Do not disturb" live state -- the notification-history widget reflects it
     // on its mute toggle; NotificationStack reads the same flow to gate popups.
     val DoNotDisturb = SourceKey<Boolean>("notifications.dnd")
-    // The project whose page is open, or null anywhere else in the app. Read by
+    // The project whose page is open in this window, or null anywhere else. Read by
     // the right rail's project-view family, which is shown on that page and has
-    // nothing to say off it.
-    val OpenProject = SourceKey<OpenProject?>("mod.open")
+    // nothing to say off it. Per window, so a second window's rail describes its
+    // own page.
+    val OpenProject = SourceKey<OpenProject?>("mod.open", ScopeLevel.Window)
+
+    /**
+     * The window a widget is drawn in, as the host reads it: its size, whether it
+     * is maximised, minimised and focused, and what the platform allows. Changed
+     * through the window commands in [Commands], never directly.
+     */
+    val Window = SourceKey<HostWindowState>("window.state", ScopeLevel.Window)
 
     /** Where the composition's history stands. Moved by the navigation commands in [Commands]. */
     val Navigation = SourceKey<NavState>("nav.state", ScopeLevel.Composition)
