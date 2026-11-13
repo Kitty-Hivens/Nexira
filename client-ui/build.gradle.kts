@@ -143,6 +143,7 @@ kotlin {
                 implementation(project(":client-media"))
                 implementation(project(":widget-api"))
                 implementation(project(":nx-ui"))
+                implementation(project(":ui-layers"))
                 implementation(project(":client-i18n"))
                 implementation(project(":client-render3d"))
                 implementation(project(":client-easter"))

@@ -124,6 +124,9 @@ include(":client-ui")
 // Leaf design-system module (NxUI): tokens, primitives, surfaces, Flexible.
 // client-ui depends on it one-way; it depends on nothing in-tree.
 include(":nx-ui")
+// Layer ordering and the dismiss stack of a window, with no visuals. Below both
+// nx-ui and the widget kernel, and depends on neither.
+include(":ui-layers")
 // Localisation layer: the AppStrings interface, the three locale
 // implementations and the LocalStrings CompositionLocal. Carved out of
 // client-ui, where it was the single largest package and imported by 150

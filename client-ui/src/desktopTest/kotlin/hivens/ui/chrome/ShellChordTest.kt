@@ -57,25 +57,18 @@ class ShellChordTest {
         assertFalse(onRelease.consume, "a release build has no overlay, so the key belongs to whoever else wants it")
     }
 
+    // The editor's back-out steps are entries of the window's dismiss stack now. A
+    // chord sees the key before anything focused does, so claiming Escape here, even
+    // while editing, would take it from a field, a dialog and the stack alike.
     @Test
-    fun `Escape backs out of the editor, but only while one is open`() {
-        val editing = resolveChord(Key.Escape, ctrl = false, released = true, debugOverlayAvailable = false, editing = true)
-        assertEquals(ShellChord.ExitEditor, editing.chord)
-        assertTrue(editing.consume)
-
-        // Escape is how every dialog, popup and overlay in the shell closes, so
-        // claiming it at window scope with no editor open would take it from all of
-        // them -- the same gate F9 gets, for a much more crowded key.
-        val idle = resolveChord(Key.Escape, ctrl = false, released = true, debugOverlayAvailable = false, editing = false)
-        assertNull(idle.chord)
-        assertFalse(idle.consume, "with no editor open Escape belongs to whatever is on screen")
-    }
-
-    @Test
-    fun `the Escape press edge is swallowed but does nothing`() {
-        val down = resolveChord(Key.Escape, ctrl = false, released = false, debugOverlayAvailable = false, editing = true)
-        assertNull(down.chord)
-        assertTrue(down.consume, "the down edge must not reach whatever holds focus")
+    fun `Escape is never a chord, with the editor open or not`() {
+        for (editing in listOf(true, false)) {
+            for (released in listOf(true, false)) {
+                val resolved = resolveChord(Key.Escape, ctrl = false, released = released, debugOverlayAvailable = true, editing = editing)
+                assertNull(resolved.chord)
+                assertFalse(resolved.consume, "Escape goes on to whatever is focused and then to the dismiss stack")
+            }
+        }
     }
 
     @Test
@@ -93,46 +86,6 @@ class ShellChordTest {
         val idle = resolveChord(Key.Z, ctrl = true, released = true, debugOverlayAvailable = false, editing = false)
         assertNull(idle.chord)
         assertFalse(idle.consume, "taking Ctrl+Z at window scope would take it from every text field in the shell")
-    }
-
-    // One of the editor's own dialogs is up: Escape is the dialog's, and claimed over
-    // it the back-out ran behind the dialog and left it standing.
-    @Test
-    fun `Escape is left to a dialog open over the editor while Ctrl Z stays the editor's`() {
-        val escape = resolveChord(Key.Escape, ctrl = false, released = false, debugOverlayAvailable = false, editing = true, claimEscape = false)
-        assertNull(escape.chord)
-        assertFalse(escape.consume, "the dialog closes on the press, so the press has to reach it")
-
-        val undo = resolveChord(Key.Z, ctrl = true, released = true, debugOverlayAvailable = false, editing = true, claimEscape = false)
-        assertEquals(ShellChord.UndoEdit, undo.chord)
-    }
-
-    @Test
-    fun `an Escape release is taken only when its press was`() {
-        var open = false
-        val claim = EscapeClaim { open }
-
-        // The press closes a dialog, and by the release the editor behind it is ready
-        // to take Escape again. Taking that release would back the editor out a step
-        // as well, on the same press.
-        assertFalse(claim.takes(released = false))
-        open = true
-        assertFalse(claim.takes(released = true), "one press, one thing done")
-
-        assertTrue(claim.takes(released = false))
-        assertTrue(claim.takes(released = true))
-    }
-
-    @Test
-    fun `an Escape press taken stays taken through its release`() {
-        var open = true
-        val claim = EscapeClaim { open }
-
-        assertTrue(claim.takes(released = false))
-        // Whatever changes between the two edges, the release follows its press, so
-        // the half of an Escape the editor took never falls through to anything else.
-        open = false
-        assertTrue(claim.takes(released = true))
     }
 
     @Test

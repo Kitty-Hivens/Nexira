@@ -7,7 +7,6 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import hivens.ui.components.QuitWithGameHost
 import hivens.ui.components.QuitGate
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -53,7 +52,6 @@ import hivens.tray.TrayStrings
 import hivens.ui.chrome.LocalChromeClose
 import hivens.ui.chrome.LocalComposeWindow
 import hivens.ui.chrome.LocalWindowHide
-import hivens.ui.chrome.EscapeClaim
 import hivens.ui.chrome.ShellChord
 import hivens.ui.chrome.resolveShellChord
 import hivens.ui.chrome.LocalUseCustomChrome
@@ -84,6 +82,8 @@ import hivens.ui.generated.resources.Res
 import hivens.ui.i18n.AppLocale
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.i18n.LocaleProvider
+import hivens.ui.layers.LayerHost
+import hivens.ui.layers.rememberWindowLayers
 import hivens.ui.notifications.Kind
 import hivens.ui.notifications.NotificationCenter
 import hivens.ui.notifications.Severity
@@ -840,26 +840,31 @@ fun FrameWindowScope.AppShellContent(
         // shell mounts. Plain assignments -- the window reads the hooks at
         // event time, and recomposition keeps them pointing at fresh captures.
         chrome.onCloseRequest = onCloseChrome
-        val escapeClaim = remember(editModeController) { EscapeClaim { editModeController.claimsEscape } }
+        // The window's layers and its dismiss stack, mounted at the root of the
+        // window's level below. Escape that nothing focused used becomes back, which
+        // a Compose popup or dialog opened later takes before the stack does. The two
+        // hooks only keep a held Escape from closing one thing per repeat.
+        val windowLayers = rememberWindowLayers()
         chrome.onPreviewKey = { ev ->
+            windowLayers.dismiss.onPreviewKeyEvent(ev)
             // Window-scoped chords (preview = before focus dispatch) so they fire
             // no matter which composable holds focus -- the side rails own focus,
             // so a host Box-level handler misses them. resolveShellChord decides
             // what was pressed and whether to swallow it; the observers of these
             // signals gate on their own state (EditorSurfaceHost on the surface
             // being editable, ShellRightRegion on the rail).
-            val resolved = resolveShellChord(ev, debugOverlay.available, editModeController.isEditing, escapeClaim)
+            val resolved = resolveShellChord(ev, debugOverlay.available, editModeController.isEditing)
             when (resolved.chord) {
                 ShellChord.ToggleEditMode     -> editModeController.requestEditToggle()
                 ShellChord.ToggleRightRail    -> editModeController.requestRightRailToggle()
                 ShellChord.ToggleDebugOverlay -> debugOverlay.toggle()
-                ShellChord.ExitEditor         -> editModeController.requestEditorEscape()
                 ShellChord.UndoEdit           -> editModeController.undo()
                 ShellChord.RedoEdit           -> editModeController.redo()
                 null                          -> Unit
             }
             resolved.consume
         }
+        chrome.onKey = windowLayers.dismiss::onKeyEvent
         run {
             // Pulled-forward: triggered by the .show watcher above when a
             // second instance fires its signal. Skip on raiseTick == 0 so
@@ -953,7 +958,7 @@ fun FrameWindowScope.AppShellContent(
             // The main window's level, for as long as this shell draws it. The console
             // stays outside: it is a window of its own and has no level yet.
             ChildLevel(ScopeLevel.Window) {
-            Box(Modifier.fillMaxSize()) {
+            LayerHost(windowLayers, Modifier.fillMaxSize()) {
             val themeReveal = rememberThemeReveal()
             NxTheme(
                 theme    = themeLibrary.active,
@@ -1099,7 +1104,7 @@ fun FrameWindowScope.AppShellContent(
                     canResize = windowCapabilities.value.resize && !windowHost.nativeFrame,
                 )
             }
-            } // end Box(window resize overlay)
+            } // end LayerHost
             } // end ChildLevel(Window)
             } // end CompositionLocalProvider(LocalCustomization)
         }

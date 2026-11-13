@@ -200,16 +200,6 @@ class EditModeController(
         }
     }
 
-    // Whether the window may take Escape for the editor. Narrower than [isEditing]:
-    // while one of the editor's own dialogs is up, Escape belongs to the dialog and
-    // the session behind it carries on, so the two cannot share one flag.
-    private val _claimsEscape = mutableStateOf(false)
-    val claimsEscape: Boolean get() = _claimsEscape.value
-
-    fun reportEscapeClaim(on: Boolean) {
-        _claimsEscape.value = on
-    }
-
     // The widget a finger last pressed. A pointer reveals a widget's resize handles by hovering
     // over it and a finger cannot hover, so the touched widget keeps its handles until another
     // is touched or the editor closes.
@@ -218,18 +208,6 @@ class EditModeController(
 
     fun selectByTouch(instanceId: String?) {
         _touchSelected.value = instanceId
-    }
-
-    // Escape (window-level, while editing) bumps this; the host observes it and runs
-    // its own staged back-out. Same focus-independent bridge as the edit toggle, and
-    // needed for the same reason: a Modifier.onKeyEvent on the host Box fires only
-    // while a descendant holds focus, and the rails and the prop panel's fields hold
-    // it instead -- so the "Esc -- exit" the editor bar promises did nothing.
-    private val _editorEscapeSignal = mutableStateOf(0)
-    val editorEscapeSignal: State<Int> = _editorEscapeSignal
-
-    fun requestEditorEscape() {
-        _editorEscapeSignal.value++
     }
 
     // Ctrl+N (window-level) bumps this; ShellRightRegion observes it and flips

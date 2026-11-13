@@ -19,10 +19,6 @@ enum class ShellChord {
     /** F9 -- the dev UI-debug overlay. Only claimed on a build that has one. */
     ToggleDebugOverlay,
 
-    /** Escape: back out of widget edit mode. Only claimed while an editor is open
-     *  with none of its dialogs up, so every dialog and popup keeps its own Escape. */
-    ExitEditor,
-
     /** Ctrl+Z -- take back the last edit. Claimed only while an editor is open. */
     UndoEdit,
 
@@ -51,60 +47,34 @@ data class ChordResolution(val chord: ShellChord?, val consume: Boolean) {
 }
 
 /**
- * Whether the window takes Escape, decided once for a press and its release.
- *
- * A dialog closes on the press of Escape and the window acts on the release, so a
- * release judged on its own found the editor ready again behind the dialog it had
- * just closed and backed it out a step as well: one press, two things done. The
- * release is taken only when its press was. [open] says whether the window may
- * take Escape at all right now.
- */
-class EscapeClaim(private val open: () -> Boolean) {
-    private var pressTaken = false
-
-    /** Whether this edge of Escape is the window's. [released] tells the release from the press. */
-    fun takes(released: Boolean): Boolean =
-        if (released) {
-            pressTaken.also { pressTaken = false }
-        } else {
-            open().also { pressTaken = it }
-        }
-}
-
-/**
  * Resolves [event] against the window-scoped chords. A thin read of the event;
  * the decision itself is [resolveChord], which takes no Compose types so it can
  * be tested without fabricating a native key event.
+ *
+ * Escape is not a chord. It belongs to the window's dismiss stack, which the
+ * window asks after everything focused has had the key (see hivens.ui.layers).
  */
 fun resolveShellChord(
     event: KeyEvent,
     debugOverlayAvailable: Boolean,
     editing: Boolean,
-    escape: EscapeClaim,
-): ChordResolution {
-    val released = event.type == KeyEventType.KeyUp
-    return resolveChord(
-        key = event.key,
-        ctrl = event.isCtrlPressed,
-        shift = event.isShiftPressed,
-        released = released,
-        debugOverlayAvailable = debugOverlayAvailable,
-        editing = editing,
-        // Asked of Escape alone, because asking is what pairs a release with its press.
-        claimEscape = event.key == Key.Escape && escape.takes(released),
-    )
-}
+): ChordResolution = resolveChord(
+    key = event.key,
+    ctrl = event.isCtrlPressed,
+    shift = event.isShiftPressed,
+    released = event.type == KeyEventType.KeyUp,
+    debugOverlayAvailable = debugOverlayAvailable,
+    editing = editing,
+)
 
 /**
  * The decision behind [resolveShellChord].
  *
  * [debugOverlayAvailable] gates F9: a release build has no overlay, so the key
- * is left to whoever else wants it rather than silently eaten. [claimEscape]
- * gates Escape the same way, and it matters far more there: Escape is how every
- * dialog, popup and overlay in the launcher closes, so claiming it at window scope
- * while no editor is open would take it from all of them. It is narrower than
- * [editing], which gates Ctrl+Z: an editor with one of its own dialogs open leaves
- * Escape to the dialog. Left out, it follows [editing].
+ * is left to whoever else wants it rather than silently eaten. [editing] gates
+ * Ctrl+Z the same way, and it matters far more there: Ctrl+Z belongs to whatever a
+ * person is typing in the rest of the time, and taking it at window scope would
+ * take it from every field in the launcher.
  */
 internal fun resolveChord(
     key: Key,
@@ -115,17 +85,11 @@ internal fun resolveChord(
     released: Boolean,
     debugOverlayAvailable: Boolean,
     editing: Boolean,
-    claimEscape: Boolean = editing,
 ): ChordResolution = when {
     ctrl && key == Key.E -> ChordResolution(ShellChord.ToggleEditMode.takeIf { released }, consume = true)
     ctrl && key == Key.N -> ChordResolution(ShellChord.ToggleRightRail.takeIf { released }, consume = true)
     debugOverlayAvailable && key == Key.F9 ->
         ChordResolution(ShellChord.ToggleDebugOverlay.takeIf { released }, consume = true)
-    claimEscape && !ctrl && key == Key.Escape ->
-        ChordResolution(ShellChord.ExitEditor.takeIf { released }, consume = true)
-    // Gated on [editing] for the reason Escape is: Ctrl+Z belongs to whatever a
-    // person is typing in the rest of the time, and taking it at window scope
-    // would take it from every field in the launcher.
     editing && ctrl && key == Key.Z ->
         ChordResolution(
             (if (shift) ShellChord.RedoEdit else ShellChord.UndoEdit).takeIf { released },

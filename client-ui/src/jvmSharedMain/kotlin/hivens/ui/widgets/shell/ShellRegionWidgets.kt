@@ -58,7 +58,6 @@ import hivens.ui.AppSidebar
 import hivens.ui.AppState
 import hivens.ui.RightPanel
 import hivens.ui.chrome.HOST_IS_MAC
-import hivens.ui.SheetBackHandler
 import hivens.ui.nx.NxIconButton
 import hivens.ui.chrome.LocalRightRailSheet
 import hivens.ui.chrome.LocalUseCustomChrome
@@ -73,6 +72,7 @@ import hivens.ui.editor.LocalShellChromeBounds
 import hivens.ui.editor.reportsContentPane
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
+import hivens.ui.layers.DismissOnBack
 import hivens.ui.surface.NxSurface
 import hivens.ui.widgets.Commands
 import hivens.ui.widgets.Sources
@@ -476,7 +476,7 @@ fun ShellRightRegion(instance: WidgetInstance) {
     // RightRailOverlay): no width in the row, and the toggle signal shows and hides it.
     if (overlayHost) {
         val edge = rememberEdgeInsets()
-        SheetBackHandler(enabled = overlayOpen) { overlayOpen = false }
+        DismissOnBack(enabled = overlayOpen) { overlayOpen = false }
         RightRailOverlay(
             open = overlayOpen,
             onOpen = { overlayOpen = true },

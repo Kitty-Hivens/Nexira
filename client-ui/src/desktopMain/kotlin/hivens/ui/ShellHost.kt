@@ -52,7 +52,10 @@ import java.awt.Color as AwtColor
  */
 class WindowChromeHooks(defaultClose: () -> Unit) {
     var onCloseRequest: () -> Unit = defaultClose
+    /** Sees every key before anything focused does. */
     var onPreviewKey: (KeyEvent) -> Boolean = { false }
+    /** Sees a key after everything focused has left it. */
+    var onKey: (KeyEvent) -> Boolean = { false }
 }
 
 /**
@@ -144,6 +147,7 @@ fun ApplicationScope.ShellHost(
         resizable      = true,
         icon           = windowIcon,
         onPreviewKeyEvent = { chrome.onPreviewKey(it) },
+        onKeyEvent        = { chrome.onKey(it) },
     ) {
         // What shows where Skia has not drawn yet, until the shell's theme takes
         // over (see AppShell): the boot screen's own background, not white.

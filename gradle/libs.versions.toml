@@ -58,6 +58,10 @@ jsoup             = "1.23.2"
 # so client-ui builds the coordinates off this version instead.
 coil              = "3.6.0"
 constraintlayoutCompose = "0.8.3"
+# The window's back dispatcher a Compose desktop window feeds with Escape, where its
+# popups and dialogs register. Already on the classpath through compose-ui, which
+# keeps it off the compile classpath. Pinned to what compose resolves.
+navigationEvent   = "1.1.0"
 
 # SVG rasteriser for pack descriptions. Skia's own SVG module is what the image
 # loader uses on this platform and it draws no text at all -- a shields.io badge
@@ -195,6 +199,7 @@ compose-foundation              = { group = "org.jetbrains.compose.foundation", 
 compose-material3               = { group = "org.jetbrains.compose.material3",  name = "material3",           version.ref = "composeMaterial3" }
 compose-ui                      = { group = "org.jetbrains.compose.ui",         name = "ui",                  version.ref = "compose" }
 compose-components-resources    = { group = "org.jetbrains.compose.components", name = "components-resources", version.ref = "compose" }
+navigationevent-compose         = { group = "org.jetbrains.androidx.navigationevent", name = "navigationevent-compose", version.ref = "navigationEvent" }
 
 # UI add-ons
 androidx-graphics-shapes        = { group = "androidx.graphics", name = "graphics-shapes",        version.ref = "graphicsShapes" }

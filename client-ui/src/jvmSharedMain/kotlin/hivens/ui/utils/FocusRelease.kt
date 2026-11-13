@@ -27,10 +27,9 @@ import androidx.compose.ui.unit.IntSize
  * reader had moved on.
  *
  * Only a press outside the focused element's bounds counts. Some elements take
- * the focus for their keys and are clicked inside without asking for it again: the
- * version picker closes on Escape and its rows are plain clickables, and a slider
- * takes arrow keys once the pointer is over it. Releasing on any press left both
- * deaf to their keys after the first click inside them.
+ * the focus for their keys and are clicked inside without asking for it again: a
+ * slider takes arrow keys once the pointer is over it. Releasing on any press left
+ * it deaf to its keys after the first click inside it.
  *
  * Only a plain primary press. A right press opens a field's own menu for the
  * selection it holds, and a shift press extends that selection: letting go of the

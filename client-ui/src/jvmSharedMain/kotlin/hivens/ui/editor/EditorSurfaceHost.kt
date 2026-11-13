@@ -157,11 +157,10 @@ import hivens.ui.theme.Status
 //     chrome only while edit mode is on)
 //   * paints the optional "Edit layout" pill at the top
 //   * paints the drag ghost following the pointer when a drag is active
-//   * backs out of edit mode a step at a time on Escape, and toggles it on Ctrl+E,
-//     both claimed at window level (see ShellChord) and handed over through the
-//     controller's signals. There is no edit-mode button, and no key handler of its
-//     own: the window sees every press first, and a second handler here acted again
-//     on the release of an Escape whose press had just closed a dialog.
+//   * backs out of edit mode a step at a time on Escape and back, through entries
+//     on the window's dismiss stack (see EditorBackOut), and toggles it on Ctrl+E,
+//     claimed at window level (see ShellChord) and handed over through the
+//     controller's signal. There is no edit-mode button and no key handler here.
 
 // Which widget instance the prop panel is currently editing.
 private data class PropTarget(val path: SlotPath, val instanceId: String)
@@ -284,24 +283,24 @@ fun EditorSurfaceHost(
         if (availableSurfaces.isEmpty()) editing = false
     }
 
-    // One Escape backs out one step, from the top: a reset confirmation, then
-    // preview, then an open slot menu, then the slot selection, then edit mode
-    // itself. Preview comes before the slot steps because it hides them, and an
-    // Escape spent on a menu nobody can see looks like an Escape that did nothing.
-    // The window-level chord is the one path that runs this. It is not claimed
-    // while a confirmation is up (see the report below), so the dialog closes
-    // itself on the press, and the two dialog steps here only matter in the frame
-    // before that report lands.
-    fun backOutOneStep() {
-        when {
-            resetAllConfirm                          -> resetAllConfirm = false
-            resetSurfaceConfirm                      -> resetSurfaceConfirm = false
-            previewing                               -> previewing = false
-            handleMenuOpen || slotMenuCursor != null -> { handleMenuOpen = false; slotMenuCursor = null }
-            selectedSlotState.value != null          -> { selectedSlotState.value = null; selectedSlotRect = null }
-            else                                     -> editing = false
-        }
-    }
+    // One Escape or back backs out one step. The confirmations are dialogs, which
+    // register for back as they open and so take Escape and back before the stack on
+    // both platforms. Their steps here keep the order right in the frame before a
+    // dialog is up, and keep a confirmation from outliving the session.
+    EditorBackOut(
+        editing             = editing,
+        onLeave             = { editing = false },
+        selection           = selectedSlotState.value != null,
+        onClearSelection    = { selectedSlotState.value = null; selectedSlotRect = null },
+        slotMenu            = handleMenuOpen || slotMenuCursor != null,
+        onCloseSlotMenu     = { handleMenuOpen = false; slotMenuCursor = null },
+        previewing          = previewing,
+        onEndPreview        = { previewing = false },
+        resetSurfaceConfirm = resetSurfaceConfirm && selectedSurface != null,
+        onCloseResetSurface = { resetSurfaceConfirm = false },
+        resetAllConfirm     = resetAllConfirm,
+        onCloseResetAll     = { resetAllConfirm = false },
+    )
     // Every way out of edit mode ends here: Escape, Ctrl+E and the editor running out
     // of surfaces alike. Whatever the session opened goes with it, so the next entry
     // starts clean rather than in preview, behind a confirmation, or with a panel open
@@ -425,30 +424,6 @@ fun EditorSurfaceHost(
     DisposableEffect(editing) {
         controller.reportEditing(editing)
         onDispose { controller.reportEditing(false) }
-    }
-
-    // Escape is claimed at window scope only while the editor is on and none of its
-    // confirmations is up. A dialog closes itself on Escape, and claimed over it the
-    // key never reached it: the back-out ran behind the dialog instead and left it
-    // standing over an editor that was gone.
-    val escapeToDialog = resetAllConfirm || (resetSurfaceConfirm && selectedSurface != null)
-    val claimsEscape = editing && !escapeToDialog
-    DisposableEffect(claimsEscape) {
-        controller.reportEscapeClaim(claimsEscape)
-        onDispose { controller.reportEscapeClaim(false) }
-    }
-
-    // Window-level Escape (AppShell onPreviewKeyEvent, gated on the claim above)
-    // bumps the signal; the same staged back-out runs here. `seen` initialises to
-    // the current tick for the same reason the toggle observer does.
-    LaunchedEffect(availableSurfaces) {
-        var seen = controller.editorEscapeSignal.value
-        snapshotFlow { controller.editorEscapeSignal.value }.collect { tick ->
-            if (tick != seen) {
-                seen = tick
-                if (editing) backOutOneStep()
-            }
-        }
     }
 
     LaunchedEffect(availableSurfaces) {

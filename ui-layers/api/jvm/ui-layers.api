@@ -1,0 +1,39 @@
+public final class hivens/ui/layers/DismissStack {
+	public static final field $stable I
+	public final fun dismissTop ()Z
+	public final fun getCanDismiss ()Z
+	public final fun getFieldFocused ()Z
+	public final fun getHandlesBack ()Z
+	public final fun onKeyEvent-ZmokQxo (Ljava/lang/Object;)Z
+	public final fun onPreviewKeyEvent-ZmokQxo (Ljava/lang/Object;)Z
+	public final fun push (Lhivens/ui/layers/LayerResident;Lkotlin/jvm/functions/Function0;)Ljava/lang/AutoCloseable;
+}
+
+public final class hivens/ui/layers/DismissStackKt {
+	public static final fun DismissOnBack (ZLkotlin/jvm/functions/Function0;Landroidx/compose/runtime/Composer;II)V
+}
+
+public final class hivens/ui/layers/LayerHostKt {
+	public static final fun LayerHost (Lhivens/ui/layers/WindowLayers;Landroidx/compose/ui/Modifier;Lkotlin/jvm/functions/Function3;Landroidx/compose/runtime/Composer;II)V
+}
+
+public final class hivens/ui/layers/LayerKt {
+	public static final fun Layer (ZZZZLkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function3;Landroidx/compose/runtime/Composer;II)V
+}
+
+public final class hivens/ui/layers/LayerResident {
+	public static final field $stable I
+}
+
+public final class hivens/ui/layers/WindowLayers {
+	public static final field $stable I
+	public fun <init> ()V
+	public final fun getDismiss ()Lhivens/ui/layers/DismissStack;
+}
+
+public final class hivens/ui/layers/WindowLayersKt {
+	public static final fun getLocalResident ()Landroidx/compose/runtime/CompositionLocal;
+	public static final fun getLocalWindowLayers ()Landroidx/compose/runtime/CompositionLocal;
+	public static final fun rememberWindowLayers (Landroidx/compose/runtime/Composer;I)Lhivens/ui/layers/WindowLayers;
+}
+

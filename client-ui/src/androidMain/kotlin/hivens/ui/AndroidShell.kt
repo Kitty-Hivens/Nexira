@@ -19,13 +19,15 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.foundation.focusable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
-import hivens.ui.chrome.EscapeClaim
 import hivens.ui.chrome.ShellChord
 import hivens.ui.chrome.resolveShellChord
 import hivens.ui.editor.EditModeController
@@ -60,6 +62,9 @@ import hivens.ui.editor.WidgetGraphReconciler
 import hivens.ui.i18n.AppLocale
 import hivens.ui.i18n.LocaleProvider
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.layers.DismissOnBack
+import hivens.ui.layers.LayerHost
+import hivens.ui.layers.rememberWindowLayers
 import hivens.ui.layout.LayoutGraphRepository
 import hivens.ui.logic.LaunchLogCollector
 import hivens.ui.screens.ConsoleContent
@@ -110,6 +115,7 @@ import hivens.widget.model.ScopeLevel
 import hivens.widget.model.walkInstances
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import org.koin.compose.koinInject
@@ -144,7 +150,6 @@ fun AndroidShell() {
     val updateRecovery: ApplyRecovery = koinInject()
     val packAutoUpdates: PackAutoUpdateService = koinInject()
     val editModeController: EditModeController = koinInject()
-    val escapeClaim = remember(editModeController) { EscapeClaim { editModeController.claimsEscape } }
 
     val settings = remember { settingsService.getSettings() }
 
@@ -263,6 +268,11 @@ fun AndroidShell() {
             ) {
               // The one window a phone has, for as long as this shell draws it.
               ChildLevel(ScopeLevel.Window) {
+                // The window's layers and its dismiss stack, at the root of its level and around
+                // the theme, as on the desktop: the host belongs to the window, and a layer takes
+                // its theme from where it is opened.
+                val layers = rememberWindowLayers()
+                LayerHost(layers, Modifier.fillMaxSize()) {
                 val themeReveal = rememberThemeReveal()
                 NxTheme(theme = themeLibrary.active, dark = isDarkTheme, uiFamily = uiFamily) {
                     ThemeRevealHost(themeReveal) {
@@ -271,25 +281,32 @@ fun AndroidShell() {
                         // Drawn edge to edge: each region paints under the system bars and pads its own
                         // content by them (see the shell regions), so nothing is padded out here.
                         val focus = remember { FocusRequester() }
+                        val refocus = rememberCoroutineScope()
                         LaunchedEffect(Unit) { focus.requestFocus() }
                         Box(
                             Modifier
                                 .fillMaxSize()
                                 .background(NxColor.page)
                                 .focusRequester(focus)
+                                // The shell's keys are read here, so they stop when nothing in the
+                                // shell holds the focus, as after Escape takes it from a field.
+                                .onFocusChanged { if (!it.hasFocus) refocus.launch { focus.requestFocus() } }
                                 .focusable()
                                 .onPreviewKeyEvent { ev ->
-                                    val resolved = resolveShellChord(ev, false, editModeController.isEditing, escapeClaim)
+                                    layers.dismiss.onPreviewKeyEvent(ev)
+                                    val resolved = resolveShellChord(ev, false, editModeController.isEditing)
                                     when (resolved.chord) {
                                         ShellChord.ToggleEditMode -> editModeController.requestEditToggle()
                                         ShellChord.ToggleRightRail -> editModeController.requestRightRailToggle()
-                                        ShellChord.ExitEditor -> editModeController.requestEditorEscape()
                                         ShellChord.UndoEdit -> editModeController.undo()
                                         ShellChord.RedoEdit -> editModeController.redo()
                                         ShellChord.ToggleDebugOverlay, null -> Unit
                                     }
                                     resolved.consume
-                                },
+                                }
+                                // A hardware Escape, after whatever holds the focus has had it and
+                                // before the system turns it into back: a held key's repeats stop here.
+                                .onKeyEvent(layers.dismiss::onKeyEvent),
                         ) {
                             AppRoot(
                                 onWallpaperLuminance = { wallpaperLuminance = it },
@@ -339,11 +356,13 @@ fun AndroidShell() {
                                 },
                             )
 
-                            // After AppRoot, so it is asked before the navigation's own Back.
-                            BackHandler(enabled = editModeController.claimsEscape) { editModeController.requestEditorEscape() }
+                            // The one Back the window's dismiss stack has, closing what Escape would.
+                            // After AppRoot, so it is asked before the navigation's own Back, which
+                            // gets the gesture only when nothing is open.
+                            BackHandler(enabled = layers.dismiss.handlesBack) { layers.dismiss.dismissTop() }
 
                             if (gameConsole.shouldShowConsole) {
-                                BackHandler { gameConsole.hide() }
+                                DismissOnBack { gameConsole.hide() }
                                 val settingsStore: ConsoleSettingsStore = koinInject()
                                 val consoleSettings by settingsStore.settings.collectAsState()
                                 NxSurface(SurfaceKind.Page, Modifier.fillMaxSize()) {
@@ -359,6 +378,7 @@ fun AndroidShell() {
                         CertificatePromptHost()
                     }
                 }
+                } // end LayerHost
               }
             }
         }
