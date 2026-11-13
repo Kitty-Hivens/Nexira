@@ -22,6 +22,7 @@ import hivens.ui.theme.NxTheme
 import hivens.ui.theme.ThemeLibrary
 import hivens.ui.theme.Themes
 import hivens.ui.widgets.ChildLevel
+import hivens.ui.widgets.KoinLevelServicesHost
 import hivens.ui.widgets.Sources
 import hivens.ui.widgets.WidgetSurface
 import hivens.ui.widgets.themepicker.ThemeSelection
@@ -194,7 +195,7 @@ class UnboundedSlotTest {
     }
 
     private val app: WidgetScope = koinApplication {
-        modules(module { single { WidgetScope.app(data, this, Dispatchers.Unconfined) } })
+        modules(module { single { WidgetScope.app(data, KoinLevelServicesHost.app(this), Dispatchers.Unconfined) } })
     }.koin.get()
 
     private fun renderReal(kind: WidgetKind): Result<Unit> {

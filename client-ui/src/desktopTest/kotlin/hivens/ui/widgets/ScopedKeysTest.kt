@@ -92,7 +92,7 @@ class ScopedKeysTest {
     }
 
     private val app: WidgetScope = koinApplication {
-        modules(module { single { WidgetScope.app(data, this, Dispatchers.Unconfined, commands) } })
+        modules(module { single { WidgetScope.app(data, KoinLevelServicesHost.app(this), Dispatchers.Unconfined, commands) } })
     }.koin.get()
 
     private fun draw(between: (ImageComposeScene) -> Unit = {}, content: @Composable () -> Unit) = onEventThread {

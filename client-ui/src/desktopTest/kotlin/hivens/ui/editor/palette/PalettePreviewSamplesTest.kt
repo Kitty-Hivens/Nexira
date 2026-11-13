@@ -14,6 +14,7 @@ import hivens.ui.theme.NxTheme
 import hivens.ui.uiCommandRegistry
 import hivens.ui.uiDataRegistry
 import hivens.ui.widgets.ChildLevel
+import hivens.ui.widgets.KoinLevelServicesHost
 import hivens.ui.widgets.Sources
 import hivens.ui.widgets.WidgetSurface
 import hivens.ui.widgets.themepicker.ThemeSelectionSource
@@ -68,7 +69,7 @@ class PalettePreviewSamplesTest {
     /** What the gallery makes of [kind], drawn the way the palette draws it, under a composition like the editor's. */
     private fun previewOf(kind: String, data: WidgetDataRegistry, commands: WidgetCommandRegistry): WidgetPreview {
         val app: WidgetScope = koinApplication {
-            modules(module { single { WidgetScope.app(data, this, Dispatchers.Unconfined, commands) } })
+            modules(module { single { WidgetScope.app(data, KoinLevelServicesHost.app(this), Dispatchers.Unconfined, commands) } })
         }.koin.get()
         val widget = WidgetKind(kind)
         return onEventThread {

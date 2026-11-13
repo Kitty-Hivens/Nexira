@@ -71,7 +71,7 @@ class SampledWidgetTest {
     private val data = WidgetDataRegistry().apply { declare(pageKey) { "sample" } }
 
     private val app: WidgetScope = koinApplication {
-        modules(module { single { WidgetScope.app(data, this, Dispatchers.Unconfined, WidgetCommandRegistry()) } })
+        modules(module { single { WidgetScope.app(data, KoinLevelServicesHost.app(this), Dispatchers.Unconfined, WidgetCommandRegistry()) } })
     }.koin.get()
 
     /** A white block that says what it was drawn on. */
@@ -187,7 +187,7 @@ class SampledWidgetTest {
     fun `with no sample the editor falls back to the warning card`() {
         val bare = WidgetDataRegistry().apply { declare(pageKey) }
         val scope: WidgetScope = koinApplication {
-            modules(module { single { WidgetScope.app(bare, this, Dispatchers.Unconfined, WidgetCommandRegistry()) } })
+            modules(module { single { WidgetScope.app(bare, KoinLevelServicesHost.app(this), Dispatchers.Unconfined, WidgetCommandRegistry()) } })
         }.koin.get()
         assertNull(scope.sampleOf("test.page"))
         val (read, frame) = draw(editing(), bare, scope)

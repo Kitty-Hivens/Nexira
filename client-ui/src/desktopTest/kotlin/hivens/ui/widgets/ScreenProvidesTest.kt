@@ -94,7 +94,7 @@ class ScreenProvidesTest {
 
     /** An app level whose Koin also holds [services], which is where a screen drawn below it injects from. */
     private fun app(services: Module): WidgetScope = koinApplication {
-        modules(module { single { WidgetScope.app(data, this, Dispatchers.Unconfined, commands) } }, services)
+        modules(module { single { WidgetScope.app(data, KoinLevelServicesHost.app(this), Dispatchers.Unconfined, commands) } }, services)
     }.koin.get()
 
     private class Probe(override val needs: List<String>, val drew: MutableList<String>) : WidgetDescriptor {

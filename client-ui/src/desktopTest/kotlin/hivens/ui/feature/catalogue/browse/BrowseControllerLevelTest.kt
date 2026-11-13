@@ -8,9 +8,13 @@ import hivens.ui.levelServicesModule
 import hivens.ui.onEventThread
 import hivens.ui.settle
 import hivens.ui.widgets.ChildLevel
+import hivens.ui.widgets.KoinLevelServicesHost
+import hivens.ui.widgets.koinScope
 import hivens.widget.api.LocalScope
 import hivens.widget.api.WidgetDataRegistry
 import hivens.widget.api.WidgetScope
+import hivens.widget.api.find
+import hivens.widget.api.get
 import hivens.widget.model.ScopeLevel
 import kotlinx.coroutines.Dispatchers
 import org.koin.compose.koinInject
@@ -28,7 +32,7 @@ import kotlin.test.assertTrue
 class BrowseControllerLevelTest {
 
     private fun app(): WidgetScope = koinApplication {
-        modules(levelServicesModule, module { single { WidgetScope.app(WidgetDataRegistry(), this, Dispatchers.Unconfined) } })
+        modules(levelServicesModule, module { single { WidgetScope.app(WidgetDataRegistry(), KoinLevelServicesHost.app(this), Dispatchers.Unconfined) } })
     }.koin.get()
 
     @Test
@@ -41,9 +45,9 @@ class BrowseControllerLevelTest {
         assertNotSame(controller, second.services.get<BrowseController>())
         val page = first.child(ScopeLevel.Composition).child(ScopeLevel.Page)
         assertSame(controller, page.services.get<BrowseController>())
-        assertNull(app.services.getOrNull<BrowseController>(), "no window, no controller")
+        assertNull(app.services.find<BrowseController>(), "no window, no controller")
         first.close()
-        assertTrue(first.services.closed)
+        assertTrue(first.koinScope.closed)
     }
 
     /** The injection sites ask Koin through the composition, and each one is answered by the window it sits in. */

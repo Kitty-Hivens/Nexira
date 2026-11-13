@@ -48,7 +48,7 @@ val LocalLayoutGraph: ProvidableCompositionLocal<LayoutGraph> =
 
 val LocalWidgetRegistry: ProvidableCompositionLocal<WidgetRegistry> =
     staticCompositionLocalOf {
-        error("LocalWidgetRegistry not provided -- did you wire WidgetRegistry in Koin?")
+        error("LocalWidgetRegistry not provided: the host provides its WidgetRegistry at the composition root")
     }
 
 // Decorator wraps every widget rendered by SlotRenderer. Default is
@@ -157,23 +157,23 @@ val LocalSlotPath: ProvidableCompositionLocal<SlotPath> =
         error("LocalSlotPath not provided -- read inside a SlotRenderer body")
     }
 
-// Cross-widget service registry. Provided once at the launcher's
-// composition root from the Koin-bound singleton. Consumer widgets
-// read via useService<T>() / useServiceByInstance / useAllServices;
-// provider widgets register via provideService(...). Must be wired
+// Cross-widget service registry. Provided once by the host at its
+// composition root, from the one instance it keeps. Consumer widgets
+// read via useService<T>() / useServiceByInstance / useAllServices,
+// provider widgets register via provideService(...). Must be provided
 // before any widget that participates in services renders.
 val LocalWidgetServiceRegistry: ProvidableCompositionLocal<WidgetServiceRegistry> =
     staticCompositionLocalOf {
-        error("LocalWidgetServiceRegistry not provided -- wire WidgetServiceRegistry in Koin and at the composition root")
+        error("LocalWidgetServiceRegistry not provided: the host provides its WidgetServiceRegistry at the composition root")
     }
 
 // App-provided reactive data sources widgets bind to via rememberSource(key).
-// Provided once at the composition root from the Koin-bound singleton, like the
-// service registry above. Static: the source set is fixed at startup; the
-// reactivity is inside each source's StateFlow, not the registry membership.
+// Provided once by the host at its composition root, like the service registry
+// above. Static: the source set is fixed at startup, and the reactivity is inside
+// each source's StateFlow, not the registry membership.
 val LocalWidgetDataRegistry: ProvidableCompositionLocal<WidgetDataRegistry> =
     staticCompositionLocalOf {
-        error("LocalWidgetDataRegistry not provided -- wire WidgetDataRegistry in Koin and at the composition root")
+        error("LocalWidgetDataRegistry not provided: the host provides its WidgetDataRegistry at the composition root")
     }
 
 /**
@@ -185,21 +185,21 @@ val LocalWidgetDataRegistry: ProvidableCompositionLocal<WidgetDataRegistry> =
  */
 val LocalScope: ProvidableCompositionLocal<WidgetScope?> = staticCompositionLocalOf { null }
 
-// App-provided commands widgets fire via rememberCommand(key) / rememberAction(key)
-// -- the write counterpart of LocalWidgetDataRegistry. Provided once at the
-// composition root from the Koin-bound singleton. Static for the same reason: the
-// command set is fixed at startup.
+// App-provided commands widgets fire via rememberCommand(key) / rememberAction(key),
+// the write counterpart of LocalWidgetDataRegistry. Provided once by the host at
+// its composition root. Static for the same reason: the command set is fixed at
+// startup.
 val LocalWidgetCommandRegistry: ProvidableCompositionLocal<WidgetCommandRegistry> =
     staticCompositionLocalOf {
-        error("LocalWidgetCommandRegistry not provided -- wire WidgetCommandRegistry in Koin and at the composition root")
+        error("LocalWidgetCommandRegistry not provided: the host provides its WidgetCommandRegistry at the composition root")
     }
 
-// Backs per-instance widget state (rememberWidgetState). Provided once at the
-// composition root from the Koin-bound store. Static: the host reference is fixed
-// at startup; the per-instance state lives in the store, not in this Local.
+// Backs per-instance widget state (rememberWidgetState). Provided once by the host
+// at its composition root, from the store it keeps. Static: the host reference is
+// fixed at startup, and the per-instance state lives in the store, not in this Local.
 val LocalWidgetStateHost: ProvidableCompositionLocal<WidgetStateHost> =
     staticCompositionLocalOf {
-        error("LocalWidgetStateHost not provided -- wire WidgetStateStore in Koin and at the composition root")
+        error("LocalWidgetStateHost not provided: the host provides its WidgetStateHost at the composition root")
     }
 
 // Edit-mode slot reflow duration (ms). 0 = no animation (the production

@@ -4,16 +4,15 @@ import hivens.widget.model.ScopeLevel
 import hivens.widget.model.SourceKey
 import hivens.widget.model.WidgetDataSource
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.isActive
-import org.koin.core.module.Module
-import org.koin.dsl.koinApplication
-import org.koin.dsl.module
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertNotSame
 import kotlin.test.assertNull
 import kotlin.test.assertSame
@@ -30,7 +29,7 @@ class WidgetScopeTest {
         }
     }
 
-    private class Service
+    private class Service(val name: String = "service")
 
     private val appKey = SourceKey<String>("test.app")
     private val windowKey = SourceKey<ScopeLevel>("test.window", ScopeLevel.Window)
@@ -43,12 +42,10 @@ class WidgetScopeTest {
         registerFactory(windowKey) { context -> Made(context.level).also { made += it } }
     }
 
-    private fun app(registry: WidgetDataRegistry = registry(), vararg modules: Module): WidgetScope {
-        val koin = koinApplication {
-            modules(module { single { WidgetScope.app(registry, this, Dispatchers.Unconfined) } }, *modules)
-        }.koin
-        return koin.get()
-    }
+    private fun app(
+        registry: WidgetDataRegistry = registry(),
+        services: MemoryLevelServices = MemoryLevelServices.app(),
+    ): WidgetScope = WidgetScope.app(registry, services, Dispatchers.Unconfined)
 
     @Test
     fun `a level makes its source only when the key is first read, and once`() {
@@ -109,7 +106,7 @@ class WidgetScopeTest {
         assertTrue(window.closed && composition.closed && page.closed)
         assertTrue(windowSource.closed, "the source the window made is closed with it")
         assertFalse(page.coroutineScope.isActive, "a page's coroutines stop with the window")
-        assertTrue(page.services.closed && window.services.closed, "the Koin scopes go too")
+        assertTrue(page.memory.closed && composition.memory.closed && window.memory.closed, "their services go too")
         assertNull(page.find(pageKey), "a closed level answers nothing")
         assertFailsWith<IllegalStateException> { window.child(ScopeLevel.Composition) }
     }
@@ -157,16 +154,93 @@ class WidgetScopeTest {
     }
 
     @Test
-    fun `a service declared for a level is one per level and closed with it`() {
-        val app = app(modules = arrayOf(module { levelServices(ScopeLevel.Window) { scoped { Service() } } }))
+    fun `each level gets its services from its parent's handle, for its own kind`() {
+        val app = app()
+        val window = app.child(ScopeLevel.Window)
+        val page = window.child(ScopeLevel.Composition).child(ScopeLevel.Page)
+        assertEquals(listOf(ScopeLevel.Window), app.memory.children.map { it.level })
+        assertEquals(ScopeLevel.Composition, window.memory.children.single().level)
+        assertEquals(ScopeLevel.Page, page.memory.level)
+    }
+
+    @Test
+    fun `closing a level closes the services it was given and leaves the app's to their owner`() {
+        val app = app()
         val a = app.child(ScopeLevel.Window)
         val b = app.child(ScopeLevel.Window)
-        val fromA = a.services.get<Service>()
-        assertSame(fromA, a.services.get<Service>())
-        assertNotSame(fromA, b.services.get<Service>())
-        val page = a.child(ScopeLevel.Composition).child(ScopeLevel.Page)
-        assertSame(fromA, page.services.get<Service>(), "a page below the window gets the window's")
-        assertNull(app.services.getOrNull<Service>(), "the app has none of its own")
+        a.close()
+        assertTrue(a.memory.closed)
+        assertFalse(b.memory.closed, "a sibling's services stay")
+        app.close()
+        assertTrue(b.memory.closed, "a window goes with the app and takes its services along")
+        assertFalse(app.memory.closed, "the app's services belong to whoever handed them in")
+    }
+
+    @Test
+    fun `a factory reads the services of the level it makes a source in`() {
+        val derived = SourceKey<String>("test.service", ScopeLevel.Window)
+        val registry = registry().apply {
+            registerFactory(derived) { context -> flowSource(MutableStateFlow(context.services.get<Service>().name)) }
+        }
+        val services = MemoryLevelServices.app(mapOf(ScopeLevel.Window to listOf({ Service("per window") })))
+        val app = app(registry, services)
+        val window = app.child(ScopeLevel.Window)
+        assertEquals("per window", window.current(derived))
+        assertSame(window.services.find<Service>(), window.child(ScopeLevel.Page).services.find<Service>(), "a page sees the window's")
+        assertNull(app.services.find<Service>(), "the app has none of its own")
+        assertFailsWith<NoSuchElementException> { app.services.get<Service>() }
+    }
+
+    @Test
+    fun `a level closes its children, what it made, its coroutines and its services in that order, and leaves its parent last`() {
+        val events = ArrayList<String>()
+        val logged = SourceKey<String>("test.logged", ScopeLevel.Window)
+        val registry = registry().apply {
+            registerFactory(logged) {
+                object : WidgetDataSource<String>, AutoCloseable {
+                    override val state: StateFlow<String> = MutableStateFlow("logged")
+                    override fun close() {
+                        events += "source"
+                    }
+                }
+            }
+        }
+        lateinit var root: WidgetScope
+        lateinit var window: WidgetScope
+        val services = MemoryLevelServices.app(events = events) { closing ->
+            if (closing.level == ScopeLevel.Window) events += "still held ${root.holds(window)}"
+        }
+        root = app(registry, services)
+        window = root.child(ScopeLevel.Window)
+        window.child(ScopeLevel.Page)
+        window.find(logged)
+        val job = assertNotNull(window.coroutineScope.coroutineContext[Job])
+        job.invokeOnCompletion { events += "job" }
+        window.close()
+        assertEquals(listOf("services Page", "source", "job", "services Window", "still held true"), events)
+        assertFalse(root.holds(window), "and it has left once its services are gone")
+    }
+
+    @Test
+    fun `services that fail to close still let the level leave its parent, and are thrown with the other failures`() {
+        val failing = SourceKey<String>("test.failing.window", ScopeLevel.Window)
+        val registry = registry().apply {
+            registerFactory(failing) {
+                object : WidgetDataSource<String>, AutoCloseable {
+                    override val state: StateFlow<String> = MutableStateFlow("x")
+                    override fun close() = error("this source cannot close")
+                }
+            }
+        }
+        val app = app(registry, MemoryLevelServices.app(failClose = setOf(ScopeLevel.Window)))
+        val window = app.child(ScopeLevel.Window)
+        window.find(failing)
+        val thrown = assertFailsWith<IllegalStateException> { window.close() }
+        assertEquals("this source cannot close", thrown.message, "the first failure is the one thrown")
+        assertEquals(listOf("the Window services cannot close"), thrown.suppressed.map { it.message })
+        assertTrue(window.memory.closed)
+        assertFalse(window.coroutineScope.isActive)
+        assertFalse(app.holds(window), "it left its parent all the same")
     }
 
     @Test

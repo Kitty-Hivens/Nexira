@@ -11,11 +11,11 @@ import kotlin.reflect.KClass
 // maps so Compose consumers recompose automatically when a provider
 // mounts or unmounts -- no separate Flow plumbing required.
 //
-// Scope: single global registry, one Koin singleton per launcher
-// process. A consumer on any surface can read a provider on any
-// other; achievement detection and music ducking are cross-surface
-// by design. Per-surface scoping can land later via a `scope`
-// filter without breaking the default.
+// Scope: single global registry, one instance per launcher process,
+// which the host keeps and provides. A consumer on any surface can
+// read a provider on any other: achievement detection and music
+// ducking are cross-surface by design. Per-surface scoping can land
+// later via a `scope` filter without breaking the default.
 //
 // Lookups return nullable snapshots so a consumer firing during the
 // brief between-mount window (provider unmounted, replacement not yet

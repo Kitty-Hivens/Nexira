@@ -27,6 +27,7 @@ import hivens.ui.components.formatBuildTimestamp
 import hivens.ui.surface.NxSurface
 import hivens.ui.theme.NxTheme
 import hivens.ui.widgets.ChildLevel
+import hivens.ui.widgets.KoinLevelServicesHost
 import hivens.ui.widgets.Sources
 import hivens.ui.widgets.WidgetSurface
 import hivens.widget.api.LocalLayoutGraph
@@ -132,7 +133,7 @@ class ProjectRailRenderTest {
             registerFactory(Sources.OpenProject) { flowSource(MutableStateFlow<OpenProject?>(project)) }
         }
         return koinApplication {
-            modules(module { single { WidgetScope.app(registry, this, Dispatchers.Unconfined) } })
+            modules(module { single { WidgetScope.app(registry, KoinLevelServicesHost.app(this), Dispatchers.Unconfined) } })
         }.koin.get()
     }
 

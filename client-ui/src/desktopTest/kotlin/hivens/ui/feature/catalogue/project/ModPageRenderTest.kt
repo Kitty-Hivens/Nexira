@@ -42,6 +42,7 @@ import hivens.ui.i18n.RussianStrings
 import hivens.ui.components.modrinthGalleryMedia
 import hivens.ui.surface.NxSurface
 import hivens.ui.theme.NxTheme
+import hivens.ui.widgets.KoinLevelServicesHost
 import hivens.ui.widgets.Sources
 import hivens.ui.widgets.WidgetSurface
 import hivens.widget.api.LocalLayoutGraph
@@ -292,7 +293,7 @@ class ModPageRenderTest {
     /** A window level under an app level of its own: the rail reads its window, the page's widgets climb through it. */
     private fun windowLevel(registry: WidgetDataRegistry): WidgetScope =
         koinApplication {
-            modules(module { single { WidgetScope.app(registry, this, Dispatchers.Unconfined) } })
+            modules(module { single { WidgetScope.app(registry, KoinLevelServicesHost.app(this), Dispatchers.Unconfined) } })
         }.koin.get<WidgetScope>().child(ScopeLevel.Window)
 
     private fun sheet(slug: String, name: String, local: Boolean = false) {

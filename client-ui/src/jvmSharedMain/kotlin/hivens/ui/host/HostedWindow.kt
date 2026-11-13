@@ -22,6 +22,7 @@ import hivens.widget.api.LocalSurfaceFamilies
 import hivens.widget.api.SurfaceFamilies
 import hivens.widget.api.WidgetScope
 import hivens.widget.api.command
+import hivens.widget.api.find
 import hivens.widget.api.flowSource
 import hivens.widget.api.rememberChildScope
 import hivens.widget.model.CommandKey
@@ -77,7 +78,7 @@ fun HostedWindow(
     val app = LocalScope.current
     val level = app?.let { rememberChildScope(it, ScopeLevel.Window) }
     if (level != null) remember(level, backend) { level.provideWindow(backend) }
-    val families = remember(level) { level?.services?.getOrNull<SurfaceFamilies>() ?: SurfaceFamilies() }
+    val families = remember(level) { level?.services?.find<SurfaceFamilies>() ?: SurfaceFamilies() }
     CompositionLocalProvider(
         // A refused window is in no registry, so nothing may be held against it.
         LocalHostWindow provides host.takeUnless { registered.refused },

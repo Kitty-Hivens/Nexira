@@ -65,7 +65,18 @@ public abstract interface class hivens/widget/api/LevelContext {
 	public abstract fun findCommand (Lhivens/widget/model/CommandKey;)Lhivens/widget/model/WidgetCommand;
 	public abstract fun getCoroutineScope ()Lkotlinx/coroutines/CoroutineScope;
 	public abstract fun getLevel ()Lhivens/widget/model/ScopeLevel;
-	public abstract fun getServices ()Lorg/koin/core/scope/Scope;
+	public abstract fun getServices ()Lhivens/widget/api/LevelServices;
+}
+
+public abstract interface class hivens/widget/api/LevelServices {
+	public abstract fun find (Lkotlin/reflect/KClass;)Ljava/lang/Object;
+	public abstract fun get (Lkotlin/reflect/KClass;)Ljava/lang/Object;
+}
+
+public abstract interface class hivens/widget/api/LevelServicesHost : java/lang/AutoCloseable {
+	public abstract fun child (Lhivens/widget/model/ScopeLevel;)Lhivens/widget/api/LevelServicesHost;
+	public abstract fun close ()V
+	public abstract fun getServices ()Lhivens/widget/api/LevelServices;
 }
 
 public final class hivens/widget/api/LocalsKt {
@@ -577,7 +588,7 @@ public final class hivens/widget/api/WidgetScope : hivens/widget/api/LevelContex
 	public fun getLevel ()Lhivens/widget/model/ScopeLevel;
 	public final fun getPages ()Lhivens/widget/api/PageLevels;
 	public final fun getParent ()Lhivens/widget/api/WidgetScope;
-	public fun getServices ()Lorg/koin/core/scope/Scope;
+	public fun getServices ()Lhivens/widget/api/LevelServices;
 	public final fun nearest (Lhivens/widget/model/ScopeLevel;)Lhivens/widget/api/WidgetScope;
 	public final fun provide (Lhivens/widget/model/SourceKey;Ljava/lang/Object;)Ljava/lang/AutoCloseable;
 	public final fun provideCommand (Lhivens/widget/model/CommandKey;Lhivens/widget/model/WidgetCommand;)Ljava/lang/AutoCloseable;
@@ -586,8 +597,8 @@ public final class hivens/widget/api/WidgetScope : hivens/widget/api/LevelContex
 }
 
 public final class hivens/widget/api/WidgetScope$Companion {
-	public final fun app (Lhivens/widget/api/WidgetDataRegistry;Lorg/koin/core/scope/Scope;Lkotlin/coroutines/CoroutineContext;Lhivens/widget/api/WidgetCommandRegistry;)Lhivens/widget/api/WidgetScope;
-	public static synthetic fun app$default (Lhivens/widget/api/WidgetScope$Companion;Lhivens/widget/api/WidgetDataRegistry;Lorg/koin/core/scope/Scope;Lkotlin/coroutines/CoroutineContext;Lhivens/widget/api/WidgetCommandRegistry;ILjava/lang/Object;)Lhivens/widget/api/WidgetScope;
+	public final fun app (Lhivens/widget/api/WidgetDataRegistry;Lhivens/widget/api/LevelServicesHost;Lkotlin/coroutines/CoroutineContext;Lhivens/widget/api/WidgetCommandRegistry;)Lhivens/widget/api/WidgetScope;
+	public static synthetic fun app$default (Lhivens/widget/api/WidgetScope$Companion;Lhivens/widget/api/WidgetDataRegistry;Lhivens/widget/api/LevelServicesHost;Lkotlin/coroutines/CoroutineContext;Lhivens/widget/api/WidgetCommandRegistry;ILjava/lang/Object;)Lhivens/widget/api/WidgetScope;
 }
 
 public final class hivens/widget/api/WidgetScopeHelpersKt {
@@ -602,11 +613,6 @@ public final class hivens/widget/api/WidgetScopeHelpersKt {
 	public static final fun rememberScopedCommand (Lhivens/widget/model/CommandKey;Landroidx/compose/runtime/Composer;I)Lkotlin/jvm/functions/Function1;
 	public static final fun rememberScopedSource (Lhivens/widget/model/SourceKey;Landroidx/compose/runtime/Composer;I)Lhivens/widget/api/ScopedSource;
 	public static final fun valueOrNull (Lhivens/widget/api/ScopedSource;)Ljava/lang/Object;
-}
-
-public final class hivens/widget/api/WidgetScopeKt {
-	public static final fun getServicesQualifier (Lhivens/widget/model/ScopeLevel;)Lorg/koin/core/qualifier/Qualifier;
-	public static final fun levelServices (Lorg/koin/core/module/Module;Lhivens/widget/model/ScopeLevel;Lkotlin/jvm/functions/Function1;)V
 }
 
 public final class hivens/widget/api/WidgetServiceHelpersKt {

@@ -22,12 +22,14 @@ import hivens.ui.settle
 import hivens.ui.uiCommandRegistry
 import hivens.ui.uiDataRegistry
 import hivens.ui.widgets.Commands
+import hivens.ui.widgets.KoinLevelServicesHost
 import hivens.ui.widgets.Sources
 import hivens.widget.api.LocalScope
 import hivens.widget.api.LocalSurfaceFamilies
 import hivens.widget.api.SurfaceFamilies
 import hivens.widget.api.WidgetScope
 import hivens.widget.api.flowSource
+import hivens.widget.api.get
 import hivens.widget.api.rememberScopedAction
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
@@ -95,7 +97,7 @@ class HostedWindowTest {
                             background       = MutableStateFlow(BackgroundSettings()),
                             accountsRevision = MutableStateFlow(0),
                         ),
-                        services = this,
+                        services = KoinLevelServicesHost.app(this),
                         context  = Dispatchers.Unconfined,
                         commands = uiCommandRegistry({}, {}, {}, {}),
                     )

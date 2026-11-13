@@ -49,7 +49,7 @@ class LevelsTest {
     }
 
     private val app: WidgetScope = koinApplication {
-        modules(module { single { WidgetScope.app(registry, this, Dispatchers.Unconfined) } })
+        modules(module { single { WidgetScope.app(registry, KoinLevelServicesHost.app(this), Dispatchers.Unconfined) } })
     }.koin.get()
 
     /** Composes [content] under the app level and draws a few frames, all on the event thread. */

@@ -26,7 +26,7 @@ fun LevelHost(scope: WidgetScope?, content: @Composable () -> Unit) {
     CompositionLocalProvider(LocalScope provides scope) {
         // Unbound because the level owns its Koin scope and closes it with itself,
         // where Koin's own scope composable would close it when this call leaves.
-        UnboundKoinScope(scope.services, content)
+        UnboundKoinScope(scope.koinScope, content)
     }
 }
 

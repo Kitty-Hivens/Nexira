@@ -60,11 +60,13 @@ import hivens.ui.utils.GameConsoleService
 import hivens.ui.utils.LogRetention
 import hivens.ui.utils.PreferenceWriter
 import hivens.ui.widgets.Commands
+import hivens.ui.widgets.KoinLevelServicesHost
 import hivens.ui.widgets.Sources
 import hivens.ui.widgets.about.AboutUpdateSource
 import hivens.ui.widgets.about.OpenUpdateDialog
 import hivens.ui.widgets.about.SystemFacts
 import hivens.ui.widgets.about.sampleUpdateCheck
+import hivens.ui.widgets.levelServices
 import hivens.ui.widgets.modules.WidgetModuleHost
 import hivens.ui.widgets.modules.WidgetModules
 import hivens.ui.widgets.profile.AccountChanges
@@ -83,7 +85,7 @@ import hivens.widget.api.WidgetScope
 import hivens.widget.api.WidgetServiceRegistry
 import hivens.widget.api.command
 import hivens.widget.api.flowSource
-import hivens.widget.api.levelServices
+import hivens.widget.api.get
 import hivens.widget.model.DefaultLayout
 import hivens.widget.model.ScopeLevel
 import hivens.widget.model.WidgetDataSource
@@ -253,7 +255,7 @@ fun uiCoreModule(
     single {
         WidgetScope.app(
             registry = get(),
-            services = this,
+            services = KoinLevelServicesHost.app(this),
             context  = get<CoroutineScope>().coroutineContext,
             commands = get(),
         )

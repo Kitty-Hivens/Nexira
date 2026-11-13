@@ -13,14 +13,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import org.koin.core.module.Module
-import org.koin.core.qualifier.Qualifier
-import org.koin.core.qualifier.named
-import org.koin.core.scope.Scope
-import org.koin.dsl.ScopeDSL
 import org.slf4j.LoggerFactory
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicLong
 import kotlin.coroutines.CoroutineContext
 
 private val log = LoggerFactory.getLogger("hivens.widget.api.WidgetScope")
@@ -37,11 +31,11 @@ interface LevelContext {
     val coroutineScope: CoroutineScope
 
     /**
-     * The level's Koin scope. A service declared for this kind of level (see
-     * [levelServices]) is made once per level and closed with it, anything else
-     * resolves from the levels above.
+     * The level's services, to read. One the host declared for this kind of level is
+     * made once per level and closed with it, and any other is seen from the levels
+     * above. Making and closing them is the level's own business, not the reader's.
      */
-    val services: Scope
+    val services: LevelServices
 
     /** Another key's source as this level sees it, read at that key's own level. Null where it is missing. */
     fun <T> find(key: SourceKey<T>): WidgetDataSource<T>?
@@ -55,7 +49,7 @@ interface LevelContext {
  *
  * The owner of a level creates it under its parent with [child] and disposes it
  * with [close], which takes everything the level made along: its children first,
- * then the sources its factories made, its coroutines and its Koin scope. Nothing
+ * then the sources its factories made, its coroutines and its services. Nothing
  * here knows who the owners are, so a shell, a window registry or an outlet can
  * own levels the same way.
  *
@@ -80,9 +74,11 @@ class WidgetScope private constructor(
     val parent: WidgetScope?,
     private val registry: WidgetDataRegistry,
     private val commands: WidgetCommandRegistry,
-    override val services: Scope,
+    private val host: LevelServicesHost,
     context: CoroutineContext,
 ) : LevelContext, AutoCloseable {
+
+    override val services: LevelServices = host.services
 
     private val job = SupervisorJob(context[Job])
 
@@ -122,9 +118,7 @@ class WidgetScope private constructor(
         require(level > this.level) { "a $level level cannot sit inside a ${this.level} level" }
         synchronized(lock) {
             check(!closed) { "a ${this.level} level that was disposed cannot take a $level level" }
-            val own = services.getKoin().createScope(nextScopeId(level), level.servicesQualifier)
-            // Koin links every new scope to its root already, so only a parent below the app needs it.
-            if (!services.isRoot) own.linkTo(services)
+            val own = host.child(level)
             return WidgetScope(level, this, registry, commands, own, coroutineScope.coroutineContext).also { children += it }
         }
     }
@@ -295,9 +289,12 @@ class WidgetScope private constructor(
     }
 
     /**
-     * Disposes this level and everything it made. Every part is attempted even
+     * Disposes this level and everything it made, in this order: its children,
+     * newest first, then the sources and commands its factories made, then its
+     * coroutines, then its services, and last it leaves its parent. The services go
+     * after everything that may still read them. Every part is attempted even
      * when one fails, and the first failure is thrown afterwards with the rest
-     * attached, so one broken source cannot keep the others or the Koin scope alive.
+     * attached, so one broken source cannot keep the others or the services alive.
      * An owner closing from inside a frame uses [closeLogged] instead, because a
      * throw there takes the window down.
      */
@@ -322,8 +319,8 @@ class WidgetScope private constructor(
             if (source is AutoCloseable) runCatching { source.close() }.onFailure(failures::add)
         }
         job.cancel()
-        // The app level borrows Koin's root scope, which lives as long as Koin does.
-        if (parent != null) runCatching { services.close() }.onFailure(failures::add)
+        // The app level's services belong to whoever handed them to app().
+        if (parent != null) runCatching { host.close() }.onFailure(failures::add)
         parent?.forget(this)
         failures.firstOrNull()?.let { first ->
             failures.drop(1).forEach(first::addSuppressed)
@@ -335,26 +332,24 @@ class WidgetScope private constructor(
         synchronized(lock) { children.remove(child) }
     }
 
+    /** Whether [child] is still among this level's children, for the tests that pin when a closing child leaves. */
+    internal fun holds(child: WidgetScope): Boolean = synchronized(lock) { child in children }
+
     companion object {
-        private val ids = AtomicLong()
-
-        private fun nextScopeId(level: ScopeLevel): String = "nexira.${level.name.lowercase()}.${ids.incrementAndGet()}"
-
         /**
          * The root of a tree: the app level, answering app keys from [registry] and
          * the app factories in it, and app commands from [commands]. [services] is
-         * Koin's root scope, and [context] the coroutine context every level's
-         * coroutines run under, so cancelling its job stops them all.
+         * the host's handle for the app, which every level below gets its own from,
+         * which the levels keep to themselves and which stays the caller's to close.
+         * [context] is the coroutine context every level's coroutines run under, so
+         * cancelling its job stops them all.
          */
         fun app(
             registry: WidgetDataRegistry,
-            services: Scope,
+            services: LevelServicesHost,
             context: CoroutineContext = Dispatchers.Default,
             commands: WidgetCommandRegistry = WidgetCommandRegistry(),
-        ): WidgetScope {
-            require(services.isRoot) { "the app level's services are Koin's root scope" }
-            return WidgetScope(ScopeLevel.App, null, registry, commands, services, context)
-        }
+        ): WidgetScope = WidgetScope(ScopeLevel.App, null, registry, commands, services, context)
     }
 }
 
@@ -372,19 +367,4 @@ internal fun AutoCloseable.closeLogged(what: String) {
     } catch (e: Exception) {
         log.error("Closing {} failed", what, e)
     }
-}
-
-/** The Koin scope qualifier every level of this kind creates its own scope under. */
-val ScopeLevel.servicesQualifier: Qualifier get() = LEVEL_QUALIFIERS.getValue(this)
-
-private val LEVEL_QUALIFIERS: Map<ScopeLevel, Qualifier> =
-    ScopeLevel.entries.associateWith { named("nexira.level.${it.name}") }
-
-/**
- * Declares services made once per level of kind [level], each closed with the
- * level that made it. Everything injected under such a level resolves from it.
- */
-fun Module.levelServices(level: ScopeLevel, declarations: ScopeDSL.() -> Unit) {
-    require(level != ScopeLevel.App) { "app-wide services are plain singles" }
-    scope(level.servicesQualifier, declarations)
 }

@@ -54,9 +54,6 @@ kotlin {
                 // needs the layout primitives (Column/Row/Box/Modifier). foundation
                 // pulls compose-ui (Modifier) transitively.
                 implementation(libs.compose.foundation)
-                // api: a level hands its services to factories and owners as a Koin scope,
-                // so the scope type is on the public contract of WidgetScope.
-                api(libs.koin.core)
                 // A level that fails to make or close a source logs it and goes on,
                 // since a throw while a frame applies takes the window down.
                 implementation(libs.slf4j.api)

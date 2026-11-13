@@ -6,8 +6,6 @@ import hivens.widget.model.SourceKey
 import hivens.widget.model.WidgetCommand
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
-import org.koin.dsl.koinApplication
-import org.koin.dsl.module
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -52,13 +50,8 @@ class WidgetScopeCommandTest {
         declare(pageSource)
     }
 
-    private fun app(commands: WidgetCommandRegistry = commands()): WidgetScope {
-        val data = sources()
-        val koin = koinApplication {
-            modules(module { single { WidgetScope.app(data, this, Dispatchers.Unconfined, commands) } })
-        }.koin
-        return koin.get()
-    }
+    private fun app(commands: WidgetCommandRegistry = commands()): WidgetScope =
+        WidgetScope.app(sources(), MemoryLevelServices.app(), Dispatchers.Unconfined, commands)
 
     @Test
     fun `two windows make one command each and do not fire each other's`() {
