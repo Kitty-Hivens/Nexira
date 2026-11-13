@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -21,6 +20,7 @@ import hivens.launcher.platform.PlatformPaths
 import hivens.ui.platform.rememberHostActions
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
+import hivens.ui.nx.NxAlertDialog
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxChoiceChip
@@ -296,8 +296,9 @@ internal fun AdvancedSection(
         val target = pendingTarget!!
         val container = NxTheme.colours.step(NxTheme.colours.topStep)
         OnFill(container) {
-            AlertDialog(
+            NxAlertDialog(
                 onDismissRequest = { pendingTarget = null },
+                paneTitle        = s.settingsDataDirConfirmTitle,
                 title = { Text(s.settingsDataDirConfirmTitle) },
                 text  = {
                     Text(s.settingsDataDirConfirmBody(

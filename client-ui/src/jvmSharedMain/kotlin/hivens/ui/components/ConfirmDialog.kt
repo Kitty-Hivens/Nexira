@@ -1,12 +1,12 @@
 package hivens.ui.components
 
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.nx.NxAlertDialog
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxTheme
@@ -34,8 +34,9 @@ fun ConfirmDialog(
     val s = LocalStrings.current
     val container = NxTheme.colours.step(NxTheme.colours.topStep)
     OnFill(container) {
-        AlertDialog(
+        NxAlertDialog(
             onDismissRequest = onDismiss,
+            paneTitle        = title,
             title = { Text(title) },
             text  = { Text(body, style = MaterialTheme.typography.bodyMedium) },
             confirmButton = {

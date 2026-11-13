@@ -10,6 +10,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.platform.LocalDensity
@@ -38,12 +39,14 @@ fun NxAnchoredCard(
     modifier: Modifier = Modifier,
     align: NxMenuAlign = NxMenuAlign.End,
     width: Dp = CARD_WIDTH,
+    /** Where the focus goes when the card closes, for a trigger that had it. */
+    returnFocus: FocusRequester? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val gapPx = with(LocalDensity.current) { CARD_GAP.roundToPx() }
     val origin = remember { mutableStateOf(TransformOrigin(1f, 0f)) }
     val provider = remember(gapPx, align, origin) { MenuBelowAnchor(align, gapPx, origin) }
-    NxMenuPopup(provider, origin, expanded, onDismissRequest) {
+    NxMenuPopup(provider, origin, expanded, onDismissRequest, returnFocus = returnFocus) {
         CardSurface(modifier, width, content)
     }
 }
@@ -62,7 +65,8 @@ fun NxAnchoredCard(
     val x = anchorInWindow.x.roundToInt()
     val y = anchorInWindow.y.roundToInt()
     val origin = remember { mutableStateOf(TransformOrigin(0f, 0f)) }
-    val provider = remember(x, y, gapPx, origin) { MenuAtWindowOffset(x, y, gapPx, origin) }
+    val parent = rememberParentInWindow()
+    val provider = remember(x, y, gapPx, origin, parent) { MenuAtWindowOffset(x, y, gapPx, origin, parent) }
     NxMenuPopup(provider, origin, expanded, onDismissRequest) {
         CardSurface(modifier, width, content)
     }

@@ -96,13 +96,37 @@ class DismissStack internal constructor(private val layers: WindowLayers) {
         fieldSessions.decrementAndGet()
     }
 
+    // The part of those sessions opened inside a layer, counted by the layer's frame.
+    private val layerFieldSessions = AtomicInteger()
+
+    internal fun layerFieldOpened() {
+        layerFieldSessions.incrementAndGet()
+    }
+
+    internal fun layerFieldClosed() {
+        layerFieldSessions.decrementAndGet()
+    }
+
+    // Fields marked persistentInput that hold the focus now, see [persistentInput].
+    private val persistentFields = AtomicInteger()
+
+    internal fun persistentFocused() {
+        persistentFields.incrementAndGet()
+    }
+
+    internal fun persistentReleased() {
+        persistentFields.decrementAndGet()
+    }
+
+    /** Whether the focused field is one of the window's own content rather than of a layer. */
+    private val contentFieldFocused: Boolean get() = fieldSessions.get() - layerFieldSessions.get() > 0
+
     /** Set by the host: takes the keyboard focus away from the focused field. */
     internal var leaveField: () -> Unit = {}
 
     /**
      * Whether a text field under the host holds a text input session. A field in a
-     * popup or dialog opened from under the host counts too, which is why leaving a
-     * field is decided where only the host's own keys arrive (see [LayerHost]).
+     * layer, or in a Compose popup or dialog opened from under the host, counts too.
      */
     val fieldFocused: Boolean get() = fieldSessions.get() > 0
 
@@ -151,14 +175,18 @@ class DismissStack internal constructor(private val layers: WindowLayers) {
     }
 
     /**
-     * Escape on its way out of the host's own focused content, which is the only
-     * place it arrives from a field of the host's: a focused field in a popup or a
-     * dialog sends its keys through that layer instead. Takes the keyboard out of
-     * the field and keeps the press from becoming back.
+     * Escape on its way out of the host's focused content, its layers included. A
+     * Compose popup or dialog sends its keys through its own owner and never comes
+     * here. Takes the keyboard out of a field of the window's own content and keeps
+     * the press from becoming back. A field in a layer keeps it, so the press closes
+     * that layer as it would close a popup. So does a field under a modal, a list hung
+     * off it for one: what the modal holds closes first. So does a field that always
+     * holds the keyboard ([persistentInput]): the press goes on to the stack.
      */
     internal fun onHostKeyEvent(event: KeyEvent): Boolean {
         if (!event.isPlainEscape() || event.type != KeyEventType.KeyDown) return false
-        if (!fresh || pressTaken || !fieldFocused) return false
+        if (!fresh || pressTaken || !contentFieldFocused || layers.plan.modal != null) return false
+        if (persistentFields.get() > 0) return false
         leaveField()
         pressTaken = true
         return true

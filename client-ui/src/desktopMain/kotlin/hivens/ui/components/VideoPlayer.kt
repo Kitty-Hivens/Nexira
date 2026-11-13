@@ -3,7 +3,6 @@ package hivens.ui.components
 import androidx.compose.foundation.background
 import hivens.ui.diag.SkinemaGate
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.drag
@@ -39,15 +38,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
@@ -56,8 +48,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupProperties
 import dev.hivens.skinema.compose.VideoScale
 import dev.hivens.skinema.compose.VideoSurface
 import dev.hivens.skinema.compose.rememberPlayerState
@@ -68,6 +58,7 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
+import hivens.ui.layers.Layer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -332,6 +323,9 @@ private fun rememberInlineVideo(path: Path, loop: Boolean, audio: Boolean): Inli
  * Full-window video over a scrim, dismissed by the close button, a backdrop click
  * or Esc. Takes a URL ([VideoMedia] resolves it from the on-disk cache -- a hit
  * after the inline view) and always plays with sound + controls.
+ *
+ * A modal layer of the window: Escape and back close it from the window's dismiss
+ * stack. It covers the whole window, so a press on it is never one outside it.
  */
 @Composable
 fun FullscreenVideoWithHandoff(
@@ -341,22 +335,8 @@ fun FullscreenVideoWithHandoff(
     onDismiss: () -> Unit,
 ) {
     val s = LocalStrings.current
-    Popup(
-        alignment        = Alignment.Center,
-        onDismissRequest = onDismiss,
-        properties       = PopupProperties(focusable = true),
-    ) {
-        val focus = remember { FocusRequester() }
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black)
-                .focusRequester(focus)
-                .focusable()
-                .onPreviewKeyEvent { ev ->
-                    if (ev.type == KeyEventType.KeyDown && ev.key == Key.Escape) { onDismiss(); true } else false
-                },
-        ) {
+    Layer(visible = true, modal = true, onDismissRequest = onDismiss, dismissOnOutsidePress = false) {
+        Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
             VideoMedia(
                 url          = url,
                 thumbUrl     = posterUrl,
@@ -382,7 +362,6 @@ fun FullscreenVideoWithHandoff(
                 modifier = Modifier.align(Alignment.TopEnd).padding(16.dp),
             )
         }
-        LaunchedEffect(Unit) { focus.requestFocus() }
     }
 }
 

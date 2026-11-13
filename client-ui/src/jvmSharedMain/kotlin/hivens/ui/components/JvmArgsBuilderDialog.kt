@@ -1,5 +1,6 @@
 package hivens.ui.components
 import hivens.ui.nx.NxButton
+import hivens.ui.nx.NxDialog
 import hivens.ui.nx.NxSectionHeader
 import hivens.ui.nx.NxSliderTrack
 import hivens.ui.nx.NxSwitch
@@ -16,8 +17,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import hivens.core.jvm.*
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
@@ -70,10 +69,7 @@ fun JvmArgsBuilderDialog(
         )
     }
 
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
-    ) {
+    NxDialog(onDismissRequest = onDismiss, defaultWidth = false, paneTitle = s.jvmTitle) {
         NxSurface(
             kind = SurfaceKind.Dialog,
             modifier = Modifier.width(820.dp).heightIn(min = 540.dp, max = 720.dp),

@@ -10,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Density
 import hivens.ui.layers.LayerHost
 import hivens.ui.layers.WindowLayers
+import hivens.ui.nx.NxDialog
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -19,7 +20,8 @@ import kotlin.test.assertTrue
 /**
  * The editor's back-out as entries of the window's dismiss stack: what one Escape,
  * or one Android back, closes while editing, and that nothing of the session is
- * left for either to reach once it ends.
+ * left for either to reach once it ends. The reset confirmations are the dialogs
+ * the host opens, modal layers with an entry of their own.
  */
 class EditorBackOutTest {
 
@@ -42,11 +44,10 @@ class EditorBackOutTest {
                 onCloseSlotMenu     = { slotMenu = false },
                 previewing          = previewing,
                 onEndPreview        = { previewing = false },
-                resetSurfaceConfirm = resetSurface,
-                onCloseResetSurface = { resetSurface = false },
-                resetAllConfirm     = resetAll,
-                onCloseResetAll     = { resetAll = false },
             )
+            // As the host gates them: only while editing.
+            if (editing && resetSurface) NxDialog(onDismissRequest = { resetSurface = false }) {}
+            if (editing && resetAll) NxDialog(onDismissRequest = { resetAll = false }) {}
         }
     }
     private var time = 0L
@@ -63,8 +64,8 @@ class EditorBackOutTest {
     }
 
     /**
-     * One Escape with no field focused and no popup or dialog open, which reaches the
-     * stack as back. How a key gets there is the layers module's to test.
+     * One Escape with no field focused, which reaches the stack as back. How a key
+     * gets there is the layers module's to test.
      */
     private fun escape(): Boolean = layers.dismiss.dismissTop().also { settle() }
 
@@ -147,6 +148,7 @@ class EditorBackOutTest {
         editing = false
         settle()
         assertFalse(layers.dismiss.canDismiss)
+        assertFalse(layers.dismiss.handlesBack, "no dialog is left holding the window either")
         assertFalse(escape())
         assertTrue(resetAll, "nothing was closed on a session that is gone")
     }

@@ -2,7 +2,6 @@ package hivens.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -11,6 +10,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.unit.dp
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.nx.NxAlertDialog
 import hivens.ui.theme.NxTheme
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -49,8 +49,9 @@ class QuitGate {
  * nothing in the world, so it comes first; stopping it takes the game's own
  * shutdown time.
  *
- * MUST be composed inside [hivens.ui.theme.NxTheme]: a `Dialog` gets its own
- * composition, and one raised from outside the theme finds no colours.
+ * MUST be composed inside [hivens.ui.theme.NxTheme]: the dialog is a layer of the
+ * window that takes its theme from where it is opened, and one raised from outside
+ * the theme finds no colours.
  */
 @Composable
 fun QuitWithGameHost(
@@ -65,8 +66,9 @@ fun QuitWithGameHost(
     // Material draws the dialog body, so its words are fitted to that body by hand: the
     // dialog step of the ladder, which is what a modal is anywhere else in the app.
     val body = NxTheme.colours.step(NxTheme.colours.topStep)
-    AlertDialog(
+    NxAlertDialog(
         onDismissRequest = gate::dismiss,
+        paneTitle        = s.quitGameTitle,
         title = { OnFill(body) { Text(s.quitGameTitle, color = NxInk.main) } },
         text  = {
             OnFill(body) {

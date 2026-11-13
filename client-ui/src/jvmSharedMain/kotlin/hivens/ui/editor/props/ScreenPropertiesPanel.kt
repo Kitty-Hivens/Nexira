@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -31,6 +30,7 @@ import hivens.ui.editor.EditModeController
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
+import hivens.ui.nx.NxAlertDialog
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxField
@@ -142,8 +142,9 @@ internal fun ScreenPropertiesPanel(
         PuppetClick("screen.delete.confirm") { delete() }
         val container = NxTheme.colours.step(NxTheme.colours.topStep)
         OnFill(container) {
-            AlertDialog(
+            NxAlertDialog(
                 onDismissRequest  = { confirmDelete = false },
+                paneTitle         = s.screenDelete,
                 containerColor    = container,
                 titleContentColor = NxInk.main,
                 textContentColor  = NxInk.quiet,

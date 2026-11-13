@@ -32,6 +32,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -82,6 +83,13 @@ fun NxChoiceMenu(
     footer: (@Composable () -> Unit)? = null,
     /** See [NxMenuPopup]: whether the list is on screen, its exit included, for the trigger's look. */
     onShownChange: ((Boolean) -> Unit)? = null,
+    /** Where the focus goes when the list closes, for a trigger that had it. */
+    returnFocus: FocusRequester? = null,
+    /**
+     * For a list of suggestions under the text field that filters it: opened while
+     * the field holds the keyboard, the list leaves it there, so typing goes on.
+     */
+    yieldsToField: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val density = LocalDensity.current
@@ -90,7 +98,7 @@ fun NxChoiceMenu(
     val anchorWidth = remember { mutableStateOf(0) }
     val provider = remember(gapPx, align, origin) { MenuBelowAnchor(align, gapPx, origin, anchorWidth) }
     val floor = with(density) { anchorWidth.value.toDp() }
-    NxMenuPopup(provider, origin, expanded, onDismissRequest, onShownChange) {
+    NxMenuPopup(provider, origin, expanded, onDismissRequest, onShownChange, returnFocus, yieldsToField) {
         NxChoiceSurface(modifier, maxOf(minWidth, floor), maxOf(maxWidth, floor), maxHeight, footer, content)
     }
 }

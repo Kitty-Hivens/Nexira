@@ -8,6 +8,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.FocusRequester
 import java.util.concurrent.atomic.AtomicLong
 
 /**
@@ -38,12 +40,62 @@ class WindowLayers {
     /** Shows [resident] on top of its siblings: a visible edge. */
     internal fun show(resident: LayerResident) {
         resident.stamp = tick()
+        resident.shown = true
+        resident.releasing = false
+        resident.tookFocus = false
         shown.remove(resident)
         shown.add(resident)
     }
 
+    /**
+     * Takes [resident] out of the order. A layer that holds the keyboard gives it back
+     * first to what had it before the layer took it, while its content is still there
+     * to let go of it.
+     */
     internal fun hide(resident: LayerResident) {
+        resident.shown = false
+        if (resident.holdsFocus || resident.tookFocus) {
+            resident.releasing = true
+            giveFocusBack(resident)
+        }
+        resident.tookFocus = false
+        resident.focusReturn = null
+        resident.holdsFocus = false
         shown.remove(resident)
+    }
+
+    /**
+     * The focus back out of a leaving layer, in order: to where the caller asked, to
+     * the child of the group it was taken from that had it, and when that child is
+     * gone to the first thing in that group, so the keyboard stays in the place the
+     * layer was opened from. A layer that took the focus from nothing gives it back to
+     * nothing.
+     */
+    private fun giveFocusBack(resident: LayerResident) {
+        if (resident.returnFocus?.requestFocus(FocusDirection.Enter) == true) return
+        val back = resident.focusReturn ?: return
+        if (resident.focusReturnToChild && back.restoreFocusedChild()) return
+        back.requestFocus(FocusDirection.Enter)
+    }
+
+    /** The focus group around the window's own content, which a layer that takes the focus returns it to. */
+    internal val contentFocus = FocusRequester()
+
+    /**
+     * Where the keyboard focus is now, as the group a focusable layer that takes it has
+     * to give it back to: a shown layer that holds it, or the window's own content.
+     */
+    internal fun focusHolder(except: LayerResident): FocusRequester =
+        shown.firstOrNull { it !== except && it.focusable && it.holdsFocus }?.focus ?: contentFocus
+
+    /** Whether [resident] is the topmost modal or a layer it was opened from. */
+    internal fun holdsModal(resident: LayerResident): Boolean {
+        var at = plan.modal
+        while (at != null) {
+            if (at === resident) return true
+            at = at.parent
+        }
+        return false
     }
 
     /** The window's dismiss stack. */

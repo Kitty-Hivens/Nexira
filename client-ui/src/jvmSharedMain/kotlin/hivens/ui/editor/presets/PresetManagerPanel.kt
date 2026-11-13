@@ -32,10 +32,9 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.nx.NxButton
+import hivens.ui.nx.NxDialog
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.surface.NxCard
@@ -99,10 +98,7 @@ fun PresetManagerPanel(
     // ran twice before (once here during composition, once in the effect).
     LaunchedEffect(Unit) { guarded { presets = withContext(Dispatchers.IO) { listProvider() } } }
 
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
-    ) {
+    NxDialog(onDismissRequest = onDismiss, defaultWidth = false, paneTitle = s.editorPresetsTitle) {
         NxSurface(
             kind     = SurfaceKind.Dialog,
             shape    = MaterialTheme.shapes.large,

@@ -36,11 +36,10 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
+import hivens.ui.nx.NxDialog
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetField
 import hivens.ui.surface.NxSurface
@@ -88,12 +87,7 @@ fun ConfirmCodeDialog(
     val s = LocalStrings.current
     var code by remember { mutableStateOf("") }
 
-    // The code is time-boxed, so put the caret in the field the moment the dialog
-    // opens -- otherwise the user has to click it first, friction on a focus-finicky
-    // Wayland stack. runCatching guards the node-not-yet-attached race the way the
-    // rest of the UI does.
     val codeFocus = remember { FocusRequester() }
-    LaunchedEffect(Unit) { val _ = runCatching { codeFocus.requestFocus() } }
 
     fun accept(raw: String) {
         // Cap at CODE_LENGTH, strip non-digits -- the server rejects anything else
@@ -103,10 +97,12 @@ fun ConfirmCodeDialog(
 
     val complete = code.length == CODE_LENGTH
 
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
-    ) {
+    NxDialog(onDismissRequest = onDismiss, defaultWidth = false, paneTitle = s.auth2faTitle) {
+        // The code is time-boxed, so put the caret in the field the moment the dialog
+        // opens, otherwise the user has to click it first, friction on a focus-finicky
+        // Wayland stack. Asked from inside the dialog, which joins the window a frame
+        // after this call: from beside it the field was not there yet.
+        LaunchedEffect(Unit) { codeFocus.requestFocus() }
         NxSurface(SurfaceKind.Dialog, modifier = Modifier.width(420.dp)) {
             Column(
                 Modifier.fillMaxWidth().padding(24.dp),
@@ -195,10 +191,7 @@ fun ConfirmCodeDialog(
     }
 }
 
-/**
- * Test seam for [CodeCells]: the cells are the part worth rendering on their own,
- * since a Dialog does not compose inside an offscreen scene.
- */
+/** Test seam for [CodeCells]: the cells are the part worth rendering on their own. */
 @Composable
 internal fun ConfirmCodeCellsForTest(code: String, hasError: Boolean = false, dimmed: Boolean = false) =
     CodeCells(code = code, hasError = hasError, dimmed = dimmed)

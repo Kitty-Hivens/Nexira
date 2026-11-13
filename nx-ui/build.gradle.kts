@@ -3,8 +3,9 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
 
 // Leaf design-system module (NxUI). Holds tokens, primitives, surfaces and the
 // Flexible decorator layer that the rest of the UI builds on. Depends on nothing
-// in-tree -- client-ui depends on it one-way. No application/packaging here, no
-// puppet source-set, no client-core: this is the bottom of the UI graph.
+// in-tree but ui-layers, which draws nothing. client-ui depends on it one-way.
+// No application/packaging here, no puppet source-set, no client-core: this is
+// the bottom of the UI graph.
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.compose)
@@ -42,6 +43,14 @@ kotlin {
         }
         getByName("desktopMain").dependsOn(jvmSharedMain)
         getByName("androidMain").dependsOn(jvmSharedMain)
+
+        getByName("jvmSharedMain") {
+            dependencies {
+                // Where popups, tooltips and dialogs stand and what closes them. This
+                // module draws them and asks ui-layers to place them.
+                implementation(project(":ui-layers"))
+            }
+        }
 
         getByName("commonMain") {
             dependencies {

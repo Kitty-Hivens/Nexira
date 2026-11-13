@@ -70,7 +70,6 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -82,6 +81,7 @@ import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
+import hivens.ui.layers.persistentInput
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.ImeAction
 import hivens.ui.nx.NxButton
@@ -211,7 +211,6 @@ internal fun ConsoleContent(
     val isLive = source is ConsoleSource.Live
     val s = LocalStrings.current
     val clipboard = LocalClipboard.current
-    val focusManager = LocalFocusManager.current
     val scope = rememberCoroutineScope()
     val gameConsole: GameConsoleService = koinInject()
     val inkMain = NxInk.main
@@ -769,7 +768,9 @@ internal fun ConsoleContent(
         // attach / detach lifecycle). Enter sends the line to the game
         // process's stdin via gameConsole.sendCommand, pushes it onto
         // cmdHistory, clears the input. Up / Down step through history
-        // (most-recent first). Esc clears or blurs.
+        // (most-recent first). Esc clears what is typed, and on an empty
+        // line goes on to whatever the window has open: the line keeps the
+        // keyboard, it is the console's way in.
         if (commandRowShown) {
             CommandInputRow(
                 value            = cmdInput,
@@ -809,9 +810,9 @@ internal fun ConsoleContent(
                     if (cmdInput.isNotEmpty()) {
                         cmdInput = ""
                         cmdHistoryIdx = -1
+                        true
                     } else {
-                        focusManager.clearFocus()
-                        val _ = runCatching { logFocus.requestFocus() }
+                        false
                     }
                 },
                 onFocusChanged   = {
@@ -1204,7 +1205,8 @@ private fun CommandInputRow(
     onSubmit: () -> Unit,
     onHistoryPrev: () -> Unit,
     onHistoryNext: () -> Unit,
-    onEscape: () -> Unit,
+    /** Whether Escape was used. An unused one goes on to the window's dismiss stack. */
+    onEscape: () -> Boolean,
     onFocusChanged: (Boolean) -> Unit,
     focusRequester: FocusRequester,
     strings: AppStrings,
@@ -1241,6 +1243,8 @@ private fun CommandInputRow(
             cursorBrush   = SolidColor(NxInk.main),
             modifier      = Modifier
                 .weight(1f)
+                // The command line holds the keyboard: Escape never takes it from here.
+                .persistentInput()
                 .focusRequester(focusRequester)
                 .onFocusChanged { onFocusChanged(it.isFocused) }
                 .onPreviewKeyEvent { ev ->
@@ -1249,7 +1253,7 @@ private fun CommandInputRow(
                         Key.Enter, Key.NumPadEnter -> { onSubmit(); true }
                         Key.DirectionUp            -> { onHistoryPrev(); true }
                         Key.DirectionDown          -> { onHistoryNext(); true }
-                        Key.Escape                 -> { onEscape(); true }
+                        Key.Escape                 -> onEscape()
                         else                       -> false
                     }
                 },

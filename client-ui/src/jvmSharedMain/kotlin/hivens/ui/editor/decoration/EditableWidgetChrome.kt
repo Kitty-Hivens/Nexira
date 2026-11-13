@@ -31,7 +31,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -95,6 +94,7 @@ import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
+import hivens.ui.nx.NxAlertDialog
 import hivens.ui.nx.NxContextMenu
 import hivens.ui.nx.NxMenuItem
 import hivens.ui.theme.Motion
@@ -873,8 +873,9 @@ fun EditableWidgetChrome(
     if (forceRemoveOpen) {
         val container = NxTheme.colours.step(NxTheme.colours.topStep)
         OnFill(container) {
-            AlertDialog(
+            NxAlertDialog(
                 onDismissRequest  = { forceRemoveOpen = false },
+                paneTitle         = s.editorForceRemoveTitle,
                 containerColor    = container,
                 titleContentColor = NxInk.main,
                 textContentColor  = NxInk.quiet,

@@ -1,9 +1,7 @@
 package hivens.ui.feature.catalogue.browse
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -48,8 +46,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupProperties
 import coil3.compose.AsyncImage
 import coil3.compose.SubcomposeAsyncImage
 import hivens.core.api.dto.modrinth.ModrinthVersion
@@ -74,6 +70,7 @@ import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxChoiceChip
 import hivens.ui.nx.NxChoiceFooterItem
+import hivens.ui.nx.NxDialog
 import hivens.ui.nx.NxField
 import hivens.ui.nx.NxIconButton
 import hivens.ui.nx.NxSelect
@@ -124,9 +121,6 @@ internal data class InstallSubject(
 @Composable
 internal fun InstallDialog(subject: InstallSubject, onDismiss: () -> Unit) {
     val s = LocalStrings.current
-    var shown by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { shown = true }
-    val scrim by animateFloatAsState(if (shown) 0.72f else 0f, animationSpec = Motion.fade, label = "installScrim")
     val model = rememberInstallDialogModel(subject)
     var tab by remember { mutableStateOf(InstallTab.Existing) }
     val tabs = if (model.newPackLoaders.isNotEmpty()) InstallTab.entries else listOf(InstallTab.Existing)
@@ -135,73 +129,70 @@ internal fun InstallDialog(subject: InstallSubject, onDismiss: () -> Unit) {
     PuppetClick("installDialog.tab.new") { tab = InstallTab.New }
     PuppetClick("installDialog.tab.existing") { tab = InstallTab.Existing }
 
-    Popup(alignment = Alignment.Center, onDismissRequest = onDismiss, properties = PopupProperties(focusable = true)) {
-        Box(
-            Modifier.fillMaxSize().background(NxColor.page.copy(alpha = scrim))
-                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onDismiss),
-            contentAlignment = Alignment.Center,
+    NxDialog(
+        onDismissRequest = onDismiss,
+        defaultWidth     = false,
+        scrim            = NxColor.page.copy(alpha = 0.72f),
+        enter            = Motion.emphasis.enter,
+        paneTitle        = s.installDialogTitle,
+    ) {
+        NxSurface(
+            kind = SurfaceKind.Dialog,
+            shape = MaterialTheme.shapes.large,
+            modifier = Modifier.widthIn(max = DIALOG_WIDTH).fillMaxWidth(0.92f),
         ) {
-            AnimatedVisibility(visible = shown, enter = Motion.emphasis.enter, exit = Motion.emphasis.exit) {
-                NxSurface(
-                    kind = SurfaceKind.Dialog,
-                    shape = MaterialTheme.shapes.large,
-                    modifier = Modifier.widthIn(max = DIALOG_WIDTH).fillMaxWidth(0.92f)
-                        .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = {}),
+            Column {
+                Row(
+                    Modifier.fillMaxWidth().padding(start = 24.dp, end = 12.dp, top = 16.dp, bottom = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Column {
-                        Row(
-                            Modifier.fillMaxWidth().padding(start = 24.dp, end = 12.dp, top = 16.dp, bottom = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(
-                                s.installDialogTitle,
-                                style = MaterialTheme.typography.titleLarge,
-                                color = NxInk.main,
-                                fontWeight = FontWeight.SemiBold,
-                                modifier = Modifier.weight(1f),
-                            )
-                            NxIconButton(icon = NxIcon.Close, contentDescription = s.installDialogClose, onClick = onDismiss)
-                        }
-                        SubjectBlock(subject)
-                        if (tabs.size > 1) {
-                            Row(
-                                Modifier.padding(horizontal = 24.dp, vertical = 14.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
-                                tabs.forEach { t -> NxChoiceChip(label = t.label(s), selected = tab == t) { tab = t } }
-                            }
-                        } else {
-                            Spacer(Modifier.height(14.dp))
-                        }
-                        HorizontalDivider(color = NxInk.line)
-                        val fade = Motion.fade
-                        AnimatedContent(
-                            targetState = tab,
-                            transitionSpec = { fade.enter togetherWith fade.exit },
-                            modifier = Modifier.fillMaxWidth().height(BODY_HEIGHT).background(NxColor.wash(NxInk.quiet, 0.04f)),
-                            label = "installTab",
-                        ) { t ->
-                            when (t) {
-                                InstallTab.Existing -> ExistingPacks(model)
-                                InstallTab.New -> NewPack(model)
-                            }
-                        }
-                        HorizontalDivider(color = NxInk.line)
-                        Row(
-                            Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Symbol(NxIcon.Inventory2, contentDescription = null, tint = NxInk.quiet, size = 18.dp)
-                            Spacer(Modifier.width(8.dp))
-                            Text(
-                                model.candidates?.let { list -> s.installDialogFitCount(list.count { it.verdict is InstallTargets.Verdict.Fits }) }.orEmpty(),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = NxInk.quiet,
-                                modifier = Modifier.weight(1f),
-                            )
-                            NxButton(label = s.installDialogClose, onClick = onDismiss, style = NxButtonStyle.Secondary, icon = NxIcon.Close, compact = true)
-                        }
+                    Text(
+                        s.installDialogTitle,
+                        style = MaterialTheme.typography.titleLarge,
+                        color = NxInk.main,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.weight(1f),
+                    )
+                    NxIconButton(icon = NxIcon.Close, contentDescription = s.installDialogClose, onClick = onDismiss)
+                }
+                SubjectBlock(subject)
+                if (tabs.size > 1) {
+                    Row(
+                        Modifier.padding(horizontal = 24.dp, vertical = 14.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        tabs.forEach { t -> NxChoiceChip(label = t.label(s), selected = tab == t) { tab = t } }
                     }
+                } else {
+                    Spacer(Modifier.height(14.dp))
+                }
+                HorizontalDivider(color = NxInk.line)
+                val fade = Motion.fade
+                AnimatedContent(
+                    targetState = tab,
+                    transitionSpec = { fade.enter togetherWith fade.exit },
+                    modifier = Modifier.fillMaxWidth().height(BODY_HEIGHT).background(NxColor.wash(NxInk.quiet, 0.04f)),
+                    label = "installTab",
+                ) { t ->
+                    when (t) {
+                        InstallTab.Existing -> ExistingPacks(model)
+                        InstallTab.New -> NewPack(model)
+                    }
+                }
+                HorizontalDivider(color = NxInk.line)
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Symbol(NxIcon.Inventory2, contentDescription = null, tint = NxInk.quiet, size = 18.dp)
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        model.candidates?.let { list -> s.installDialogFitCount(list.count { it.verdict is InstallTargets.Verdict.Fits }) }.orEmpty(),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = NxInk.quiet,
+                        modifier = Modifier.weight(1f),
+                    )
+                    NxButton(label = s.installDialogClose, onClick = onDismiss, style = NxButtonStyle.Secondary, icon = NxIcon.Close, compact = true)
                 }
             }
         }

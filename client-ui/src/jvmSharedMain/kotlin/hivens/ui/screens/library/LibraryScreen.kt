@@ -1,15 +1,6 @@
 package hivens.ui.screens.library
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -39,8 +30,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupProperties
 import hivens.launcher.InstallPhase
 import hivens.launcher.PackImportService
 import hivens.launcher.PackInstallService
@@ -56,6 +45,7 @@ import hivens.ui.nx.NxChoiceFooterItem
 import hivens.ui.nx.NxChoiceItem
 import hivens.ui.nx.NxChoiceMenu
 import hivens.ui.nx.NxContextMenu
+import hivens.ui.nx.NxDialog
 import hivens.ui.nx.NxField
 import hivens.ui.nx.NxMenuItem
 import hivens.ui.puppet.PuppetClick
@@ -296,103 +286,94 @@ private fun NewLocalPackDialog(
 
     // Unfold on open: the scrim fades in and the card arrives. Both are motion
     // roles, so a still style collapses the unfold to instant on its own.
-    var shown by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { shown = true }
-    val scrimAlpha by animateFloatAsState(if (shown) 0.72f else 0f, animationSpec = Motion.fade, label = "scrim")
-
-    Popup(alignment = Alignment.Center, onDismissRequest = onDismiss, properties = PopupProperties(focusable = true)) {
-        Box(
-            Modifier.fillMaxSize().background(NxColor.page.copy(alpha = scrimAlpha))
-                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onDismiss),
-            contentAlignment = Alignment.Center,
+    NxDialog(
+        onDismissRequest = onDismiss,
+        defaultWidth     = false,
+        scrim            = NxColor.page.copy(alpha = 0.72f),
+        enter            = Motion.emphasis.enter,
+        paneTitle        = s.libraryNewLocalPack,
+    ) {
+        NxSurface(
+            kind = SurfaceKind.Dialog,
+            shape = MaterialTheme.shapes.large,
+            modifier = Modifier.widthIn(max = 460.dp).fillMaxWidth(0.9f),
         ) {
-          AnimatedVisibility(
-              visible = shown,
-              enter = Motion.emphasis.enter,
-              exit  = Motion.emphasis.exit,
-          ) {
-            NxSurface(
-                kind = SurfaceKind.Dialog,
-                shape = MaterialTheme.shapes.large,
-                modifier = Modifier.widthIn(max = 460.dp).fillMaxWidth(0.9f)
-                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = {}),
-            ) {
-                // A low window, a phone on its side, has less height than the form with a loader version in it
-                Column(Modifier.verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Symbol(NxIcon.Inventory2, contentDescription = null, tint = NxColor.lead(), size = 22.dp)
-                        Text(s.libraryNewLocalPack, style = MaterialTheme.typography.titleMedium, color = NxInk.main, fontWeight = FontWeight.Bold)
-                    }
+            // A low window, a phone on its side, has less height than the form with a loader version in it
+            Column(Modifier.verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Symbol(NxIcon.Inventory2, contentDescription = null, tint = NxColor.lead(), size = 22.dp)
+                    Text(s.libraryNewLocalPack, style = MaterialTheme.typography.titleMedium, color = NxInk.main, fontWeight = FontWeight.Bold)
+                }
 
-                    FieldLabel(s.createPackName)
-                    NxField(value = name, onValueChange = { name = it }, placeholder = defaultName.ifBlank { s.createPackName }, modifier = Modifier.fillMaxWidth())
-                    PuppetField("createPack.name", name) { name = it }
+                FieldLabel(s.createPackName)
+                NxField(value = name, onValueChange = { name = it }, placeholder = defaultName.ifBlank { s.createPackName }, modifier = Modifier.fillMaxWidth())
+                PuppetField("createPack.name", name) { name = it }
 
-                    FieldLabel(s.createPackMc)
-                    Box {
-                        NxField(
-                            value = mc,
-                            onValueChange = { mc = it; mcMenuOpen = true },
-                            placeholder = "1.20.1",
-                            // Open the picker on focus (a click focuses the field) rather than a
-                            // clickable -- clickable's default hover/press state layer is an
-                            // unclipped square whose corners poke past the field's rounded shape.
-                            modifier = Modifier.fillMaxWidth().onFocusChanged { if (it.isFocused) mcMenuOpen = true },
-                        )
-                        // The list hangs off the field's leading edge and takes its
-                        // width, because it belongs to that field. It owns the height
-                        // cap and the scroll, and the snapshots switch is a footer so
-                        // it stays reachable with sixty versions listed.
-                        NxChoiceMenu(
-                            expanded         = mcMenuOpen && versions.isNotEmpty(),
-                            onDismissRequest = { mcMenuOpen = false },
-                            maxHeight        = 240.dp,
-                            footer           = {
-                                NxChoiceFooterItem(
-                                    label = if (showSnapshots) s.createPackHideSnapshots else s.createPackShowSnapshots,
-                                    icon  = if (showSnapshots) NxIcon.VisibilityOff else NxIcon.Visibility,
-                                ) { showSnapshots = !showSnapshots }
-                            },
-                        ) {
-                            matches.forEach { v ->
-                                NxChoiceItem(label = v, selected = v == mc) {
-                                    mc = v
-                                    mcMenuOpen = false
-                                }
+                FieldLabel(s.createPackMc)
+                Box {
+                    NxField(
+                        value = mc,
+                        onValueChange = { mc = it; mcMenuOpen = true },
+                        placeholder = "1.20.1",
+                        // Open the picker on focus (a click focuses the field) rather than a
+                        // clickable -- clickable's default hover/press state layer is an
+                        // unclipped square whose corners poke past the field's rounded shape.
+                        modifier = Modifier.fillMaxWidth().onFocusChanged { if (it.isFocused) mcMenuOpen = true },
+                    )
+                    // The list hangs off the field's leading edge and takes its
+                    // width, because it belongs to that field. It owns the height
+                    // cap and the scroll, and the snapshots switch is a footer so
+                    // it stays reachable with sixty versions listed.
+                    NxChoiceMenu(
+                        expanded         = mcMenuOpen && versions.isNotEmpty(),
+                        onDismissRequest = { mcMenuOpen = false },
+                        maxHeight        = 240.dp,
+                        // The list follows what is typed into the field above it.
+                        yieldsToField    = true,
+                        footer           = {
+                            NxChoiceFooterItem(
+                                label = if (showSnapshots) s.createPackHideSnapshots else s.createPackShowSnapshots,
+                                icon  = if (showSnapshots) NxIcon.VisibilityOff else NxIcon.Visibility,
+                            ) { showSnapshots = !showSnapshots }
+                        },
+                    ) {
+                        matches.forEach { v ->
+                            NxChoiceItem(label = v, selected = v == mc) {
+                                mc = v
+                                mcMenuOpen = false
                             }
                         }
                     }
-                    PuppetField("createPack.mc", mc) { mc = it; mcMenuOpen = true }
+                }
+                PuppetField("createPack.mc", mc) { mc = it; mcMenuOpen = true }
 
-                    FieldLabel(s.createPackLoader)
-                    LoaderPicker(
-                        mcVersion       = mc.trim(),
-                        mcKnown         = mc.trim() in versions,
-                        loaderId        = loaderId,
-                        onLoader        = { loaderId = it },
-                        loaderVersion   = loaderVersion,
-                        onLoaderVersion = { loaderVersion = it },
-                        puppetKey       = "createPack.loaderVersion",
-                        label           = { FieldLabel(it) },
+                FieldLabel(s.createPackLoader)
+                LoaderPicker(
+                    mcVersion       = mc.trim(),
+                    mcKnown         = mc.trim() in versions,
+                    loaderId        = loaderId,
+                    onLoader        = { loaderId = it },
+                    loaderVersion   = loaderVersion,
+                    onLoaderVersion = { loaderVersion = it },
+                    puppetKey       = "createPack.loaderVersion",
+                    label           = { FieldLabel(it) },
+                )
+
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End)) {
+                    NxButton(label = s.createPackCancel, onClick = onDismiss, style = NxButtonStyle.Tertiary, compact = true)
+                    NxButton(
+                        label = s.createPackConfirm,
+                        onClick = { onCreate(effectiveName.trim(), mc.trim(), loaderId, loaderVersion.trim().takeIf { loaderId != null }.orEmpty()) },
+                        style = NxButtonStyle.Primary,
+                        icon = NxIcon.Add,
+                        enabled = canCreate,
+                        compact = true,
                     )
-
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End)) {
-                        NxButton(label = s.createPackCancel, onClick = onDismiss, style = NxButtonStyle.Tertiary, compact = true)
-                        NxButton(
-                            label = s.createPackConfirm,
-                            onClick = { onCreate(effectiveName.trim(), mc.trim(), loaderId, loaderVersion.trim().takeIf { loaderId != null }.orEmpty()) },
-                            style = NxButtonStyle.Primary,
-                            icon = NxIcon.Add,
-                            enabled = canCreate,
-                            compact = true,
-                        )
-                        PuppetClick("createPack.create", enabled = canCreate) {
-                            onCreate(effectiveName.trim(), mc.trim(), loaderId, loaderVersion.trim().takeIf { loaderId != null }.orEmpty())
-                        }
+                    PuppetClick("createPack.create", enabled = canCreate) {
+                        onCreate(effectiveName.trim(), mc.trim(), loaderId, loaderVersion.trim().takeIf { loaderId != null }.orEmpty())
                     }
                 }
             }
-          }
         }
     }
 }

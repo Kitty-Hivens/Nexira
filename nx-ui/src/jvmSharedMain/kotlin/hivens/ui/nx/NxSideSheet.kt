@@ -2,16 +2,16 @@ package hivens.ui.nx
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.focusable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -24,19 +24,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupProperties
 import hivens.ui.customization.LocalCustomization
+import hivens.ui.layers.Layer
+import hivens.ui.layers.layerBody
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.Motion
@@ -49,8 +42,9 @@ import kotlinx.coroutines.launch
  *
  * Over the whole window rather than over the screen that opened it, because a
  * scrim that stops at the rails says the rails are still in play while the sheet
- * holds the keyboard and swallows the clicks. It is a popup for that reason: a
- * popup draws above the window's own layout whichever screen asked for it.
+ * holds the keyboard and swallows the clicks. It is a modal layer of the window for
+ * that reason: a layer draws above the window's own layout whichever screen asked
+ * for it, and a menu opened inside the sheet draws above the sheet.
  *
  * The page stays readable beside it under a light scrim, which is the point of a
  * sheet over a dialog: what is being configured is still in view. [expanded] widens
@@ -91,27 +85,14 @@ fun NxSideSheet(
         }
     }
 
-    Popup(
-        alignment        = Alignment.TopStart,
-        onDismissRequest = close,
-        properties       = PopupProperties(focusable = true),
-    ) {
-        val focus = remember { FocusRequester() }
-        LaunchedEffect(Unit) { focus.requestFocus() }
+    Layer(visible = true, modal = true, onDismissRequest = close) {
         BoxWithConstraints(
             Modifier
                 .fillMaxSize()
-                .focusRequester(focus)
-                .focusable()
-                .onPreviewKeyEvent { ev ->
-                    if (ev.type == KeyEventType.KeyDown && ev.key == Key.Escape) {
-                        close(); true
-                    } else {
-                        false
-                    }
-                }
                 .drawBehind { drawRect(scrimColour.copy(alpha = SCRIM_ALPHA * shown.value)) }
-                .clickable(remember { MutableInteractionSource() }, indication = null, onClick = close),
+                // The scrim runs under the system bars and the keyboard, the sheet
+                // stays clear of them, as it did in a popup window of its own.
+                .windowInsetsPadding(WindowInsets.safeDrawing),
         ) {
             val room = (maxWidth - EDGE * 2).coerceAtLeast(0.dp)
             val target = minOf(if (expanded) expandedWidth else width, room)
@@ -128,7 +109,9 @@ fun NxSideSheet(
                     // draws its content alone and anything inside that blurs what is
                     // behind it would find nothing there.
                     .graphicsLayer { translationX = (1f - shown.value) * (size.width + EDGE.toPx()) }
-                    .clickable(remember { MutableInteractionSource() }, indication = null, onClick = {}),
+                    // The sheet itself, so a press on it is never one on the scrim
+                    // beside it, which the layer reads as outside and closes.
+                    .layerBody(),
             ) {
                 Column(Modifier.fillMaxSize()) { content(close) }
             }

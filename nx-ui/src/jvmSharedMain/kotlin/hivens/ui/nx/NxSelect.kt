@@ -98,6 +98,8 @@ fun <T> NxSelect(
     // Up for as long as any of the list is on screen, see [NxMenuPopup].
     var shown by remember { mutableStateOf(false) }
     var triggerWidth by remember { mutableStateOf(0.dp) }
+    // The list takes the keyboard to walk it, and gives it back here when it closes.
+    val triggerFocus = remember { FocusRequester() }
     val density = LocalDensity.current
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
@@ -131,6 +133,7 @@ fun <T> NxSelect(
             modifier          = Modifier
                 .fillMaxWidth()
                 .onGloballyPositioned { triggerWidth = with(density) { it.size.width.toDp() } }
+                .focusRequester(triggerFocus)
                 .hoverable(interaction, enabled = enabled)
                 .clickable(
                     interactionSource = interaction,
@@ -178,7 +181,7 @@ fun <T> NxSelect(
         val gapPx = with(density) { 8.dp.roundToPx() }
         val origin = remember { mutableStateOf(TransformOrigin(0f, 0f)) }
         val provider = remember(gapPx, origin) { MenuBelowAnchor(NxMenuAlign.Start, gapPx, origin) }
-        NxMenuPopup(provider, origin, expanded, { expanded = false }, { shown = it }) {
+        NxMenuPopup(provider, origin, expanded, { expanded = false }, { shown = it }, returnFocus = triggerFocus) {
             SelectList(
                 options   = options,
                 selected  = selected,
@@ -245,7 +248,6 @@ private fun <T> SelectList(
                         options.getOrNull(active)?.let(onPick) ?: onDismiss()
                         true
                     }
-                    Key.Escape -> { onDismiss(); true }
                     else       -> false
                 }
             },

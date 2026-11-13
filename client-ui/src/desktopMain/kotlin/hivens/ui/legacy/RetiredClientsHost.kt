@@ -30,7 +30,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import hivens.launcher.legacy.RetiredClientAdopter
 import hivens.launcher.legacy.RetiredClientScanner
 import hivens.launcher.legacy.RetiredDataSweeper
@@ -40,6 +39,7 @@ import hivens.ui.icons.Symbol
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxChoiceChip
+import hivens.ui.nx.NxDialog
 import hivens.ui.nx.NxField
 import hivens.ui.nx.NxVerticalScrollbar
 import hivens.ui.surface.NxCard
@@ -55,10 +55,10 @@ import hivens.ui.theme.Status
 /**
  * The surface for what the retired server path left on disk.
  *
- * MUST be composed inside [hivens.ui.theme.NxTheme]: it is a `Dialog`, which on
- * desktop gets its own composition, and one raised from outside the theme finds
- * no colours and takes the shell down with it. Same rule as the two-factor
- * prompt beside it in the shell.
+ * MUST be composed inside [hivens.ui.theme.NxTheme]: it is a dialog on the
+ * window's layers, which takes its theme from where it is opened, and one raised
+ * from outside the theme finds no colours and takes the shell down with it. Same
+ * rule as the two-factor prompt beside it in the shell.
  *
  * A dialog and not a screen. This is a chore with an end -- once the folders are
  * dealt with there is nothing to come back to -- so a route in the back stack
@@ -84,7 +84,7 @@ fun RetiredClientsHost() {
 
     LaunchedEffect(Unit) { state.load() }
 
-    Dialog(onDismissRequest = { if (!state.running) gate.dismiss() }) {
+    NxDialog(onDismissRequest = { if (!state.running) gate.dismiss() }, paneTitle = LocalStrings.current.retiredTitle) {
         RetiredClientsBody(
             rows = state.rows,
             loading = state.loading,
@@ -101,9 +101,8 @@ fun RetiredClientsHost() {
 /**
  * The dialog's contents, apart from the dialog.
  *
- * Split out so a render sheet can draw it: a `Dialog` gets its own composition
- * and an off-screen scene has no window to raise one in, so a body that only
- * existed inside one could never be looked at before it shipped.
+ * Split out so a render sheet can draw the body on its own, at the size it
+ * takes, without a window, a scrim or the gate's state around it.
  */
 @Composable
 internal fun RetiredClientsBody(

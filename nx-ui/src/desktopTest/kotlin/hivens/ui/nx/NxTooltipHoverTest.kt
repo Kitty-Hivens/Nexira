@@ -17,6 +17,8 @@ import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.unit.Density
+import hivens.ui.layers.LayerHost
+import hivens.ui.layers.rememberWindowLayers
 import hivens.ui.theme.NxTheme
 import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.Image
@@ -26,10 +28,12 @@ import kotlin.test.assertTrue
 /**
  * Does hover actually raise the tooltip.
  *
- * The rewrite swapped `TooltipArea` for a hand-rolled hover plus [androidx.compose.ui.window.Popup],
- * and a call site that used to work stopped. That is not a thing to settle by
- * pointing at the running app: `ImageComposeScene.sendPointerEvent` drives the
- * pointer off-screen, so the question becomes a pixel count.
+ * The rewrite swapped `TooltipArea` for a hand-rolled hover plus a popup, now a
+ * layer of the window, and a call site that used to work stopped. That is not a
+ * thing to settle by pointing at the running app: `ImageComposeScene.sendPointerEvent`
+ * drives the pointer off-screen, so the question becomes a pixel count. The scenes
+ * that draw the library's own popups mount the window's layers at the root, as the
+ * shell does.
  */
 class NxTooltipHoverTest {
 
@@ -63,12 +67,14 @@ class NxTooltipHoverTest {
     private fun hoverInk(behaviour: NxTooltipBehaviour): Pair<Int, Int> {
         val scene = ImageComposeScene(width = 400, height = 300, density = Density(1f)) {
             NxTheme(dark = true) {
-                Box(Modifier.fillMaxSize().background(Color.Black)) {
-                    NxTooltip(
-                        tooltip = { Box(Modifier.size(40.dp2()).background(tipColor)) },
-                        behaviour = behaviour,
-                    ) {
-                        Box(Modifier.size(60.dp2()).background(anchorColor))
+                LayerHost(rememberWindowLayers(), Modifier.fillMaxSize()) {
+                    Box(Modifier.fillMaxSize().background(Color.Black)) {
+                        NxTooltip(
+                            tooltip = { Box(Modifier.size(40.dp2()).background(tipColor)) },
+                            behaviour = behaviour,
+                        ) {
+                            Box(Modifier.size(60.dp2()).background(anchorColor))
+                        }
                     }
                 }
             }
@@ -201,29 +207,34 @@ class NxTooltipHoverTest {
 
     /**
      * The last control: [NxContextMenu] uses the identical popup pattern (a
-     * MutableTransitionState, a conditional Popup, AnimatedVisibility, NxSurface)
-     * and is known to work in the app. If it inks here and my tooltip does not,
-     * the difference between the two is the bug.
+     * MutableTransitionState, a conditional anchored layer, AnimatedVisibility,
+     * NxSurface) and is known to work in the app. If it inks here and my tooltip
+     * does not, the difference between the two is the bug.
      */
     @OptIn(ExperimentalComposeUiApi::class)
     @Test
     fun `control, the context menu popup pattern under the same harness`() {
         val scene = ImageComposeScene(width = 400, height = 300, density = Density(1f)) {
             NxTheme(dark = true) {
-                Box(Modifier.fillMaxSize().background(Color.Black)) {
-                    Box {
-                        Box(Modifier.size(60.dp2()).background(anchorColor))
-                        NxContextMenu(expanded = true, onDismissRequest = {}) {
-                            Box(Modifier.size(40.dp2()).background(tipColor))
+                LayerHost(rememberWindowLayers(), Modifier.fillMaxSize()) {
+                    Box(Modifier.fillMaxSize().background(Color.Black)) {
+                        Box {
+                            Box(Modifier.size(60.dp2()).background(anchorColor))
+                            NxContextMenu(expanded = true, onDismissRequest = {}) {
+                                Box(Modifier.size(40.dp2()).background(tipColor))
+                            }
                         }
                     }
                 }
             }
         }
+        // The clock by hand, as for the tooltip: the menu is a layer of this scene and
+        // unfolds on its frame clock, which render() with no argument never moves.
         var seen = 0
-        repeat(8) {
-            Thread.sleep(30)
-            seen = maxOf(seen, tipInk(Bitmap.makeFromImage(scene.render())))
+        var t = 0L
+        repeat(20) {
+            t += 16_000_000L
+            seen = maxOf(seen, tipInk(Bitmap.makeFromImage(scene.render(t))))
         }
         scene.close()
         println("MENU-PATTERN inked pixels: $seen")

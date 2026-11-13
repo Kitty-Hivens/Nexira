@@ -272,6 +272,35 @@ fun AndroidShell() {
                 // the theme, as on the desktop: the host belongs to the window, and a layer takes
                 // its theme from where it is opened.
                 val layers = rememberWindowLayers()
+                val focus = remember { FocusRequester() }
+                val refocus = rememberCoroutineScope()
+                LaunchedEffect(Unit) { focus.requestFocus() }
+                // Around the layers rather than inside the window's own content, so a key
+                // from a menu or a dialog that holds the focus passes these hooks as well.
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .focusRequester(focus)
+                        // The shell's keys are read here, so they stop when nothing in the
+                        // shell holds the focus, as after Escape takes it from a field.
+                        .onFocusChanged { if (!it.hasFocus) refocus.launch { focus.requestFocus() } }
+                        .focusable()
+                        .onPreviewKeyEvent { ev ->
+                            layers.dismiss.onPreviewKeyEvent(ev)
+                            val resolved = resolveShellChord(ev, false, editModeController.isEditing)
+                            when (resolved.chord) {
+                                ShellChord.ToggleEditMode -> editModeController.requestEditToggle()
+                                ShellChord.ToggleRightRail -> editModeController.requestRightRailToggle()
+                                ShellChord.UndoEdit -> editModeController.undo()
+                                ShellChord.RedoEdit -> editModeController.redo()
+                                ShellChord.ToggleDebugOverlay, null -> Unit
+                            }
+                            resolved.consume
+                        }
+                        // A hardware Escape, after whatever holds the focus has had it and
+                        // before the system turns it into back: a held key's repeats stop here.
+                        .onKeyEvent(layers.dismiss::onKeyEvent),
+                ) {
                 LayerHost(layers, Modifier.fillMaxSize()) {
                 val themeReveal = rememberThemeReveal()
                 NxTheme(theme = themeLibrary.active, dark = isDarkTheme, uiFamily = uiFamily) {
@@ -280,34 +309,7 @@ fun AndroidShell() {
                         // layout yields room to them instead of drawing under.
                         // Drawn edge to edge: each region paints under the system bars and pads its own
                         // content by them (see the shell regions), so nothing is padded out here.
-                        val focus = remember { FocusRequester() }
-                        val refocus = rememberCoroutineScope()
-                        LaunchedEffect(Unit) { focus.requestFocus() }
-                        Box(
-                            Modifier
-                                .fillMaxSize()
-                                .background(NxColor.page)
-                                .focusRequester(focus)
-                                // The shell's keys are read here, so they stop when nothing in the
-                                // shell holds the focus, as after Escape takes it from a field.
-                                .onFocusChanged { if (!it.hasFocus) refocus.launch { focus.requestFocus() } }
-                                .focusable()
-                                .onPreviewKeyEvent { ev ->
-                                    layers.dismiss.onPreviewKeyEvent(ev)
-                                    val resolved = resolveShellChord(ev, false, editModeController.isEditing)
-                                    when (resolved.chord) {
-                                        ShellChord.ToggleEditMode -> editModeController.requestEditToggle()
-                                        ShellChord.ToggleRightRail -> editModeController.requestRightRailToggle()
-                                        ShellChord.UndoEdit -> editModeController.undo()
-                                        ShellChord.RedoEdit -> editModeController.redo()
-                                        ShellChord.ToggleDebugOverlay, null -> Unit
-                                    }
-                                    resolved.consume
-                                }
-                                // A hardware Escape, after whatever holds the focus has had it and
-                                // before the system turns it into back: a held key's repeats stop here.
-                                .onKeyEvent(layers.dismiss::onKeyEvent),
-                        ) {
+                        Box(Modifier.fillMaxSize().background(NxColor.page)) {
                             AppRoot(
                                 onWallpaperLuminance = { wallpaperLuminance = it },
                                 onWallpaperColours = { colours ->
@@ -379,6 +381,7 @@ fun AndroidShell() {
                     }
                 }
                 } // end LayerHost
+                } // end key hooks
               }
             }
         }

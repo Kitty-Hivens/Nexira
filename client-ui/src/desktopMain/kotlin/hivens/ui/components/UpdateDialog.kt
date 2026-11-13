@@ -20,6 +20,7 @@ import hivens.ui.chrome.LocalWindowHide
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
+import hivens.ui.nx.NxDialog
 import hivens.ui.platform.SystemActions
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
@@ -49,7 +50,6 @@ import hivens.ui.theme.Status
  */
 private val WINDOW_TEARDOWN_GRACE = 150.milliseconds
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun UpdateDialog(
     update: LauncherUpdate,
@@ -65,21 +65,7 @@ fun UpdateDialog(
     var downloadState by remember { mutableStateOf<DownloadState>(DownloadState.Idle) }
     var errorMessage  by remember { mutableStateOf<String?>(null) }
 
-    // Focus the primary action so Enter triggers it without a mouse hop -- the
-    // mandatory dialog blocks Esc and offers no other keyboard path. Re-request
-    // on each state change so focus follows the action as the flow advances
-    // (Idle download -> Ready install -> Failed retry); the disabled Downloading
-    // button is skipped since it cannot hold focus. runCatching guards the
-    // node-not-yet-attached race.
     val primaryFocus = remember { FocusRequester() }
-    LaunchedEffect(downloadState) {
-        when (downloadState) {
-            is DownloadState.Idle, is DownloadState.Ready, is DownloadState.Failed -> {
-                val _ = runCatching { primaryFocus.requestFocus() }
-            }
-            is DownloadState.Downloading, is DownloadState.Installing -> Unit
-        }
-    }
 
     // Critical and mandatory both block the backdrop dismiss, but a mandatory
     // update goes further: it also replaces the "Later" button with a hard
@@ -190,261 +176,277 @@ fun UpdateDialog(
         downloadState = DownloadState.Idle
     }
 
-    BasicAlertDialog(
-        onDismissRequest = { if (!isBlocking) onDismiss() }
-    ) {
-        NxSurface(
-            kind      = SurfaceKind.Dialog,
-            modifier  = Modifier.width(700.dp).wrapContentHeight(),
-            shape     = MaterialTheme.shapes.large,
-        ) {
-            Column(Modifier.padding(24.dp)) {
+    val title = when {
+        update.isMandatory -> s.updateTitleMandatory
+        update.isCritical  -> s.updateTitleCritical
+        else               -> s.updateTitle
+    }
+    NxDialog(onDismissRequest = { if (!isBlocking) onDismiss() }, paneTitle = title) {
+        // Focus the primary action so Enter triggers it without a mouse hop, as the
+        // mandatory dialog blocks Esc and offers no other keyboard path. Re-request
+        // on each state change so focus follows the action as the flow advances
+        // (Idle download -> Ready install -> Failed retry), skipping the disabled
+        // Downloading button, which cannot hold focus. Asked from inside the dialog,
+        // which joins the window a frame after this call: from beside it the button
+        // was not there yet and the first Enter did nothing.
+        LaunchedEffect(downloadState) {
+            when (downloadState) {
+                is DownloadState.Idle, is DownloadState.Ready, is DownloadState.Failed -> primaryFocus.requestFocus()
+                is DownloadState.Downloading, is DownloadState.Installing -> Unit
+            }
+        }
+        // The bounds an alert dialog's frame puts on whatever it holds, which this one
+        // was drawn inside: the 700 asked for below comes out at 560.
+        Box(Modifier.sizeIn(minWidth = 280.dp, maxWidth = 560.dp), propagateMinConstraints = true) {
+            NxSurface(
+                kind      = SurfaceKind.Dialog,
+                modifier  = Modifier.width(700.dp).wrapContentHeight(),
+                shape     = MaterialTheme.shapes.large,
+            ) {
+                Column(Modifier.padding(24.dp)) {
 
-                // ── Header ────────────────────────────────────────────────────
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier          = Modifier.fillMaxWidth()
-                ) {
-                    Symbol(icon = if (isBlocking) NxIcon.Warning else NxIcon.CloudDownload,
-                        contentDescription = null,
-                        tint               = if (isBlocking) NxColor.status(Status.Error) else NxColor.lead(),
-                        modifier           = Modifier.size(32.dp)
-                    )
-                    Spacer(Modifier.width(12.dp))
-                    Column {
-                        Text(
-                            text       = when {
-                                update.isMandatory -> s.updateTitleMandatory
-                                update.isCritical  -> s.updateTitleCritical
-                                else               -> s.updateTitle
-                            },
-                            style      = MaterialTheme.typography.titleLarge,
-                            color      = if (isBlocking) NxColor.status(Status.Error, text = true) else NxInk.main,
-                            fontWeight = FontWeight.Bold
+                    // ── Header ────────────────────────────────────────────────────
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier          = Modifier.fillMaxWidth()
+                    ) {
+                        Symbol(icon = if (isBlocking) NxIcon.Warning else NxIcon.CloudDownload,
+                            contentDescription = null,
+                            tint               = if (isBlocking) NxColor.status(Status.Error) else NxColor.lead(),
+                            modifier           = Modifier.size(32.dp)
                         )
-                        Text(
-                            text  = update.version,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = NxInk.quiet
-                        )
-                    }
-                }
-
-                // ── Critical / Mandatory banner ──────────────────────────────
-                if (isBlocking) {
-                    Spacer(Modifier.height(16.dp))
-                    val bannerFill = NxColor.wash(NxColor.status(Status.Error), 0.1f)
-                    OnFill(bannerFill) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(bannerFill, MaterialTheme.shapes.medium)
-                                .padding(12.dp)
-                        ) {
-                            val bannerText = when {
-                                update.isMandatory -> {
-                                    val reason = update.mandatoryReason
-                                    if (!reason.isNullOrBlank()) s.updateMandatoryBannerWithReason(reason)
-                                    else s.updateMandatoryBanner
-                                }
-                                else -> s.updateCriticalBanner
-                            }
+                        Spacer(Modifier.width(12.dp))
+                        Column {
                             Text(
-                                bannerText,
-                                style      = MaterialTheme.typography.bodyMedium,
-                                color      = NxColor.status(Status.Error, text = true),
-                                fontWeight = FontWeight.Medium
+                                text       = title,
+                                style      = MaterialTheme.typography.titleLarge,
+                                color      = if (isBlocking) NxColor.status(Status.Error, text = true) else NxInk.main,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text  = update.version,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = NxInk.quiet
                             )
                         }
                     }
-                }
 
-                Spacer(Modifier.height(16.dp))
-                HorizontalDivider(color = NxInk.line)
-                Spacer(Modifier.height(16.dp))
-
-                // ── Player notes, or the engineering log behind them ──────────
-                // The highlights are the target release's notes as written for a
-                // player, in the reader's own language where a translation exists.
-                // That is the whole of what this panel is for. The stitched
-                // changelog is the fallback for a release with no such notes, and
-                // it stays English: it is assembled from release bodies, which
-                // carry the engineering log.
-                val hasHighlights = !update.highlights.isNullOrBlank()
-                val bodyContent = update.highlights?.takeIf { it.isNotBlank() }
-                    ?: update.changelog.takeIf { it.isNotBlank() }
-                    ?: s.updateNoChangelog
-
-                Text(
-                    if (hasHighlights) s.updateHighlights else s.updateChangelog,
-                    style      = MaterialTheme.typography.titleSmall,
-                    color      = NxInk.main,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(Modifier.height(8.dp))
-
-                // Highlights are short prose, full changelog can be paragraphs of
-                // commit-flavored text. Cap height in both cases -- the dialog is
-                // 700dp wide and would dominate the screen otherwise.
-                val bodyMaxHeight = if (hasHighlights) 200.dp else 350.dp
-                NxSurface(
-                    kind     = SurfaceKind.Field,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = bodyMaxHeight),
-                ) {
-                    ReleaseNotes(
-                        markdown = bodyContent,
-                        modifier = Modifier.padding(12.dp).verticalScroll(rememberScrollState())
-                    )
-                }
-
-                Spacer(Modifier.height(16.dp))
-
-                // ── Download progress ─────────────────────────────────────────
-                AnimatedVisibility(
-                    visible = downloadState is DownloadState.Downloading,
-                    enter   = expandVertically() + fadeIn(),
-                    exit    = shrinkVertically() + fadeOut()
-                ) {
-                    if (downloadState is DownloadState.Downloading) {
-                        DownloadProgress(downloadState as DownloadState.Downloading)
-                    }
-                }
-
-                // ── Error ─────────────────────────────────────────────────────
-                errorMessage?.let { error ->
-                    val errorFill = NxColor.wash(NxColor.status(Status.Error), 0.1f)
-                    OnFill(errorFill) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(errorFill, MaterialTheme.shapes.medium)
-                                .padding(12.dp)
-                        ) {
-                            Column {
+                    // ── Critical / Mandatory banner ──────────────────────────────
+                    if (isBlocking) {
+                        Spacer(Modifier.height(16.dp))
+                        val bannerFill = NxColor.wash(NxColor.status(Status.Error), 0.1f)
+                        OnFill(bannerFill) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(bannerFill, MaterialTheme.shapes.medium)
+                                    .padding(12.dp)
+                            ) {
+                                val bannerText = when {
+                                    update.isMandatory -> {
+                                        val reason = update.mandatoryReason
+                                        if (!reason.isNullOrBlank()) s.updateMandatoryBannerWithReason(reason)
+                                        else s.updateMandatoryBanner
+                                    }
+                                    else -> s.updateCriticalBanner
+                                }
                                 Text(
-                                    s.updateErrorTitle,
-                                    style      = MaterialTheme.typography.titleSmall,
+                                    bannerText,
+                                    style      = MaterialTheme.typography.bodyMedium,
                                     color      = NxColor.status(Status.Error, text = true),
-                                    fontWeight = FontWeight.Bold
+                                    fontWeight = FontWeight.Medium
                                 )
-                                Text(error, style = MaterialTheme.typography.bodyMedium, color = NxColor.status(Status.Error, text = true))
                             }
                         }
                     }
+
                     Spacer(Modifier.height(16.dp))
-                }
+                    HorizontalDivider(color = NxInk.line)
+                    Spacer(Modifier.height(16.dp))
 
-                // ── Actions ───────────────────────────────────────────────────
-                Row(
-                    modifier          = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // "View on GitHub" sits left, doesn't compete for attention with the
-                    // primary install button on the right. Hidden during download so the
-                    // user can't accidentally yank focus mid-progress.
-                    if (!busy) {
-                        TextButton(onClick = { SystemActions.openUrl(update.releasePageUrl) }) {
-                            Symbol(icon = NxIcon.OpenInNew,
-                                contentDescription = null,
-                                tint               = NxInk.quiet,
-                                modifier           = Modifier.size(16.dp)
-                            )
-                            Spacer(Modifier.width(6.dp))
-                            Text(s.updateViewOnGitHub, color = NxInk.quiet)
+                    // ── Player notes, or the engineering log behind them ──────────
+                    // The highlights are the target release's notes as written for a
+                    // player, in the reader's own language where a translation exists.
+                    // That is the whole of what this panel is for. The stitched
+                    // changelog is the fallback for a release with no such notes, and
+                    // it stays English: it is assembled from release bodies, which
+                    // carry the engineering log.
+                    val hasHighlights = !update.highlights.isNullOrBlank()
+                    val bodyContent = update.highlights?.takeIf { it.isNotBlank() }
+                        ?: update.changelog.takeIf { it.isNotBlank() }
+                        ?: s.updateNoChangelog
+
+                    Text(
+                        if (hasHighlights) s.updateHighlights else s.updateChangelog,
+                        style      = MaterialTheme.typography.titleSmall,
+                        color      = NxInk.main,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(Modifier.height(8.dp))
+
+                    // Highlights are short prose, full changelog can be paragraphs of
+                    // commit-flavored text. Cap height in both cases -- the dialog is
+                    // 700dp wide and would dominate the screen otherwise.
+                    val bodyMaxHeight = if (hasHighlights) 200.dp else 350.dp
+                    NxSurface(
+                        kind     = SurfaceKind.Field,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = bodyMaxHeight),
+                    ) {
+                        ReleaseNotes(
+                            markdown = bodyContent,
+                            modifier = Modifier.padding(12.dp).verticalScroll(rememberScrollState())
+                        )
+                    }
+
+                    Spacer(Modifier.height(16.dp))
+
+                    // ── Download progress ─────────────────────────────────────────
+                    AnimatedVisibility(
+                        visible = downloadState is DownloadState.Downloading,
+                        enter   = expandVertically() + fadeIn(),
+                        exit    = shrinkVertically() + fadeOut()
+                    ) {
+                        if (downloadState is DownloadState.Downloading) {
+                            DownloadProgress(downloadState as DownloadState.Downloading)
                         }
                     }
 
-                    Spacer(Modifier.weight(1f))
-
-                    if (!isBlocking && !busy) {
-                        TextButton(onClick = onDismiss) {
-                            Text(s.updateLater, color = NxInk.quiet)
-                        }
-                        Spacer(Modifier.width(8.dp))
-                    }
-
-                    // Mandatory updates need a hard exit path -- without it the
-                    // user's only choices are "install now" or "kill the
-                    // process from outside". Hidden mid-download to avoid the
-                    // user yanking themselves out of an installation in progress.
-                    if (update.isMandatory && !busy) {
-                        TextButton(onClick = { exitProcess(0) }) {
-                            Text(s.updateExit, color = NxInk.quiet)
-                        }
-                        Spacer(Modifier.width(8.dp))
-                    }
-
-                    when (downloadState) {
-                        is DownloadState.Idle -> {
-                            val fill = if (isBlocking) NxColor.status(Status.Error) else NxColor.lead()
-                            Button(
-                                onClick = { launchDownload() },
-                                modifier = Modifier.focusRequester(primaryFocus),
-                                colors = ButtonDefaults.buttonColors(containerColor = fill),
-                                shape  = MaterialTheme.shapes.small
+                    // ── Error ─────────────────────────────────────────────────────
+                    errorMessage?.let { error ->
+                        val errorFill = NxColor.wash(NxColor.status(Status.Error), 0.1f)
+                        OnFill(errorFill) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(errorFill, MaterialTheme.shapes.medium)
+                                    .padding(12.dp)
                             ) {
-                                Text(
-                                    if (isBlocking) s.updateDownloadNow else s.updateDownload,
-                                    color      = NxColor.on(fill),
-                                    fontWeight = FontWeight.Bold
+                                Column {
+                                    Text(
+                                        s.updateErrorTitle,
+                                        style      = MaterialTheme.typography.titleSmall,
+                                        color      = NxColor.status(Status.Error, text = true),
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(error, style = MaterialTheme.typography.bodyMedium, color = NxColor.status(Status.Error, text = true))
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(16.dp))
+                    }
+
+                    // ── Actions ───────────────────────────────────────────────────
+                    Row(
+                        modifier          = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // "View on GitHub" sits left, doesn't compete for attention with the
+                        // primary install button on the right. Hidden during download so the
+                        // user can't accidentally yank focus mid-progress.
+                        if (!busy) {
+                            TextButton(onClick = { SystemActions.openUrl(update.releasePageUrl) }) {
+                                Symbol(icon = NxIcon.OpenInNew,
+                                    contentDescription = null,
+                                    tint               = NxInk.quiet,
+                                    modifier           = Modifier.size(16.dp)
                                 )
+                                Spacer(Modifier.width(6.dp))
+                                Text(s.updateViewOnGitHub, color = NxInk.quiet)
                             }
                         }
 
-                        is DownloadState.Downloading -> {
-                            val fill = NxColor.wash(NxColor.lead(), 0.5f)
-                            Button(
-                                onClick  = {},
-                                enabled  = false,
-                                colors   = ButtonDefaults.buttonColors(disabledContainerColor = fill),
-                                shape = MaterialTheme.shapes.small
-                            ) {
-                                CircularProgressIndicator(
-                                    modifier    = Modifier.size(16.dp),
-                                    color       = NxColor.on(fill),
-                                    strokeWidth = 2.dp
-                                )
-                                Spacer(Modifier.width(8.dp))
-                                Text(s.updateDownloading, color = NxColor.on(fill))
+                        Spacer(Modifier.weight(1f))
+
+                        if (!isBlocking && !busy) {
+                            TextButton(onClick = onDismiss) {
+                                Text(s.updateLater, color = NxInk.quiet)
                             }
+                            Spacer(Modifier.width(8.dp))
                         }
 
-                        is DownloadState.Ready -> {
-                            val path = (downloadState as DownloadState.Ready).installerPath
-                            val fill = NxColor.status(Status.Success)
-                            Button(
-                                onClick = { installUpdate(path) },
-                                modifier = Modifier.focusRequester(primaryFocus),
-                                colors = ButtonDefaults.buttonColors(containerColor = fill),
-                                shape  = MaterialTheme.shapes.small
-                            ) {
-                                Text(s.updateInstall, color = NxColor.on(fill), fontWeight = FontWeight.Bold)
+                        // Mandatory updates need a hard exit path -- without it the
+                        // user's only choices are "install now" or "kill the
+                        // process from outside". Hidden mid-download to avoid the
+                        // user yanking themselves out of an installation in progress.
+                        if (update.isMandatory && !busy) {
+                            TextButton(onClick = { exitProcess(0) }) {
+                                Text(s.updateExit, color = NxInk.quiet)
                             }
+                            Spacer(Modifier.width(8.dp))
                         }
 
-                        is DownloadState.Installing -> {
-                            val fill = NxColor.wash(NxColor.status(Status.Success), 0.5f)
-                            Button(
-                                onClick  = {},
-                                enabled  = false,
-                                colors   = ButtonDefaults.buttonColors(disabledContainerColor = fill),
-                                shape    = MaterialTheme.shapes.small
-                            ) {
-                                Text(s.updateInstall, color = NxColor.on(fill))
+                        when (downloadState) {
+                            is DownloadState.Idle -> {
+                                val fill = if (isBlocking) NxColor.status(Status.Error) else NxColor.lead()
+                                Button(
+                                    onClick = { launchDownload() },
+                                    modifier = Modifier.focusRequester(primaryFocus),
+                                    colors = ButtonDefaults.buttonColors(containerColor = fill),
+                                    shape  = MaterialTheme.shapes.small
+                                ) {
+                                    Text(
+                                        if (isBlocking) s.updateDownloadNow else s.updateDownload,
+                                        color      = NxColor.on(fill),
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
                             }
-                        }
 
-                        is DownloadState.Failed -> {
-                            val fill = NxColor.lead()
-                            Button(
-                                onClick = { errorMessage = null; downloadState = DownloadState.Idle },
-                                modifier = Modifier.focusRequester(primaryFocus),
-                                colors  = ButtonDefaults.buttonColors(containerColor = fill),
-                                shape   = MaterialTheme.shapes.small
-                            ) {
-                                Text(s.updateRetry, color = NxColor.on(fill))
+                            is DownloadState.Downloading -> {
+                                val fill = NxColor.wash(NxColor.lead(), 0.5f)
+                                Button(
+                                    onClick  = {},
+                                    enabled  = false,
+                                    colors   = ButtonDefaults.buttonColors(disabledContainerColor = fill),
+                                    shape = MaterialTheme.shapes.small
+                                ) {
+                                    CircularProgressIndicator(
+                                        modifier    = Modifier.size(16.dp),
+                                        color       = NxColor.on(fill),
+                                        strokeWidth = 2.dp
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(s.updateDownloading, color = NxColor.on(fill))
+                                }
+                            }
+
+                            is DownloadState.Ready -> {
+                                val path = (downloadState as DownloadState.Ready).installerPath
+                                val fill = NxColor.status(Status.Success)
+                                Button(
+                                    onClick = { installUpdate(path) },
+                                    modifier = Modifier.focusRequester(primaryFocus),
+                                    colors = ButtonDefaults.buttonColors(containerColor = fill),
+                                    shape  = MaterialTheme.shapes.small
+                                ) {
+                                    Text(s.updateInstall, color = NxColor.on(fill), fontWeight = FontWeight.Bold)
+                                }
+                            }
+
+                            is DownloadState.Installing -> {
+                                val fill = NxColor.wash(NxColor.status(Status.Success), 0.5f)
+                                Button(
+                                    onClick  = {},
+                                    enabled  = false,
+                                    colors   = ButtonDefaults.buttonColors(disabledContainerColor = fill),
+                                    shape    = MaterialTheme.shapes.small
+                                ) {
+                                    Text(s.updateInstall, color = NxColor.on(fill))
+                                }
+                            }
+
+                            is DownloadState.Failed -> {
+                                val fill = NxColor.lead()
+                                Button(
+                                    onClick = { errorMessage = null; downloadState = DownloadState.Idle },
+                                    modifier = Modifier.focusRequester(primaryFocus),
+                                    colors  = ButtonDefaults.buttonColors(containerColor = fill),
+                                    shape   = MaterialTheme.shapes.small
+                                ) {
+                                    Text(s.updateRetry, color = NxColor.on(fill))
+                                }
                             }
                         }
                     }

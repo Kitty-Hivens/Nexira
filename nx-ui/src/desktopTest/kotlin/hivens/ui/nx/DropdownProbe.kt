@@ -21,6 +21,8 @@ import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import hivens.ui.icons.NxIcon
+import hivens.ui.layers.LayerHost
+import hivens.ui.layers.rememberWindowLayers
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.Spacing
 import org.jetbrains.skia.EncodedImageFormat
@@ -78,8 +80,12 @@ class DropdownProbe {
             height = (hDp * density).toInt(),
             density = Density(density),
         ) {
-            NxTheme(dark = dark) {
-                Box(Modifier.fillMaxSize().background(NxColor.page).padding(Spacing.s16)) { body() }
+            // The window's layers at the root, where the shell mounts them: every
+            // popup on these sheets is one of them.
+            LayerHost(rememberWindowLayers(), Modifier.fillMaxSize()) {
+                NxTheme(dark = dark) {
+                    Box(Modifier.fillMaxSize().background(NxColor.page).padding(Spacing.s16)) { body() }
+                }
             }
         }
         // The popup unfolds over several frames, so the clock is advanced by hand;

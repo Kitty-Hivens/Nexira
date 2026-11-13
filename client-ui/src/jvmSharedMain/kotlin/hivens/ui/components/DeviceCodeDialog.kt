@@ -19,10 +19,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.nx.NxButton
+import hivens.ui.nx.NxDialog
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetField
 import hivens.ui.puppet.PuppetScreen
@@ -54,10 +53,7 @@ fun DeviceCodeDialog(
     val s = LocalStrings.current
     PuppetScreen("Login_DeviceCode")
 
-    Dialog(
-        onDismissRequest = onCancel,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
-    ) {
+    NxDialog(onDismissRequest = onCancel, defaultWidth = false, paneTitle = s.msaTitle) {
         NxSurface(
             kind = SurfaceKind.Dialog,
             modifier = Modifier.width(420.dp),

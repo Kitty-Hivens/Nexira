@@ -31,6 +31,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -39,10 +40,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -51,12 +55,12 @@ import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Popup
+import androidx.compose.ui.unit.round
 import androidx.compose.ui.window.PopupPositionProvider
-import androidx.compose.ui.window.PopupProperties
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
+import hivens.ui.layers.AnchoredLayer
 import hivens.ui.surface.NxSurface
 import hivens.ui.theme.Motion
 import hivens.ui.theme.Spacing
@@ -138,6 +142,8 @@ fun NxContextMenu(
     footer: (@Composable () -> Unit)? = null,
     /** See [NxMenuPopup]: whether the menu is on screen, its exit included, for the trigger's look. */
     onShownChange: ((Boolean) -> Unit)? = null,
+    /** Where the focus goes when the menu closes, for a trigger that had it. */
+    returnFocus: FocusRequester? = null,
     content: @Composable () -> Unit,
 ) {
     val density = LocalDensity.current
@@ -148,7 +154,7 @@ fun NxContextMenu(
         MenuBelowAnchor(align, gapPx, origin, anchorWidth.takeIf { matchAnchorWidth })
     }
     val floor = if (matchAnchorWidth) with(density) { anchorWidth.value.toDp() } else 0.dp
-    NxMenuPopup(provider, origin, expanded, onDismissRequest, onShownChange) {
+    NxMenuPopup(provider, origin, expanded, onDismissRequest, onShownChange, returnFocus) {
         NxMenuSurface(modifier, maxOf(minWidth, floor), maxOf(maxWidth, floor), maxHeight, footer, content)
     }
 }
@@ -175,7 +181,8 @@ fun NxContextMenu(
     val x = anchorInWindow.x.roundToInt()
     val y = anchorInWindow.y.roundToInt()
     val origin = remember { mutableStateOf(TransformOrigin(0f, 0f)) }
-    val provider = remember(x, y, gapPx, origin) { MenuAtWindowOffset(x, y, gapPx, origin) }
+    val parent = rememberParentInWindow()
+    val provider = remember(x, y, gapPx, origin, parent) { MenuAtWindowOffset(x, y, gapPx, origin, parent) }
     NxMenuPopup(provider, origin, expanded, onDismissRequest) {
         NxMenuSurface(modifier, minWidth, maxWidth, maxHeight, footer, content)
     }
@@ -184,6 +191,16 @@ fun NxContextMenu(
 /**
  * The popup shell: mounted through the exit animation, unfolding from wherever
  * [origin] says the trigger is.
+ *
+ * A modal layer of the window, hung off the trigger by [provider]: a press outside
+ * closes it and goes no further, it takes the keyboard, and Escape or back closes it
+ * from the window's dismiss stack. Opened from inside a sheet or a dialog it draws
+ * above that, because it is that layer's child. Once [expanded] goes false it is
+ * only a picture on its way out: it blocks nothing and closes nothing more.
+ *
+ * [returnFocus] is the trigger's own focus, where the keyboard goes back to when the
+ * popup leaves. [yieldsToField] is for a list hung off the text field it filters,
+ * which leaves the keyboard in the field (see [AnchoredLayer]).
  *
  * Shared with [NxChoiceMenu] and [NxSelect], which supply their own body: a list
  * of answers has its own rows, and a select's list is data that lays itself out
@@ -206,6 +223,8 @@ internal fun NxMenuPopup(
      * moved. Lit for as long as this says true, it holds steady across the gap.
      */
     onShownChange: ((Boolean) -> Unit)? = null,
+    returnFocus: FocusRequester? = null,
+    yieldsToField: Boolean = false,
     body: @Composable () -> Unit,
 ) {
     val states = remember { MutableTransitionState(false) }
@@ -213,14 +232,17 @@ internal fun NxMenuPopup(
     val shown = states.currentState || states.targetState
     val report by rememberUpdatedState(onShownChange)
     LaunchedEffect(shown) { report?.invoke(shown) }
-    // Stay mounted through the exit animation: render while either the live or
-    // the target state is still "open".
-    if (!shown) return
-
-    Popup(
-        popupPositionProvider = provider,
-        onDismissRequest      = onDismissRequest,
-        properties            = PopupProperties(focusable = true),
+    // Shown through the exit animation: while either the live or the target state is
+    // still "open". Always in the composition, so the layer stays one layer across
+    // opening and closing rather than a new one each time.
+    AnchoredLayer(
+        visible          = shown,
+        position         = provider,
+        modal            = expanded,
+        focusable        = true,
+        onDismissRequest = onDismissRequest.takeIf { expanded },
+        returnFocus      = returnFocus,
+        yieldsToField    = yieldsToField,
     ) {
         AnimatedVisibility(
             visibleState = states,
@@ -461,16 +483,21 @@ internal class MenuBelowAnchor(
 }
 
 /**
- * Places the menu's top-left at a fixed window offset (the cursor), clamped into
- * the window and flipped above when it would overrun the bottom. Ignores
- * [anchorBounds] -- the position is the absolute window point the caller passed --
- * and reports the pointer itself as the origin.
+ * Places the menu's top-left at a fixed window point (the cursor), clamped into the
+ * room and flipped above when it would overrun the bottom, and reports the pointer
+ * itself as the origin.
+ *
+ * The point is a window one and the bounds the layer hands over are measured from
+ * the corner of the room it has, which on a phone starts under the status bar. The
+ * anchor's own place in the window, [parentInWindow], is what turns one into the
+ * other.
  */
 internal class MenuAtWindowOffset(
-    private val x: Int,
-    private val y: Int,
+    private val windowX: Int,
+    private val windowY: Int,
     private val gapPx: Int,
     private val origin: MutableState<TransformOrigin>,
+    private val parentInWindow: State<IntOffset>,
 ) : PopupPositionProvider {
     override fun calculatePosition(
         anchorBounds: IntRect,
@@ -478,6 +505,8 @@ internal class MenuAtWindowOffset(
         layoutDirection: LayoutDirection,
         popupContentSize: IntSize,
     ): IntOffset {
+        val x = anchorBounds.left + windowX - parentInWindow.value.x
+        val y = anchorBounds.top + windowY - parentInWindow.value.y
         val px = x.coerceIn(0, (windowSize.width - popupContentSize.width).coerceAtLeast(0))
         val below = y + gapPx
         val growsDown = below + popupContentSize.height <= windowSize.height
@@ -485,6 +514,22 @@ internal class MenuAtWindowOffset(
         origin.value = anchorOrigin(x, px, popupContentSize.width, growsDown)
         return IntOffset(px, py)
     }
+}
+
+/**
+ * Where the layout this is called in sits in the window: the same layout an anchored
+ * layer called beside it hangs off.
+ */
+@Composable
+internal fun rememberParentInWindow(): State<IntOffset> {
+    val at = remember { mutableStateOf(IntOffset.Zero) }
+    Layout(
+        content  = {},
+        modifier = Modifier.onGloballyPositioned { coordinates ->
+            coordinates.parentLayoutCoordinates?.let { at.value = it.positionInWindow().round() }
+        },
+    ) { _, _ -> layout(0, 0) {} }
+    return at
 }
 
 /** Where the trigger sits inside the menu's own box, as a fraction on each axis. */

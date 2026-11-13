@@ -54,8 +54,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupProperties
 import coil3.compose.AsyncImage
 import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
@@ -65,6 +63,7 @@ import hivens.core.api.catalogue.CatalogueGalleryItem
 import hivens.core.api.dto.modrinth.ModrinthGalleryImage
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
+import hivens.ui.layers.Layer
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.Motion
@@ -339,11 +338,9 @@ private fun GalleryLightbox(
     onIndexChange: (Int) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    Popup(
-        alignment        = Alignment.Center,
-        onDismissRequest = onDismiss,
-        properties       = PopupProperties(focusable = true),
-    ) {
+    // A modal layer of the window: Escape and back close it from the window's dismiss
+    // stack, and anything opened from it draws above it.
+    Layer(visible = true, modal = true, onDismissRequest = onDismiss) {
         val focus = remember { FocusRequester() }
         val scrim = remember { MutableInteractionSource() }
         val scope = rememberCoroutineScope()
@@ -379,7 +376,6 @@ private fun GalleryLightbox(
                 .onPreviewKeyEvent { ev ->
                     if (ev.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                     when (ev.key) {
-                        Key.Escape         -> { onDismiss(); true }
                         Key.DirectionLeft  -> { page(-1); true }
                         Key.DirectionRight -> { page(1); true }
                         else               -> false

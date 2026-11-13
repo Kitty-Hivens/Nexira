@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -19,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import hivens.core.diag.ActionRing
 import hivens.launcher.network.CertificateTrustGate
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.nx.NxAlertDialog
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.theme.NxTheme
 import org.koin.compose.koinInject
@@ -38,9 +38,9 @@ import hivens.ui.theme.Status
  * news are readable without signing in, which is what they never needed in the first
  * place.
  *
- * MUST be composed inside [hivens.ui.theme.NxTheme]: the prompt is a `Dialog`, which
- * on desktop gets its own composition, and one raised from outside the theme finds no
- * `LocalScheme` and takes the shell down with it.
+ * MUST be composed inside [hivens.ui.theme.NxTheme]: the prompt is a layer of the
+ * window that takes its theme from where it is opened, and one raised from outside the
+ * theme finds no `LocalScheme` and takes the shell down with it.
  */
 @Composable
 fun CertificatePromptHost() {
@@ -64,8 +64,9 @@ fun CertificatePromptHost() {
     // Material draws the dialog body, so its words are fitted to that body by hand: the
     // dialog step of the ladder, which is what a modal is anywhere else in the app.
     val body = NxTheme.colours.step(NxTheme.colours.topStep)
-    AlertDialog(
+    NxAlertDialog(
         onDismissRequest = { gate.dismiss() },
+        paneTitle        = s.sslWarningTitle,
         title = { OnFill(body) { Text(s.sslWarningTitle, color = NxInk.main, fontWeight = FontWeight.Bold) } },
         text = {
             OnFill(body) {

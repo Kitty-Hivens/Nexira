@@ -1058,9 +1058,10 @@ fun FrameWindowScope.AppShellContent(
                 uiFamily = uiFamily,
             ) {
                 DebugOverlay(debugOverlay)
-                // Inside the theme on purpose: the prompts are Dialogs with their own
-                // composition, and one raised from outside finds no theme and takes
-                // the shell down.
+                // Inside the theme on purpose: the prompts are dialogs on the window's
+                // layers, which take their composition locals from where they are
+                // opened, and one opened outside the theme finds none and takes the
+                // shell down.
                 hivens.ui.components.TwoFactorPromptHost()
                 // Whatever read the host -- the news, a login -- parks its refused
                 // certificate here for the user to answer once.

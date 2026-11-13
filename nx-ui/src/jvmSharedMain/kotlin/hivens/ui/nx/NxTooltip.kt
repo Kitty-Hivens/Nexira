@@ -41,11 +41,10 @@ import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
-import androidx.compose.ui.window.PopupProperties
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.Symbol
+import hivens.ui.layers.AnchoredLayer
 import hivens.ui.surface.NxSurface
 import hivens.ui.theme.Motion
 import hivens.ui.theme.Spacing
@@ -153,7 +152,7 @@ data class NxTooltipBehaviour(
 /**
  * Hover tooltip carrying whatever [tooltip] draws.
  *
- * Built on [Popup] rather than Compose's `TooltipArea` for two reasons the
+ * Built on [AnchoredLayer] rather than Compose's `TooltipArea` for two reasons the
  * parameters above depend on: that one places at the cursor and nothing else, and
  * it offers no transition, so a tooltip appeared at full size while every other
  * floating layer in the library grows out of what raised it.
@@ -232,12 +231,9 @@ fun NxTooltip(
                 NxTooltipPlacement.BelowAnchor ->
                     remember(gapPx, behaviour.centred) { BelowAnchorStartAligned(gapPx, behaviour.centred) }
             }
-            Popup(
-                popupPositionProvider = provider,
-                // Not focusable: a tooltip never takes the keyboard, and a focusable
-                // popup would steal it from the field the pointer is only passing over.
-                properties = PopupProperties(focusable = false),
-            ) {
+            // Neither modal nor focusable nor closable: a tooltip never takes the
+            // keyboard or Escape from the field the pointer is only passing over.
+            AnchoredLayer(visible = true, position = provider) {
                 AnimatedVisibility(
                     visibleState = states,
                     enter = fadeIn(Motion.tap.of()) +

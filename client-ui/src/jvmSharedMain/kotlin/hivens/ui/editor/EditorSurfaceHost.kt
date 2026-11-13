@@ -27,7 +27,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -95,6 +94,7 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.layout.LayoutGraphRepository
 import hivens.ui.layout.LayoutReconcile
+import hivens.ui.nx.NxAlertDialog
 import hivens.ui.nx.NxContextMenu
 import hivens.ui.nx.NxMenuItem
 import hivens.ui.nx.WidthClass
@@ -283,23 +283,18 @@ fun EditorSurfaceHost(
         if (availableSurfaces.isEmpty()) editing = false
     }
 
-    // One Escape or back backs out one step. The confirmations are dialogs, which
-    // register for back as they open and so take Escape and back before the stack on
-    // both platforms. Their steps here keep the order right in the frame before a
-    // dialog is up, and keep a confirmation from outliving the session.
+    // One Escape or back backs out one step. The reset confirmations are modal
+    // dialogs on the window's layers, so they close first and hold these steps out
+    // of reach while they are up.
     EditorBackOut(
-        editing             = editing,
-        onLeave             = { editing = false },
-        selection           = selectedSlotState.value != null,
-        onClearSelection    = { selectedSlotState.value = null; selectedSlotRect = null },
-        slotMenu            = handleMenuOpen || slotMenuCursor != null,
-        onCloseSlotMenu     = { handleMenuOpen = false; slotMenuCursor = null },
-        previewing          = previewing,
-        onEndPreview        = { previewing = false },
-        resetSurfaceConfirm = resetSurfaceConfirm && selectedSurface != null,
-        onCloseResetSurface = { resetSurfaceConfirm = false },
-        resetAllConfirm     = resetAllConfirm,
-        onCloseResetAll     = { resetAllConfirm = false },
+        editing          = editing,
+        onLeave          = { editing = false },
+        selection        = selectedSlotState.value != null,
+        onClearSelection = { selectedSlotState.value = null; selectedSlotRect = null },
+        slotMenu         = handleMenuOpen || slotMenuCursor != null,
+        onCloseSlotMenu  = { handleMenuOpen = false; slotMenuCursor = null },
+        previewing       = previewing,
+        onEndPreview     = { previewing = false },
     )
     // Every way out of edit mode ends here: Escape, Ctrl+E and the editor running out
     // of surfaces alike. Whatever the session opened goes with it, so the next entry
@@ -737,8 +732,9 @@ fun EditorSurfaceHost(
             if (availableSurfaces.isNotEmpty()) {
                 val surfaceForReset = selectedSurface
                 if (editing && resetSurfaceConfirm && surfaceForReset != null) {
-                    AlertDialog(
+                    NxAlertDialog(
                         onDismissRequest = { resetSurfaceConfirm = false },
+                        paneTitle        = s.editorResetSurfaceTitle,
                         title            = { Text(s.editorResetSurfaceTitle) },
                         text             = {
                             Text(
@@ -768,8 +764,9 @@ fun EditorSurfaceHost(
                     )
                 }
                 if (editing && resetAllConfirm) {
-                    AlertDialog(
+                    NxAlertDialog(
                         onDismissRequest = { resetAllConfirm = false },
+                        paneTitle        = s.editorResetAllTitle,
                         title            = { Text(s.editorResetAllTitle) },
                         text             = { Text(s.editorResetAllBody, style = MaterialTheme.typography.bodyMedium) },
                         confirmButton = {

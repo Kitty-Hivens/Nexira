@@ -29,13 +29,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.MutableState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupProperties
 import hivens.ui.icons.NxIcon
+import hivens.ui.layers.AnchoredLayer
 import hivens.ui.surface.NxSurface
 import hivens.ui.theme.Motion
 import hivens.ui.theme.Spacing
@@ -73,13 +73,15 @@ fun NxPopoverPanel(
     width: Dp = 268.dp,
     maxBodyHeight: Dp = 420.dp,
     footer: (@Composable () -> Unit)? = null,
+    /** Where the focus goes when the panel closes, for a trigger that had it. */
+    returnFocus: FocusRequester? = null,
     content: @Composable () -> Unit,
 ) {
     val states = remember { MutableTransitionState(false) }
     states.targetState = expanded
-    // Mounted through the exit animation, like the context menu: dropping the
-    // popup on the frame the flag flips would cut the fade.
-    if (!states.currentState && !states.targetState) return
+    // Shown through the exit animation, like the context menu: dropping the popup on
+    // the frame the flag flips would cut the fade.
+    val shown = states.currentState || states.targetState
 
     // Written by the position provider during layout and read by the transition --
     // the same handshake Material's own menu uses, because only the provider knows
@@ -87,10 +89,15 @@ fun NxPopoverPanel(
     val origin = remember { mutableStateOf(TransformOrigin(1f, 0f)) }
     val provider = remember(origin) { FromAnchorCorner(origin) }
 
-    Popup(
-        popupPositionProvider = provider,
-        onDismissRequest      = onDismissRequest,
-        properties            = PopupProperties(focusable = true),
+    // Modal, like a menu: a press outside closes it and goes no further, and it
+    // holds the keyboard while it is open. On its way out it blocks and closes nothing.
+    AnchoredLayer(
+        visible          = shown,
+        position         = provider,
+        modal            = expanded,
+        focusable        = true,
+        onDismissRequest = onDismissRequest.takeIf { expanded },
+        returnFocus      = returnFocus,
     ) {
         AnimatedVisibility(
             visibleState = states,

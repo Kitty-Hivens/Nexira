@@ -1,3 +1,7 @@
+public final class hivens/ui/layers/AnchoredLayerKt {
+	public static final fun AnchoredLayer (ZLandroidx/compose/ui/window/PopupPositionProvider;ZZLkotlin/jvm/functions/Function0;ZLandroidx/compose/ui/focus/FocusRequester;ZLkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;II)V
+}
+
 public final class hivens/ui/layers/DismissStack {
 	public static final field $stable I
 	public final fun dismissTop ()Z
@@ -13,16 +17,24 @@ public final class hivens/ui/layers/DismissStackKt {
 	public static final fun DismissOnBack (ZLkotlin/jvm/functions/Function0;Landroidx/compose/runtime/Composer;II)V
 }
 
+public final class hivens/ui/layers/LayerBodyKt {
+	public static final fun layerBody (Landroidx/compose/ui/Modifier;)Landroidx/compose/ui/Modifier;
+}
+
 public final class hivens/ui/layers/LayerHostKt {
 	public static final fun LayerHost (Lhivens/ui/layers/WindowLayers;Landroidx/compose/ui/Modifier;Lkotlin/jvm/functions/Function3;Landroidx/compose/runtime/Composer;II)V
 }
 
 public final class hivens/ui/layers/LayerKt {
-	public static final fun Layer (ZZZZLkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function3;Landroidx/compose/runtime/Composer;II)V
+	public static final fun Layer (ZZZZZLkotlin/jvm/functions/Function0;ZLandroidx/compose/ui/focus/FocusRequester;Lkotlin/jvm/functions/Function3;Landroidx/compose/runtime/Composer;II)V
 }
 
 public final class hivens/ui/layers/LayerResident {
 	public static final field $stable I
+}
+
+public final class hivens/ui/layers/PersistentInputKt {
+	public static final fun persistentInput (Landroidx/compose/ui/Modifier;)Landroidx/compose/ui/Modifier;
 }
 
 public final class hivens/ui/layers/WindowLayers {
