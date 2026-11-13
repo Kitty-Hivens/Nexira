@@ -57,6 +57,7 @@ jsoup             = "1.23.2"
 # implementation(<catalog accessor>) { ... } is rejected there (Provider vs String),
 # so client-ui builds the coordinates off this version instead.
 coil              = "3.6.0"
+constraintlayoutCompose = "0.8.3"
 
 # SVG rasteriser for pack descriptions. Skia's own SVG module is what the image
 # loader uses on this platform and it draws no text at all -- a shields.io badge
@@ -155,6 +156,7 @@ mockk             = "1.14.11"
 junit             = "6.1.3"
 
 [libraries]
+constraintlayout-compose-multiplatform = { module = "tech.annexflow.compose:constraintlayout-compose-multiplatform", version.ref = "constraintlayoutCompose" }
 jsvg = { module = "com.github.weisj:jsvg", version.ref = "jsvg" }
 # Logging
 slf4j-api                       = { group = "org.slf4j",       name = "slf4j-api",                version.ref = "slf4j" }

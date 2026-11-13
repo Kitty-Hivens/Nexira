@@ -282,6 +282,8 @@ kotlin {
                 implementation(project.dependencies.platform(libs.junit.bom))
                 implementation(kotlin("test"))
                 implementation(libs.kotlinx.coroutines.test)
+                // On trial for relative placement: the density test runs before it reaches the product.
+                implementation(libs.constraintlayout.compose.multiplatform)
             }
         }
     }
