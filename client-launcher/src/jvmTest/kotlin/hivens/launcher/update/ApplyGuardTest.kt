@@ -83,7 +83,7 @@ class ApplyGuardTest {
         }
 
         suspend fun run(rewrite: suspend () -> Unit) =
-            guard.apply(clientDir, before, MANAGED, "1", "2", rewrite)
+            guard.apply(clientDir, before, MANAGED, "1", "2", rewrite = rewrite)
     }
 
     @Test

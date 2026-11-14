@@ -43,6 +43,11 @@ internal class ApplyGuard(
      * instance it exists to prevent. When the restore itself fails, the marker is
      * kept, so the next start's recovery gets a second attempt, and the snapshot
      * stays for a manual one.
+     *
+     * [reattach] marks an apply that also moves the pack between Local and its
+     * source. Its rollback, here or from the snapshot later, puts the reference and
+     * the fork note back too. An ordinary update's leaves them as the record has
+     * them, so it cannot undo a detach made while it ran.
      */
     suspend fun <T> apply(
         clientDir: Path,
@@ -50,10 +55,11 @@ internal class ApplyGuard(
         managed: Set<String>,
         fromVersion: String?,
         toVersion: String,
+        reattach: Boolean = false,
         rewrite: suspend () -> T,
     ): T {
         val now = Instant.now().toEpochMilli()
-        val snapshot = snapshots.capture(clientDir, instance, managed, "$now-${UUID.randomUUID().toString().take(8)}", now)
+        val snapshot = snapshots.capture(clientDir, instance, managed, "$now-${UUID.randomUUID().toString().take(8)}", now, reattach)
         // Before the first file write, so a hard crash from here to the commit is
         // rolled back on the next start instead of leaving a half-updated pack.
         journal.begin(
@@ -70,7 +76,7 @@ internal class ApplyGuard(
         val result = try {
             rewrite()
         } catch (e: Throwable) {
-            withContext(NonCancellable) { rollBack(clientDir, instance.instanceDirName, snapshot.id, managed, e) }
+            withContext(NonCancellable) { rollBack(clientDir, instance.instanceDirName, snapshot.id, managed, reattach, e) }
             throw e
         }
         withContext(NonCancellable) { journal.complete(instance.instanceDirName) }
@@ -78,10 +84,17 @@ internal class ApplyGuard(
         return result
     }
 
-    private suspend fun rollBack(clientDir: Path, instanceDirName: String, snapshotId: String, managed: Set<String>, cause: Throwable) {
+    private suspend fun rollBack(
+        clientDir: Path,
+        instanceDirName: String,
+        snapshotId: String,
+        managed: Set<String>,
+        reattach: Boolean,
+        cause: Throwable,
+    ) {
         try {
             val before = snapshots.restore(clientDir, instanceDirName, snapshotId, managed)
-            repository.update(before.id) { it.withBuildOf(before) }
+            repository.update(before.id) { it.withBuildOf(before, provenance = reattach) }
             snapshots.delete(instanceDirName, snapshotId)
             journal.complete(instanceDirName)
             log.warn("update: {} did not finish ({}) and was rolled back to the snapshot", instanceDirName, cause.toString())

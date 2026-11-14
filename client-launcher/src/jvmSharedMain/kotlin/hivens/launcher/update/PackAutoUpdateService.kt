@@ -2,6 +2,7 @@ package hivens.launcher.update
 
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.AmberUpdatePolicy
+import hivens.core.data.PackInstance
 import hivens.core.data.SettingsData
 import hivens.core.launch.InstanceWork
 import hivens.core.launch.InstanceWorkRegistry
@@ -67,7 +68,7 @@ class PackAutoUpdateService(
             try {
                 when (val check = updater.checkForUpdate(instance)) {
                     UpdateCheck.UpToDate -> setStatus(instance.id, PackUpdateStatus.UpToDate)
-                    is UpdateCheck.Available -> applyOrHold(instance.id, check, settings.amberUpdatePolicy)
+                    is UpdateCheck.Available -> applyOrHold(instance, check, settings.amberUpdatePolicy)
                 }
             } catch (e: CancellationException) {
                 // The pass being cancelled is not a per-pack failure: badging every
@@ -87,7 +88,8 @@ class PackAutoUpdateService(
         }
     }
 
-    private suspend fun applyOrHold(id: String, check: UpdateCheck.Available, amber: AmberUpdatePolicy) {
+    private suspend fun applyOrHold(seen: PackInstance, check: UpdateCheck.Available, amber: AmberUpdatePolicy) {
+        val id = seen.id
         val autoApply = check.compat.isSafe || amber == AmberUpdatePolicy.SnapshotThenApply
         if (!autoApply) {
             setStatus(
@@ -101,7 +103,6 @@ class PackAutoUpdateService(
             )
             return
         }
-        val instance = repository.get(id) ?: return
         // Taken in one step and only now, with the build known. The look at the start
         // of the pass is a seconds-old answer by here, after a network round trip:
         // a Play or a catalogue install accepted in between found the pack free and
@@ -118,6 +119,15 @@ class PackAutoUpdateService(
             }
         }
         val status = try {
+            // Read again under the mark, which a detach also takes. A detach that
+            // landed while the check was out turned the pack into its player's own,
+            // and the build applied over it bound it to its server again.
+            val instance = repository.get(id)
+            if (instance == null || instance.packRef.origin != seen.packRef.origin || instance.forkedFrom != seen.forkedFrom) {
+                log.info("auto-update: {} changed hands during the check, left alone", id)
+                state.update { it - id }
+                return
+            }
             if (runningPackId() == id) {
                 log.info("auto-update: {} was launched meanwhile, left for the next pass", id)
                 PackUpdateStatus.Pending(check.toVersion, check.direction, check.compat, held = false)

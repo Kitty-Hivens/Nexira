@@ -15,6 +15,8 @@ import hivens.core.launch.LaunchState
 import hivens.core.security.SslBypassStore
 import hivens.core.update.PackUpdateStatusHub
 import hivens.launcher.PackInstallService
+import hivens.launcher.PackOperationService
+import hivens.launcher.instance.PackInstanceService
 import hivens.launcher.instance.InstanceContentUpdater
 import hivens.launcher.network.ServerProtocolConfig
 import hivens.launcher.platform.PlatformPaths
@@ -45,6 +47,9 @@ import hivens.ui.packs.LauncherPackActions
 import hivens.ui.packs.PackActions
 import hivens.ui.packs.deletePack
 import hivens.ui.packs.launchPack
+import hivens.ui.packs.ReattachPreviews
+import hivens.ui.packs.previewReattach
+import hivens.ui.packs.reattachPack
 import hivens.ui.packs.updatePack
 import hivens.ui.session.SessionStore
 import hivens.ui.theme.ThemeLibrary
@@ -321,6 +326,21 @@ fun uiCoreModule(
         )
     }
 
+    // The reattach previews, one per pack that asked, for the screen and any widget
+    // alike. A reattach runs only on one of them.
+    single {
+        val instances: PackInstanceService = get()
+        val packs: IPackRepository = get()
+        ReattachPreviews(
+            // The record as it is when measured, not as it was asked about: a
+            // preview measured again after work on the pack reads what that work left.
+            measure    = { pack -> instances.previewReattach(packs.get(pack.id) ?: pack) },
+            operations = get<PackOperationService>().operations,
+            scope      = get(),
+            discard    = instances::discardReattachPreview,
+        )
+    }
+
     // Reactive data sources widgets bind to via rememberSource -- decouples a
     // widget from the concrete service backing its data. Populated eagerly so
     // the registry is complete before the first widget composes.
@@ -556,7 +576,8 @@ private val CORE_PARTS: Map<String, CorePart> = buildMap {
     listOf(
         Sources.PackLibrary.id, Sources.PackLaunches.id, Sources.LaunchState.id, Sources.PackInstalls.id,
         Commands.LaunchPack.id, Commands.StopPack.id, Commands.InstallPack.id, Commands.DismissInstall.id,
-        Commands.CancelInstall.id, Commands.UpdatePack.id, Commands.DeletePack.id,
+        Commands.CancelInstall.id, Commands.UpdatePack.id, Commands.DeletePack.id, Commands.ReattachPack.id,
+        Commands.PreviewReattach.id, Sources.ReattachPreviews.id,
     ).forEach { put(it, CorePart.Packs) }
     listOf(Sources.ConsoleVisible.id, Commands.SetConsoleVisible.id).forEach { put(it, CorePart.Console) }
 }
@@ -627,6 +648,9 @@ internal fun uiDataRegistry(
     registerFactory(Sources.PackInstalls, sample = { emptyMap() }) { app ->
         flowSource(app.services.get<PackActions>().installs)
     }
+    registerFactory(Sources.ReattachPreviews, sample = { emptyMap() }) { app ->
+        flowSource(app.services.get<ReattachPreviews>().previews)
+    }
     registerFactory(Sources.ConsoleVisible, sample = { false }) { app ->
         flowSource(app.services.get<GameConsoleService>().visible)
     }
@@ -689,6 +713,16 @@ internal fun uiCommandRegistry(
         val packs = app.services.get<IPackRepository>()
         val actions = app.services.get<PackActions>()
         command { id -> deletePack(id, packs, actions, app.coroutineScope) }
+    }
+    registerFactory(Commands.PreviewReattach) { app ->
+        val packs = app.services.get<IPackRepository>()
+        val previews = app.services.get<ReattachPreviews>()
+        command { id -> previewReattach(id, packs, previews) }
+    }
+    registerFactory(Commands.ReattachPack) { app ->
+        val packs = app.services.get<IPackRepository>()
+        val actions = app.services.get<PackActions>()
+        command { request -> reattachPack(request, packs, actions) }
     }
     registerFactory(Commands.SetConsoleVisible) { app ->
         val console = app.services.get<GameConsoleService>()

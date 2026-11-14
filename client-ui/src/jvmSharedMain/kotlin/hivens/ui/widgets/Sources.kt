@@ -9,6 +9,7 @@ import hivens.ui.AppState
 import hivens.ui.background.BackgroundSettings
 import hivens.ui.i18n.AppLocale
 import hivens.ui.navigation.NavState
+import hivens.ui.packs.ReattachPreviewState
 import hivens.ui.notifications.IndicationCenter.LaunchIndication
 import hivens.ui.notifications.PersistedNotification
 import hivens.ui.feature.catalogue.project.OpenProject
@@ -117,6 +118,18 @@ object Sources {
      * key. Started by [Commands.InstallPack].
      */
     val PackInstalls = SourceKey<Map<String, InstallSnapshot>>("packs.installs")
+
+    /**
+     * The latest reattach preview of each detached pack that asked for one, by pack
+     * id, asked for with [Commands.PreviewReattach]. When an operation on the pack (an
+     * update, a repair, a reattach) starts or ends its preview is measured again, and
+     * reads as comparing while that operation runs. Other changes to the files, an
+     * edit on the Content tab among them, do not refresh it. A preview goes a while
+     * after it answered if nobody asks again. A reattach is refused unless the pack
+     * still measures as the confirmed preview said, so a preview older than the
+     * files can at worst be refused, never applied.
+     */
+    val ReattachPreviews = SourceKey<Map<String, ReattachPreviewState>>("packs.reattach.previews")
 
     /** Whether the console is asked to be on screen. Changed through [Commands.SetConsoleVisible]. */
     val ConsoleVisible = SourceKey<Boolean>("console.visible")

@@ -539,8 +539,26 @@ val mirrorModule = module {
     // sync reads.
     single { SmrtAuthlibSwapper(get(named("smartycraft")), get<ServerProtocolConfig>(), get()) }
     single { PackInstaller(syncService = get(), runtimeProvisioner = get(), repository = get(), dataDir = get()) }
-    // Instance-level mutations that reach past the registry (full delete, detach).
-    single { PackInstanceService(repository = get(), dataDir = get(), running = get(), work = get(), snapshots = get(), journal = get(), sizes = get()) }
+    // Instance-level mutations that reach past the registry (full delete, detach,
+    // reattach). A detach keeps the cover the resolver already knows, and a reattach
+    // goes back through the updater of the source the pack was detached from.
+    single {
+        val art: PackArtResolver = get()
+        PackInstanceService(
+            repository = get(),
+            dataDir = get(),
+            running = get(),
+            work = get(),
+            snapshots = get(),
+            journal = get(),
+            sizes = get(),
+            knownArt = art::cached,
+            reattachers = mapOf(
+                PackOrigin.Mirror to get<PackUpdateService>(),
+                PackOrigin.Modrinth to get<ModrinthPackUpdater>(),
+            ),
+        )
+    }
     // On-disk size of an instance, measured on the app scope and shared, so a
     // surface that asks again does not re-walk a tree the size of a world save.
     single { InstanceSizeService(dataDir = get(), scope = get(), clock = get()) }
@@ -578,6 +596,7 @@ val mirrorModule = module {
             snapshotService = get(),
             journal = get(),
             dataDir = get(),
+            roster = get(),
         )
     }
     // One PackUpdater above, routing to the source each instance came from. The

@@ -915,7 +915,8 @@ private fun StatusRow(operation: PackOperation?) {
                 }
             }
             is PackOperationPhase.Updated -> Text(
-                text  = s.packVersionsApplied(phase.version),
+                // Said the way the settings sheet says it, so one outcome reads the same on both.
+                text  = if (operation.kind == PackOperationKind.Reattach) s.packSettingsReattached(phase.version) else s.packVersionsApplied(phase.version),
                 style = MaterialTheme.typography.labelSmall,
                 color = NxColor.status(Status.Success, text = true),
             )
@@ -947,6 +948,13 @@ private fun StatusRow(operation: PackOperation?) {
             )
             is PackOperationPhase.Refused -> Text(
                 text     = s.packOperationRefused(phase.work.label(s)),
+                style    = MaterialTheme.typography.labelSmall,
+                color    = NxColor.status(Status.Error, text = true),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            PackOperationPhase.PreviewStale -> Text(
+                text     = s.packSettingsReattachStale,
                 style    = MaterialTheme.typography.labelSmall,
                 color    = NxColor.status(Status.Error, text = true),
                 maxLines = 1,

@@ -3,12 +3,19 @@ package hivens.launcher.instance
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
+import hivens.core.data.PackReference
 import hivens.core.io.InstanceMutationLock
 import hivens.core.launch.InstanceWork
 import hivens.core.launch.InstanceWorkRegistry
+import hivens.launcher.catalogue.PackArt
 import hivens.launcher.launch.RunningPackSource
 import hivens.launcher.update.ApplyJournal
+import hivens.launcher.update.PackReattacher
 import hivens.launcher.update.PackSnapshotService
+import hivens.launcher.update.ReattachConfirmation
+import hivens.launcher.update.ReattachPreview
+import hivens.launcher.update.ReattachPreviewStaleException
+import hivens.launcher.update.reattachArchiveDir
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
@@ -17,11 +24,11 @@ import java.nio.file.Path
 
 /**
  * Instance-level mutations that reach past the registry: a full delete (files on
- * disk THEN the registry entry) and a detach-to-Local fork. Plain field edits
- * (rename, notes, runtime) stay a direct [IPackRepository.put] at the call site;
- * these two live here because the delete's fs half must be ordered against the
- * registry, and both were previously duplicated inline across the Library and
- * detail surfaces.
+ * disk THEN the registry entry), a detach-to-Local fork and the reattach that
+ * undoes it. Plain field edits (rename, notes, runtime) stay a direct
+ * [IPackRepository.put] at the call site; these live here because the delete's fs
+ * half must be ordered against the registry, and the delete and detach were
+ * previously duplicated inline across the Library and detail surfaces.
  */
 class PackInstanceService(
     private val repository: IPackRepository,
@@ -31,6 +38,13 @@ class PackInstanceService(
     private val snapshots: PackSnapshotService,
     private val journal: ApplyJournal,
     private val sizes: InstanceSizeService,
+    /**
+     * The cover already known for a pack, with no network: what it captured and
+     * what its source has answered this run. A detach writes it into the record.
+     */
+    private val knownArt: (PackInstance) -> PackArt? = { null },
+    /** What can put a detached pack back on its source, by the source's origin. */
+    private val reattachers: Map<PackOrigin, PackReattacher> = emptyMap(),
 ) {
     private val log = LoggerFactory.getLogger(PackInstanceService::class.java)
 
@@ -83,6 +97,8 @@ class PackInstanceService(
                     // for good, since the prune runs only inside an apply.
                     snapshots.deleteAll(instance.instanceDirName)
                     journal.complete(instance.instanceDirName)
+                    // The source archive a reattach preview kept, which nothing else would remove.
+                    val _ = deleteTree(reattachArchiveDir(dataDir, instance.instanceDirName))
                     sizes.forget(instance.id)
                     DeleteOutcome.Deleted
                 } else {
@@ -98,6 +114,7 @@ class PackInstanceService(
      * Fork this instance into a Local one the user owns: flip origin to Local and
      * record where it came from in [PackInstance.forkedFrom] so provenance (and
      * its art) survive. Moves no files -- the same on-disk instance is now Local.
+     * [reattach] undoes it.
      *
      * The server binding goes too. Flipping only the origin left the cached
      * manifest's auth requirement in place, so the launch still treated the pack as
@@ -105,17 +122,119 @@ class PackInstanceService(
      * opened adding and removing mods because the origin was now Local: whatever
      * the player added was deleted at Play. A pack whose contents are its owner's
      * is not one a server session can be lent to, so it launches unbound.
+     *
+     * The cover known at this moment is written into the record. Art is looked up
+     * from the pack's source, and an install that captured none left a detached
+     * pack with nothing to show offline, or before its source had been asked.
      */
     suspend fun detachToLocal(instance: PackInstance): PackInstance {
+        // Held as an update holds the instance, and under the same lock. A detach that
+        // landed while an update ran had the update's commit put the source back, or
+        // its rollback re-bind the pack, with the player's own mods in it.
+        val mark = when (val claim = work.claim(instance.id, InstanceWork.Update)) {
+            is InstanceWorkRegistry.Claim.Held -> claim.mark
+            is InstanceWorkRegistry.Claim.Taken -> throw InstanceBusyException(instance.id, claim.by)
+        }
+        try {
+            // Not waited for: a sync that holds the files without a claim would keep
+            // this mark up, and Play refused as "updating", for as long as it ran.
+            return InstanceMutationLock.tryWithLock(instanceDirOf(instance)) { detachRecord(instance) }
+                ?: throw InstanceBusyException(instance.id, InstanceWork.Update)
+        } finally {
+            mark.release()
+        }
+    }
+
+    private suspend fun detachRecord(instance: PackInstance): PackInstance {
+        val art = knownArt(instance)
         val detach: (PackInstance) -> PackInstance = { current ->
             current.copy(
                 packRef = current.packRef.copy(origin = PackOrigin.Local),
                 forkedFrom = current.forkedFrom ?: current.packRef,
                 cachedManifest = current.cachedManifest?.copy(authRequirement = null),
+                iconUrl = art?.iconUrl ?: current.iconUrl,
+                bannerUrl = art?.bannerUrl ?: current.bannerUrl,
             )
         }
         return repository.update(instance.id, detach) ?: detach(instance)
     }
+
+    /**
+     * Whether a detach of [instance] could be undone: its source is one that can
+     * take a detached pack back. A pack synced from a game server cannot, so its
+     * detach is for good, and says so.
+     */
+    fun canReattachAfterDetach(instance: PackInstance): Boolean = instance.packRef.origin in reattachers
+
+    /**
+     * Whether [instance] was detached from a source that can take it back. A pack
+     * that was never detached, or came from a source with no builds to return to,
+     * has nothing to reattach to.
+     */
+    fun canReattach(instance: PackInstance): Boolean = reattacherFor(instance) != null
+
+    /**
+     * What reattaching [instance] would remove and bring back, against the source
+     * build it would land on. Throws when [canReattach] is false.
+     */
+    suspend fun previewReattach(instance: PackInstance): ReattachPreview {
+        val (source, reattacher) = requireReattacher(instance)
+        return reattacher.previewReattach(instance, source)
+    }
+
+    /**
+     * Puts [instance] back on the source it was detached from: its files brought to
+     * the source's build, the source restored as its reference, the fork note
+     * cleared and the server binding written back the way an install of that build
+     * writes it. Throws when [canReattach] is false.
+     *
+     * Runs only on a preview the player confirmed: [confirmed] names the build it
+     * measured and what it listed, the source measures the pack again before it
+     * writes anything, and a pack that no longer measures the same is refused with
+     * [ReattachPreviewStaleException] and left as it was. There is no way to reach
+     * the files without having been shown what happens to them.
+     *
+     * The files move the way the source's ordinary update moves them, so a config
+     * edit the build did not change stays. Local changes to the mods are not kept:
+     * `mods/` is the build's again, so what the player added goes and what they
+     * removed or changed comes back. A pack bound to a server may not carry mods of
+     * its player's choosing, and a player who wants their own mods publishes their
+     * fork as a pack of its own.
+     */
+    suspend fun reattach(
+        instance: PackInstance,
+        confirmed: ReattachConfirmation,
+        progress: ((current: Int, total: Int, path: String) -> Unit)? = null,
+    ): PackInstance {
+        val (source, reattacher) = requireReattacher(instance)
+        // The files are rewritten under the game otherwise. The surfaces that offer
+        // this ask first, and a command arriving from elsewhere is refused here.
+        check(running.runningPackInstanceId.value != instance.id) { "the game of pack ${instance.id} is running" }
+        return reattacher.reattach(instance, source, confirmed, progress)
+    }
+
+    /** Lets go of what [instance]'s reattach previews kept, see [PackReattacher.discardPreview]. */
+    suspend fun discardReattachPreview(instance: PackInstance) {
+        reattacherFor(instance)?.second?.discardPreview(instance)
+    }
+
+    /**
+     * What to call the source [instance] was detached from, for a player to read:
+     * the name the source publishes, else the pack's own name, else the source's id.
+     * Null when it cannot be reattached at all.
+     */
+    suspend fun reattachSourceName(instance: PackInstance): String? {
+        val (source, reattacher) = reattacherFor(instance) ?: return null
+        return reattacher.sourceName(source) ?: instance.displayName.takeIf { it.isNotBlank() } ?: source.id
+    }
+
+    private fun reattacherFor(instance: PackInstance): Pair<PackReference, PackReattacher>? {
+        val source = instance.forkedFrom ?: return null
+        return reattachers[source.origin]?.let { source to it }
+    }
+
+    private fun requireReattacher(instance: PackInstance): Pair<PackReference, PackReattacher> =
+        reattacherFor(instance) ?: throw IllegalStateException("pack ${instance.id} was not detached from a source that can take it back")
 
     /**
      * Recursive delete, deepest-first so directories are empty before removal.
@@ -137,3 +256,7 @@ class PackInstanceService(
         return ok
     }
 }
+
+/** Other work holds the instance [instanceId], so nothing was done to it. */
+class InstanceBusyException(instanceId: String, val work: InstanceWork) :
+    IllegalStateException("pack $instanceId is busy: $work")

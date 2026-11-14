@@ -25,6 +25,12 @@ import hivens.core.launch.LaunchState
 import hivens.core.security.SslBypassEntry
 import hivens.core.security.SslBypassStore
 import hivens.launcher.InstallSnapshot
+import hivens.core.update.CompatChange
+import hivens.launcher.PackOperation
+import hivens.launcher.PackOperationKind
+import hivens.launcher.PackOperationPhase
+import hivens.launcher.update.ReattachConfirmation
+import hivens.launcher.update.ReattachPreview
 import hivens.launcher.platform.PlatformPaths
 import hivens.ui.AppState
 import hivens.ui.appearance.AppearanceStore
@@ -43,6 +49,9 @@ import hivens.ui.notifications.PersistedNotification
 import hivens.ui.onEventThread
 import hivens.ui.packs.PackActions
 import hivens.ui.packs.PackInstallRequest
+import hivens.ui.packs.ReattachPreviewState
+import hivens.ui.packs.ReattachPreviews
+import hivens.ui.packs.ReattachRequest
 import hivens.ui.reportedTo
 import hivens.ui.session.SessionStore
 import hivens.ui.sessionModule
@@ -103,6 +112,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -209,6 +219,7 @@ class CoreKeysTest {
         val cancelled = CopyOnWriteArrayList<String>()
         val updated = CopyOnWriteArrayList<PackInstance>()
         val deleted = CopyOnWriteArrayList<PackInstance>()
+        val reattached = CopyOnWriteArrayList<Pair<PackInstance, ReattachConfirmation>>()
         override val launchState = MutableStateFlow<LaunchState>(LaunchState.Idle)
         override val installs = MutableStateFlow<Map<String, InstallSnapshot>>(emptyMap())
         override fun launch(session: SessionData, pack: PackInstance): Boolean {
@@ -233,6 +244,9 @@ class CoreKeysTest {
         override suspend fun delete(pack: PackInstance) {
             deleted += pack
         }
+        override fun reattach(pack: PackInstance, confirmed: ReattachConfirmation) {
+            reattached += pack to confirmed
+        }
     }
 
     private class Problems : CoreProblems {
@@ -245,6 +259,19 @@ class CoreKeysTest {
             withdrawn += kind
         }
     }
+
+    /** What the stand-in source answers for any pack a reattach is previewed for. */
+    private val shownPreview = ReattachPreview(
+        build = "5",
+        toVersion = "5",
+        compat = CompatChange.Same,
+        removed = listOf("mods/mine.jar"),
+        restored = emptyList(),
+        replaced = emptyList(),
+    )
+
+    /** Work on the packs as the operation service would publish it. */
+    private val operations = MutableStateFlow<Map<String, PackOperation>>(emptyMap())
 
     private val pack = PackInstance(
         id = "p1",
@@ -288,6 +315,8 @@ class CoreKeysTest {
         val center = NotificationCenter(archive = { archived += it })
         val reporter: CoreProblems =
             if (notified) NotifiedCoreProblems(center, scope) { stringsFor(AppLocale.ENGLISH) } else problems
+        val measured = AtomicInteger()
+        val previews = ReattachPreviews(measure = { measured.incrementAndGet(); shownPreview }, operations = operations, scope = scope)
         val preferences = PreferenceWriter("core-keys-test")
         val indications = IndicationCenter()
         val console = GameConsoleService(
@@ -324,6 +353,7 @@ class CoreKeysTest {
                     single<CoreProblems> { reporter }
                     single<IPackRepository> { Packs(listOf(pack)) }
                     if (withActions) single<PackActions> { actions }
+                    single { previews }
                     single { indications }
                     single { console }
                     single { appearance }
@@ -374,7 +404,7 @@ class CoreKeysTest {
 
     private val appWide: List<SourceKey<*>> = listOf(
         Sources.Session, Sources.SystemSchemeAvailable, Sources.PackLibrary, Sources.PackLaunches,
-        Sources.LaunchState, Sources.PackInstalls, Sources.ConsoleVisible,
+        Sources.LaunchState, Sources.PackInstalls, Sources.ReattachPreviews, Sources.ConsoleVisible,
     )
 
     private val composedCommands: List<CommandKey<*>> = listOf(
@@ -383,7 +413,8 @@ class CoreKeysTest {
 
     private val appCommands: List<CommandKey<*>> = listOf(
         Commands.SignIn, Commands.SignOut, Commands.LaunchPack, Commands.StopPack, Commands.InstallPack,
-        Commands.DismissInstall, Commands.CancelInstall, Commands.UpdatePack, Commands.DeletePack, Commands.SetConsoleVisible,
+        Commands.DismissInstall, Commands.CancelInstall, Commands.UpdatePack, Commands.DeletePack, Commands.PreviewReattach,
+        Commands.ReattachPack, Commands.SetConsoleVisible,
     )
 
     @Test
@@ -590,7 +621,7 @@ class CoreKeysTest {
     }
 
     @Test
-    fun `stop, install, update and delete reach the launcher's actions with the pack they name`() {
+    fun `stop, install, update, delete and reattach reach the launcher's actions with the pack they name`() {
         val launcher = Launcher()
         val app = launcher.app
         val request = PackInstallRequest(
@@ -603,16 +634,83 @@ class CoreKeysTest {
         launcher.fire(app, Commands.CancelInstall, "k2")
         launcher.fire(app, Commands.UpdatePack, pack.id)
         launcher.fire(app, Commands.DeletePack, pack.id)
+        launcher.fire(app, Commands.ReattachPack, ReattachRequest(pack.id, shownPreview.confirmation))
         launcher.fire(app, Commands.UpdatePack, "not-installed")
         launcher.fire(app, Commands.DeletePack, "not-installed")
+        launcher.fire(app, Commands.ReattachPack, ReattachRequest("not-installed", shownPreview.confirmation))
         awaitTrue("the delete") { launcher.actions.deleted.isNotEmpty() }
         assertEquals(listOf(pack.id), launcher.actions.stopped)
         assertEquals(listOf(request), launcher.actions.installed)
         assertEquals(listOf("k1"), launcher.actions.dismissed)
         assertEquals(listOf("k2"), launcher.actions.cancelled)
         assertEquals(listOf(pack), launcher.actions.updated)
+        assertEquals(listOf(pack to shownPreview.confirmation), launcher.actions.reattached, "with the preview the player agreed to")
         Thread.sleep(100)
         assertEquals(listOf(pack), launcher.actions.deleted)
+    }
+
+    /**
+     * A widget gets a reattach preview the way the settings screen does. Work on the
+     * pack may change the files it measured, so while that work runs the preview
+     * reads as comparing and once it ends it is measured again. Dropped instead, the
+     * dialog that asked for it waited on a comparison nobody was running.
+     */
+    @Test
+    fun `a reattach preview is asked for by command, read from its source, and measured again after work on the pack`() {
+        val launcher = Launcher()
+        val app = launcher.app
+        launcher.fire(app, Commands.PreviewReattach, pack.id)
+        launcher.fire(app, Commands.PreviewReattach, "not-installed")
+        awaitTrue("the preview") { launcher.source(app, Sources.ReattachPreviews)[pack.id] is ReattachPreviewState.Ready }
+        assertEquals(
+            mapOf<String, ReattachPreviewState>(pack.id to ReattachPreviewState.Ready(shownPreview)),
+            launcher.source(app, Sources.ReattachPreviews),
+        )
+
+        assertEquals(1, launcher.measured.get())
+
+        operations.value = mapOf(pack.id to PackOperation(pack.id, PackOperationKind.Repair, PackOperationPhase.Running(0, 0, "")))
+        awaitTrue("comparing while the work runs") { launcher.source(app, Sources.ReattachPreviews)[pack.id] == ReattachPreviewState.Comparing }
+        operations.value = mapOf(pack.id to PackOperation(pack.id, PackOperationKind.Repair, PackOperationPhase.Running(5, 9, "a.jar")))
+        operations.value = mapOf(pack.id to PackOperation(pack.id, PackOperationKind.Repair, PackOperationPhase.Repaired(1, 0)))
+        awaitTrue("measured again once it ended") {
+            launcher.measured.get() == 2 && launcher.source(app, Sources.ReattachPreviews)[pack.id] is ReattachPreviewState.Ready
+        }
+        Thread.sleep(100)
+        assertEquals(2, launcher.measured.get(), "progress within the work is not news")
+
+        launcher.previews.forget(pack.id)
+        assertTrue(launcher.source(app, Sources.ReattachPreviews).isEmpty(), "and gone once nobody wants it")
+    }
+
+    /**
+     * Work dismissed before its end was seen left a widget's preview comparing for
+     * good, and a preview nobody forgot kept its pack's archive until the next start.
+     */
+    @Test
+    fun `work dismissed early still ends, and a preview nobody forgets goes with what it kept`() {
+        val ops = MutableStateFlow<Map<String, PackOperation>>(emptyMap())
+        val measured = AtomicInteger()
+        val discarded = CopyOnWriteArrayList<String>()
+        val store = ReattachPreviews(
+            measure  = { measured.incrementAndGet(); shownPreview },
+            operations = ops,
+            scope    = scope,
+            discard  = { discarded += it.id },
+            keepFor  = 600.milliseconds,
+        )
+        store.request(pack)
+        awaitTrue("the preview") { store.previews.value[pack.id] is ReattachPreviewState.Ready }
+
+        ops.value = mapOf(pack.id to PackOperation(pack.id, PackOperationKind.Repair, PackOperationPhase.Running(0, 0, "")))
+        awaitTrue("comparing while it runs") { store.previews.value[pack.id] == ReattachPreviewState.Comparing }
+        ops.value = emptyMap()
+        awaitTrue("measured again though its end was never seen") {
+            measured.get() == 2 && store.previews.value[pack.id] is ReattachPreviewState.Ready
+        }
+
+        awaitTrue("gone a while after it answered") { store.previews.value.isEmpty() }
+        awaitTrue("and what it kept let go") { discarded.toList() == listOf(pack.id) }
     }
 
     @Test

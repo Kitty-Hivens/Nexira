@@ -1,6 +1,8 @@
 package hivens.launcher.mrpack
 
 import hivens.launcher.util.instanceDirName
+import hivens.launcher.util.sha1Of
+import hivens.launcher.util.sha512Of
 import hivens.core.net.Digest
 import hivens.core.net.DigestAlgorithm
 import hivens.core.net.SkipIfPresent
@@ -25,11 +27,13 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
 import java.io.IOException
+import java.io.InputStream
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.time.Instant
 import java.util.UUID
+import java.util.zip.CRC32
 import java.util.zip.ZipFile
 
 /**
@@ -167,6 +171,13 @@ class MrpackInstaller(
      * An instance with no record (installed before records existed) updates as a
      * full write of the pack's content and deletes nothing at all: not knowing
      * what was ours, the safe reading is that none of it was.
+     *
+     * [strictMods] holds `mods/` to the version: a file the version ships there is
+     * measured against the disk rather than the record and written unless it holds
+     * the version's bytes, and one switched off by its name is switched back on.
+     * Everything else updates as above. A reattach asks for that: the pack's mods
+     * are its source's again, and the record cannot see an edit that kept a jar's
+     * size.
      */
     suspend fun update(
         instance: PackInstance,
@@ -179,6 +190,7 @@ class MrpackInstaller(
          */
         installedArchive: Path? = null,
         progress: (current: Int, total: Int, filename: String) -> Unit = { _, _, _ -> },
+        strictMods: Boolean = false,
     ): PackInstance = withContext(Dispatchers.IO) {
         val clientDir = dataDir.resolve("instances").resolve(instance.instanceDirName)
         if (!Files.isDirectory(clientDir)) throw IOException("instance dir is gone: $clientDir")
@@ -208,12 +220,21 @@ class MrpackInstaller(
             val overrides = overrideEntries(zip, OVERRIDES) + overrideEntries(zip, CLIENT_OVERRIDES)
             val ours = files.map { it.path }.toSet() + overrides.keys
 
-            val wanted = files.filterNot { file ->
-                val rec = old[file.path] ?: return@filterNot false
-                val dest = safeResolve(clientDir, file.path)
-                // The pack did not move it and it is still here as we left it.
-                rec.sha1 == file.hashes[HASH_SHA1] && Files.isRegularFile(dest) && Files.size(dest) == rec.size
+            // A mod the player switched off by its name is the pack's bytes already:
+            // put back under its own name rather than fetched again beside it.
+            if (strictMods) {
+                // A link under a mod's name is not the version's file whatever it
+                // points at, and the fetch below checks what is in place through it.
+                files.filter { it.path.startsWith(MODS_DIR) }.forEach { file ->
+                    val dest = safeResolve(clientDir, file.path)
+                    if (Files.isSymbolicLink(dest)) Files.delete(dest)
+                }
+                files.forEach { file ->
+                    val off = switchedBackOn(clientDir, file) ?: return@forEach
+                    Files.move(off, safeResolve(clientDir, file.path))
+                }
             }
+            val wanted = files.filter { file -> fetches(clientDir, file, old, strictMods) }
             log.info(
                 "mrpack update: {} of {} indexed file(s) need fetching for {}",
                 wanted.size, files.size, instance.instanceDirName,
@@ -224,7 +245,7 @@ class MrpackInstaller(
                 }
             }
 
-            applyOverrides(zip, clientDir, overrides, old)
+            applyOverrides(zip, clientDir, overrides, old, strictMods)
 
             // Retiring last, not first. A file this version drops is one the old
             // version was still using, so removing it before the replacements are
@@ -336,20 +357,22 @@ class MrpackInstaller(
      * An entry whose CRC matches the record is one the pack has not touched
      * since we placed it, so it is left alone -- which is also what preserves an
      * edit the player made to a config this version does not care about.
+     *
+     * [strictMods] holds an override under `mods/` to the disk instead, see [update].
      */
     private fun applyOverrides(
         zip: ZipFile,
         clientDir: Path,
         overrides: Map<String, OverrideEntry>,
         old: Map<String, PackFileEntry>,
+        strictMods: Boolean = false,
     ) {
         val budget = UnpackBudget(UnpackLimits.PACK_CONTENT, "mrpack overrides")
         var written = 0
         for ((relative, entry) in overrides) {
             val dest = safeResolve(clientDir, relative)
             val rec = old[relative]
-            val packKeptIt = rec?.crc32 != null && entry.crc != null && rec.crc32 == entry.crc
-            if (packKeptIt && Files.isRegularFile(dest)) continue
+            if (!writes(zip, clientDir, relative, entry, old, strictMods)) continue
 
             if (rec != null && Files.isRegularFile(dest) && touchedSince(dest, rec)) {
                 log.warn(
@@ -375,6 +398,145 @@ class MrpackInstaller(
         }
         log.info("mrpack update: wrote {} of {} override(s)", written, overrides.size)
     }
+
+    /**
+     * Whether [update] fetches [file]: under [strictMods] a mod is fetched unless
+     * the disk holds its bytes, and otherwise a file is fetched unless the record
+     * says the version kept it and it is still as it was placed.
+     */
+    private fun fetches(clientDir: Path, file: MrpackFile, old: Map<String, PackFileEntry>, strictMods: Boolean): Boolean {
+        if (strictMods && file.path.startsWith(MODS_DIR)) return stateOf(clientDir, file) != OnDisk.Same
+        val rec = old[file.path] ?: return true
+        val dest = safeResolve(clientDir, file.path)
+        // The pack did not move it and it is still here as we left it.
+        return !(rec.sha1 == file.hashes[HASH_SHA1] && Files.isRegularFile(dest) && Files.size(dest) == rec.size)
+    }
+
+    /**
+     * Whether [applyOverrides] writes the override at [relative]: under [strictMods]
+     * one in `mods/` is written unless the disk holds its bytes, and otherwise one
+     * whose CRC matches the record is left alone, edits included.
+     */
+    private fun writes(
+        zip: ZipFile,
+        clientDir: Path,
+        relative: String,
+        entry: OverrideEntry,
+        old: Map<String, PackFileEntry>,
+        strictMods: Boolean,
+    ): Boolean {
+        if (strictMods && relative.startsWith(MODS_DIR)) return stateOf(zip, clientDir, relative, entry) != OnDisk.Same
+        val rec = old[relative]
+        val packKeptIt = rec?.crc32 != null && entry.crc != null && rec.crc32 == entry.crc
+        return !(packKeptIt && Files.isRegularFile(safeResolve(clientDir, relative)))
+    }
+
+    /**
+     * What an [update] of the instance in [clientDir] to the version in [archive],
+     * with `strictMods`, would change: the files it writes that the disk does not
+     * already hold, the mods it switches back on, and what it retires. Reads the
+     * archive and the disk and touches neither.
+     *
+     * Answered by the same tests that update applies, so what it lists is what
+     * that update does, and a file it would leave alone is not listed.
+     */
+    fun divergence(archive: Path, clientDir: Path): MrpackDivergence = ZipFile(archive.toFile()).use { zip ->
+        val index = readIndex(zip)
+        val files = index.files.filter { it.env?.client != ENV_UNSUPPORTED }
+        val overrides = overrideEntries(zip, OVERRIDES) + overrideEntries(zip, CLIENT_OVERRIDES)
+        val old = PackFileRecord.read(clientDir)
+        val missing = ArrayList<String>()
+        val changed = ArrayList<String>()
+        val turnedOn = ArrayList<String>()
+        fun sort(path: String, state: OnDisk) {
+            when (state) {
+                OnDisk.Missing -> missing += path
+                OnDisk.Changed -> changed += path
+                OnDisk.Same -> Unit
+            }
+        }
+        // client-overrides wins on a clash, so an override path is judged once,
+        // against the entry that would be written, as [update] writes it.
+        files.filter { it.path !in overrides }.forEach { file ->
+            when {
+                file.path.startsWith(MODS_DIR) && Files.isSymbolicLink(safeResolve(clientDir, file.path)) -> changed += file.path
+                switchedBackOn(clientDir, file) != null -> turnedOn += file.path
+                fetches(clientDir, file, old, strictMods = true) -> sort(file.path, stateOf(clientDir, file))
+            }
+        }
+        overrides.forEach { (path, entry) ->
+            if (writes(zip, clientDir, path, entry, old, strictMods = true)) sort(path, stateOf(zip, clientDir, path, entry))
+        }
+        val ours = files.map { it.path }.toSet() + overrides.keys
+        val retired = (old.keys - ours).filter { relative ->
+            runCatching { Files.isRegularFile(safeResolve(clientDir, relative)) }.getOrDefault(false)
+        }
+        val mods = LinkedHashMap<String, String>()
+        files.forEach { file -> topLevelMod(file.path)?.let { mods[it] = file.hashes[HASH_SHA1].orEmpty() } }
+        overrides.keys.forEach { path -> topLevelMod(path)?.let { mods.putIfAbsent(it, "") } }
+        val modPaths = ours.filter { it.startsWith(MODS_DIR) }.toSet()
+        MrpackDivergence(missing.sorted(), changed.sorted(), retired.sorted(), mods, turnedOn.sorted(), modPaths)
+    }
+
+    /**
+     * The `.disabled` copy of the mod [file] when the mod is missing under its own
+     * name and that copy holds the bytes the index names: a mod the player switched
+     * off by renaming it, which a strict update switches back on by renaming it again.
+     */
+    private fun switchedBackOn(clientDir: Path, file: MrpackFile): Path? {
+        if (!file.path.startsWith(MODS_DIR) || stateOf(clientDir, file) != OnDisk.Missing) return null
+        val off = safeResolve(clientDir, "${file.path}$DISABLED_SUFFIX")
+        if (!Files.isRegularFile(off)) return null
+        val sha1 = file.hashes[HASH_SHA1]
+        val sha512 = file.hashes[HASH_SHA512]
+        val same = when {
+            sha1 != null -> sha1Of(off).equals(sha1, ignoreCase = true)
+            sha512 != null -> sha512Of(off).equals(sha512, ignoreCase = true)
+            else -> false
+        }
+        return off.takeIf { same }
+    }
+
+    /** The file name of [path] when it sits directly in `mods/`, where the loader reads it. */
+    private fun topLevelMod(path: String): String? =
+        path.removePrefix(MODS_DIR).takeIf { path.startsWith(MODS_DIR) && it.isNotEmpty() && '/' !in it }
+
+    /** What the disk holds where an indexed file belongs, measured by the strongest hash the index names. */
+    private fun stateOf(clientDir: Path, file: MrpackFile): OnDisk {
+        val dest = safeResolve(clientDir, file.path)
+        if (!Files.isRegularFile(dest)) return OnDisk.Missing
+        val sha1 = file.hashes[HASH_SHA1]
+        val sha512 = file.hashes[HASH_SHA512]
+        val same = when {
+            sha1 != null -> sha1Of(dest).equals(sha1, ignoreCase = true)
+            sha512 != null -> sha512Of(dest).equals(sha512, ignoreCase = true)
+            else -> false
+        }
+        return if (same) OnDisk.Same else OnDisk.Changed
+    }
+
+    /** What the disk holds where an override belongs, by CRC32 against the archive's entry. */
+    private fun stateOf(zip: ZipFile, clientDir: Path, relative: String, entry: OverrideEntry): OnDisk {
+        val dest = safeResolve(clientDir, relative)
+        if (!Files.isRegularFile(dest)) return OnDisk.Missing
+        val want = entry.crc ?: zip.getInputStream(zip.getEntry(entry.name)).use(::crc32Of)
+        val have = Files.newInputStream(dest).use(::crc32Of)
+        return if (want == have) OnDisk.Same else OnDisk.Changed
+    }
+
+    private fun crc32Of(input: InputStream): Long {
+        val crc = CRC32()
+        val buffer = ByteArray(64 * 1024)
+        while (true) {
+            val n = input.read(buffer)
+            if (n <= 0) break
+            crc.update(buffer, 0, n)
+        }
+        return crc.value
+    }
+
+    /** How a file the pack ships compares with what sits in its place. */
+    private enum class OnDisk { Missing, Changed, Same }
 
     /** Cheap edit check: the record's size and mtime, no bytes read. */
     private fun touchedSince(file: Path, rec: PackFileEntry): Boolean = runCatching {
@@ -503,6 +665,8 @@ class MrpackInstaller(
         const val HASH_SHA512 = "sha512"
         const val DOWNLOADS_DIR = "downloads"
         const val STAGING_SUFFIX = ".nexira-staged"
+        const val MODS_DIR = "mods/"
+        const val DISABLED_SUFFIX = ".disabled"
 
         /** Modrinth dependency key -> LoaderRegistry id, checked in this order. */
         val LOADER_KEYS = linkedMapOf(
@@ -513,6 +677,25 @@ class MrpackInstaller(
         )
     }
 }
+
+/**
+ * Where an instance stands against one version of its pack, as
+ * [MrpackInstaller.divergence] reads it. Paths are relative to the instance.
+ */
+data class MrpackDivergence(
+    /** Files the update writes that are not on disk. */
+    val missing: List<String>,
+    /** Files the update writes over other bytes on disk. */
+    val changed: List<String>,
+    /** Files the record says the pack placed, which this version no longer ships, still on disk. */
+    val retired: List<String>,
+    /** Each name the version places directly in `mods/`, with its sha1 where the index publishes one. */
+    val mods: Map<String, String>,
+    /** Files the version ships that sit under their `.disabled` name with the right bytes, which it switches back on. */
+    val turnedOn: List<String> = emptyList(),
+    /** Every path the version places under `mods/`, versioned folders included. */
+    val modPaths: Set<String> = emptySet(),
+)
 
 /**
  * Provenance for an installed `.mrpack`: the [PackOrigin] plus a source-local id

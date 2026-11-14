@@ -5,6 +5,7 @@ import hivens.core.api.HttpClientProvider
 import hivens.core.api.dto.smrt.toBaselineManifest
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.CachedManifestSnapshot
+import hivens.core.data.PackAuthRequirement
 import hivens.core.data.OptionalContentRules
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
@@ -15,6 +16,10 @@ import hivens.core.update.UpdateCheck
 import hivens.core.update.UpdateDirection
 import hivens.core.update.UpdateOutcome
 import hivens.core.update.VersionChannel
+import hivens.core.launch.InstanceWorkRegistry
+import hivens.launcher.instance.InstanceSizeService
+import hivens.launcher.instance.PackInstanceService
+import hivens.launcher.launch.RunningPackSource
 import hivens.launcher.modrinth.ModrinthClient
 import hivens.launcher.smrt.SmrtPackClient
 import hivens.launcher.smrt.SmrtSyncService
@@ -25,20 +30,29 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import io.ktor.utils.io.ByteReadChannel
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import java.io.ByteArrayOutputStream
+import java.io.IOException
 import java.nio.file.Files
+import java.nio.file.LinkOption
 import java.nio.file.Path
 import java.security.MessageDigest
+import java.util.jar.Attributes
+import java.util.jar.JarOutputStream
+import java.util.jar.Manifest
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class PackUpdateServiceTest {
@@ -54,6 +68,15 @@ class PackUpdateServiceTest {
     private fun readText(p: Path) = Files.readString(p)
 
     private class FakeRepo : IPackRepository {
+        /** How many of the next record updates fail, the way a full disk fails the registry write. */
+        var failingUpdates = 0
+        override suspend fun update(id: String, transform: (PackInstance) -> PackInstance): PackInstance? {
+            if (failingUpdates > 0) {
+                failingUpdates--
+                throw IOException("the registry could not be written")
+            }
+            return super.update(id, transform)
+        }
         private val map = LinkedHashMap<String, PackInstance>()
         private val flow = MutableStateFlow<List<PackInstance>>(emptyList())
         override fun observe(): StateFlow<List<PackInstance>> = flow.asStateFlow()
@@ -75,17 +98,24 @@ class PackUpdateServiceTest {
     private fun asset(dest: String, bytes: ByteArray, url: String) =
         """{"dest":"$dest","sha1":"${sha1(bytes)}","size_bytes":${bytes.size},"required":true,"source":{"type":"smrt_static","url":"$url"}}"""
 
-    private fun manifest(version: String, mods: List<String>, assets: List<String>, mc: String = "1.20.1") =
+    private fun manifest(version: String, mods: List<String>, assets: List<String>, mc: String = "1.20.1", auth: String? = null) =
         """{"schema_version":2,"pack_id":"test","pack_version":"$version","generated_at":"now",
             "minecraft":{"version":"$mc"},"loader":{"name":"fabric","version":"0.19.2"},"java":{"major":17},
+            ${auth?.let { "\"auth\":$it," }.orEmpty()}
             "mods":[${mods.joinToString(",")}],"assets":[${assets.joinToString(",")}]}"""
 
     private fun summary(latest: String) =
         """{"pack_id":"test","display_name":"Test","tagline":"t","minecraft_version":"1.20.1","latest_pack_version":"$latest"}"""
 
-    /** Per-test wiring: a mock mirror whose served manifest/summary can be flipped v1 -> v2. */
-    private inner class Harness {
+    /**
+     * Per-test wiring: a mock mirror whose served manifest/summary can be flipped v1 -> v2.
+     * [auth] is the server binding every build declares, as the mirror writes it.
+     */
+    private inner class Harness(auth: String? = null) {
         val dataDir = tempDir("data")
+
+        /** More addresses the mock mirror answers, for a test that needs a build or a file of its own. */
+        val extra = HashMap<String, ByteArray>()
         val clientDir: Path = dataDir.resolve("instances").resolve("inst")
         val repo = FakeRepo()
 
@@ -102,6 +132,7 @@ class PackUpdateServiceTest {
             // ships, and the game rewrites it whenever the player edits their
             // server list -- the case the name-keyed list used to answer.
             listOf(asset("config/x.cfg", CFG, CFG_URL), asset("servers.dat", SERVERS_V1, SERVERS_V1_URL)),
+            auth = auth,
         )
         var manifestBody = v1Body
         var summaryBody = summary(V1)
@@ -121,6 +152,7 @@ class PackUpdateServiceTest {
                 asset("config/new.cfg", NEWCFG, NEWCFG_URL),
                 asset("servers.dat", SERVERS_V2, SERVERS_V2_URL),
             ),
+            auth = auth,
         )
 
         private val engine = MockEngine { req ->
@@ -139,15 +171,30 @@ class PackUpdateServiceTest {
                 NEWCFG_URL -> respond(ByteReadChannel(NEWCFG), HttpStatusCode.OK)
                 SERVERS_V1_URL -> respond(ByteReadChannel(SERVERS_V1), HttpStatusCode.OK)
                 SERVERS_V2_URL -> respond(ByteReadChannel(SERVERS_V2), HttpStatusCode.OK)
-                else -> respond("missing ${req.url}", HttpStatusCode.NotFound)
+                else -> extra[req.url.toString()]?.let { respond(ByteReadChannel(it), HttpStatusCode.OK, jsonHeaders) }
+                    ?: respond("missing ${req.url}", HttpStatusCode.NotFound)
             }
         }
         private val provider = HttpClientProvider { HttpClient(engine) }
         val client = SmrtPackClient(provider, MIRROR, json)
         val sync = SmrtSyncService(ModrinthClient(provider, testTransferEngine(provider), json), testTransferEngine(provider))
-        private val snapshots = PackSnapshotService(dataDir, json)
+        val snapshots = PackSnapshotService(dataDir, json)
         val journal = ApplyJournal(dataDir, json)
         val service = PackUpdateService(client, sync, repo, snapshots, journal, dataDir)
+
+        /** Detach and reattach as the launcher runs them, with this mirror as the only source that takes a pack back. */
+        val instances = PackInstanceService(
+            repository = repo,
+            dataDir = dataDir,
+            running = object : RunningPackSource {
+                override val runningPackInstanceId: StateFlow<String?> = MutableStateFlow(null)
+            },
+            work = InstanceWorkRegistry(),
+            snapshots = snapshots,
+            journal = journal,
+            sizes = InstanceSizeService(dataDir, CoroutineScope(Dispatchers.Unconfined)),
+            reattachers = mapOf(PackOrigin.Mirror to service),
+        )
 
         fun serveV2() { manifestBody = v2Body }
 
@@ -182,6 +229,14 @@ class PackUpdateServiceTest {
             listOf(asset("config/x.cfg", CFG, CFG_URL), asset("servers.dat", SERVERS_V1, SERVERS_V1_URL)),
         )
         fun serveV2OptRequired() { manifestBody = v2OptRequired() }
+
+        /** [installV1], bound to its server the way an install of a build that declares one records it. */
+        suspend fun installBound(): PackInstance {
+            val installed = installV1()
+            val bound = installed.copy(cachedManifest = installed.cachedManifest?.copy(authRequirement = PackAuthRequirement.SmartyCraft("Industrial")))
+            repo.put(bound)
+            return bound
+        }
 
         /** Install v1 with optB toggled off, and record the resulting instance. */
         suspend fun installV1(): PackInstance {
@@ -557,6 +612,536 @@ class PackUpdateServiceTest {
 
         assertFalse(Files.exists(h.clientDir))
         assertEquals(null, h.repo.get(instance.id))
+    }
+
+    // ── Reattach ──────────────────────────────────────────────────────
+
+    /** Reattaches [detached] on the preview a player would be shown, confirmed as shown. */
+    private suspend fun Harness.reattachAsShown(detached: PackInstance): PackInstance =
+        instances.reattach(detached, instances.previewReattach(detached).confirmation)
+
+    @Test
+    fun `a reattach puts the source back as the reference with the binding an install gives it`() = runTest {
+        val h = Harness(auth = """{"kind":"smartycraft","server_id":"Industrial"}""")
+        val detached = h.instances.detachToLocal(h.installBound())
+        assertEquals(PackOrigin.Local, detached.packRef.origin)
+        assertNull(detached.cachedManifest?.authRequirement)
+        assertTrue(h.instances.canReattach(detached))
+
+        val back = h.reattachAsShown(detached)
+
+        assertEquals(PackReference(PackOrigin.Mirror, "test", V1), back.packRef)
+        assertNull(back.forkedFrom, "the fork note goes with the fork")
+        assertEquals(PackAuthRequirement.SmartyCraft("Industrial"), back.cachedManifest?.authRequirement, "bound to its server again")
+        assertEquals(V1, back.pinnedPackVersion)
+        assertEquals(h.client.fetchManifest("test").toBaselineManifest(), back.installedManifest)
+        assertEquals(back, h.repo.get("i1"), "and that is what the registry holds")
+        assertFalse(h.instances.canReattach(back), "nothing to reattach once it is back")
+        assertTrue(h.journal.listPending().isEmpty())
+    }
+
+    @Test
+    fun `the reattach preview lists exactly what will change, and the reattach does just that`() = runTest {
+        val h = Harness()
+        val detached = h.instances.detachToLocal(h.installV1())
+        val mods = h.clientDir.resolve("mods")
+        Files.writeString(mods.resolve("extra.jar"), "MINE")
+        Files.writeString(mods.resolve("notes.txt"), "not a mod")
+        Files.delete(mods.resolve("req.jar"))
+        Files.writeString(mods.resolve("drop.jar"), "PATCHED")
+        Files.writeString(h.clientDir.resolve("config/x.cfg"), "EDITED")
+
+        val preview = h.instances.previewReattach(detached)
+
+        assertEquals(V1, preview.toVersion)
+        assertEquals(CompatChange.Same, preview.compat)
+        assertEquals(listOf("mods/extra.jar"), preview.removed)
+        assertEquals(listOf("mods/req.jar"), preview.restored)
+        assertEquals(listOf("mods/drop.jar"), preview.replaced, "a mod is held to the build, a config edit the build did not change is not listed")
+        assertEquals(listOf("mods/drop.jar", "mods/req.jar"), preview.returned)
+        assertTrue(preview.turnedOn.isEmpty() && preview.turnedOff.isEmpty() && preview.kept.isEmpty())
+
+        h.instances.reattach(detached, preview.confirmation)
+
+        assertFalse(Files.exists(mods.resolve("extra.jar")), "a mod the player added is gone")
+        assertEquals("REQ-V1", readText(mods.resolve("req.jar")), "one they removed is back")
+        assertEquals("DROP", readText(mods.resolve("drop.jar")), "one they changed is the source's again")
+        assertEquals("EDITED", readText(h.clientDir.resolve("config/x.cfg")), "the player's config edit survives, as an update keeps it")
+        assertEquals("not a mod", readText(mods.resolve("notes.txt")), "what no loader reads is not the sweep's")
+        assertEquals("OPTB-V1", readText(mods.resolve("optB.jar.disabled")), "an optional the player turned off stays off")
+        assertTrue(h.instances.previewReattach(detached).isEmpty, "nothing differs once it is done")
+    }
+
+    /**
+     * A reattach moves the pack the way the source's own update does. It used to place
+     * the build as a fresh install would, and a config the player had tuned went back
+     * to the pack's copy although the build had not changed it.
+     */
+    @Test
+    fun `a reattach keeps a config edit the build did not change and updates what the build changed`() = runTest {
+        val h = Harness()
+        val detached = h.instances.detachToLocal(h.installV1())
+        Files.writeString(h.clientDir.resolve("config/x.cfg"), "MY SETTINGS")
+        h.serveV2()
+
+        val preview = h.instances.previewReattach(detached)
+
+        assertEquals(V2, preview.toVersion)
+        assertEquals(listOf("mods/drop.jar"), preview.removed)
+        assertEquals(listOf("config/new.cfg"), preview.restored)
+        assertEquals(listOf("mods/optB.jar", "mods/req.jar", "servers.dat"), preview.replaced)
+        assertTrue(preview.kept.isEmpty())
+
+        h.instances.reattach(detached, preview.confirmation)
+
+        assertEquals("MY SETTINGS", readText(h.clientDir.resolve("config/x.cfg")), "the build left it alone, so the edit stays")
+        assertEquals("SERVERS-V2", readText(h.clientDir.resolve("servers.dat")), "the build changed it, so it is updated")
+        assertEquals("NEWCFG", readText(h.clientDir.resolve("config/new.cfg")))
+        assertEquals("REQ-V2", readText(h.clientDir.resolve("mods/req.jar")))
+        assertFalse(Files.exists(h.clientDir.resolve("mods/drop.jar")))
+    }
+
+    @Test
+    fun `a file both the player and the build changed keeps the player's copy and gets the build's beside it`() = runTest {
+        val h = Harness()
+        val detached = h.instances.detachToLocal(h.installV1())
+        Files.writeString(h.clientDir.resolve("servers.dat"), "MY SERVERS")
+        h.serveV2()
+
+        val preview = h.instances.previewReattach(detached)
+        assertEquals(listOf("servers.dat"), preview.kept)
+        assertFalse("servers.dat" in preview.replaced)
+
+        h.instances.reattach(detached, preview.confirmation)
+
+        assertEquals("MY SERVERS", readText(h.clientDir.resolve("servers.dat")))
+        assertEquals("SERVERS-V2", readText(h.clientDir.resolve("servers.dat.new")))
+    }
+
+    /**
+     * The player agreed to a list. Anything else, a confirmation that names no preview
+     * or one the pack no longer matches, used to have the files rewritten all the same.
+     */
+    @Test
+    fun `a reattach without a preview that still holds refuses and touches nothing`() = runTest {
+        val h = Harness()
+        val detached = h.instances.detachToLocal(h.installV1())
+        val mods = h.clientDir.resolve("mods")
+        Files.writeString(mods.resolve("extra.jar"), "MINE")
+        val shown = h.instances.previewReattach(detached)
+        Files.writeString(mods.resolve("late.jar"), "ADDED AFTER THE PREVIEW")
+
+        assertFailsWith<ReattachPreviewStaleException> { h.instances.reattach(detached, shown.confirmation) }
+        assertFailsWith<ReattachPreviewStaleException> { h.instances.reattach(detached, ReattachConfirmation(V1, "made up")) }
+        h.serveV2()
+        assertFailsWith<ReattachPreviewStaleException> {
+            h.instances.reattach(detached, h.instances.previewReattach(detached).confirmation.copy(build = V1))
+        }
+
+        assertEquals("MINE", readText(mods.resolve("extra.jar")))
+        assertEquals("ADDED AFTER THE PREVIEW", readText(mods.resolve("late.jar")))
+        assertEquals(detached, h.repo.get("i1"), "the record is the detached one still")
+        assertTrue(h.service.listSnapshots(detached).isEmpty(), "not even a snapshot was taken")
+        assertTrue(h.journal.listPending().isEmpty())
+    }
+
+    @Test
+    fun `a reattach that fails part way puts back the player's mods and the detached record`() = runTest {
+        val h = Harness(auth = """{"kind":"smartycraft","server_id":"Industrial"}""")
+        val detached = h.instances.detachToLocal(h.installBound())
+        val mods = h.clientDir.resolve("mods")
+        Files.writeString(mods.resolve("extra.jar"), "MINE")
+        Files.delete(mods.resolve("req.jar"))
+        val confirmed = h.instances.previewReattach(detached).confirmation
+        // The files are all in place by the time the record is written, and the write fails.
+        h.repo.failingUpdates = 1
+
+        assertFailsWith<IOException> { h.instances.reattach(detached, confirmed) }
+
+        assertEquals("MINE", readText(mods.resolve("extra.jar")), "the swept mod is back")
+        assertFalse(Files.exists(mods.resolve("req.jar")), "and what the build brought is gone again")
+        val record = h.repo.get("i1")!!
+        assertEquals(PackOrigin.Local, record.packRef.origin)
+        assertEquals(detached.forkedFrom, record.forkedFrom)
+        assertNull(record.cachedManifest?.authRequirement)
+        assertTrue(h.journal.listPending().isEmpty())
+    }
+
+    /**
+     * Rolled back with the build fields alone, the record kept the source's reference
+     * over the player's own mods again: unbound, its Content tab locked, and no
+     * reattach offered.
+     */
+    @Test
+    fun `rolling back a reattach returns the pack to the detached state it came from`() = runTest {
+        val h = Harness(auth = """{"kind":"smartycraft","server_id":"Industrial"}""")
+        val detached = h.instances.detachToLocal(h.installBound())
+        Files.writeString(h.clientDir.resolve("mods/extra.jar"), "MINE")
+        val back = h.reattachAsShown(detached)
+
+        val rolled = h.service.rollback(back, h.service.listSnapshots(back).first().id)
+
+        assertEquals(PackOrigin.Local, rolled.packRef.origin)
+        assertEquals(detached.forkedFrom, rolled.forkedFrom)
+        assertNull(rolled.cachedManifest?.authRequirement, "unbound, as a detached pack is")
+        assertEquals(rolled, h.repo.get("i1"))
+        assertEquals("MINE", readText(h.clientDir.resolve("mods/extra.jar")))
+        assertTrue(h.instances.canReattach(rolled), "and it can be reattached again")
+    }
+
+    @Test
+    fun `a crash between the reattach commit and its marker is recovered to the detached state`() = runTest {
+        val h = Harness(auth = """{"kind":"smartycraft","server_id":"Industrial"}""")
+        val detached = h.instances.detachToLocal(h.installBound())
+        Files.writeString(h.clientDir.resolve("mods/extra.jar"), "MINE")
+        val back = h.reattachAsShown(detached)
+        val snapshot = h.service.listSnapshots(back).first()
+        // What a crash right after the commit leaves: the marker the guard clears last.
+        h.journal.begin(PendingApply(back.id, back.instanceDirName, snapshot.id, V1, V1, listOf("mods/extra.jar", "mods/req.jar"), 1L))
+
+        ApplyRecovery(h.snapshots, h.repo, h.journal, h.dataDir, InstanceWorkRegistry()).recoverInterrupted()
+
+        val record = h.repo.get("i1")!!
+        assertEquals(PackOrigin.Local, record.packRef.origin)
+        assertEquals(detached.forkedFrom, record.forkedFrom)
+        assertNull(record.cachedManifest?.authRequirement)
+        assertEquals("MINE", readText(h.clientDir.resolve("mods/extra.jar")))
+    }
+
+    /**
+     * A mod dropped in unpacked is one the loader reads. Left by the reattach, every
+     * launch of the bound pack after it went without a token, and nobody had said why.
+     * A folder kept by a link is taken as the link, and an empty folder inside one
+     * comes back with it.
+     */
+    @Test
+    fun `an unpacked mod folder is listed, removed, and put back by a rollback`() = runTest {
+        val h = Harness()
+        val detached = h.instances.detachToLocal(h.installV1())
+        val folder = Files.createDirectories(h.clientDir.resolve("mods/handmade"))
+        Files.writeString(folder.resolve("mcmod.info"), "[]")
+        Files.writeString(folder.resolve("Handmade.class"), "CAFEBABE")
+        Files.createDirectories(folder.resolve("assets/empty"))
+        val elsewhere = Files.createDirectories(tempDir("linked-mod").resolve("linked"))
+        Files.writeString(elsewhere.resolve("mcmod.info"), "[]")
+        val link = Files.createSymbolicLink(h.clientDir.resolve("mods/linked"), elsewhere)
+
+        val preview = h.instances.previewReattach(detached)
+        assertEquals(listOf("mods/handmade", "mods/linked"), preview.removed)
+
+        val back = h.instances.reattach(detached, preview.confirmation)
+        assertFalse(Files.exists(folder), "the folder goes with the reattach")
+        assertFalse(Files.exists(link, LinkOption.NOFOLLOW_LINKS), "the link goes")
+        assertTrue(Files.exists(elsewhere.resolve("mcmod.info")), "and what it points at is left alone")
+
+        h.service.rollback(back, h.service.listSnapshots(back).first().id)
+        assertEquals("CAFEBABE", readText(folder.resolve("Handmade.class")), "and comes back whole with its rollback")
+        assertTrue(Files.isDirectory(folder.resolve("assets/empty")), "its empty folders too")
+        assertTrue(Files.isSymbolicLink(link), "the link comes back as a link")
+        assertEquals(elsewhere, Files.readSymbolicLink(link))
+    }
+
+    /**
+     * The version folder is read by the loader, and the first entries of one holding
+     * an unpacked mod look like a mod themselves. The strict sweep took the whole
+     * folder for one and deleted it.
+     */
+    @Test
+    fun `the version folder is never a stray, only what is in it`() = runTest {
+        val h = Harness()
+        val detached = h.instances.detachToLocal(h.installV1())
+        val versionDir = Files.createDirectories(h.clientDir.resolve("mods/1.7.10"))
+        val exploded = Files.createDirectories(versionDir.resolve("exploded"))
+        Files.writeString(exploded.resolve("mcmod.info"), "[]")
+        Files.writeString(exploded.resolve("Exploded.class"), "CAFEBABE")
+        Files.writeString(versionDir.resolve("notes.txt"), "kept")
+
+        val preview = h.instances.previewReattach(detached)
+        assertEquals(listOf("mods/1.7.10/exploded"), preview.removed)
+
+        h.instances.reattach(detached, preview.confirmation)
+        assertFalse(Files.exists(exploded))
+        assertEquals("kept", readText(versionDir.resolve("notes.txt")), "and the folder with the rest of it stays")
+    }
+
+    /**
+     * A link under a mod's name read as the build's file to the scan, which reads
+     * through it, so the reattach left the link in place: whatever it points at
+     * later is what the game loads.
+     */
+    @Test
+    fun `a mod kept as a link is replaced by the build's own file`() = runTest {
+        val h = Harness()
+        val detached = h.instances.detachToLocal(h.installV1())
+        val elsewhere = tempDir("linked-jar").resolve("req.jar").also { Files.write(it, REQ_V1) }
+        val req = h.clientDir.resolve("mods/req.jar")
+        Files.delete(req)
+        Files.createSymbolicLink(req, elsewhere)
+
+        val preview = h.instances.previewReattach(detached)
+        assertEquals(listOf("mods/req.jar"), preview.replaced)
+
+        h.instances.reattach(detached, preview.confirmation)
+        assertFalse(Files.isSymbolicLink(req))
+        assertEquals("REQ-V1", readText(req))
+        assertEquals("REQ-V1", readText(elsewhere), "what the link pointed at is left alone")
+    }
+
+    /**
+     * An update reads the record before it waits for the lock. A detach that landed
+     * in between had the update write its source's build and server binding onto a
+     * pack that had just become its player's own.
+     */
+    @Test
+    fun `an update asked for before a detach refuses once it finds the pack detached`() = runTest {
+        val h = Harness(auth = """{"kind":"smartycraft","server_id":"Industrial"}""")
+        val bound = h.installBound()
+        h.instances.detachToLocal(bound)
+        h.serveV2()
+
+        assertFailsWith<InstanceChangedException> { h.service.applyUpdate(bound, null, null) }
+
+        val record = h.repo.get(bound.id)!!
+        assertEquals(PackOrigin.Local, record.packRef.origin)
+        assertNull(record.cachedManifest?.authRequirement, "not bound again")
+        assertEquals("REQ-V1", readText(h.clientDir.resolve("mods/req.jar")), "and no file moved")
+    }
+
+    /**
+     * The reconcile keeps a jar the player changed where the build did not change it,
+     * and with the build the pack was detached from gone it has no identity to tell
+     * otherwise. The reattach reported success over a jar the build never shipped.
+     */
+    @Test
+    fun `a swapped jar is the build's again even when the build the pack left is gone`() = runTest {
+        val h = Harness()
+        val installed = h.installV1()
+        // A pin the mirror no longer serves: the mods' identity cannot be read.
+        h.repo.put(installed.copy(pinnedPackVersion = "2025.12.31"))
+        val detached = h.instances.detachToLocal(h.repo.get(installed.id)!!)
+        Files.writeString(h.clientDir.resolve("mods/drop.jar"), "EVIL")
+
+        val preview = h.instances.previewReattach(detached)
+        assertEquals(ReattachBasis.NamesOnly, preview.basis, "and the dialog says what it is going on")
+        assertEquals(listOf("mods/drop.jar"), preview.replaced)
+
+        h.instances.reattach(detached, preview.confirmation)
+        assertEquals("DROP", readText(h.clientDir.resolve("mods/drop.jar")))
+    }
+
+    /** An update parks the build's copy beside an edit both sides made. A jar is the build's instead. */
+    @Test
+    fun `a mod both the player and the build changed is the build's after a reattach`() = runTest {
+        val h = Harness()
+        val detached = h.instances.detachToLocal(h.installV1())
+        Files.writeString(h.clientDir.resolve("mods/req.jar"), "MINE")
+        h.serveV2()
+
+        val preview = h.instances.previewReattach(detached)
+        assertTrue("mods/req.jar" in preview.replaced)
+        assertTrue(preview.kept.isEmpty())
+
+        h.instances.reattach(detached, preview.confirmation)
+        assertEquals("REQ-V2", readText(h.clientDir.resolve("mods/req.jar")))
+        assertFalse(Files.exists(h.clientDir.resolve("mods/req.jar.new")))
+    }
+
+    @Test
+    fun `with no record of what the build placed every difference is replaced and the preview says so`() = runTest {
+        val h = Harness()
+        val installed = h.installV1()
+        h.repo.put(installed.copy(installedManifest = null, pinnedPackVersion = "2025.12.31"))
+        val detached = h.instances.detachToLocal(h.repo.get(installed.id)!!)
+        Files.writeString(h.clientDir.resolve("config/x.cfg"), "EDITED")
+
+        val preview = h.instances.previewReattach(detached)
+
+        assertEquals(ReattachBasis.NoBaseline, preview.basis)
+        assertEquals(CompatChange.Unknown, preview.compat)
+        assertEquals(listOf("config/x.cfg"), preview.replaced, "an edit cannot be told from the build's, so it is listed as replaced")
+    }
+
+    /**
+     * FML extracts a contained dependency only where no file of its name sits yet, so
+     * whatever bytes sat under that name stayed through a reattach for good.
+     */
+    @Test
+    fun `whatever sits under a name a jar declares is removed for the loader to extract again`() = runTest {
+        val h = Harness()
+        val detached = h.instances.detachToLocal(h.installV1())
+        val carrier = jarDeclaring("scala-library-2.11.1.jar")
+        Files.write(h.clientDir.resolve("mods/scalar.jar"), carrier)
+        val versionDir = Files.createDirectories(h.clientDir.resolve("mods/1.7.10"))
+        Files.writeString(versionDir.resolve("scala-library-2.11.1.jar"), "NOT THE CARRIER'S")
+        // A build that ships the carrier, so it is on the roster.
+        val v3 = "2026.03.03"
+        h.extra["https://mirror.test/dl/scalar"] = carrier
+        val body = manifest(
+            v3,
+            listOf(
+                mod("req.jar", REQ_V1, REQ_V1_URL, required = true, defaultEnabled = true),
+                mod("optB.jar", OPTB_V1, OPTB_V1_URL, required = false, defaultEnabled = true),
+                mod("drop.jar", DROP, DROP_URL, required = true, defaultEnabled = true),
+                mod("scalar.jar", carrier, "https://mirror.test/dl/scalar", required = true, defaultEnabled = true),
+            ),
+            listOf(asset("config/x.cfg", CFG, CFG_URL), asset("servers.dat", SERVERS_V1, SERVERS_V1_URL)),
+        )
+        h.manifestBody = body
+        h.extra["https://mirror.test/v1/packs/test/manifest/$v3"] = body.toByteArray()
+
+        val preview = h.instances.previewReattach(detached)
+        assertEquals(listOf("mods/1.7.10/scala-library-2.11.1.jar"), preview.removed)
+
+        h.instances.reattach(detached, preview.confirmation)
+        assertFalse(Files.exists(versionDir.resolve("scala-library-2.11.1.jar")))
+        assertTrue(Files.exists(h.clientDir.resolve("mods/scalar.jar")))
+    }
+
+    /**
+     * On a filesystem that ignores case the build's `JEI.jar` opens `jei.jar`, so the
+     * scan found the build's bytes and wrote nothing, and the sweep then removed the
+     * file by its name. A hard link stands in for that here: two names, one file.
+     */
+    @Test
+    fun `a file the build's name opens is not a stray`() = runTest {
+        val h = Harness()
+        val detached = h.instances.detachToLocal(h.installV1())
+        Files.createLink(h.clientDir.resolve("mods/Req.jar"), h.clientDir.resolve("mods/req.jar"))
+
+        val preview = h.instances.previewReattach(detached)
+
+        assertFalse("mods/Req.jar" in preview.removed)
+    }
+
+    /**
+     * A detach that landed while an update ran had the update's rollback put the
+     * source back over the player's own mods, bound to its server again.
+     */
+    @Test
+    fun `an ordinary update rolled back after a detach leaves the pack detached`() = runTest {
+        val h = Harness(auth = """{"kind":"smartycraft","server_id":"Industrial"}""")
+        val bound = h.installBound()
+        val guard = ApplyGuard(h.snapshots, h.journal, h.repo)
+
+        assertFailsWith<IOException> {
+            guard.apply(h.clientDir, bound, setOf("mods/req.jar"), V1, V2) {
+                h.repo.update(bound.id) { current ->
+                    current.copy(
+                        packRef = current.packRef.copy(origin = PackOrigin.Local),
+                        forkedFrom = current.packRef,
+                        cachedManifest = current.cachedManifest?.copy(authRequirement = null),
+                    )
+                }
+                throw IOException("the build did not land")
+            }
+        }
+
+        val record = h.repo.get(bound.id)!!
+        assertEquals(PackOrigin.Local, record.packRef.origin)
+        assertEquals(bound.packRef, record.forkedFrom)
+        assertNull(record.cachedManifest?.authRequirement)
+    }
+
+    /**
+     * Rolled back, a reattach is a Local pack again whose mods are its owner's. The
+     * build's rules for which of them are on moved a mod the player had switched on.
+     */
+    @Test
+    fun `rolling back a reattach leaves the player's switches as they were`() = runTest {
+        val h = Harness()
+        val detached = h.instances.detachToLocal(h.installV1())
+        val mods = h.clientDir.resolve("mods")
+        Files.move(mods.resolve("optB.jar.disabled"), mods.resolve("optB.jar"))
+        val back = h.reattachAsShown(detached)
+        assertTrue(Files.exists(mods.resolve("optB.jar.disabled")), "the build's choice, while reattached")
+
+        h.service.rollback(back, h.service.listSnapshots(back).first().id)
+
+        assertTrue(Files.exists(mods.resolve("optB.jar")), "the player's choice again")
+        assertFalse(Files.exists(mods.resolve("optB.jar.disabled")))
+    }
+
+    /**
+     * The scan reads a mod under either name, so a mod switched by renaming it made
+     * no difference to the preview, while the sync moved it all the same.
+     */
+    @Test
+    fun `a mod switched by its name is listed as switched back`() = runTest {
+        val h = Harness()
+        val detached = h.instances.detachToLocal(h.installV1())
+        val mods = h.clientDir.resolve("mods")
+        Files.move(mods.resolve("req.jar"), mods.resolve("req.jar.disabled"))
+        Files.move(mods.resolve("optB.jar.disabled"), mods.resolve("optB.jar"))
+
+        val preview = h.instances.previewReattach(detached)
+
+        assertEquals(listOf("mods/req.jar"), preview.turnedOn, "a required mod switched off comes back on")
+        assertEquals(listOf("mods/optB.jar"), preview.turnedOff, "an optional the pack has off goes off")
+        assertTrue(preview.removed.isEmpty() && preview.restored.isEmpty() && preview.replaced.isEmpty())
+        assertFalse(preview.isEmpty)
+
+        h.instances.reattach(detached, preview.confirmation)
+        assertTrue(Files.exists(mods.resolve("req.jar")))
+        assertTrue(Files.exists(mods.resolve("optB.jar.disabled")))
+        assertFalse(Files.exists(mods.resolve("optB.jar")))
+    }
+
+    @Test
+    fun `a reattach that moves Minecraft is graded like the update that would`() = runTest {
+        val h = Harness()
+        val detached = h.instances.detachToLocal(h.installV1())
+        h.serveAmberV2()
+
+        val preview = h.instances.previewReattach(detached)
+
+        assertEquals(V2, preview.toVersion)
+        assertEquals(CompatChange.McBump, preview.compat)
+        assertFalse(preview.compat.isSafe)
+    }
+
+    @Test
+    fun `a pinned pack goes back to its pinned build, and to the latest once the source no longer has it`() = runTest {
+        val kept = Harness()
+        val pinned = kept.installV1().copy(followLatest = false)
+        kept.repo.put(pinned)
+        kept.serveV2()
+        assertEquals(V1, kept.reattachAsShown(kept.instances.detachToLocal(pinned)).pinnedPackVersion)
+        assertEquals("REQ-V1", readText(kept.clientDir.resolve("mods/req.jar")))
+
+        val retired = Harness()
+        val stale = retired.installV1().copy(followLatest = false)
+        retired.repo.put(stale)
+        retired.serveV2()
+        retired.versionsBody = """{"schema_version":2,"pack_id":"test","latest":"$V2","builds":[
+            {"version_number":"$V2","version_type":"release","date_published":"2026-02-02T00:00:00Z","fingerprint":"bb","mods_count":2,"assets_count":2}
+        ]}"""
+        val detached = retired.instances.detachToLocal(stale)
+        assertEquals(V2, retired.instances.previewReattach(detached).toVersion)
+        assertEquals(V2, retired.reattachAsShown(detached).pinnedPackVersion)
+        assertEquals("REQ-V2", readText(retired.clientDir.resolve("mods/req.jar")))
+        assertFalse(Files.exists(retired.clientDir.resolve("mods/drop.jar")), "a mod the new build dropped goes with the sweep")
+    }
+
+    /** A follow-latest pack's recorded build is not a pin: it was simply the build on the day it was detached. */
+    @Test
+    fun `a pack that follows the latest goes back to the latest`() = runTest {
+        val h = Harness()
+        val detached = h.instances.detachToLocal(h.installV1())
+        h.serveV2()
+
+        assertEquals(V2, h.reattachAsShown(detached).packRef.version)
+        assertEquals("REQ-V2", readText(h.clientDir.resolve("mods/req.jar")))
+    }
+
+    /** A jar whose manifest declares [contained] as `ContainedDeps`, the way FML reads it. */
+    private fun jarDeclaring(vararg contained: String): ByteArray {
+        val manifest = Manifest().apply {
+            mainAttributes[Attributes.Name.MANIFEST_VERSION] = "1.0"
+            mainAttributes.putValue("ContainedDeps", contained.joinToString(" "))
+        }
+        val out = ByteArrayOutputStream()
+        JarOutputStream(out, manifest).use { }
+        return out.toByteArray()
     }
 
     private companion object {

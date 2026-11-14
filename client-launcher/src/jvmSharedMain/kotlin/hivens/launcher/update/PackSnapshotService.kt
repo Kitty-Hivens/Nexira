@@ -10,6 +10,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
+import java.nio.file.LinkOption
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.util.stream.Collectors
@@ -38,6 +39,12 @@ class PackSnapshotService(
     /**
      * Capture the current bytes of the [managedRealPaths] that exist, plus the
      * pre-update [instance] record, into a new snapshot [id].
+     *
+     * A managed path that is a folder or a link is kept as one: the folder so an
+     * empty one comes back, the link by where it points, so a restore puts the link
+     * back rather than a copy of what it led to. [reattach] marks a snapshot taken
+     * by a reattach, whose record also says where the pack came from, see
+     * [takenByReattach].
      */
     fun capture(
         clientDir: Path,
@@ -45,12 +52,15 @@ class PackSnapshotService(
         managedRealPaths: Set<String>,
         id: String,
         createdAtEpoch: Long,
+        reattach: Boolean = false,
     ): PackSnapshot {
         val root = clientDir.normalize()
         val dir = rootFor(instance.instanceDirName).resolve(id)
         val filesDir = dir.resolve("files")
         Files.createDirectories(filesDir)
         val captured = ArrayList<String>()
+        val folders = ArrayList<String>()
+        val links = LinkedHashMap<String, String>()
         // The pack's files, plus the two the instance keeps about itself. Those two
         // are not manifest paths, so a scan never lists them and a restore driven by
         // the manifest cannot put them back: without capturing them by name here, a
@@ -58,13 +68,22 @@ class PackSnapshotService(
         // rolled back from, and that roster is what the next launch deletes by.
         for (rel in managedRealPaths + SmrtSyncService.INSTANCE_STATE_FILES) {
             val src = root.resolve(rel).normalize()
-            if (!src.startsWith(root) || !Files.isRegularFile(src)) continue
+            if (!src.startsWith(root)) continue
+            if (Files.isSymbolicLink(src)) {
+                links[rel] = Files.readSymbolicLink(src).toString()
+                continue
+            }
+            if (Files.isDirectory(src, LinkOption.NOFOLLOW_LINKS)) {
+                folders += rel
+                continue
+            }
+            if (!Files.isRegularFile(src)) continue
             val dst = filesDir.resolve(rel)
             Files.createDirectories(dst.parent)
             linkOrCopy(src, dst, replace = false)
             captured += rel
         }
-        val record = SnapshotRecord(id, createdAtEpoch, instance.pinnedPackVersion, instance, captured)
+        val record = SnapshotRecord.of(id, createdAtEpoch, instance.pinnedPackVersion, instance, captured, folders, links, reattach)
         AtomicFiles.writeString(dir.resolve("snapshot.json"), json.encodeToString(SnapshotRecord.serializer(), record))
         log.info("snapshot: captured {} file(s) for instance {} as {}", captured.size, instance.instanceDirName, id)
         return record.toPublic()
@@ -87,7 +106,7 @@ class PackSnapshotService(
         val root = clientDir.normalize()
         val dir = rootFor(instanceDirName).resolve(id)
         val record = readRecord(dir)
-        val capturedSet = record.capturedPaths.toSet()
+        val capturedSet = record.files.toSet() + record.folders + record.links.keys
 
         // Track every path the restore could not reconcile: a failed rollback that
         // silently reported success left the instance half-updated with the registry
@@ -106,7 +125,24 @@ class PackSnapshotService(
                 runCatching { Files.deleteIfExists(live) }.onFailure { failures += "delete $rel" }
             }
         }
-        for (rel in record.capturedPaths) {
+        for (rel in record.folders) {
+            val dst = root.resolve(rel).normalize()
+            if (!dst.startsWith(root)) continue
+            runCatching { Files.createDirectories(dst) }.onFailure { failures += "restore folder $rel" }
+        }
+        for ((rel, target) in record.links) {
+            val dst = root.resolve(rel).normalize()
+            if (!dst.startsWith(root)) continue
+            // Over whatever stands there now. An update replaces a linked file with a
+            // regular one by moving its download over the link, and that file is
+            // exactly what the rollback is undoing.
+            runCatching {
+                Files.createDirectories(dst.parent)
+                if (Files.isDirectory(dst, LinkOption.NOFOLLOW_LINKS)) deleteTree(dst, clearReadOnly = false) else Files.deleteIfExists(dst)
+                Files.createSymbolicLink(dst, Path.of(target))
+            }.onFailure { failures += "restore link $rel" }
+        }
+        for (rel in record.files) {
             val src = dir.resolve("files").resolve(rel)
             val dst = root.resolve(rel).normalize()
             if (!dst.startsWith(root)) continue
@@ -125,6 +161,15 @@ class PackSnapshotService(
         log.info("snapshot: restored instance {} from {}", instanceDirName, id)
         return record.instance
     }
+
+    /**
+     * Whether snapshot [id] was taken by a reattach. Its record then names where the
+     * pack came from as well as which build it was on, and a rollback to it puts
+     * both back, see [hivens.launcher.record.withBuildOf]. False for a snapshot that
+     * cannot be read.
+     */
+    fun takenByReattach(instanceDirName: String, id: String): Boolean =
+        runCatching { readRecord(rootFor(instanceDirName).resolve(id)).reattach }.getOrDefault(false)
 
     /** Snapshots for an instance, newest first. */
     fun list(instanceDirName: String): List<PackSnapshot> {
@@ -180,15 +225,57 @@ class PackSnapshotService(
             .getOrThrow()
     }
 
+    /**
+     * What `snapshot.json` holds.
+     *
+     * Folders, links and the reattach mark came later, and a launcher from before them
+     * ignores fields it does not know. Reading such a snapshot it would delete the
+     * folders and links it was meant to restore, and put a reattach back onto the
+     * source instead of Local. So a snapshot that has any of them writes its file list
+     * under [capturedFiles] and leaves [capturedPaths] null, which an older launcher
+     * requires and fails to read: it refuses the snapshot rather than restore half of
+     * it. A snapshot with none of them is written the old way and stays readable to it.
+     */
     @Serializable
     private data class SnapshotRecord(
         val id: String,
         val createdAtEpoch: Long,
         val fromVersion: String?,
         val instance: PackInstance,
-        val capturedPaths: List<String>,
+        val capturedPaths: List<String>? = null,
+        val capturedFiles: List<String>? = null,
+        val folders: List<String> = emptyList(),
+        /** Each captured link by where it pointed, written back as a link. */
+        val links: Map<String, String> = emptyMap(),
+        val reattach: Boolean = false,
     ) {
+        /** The captured files, under whichever name they were written. */
+        val files: List<String> get() = capturedFiles ?: capturedPaths.orEmpty()
+
         fun toPublic() = PackSnapshot(id, createdAtEpoch, fromVersion)
+
+        companion object {
+            fun of(
+                id: String,
+                createdAtEpoch: Long,
+                fromVersion: String?,
+                instance: PackInstance,
+                files: List<String>,
+                folders: List<String>,
+                links: Map<String, String>,
+                reattach: Boolean,
+            ): SnapshotRecord {
+                val olderCanRead = folders.isEmpty() && links.isEmpty() && !reattach
+                return SnapshotRecord(
+                    id, createdAtEpoch, fromVersion, instance,
+                    capturedPaths = files.takeIf { olderCanRead },
+                    capturedFiles = files.takeUnless { olderCanRead },
+                    folders = folders,
+                    links = links,
+                    reattach = reattach,
+                )
+            }
+        }
     }
 }
 

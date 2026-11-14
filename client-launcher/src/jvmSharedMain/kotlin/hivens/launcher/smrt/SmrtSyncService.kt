@@ -9,6 +9,7 @@ import hivens.core.api.interfaces.RosterInspection
 import hivens.core.api.interfaces.RosterVerdict
 import hivens.core.diag.ActionRing
 import hivens.core.io.AtomicFiles
+import hivens.core.io.deleteTree
 import hivens.core.io.InstanceMutationLock
 import hivens.core.io.fileOpRetry
 import hivens.core.io.resolveWithinRoot
@@ -28,10 +29,13 @@ import java.io.IOException
 import java.io.InputStream
 import java.net.URI
 import java.nio.file.Files
+import java.nio.file.LinkOption
 import java.nio.file.Path
+import java.nio.file.attribute.BasicFileAttributes
 import java.security.MessageDigest
 import java.nio.file.StandardCopyOption
 import java.util.Comparator
+import java.util.Locale
 
 /**
  * v2-manifest sync. Speaks the smrt mirror's flat `mods[] + assets[]` shape with
@@ -137,18 +141,80 @@ class SmrtSyncService(
             // Drop manifest-removed mods and any other archive the manifest
             // does not name. Only top-level mods/{expected_filename} entries
             // survive.
-            val expected = manifest.mods.flatMap { listOf(it.filename, "${it.filename}.disabled") }.toSet()
+            val expected = rosterOf(manifest)
             // One rule for both cases. The old split -- wipe everything on a source
             // change, drop stray jars otherwise -- dates from the clients era, where
             // SC laid mods out under mods/<mcversion>/ and a duplicate coremod loaded
             // twice. Since the sweep only ever removes archives the manifest does not
             // name, the migration case needs nothing extra.
-            pruneForeignEntries(clientDir, expected, manifest.mods.associate { it.filename to it.sha1 })
+            pruneForeignEntries(clientDir, expected, digestsOf(manifest))
 
             writeSourceMarker(marker, SOURCE_MIRROR)
             writeRoster(clientDir, expected)
         }
     }
+
+    /**
+     * What `mods/` holds that a build of [manifest] does not account for, as paths
+     * relative to [clientDir], read the strict way a reattach reads it (see
+     * [foreignEntries]): the archives a [sync] would sweep, the unpacked mod folders
+     * it reports and leaves, and whatever sits in the version folder under a name a
+     * jar declares. Reads and touches nothing, so a reattach can say before it runs
+     * what it will take away, and then take exactly that with [dropStrays].
+     *
+     * Files that would not open to be judged are answered apart and never as strays:
+     * a reattach refuses while any are left rather than delete one it could not read.
+     */
+    fun strays(clientDir: Path, manifest: SmrtPackManifest): StrayScan =
+        strays(clientDir, rosterOf(manifest), digestsOf(manifest), manifest.assets.map { it.dest }.filter { it.startsWith(MODS_PREFIX) }.toSet())
+
+    /**
+     * [strays] for a build that is not a mirror manifest. [expected] names each file
+     * the build places at the top of `mods/`, with its sha1 where known, and
+     * [ownPaths] every path under `mods/` it places at all, versioned folders
+     * included, relative to [clientDir].
+     */
+    fun strays(clientDir: Path, expected: Map<String, String>, ownPaths: Set<String> = emptySet()): StrayScan =
+        strays(clientDir, expected.keys, expected, ownPaths)
+
+    private fun strays(clientDir: Path, roster: Set<String>, digests: Map<String, String>, ownPaths: Set<String>): StrayScan {
+        val walk = foreignEntries(clientDir, roster, digests, strict = true, ownPaths = ownPaths)
+        return StrayScan(
+            strays = walk.foreign.map { (_, rel) -> "$MODS_PREFIX$rel" }.sorted(),
+            unreadable = walk.unreadable.map { "$MODS_PREFIX$it" }.sorted(),
+        )
+    }
+
+    /**
+     * Removes the [paths] a [strays] measured, folders and links included, and
+     * nothing else. Measured once and removed as measured, so what goes is what the
+     * reattach listed and captured, whatever the jars it has written since declare.
+     * The caller holds [InstanceMutationLock] for [clientDir].
+     */
+    internal fun dropStrays(clientDir: Path, paths: Collection<String>): StrayDrop {
+        val root = clientDir.normalize()
+        val removed = mutableListOf<String>()
+        val blocked = mutableListOf<String>()
+        for (rel in paths) {
+            val path = root.resolve(rel).normalize()
+            if (!path.startsWith(root.resolve("mods")) || !Files.exists(path, LinkOption.NOFOLLOW_LINKS)) continue
+            runCatching {
+                fileOpRetry("reattach drop $rel") {
+                    if (Files.isDirectory(path, LinkOption.NOFOLLOW_LINKS)) deleteTree(path, clearReadOnly = false) else Files.delete(path)
+                }
+            }.onSuccess { removed += rel }.onFailure { blocked += rel }
+        }
+        if (removed.isNotEmpty()) log.info("smrt sync: dropped {} stray entr(ies) from mods/: {}", removed.size, removed)
+        if (blocked.isNotEmpty()) log.warn("smrt sync: {} stray entr(ies) could not be removed from mods/: {}", blocked.size, blocked)
+        return StrayDrop(removed.sorted(), blocked.sorted())
+    }
+
+    /** The names `mods/` may hold after a sync of [manifest]: each mod, under its own name and its off name. */
+    private fun rosterOf(manifest: SmrtPackManifest): Set<String> =
+        manifest.mods.flatMap { listOf(it.filename, "${it.filename}.disabled") }.toSet()
+
+    private fun digestsOf(manifest: SmrtPackManifest): Map<String, String> =
+        manifest.mods.associate { it.filename to it.sha1 }
 
     /**
      * Checks an installed pack against [manifest] and puts right whatever does not
@@ -645,11 +711,25 @@ class SmrtSyncService(
      * plus a delete, [inspectRoster] is this without one -- the rule for what counts
      * as foreign has to be the same in both, or a launch would be held to one
      * standard and the session that follows it to another.
+     *
+     * [strict] is a reattach's reading, which hands `mods/` to the build whole and
+     * runs no game in between. A name a rostered jar declares as a `ContainedDeps`
+     * is no reason to keep what sits under it in the version folder: the name says
+     * nothing about the bytes, and FML 1.7.10 extracts a contained dependency only
+     * where no file of that name exists yet, so removing it is what makes the next
+     * start put the declaring jar's own copy there. And a top-level file is the
+     * build's when the build's name opens it, as the scan that measured it opened
+     * it: on a filesystem that ignores case, `jei.jar` is what `JEI.jar` opens.
+     * A file whose standing cannot be read is answered as unreadable and kept. The
+     * version folder itself is never one, only what is in it, and a path the build
+     * places itself, [ownPaths], at any depth, is the build's.
      */
     private fun foreignEntries(
         clientDir: Path,
         expected: Set<String>,
         digests: Map<String, String> = emptyMap(),
+        strict: Boolean = false,
+        ownPaths: Set<String> = emptySet(),
     ): ForeignWalk {
         val modsDir = clientDir.resolve("mods")
         if (!Files.isDirectory(modsDir)) return ForeignWalk(emptyList(), emptyList())
@@ -659,7 +739,8 @@ class SmrtSyncService(
         // judged, because building it opens every rostered jar to read one
         // manifest. An instance with nothing under a subdirectory, which is
         // almost all of them, never pays for it.
-        val unpacked by lazy { unpackedDepNames(modsDir, expected) }
+        val unpacked by lazy { if (strict) emptySet() else unpackedDepNames(modsDir, expected) }
+        val byCase by lazy { expected.groupBy { it.lowercase(Locale.ROOT) } }
         Files.walk(modsDir).use { stream ->
             stream.sorted(Comparator.reverseOrder()).forEach { p ->
                 if (p == modsDir) return@forEach
@@ -674,7 +755,11 @@ class SmrtSyncService(
                 // loader will happily read (its discovery matches `.+\.jar`, leading
                 // dot and all). Testing the first segment alone let that one through.
                 if (rel.nameCount > 1 && rel.getName(0).toString().startsWith(".")) return@forEach
+                if (strict && "$MODS_PREFIX${rel.joinToString("/")}" in ownPaths) return@forEach
                 if (Files.isDirectory(p)) {
+                    // The folder the loader reads beside `mods/` is not a mod for
+                    // holding one, however its first entries look.
+                    if (strict && p.parent == modsDir && isVersionDir(p.fileName.toString())) return@forEach
                     // A directory is a mod candidate in its own right: FML adds one it
                     // finds beside the mods as a ContainerType.DIR and reads it as an
                     // unpacked mod. Archives get all the attention and this shape got
@@ -700,7 +785,16 @@ class SmrtSyncService(
                 // `mods/carpentersblocks/`, and neither is a way to run code that
                 // the pack did not ship.
                 val keep = when {
-                    p.parent == modsDir -> p.fileName.toString() in expected
+                    p.parent == modsDir -> p.fileName.toString() in expected || strict && when (
+                        opensAs(p, modsDir, byCase[p.fileName.toString().lowercase(Locale.ROOT)].orEmpty())
+                    ) {
+                        Opens.YES -> true
+                        Opens.NO -> false
+                        Opens.UNREADABLE -> {
+                            unreadable += rel.joinToString("/")
+                            true
+                        }
+                    }
                     p.parent.parent == modsDir && isVersionDir(p.parent.fileName.toString()) -> {
                         // The version directory is read by the loader, so the same
                         // standard as the top level applies, answered by the pack's
@@ -735,6 +829,41 @@ class SmrtSyncService(
             }
         }
         return ForeignWalk(found, unreadable)
+    }
+
+    /** Whether a name the build gives opens a file in `mods/`. */
+    private enum class Opens { YES, NO, UNREADABLE }
+
+    /**
+     * Whether one of the [names] opens [file] on this filesystem, the way the scan
+     * that measured the instance opened it: the directory entry the name lands on is
+     * this one. Compared without following links, by the entry itself, so a link the
+     * build's name lands on is that entry and no link borrows the standing of what it
+     * points at. A name with nothing under it is a plain no. Anything that will not
+     * answer is [Opens.UNREADABLE], never a no: a no is a delete.
+     */
+    private fun opensAs(file: Path, modsDir: Path, names: List<String>): Opens {
+        if (names.isEmpty()) return Opens.NO
+        for (name in names) {
+            val named = modsDir.resolve(name)
+            if (!Files.exists(named, LinkOption.NOFOLLOW_LINKS)) continue
+            val same = try {
+                sameEntry(file, named)
+            } catch (e: IOException) {
+                log.warn("mods roster: cannot tell whether {} is {}, it stays: {}", file.fileName, name, e.toString())
+                return Opens.UNREADABLE
+            }
+            if (same) return Opens.YES
+        }
+        return Opens.NO
+    }
+
+    /** Whether [a] and [b] name one directory entry, links taken as themselves. */
+    private fun sameEntry(a: Path, b: Path): Boolean {
+        val keyA = Files.readAttributes(a, BasicFileAttributes::class.java, LinkOption.NOFOLLOW_LINKS).fileKey()
+        val keyB = Files.readAttributes(b, BasicFileAttributes::class.java, LinkOption.NOFOLLOW_LINKS).fileKey()
+        if (keyA != null && keyB != null) return keyA == keyB
+        return a.toRealPath(LinkOption.NOFOLLOW_LINKS) == b.toRealPath(LinkOption.NOFOLLOW_LINKS)
     }
 
     /**
@@ -1242,3 +1371,12 @@ class SmrtSyncService(
         private const val MOD_SCAN_LIMIT = 400L
     }
 }
+
+/** What [SmrtSyncService.dropStrays] removed from `mods/`, and what would not go. Paths relative to the instance. */
+data class StrayDrop(val removed: List<String>, val blocked: List<String>)
+
+/**
+ * What a strict reading of `mods/` found: the [strays] a reattach removes, and the
+ * files it could not judge, which it refuses over. Paths relative to the instance.
+ */
+data class StrayScan(val strays: List<String>, val unreadable: List<String>)

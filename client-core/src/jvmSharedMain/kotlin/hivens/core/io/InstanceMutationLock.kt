@@ -24,4 +24,19 @@ object InstanceMutationLock {
         val mutex = locks.computeIfAbsent(instanceDir.toAbsolutePath().normalize()) { Mutex() }
         return mutex.withLock { block() }
     }
+
+    /**
+     * [block] under the lock when it is free right now, or null without waiting when
+     * something holds it. For a change that should be refused at once rather than
+     * queue behind a sync of unknown length.
+     */
+    suspend fun <T : Any> tryWithLock(instanceDir: Path, block: suspend () -> T): T? {
+        val mutex = locks.computeIfAbsent(instanceDir.toAbsolutePath().normalize()) { Mutex() }
+        if (!mutex.tryLock()) return null
+        try {
+            return block()
+        } finally {
+            mutex.unlock()
+        }
+    }
 }

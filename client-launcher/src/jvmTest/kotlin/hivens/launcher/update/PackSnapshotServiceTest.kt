@@ -4,8 +4,11 @@ import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
 import hivens.core.data.PackReference
 import hivens.core.io.AtomicFiles
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -139,6 +142,71 @@ class PackSnapshotServiceTest {
         assertFalse(Files.exists(clientDir.resolve(".nexira-mods")), "the update's roster goes with the update")
         assertFalse(Files.exists(clientDir.resolve(".nexira-sync-source")), "so does the marker it wrote")
         assertEquals("old-a", Files.readString(modsDir.resolve("a.jar")))
+    }
+
+    /**
+     * An update replaces a linked file with a regular one by moving its download over
+     * the link. The rollback found that file where the link had been and gave up, so
+     * a failed update stayed half applied.
+     */
+    @Test
+    fun `a link the update replaced with a file comes back as the link`() {
+        val dataDir = Files.createTempDirectory("snap-link")
+        val dir = "inst"
+        val clientDir = dataDir.resolve("instances").resolve(dir)
+        val config = Files.createDirectories(clientDir.resolve("config"))
+        val shared = Files.createTempDirectory("shared").resolve("a.txt").also { Files.writeString(it, "shared") }
+        Files.createSymbolicLink(config.resolve("a.txt"), shared)
+        val svc = PackSnapshotService(dataDir, json)
+        val managed = setOf("config/a.txt")
+        val snap = svc.capture(clientDir, instance(dir), managed, "s1", 1L)
+
+        val part = config.resolve("a.txt.part").also { Files.writeString(it, "the update's") }
+        Files.move(part, config.resolve("a.txt"), StandardCopyOption.REPLACE_EXISTING)
+        assertFalse(Files.isSymbolicLink(config.resolve("a.txt")))
+
+        svc.restore(clientDir, dir, snap.id, managed)
+
+        assertTrue(Files.isSymbolicLink(config.resolve("a.txt")))
+        assertEquals(shared, Files.readSymbolicLink(config.resolve("a.txt")))
+        assertEquals("shared", Files.readString(shared), "what it points at was never touched")
+    }
+
+    /** What a launcher from before folders, links and the reattach mark reads of a snapshot. */
+    @Serializable
+    private data class OlderRecord(
+        val id: String,
+        val createdAtEpoch: Long,
+        val fromVersion: String?,
+        val instance: PackInstance,
+        val capturedPaths: List<String>,
+    )
+
+    /**
+     * An older launcher ignores what it does not know, so it would delete the folders
+     * and links a snapshot holds and put a reattach back onto its source. It has to
+     * refuse such a snapshot instead, and keep reading an ordinary one.
+     */
+    @Test
+    fun `an older launcher refuses a snapshot it cannot restore whole and reads an ordinary one`() {
+        val dataDir = Files.createTempDirectory("snap-format")
+        val dir = "inst"
+        val clientDir = dataDir.resolve("instances").resolve(dir)
+        Files.createDirectories(clientDir.resolve("mods/folder"))
+        Files.writeString(clientDir.resolve("mods/a.jar"), "a")
+        val svc = PackSnapshotService(dataDir, json)
+        svc.capture(clientDir, instance(dir), setOf("mods/a.jar"), "plain", 1L)
+        svc.capture(clientDir, instance(dir), setOf("mods/a.jar", "mods/folder"), "folders", 2L)
+        svc.capture(clientDir, instance(dir), setOf("mods/a.jar"), "reattach", 3L, reattach = true)
+        fun read(id: String) = json.decodeFromString(
+            OlderRecord.serializer(),
+            Files.readString(dataDir.resolve("snapshots").resolve(dir).resolve(id).resolve("snapshot.json")),
+        )
+
+        assertEquals(listOf("mods/a.jar"), read("plain").capturedPaths)
+        assertFailsWith<SerializationException> { read("folders") }
+        assertFailsWith<SerializationException> { read("reattach") }
+        assertEquals(3, svc.list(dir).size, "this launcher reads all three")
     }
 
     @Test

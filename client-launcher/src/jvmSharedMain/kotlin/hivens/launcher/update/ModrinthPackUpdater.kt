@@ -3,7 +3,9 @@ package hivens.launcher.update
 import hivens.core.api.dto.modrinth.ModrinthVersion
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackInstance
+import hivens.core.data.PackReference
 import hivens.core.io.InstanceMutationLock
+import hivens.core.io.deleteTree
 import hivens.core.update.CompatChange
 import hivens.core.update.PackBuild
 import hivens.core.update.PackSnapshot
@@ -15,7 +17,11 @@ import hivens.core.update.classifyCompat
 import hivens.launcher.modrinth.ModrinthClient
 import hivens.launcher.mrpack.MrpackInstaller
 import hivens.launcher.mrpack.MrpackSource
+import hivens.launcher.smrt.SmrtSyncService
+import hivens.launcher.util.sha1Of
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
@@ -24,6 +30,9 @@ import org.slf4j.LoggerFactory
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.StandardCopyOption
+import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import hivens.launcher.record.PackFileRecord
 import hivens.launcher.record.withBuildOf
 
@@ -50,7 +59,14 @@ class ModrinthPackUpdater(
     private val snapshotService: PackSnapshotService,
     journal: ApplyJournal,
     private val dataDir: Path,
-) : PackUpdater {
+    /**
+     * Whose rule says which files in `mods/` a build does not account for. Asked
+     * only by a reattach, which hands `mods/` back to the build: the same rule the
+     * mirror's sync sweeps by, so a reattach means the same whichever source the
+     * pack came from.
+     */
+    private val roster: SmrtSyncService,
+) : PackUpdater, PackReattacher {
 
     private val log = LoggerFactory.getLogger(ModrinthPackUpdater::class.java)
     private val guard = ApplyGuard(snapshotService, journal, repository)
@@ -127,6 +143,7 @@ class ModrinthPackUpdater(
         return InstanceMutationLock.withLock(clientDir) {
             withContext(Dispatchers.IO) {
                 val current = repository.get(instance.id) ?: throw InstanceRemovedException(instance)
+                requireSameProvenance(instance, current)
                 // A directory, so the archive path does not exist yet: downloadTo
                 // skips a target that is already on disk, and createTempFile
                 // creates one, so handing it a temp FILE downloaded nothing and
@@ -182,6 +199,11 @@ class ModrinthPackUpdater(
                             installedArchive = installedArchive,
                             progress = progress ?: { _, _, _ -> },
                         )
+                        // A version the player picked is a pin, as on the mirror: left
+                        // following the latest, the auto-updater undid a deliberate
+                        // move to an older build, and a reattach of a fork kept on it
+                        // went to the newest.
+                        if (targetVersion != null) repository.update(current.id) { it.copy(followLatest = false) }
                     }
                 } finally {
                     @Suppress("BlockingMethodInNonBlockingContext")
@@ -194,6 +216,203 @@ class ModrinthPackUpdater(
                 UpdateOutcome.Applied(target.versionNumber, compat, plan = null)
             }
         }
+    }
+
+    /**
+     * Preview folders a preview is still fetching into or measuring from. A discard
+     * leaves these alone: they belong to a preview that has not answered yet.
+     */
+    private val previewing: MutableSet<Path> = ConcurrentHashMap.newKeySet()
+
+    /**
+     * See [PackReattacher.previewReattach]. Modrinth says what a build contains only
+     * inside its archive, so the archive is fetched to answer, into a folder of this
+     * preview's own. It is kept there for the reattach that follows, which takes it
+     * over, and goes when the preview is discarded, when a later preview of the same
+     * pack answers, when the instance is deleted, or at the next start. A preview that
+     * fails or is cancelled takes its folder with it.
+     */
+    override suspend fun previewReattach(instance: PackInstance, source: PackReference): ReattachPreview =
+        withContext(Dispatchers.IO) {
+            val target = reattachTarget(instance, source)
+            val home = reattachArchiveDir(dataDir, instance.instanceDirName)
+            val dir = home.resolve("$PREVIEW_PREFIX${UUID.randomUUID()}")
+            previewing.add(dir)
+            try {
+                val archive = fetchArchive(dir, target)
+                val preview = measure(clientDirOf(instance), instance, archive, target).preview
+                // This one answers for the pack now: earlier previews' archives go.
+                previewFolders(home).filter { it != dir && it !in previewing }.forEach(::dropArchives)
+                preview
+            } catch (e: Throwable) {
+                withContext(NonCancellable) {
+                    dropArchives(dir)
+                    dropIfEmpty(home)
+                }
+                throw e
+            } finally {
+                previewing.remove(dir)
+            }
+        }
+
+    /** See [PackReattacher.discardPreview]: every finished preview's archive for the pack goes. */
+    override suspend fun discardPreview(instance: PackInstance) = withContext(Dispatchers.IO) {
+        val home = reattachArchiveDir(dataDir, instance.instanceDirName)
+        previewFolders(home).filter { it !in previewing }.forEach(::dropArchives)
+        dropIfEmpty(home)
+    }
+
+    /**
+     * See [PackReattacher.reattach]. The build goes on through [MrpackInstaller.update]
+     * as an ordinary update puts it on, retirements included, with `mods/` held to
+     * the build, then everything in `mods/` the build does not ship is swept by the
+     * mirror's own rule, mod folders included, all inside the same guard an update
+     * runs in. The record takes the build the way an update writes it, and then the
+     * source back.
+     *
+     * The archive is the reattach's own for its whole length: the one its preview
+     * fetched is moved into a folder only this reattach uses, or fetched there, so a
+     * preview that starts, fails or is discarded meanwhile cannot take it away.
+     */
+    override suspend fun reattach(
+        instance: PackInstance,
+        source: PackReference,
+        confirmed: ReattachConfirmation,
+        progress: ((current: Int, total: Int, path: String) -> Unit)?,
+    ): PackInstance {
+        val target = client.listVersions(source.id).resolve(confirmed.build) ?: throw ReattachPreviewStaleException(instance.id)
+        val clientDir = clientDirOf(instance)
+        val home = reattachArchiveDir(dataDir, instance.instanceDirName)
+        val dir = home.resolve("$APPLY_PREFIX${UUID.randomUUID()}")
+        try {
+            val archive = takeOver(home, dir, target) ?: fetchArchive(dir, target)
+            return InstanceMutationLock.withLock(clientDir) {
+                withContext(Dispatchers.IO) {
+                    val current = repository.get(instance.id) ?: throw InstanceRemovedException(instance)
+                    // Measured again under the lock, so what is written is what the
+                    // player read, or nothing is.
+                    val measured = measure(clientDir, current, archive, target)
+                    measured.preview.requireConfirmed(confirmed, instance.id)
+                    val managed = PackFileRecord.read(clientDir).keys + installer.archivePaths(archive) +
+                        filesUnder(clientDir, measured.preview.removed) + measured.preview.turnedOn.map { "$it.disabled" } +
+                        PackFileRecord.FILE_NAME
+                    guard.apply(clientDir, current, managed, currentVersionOf(current), target.versionNumber, reattach = true) {
+                        installer.update(
+                            instance = current,
+                            mrpack = archive,
+                            source = MrpackSource(source.origin, source.id, target.versionNumber, buildKey = target.id),
+                            progress = progress ?: { _, _, _ -> },
+                            strictMods = true,
+                        )
+                        val drop = roster.dropStrays(clientDir, measured.strays)
+                        if (drop.blocked.isNotEmpty()) throw IOException("could not remove ${drop.blocked.joinToString()} from mods/")
+                        log.info("modrinth reattach: {} back on {} {}, {} stray(s) removed", instance.instanceDirName, source.id, target.versionNumber, drop.removed.size)
+                        repository.update(current.id) { it.backOn(source, target.versionNumber) }
+                            ?: throw InstanceRemovedException(instance)
+                    }
+                }
+            }
+        } finally {
+            withContext(NonCancellable) {
+                dropArchives(dir)
+                dropIfEmpty(home)
+            }
+        }
+    }
+
+    override suspend fun sourceName(source: PackReference): String? =
+        runCatching { client.resolveProject(source.id).title }
+            .onFailure { if (it is CancellationException) throw it }
+            .getOrNull()
+            ?.takeIf { it.isNotBlank() }
+
+    /** A preview, and the strays it measured, which the reattach removes as measured. */
+    private class Measured(val preview: ReattachPreview, val strays: List<String>)
+
+    private fun measure(clientDir: Path, record: PackInstance, archive: Path, target: ModrinthVersion): Measured {
+        val divergence = installer.divergence(archive, clientDir)
+        // Held to every path the build places under `mods/`, its versioned folders
+        // included: a jar the build itself puts in `mods/<mcversion>/` is its own.
+        val scan = roster.strays(clientDir, divergence.mods, divergence.modPaths)
+        val preview = ReattachPreview(
+            build = target.id,
+            toVersion = target.versionNumber,
+            compat = compatOf(record, target),
+            removed = (divergence.retired + scan.strays).distinct().sorted(),
+            restored = divergence.missing,
+            replaced = divergence.changed,
+            turnedOn = divergence.turnedOn,
+            // No record means no telling the player's files from the pack's: every
+            // file the version ships is written, edits included.
+            basis = if (PackFileRecord.read(clientDir).isEmpty()) ReattachBasis.NoBaseline else ReattachBasis.Full,
+            unreadable = scan.unreadable,
+        )
+        return Measured(preview, scan.strays)
+    }
+
+    /**
+     * The version a reattach would land on: the pinned build where the pack is
+     * pinned and Modrinth still lists it, and the newest where it is not.
+     */
+    private suspend fun reattachTarget(instance: PackInstance, source: PackReference): ModrinthVersion {
+        val ordered = client.listVersions(source.id).sortedByDescending { it.datePublished }
+        val pin = instance.reattachPin { pin -> ordered.resolve(pin) != null }
+        return pin?.let { ordered.resolve(it) }
+            ?: ordered.firstOrNull()
+            ?: throw IOException("Modrinth lists no versions of pack ${source.id}")
+    }
+
+    /**
+     * Moves a finished preview's archive of [target] into [dir], when one holds the
+     * published bytes, and answers with it there. Moved, not copied, in one step: a
+     * preview cleanup that runs at the same moment either finds it gone or loses it
+     * before the move, and then the reattach fetches its own.
+     */
+    private suspend fun takeOver(home: Path, dir: Path, target: ModrinthVersion): Path? = withContext(Dispatchers.IO) {
+        val name = archiveName(target)
+        val sha1 = target.primaryFile().hashes.sha1
+        Files.createDirectories(dir)
+        for (folder in previewFolders(home).filter { it !in previewing }) {
+            val kept = folder.resolve(name)
+            if (!Files.isRegularFile(kept) || !sha1.equals(runCatching { sha1Of(kept) }.getOrNull(), ignoreCase = true)) continue
+            val mine = dir.resolve(name)
+            val moved = runCatching { Files.move(kept, mine, StandardCopyOption.ATOMIC_MOVE) }.isSuccess
+            if (moved) {
+                dropIfEmpty(folder)
+                return@withContext mine
+            }
+        }
+        null
+    }
+
+    /** [target]'s archive fetched into [dir], held to its published digest. */
+    private suspend fun fetchArchive(dir: Path, target: ModrinthVersion): Path {
+        val file = target.primaryFile()
+        val archive = dir.resolve(archiveName(target))
+        withContext(Dispatchers.IO) { Files.createDirectories(dir) }
+        client.downloadTo(file.url, archive, file.hashes.sha1)
+        // Say what went wrong here rather than let a zero-byte file reach the zip
+        // reader, which names neither the pack nor where the bytes came from.
+        if (withContext(Dispatchers.IO) { runCatching { Files.size(archive) }.getOrDefault(0L) } == 0L) {
+            throw IOException("downloaded nothing for ${target.projectId} ${target.versionNumber} from ${file.url}")
+        }
+        return archive
+    }
+
+    private fun archiveName(target: ModrinthVersion): String = "${target.id.replace(Regex("[^A-Za-z0-9._-]"), "_")}.mrpack"
+
+    private fun previewFolders(home: Path): List<Path> =
+        if (!Files.isDirectory(home)) emptyList()
+        else Files.list(home).use { entries -> entries.filter { it.fileName.toString().startsWith(PREVIEW_PREFIX) }.toList() }
+
+    /** Removes [dir] when nothing is left in it. Something still in it keeps it. */
+    private fun dropIfEmpty(dir: Path) {
+        val _ = runCatching { Files.deleteIfExists(dir) }
+    }
+
+    private fun dropArchives(dir: Path) {
+        runCatching { deleteTree(dir, clearReadOnly = false) }
+            .onFailure { log.warn("modrinth reattach: could not remove the archive kept in {}", dir, it) }
     }
 
     override fun listSnapshots(instance: PackInstance): List<PackSnapshot> =
@@ -210,11 +429,12 @@ class ModrinthPackUpdater(
                 // undone: no record is read as "retire nothing", a wrong one as
                 // "retire the wrong things".
                 val managed = PackFileRecord.read(clientDir).keys + PackFileRecord.FILE_NAME
+                val reattach = snapshotService.takenByReattach(current.instanceDirName, snapshotId)
                 val restored = snapshotService.restore(clientDir, current.instanceDirName, snapshotId, managed)
                 // A rollback is a deliberate pin: stop following latest, or the
                 // update just undone comes back on the next pass.
-                repository.update(current.id) { it.withBuildOf(restored).copy(followLatest = false) }
-                    ?: current.withBuildOf(restored).copy(followLatest = false)
+                repository.update(current.id) { it.withBuildOf(restored, provenance = reattach).copy(followLatest = false) }
+                    ?: current.withBuildOf(restored, provenance = reattach).copy(followLatest = false)
             }
         }
     }
@@ -279,3 +499,9 @@ class ModrinthPackUpdater(
         loaderName = loaders.firstOrNull(),
     )
 }
+
+/** A preview's archive folder, under the instance's reattach folder. */
+private const val PREVIEW_PREFIX = "preview-"
+
+/** A reattach's own archive folder, under the instance's reattach folder. */
+private const val APPLY_PREFIX = "apply-"

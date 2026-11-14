@@ -10,6 +10,7 @@ import hivens.core.data.CachedManifestSnapshot
 import hivens.core.data.FileManifest
 import hivens.core.data.OptionalContentRules
 import hivens.core.data.PackInstance
+import hivens.core.data.PackReference
 import hivens.core.data.fileManifestOf
 import hivens.core.data.flatten
 import hivens.core.io.InstanceMutationLock
@@ -35,6 +36,8 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
+import java.io.IOException
+import java.nio.file.Files
 import java.nio.file.Path
 
 /**
@@ -62,7 +65,7 @@ class PackUpdateService(
     private val dataDir: Path,
     /** The reader's language tag, for the release notes the mirror writes per language. */
     private val language: () -> String = { "" },
-) : PackUpdater {
+) : PackUpdater, PackReattacher {
     private val log = LoggerFactory.getLogger(PackUpdateService::class.java)
     private val guard = ApplyGuard(snapshotService, journal, repository)
 
@@ -133,9 +136,10 @@ class PackUpdateService(
         return InstanceMutationLock.withLock(clientDir) {
             withContext(Dispatchers.IO) {
                 val fresh = repository.get(instance.id) ?: throw InstanceRemovedException(instance)
+                requireSameProvenance(instance, fresh)
                 val targetManifest = target.toBaselineManifest()
                 val paths = fresh.installedManifest?.flatten()?.keys.orEmpty() + targetManifest.flatten().keys
-                val plan = computePlan(fresh, target, targetManifest, scanInstanceState(clientDir, paths))
+                val plan = computePlan(fresh, target, targetManifest, scanInstanceState(clientDir, paths), fetchBaselineMods(fresh))
                 val compat = gradeCompat(fresh, target)
                 val enabledState = OptionalContentRules.enabledState(target.mods, fresh.optionalContent)
                 val assetState = OptionalContentRules.assetState(target.assets, fresh.optionalContent, OptionalContentRules.placedIn(clientDir))
@@ -149,7 +153,7 @@ class PackUpdateService(
                     commitBuild()
                 } else {
                     val managed = managedRealPaths(fresh.installedManifest, targetManifest)
-                    guard.apply(clientDir, fresh, managed, currentVersionOf(fresh), target.packVersion, commitBuild)
+                    guard.apply(clientDir, fresh, managed, currentVersionOf(fresh), target.packVersion, rewrite = commitBuild)
                 }
                 // After the commit and outside it: the update is done by here, and a
                 // cache that failed to clear is no reason to undo it. Left alone, the
@@ -201,7 +205,7 @@ class PackUpdateService(
     private suspend fun previewFor(instance: PackInstance, target: SmrtPackManifest): UpdateCheck {
         val targetManifest = target.toBaselineManifest()
         val paths = instance.installedManifest?.flatten()?.keys.orEmpty() + targetManifest.flatten().keys
-        val plan = computePlan(instance, target, targetManifest, scanInstanceState(clientDirOf(instance), paths))
+        val plan = computePlan(instance, target, targetManifest, scanInstanceState(clientDirOf(instance), paths), fetchBaselineMods(instance))
         val from = currentVersionOf(instance)
         return UpdateCheck.Available(
             fromVersion = from,
@@ -249,19 +253,24 @@ class PackUpdateService(
      * evidence -- which is the thing a list of names was standing in for, and it
      * stands in badly: a name is not evidence, protection by name is lifted by a
      * rename, and the list is a file the instance's own owner can extend.
+     *
+     * [baselineMods] is what [fetchBaselineMods] answers, handed in so a caller that
+     * has to know which reading the plan got asks only once.
      */
-    private suspend fun computePlan(
+    private fun computePlan(
         instance: PackInstance,
         target: SmrtPackManifest,
         targetManifest: FileManifest,
         current: FileManifest,
+        baselineMods: List<SmrtModEntry>?,
     ): UpdatePlan {
-        val baselineMods = fetchBaselineMods(instance)
-            ?: return UpdateReconciler.reconcile(
+        if (baselineMods == null) {
+            return UpdateReconciler.reconcile(
                 baseline = instance.installedManifest,
                 target = targetManifest,
                 current = current,
             )
+        }
         val modPlan = reconcileMods(baselineMods, target.mods, current)
         val assetPlan = UpdateReconciler.reconcile(
             baseline = instance.installedManifest?.let(::assetsOnly),
@@ -311,16 +320,21 @@ class PackUpdateService(
      * Persist the applied build. [pinExplicit] (a switch/rollback to a specific
      * version) also stops following latest, so the auto-updater does not undo a
      * deliberate downgrade on the next startup.
+     *
+     * [reattachTo] puts a detached pack back on that source in the same write, so
+     * the reference, the server binding and the build it rests on land together.
      */
     private suspend fun commit(
         instance: PackInstance,
         target: SmrtPackManifest,
         pinExplicit: Boolean,
-    ) {
+        reattachTo: PackReference? = null,
+    ): PackInstance? =
         // Onto the record as it is at the commit, not as it was read when the update
         // began: an update takes minutes, and a game exiting meanwhile records its
         // playtime, which a whole-record write put back to zero.
-        repository.update(instance.id) { current ->
+        repository.update(instance.id) { record ->
+            val current = reattachTo?.let { record.backOn(it, target.packVersion) } ?: record
             current.copy(
                 packRef = current.packRef.copy(version = target.packVersion),
                 pinnedPackVersion = target.packVersion,
@@ -339,6 +353,191 @@ class PackUpdateService(
                 optionalContent = OptionalContentRules.carried(target, current.optionalContent, OptionalContentRules.placedIn(clientDirOf(current))),
             )
         }
+
+    /**
+     * See [PackReattacher.previewReattach]. Measured the way the reattach moves the
+     * pack: the plan an ordinary update to that build would make, with `mods/` held
+     * strictly to the build, every mod moved between its own name and its
+     * switched-off one, and what the sweep removes.
+     */
+    override suspend fun previewReattach(instance: PackInstance, source: PackReference): ReattachPreview =
+        withContext(Dispatchers.IO) {
+            reattachPlan(clientDirOf(instance), instance, reattachTarget(instance, source)).preview
+        }
+
+    /**
+     * See [PackReattacher.reattach]. The build goes on through the apply an ordinary
+     * update runs, from the plan the preview showed, then the mod folders and stray
+     * archives the build does not ship are removed, and the record is written by the
+     * same commit an update makes. A failure part way is rolled back to the files
+     * and record the pack had before.
+     */
+    override suspend fun reattach(
+        instance: PackInstance,
+        source: PackReference,
+        confirmed: ReattachConfirmation,
+        progress: ((current: Int, total: Int, path: String) -> Unit)?,
+    ): PackInstance {
+        val target = client.fetchManifestVersion(source.id, confirmed.build)
+        val clientDir = clientDirOf(instance)
+        val written = InstanceMutationLock.withLock(clientDir) {
+            withContext(Dispatchers.IO) {
+                val fresh = repository.get(instance.id) ?: throw InstanceRemovedException(instance)
+                // Measured again under the lock, so what is written is what the
+                // player read, or nothing is.
+                val measured = reattachPlan(clientDir, fresh, target)
+                measured.preview.requireConfirmed(confirmed, instance.id)
+                // What the sweep takes is captured too, folders file by file, so a
+                // reattach that fails part way puts the player's mods back with
+                // everything else.
+                val managed = managedRealPaths(measured.baseline, target.toBaselineManifest()) +
+                    filesUnder(clientDir, measured.preview.removed)
+                val enabledState = OptionalContentRules.enabledState(target.mods, fresh.optionalContent)
+                val assetState = OptionalContentRules.assetState(target.assets, fresh.optionalContent, OptionalContentRules.placedIn(clientDir))
+                guard.apply(clientDir, fresh, managed, currentVersionOf(fresh), target.packVersion, reattach = true) {
+                    // The download is checked against the file in place before it is
+                    // fetched, and through a link that check reads the link's target.
+                    measured.links.forEach { Files.deleteIfExists(clientDir.resolve(it)) }
+                    syncService.applyUpdate(clientDir, target, measured.plan, enabledState, progress, assetState)
+                    val drop = syncService.dropStrays(clientDir, measured.strays)
+                    if (drop.blocked.isNotEmpty()) throw IOException("could not remove ${drop.blocked.joinToString()} from mods/")
+                    commit(fresh, target, pinExplicit = false, reattachTo = source)
+                } ?: throw InstanceRemovedException(instance)
+            }
+        }
+        log.info("reattach: {} back on {} {}", instance.instanceDirName, source.id, target.packVersion)
+        return written
+    }
+
+    override suspend fun sourceName(source: PackReference): String? =
+        runCatching { client.fetchSummary(source.id).displayName }
+            .onFailure { if (it is CancellationException) throw it }
+            .getOrNull()
+            ?.takeIf { it.isNotBlank() }
+
+    /**
+     * The build a reattach would land on: the pinned build where the pack is pinned
+     * and the mirror still has it, and the mirror's latest where it is not.
+     */
+    private suspend fun reattachTarget(instance: PackInstance, source: PackReference): SmrtPackManifest {
+        val pin = instance.reattachPin { pin -> client.listBuilds(source.id).builds.any { it.versionNumber == pin } }
+        return if (pin != null) client.fetchManifestVersion(source.id, pin) else client.fetchManifest(source.id)
+    }
+
+    /**
+     * A reattach measured: what it shows, the plan it applies, the baseline that plan
+     * was made against, and the strays it removes, as measured.
+     */
+    private class ReattachPlan(
+        val preview: ReattachPreview,
+        val plan: UpdatePlan,
+        val baseline: FileManifest?,
+        val strays: List<String>,
+        /** Mod paths that are links, which the build's own file replaces: the link goes first. */
+        val links: List<String>,
+    )
+
+    /**
+     * The plan an ordinary update of [record] to [target] would make, with `mods/`
+     * held strictly to the build.
+     *
+     * The baseline is the one the record kept: a detach leaves the installed build's
+     * baseline in place, so the reconcile tells the player's edits from the pack's
+     * as an update does. A record from before baselines existed has none, and the
+     * manifest of the build it was detached from stands in, which is the same thing
+     * written down later. Without either, every difference is the pack's to write,
+     * as an update with no baseline treats it, and the preview says so.
+     */
+    private suspend fun reattachPlan(clientDir: Path, record: PackInstance, target: SmrtPackManifest): ReattachPlan {
+        val baseline = record.installedManifest ?: currentVersionOf(record)?.let { version ->
+            runCatching { client.fetchManifestVersion(record.packRef.id, version).toBaselineManifest() }
+                .onFailure { if (it is CancellationException) throw it else log.warn("reattach: no baseline for {}: {}", record.instanceDirName, it.toString()) }
+                .getOrNull()
+        }
+        val based = record.copy(installedManifest = baseline)
+        val targetManifest = target.toBaselineManifest()
+        val current = scanInstanceState(clientDir, baseline?.flatten()?.keys.orEmpty() + targetManifest.flatten().keys)
+        val baselineMods = fetchBaselineMods(based)
+        val basis = when {
+            baseline == null -> ReattachBasis.NoBaseline
+            baselineMods == null -> ReattachBasis.NamesOnly
+            else -> ReattachBasis.Full
+        }
+        // A link under a mod's name is not the build's file whatever it points at
+        // today, so it is written over like any other difference. The scan reads
+        // through it and would call it the build's.
+        val links = target.mods.flatMap { mod -> listOf("mods/${mod.filename}", "mods/${mod.filename}$DISABLED") }
+            .filter { Files.isSymbolicLink(clientDir.resolve(it)) }
+        val plan = computePlan(based, target, targetManifest, current, baselineMods)
+            .strictInMods(target, current, links.map { it.removeSuffix(DISABLED) }.toSet())
+
+        val touched = plan.toAdd.toSet() + plan.toUpdate + plan.toDelete + plan.conflicts
+        val turnedOn = ArrayList<String>()
+        val turnedOff = ArrayList<String>()
+        // A file with the right bytes under the other name is no difference to the
+        // scan, which reads either name, and the apply's relabel still moves it.
+        // Asked the way the relabel asks it, from the same choice.
+        fun sortByName(path: String, on: Boolean) {
+            if (path in touched) return
+            val active = Files.isRegularFile(clientDir.resolve(path))
+            val off = Files.isRegularFile(clientDir.resolve("$path$DISABLED"))
+            when {
+                on && !active && off -> turnedOn += path
+                !on && active && !off -> turnedOff += path
+            }
+        }
+        val enabledState = OptionalContentRules.enabledState(target.mods, record.optionalContent)
+        target.mods.forEach { mod -> sortByName("mods/${mod.filename}", enabledState[mod.filename] ?: (mod.required || mod.defaultEnabled)) }
+        val assetState = OptionalContentRules.assetState(target.assets, record.optionalContent, OptionalContentRules.placedIn(clientDir))
+        target.assets.filter { it.hasOffName }.forEach { asset ->
+            sortByName(asset.dest, !asset.toggleable || (assetState[asset.dest] ?: true))
+        }
+        val scan = syncService.strays(clientDir, target)
+        val strays = scan.strays
+        val preview = ReattachPreview(
+            build = target.packVersion,
+            toVersion = target.packVersion,
+            compat = gradeCompat(based, target),
+            removed = (plan.toDelete + strays).distinct().sorted(),
+            restored = plan.toAdd.sorted(),
+            replaced = plan.toUpdate.sorted(),
+            turnedOn = turnedOn.sorted(),
+            turnedOff = turnedOff.sorted(),
+            kept = plan.conflicts.sorted(),
+            basis = basis,
+            unreadable = scan.unreadable,
+        )
+        return ReattachPlan(preview, plan, baseline, strays, links)
+    }
+
+    /**
+     * [this] plan with `mods/` held to the build, whatever the reconcile made of it.
+     *
+     * Asked of the disk directly rather than of the plan's lists: a reconcile keeps a
+     * jar the player changed where the build did not change it, and with no identity
+     * to go on it keeps one the build did change too, and neither lands in a list
+     * this could correct. So every mod the build ships is written unless the disk
+     * already holds its bytes, under either of its names, and one that does is not
+     * listed at all, since nothing is written for it, unless that is a link: [linked]
+     * mods are written over, see [reattachPlan].
+     */
+    private fun UpdatePlan.strictInMods(target: SmrtPackManifest, current: FileManifest, linked: Set<String>): UpdatePlan {
+        val onDisk = current.flatten()
+        val add = LinkedHashSet(toAdd)
+        val update = LinkedHashSet(toUpdate)
+        val parked = conflicts.toMutableSet()
+        for (mod in target.mods) {
+            val path = "mods/${mod.filename}"
+            val have = onDisk[path]?.sha1
+            add -= path
+            update -= path
+            parked -= path
+            when {
+                have == null -> add += path
+                path in linked || !have.equals(mod.sha1, ignoreCase = true) -> update += path
+            }
+        }
+        return copy(toAdd = add.toList(), toUpdate = update.toList(), conflicts = conflicts.filter { it in parked })
     }
 
     /**
@@ -375,15 +574,19 @@ class PackUpdateService(
             withContext(Dispatchers.IO) {
                 val current = repository.get(instance.id) ?: throw InstanceRemovedException(instance)
                 val managed = managedRealPaths(null, current.installedManifest ?: FileManifest())
+                val reattach = snapshotService.takenByReattach(current.instanceDirName, snapshotId)
                 val restored = snapshotService.restore(clientDir, current.instanceDirName, snapshotId, managed)
                 // A rollback is a deliberate pin: stop following latest so the update we
                 // just undid is not re-applied on the next startup.
-                repository.update(current.id) { it.withBuildOf(restored).copy(followLatest = false) }
-                    ?: current.withBuildOf(restored).copy(followLatest = false)
+                val written = repository.update(current.id) { it.withBuildOf(restored, provenance = reattach).copy(followLatest = false) }
+                    ?: current.withBuildOf(restored, provenance = reattach).copy(followLatest = false)
+                written to reattach
             }
         }
-        relabelAfterRollback(clientDir, rolled)
-        return rolled
+        // A reattach undone is a Local pack again, whose mods are its owner's: the
+        // build's rules for which of them are switched on are no longer its rules.
+        if (!rolled.second) relabelAfterRollback(clientDir, rolled.first)
+        return rolled.first
     }
 
     /**
@@ -419,3 +622,6 @@ class PackUpdateService(
     }
 
 }
+
+/** The name a switched-off file sits under, beside its own. */
+private const val DISABLED = ".disabled"

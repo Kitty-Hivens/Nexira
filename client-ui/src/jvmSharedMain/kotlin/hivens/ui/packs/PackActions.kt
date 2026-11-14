@@ -18,6 +18,8 @@ import hivens.launcher.PackOperationKind
 import hivens.launcher.PackOperationPhase
 import hivens.launcher.PackOperationService
 import hivens.launcher.instance.PackInstanceService
+import hivens.launcher.update.ReattachConfirmation
+import hivens.launcher.update.ReattachPreviewStaleException
 import hivens.launcher.launch.LauncherController
 import hivens.ui.notifications.CoreProblem
 import hivens.ui.notifications.CoreProblems
@@ -70,6 +72,14 @@ interface PackActions {
 
     /** Deletes [pack] and its files, or does nothing when its game is running or other work on it is under way. */
     suspend fun delete(pack: PackInstance)
+
+    /**
+     * Puts the detached [pack] back on its source's build as the preview [confirmed]
+     * described, or does nothing when it was never detached or other work on it is
+     * under way. A pack that no longer measures as the preview said is refused and
+     * left as it was, and the refusal is the operation's outcome.
+     */
+    fun reattach(pack: PackInstance, confirmed: ReattachConfirmation)
 }
 
 /** [PackActions] over the launcher's own services. */
@@ -111,6 +121,14 @@ class LauncherPackActions(
         val outcome = instances.deleteCompletely(pack)
         if (outcome != PackInstanceService.DeleteOutcome.Deleted) log.info("Pack {} was not deleted: {}", pack.id, outcome)
     }
+
+    override fun reattach(pack: PackInstance, confirmed: ReattachConfirmation) {
+        if (!instances.canReattach(pack)) {
+            log.info("Pack {} was not detached from a source that can take it back", pack.id)
+            return
+        }
+        val _ = operations.startReattach(pack, instances, confirmed)
+    }
 }
 
 /**
@@ -132,6 +150,23 @@ fun PackOperationService.startLatestUpdate(pack: PackInstance, updater: PackUpda
         PackOperationPhase.Updated((outcome as? UpdateOutcome.Applied)?.toVersion ?: current)
     }
 }
+
+/**
+ * Starts putting the detached [pack] back on its source as an operation of this
+ * service, so its progress and outcome read like an update's wherever the pack is
+ * shown, and closing whatever started it does not cancel it. [confirmed] is the
+ * preview the player agreed to. False when the service refused, other work on the
+ * pack being under way.
+ */
+fun PackOperationService.startReattach(pack: PackInstance, instances: PackInstanceService, confirmed: ReattachConfirmation): Boolean =
+    start(pack, PackOperationKind.Reattach) { progress ->
+        try {
+            val back = instances.reattach(pack, confirmed) { c, t, p -> progress(c, t, p.substringAfterLast('/')) }
+            PackOperationPhase.Updated(back.pinnedPackVersion ?: back.packRef.version ?: confirmed.build)
+        } catch (_: ReattachPreviewStaleException) {
+            PackOperationPhase.PreviewStale
+        }
+    }
 
 /**
  * Starts the game of the pack [packId] as [session], or as the offline name the
@@ -179,4 +214,16 @@ internal fun deletePack(packId: String, packs: IPackRepository, actions: PackAct
 internal fun updatePack(packId: String, packs: IPackRepository, actions: PackActions) {
     val pack = packs.observe().value.firstOrNull { it.id == packId } ?: return
     actions.update(pack)
+}
+
+/** Puts the detached pack [request] names back on its source as its preview said. A pack that is not installed is left alone. */
+internal fun reattachPack(request: ReattachRequest, packs: IPackRepository, actions: PackActions) {
+    val pack = packs.observe().value.firstOrNull { it.id == request.packId } ?: return
+    actions.reattach(pack, request.confirmation)
+}
+
+/** Measures the pack [packId] against its source for a reattach. A pack that is not installed is left alone. */
+internal fun previewReattach(packId: String, packs: IPackRepository, previews: ReattachPreviews) {
+    val pack = packs.observe().value.firstOrNull { it.id == packId } ?: return
+    previews.request(pack)
 }

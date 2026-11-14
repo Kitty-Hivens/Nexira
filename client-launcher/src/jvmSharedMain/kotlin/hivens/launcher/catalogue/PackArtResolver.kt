@@ -2,6 +2,7 @@ package hivens.launcher.catalogue
 
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
+import hivens.core.data.PackReference
 import hivens.launcher.modrinth.ModrinthClient
 import hivens.launcher.smrt.SmrtPackClient
 import kotlinx.coroutines.CancellationException
@@ -30,6 +31,13 @@ data class PackArt(val iconUrl: String?, val bannerUrl: String?) {
  * Only an answer is memoised. A lookup that failed, or was cancelled because the
  * card scrolled away, says nothing about the pack, and written down as NONE it
  * kept the placeholder up until the next start.
+ *
+ * A pack detached into a Local one is asked about at the source it was detached
+ * from ([PackInstance.forkedFrom]). Asked by its own reference it named a Local
+ * pack, which has no source to answer, and a detached pack lost the cover its
+ * source still publishes. The answer is the source's, so it is shared with an
+ * install of that same pack, and what each record captured is laid over it per
+ * instance.
  */
 class PackArtResolver(
     private val modrinth: ModrinthClient,
@@ -57,7 +65,10 @@ class PackArtResolver(
 
     /** One expression, so the reader and the writer cannot drift apart. */
     private fun keyOf(instance: PackInstance): String =
-        "${instance.packRef.origin}:${instance.packRef.id}"
+        sourceOf(instance).let { "${it.origin}:${it.id}" }
+
+    /** Where the pack's art is published: the source it was detached from, or its own. */
+    private fun sourceOf(instance: PackInstance): PackReference = instance.forkedFrom ?: instance.packRef
 
     private fun captured(instance: PackInstance): PackArt? =
         if (instance.iconUrl != null || instance.bannerUrl != null) PackArt(instance.iconUrl, instance.bannerUrl) else null
@@ -70,22 +81,23 @@ class PackArtResolver(
         val key = keyOf(instance)
         cache[key]?.let { return it.over(instance) }
 
+        val source = sourceOf(instance)
         val fromSource = try {
-            when (instance.packRef.origin) {
-                PackOrigin.Modrinth -> modrinth.resolveProject(instance.packRef.id).let { p ->
+            when (source.origin) {
+                PackOrigin.Modrinth -> modrinth.resolveProject(source.id).let { p ->
                     PackArt(
                         iconUrl   = p.iconUrl,
                         // Full-res (raw_url) -- the hero banner upscales a 350px `url` thumbnail.
                         bannerUrl = (p.gallery.firstOrNull { it.featured } ?: p.gallery.firstOrNull())?.let { it.rawUrl ?: it.url },
                     )
                 }
-                PackOrigin.Mirror -> mirror.fetchSummary(instance.packRef.id).let { PackArt(it.iconUrl, it.bannerUrl) }
+                PackOrigin.Mirror -> mirror.fetchSummary(source.id).let { PackArt(it.iconUrl, it.bannerUrl) }
                 else              -> PackArt.NONE
             }.also { cache[key] = it }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            log.warn("Pack art lookup failed for {} ({}): {}", instance.packRef.id, instance.packRef.origin, e.message)
+            log.warn("Pack art lookup failed for {} ({}): {}", source.id, source.origin, e.message)
             return captured(instance) ?: PackArt.NONE
         }
         return fromSource.over(instance)

@@ -2,6 +2,7 @@ package hivens.launcher.update
 
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.io.InstanceMutationLock
+import hivens.core.io.deleteTree
 import hivens.core.launch.InstanceWork
 import hivens.core.launch.InstanceWorkRegistry
 import kotlinx.coroutines.CancellationException
@@ -32,8 +33,16 @@ class ApplyRecovery(
 ) {
     private val log = LoggerFactory.getLogger(ApplyRecovery::class.java)
 
-    /** Roll back every journalled in-flight apply. Returns the recovered instance dir names. */
+    /**
+     * Roll back every journalled in-flight apply. Returns the recovered instance dir
+     * names.
+     *
+     * Also clears the archives reattach previews kept. No reattach outlives the process
+     * that started it, so whatever is there at a start belongs to nobody.
+     */
     suspend fun recoverInterrupted(): List<String> = withContext(io) {
+        runCatching { deleteTree(reattachArchiveRoot(dataDir), clearReadOnly = false) }
+            .onFailure { log.warn("apply-recovery: could not clear the kept reattach archives", it) }
         journal.listPending().mapNotNull { listed ->
             // Marked for its whole length, so the launch controls say why this pack
             // cannot start yet instead of letting it start over a half-rolled-back
@@ -56,10 +65,12 @@ class ApplyRecovery(
                 return@withLock null
             }
             val rolledBack = try {
+                // Read before the restore, which is followed by the snapshot's deletion.
+                val reattach = snapshotService.takenByReattach(entry.instanceDirName, entry.snapshotId)
                 val restored = snapshotService.restore(clientDir, entry.instanceDirName, entry.snapshotId, entry.managedPaths.toSet())
                 // Pin: a recovered instance stops following latest so a reproducible
                 // bad build is not re-applied (and re-crashed) on the next pass.
-                repository.update(restored.id) { it.withBuildOf(restored).copy(followLatest = false) }
+                repository.update(restored.id) { it.withBuildOf(restored, provenance = reattach).copy(followLatest = false) }
                 snapshotService.delete(entry.instanceDirName, entry.snapshotId)
                 log.warn(
                     "apply-recovery: instance {} had an update to {} interrupted; rolled back to {}",

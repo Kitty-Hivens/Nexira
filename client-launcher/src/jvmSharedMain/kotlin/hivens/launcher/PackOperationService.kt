@@ -14,9 +14,18 @@ import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
 import java.util.concurrent.ConcurrentHashMap
 
-/** Which long operation an instance is running. The two read differently: one puts a
- *  different build in place, the other puts the installed one back. */
-enum class PackOperationKind(internal val work: InstanceWork) { Update(InstanceWork.Update), Repair(InstanceWork.Repair) }
+/**
+ * Which long operation an instance is running. They read differently: an update puts
+ * a different build in place, a repair puts the installed one back, and a reattach
+ * puts a detached pack back on its source's build. A reattach moves the instance to
+ * a build like an update does, so it holds the instance as one, and it ends in
+ * [PackOperationPhase.Updated] with the build it landed on.
+ */
+enum class PackOperationKind(internal val work: InstanceWork) {
+    Update(InstanceWork.Update),
+    Repair(InstanceWork.Repair),
+    Reattach(InstanceWork.Update),
+}
 
 /** Lifecycle of one operation, published under the instance it runs on. */
 sealed interface PackOperationPhase {
@@ -47,6 +56,13 @@ sealed interface PackOperationPhase {
      * click that did nothing and said nothing read as a broken button.
      */
     data class Refused(val work: InstanceWork) : PackOperationPhase
+
+    /**
+     * Not done, because the pack no longer measured the way the preview the player
+     * confirmed had said, and nothing was touched. Its own outcome rather than a
+     * failure: nothing went wrong, and what to do next is compare again.
+     */
+    data object PreviewStale : PackOperationPhase
 }
 
 /** Observable state of the one operation an instance may have in flight or just finished. */

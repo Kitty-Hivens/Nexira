@@ -198,6 +198,29 @@ class PackAutoUpdateServiceTest {
         assertEquals(null, work.workOn("launched"), "the mark taken for the launched pack is let go")
     }
 
+    /**
+     * The pass read the record before its check went out. A detach that landed while
+     * it was out had the build applied over the player's own pack, bound to its
+     * server again.
+     */
+    @Test
+    fun `a pack detached while the check is out is left alone`() = runTest {
+        val repo = FakeRepo(listOf(instance("detached")))
+        val fake = FakeUpdater(mapOf("detached" to available(CompatChange.Same)))
+        val updater = object : PackUpdater by fake {
+            override suspend fun checkForUpdate(instance: PackInstance, forceRefresh: Boolean): UpdateCheck {
+                repo.put(instance.copy(packRef = instance.packRef.copy(origin = PackOrigin.Local), forkedFrom = instance.packRef))
+                return fake.checkForUpdate(instance, forceRefresh)
+            }
+        }
+        val service = PackAutoUpdateService(repo, updater, { settings() }, InstanceWorkRegistry(), { null })
+
+        service.runOnce()
+
+        assertTrue(fake.applied.isEmpty(), "applied ${fake.applied}")
+        assertEquals(null, service.statuses.value["detached"], "nothing failed and nothing is pending for it")
+    }
+
     /** Deleted between the check and the apply: nothing failed, and there is no card left to badge. */
     @Test
     fun `a pack deleted during the pass is not reported as failed`() = runTest {

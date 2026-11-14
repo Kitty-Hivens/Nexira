@@ -1320,8 +1320,51 @@ interface AppStrings {
     val packSettingsOpenFolder: String
     val packSettingsSizeComputing: String
     val packSettingsDetach: String
+    /** Under the detach row of a pack whose source can take it back, so it says the pack can be reattached later. */
     val packSettingsDetachDesc: String
+    /** Under the detach row of a pack whose source cannot take it back, so it does not mention reattaching. In practice that is an old record from the launcher's former SmartyCraft server sync, since packs for a game server now come from the mirror. */
+    val packSettingsDetachDescFinal: String
     val packSettingsDetachAction: String
+    /** Row title and dialog title for putting a detached pack back under its source, [name] being what the source calls the pack, else the pack's own name, else its id. */
+    fun packSettingsReattach(name: String): String
+    /** Under that row: what reattaching does to the pack, and that the player's own changes to its mods do not survive it. */
+    val packSettingsReattachDesc: String
+    /** The button on the row and the confirm label of its dialog. */
+    val packSettingsReattachAction: String
+    /** The dialog's lead line, [version] being the source build the pack lands on. */
+    fun packSettingsReattachBody(version: String): String
+    /** Shown while the dialog compares the instance with the source build, which may download that build's index first. */
+    val packSettingsReattachComparing: String
+    /** The comparison did not run, and [message] says why. */
+    fun packSettingsReattachCompareFailed(message: String): String
+    /** No file changes, so reattaching only restores the link to the source. */
+    val packSettingsReattachNothing: String
+    /** A warning line in the dialog when the pack has no record of what its build placed, so every file that differs from the build is replaced and none is kept as the player's edit. */
+    val packSettingsReattachNoBaseline: String
+    /** A note in the dialog when the build the pack was detached from is no longer available from the source, so mods are matched by file name and one renamed between builds is replaced as a new one. */
+    val packSettingsReattachNamesOnly: String
+    /** A warning line in the dialog when some files in the pack's mods folder could not be read, so the launcher cannot tell whether they belong to the build and does not reattach until they can be read, [names] being a short comma-joined list of their file names. */
+    fun packSettingsReattachUnreadable(names: String): String
+    /** Header over the files that reattaching removes from the instance. */
+    fun packSettingsReattachRemoved(count: Int): String
+    /** Header over the files the source brings back, the missing ones restored and the changed ones replaced by its copy. */
+    fun packSettingsReattachReturned(count: Int): String
+    /** Header over the mods whose files already match but sit under their switched-off name, which reattaching switches back on. */
+    fun packSettingsReattachTurnedOn(count: Int): String
+    /** Header over the optional mods the pack's own choice has off but which sit switched on, which reattaching switches off. */
+    fun packSettingsReattachTurnedOff(count: Int): String
+    /** Header over the files the player edited that the build changed too, which keep the player's copy and get the build's beside them as .new. */
+    fun packSettingsReattachKept(count: Int): String
+    /** Expands a collapsed file list by the [count] entries it hides. */
+    fun packSettingsReattachMore(count: Int): String
+    /** Collapses that list again. */
+    val packSettingsReattachLess: String
+    /** Footer progress while the pack is put back on the source build, worded like the repair progress. */
+    fun packSettingsReattachProgress(current: Int, total: Int, name: String): String
+    /** Footer outcome, [version] being the build the pack is now on. */
+    fun packSettingsReattached(version: String): String
+    /** Footer outcome when the reattach was refused because the pack changed after the comparison the player confirmed, and nothing was touched. */
+    val packSettingsReattachStale: String
     val packSettingsRepair: String
     val packSettingsRepairDesc: String
     val packSettingsRepairAction: String

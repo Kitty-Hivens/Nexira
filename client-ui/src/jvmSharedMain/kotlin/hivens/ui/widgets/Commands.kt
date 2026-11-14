@@ -6,6 +6,7 @@ import hivens.ui.Screen
 import hivens.ui.background.BackgroundSettings
 import hivens.ui.i18n.AppLocale
 import hivens.ui.packs.PackInstallRequest
+import hivens.ui.packs.ReattachRequest
 import hivens.widget.model.CommandKey
 import hivens.widget.model.ScopeLevel
 
@@ -94,6 +95,28 @@ object Commands {
 
     /** Deletes the pack with this id and its files. Refused while its game runs or other work holds it. */
     val DeletePack = CommandKey<String>("pack.delete")
+
+    /**
+     * Measures the detached pack with this id against its source's build: what a
+     * reattach would remove and bring back. The answer lands in
+     * [Sources.ReattachPreviews].
+     */
+    val PreviewReattach = CommandKey<String>("pack.reattach.preview")
+
+    /**
+     * Puts a detached pack back on the source it was detached from and moves it to
+     * the source's build the way an update does: its mods become the build's again,
+     * while a config edit the build did not change stays. Carries the preview the player was shown and agreed to,
+     * from [Sources.ReattachPreviews], and is refused, touching nothing, when the
+     * pack no longer measures as that preview said. Does nothing for a pack that was
+     * never detached, and is refused while its game runs or other work holds it.
+     *
+     * What the confirmation proves is that a preview was measured and that the pack
+     * still measures the same, not that a person read it. A widget could hand on a
+     * preview it never showed. That is accepted: the launcher's own surfaces show
+     * the list before they ask, and a widget is the player's own choice to install.
+     */
+    val ReattachPack = CommandKey<ReattachRequest>("pack.reattach")
 
     /** Puts the console on screen or takes it off. Paired with [Sources.ConsoleVisible]. */
     val SetConsoleVisible = CommandKey<Boolean>("console.visible.set")

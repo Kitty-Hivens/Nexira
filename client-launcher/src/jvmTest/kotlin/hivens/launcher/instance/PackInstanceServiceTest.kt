@@ -6,12 +6,18 @@ import hivens.core.data.PackAuthRequirement
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
 import hivens.core.data.PackReference
+import hivens.core.io.InstanceMutationLock
 import hivens.core.launch.InstanceWork
 import hivens.core.launch.InstanceWorkRegistry
+import hivens.core.update.CompatChange
+import hivens.launcher.catalogue.PackArt
 import hivens.launcher.instance.PackInstanceService.DeleteOutcome
 import hivens.launcher.launch.RunningPackSource
 import hivens.launcher.update.ApplyJournal
+import hivens.launcher.update.PackReattacher
 import hivens.launcher.update.PackSnapshotService
+import hivens.launcher.update.ReattachConfirmation
+import hivens.launcher.update.ReattachPreview
 import hivens.launcher.update.PendingApply
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -27,6 +33,7 @@ import kotlinx.coroutines.test.runTest
 import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -56,12 +63,38 @@ class PackInstanceServiceTest {
     }
     private val work = InstanceWorkRegistry()
 
-    private fun service(repo: IPackRepository, data: java.nio.file.Path) = PackInstanceService(
+    private fun service(
+        repo: IPackRepository,
+        data: java.nio.file.Path,
+        knownArt: (PackInstance) -> PackArt? = { null },
+        reattachers: Map<PackOrigin, PackReattacher> = emptyMap(),
+    ) = PackInstanceService(
         repo, data, running, work,
         snapshots = PackSnapshotService(data, json),
         journal = ApplyJournal(data, json),
         sizes = InstanceSizeService(data, CoroutineScope(Dispatchers.Unconfined)),
+        knownArt = knownArt,
+        reattachers = reattachers,
     )
+
+    /** A source that records what it was asked and answers with the record put back on it. */
+    private class RecordingReattacher : PackReattacher {
+        val asked = mutableListOf<Pair<String, PackReference>>()
+        override suspend fun previewReattach(instance: PackInstance, source: PackReference): ReattachPreview {
+            asked += "preview:${instance.id}" to source
+            return ReattachPreview("v9", "9", CompatChange.Same, removed = listOf("mods/mine.jar"), restored = emptyList(), replaced = emptyList())
+        }
+        override suspend fun reattach(
+            instance: PackInstance,
+            source: PackReference,
+            confirmed: ReattachConfirmation,
+            progress: ((current: Int, total: Int, path: String) -> Unit)?,
+        ): PackInstance {
+            asked += "reattach:${instance.id}:${confirmed.build}" to source
+            return instance.copy(packRef = source, forkedFrom = null)
+        }
+        override suspend fun sourceName(source: PackReference): String? = "Source of ${source.id}"
+    }
     private val json = Json { ignoreUnknownKeys = true }
 
     private fun instance(id: String, dir: String = id, origin: PackOrigin = PackOrigin.Mirror) = PackInstance(
@@ -112,6 +145,132 @@ class PackInstanceServiceTest {
         assertEquals(PackOrigin.Local, detached.packRef.origin)
         assertEquals(pack.packRef, detached.forkedFrom)
         assertEquals(PackOrigin.Local, repo.get("1")?.packRef?.origin, "persisted as Local")
+    }
+
+    /**
+     * The detached pack used to keep only the art its install captured, which for a
+     * pack installed before covers were captured was none: its card fell back to the
+     * pixel mosaic while the mirror still published a banner for it.
+     */
+    @Test
+    fun `a detach writes the cover already known into the record`() = runTest {
+        val data = Files.createTempDirectory("pis")
+        val repo = FakeRepo()
+        val pack = instance("1").copy(iconUrl = "https://cdn/captured-icon.png")
+        repo.put(pack)
+        val known = PackArt(iconUrl = null, bannerUrl = "https://cdn/banner.png")
+
+        val detached = service(repo, data, knownArt = { if (it.packRef.origin == PackOrigin.Mirror) known else null }).detachToLocal(pack)
+
+        assertEquals("https://cdn/banner.png", detached.bannerUrl, "the source's banner, kept for good")
+        assertEquals("https://cdn/captured-icon.png", detached.iconUrl, "a field nothing new is known for keeps what it had")
+        assertEquals(detached, repo.get("1"))
+    }
+
+    @Test
+    fun `a pack that was never detached offers no reattach`() = runTest {
+        val data = Files.createTempDirectory("pis")
+        val repo = FakeRepo()
+        val source = RecordingReattacher()
+        val reattachers = mapOf<PackOrigin, PackReattacher>(PackOrigin.Mirror to source, PackOrigin.Modrinth to source)
+        val local = instance("1", origin = PackOrigin.Local)
+        val fromLocal = instance("2", origin = PackOrigin.Local).copy(forkedFrom = PackReference(PackOrigin.Local, "base"))
+        val mirror = instance("3", origin = PackOrigin.Mirror)
+        listOf(local, fromLocal, mirror).forEach { repo.put(it) }
+        val service = service(repo, data, reattachers = reattachers)
+
+        listOf(local, fromLocal, mirror).forEach { pack ->
+            assertFalse(service.canReattach(pack), "${pack.id} offers a reattach")
+            assertFailsWith<IllegalStateException> { service.previewReattach(pack) }
+            assertFailsWith<IllegalStateException> { service.reattach(pack, ReattachConfirmation("v9", "any")) }
+            assertNull(service.reattachSourceName(pack))
+        }
+        assertTrue(source.asked.isEmpty(), "no source was asked about a pack it never had")
+    }
+
+    @Test
+    fun `a reattach goes to the source the pack was detached from`() = runTest {
+        val data = Files.createTempDirectory("pis")
+        val repo = FakeRepo()
+        val mirror = RecordingReattacher()
+        val modrinth = RecordingReattacher()
+        val service = service(repo, data, reattachers = mapOf(PackOrigin.Mirror to mirror, PackOrigin.Modrinth to modrinth))
+        val fromModrinth = instance("1", origin = PackOrigin.Modrinth)
+        repo.put(fromModrinth)
+        val detached = service.detachToLocal(fromModrinth)
+
+        assertTrue(service.canReattach(detached))
+        val preview = service.previewReattach(detached)
+        assertEquals(listOf("mods/mine.jar"), preview.removed)
+        assertEquals("Source of pack", service.reattachSourceName(detached))
+        val back = service.reattach(detached, preview.confirmation)
+
+        assertEquals(fromModrinth.packRef, back.packRef)
+        assertEquals(
+            listOf("preview:1" to fromModrinth.packRef, "reattach:1:v9" to fromModrinth.packRef),
+            modrinth.asked,
+        )
+        assertTrue(mirror.asked.isEmpty())
+    }
+
+    /**
+     * A detach that landed while an update ran had the update's commit put the source
+     * back, or its rollback re-bind the pack, over the player's own mods.
+     */
+    @Test
+    fun `a pack being updated is not detached under the update`() = runTest {
+        val data = Files.createTempDirectory("pis")
+        val repo = FakeRepo()
+        val pack = instance("1")
+        repo.put(pack)
+        val release = CompletableDeferred<Unit>()
+        launch { work.during("1", InstanceWork.Update) { release.await() } }
+        advanceUntilIdle()
+
+        val refused = assertFailsWith<InstanceBusyException> { service(repo, data).detachToLocal(pack) }
+
+        assertEquals(InstanceWork.Update, refused.work)
+        assertEquals(pack, repo.get("1"), "nothing about the pack moved")
+        release.complete(Unit)
+    }
+
+    /**
+     * A detach waited for the lock under its claim, so a long sync showed the pack as
+     * updating and refused Play for as long as it ran.
+     */
+    @Test
+    fun `a detach refuses at once while the files are locked`() = runTest {
+        val data = Files.createTempDirectory("pis")
+        val repo = FakeRepo()
+        val pack = instance("1", dir = "industrial")
+        repo.put(pack)
+        val held = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        launch { InstanceMutationLock.withLock(data.resolve("instances").resolve("industrial")) { held.complete(Unit); release.await() } }
+        held.await()
+
+        assertFailsWith<InstanceBusyException> { service(repo, data).detachToLocal(pack) }
+
+        assertEquals(pack, repo.get("1"))
+        assertNull(work.workOn("1"), "and its claim is let go")
+        release.complete(Unit)
+    }
+
+    /** The files would be rewritten under the game, the way a delete used to remove them from under it. */
+    @Test
+    fun `a pack whose game is running is not reattached`() = runTest {
+        val data = Files.createTempDirectory("pis")
+        val repo = FakeRepo()
+        val source = RecordingReattacher()
+        val service = service(repo, data, reattachers = mapOf(PackOrigin.Mirror to source))
+        val pack = instance("1")
+        repo.put(pack)
+        val detached = service.detachToLocal(pack)
+        runningId.value = "1"
+
+        assertFailsWith<IllegalStateException> { service.reattach(detached, ReattachConfirmation("v9", "any")) }
+        assertTrue(source.asked.isEmpty())
+        assertEquals(PackOrigin.Local, repo.get("1")?.packRef?.origin)
     }
 
     /**

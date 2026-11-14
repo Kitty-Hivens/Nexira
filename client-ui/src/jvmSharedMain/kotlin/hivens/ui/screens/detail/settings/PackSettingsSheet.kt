@@ -280,7 +280,7 @@ fun PackSettingsSheet(
                     PackSettingsCategory.Content ->
                         PackContentSection(shown, adopt)
                     PackSettingsCategory.Data ->
-                        PackDataSection(shown, instanceDir, operation, onDismiss)
+                        PackDataSection(shown, instanceDir, operation, onDismiss, onNotice = { notice = it })
                 }
             }
         }
@@ -421,6 +421,7 @@ private fun FooterStatus(operation: PackOperation?, notice: String?) {
                         text     = when (operation.kind) {
                             PackOperationKind.Update -> s.packVersionsApplying(phase.current, phase.total, phase.path)
                             PackOperationKind.Repair -> s.packSettingsRepairProgress(phase.current, phase.total, phase.path)
+                            PackOperationKind.Reattach -> s.packSettingsReattachProgress(phase.current, phase.total, phase.path)
                         },
                         style    = MaterialTheme.typography.labelSmall,
                         color    = NxInk.quiet,
@@ -432,7 +433,7 @@ private fun FooterStatus(operation: PackOperation?, notice: String?) {
                 }
             }
             phase is PackOperationPhase.Updated -> Text(
-                text  = s.packVersionsApplied(phase.version),
+                text  = if (operation.kind == PackOperationKind.Reattach) s.packSettingsReattached(phase.version) else s.packVersionsApplied(phase.version),
                 style = MaterialTheme.typography.labelSmall,
                 color = NxColor.status(Status.Success, text = true),
             )
@@ -459,6 +460,7 @@ private fun FooterStatus(operation: PackOperation?, notice: String?) {
             )
             phase is PackOperationPhase.Failed -> FooterError(s.packVersionsFailed(phase.message))
             phase is PackOperationPhase.Refused -> FooterError(s.packOperationRefused(phase.work.label(s)))
+            phase is PackOperationPhase.PreviewStale -> FooterError(s.packSettingsReattachStale)
             notice != null -> FooterError(notice)
         }
     }
