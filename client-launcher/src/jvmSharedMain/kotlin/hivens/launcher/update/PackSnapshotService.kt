@@ -7,11 +7,13 @@ import hivens.core.io.AtomicFiles
 import hivens.core.update.PackSnapshot
 import hivens.launcher.smrt.SmrtSyncService
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.LinkOption
 import java.nio.file.Path
+import java.nio.file.Paths
 import java.nio.file.StandardCopyOption
 import java.util.stream.Collectors
 
@@ -139,7 +141,7 @@ class PackSnapshotService(
             runCatching {
                 Files.createDirectories(dst.parent)
                 if (Files.isDirectory(dst, LinkOption.NOFOLLOW_LINKS)) deleteTree(dst, clearReadOnly = false) else Files.deleteIfExists(dst)
-                Files.createSymbolicLink(dst, Path.of(target))
+                Files.createSymbolicLink(dst, Paths.get(target))
             }.onFailure { failures += "restore link $rel" }
         }
         for (rel in record.files) {
@@ -207,8 +209,19 @@ class PackSnapshotService(
             .onFailure { log.warn("snapshot: failed to delete {} for {}", id, instanceDirName, it) }
     }
 
-    private fun readRecord(dir: Path): SnapshotRecord =
-        json.decodeFromString(SnapshotRecord.serializer(), readUtf8(dir.resolve("snapshot.json")))
+    /**
+     * The record in [dir], refused when it names no file list at all. Both lists are
+     * optional to the decoder, but this build always writes one of them, so a record
+     * with neither was edited or written by something else. Read as "nothing was
+     * captured", its restore would delete every managed file and report success.
+     */
+    private fun readRecord(dir: Path): SnapshotRecord {
+        val record = json.decodeFromString(SnapshotRecord.serializer(), readUtf8(dir.resolve("snapshot.json")))
+        if (record.capturedFiles == null && record.capturedPaths == null) {
+            throw SerializationException("snapshot ${record.id} in $dir names no captured files")
+        }
+        return record
+    }
 
     private fun linkOrCopy(src: Path, dst: Path, replace: Boolean) {
         if (replace) {

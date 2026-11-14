@@ -602,6 +602,7 @@ public final class hivens/widget/api/WidgetScope : hivens/widget/api/LevelContex
 	public final fun provide (Lhivens/widget/model/SourceKey;Ljava/lang/Object;)Ljava/lang/AutoCloseable;
 	public final fun provideCommand (Lhivens/widget/model/CommandKey;Lhivens/widget/model/WidgetCommand;)Ljava/lang/AutoCloseable;
 	public final fun provideSource (Lhivens/widget/model/SourceKey;Lhivens/widget/model/WidgetDataSource;)Ljava/lang/AutoCloseable;
+	public final fun retryFailed ()V
 	public final fun sampleOf (Ljava/lang/String;)Lkotlin/jvm/functions/Function0;
 }
 

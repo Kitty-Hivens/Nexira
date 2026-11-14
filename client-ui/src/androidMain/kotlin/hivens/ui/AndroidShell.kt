@@ -134,6 +134,10 @@ fun AndroidShell() {
     val widgetServiceRegistry: WidgetServiceRegistry = koinInject()
     val widgetDataRegistry: WidgetDataRegistry = koinInject()
     val appLevel: WidgetScope = koinInject()
+    // The app level outlives the Activity, and with it the record of which of its
+    // parts could not be made. A shell made again for a new Activity gives them
+    // another try before anything in it reads them.
+    remember(appLevel) { appLevel.retryFailed() }
     val widgetCommandRegistry: WidgetCommandRegistry = koinInject()
     val widgetStateStore: WidgetStateStore = koinInject()
     val applicationScope: CoroutineScope = koinInject()
@@ -274,7 +278,13 @@ fun AndroidShell() {
                         .focusable()
                         .onPreviewKeyEvent { ev ->
                             layers.dismiss.onPreviewKeyEvent(ev)
-                            val resolved = resolveShellChord(ev, false, editModeController.isEditing)
+                            val resolved = resolveShellChord(
+                                event = ev,
+                                debugOverlayAvailable = false,
+                                editing = editModeController.isEditing,
+                                fieldFocused = layers.dismiss.fieldFocused,
+                                modalOpen = layers.modalOpen,
+                            )
                             when (resolved.chord) {
                                 ShellChord.ToggleEditMode -> editModeController.requestEditToggle()
                                 ShellChord.ToggleRightRail -> editModeController.requestRightRailToggle()

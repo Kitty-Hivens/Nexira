@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.Symbol
+import hivens.ui.layers.layerTrigger
 import hivens.ui.customization.LocalCustomization
 import hivens.ui.theme.Motion
 import hivens.ui.theme.Spacing
@@ -93,6 +94,7 @@ fun NxRow(
             .fillMaxWidth()
             .clip(shape)
             .drawBehind { drawSoftHover(tint, alpha.value) }
+            .layerTrigger()
             .clickable(interactionSource = interaction, indication = null, onClick = onClick)
             .padding(horizontal = edgeBleed, vertical = Spacing.s8)
     } else {

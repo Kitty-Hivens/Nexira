@@ -250,6 +250,8 @@ private fun TakeFocus(resident: LayerResident, layers: WindowLayers) {
     val yields = remember(resident) { resident.yieldsToField && layers.dismiss.fieldFocused }
     DisposableEffect(resident) {
         if (!resident.shown) return@DisposableEffect onDispose { }
+        resident.trigger = layers.triggerHoldingFocus()
+        resident.takenFrom = layers.layerHoldingFocus(except = resident)
         val from = layers.focusHolder(except = resident)
         val saved = from.saveFocusedChild()
         // The window's content as a whole cannot take the focus, a layer's root can:
@@ -345,6 +347,13 @@ private class OutsidePressElement(val onPress: () -> Unit) : ModifierNodeElement
 }
 
 /**
+ * Whether this press came from a finger or from a mouse's primary, secondary or
+ * middle button: a press that can mean "outside", not one of the buttons the window
+ * turns into back and forward.
+ */
+internal expect fun PointerEvent.pressesMainButton(): Boolean
+
+/**
  * Asks a modal to close on a press outside it.
  *
  * It shares the press with what is under it, so a layer that stays usable still
@@ -354,6 +363,9 @@ private class OutsidePressElement(val onPress: () -> Unit) : ModifierNodeElement
 private class OutsidePressNode(var onPress: () -> Unit) : Modifier.Node(), PointerInputModifierNode {
     override fun onPointerEvent(pointerEvent: PointerEvent, pass: PointerEventPass, bounds: IntSize) {
         if (pass != PointerEventPass.Final || pointerEvent.type != PointerEventType.Press) return
+        // The mouse's back and forward buttons are back and forward, which the window
+        // routes through its dismiss stack. Taken here too, one press closed two things.
+        if (!pointerEvent.pressesMainButton()) return
         if (pointerEvent.changes.any { it.isConsumed }) return
         onPress()
     }

@@ -63,19 +63,42 @@ internal class LayerScene(
         settle()
     }
 
-    /** One edge of Escape through the window. */
-    fun escape(type: KeyEventType) {
-        val event = escapeEvent(type)
+    /**
+     * A press and release of a mouse thumb button, as Compose reports one. Where AWT
+     * numbers it 4 or 5 (Windows, macOS) it carries the back or forward flag. On X11
+     * AWT numbers it 6 or 7, and Compose passes it on with no flag at all, as the
+     * button of index 5 or 6.
+     */
+    fun clickThumb(x: Float, y: Float, forward: Boolean, x11: Boolean) {
+        val button = when {
+            x11 -> PointerButton(if (forward) 6 else 5)
+            forward -> PointerButton.Forward
+            else -> PointerButton.Back
+        }
+        val held = when {
+            x11 -> PointerButtons()
+            forward -> PointerButtons(isForwardPressed = true)
+            else -> PointerButtons(isBackPressed = true)
+        }
+        scene.sendPointerEvent(PointerEventType.Press, Offset(x, y), buttons = held, button = button)
+        settle()
+        scene.sendPointerEvent(PointerEventType.Release, Offset(x, y), buttons = PointerButtons(), button = button)
+        settle()
+    }
+
+    /** One edge of Escape through the window, with Ctrl held when [ctrl]. */
+    fun escape(type: KeyEventType, ctrl: Boolean = false) {
+        val event = escapeEvent(type, ctrl)
         layers?.dismiss?.onPreviewKeyEvent(event)
         val used = scene.sendKeyEvent(event) || layers?.dismiss?.onKeyEvent(event) == true
         if (!used && type == KeyEventType.KeyDown) backInput.backCompleted()
         settle()
     }
 
-    /** A whole press of Escape. */
-    fun pressEscape() {
-        escape(KeyEventType.KeyDown)
-        escape(KeyEventType.KeyUp)
+    /** A whole press of Escape, with Ctrl held when [ctrl]. */
+    fun pressEscape(ctrl: Boolean = false) {
+        escape(KeyEventType.KeyDown, ctrl)
+        escape(KeyEventType.KeyUp, ctrl)
     }
 
     override fun close() = scene.close()
@@ -84,4 +107,5 @@ internal class LayerScene(
 // A test has no window to deliver an AWT event through, and this factory is the one
 // way to make a key event without one.
 @OptIn(InternalComposeUiApi::class)
-internal fun escapeEvent(type: KeyEventType): KeyEvent = KeyEvent(Key.Escape, type)
+internal fun escapeEvent(type: KeyEventType, ctrl: Boolean = false): KeyEvent =
+    KeyEvent(Key.Escape, type, isCtrlPressed = ctrl)

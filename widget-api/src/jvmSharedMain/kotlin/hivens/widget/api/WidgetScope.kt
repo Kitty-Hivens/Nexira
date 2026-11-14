@@ -28,7 +28,8 @@ typealias SourceFactory<T> = (LevelContext) -> WidgetDataSource<T>
  * the key has no answer. For the host, which has to make such a failure visible.
  *
  * Told once per key and level, and only once the key really is missing: a factory
- * that failed while another run of it for the same level succeeded is not told.
+ * that failed while another run of it for the same level succeeded is not told. A
+ * level told to [WidgetScope.retryFailed] tells a key that fails again once more.
  * Called on whichever thread read the key, which may be the composition's, so an
  * implementation hands anything slow elsewhere and returns at once.
  */
@@ -325,6 +326,35 @@ class WidgetScope private constructor(
         return endRun(key.id, marked, madeCommands, fresh, null, "command") as WidgetCommand<P>?
     }
 
+    /**
+     * Gives every key whose factory failed in this level another try at its next
+     * read, instead of leaving it missing for the level's whole life.
+     *
+     * For the owner of a level that outlives what reads it. The app level stays for
+     * the process, so a part of the host that could not start the first time stayed
+     * missing through every crash reload, which rebuilds everything below it. The
+     * owner calls this when it builds what reads the level again.
+     *
+     * At most once per level per second: a call sooner than that after the last one
+     * that took effect does nothing. A caller asking on every frame would
+     * otherwise run every failing factory, and log its failure, on every frame.
+     */
+    fun retryFailed() {
+        synchronized(lock) {
+            val now = clock()
+            val last = lastRetry
+            if (last != null && now - last < RETRY_INTERVAL_MS * 1_000_000L) return
+            lastRetry = now
+            failed.clear()
+        }
+    }
+
+    // When retryFailed last took effect, on [clock], null before it ever did.
+    private var lastRetry: Long? = null
+
+    /** The level's clock in nanoseconds, for the tests that step it past [RETRY_INTERVAL_MS]. */
+    internal var clock: () -> Long = System::nanoTime
+
     /** Where [id] lives and what answers it, as the registries of this tree have it. Sources first. */
     fun declarationOf(id: String): KeyDeclaration? = registry.declarationOf(id) ?: commands.declarationOf(id)
 
@@ -419,6 +449,9 @@ class WidgetScope private constructor(
 
 /** Prefixed to a command's id where it shares a set with source ids. */
 private const val COMMAND_MARK = "command:"
+
+/** How long after one [WidgetScope.retryFailed] that took effect the next one does nothing. */
+internal const val RETRY_INTERVAL_MS: Long = 1_000L
 
 /**
  * Closes this and logs a failure instead of throwing it, for an owner that

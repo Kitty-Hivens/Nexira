@@ -281,6 +281,36 @@ class DismissStackTest {
         }
     }
 
+    // The window's back input turns Escape into back whatever is held with it.
+    @Test
+    fun `Escape with Ctrl held leaves a field first and closes one thing however long it is held`() {
+        val layers = WindowLayers()
+        val focus = FocusRequester()
+        val closed = mutableListOf<String>()
+        LayerScene(layers) {
+            LayerHost(layers, Modifier.fillMaxSize()) {
+                var aOpen by remember { mutableStateOf(true) }
+                var bOpen by remember { mutableStateOf(true) }
+                DismissOnBack(enabled = aOpen) { closed += "a"; aOpen = false }
+                DismissOnBack(enabled = bOpen) { closed += "b"; bOpen = false }
+                Field(Modifier.focusRequester(focus))
+            }
+        }.use { scene ->
+            scene.settle()
+            focus.requestFocus()
+            scene.settle()
+            scene.pressEscape(ctrl = true)
+            assertFalse(layers.dismiss.fieldFocused, "the first press leaves the field")
+            assertEquals(emptyList(), closed)
+
+            scene.escape(KeyEventType.KeyDown, ctrl = true)
+            scene.escape(KeyEventType.KeyDown, ctrl = true)
+            scene.escape(KeyEventType.KeyDown, ctrl = true)
+            scene.escape(KeyEventType.KeyUp, ctrl = true)
+            assertEquals(listOf("b"), closed)
+        }
+    }
+
     // A popup closes on the first press of a held Escape. The repeats come after it,
     // and the first of them must not look like a press of its own to the stack.
     @Test

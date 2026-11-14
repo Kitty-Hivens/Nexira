@@ -7,6 +7,8 @@ import hivens.core.io.AtomicFiles
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import kotlin.test.Test
@@ -207,6 +209,30 @@ class PackSnapshotServiceTest {
         assertFailsWith<SerializationException> { read("folders") }
         assertFailsWith<SerializationException> { read("reattach") }
         assertEquals(3, svc.list(dir).size, "this launcher reads all three")
+    }
+
+    /**
+     * Both file lists are optional to the decoder. Read as "nothing was captured", a
+     * record with neither would have the restore delete every managed file of the
+     * pack, put nothing back and report success.
+     */
+    @Test
+    fun `a record that names no file list is refused and the pack is left alone`() {
+        val dataDir = Files.createTempDirectory("snap-no-list")
+        val dir = "inst"
+        val clientDir = dataDir.resolve("instances").resolve(dir)
+        Files.createDirectories(clientDir.resolve("mods"))
+        Files.writeString(clientDir.resolve("mods/a.jar"), "a")
+        val svc = PackSnapshotService(dataDir, json)
+        svc.capture(clientDir, instance(dir), setOf("mods/a.jar"), "s1", 1L, reattach = true)
+        val file = dataDir.resolve("snapshots").resolve(dir).resolve("s1").resolve("snapshot.json")
+        val stripped = JsonObject(json.parseToJsonElement(Files.readString(file)).jsonObject - "capturedFiles" - "capturedPaths")
+        Files.writeString(file, stripped.toString())
+
+        assertFailsWith<SerializationException> { svc.restore(clientDir, dir, "s1", setOf("mods/a.jar")) }
+        assertEquals("a", Files.readString(clientDir.resolve("mods/a.jar")), "nothing was deleted")
+        assertTrue(svc.list(dir).isEmpty(), "it is not offered as a rollback either")
+        assertFalse(svc.takenByReattach(dir, "s1"))
     }
 
     @Test

@@ -7,6 +7,7 @@ import hivens.widget.model.ScopeLevel
 import hivens.widget.model.WidgetCommand
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import org.slf4j.LoggerFactory
 
 /** Wraps a plain side-effecting block as a synchronous [WidgetCommand]. */
 fun <P> command(block: (P) -> Unit): WidgetCommand<P> = WidgetCommand { block(it) }
@@ -22,9 +23,11 @@ fun <P> suspendCommand(scope: CoroutineScope, block: suspend (P) -> Unit): Widge
 
 /**
  * Binds a widget to a command by [key] and returns a dispatcher: the widget says
- * what it wants to happen, not which service does it. Memoized on the id. Errors
- * on dispatch if nothing answers the key: an app command is always there, so a
- * miss is a wiring bug, the same contract as [rememberSource].
+ * what it wants to happen, not which service does it. Memoized on the id. Fired
+ * where nothing answers the key, it does nothing and says so in the log: a host may
+ * leave an app command out, a factory may fail to make one, and a click is no place
+ * to throw. A widget that cannot stand without the command names it in its `needs`
+ * and is kept off where it is missing.
  *
  * Answered the way [rememberSource] answers an app source: the registry's command,
  * or else the one the app level makes from the registry's factory for the key.
@@ -38,7 +41,7 @@ fun <P> rememberCommand(key: CommandKey<P>): (P) -> Unit {
     requireApp(key)
     val registry = LocalWidgetCommandRegistry.current
     val scope = LocalScope.current
-    return remember(key.id, registry, scope) { { payload: P -> appCommand(key, registry, scope).run(payload) } }
+    return remember(key.id, registry, scope) { { payload: P -> appCommand(key, registry, scope)?.run(payload) } }
 }
 
 /**
@@ -52,12 +55,17 @@ fun rememberAction(key: CommandKey<Unit>): () -> Unit {
     requireApp(key)
     val registry = LocalWidgetCommandRegistry.current
     val scope = LocalScope.current
-    return remember(key.id, registry, scope) { { appCommand(key, registry, scope).run(Unit) } }
+    return remember(key.id, registry, scope) { { appCommand(key, registry, scope)?.run(Unit) } }
 }
 
-/** What answers the app command [key] at the moment it is fired. Throws when nothing does. */
-private fun <P> appCommand(key: CommandKey<P>, registry: WidgetCommandRegistry, scope: WidgetScope?): WidgetCommand<P> =
-    registry.find(key) ?: scope?.findCommand(key) ?: error("no widget command registered for '${key.id}'")
+/** What answers the app command [key] at the moment it is fired, or null, logged, when nothing does. */
+private fun <P> appCommand(key: CommandKey<P>, registry: WidgetCommandRegistry, scope: WidgetScope?): WidgetCommand<P>? {
+    val command = registry.find(key) ?: scope?.findCommand(key)
+    if (command == null) log.warn("Widget command '{}' was fired where nothing answers it, and did nothing", key.id)
+    return command
+}
+
+private val log = LoggerFactory.getLogger("hivens.widget.api.WidgetCommands")
 
 private fun requireApp(key: CommandKey<*>) {
     require(key.level == ScopeLevel.App) {

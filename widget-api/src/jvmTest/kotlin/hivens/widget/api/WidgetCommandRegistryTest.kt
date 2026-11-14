@@ -35,11 +35,12 @@ class WidgetCommandRegistryTest {
         assertEquals(42, seen)
     }
 
+    // A host may leave an app command out, a phone the launcher update check.
     @Test
-    fun `dispatch throws for an unregistered key`() {
+    fun `dispatch of an unregistered key does nothing`() {
         val reg = WidgetCommandRegistry()
-        val ex = assertFailsWith<IllegalStateException> { reg.dispatch(clearKey) }
-        assertTrue("clear" in (ex.message ?: ""), "error names the missing id")
+        reg.dispatch(clearKey)
+        reg.dispatch(volumeKey, 1)
     }
 
     @Test

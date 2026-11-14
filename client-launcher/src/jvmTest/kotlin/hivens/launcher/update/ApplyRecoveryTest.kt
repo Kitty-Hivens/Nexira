@@ -180,6 +180,26 @@ class ApplyRecoveryTest {
         assertEquals("committed-a", Files.readString(modsDir.resolve("a.jar")), "the update that landed stays")
     }
 
+    /**
+     * A phone makes the shell again for every new Activity, and the desktop after a
+     * crash reload, in a process whose reattach may still be fetching its archive.
+     * Only the first pass of a process finds archives that belong to nobody.
+     */
+    @Test
+    fun `only the first pass of a process clears the kept reattach archives`() = runTest {
+        val dataDir = Files.createTempDirectory("rec5")
+        val recovery = ApplyRecovery(PackSnapshotService(dataDir, json), FakeRepo(), ApplyJournal(dataDir, json), dataDir, InstanceWorkRegistry())
+        val leftover = Files.createDirectories(reattachArchiveDir(dataDir, "old").resolve("preview-1"))
+
+        recovery.recoverInterrupted()
+        assertFalse(Files.exists(leftover), "what a past process kept goes at the first start")
+
+        val running = Files.createDirectories(reattachArchiveDir(dataDir, "inst").resolve("apply-1"))
+        Files.writeString(running.resolve("pack.mrpack"), "half")
+        recovery.recoverInterrupted()
+        assertTrue(Files.exists(running.resolve("pack.mrpack")), "a reattach running in this process keeps its archive")
+    }
+
     @Test
     fun `recoverInterrupted clears the marker when the snapshot is gone`() = runTest {
         val dataDir = Files.createTempDirectory("rec2")

@@ -214,6 +214,10 @@ fun FrameWindowScope.AppShellContent(
     val widgetServiceRegistry: WidgetServiceRegistry = koinInject()
     val widgetDataRegistry: WidgetDataRegistry = koinInject()
     val appLevel: WidgetScope = koinInject()
+    // The app level outlives this shell, and with it the record of which of its parts
+    // could not be made. A shell made again after a crash reload gives them another
+    // try before anything in it reads them.
+    remember(appLevel) { appLevel.retryFailed() }
     val widgetCommandRegistry: WidgetCommandRegistry = koinInject()
     val widgetStateStore: WidgetStateStore = koinInject()
     val editModeController: EditModeController  = koinInject()
@@ -226,17 +230,6 @@ fun FrameWindowScope.AppShellContent(
 
     val settings = remember { settingsService.getSettings() }
 
-    // Every way out of the launcher goes through here. With a game running it asks
-    // first (see QuitWithGameHost); otherwise it quits as it always has.
-    val quitGate = remember { QuitGate() }
-    val quit: () -> Unit = {
-        val state = controller.state.value
-        if (controller.runningPackInstanceId.value != null || state is LaunchState.GameRunning || state is LaunchState.Stopping) {
-            quitGate.request()
-        } else {
-            exitApp()
-        }
-    }
 
     // The console's own commands, declared in ConsoleCommands. Registered once;
     // the console service is a process singleton. The UI-debug toggle is among
@@ -320,6 +313,29 @@ fun FrameWindowScope.AppShellContent(
     val revealWindow: () -> Unit = {
         windowHost.unminimize()
         isWindowVisible = true
+    }
+
+    // Bumped each time the window has to come to the front: the .show signal of a
+    // second launch, and the quit question below. The Window content uses it to
+    // invoke window.toFront() / requestFocus(), so the window is raised and not
+    // just made visible behind other windows.
+    var raiseTick by remember { mutableStateOf(0) }
+
+    // Every way out of the launcher goes through here. With a game running it asks
+    // first (see QuitWithGameHost), otherwise it quits as it always has. The question
+    // is drawn in this window, which is hidden to the tray while a game runs, so the
+    // window comes back and to the front first: asked in a hidden window, tray Exit
+    // did nothing anyone could see.
+    val quitGate = remember { QuitGate() }
+    val quit: () -> Unit = {
+        val state = controller.state.value
+        if (controller.runningPackInstanceId.value != null || state is LaunchState.GameRunning || state is LaunchState.Stopping) {
+            revealWindow()
+            raiseTick++
+            quitGate.request()
+        } else {
+            exitApp()
+        }
     }
 
     // How the launcher looks and speaks lives in the appearance store, which every
@@ -426,12 +442,6 @@ fun FrameWindowScope.AppShellContent(
         }
     }
 
-
-    // Bumped each time the .show signal fires; the Window content uses it
-    // to invoke window.toFront() / requestFocus() so a duplicate-launch
-    // attempt actually raises the existing instance, not just makes it
-    // visible-but-buried-under-other-windows.
-    var raiseTick by remember { mutableStateOf(0) }
 
     LaunchedEffect(Unit) {
         val showFile = boot.paths.dataDir.resolve(".show").toFile()
@@ -784,15 +794,7 @@ fun FrameWindowScope.AppShellContent(
 
         // The console is a window of its own beside this one (see ShellHost) and
         // draws in what this shell decided, published for it here.
-        SideEffect {
-            look.update(
-                theme         = themeLibrary.active,
-                dark          = isDarkTheme,
-                locale        = currentLocale,
-                uiFamily      = uiFamily,
-                customization = customization,
-            )
-        }
+        PublishShellLook(look, appearance, uiFamily, customization)
 
         // ── Main window ────────────────────────────────────────────────
         // af.requestCloseDialog dispatches: chaos active -> pop the torturous
@@ -849,8 +851,15 @@ fun FrameWindowScope.AppShellContent(
             // so a host Box-level handler misses them. resolveShellChord decides
             // what was pressed and whether to swallow it; the observers of these
             // signals gate on their own state (EditorSurfaceHost on the surface
-            // being editable, ShellRightRegion on the rail).
-            val resolved = resolveShellChord(ev, debugOverlay.available, editModeController.isEditing)
+            // being editable, ShellRightRegion on the rail). A modal and a focused
+            // text field keep the keys that would act behind them.
+            val resolved = resolveShellChord(
+                event                 = ev,
+                debugOverlayAvailable = debugOverlay.available,
+                editing               = editModeController.isEditing,
+                fieldFocused          = windowLayers.dismiss.fieldFocused,
+                modalOpen             = windowLayers.modalOpen,
+            )
             when (resolved.chord) {
                 ShellChord.ToggleEditMode     -> editModeController.requestEditToggle()
                 ShellChord.ToggleRightRail    -> editModeController.requestRightRailToggle()

@@ -58,6 +58,8 @@ fun resolveShellChord(
     event: KeyEvent,
     debugOverlayAvailable: Boolean,
     editing: Boolean,
+    fieldFocused: Boolean,
+    modalOpen: Boolean,
 ): ChordResolution = resolveChord(
     key = event.key,
     ctrl = event.isCtrlPressed,
@@ -65,6 +67,8 @@ fun resolveShellChord(
     released = event.type == KeyEventType.KeyUp,
     debugOverlayAvailable = debugOverlayAvailable,
     editing = editing,
+    fieldFocused = fieldFocused,
+    modalOpen = modalOpen,
 )
 
 /**
@@ -74,7 +78,13 @@ fun resolveShellChord(
  * is left to whoever else wants it rather than silently eaten. [editing] gates
  * Ctrl+Z the same way, and it matters far more there: Ctrl+Z belongs to whatever a
  * person is typing in the rest of the time, and taking it at window scope would
- * take it from every field in the launcher.
+ * take it from every field in the launcher. While the editor is open it still
+ * belongs to a focused text field ([fieldFocused]): a name typed into the preset
+ * dialog undoes its own typing, not the layout behind it.
+ *
+ * [modalOpen] says a modal holds the window. Edit mode, the right rail and the
+ * editor's undo all act on what the modal blocks, so they are left alone until it
+ * closes, and the keys go on to the modal. F9 is a diagnostic and works over it.
  */
 internal fun resolveChord(
     key: Key,
@@ -85,12 +95,15 @@ internal fun resolveChord(
     released: Boolean,
     debugOverlayAvailable: Boolean,
     editing: Boolean,
+    fieldFocused: Boolean = false,
+    modalOpen: Boolean = false,
 ): ChordResolution = when {
-    ctrl && key == Key.E -> ChordResolution(ShellChord.ToggleEditMode.takeIf { released }, consume = true)
-    ctrl && key == Key.N -> ChordResolution(ShellChord.ToggleRightRail.takeIf { released }, consume = true)
     debugOverlayAvailable && key == Key.F9 ->
         ChordResolution(ShellChord.ToggleDebugOverlay.takeIf { released }, consume = true)
-    editing && ctrl && key == Key.Z ->
+    modalOpen -> ChordResolution.Ignored
+    ctrl && key == Key.E -> ChordResolution(ShellChord.ToggleEditMode.takeIf { released }, consume = true)
+    ctrl && key == Key.N -> ChordResolution(ShellChord.ToggleRightRail.takeIf { released }, consume = true)
+    editing && !fieldFocused && ctrl && key == Key.Z ->
         ChordResolution(
             (if (shift) ShellChord.RedoEdit else ShellChord.UndoEdit).takeIf { released },
             consume = true,

@@ -15,6 +15,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.Symbol
+import hivens.ui.layers.layerTrigger
 import hivens.ui.theme.Spacing
 import hivens.ui.theme.NxInk
 
@@ -66,6 +67,7 @@ fun NxIconButton(
         Box(
             modifier = Modifier
                 .clip(CircleShape)
+                .layerTrigger()
                 .clickable(
                     interactionSource = interaction,
                     indication        = ShapedStateLayer(CircleShape, shownTint),

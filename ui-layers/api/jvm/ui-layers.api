@@ -33,6 +33,10 @@ public final class hivens/ui/layers/LayerResident {
 	public static final field $stable I
 }
 
+public final class hivens/ui/layers/LayerTriggerKt {
+	public static final fun layerTrigger (Landroidx/compose/ui/Modifier;)Landroidx/compose/ui/Modifier;
+}
+
 public final class hivens/ui/layers/PersistentInputKt {
 	public static final fun persistentInput (Landroidx/compose/ui/Modifier;)Landroidx/compose/ui/Modifier;
 }
@@ -41,6 +45,7 @@ public final class hivens/ui/layers/WindowLayers {
 	public static final field $stable I
 	public fun <init> ()V
 	public final fun getDismiss ()Lhivens/ui/layers/DismissStack;
+	public final fun getModalOpen ()Z
 }
 
 public final class hivens/ui/layers/WindowLayersKt {

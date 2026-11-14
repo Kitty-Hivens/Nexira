@@ -6,6 +6,7 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.unit.Density
 import hivens.auth.AccountStore
+import hivens.auth.AuthCapabilities
 import hivens.auth.AuthProvider
 import hivens.auth.AuthProviderRegistry
 import hivens.auth.OfflineAuthProvider
@@ -52,6 +53,7 @@ import hivens.ui.packs.PackInstallRequest
 import hivens.ui.packs.ReattachPreviewState
 import hivens.ui.packs.ReattachPreviews
 import hivens.ui.packs.ReattachRequest
+import hivens.ui.packs.withdrawNoticesOfInstalledPacks
 import hivens.ui.reportedTo
 import hivens.ui.session.SessionStore
 import hivens.ui.sessionModule
@@ -84,12 +86,14 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.job
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.koin.core.Koin
 import org.koin.core.KoinApplication
 import org.koin.dsl.koinApplication
 import org.koin.dsl.module
+import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Instant
@@ -258,6 +262,9 @@ class CoreKeysTest {
         override fun withdraw(kind: KClass<out CoreProblem>) {
             withdrawn += kind
         }
+        override fun withdraw(problem: CoreProblem) {
+            withdrawn += problem::class
+        }
     }
 
     /** What the stand-in source answers for any pack a reattach is previewed for. */
@@ -303,6 +310,8 @@ class CoreKeysTest {
         saved: SessionData? = null,
         withActions: Boolean = true,
         notified: Boolean = false,
+        /** What signs a stored account in at startup. */
+        auth: AuthProvider = OfflineAuthProvider(),
         configure: Accounts.() -> Unit = {},
     ) {
         val settings = Settings(settings)
@@ -310,11 +319,16 @@ class CoreKeysTest {
         val actions = RecordingActions()
         val problems = Problems()
 
-        /** What reached the notification history, when [notified] puts the launcher's own reporter in. */
+        /**
+         * What reached the notification history, when [notified] puts the launcher's
+         * own reporter in. It pushes on the reporting thread, so a report has landed by
+         * the time the call that made it returns, and nothing arrives after.
+         */
         val archived = CopyOnWriteArrayList<PersistedNotification>()
         val center = NotificationCenter(archive = { archived += it })
         val reporter: CoreProblems =
-            if (notified) NotifiedCoreProblems(center, scope) { stringsFor(AppLocale.ENGLISH) } else problems
+            if (notified) NotifiedCoreProblems(center, scope, Dispatchers.Unconfined) { stringsFor(AppLocale.ENGLISH) } else problems
+        val packs = Packs(listOf(pack))
         val measured = AtomicInteger()
         val previews = ReattachPreviews(measure = { measured.incrementAndGet(); shownPreview }, operations = operations, scope = scope)
         val preferences = PreferenceWriter("core-keys-test")
@@ -346,12 +360,12 @@ class CoreKeysTest {
                     single<CoroutineScope> { scope }
                     single<ISettingsService> { this@Launcher.settings }
                     single<AccountStore> { accounts }
-                    single<AuthProvider> { OfflineAuthProvider() }
+                    single<AuthProvider> { auth }
                     single { OfflineAuthProvider() }
                     single { AuthProviderRegistry(emptyList()) }
                     single<SslBypassStore> { Grants() }
                     single<CoreProblems> { reporter }
-                    single<IPackRepository> { Packs(listOf(pack)) }
+                    single<IPackRepository> { packs }
                     if (withActions) single<PackActions> { actions }
                     single { previews }
                     single { indications }
@@ -376,7 +390,30 @@ class CoreKeysTest {
 
         /** The app's session store, made the way the first read of the session makes it. */
         val session: SessionStore get() = koin.get()
+
+        /**
+         * Waits for the work the app level's commands launched so far. The app level
+         * runs on the test thread until its work suspends, and the commands return
+         * nothing to wait on, so what they left running is joined here.
+         */
+        fun drain() = runBlocking {
+            withTimeout(5.seconds) { app.coroutineScope.coroutineContext.job.children.toList().forEach { it.join() } }
+        }
     }
+
+    /** A provider whose server is never reached, the way a network that is down answers a sign-in. */
+    private class Unreachable : AuthProvider {
+        override val id: String = "unreachable"
+        override val displayName: String = "Unreachable"
+        override val capabilities = AuthCapabilities(supports2FA = false)
+        override suspend fun login(username: String, password: String, serverId: String): SessionData =
+            throw IOException("no route to host")
+        override suspend fun completeTwoFactor(username: String, password: String, serverId: String, uid: String, code: String): SessionData =
+            throw IOException("no route to host")
+    }
+
+    /** A stored account the startup sign-in logs in again with its saved password. */
+    private val stored = SessionData(playerName = "Steve", accessToken = "token", cachedPassword = "secret")
 
     private fun <T> await(flow: StateFlow<T>, what: String, predicate: (T) -> Boolean): T = runBlocking {
         try {
@@ -448,8 +485,6 @@ class CoreKeysTest {
         assertNull(launcher.app.findCommand(Commands.StopPack))
         assertNull(launcher.app.findCommand(Commands.LaunchPack))
         assertNull(launcher.app.find(Sources.PackInstalls))
-        awaitTrue("the notice") { launcher.center.groups.value.isNotEmpty() }
-        Thread.sleep(200)
         val group = launcher.center.groups.value.single()
         assertEquals("core:part:Packs", group.sourceKey)
         assertEquals("Packs cannot be launched or changed", group.events.single().title)
@@ -461,7 +496,8 @@ class CoreKeysTest {
     fun `one cause reported from many threads at once is one notice`() {
         val archived = CopyOnWriteArrayList<PersistedNotification>()
         val center = NotificationCenter(archive = { archived += it })
-        val reporter = NotifiedCoreProblems(center, scope) { stringsFor(AppLocale.ENGLISH) }
+        // Pushed on the reporting thread, so every report has landed once its thread is joined.
+        val reporter = NotifiedCoreProblems(center, scope, Dispatchers.Unconfined) { stringsFor(AppLocale.ENGLISH) }
         val start = CyclicBarrier(16)
         val threads = (1..16).map { n ->
             thread {
@@ -470,8 +506,7 @@ class CoreKeysTest {
             }
         }
         threads.forEach { it.join(5_000) }
-        awaitTrue("the notice") { center.groups.value.isNotEmpty() }
-        Thread.sleep(300)
+        assertTrue(threads.none { it.isAlive }, "a reporting thread never finished")
         assertEquals(1, archived.size, "the same cause was told more than once")
         assertEquals(1, center.groups.value.single().events.size)
     }
@@ -514,6 +549,43 @@ class CoreKeysTest {
         awaitTrue("the startup sign-in standing down") {
             ActionRing.snapshot().any { it.text.contains("the manual one stays") }
         }
+        assertEquals("Alex", (store.state.value as? AppState.Authenticated)?.session?.playerName)
+    }
+
+    @Test
+    fun `a sign-in made by hand while the startup one finds nothing to sign in with stays`() {
+        ActionRing.clear()
+        val hold = CountDownLatch(1)
+        val launcher = Launcher { this.hold = hold }
+        val store = launcher.session
+        assertTrue(launcher.accounts.entered.await(5, TimeUnit.SECONDS), "the startup sign-in never reached the store")
+        launcher.fire(launcher.app, Commands.SignIn, SessionData(playerName = "Alex"))
+        hold.countDown()
+        awaitTrue("the startup sign-in standing down") {
+            ActionRing.snapshot().any { it.text.contains("found no session after a manual sign-in") }
+        }
+        assertEquals("Alex", (store.state.value as? AppState.Authenticated)?.session?.playerName)
+    }
+
+    @Test
+    fun `a network that is down leaves the sign-in form usable and keeps trying`() {
+        ActionRing.clear()
+        val launcher = Launcher(saved = stored, auth = Unreachable())
+        assertIs<AppState.Unauthenticated>(settled(launcher), "loading covers the first attempt only")
+        awaitTrue("a retry planned") { ActionRing.snapshot().any { it.text.contains("network down, retry #1") } }
+        assertTrue(launcher.problems.reported.isEmpty(), "a network that is down is not a failure of the launcher")
+    }
+
+    @Test
+    fun `a sign-in made by hand while the network is down stays`() {
+        ActionRing.clear()
+        val hold = CountDownLatch(1)
+        val launcher = Launcher(saved = stored, auth = Unreachable()) { this.hold = hold }
+        val store = launcher.session
+        assertTrue(launcher.accounts.entered.await(5, TimeUnit.SECONDS), "the startup sign-in never reached the store")
+        launcher.fire(launcher.app, Commands.SignIn, SessionData(playerName = "Alex"))
+        hold.countDown()
+        awaitTrue("the network failure handled") { ActionRing.snapshot().any { it.text.contains("network down, retry #1") } }
         assertEquals("Alex", (store.state.value as? AppState.Authenticated)?.session?.playerName)
     }
 
@@ -572,14 +644,38 @@ class CoreKeysTest {
         assertIs<CoreProblem.SignedOutNameKept>(launcher.problems.reported.single(), "it says what happened, not that sign-out failed")
     }
 
+    // A notice the person dismissed said nothing about the next attempt, and one that
+    // stood said the opposite of what the next attempt did.
+    @Test
+    fun `every failed sign-out is told, and one that works takes the notice back`() {
+        val launcher = Launcher(notified = true) { failClear = true }
+        settled(launcher)
+        launcher.fire(launcher.app, Commands.SignIn, SessionData(playerName = "Alex"))
+        fun signOut() = runBlocking { withTimeout(5.seconds) { launcher.session.signOut().join() } }
+        fun standing() = launcher.center.groups.value.any { it.sourceKey == "core:sign-out" }
+
+        signOut()
+        assertTrue(standing())
+        launcher.center.dismiss("core:sign-out")
+        signOut()
+        assertTrue(standing(), "the second failure is told too")
+        assertEquals(2, launcher.archived.size)
+
+        launcher.accounts.failClear = false
+        signOut()
+        assertFalse(standing(), "a sign-out that worked leaves no word that it could not")
+        assertIs<AppState.Unauthenticated>(launcher.session.state.value)
+    }
+
     @Test
     fun `the session store is closed with the app, and does nothing after`() {
         val launcher = Launcher()
         val store = launcher.session
         settled(launcher)
         launcher.application.close()
-        val _ = store.signOut()
-        Thread.sleep(200)
+        val signOut = store.signOut()
+        runBlocking { withTimeout(5.seconds) { signOut.join() } }
+        assertTrue(signOut.isCancelled, "a closed store started the sign-out anyway")
         assertFalse(launcher.accounts.cleared, "a closed store still cleared the accounts")
     }
 
@@ -611,12 +707,73 @@ class CoreKeysTest {
         assertTrue(launcher.actions.launched.isEmpty())
     }
 
+    // Under a key of its own, so taking it back cannot take the launch driver's
+    // notices for the pack with it, and told each time, since each is a press of Play.
+    @Test
+    fun `a pack that is not installed is told under its own key each time it is launched`() {
+        val launcher = Launcher(notified = true)
+        launcher.fire(launcher.app, Commands.LaunchPack, "not-installed")
+        launcher.center.dismiss("core:pack:not-installed:not-installed")
+        launcher.fire(launcher.app, Commands.LaunchPack, "not-installed")
+        assertEquals(listOf("core:pack:not-installed:not-installed"), launcher.center.groups.value.map { it.sourceKey })
+        assertEquals(2, launcher.archived.size)
+    }
+
+    // The launcher's own Play reads "signing in" and does nothing while the launcher
+    // finds out who it is. A launch started at once ran under the offline name in
+    // front of the account about to sign in, and one kept waiting showed nothing and
+    // could wait for good.
+    @Test
+    fun `a launch asked for while the startup sign-in runs is refused, as Play is`() {
+        val hold = CountDownLatch(1)
+        val account = SessionData(playerName = "Alex", accessToken = "token", twoFactor = true)
+        val launcher = Launcher(SettingsData(offlinePlayerName = "Steve"), saved = account) { this.hold = hold }
+        val store = launcher.session
+        assertTrue(launcher.accounts.entered.await(5, TimeUnit.SECONDS), "the startup sign-in never reached the store")
+        assertIs<AppState.Loading>(store.state.value)
+
+        launcher.fire(launcher.app, Commands.LaunchPack, pack.id)
+        hold.countDown()
+        assertIs<AppState.Authenticated>(settled(launcher))
+        launcher.drain()
+        assertTrue(launcher.actions.launched.isEmpty(), "nothing started, then or once the sign-in settled")
+
+        launcher.fire(launcher.app, Commands.LaunchPack, pack.id)
+        assertEquals("Alex", launcher.actions.launched.single().first.playerName, "a press after it runs as the account")
+    }
+
+    // The notice is sticky, and says something that stops being true.
+    @Test
+    fun `a pack said to be missing is taken back once it launches`() {
+        val launcher = Launcher(notified = true)
+        settled(launcher)
+        launcher.fire(launcher.app, Commands.LaunchPack, "later")
+        assertTrue(launcher.center.groups.value.any { it.sourceKey == "core:pack:later:not-installed" })
+
+        runBlocking { launcher.packs.put(pack.copy(id = "later", instanceDirName = "later")) }
+        launcher.fire(launcher.app, Commands.SignIn, SessionData(playerName = "Alex"))
+        launcher.fire(launcher.app, Commands.LaunchPack, "later")
+        assertEquals("later", launcher.actions.launched.single().second.id)
+        assertTrue(launcher.center.groups.value.none { it.sourceKey == "core:pack:later:not-installed" })
+    }
+
+    @Test
+    fun `a pack said to be missing is taken back once it is installed`() {
+        val launcher = Launcher(notified = true)
+        withdrawNoticesOfInstalledPacks(launcher.packs.observe(), launcher.reporter, scope)
+        launcher.fire(launcher.app, Commands.LaunchPack, "later")
+        assertTrue(launcher.center.groups.value.any { it.sourceKey == "core:pack:later:not-installed" })
+
+        runBlocking { launcher.packs.put(pack.copy(id = "later", instanceDirName = "later")) }
+        awaitTrue("the notice taken back") { launcher.center.groups.value.none { it.sourceKey == "core:pack:later:not-installed" } }
+    }
+
     @Test
     fun `nobody signed in and no offline name starts nothing`() {
         val launcher = Launcher()
         settled(launcher)
         launcher.fire(launcher.app, Commands.LaunchPack, pack.id)
-        Thread.sleep(200)
+        launcher.drain()
         assertTrue(launcher.actions.launched.isEmpty())
     }
 
@@ -638,14 +795,13 @@ class CoreKeysTest {
         launcher.fire(app, Commands.UpdatePack, "not-installed")
         launcher.fire(app, Commands.DeletePack, "not-installed")
         launcher.fire(app, Commands.ReattachPack, ReattachRequest("not-installed", shownPreview.confirmation))
-        awaitTrue("the delete") { launcher.actions.deleted.isNotEmpty() }
+        launcher.drain()
         assertEquals(listOf(pack.id), launcher.actions.stopped)
         assertEquals(listOf(request), launcher.actions.installed)
         assertEquals(listOf("k1"), launcher.actions.dismissed)
         assertEquals(listOf("k2"), launcher.actions.cancelled)
         assertEquals(listOf(pack), launcher.actions.updated)
         assertEquals(listOf(pack to shownPreview.confirmation), launcher.actions.reattached, "with the preview the player agreed to")
-        Thread.sleep(100)
         assertEquals(listOf(pack), launcher.actions.deleted)
     }
 
@@ -673,10 +829,11 @@ class CoreKeysTest {
         awaitTrue("comparing while the work runs") { launcher.source(app, Sources.ReattachPreviews)[pack.id] == ReattachPreviewState.Comparing }
         operations.value = mapOf(pack.id to PackOperation(pack.id, PackOperationKind.Repair, PackOperationPhase.Running(5, 9, "a.jar")))
         operations.value = mapOf(pack.id to PackOperation(pack.id, PackOperationKind.Repair, PackOperationPhase.Repaired(1, 0)))
+        // The end is the last change sent, and the collector takes changes in order, so
+        // once the end has been measured nothing is left that could measure again.
         awaitTrue("measured again once it ended") {
             launcher.measured.get() == 2 && launcher.source(app, Sources.ReattachPreviews)[pack.id] is ReattachPreviewState.Ready
         }
-        Thread.sleep(100)
         assertEquals(2, launcher.measured.get(), "progress within the work is not news")
 
         launcher.previews.forget(pack.id)
@@ -757,6 +914,19 @@ class CoreKeysTest {
         assertEquals("de", saved.locale)
         assertTrue(dir.resolve("themes.json").exists())
         assertEquals(theme, ThemeManager(dir) { _, _ -> }.load().selected, "the choice is in the theme file")
+    }
+
+    // The test above changes the mode after the dark choice, and the mode writes the
+    // scheme over whatever the choice saved.
+    @Test
+    fun `a dark or light choice made by hand is saved for the next start`() {
+        val launcher = Launcher(SettingsData(isDarkTheme = true, themeMode = ThemeMode.System, themeFromWallpaper = false))
+        launcher.fire(launcher.composition(), Commands.SetDarkTheme, false)
+        launcher.preferences.drain(5.seconds)
+        val saved = launcher.settings.current
+        assertFalse(saved.isDarkTheme)
+        assertEquals(ThemeMode.Manual, saved.themeMode)
+        assertFalse(saved.themeFromWallpaper)
     }
 
     @Test

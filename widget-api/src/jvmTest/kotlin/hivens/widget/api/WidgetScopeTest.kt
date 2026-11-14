@@ -221,6 +221,19 @@ class WidgetScopeTest {
         assertFalse(root.holds(window), "and it has left once its services are gone")
     }
 
+    // The order test above has a single child, which any order closes the same way.
+    @Test
+    fun `a level closes its children newest first`() {
+        val window = app().child(ScopeLevel.Window)
+        val closed = ArrayList<String>()
+        val older = window.child(ScopeLevel.Page)
+        val newer = window.child(ScopeLevel.Page)
+        assertNotNull(older.coroutineScope.coroutineContext[Job]).invokeOnCompletion { closed += "older" }
+        assertNotNull(newer.coroutineScope.coroutineContext[Job]).invokeOnCompletion { closed += "newer" }
+        window.close()
+        assertEquals(listOf("newer", "older"), closed, "the way they were stacked on, undone")
+    }
+
     @Test
     fun `services that fail to close still let the level leave its parent, and are thrown with the other failures`() {
         val failing = SourceKey<String>("test.failing.window", ScopeLevel.Window)
@@ -382,6 +395,58 @@ class WidgetScopeTest {
         assertNull(page.find(broken))
         assertNull(page.find(broken))
         assertEquals(1, attempts, "a failed factory is not run again on every read")
+    }
+
+    // The app level outlives every shell, so a part that failed once stayed missing
+    // through every crash reload until its owner says to try again.
+    @Test
+    fun `a failed key is tried again once its level is told to`() {
+        val flaky = SourceKey<String>("test.flaky")
+        var attempts = 0
+        val told = ArrayList<String>()
+        val registry = WidgetDataRegistry().apply {
+            registerFactory(flaky) {
+                attempts++
+                if (attempts == 1) error("not yet") else flowSource(MutableStateFlow("up"))
+            }
+        }
+        val app = WidgetScope.app(registry, MemoryLevelServices.app(), Dispatchers.Unconfined, failures = { id, _, _ -> told += id })
+        assertNull(app.find(flaky))
+        assertNull(app.find(flaky))
+        assertEquals(1, attempts, "left missing until told otherwise")
+
+        app.retryFailed()
+        assertEquals("up", app.current(flaky))
+        assertEquals(2, attempts)
+        assertEquals(listOf("test.flaky"), told)
+    }
+
+    // A module asking on every frame must not run the failing factory, and log it,
+    // on every frame.
+    @Test
+    fun `a retry comes at most once per interval`() {
+        val broken = SourceKey<String>("test.always.broken")
+        var attempts = 0
+        val registry = WidgetDataRegistry().apply {
+            registerFactory(broken) {
+                attempts++
+                error("still broken")
+            }
+        }
+        val app = WidgetScope.app(registry, MemoryLevelServices.app(), Dispatchers.Unconfined)
+        var now = 0L
+        app.clock = { now }
+        app.find(broken)
+        repeat(5) {
+            app.retryFailed()
+            app.find(broken)
+            now += 10_000_000L
+        }
+        assertEquals(2, attempts, "one retry within the interval, however many calls")
+        now += RETRY_INTERVAL_MS * 1_000_000L
+        app.retryFailed()
+        app.find(broken)
+        assertEquals(3, attempts, "and another once it has passed")
     }
 
     @Test

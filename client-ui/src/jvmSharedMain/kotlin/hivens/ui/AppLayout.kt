@@ -124,139 +124,121 @@ fun AppLayout(
     // because navigation is not yet a widget surface; the center region widget
     // invokes it. Reads currentSession live on each recompose.
     val centerBody: @Composable () -> Unit = {
-        // Screens are disposed when they are swapped out, so everything a reader had
-        // arranged -- a scroll position, an open tab, a chosen category -- died with
-        // the visit and came back at its default. Held per destination here instead.
-        val retention = rememberSaveableStateHolder()
-        // And a page level per destination, for what a page makes and is handed. It
-        // lives while the destination is anywhere in the history, back or forward,
-        // and goes once it has left the history and stopped drawing. The composition's
-        // level keeps them, so they go with it even if this router leaves first.
-        val pages = LocalScope.current?.nearest(ScopeLevel.Composition)?.pages
-        val historyKeys = history.mapTo(HashSet()) { it.retentionKey }
-        LaunchedEffect(pages, historyKeys) { pages?.keep(historyKeys) }
-        // How a screen replaces another is the swap primitive's business, not the
-        // router's. A still style collapses it without this site knowing.
-        NxSwap(
-            target = currentScreen,
-            label  = "screen",
-        ) { screen ->
-            Destination(retention, pages, screen.retentionKey) {
-                when (screen) {
-                    // One home. The classic dashboard WAS the SmartyCraft server
-                    // list, and SmartyCraft arrives as mirror packs now, so the
-                    // screen it lived on went with the path it was a front for.
-                    Screen.Home -> NewHomeScreen()
+        ScreenRouter(currentScreen, history) { screen ->
+            when (screen) {
+                // One home. The classic dashboard WAS the SmartyCraft server
+                // list, and SmartyCraft arrives as mirror packs now, so the
+                // screen it lived on went with the path it was a front for.
+                Screen.Home -> NewHomeScreen()
 
-                    Screen.Profile ->
-                        ProfileSurface(
-                            session       = currentSession,
-                            authResolving = appState is AppState.Loading,
-                        )
+                Screen.Profile ->
+                    ProfileSurface(
+                        session       = currentSession,
+                        authResolving = appState is AppState.Loading,
+                    )
 
-                    Screen.Wardrobe ->
-                        WardrobeSurface(session = currentSession, onBack = onBack)
+                Screen.Wardrobe ->
+                    WardrobeSurface(session = currentSession, onBack = onBack)
 
-                    Screen.Settings ->
-                        SettingsScreen(
-                            isDarkTheme                  = isDarkTheme,
-                            onToggleTheme                = onToggleDarkTheme,
-                            onOpenThemePicker            = { onScreenChange(Screen.ThemePicker) },
-                            currentLocale                = currentLocale,
-                            onLocaleChanged              = onLocaleChanged,
-                            onOpenBackgroundSettings     = { onScreenChange(Screen.BackgroundSettings) },
-                            onOpenAbout                  = { onScreenChange(Screen.About) },
-                        )
+                Screen.Settings ->
+                    SettingsScreen(
+                        isDarkTheme                  = isDarkTheme,
+                        onToggleTheme                = onToggleDarkTheme,
+                        onOpenThemePicker            = { onScreenChange(Screen.ThemePicker) },
+                        currentLocale                = currentLocale,
+                        onLocaleChanged              = onLocaleChanged,
+                        onOpenBackgroundSettings     = { onScreenChange(Screen.BackgroundSettings) },
+                        onOpenAbout                  = { onScreenChange(Screen.About) },
+                    )
 
-                    Screen.ThemePicker -> ThemePickerSurface()
+                Screen.ThemePicker -> ThemePickerSurface()
 
-                    Screen.About ->
-                        AboutSurface(onBack = onBack)
+                Screen.About ->
+                    AboutSurface(onBack = onBack)
 
-                    Screen.BackgroundSettings ->
-                        BgSettingsSurface(
-                            currentSettings   = backgroundSettings,
-                            onSettingsChanged = onBackgroundSettingsChanged,
-                            onBack            = onBack,
-                            isDarkTheme       = isDarkTheme,
-                            onToggleDarkTheme = onToggleDarkTheme,
-                            themeMode = themeMode,
-                            onThemeModeChanged = onThemeModeChanged,
-                            systemThemeAvailable = systemThemeAvailable,
-                            activeTheme       = themeLibrary.active,
-                            surfaceBlur       = customization.surfaceBlur,
-                            onSurfaceBlurChanged = { onCustomizationChanged(customization.copy(surfaceBlur = it)) },
-                            reduceMotion      = customization.reduceMotion,
-                            onReduceMotionChanged = { onCustomizationChanged(customization.copy(reduceMotion = it)) },
-                            onOpenThemePicker = { onScreenChange(Screen.ThemePicker) },
-                        )
+                Screen.BackgroundSettings ->
+                    BgSettingsSurface(
+                        currentSettings   = backgroundSettings,
+                        onSettingsChanged = onBackgroundSettingsChanged,
+                        onBack            = onBack,
+                        isDarkTheme       = isDarkTheme,
+                        onToggleDarkTheme = onToggleDarkTheme,
+                        themeMode = themeMode,
+                        onThemeModeChanged = onThemeModeChanged,
+                        systemThemeAvailable = systemThemeAvailable,
+                        activeTheme       = themeLibrary.active,
+                        surfaceBlur       = customization.surfaceBlur,
+                        onSurfaceBlurChanged = { onCustomizationChanged(customization.copy(surfaceBlur = it)) },
+                        reduceMotion      = customization.reduceMotion,
+                        onReduceMotionChanged = { onCustomizationChanged(customization.copy(reduceMotion = it)) },
+                        onOpenThemePicker = { onScreenChange(Screen.ThemePicker) },
+                    )
 
-                    Screen.Library -> LibraryScreen(onScreenChange = onScreenChange)
+                Screen.Library -> LibraryScreen(onScreenChange = onScreenChange)
 
-                    Screen.Browse  -> BrowseScreen()
+                Screen.Browse  -> BrowseScreen()
 
-                    is Screen.BrowseInto -> BrowseScreen(intoInstanceId = screen.instanceId)
+                is Screen.BrowseInto -> BrowseScreen(intoInstanceId = screen.instanceId)
 
-                    is Screen.CataloguePackDetail ->
-                        CataloguePackDetailScreen(
-                            origin      = screen.origin,
-                            packId      = screen.packId,
-                            onBack      = onBack,
-                            onInstalled = { instanceId -> onScreenChange(Screen.PackDetail(instanceId)) },
-                        )
+                is Screen.CataloguePackDetail ->
+                    CataloguePackDetailScreen(
+                        origin      = screen.origin,
+                        packId      = screen.packId,
+                        onBack      = onBack,
+                        onInstalled = { instanceId -> onScreenChange(Screen.PackDetail(instanceId)) },
+                    )
 
-                    is Screen.PackDetail ->
-                        PackDetailScreen(
-                            instanceId          = screen.instanceId,
-                            appState            = appState,
-                            onBack              = onBack,
-                            initialShowSettings    = screen.openSettings,
-                            initialSettingsSection = screen.settingsSection,
-                            onOpenVersions         = { fromSettings ->
-                                // Coming from the settings overlay: stamp the current
-                                // stack entry so Back restores the overlay, and the
-                                // section it was standing on. Without the section the
-                                // overlay came back on its first one, which is not
-                                // where anybody left it -- the version screen is only
-                                // reachable from Version.
-                                if (fromSettings) {
-                                    onReplaceScreen(
-                                        Screen.PackDetail(
-                                            screen.instanceId,
-                                            openSettings = true,
-                                            settingsSection = PackSettingsCategory.Version,
-                                        ),
-                                    )
-                                }
-                                onScreenChange(Screen.PackVersions(screen.instanceId))
-                            },
-                            onOpenProject          = { onScreenChange(Screen.ModDetail(it)) },
-                            onFindProjects         = {
-                                browse.aimAt(screen.instanceId)
-                                onScreenChange(Screen.BrowseInto(screen.instanceId))
-                            },
-                        )
-
-                    is Screen.PackVersions ->
-                        PackVersionsScreen(
-                            instanceId = screen.instanceId,
-                            onBack     = onBack,
-                        )
-
-                    is Screen.ModDetail -> ModDetailScreen(
-                        target = screen.target,
-                        onOpenVersion = { id, number ->
-                            onScreenChange(Screen.ModVersion(screen.target, id, number))
+                is Screen.PackDetail ->
+                    PackDetailScreen(
+                        instanceId          = screen.instanceId,
+                        appState            = appState,
+                        onBack              = onBack,
+                        initialShowSettings    = screen.openSettings,
+                        initialSettingsSection = screen.settingsSection,
+                        onOpenVersions         = { fromSettings ->
+                            // Coming from the settings overlay: stamp the current
+                            // stack entry so Back restores the overlay, and the
+                            // section it was standing on. Without the section the
+                            // overlay came back on its first one, which is not
+                            // where anybody left it -- the version screen is only
+                            // reachable from Version.
+                            if (fromSettings) {
+                                onReplaceScreen(
+                                    Screen.PackDetail(
+                                        screen.instanceId,
+                                        openSettings = true,
+                                        settingsSection = PackSettingsCategory.Version,
+                                    ),
+                                )
+                            }
+                            onScreenChange(Screen.PackVersions(screen.instanceId))
+                        },
+                        onOpenProject          = { onScreenChange(Screen.ModDetail(it)) },
+                        onFindProjects         = {
+                            browse.aimAt(screen.instanceId)
+                            onScreenChange(Screen.BrowseInto(screen.instanceId))
                         },
                     )
 
-                    is Screen.ModVersion -> ModVersionScreen(
-                        target = screen.target,
-                        versionId = screen.versionId,
+                is Screen.PackVersions ->
+                    PackVersionsScreen(
+                        instanceId = screen.instanceId,
+                        onBack     = onBack,
                     )
 
-                    is Screen.Custom -> CustomScreen(screen.id)
-                }
+                is Screen.ModDetail -> ModDetailScreen(
+                    target = screen.target,
+                    onOpenVersion = { id, number ->
+                        onScreenChange(Screen.ModVersion(screen.target, id, number))
+                    },
+                )
+
+                is Screen.ModVersion -> ModVersionScreen(
+                    target = screen.target,
+                    versionId = screen.versionId,
+                )
+
+                is Screen.Custom -> CustomScreen(screen.id)
             }
         }
     } // end centerBody
@@ -343,6 +325,37 @@ private fun ProvideComposition(
     }
     }
     }
+    }
+}
+
+/**
+ * Draws [currentScreen] with [screen], each destination in its own saveable state
+ * and page level, and swaps one for the next with the swap primitive's transition.
+ *
+ * Screens are disposed when they are swapped out, so everything a reader had
+ * arranged, a scroll position, an open tab, a chosen category, died with the visit
+ * and came back at its default. It is held per destination here instead, and so is
+ * a page level, for what a page makes and is handed. A page level lives while its
+ * destination is anywhere in [history], back or forward, and goes once it has left
+ * the history and stopped drawing. The composition's level keeps them, so they go
+ * with it even if this router leaves first.
+ */
+@Composable
+internal fun ScreenRouter(currentScreen: Screen, history: List<Screen>, screen: @Composable (Screen) -> Unit) {
+    val retention = rememberSaveableStateHolder()
+    val pages = LocalScope.current?.nearest(ScopeLevel.Composition)?.pages
+    val historyKeys = history.mapTo(HashSet()) { it.retentionKey }
+    LaunchedEffect(pages, historyKeys) { pages?.keep(historyKeys) }
+    // How a screen replaces another is the swap primitive's business, not the
+    // router's. A still style collapses it without this site knowing. Two entries
+    // of one destination are one content, which the entry changes in place: drawn
+    // side by side during the swap they held one saved state twice, which throws.
+    NxSwap(
+        target     = currentScreen,
+        label      = "screen",
+        contentKey = { it.retentionKey },
+    ) { target ->
+        Destination(retention, pages, target.retentionKey) { screen(target) }
     }
 }
 

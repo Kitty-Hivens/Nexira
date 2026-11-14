@@ -11,6 +11,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
 import java.nio.file.Path
+import java.util.concurrent.atomic.AtomicBoolean
 import hivens.launcher.record.withBuildOf
 
 /**
@@ -33,16 +34,24 @@ class ApplyRecovery(
 ) {
     private val log = LoggerFactory.getLogger(ApplyRecovery::class.java)
 
+    /** Whether this process has cleared the kept reattach archives already. */
+    private val archivesCleared = AtomicBoolean(false)
+
     /**
      * Roll back every journalled in-flight apply. Returns the recovered instance dir
      * names.
      *
-     * Also clears the archives reattach previews kept. No reattach outlives the process
-     * that started it, so whatever is there at a start belongs to nobody.
+     * Also clears the archives reattach previews kept, on the first call only. No
+     * reattach outlives the process that started it, so whatever is there before the
+     * first call belongs to nobody. A later call comes from a shell made again in the
+     * same process, a crash reload or a new Activity on a phone, while a reattach
+     * started earlier may still be fetching into that folder.
      */
     suspend fun recoverInterrupted(): List<String> = withContext(io) {
-        runCatching { deleteTree(reattachArchiveRoot(dataDir), clearReadOnly = false) }
-            .onFailure { log.warn("apply-recovery: could not clear the kept reattach archives", it) }
+        if (archivesCleared.compareAndSet(false, true)) {
+            runCatching { deleteTree(reattachArchiveRoot(dataDir), clearReadOnly = false) }
+                .onFailure { log.warn("apply-recovery: could not clear the kept reattach archives", it) }
+        }
         journal.listPending().mapNotNull { listed ->
             // Marked for its whole length, so the launch controls say why this pack
             // cannot start yet instead of letting it start over a half-rolled-back

@@ -21,7 +21,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import java.nio.file.Path
+import java.nio.file.Paths
 
 /** The project page's surface, see [ProjectPage]. */
 internal const val PROJECT_SURFACE = "project"
@@ -69,7 +69,7 @@ internal fun sampleProjectPage(): ProjectPage {
         target = ModTarget.Catalogue(SAMPLE_PROJECT.id),
         modrinth = ModrinthClient(offline, TransferEngine(offline)),
         repo = NoPacks,
-        dataDir = Path.of("."),
+        dataDir = Paths.get("."),
         scanner = InstanceContentScanner(),
         open = OpenProjectState(),
         strings = EnglishStrings,

@@ -16,8 +16,10 @@ import hivens.widget.model.ScopeLevel
  * the backing services are named here, while the WidgetCommandRegistry keys on the
  * string id alone.
  *
- * Every key listed is registered, made by a factory or declared, since a key
- * nothing answers would throw on dispatch. A key need not have a consumer in the
+ * Every key listed is registered, made by a factory or declared on every host, except
+ * the ones that say which host answers them, such as [CheckUpdate]. A key nothing
+ * answers is missing where it is read, which keeps a widget that needs it off the
+ * surface, and fired anyway it does nothing. A key need not have a consumer in the
  * launcher's own widgets: these are what any widget, a module's among them, can
  * fire, so a key is listed for what the launcher can do, not for who uses it today.
  *
@@ -28,6 +30,13 @@ import hivens.widget.model.ScopeLevel
  */
 object Commands {
     val ClearNotifications = CommandKey<Unit>("notifications.clear")
+
+    /**
+     * Checks for a newer build of the launcher. Answered only by a host that can
+     * replace the launcher itself, the desktop. Absent on a phone, whose launcher is
+     * updated through its package, so a widget that needs it is kept off the surface
+     * there rather than drawn with a button that does nothing.
+     */
     val CheckUpdate = CommandKey<Unit>("update.check")
     // Sets the "do not disturb" popup mute; paired with [Sources.DoNotDisturb].
     val SetDoNotDisturb = CommandKey<Boolean>("notifications.dnd.set")

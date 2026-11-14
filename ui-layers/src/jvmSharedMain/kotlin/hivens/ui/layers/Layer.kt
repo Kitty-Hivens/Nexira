@@ -40,9 +40,10 @@ import androidx.compose.ui.window.PopupProperties
  * press outside it unless [dismissOnOutsidePress] is false.
  *
  * [returnFocus] is where the focus goes when the layer leaves, for a trigger that
- * knows it should have it back. Without it the layer gives the focus back to what
- * had it when the layer took it, or to the place it was opened from when that is
- * gone, and to nothing when nothing had it.
+ * knows it should have it back. Without it the layer gives the focus back to the
+ * [layerTrigger] that held it when the layer appeared, else to what had it then, or
+ * to the place it was opened from when that is gone, and to nothing when nothing
+ * had it.
  *
  * [content] is composed with the composition locals of this call site, so it keeps
  * the theme, the strings and the scope of where it was opened. [BoxScope] places

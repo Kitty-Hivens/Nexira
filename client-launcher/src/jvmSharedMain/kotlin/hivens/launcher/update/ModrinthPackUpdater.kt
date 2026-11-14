@@ -33,6 +33,7 @@ import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import java.util.stream.Collectors
 import hivens.launcher.record.PackFileRecord
 import hivens.launcher.record.withBuildOf
 
@@ -403,7 +404,7 @@ class ModrinthPackUpdater(
 
     private fun previewFolders(home: Path): List<Path> =
         if (!Files.isDirectory(home)) emptyList()
-        else Files.list(home).use { entries -> entries.filter { it.fileName.toString().startsWith(PREVIEW_PREFIX) }.toList() }
+        else Files.list(home).use { entries -> entries.filter { it.fileName.toString().startsWith(PREVIEW_PREFIX) }.collect(Collectors.toList()) }
 
     /** Removes [dir] when nothing is left in it. Something still in it keeps it. */
     private fun dropIfEmpty(dir: Path) {

@@ -88,6 +88,53 @@ class ShellChordTest {
         assertFalse(idle.consume, "taking Ctrl+Z at window scope would take it from every text field in the shell")
     }
 
+    // The preset dialog's name field: Ctrl+Z undoes the typing, not the layout
+    // behind the dialog, and a preset saved next carries the layout as it was.
+    @Test
+    fun `ctrl Z belongs to a focused field while the editor is open`() {
+        for (shift in listOf(false, true)) {
+            for (released in listOf(false, true)) {
+                val resolved = resolveChord(
+                    Key.Z, ctrl = true, shift = shift, released = released,
+                    debugOverlayAvailable = false, editing = true, fieldFocused = true,
+                )
+                assertNull(resolved.chord)
+                assertFalse(resolved.consume, "the field gets both edges")
+            }
+        }
+    }
+
+    @Test
+    fun `under a modal the chords that act behind it are left to it`() {
+        for (key in listOf(Key.E, Key.N, Key.Z)) {
+            for (released in listOf(false, true)) {
+                val resolved = resolveChord(
+                    key, ctrl = true, released = released,
+                    debugOverlayAvailable = true, editing = true, modalOpen = true,
+                )
+                assertNull(resolved.chord, "$key")
+                assertFalse(resolved.consume, "$key")
+            }
+        }
+        assertEquals(
+            ShellChord.ToggleDebugOverlay,
+            resolveChord(Key.F9, ctrl = false, released = true, debugOverlayAvailable = true, editing = false, modalOpen = true).chord,
+            "the debug overlay is a diagnostic and works over a modal",
+        )
+    }
+
+    @Test
+    fun `a focused field leaves edit mode and the rail chords working`() {
+        assertEquals(
+            ShellChord.ToggleEditMode,
+            resolveChord(Key.E, ctrl = true, released = true, debugOverlayAvailable = false, editing = false, fieldFocused = true).chord,
+        )
+        assertEquals(
+            ShellChord.ToggleRightRail,
+            resolveChord(Key.N, ctrl = true, released = true, debugOverlayAvailable = false, editing = true, fieldFocused = true).chord,
+        )
+    }
+
     @Test
     fun `an unrelated chord is left alone`() {
         val resolved = resolveChord(Key.S, ctrl = true, released = true, debugOverlayAvailable = true, editing = false)

@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.Symbol
+import hivens.ui.layers.layerTrigger
 import hivens.ui.theme.Spacing
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
@@ -96,6 +97,7 @@ fun NxButton(
                     else Color.Transparent,
                 )
                 .let { if (bordered) it.border(1.dp, outline.copy(alpha = dim), shape) else it }
+                .layerTrigger()
                 .clickable(enabled = enabled, onClick = onClick)
                 .padding(pad),
             verticalAlignment     = Alignment.CenterVertically,

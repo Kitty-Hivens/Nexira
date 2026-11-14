@@ -33,8 +33,17 @@ enum class CorePart {
 
 /** A failure in the launcher's core the person has to be told about, because nothing on screen would say it. */
 sealed interface CoreProblem {
-    /** What the problem is told under. One notice per key for the life of the process. */
+    /** What the problem is told under. One notice per key, see [perAttempt]. */
     val key: String
+
+    /**
+     * Whether the problem answers something the person asked for and may ask for
+     * again: a sign-out, a launch. Each attempt that fails is told, since the last
+     * notice may be dismissed by then and the new attempt otherwise says nothing.
+     * A problem that is not is told once for the life of the process, however many
+     * windows and reloads run into it.
+     */
+    val perAttempt: Boolean get() = false
 
     /** The launcher's own sign-in threw, so the launcher was left signed out. */
     data class SignInFailed(val cause: Throwable) : CoreProblem {
@@ -44,11 +53,13 @@ sealed interface CoreProblem {
     /** Signing out threw before the accounts were cleared, so they are still on this device. */
     data class SignOutFailed(val cause: Throwable) : CoreProblem {
         override val key: String get() = "core:sign-out"
+        override val perAttempt: Boolean get() = true
     }
 
     /** Signed out, but the offline name could not be removed, so the next start may sign in under it. */
     data class SignedOutNameKept(val cause: Throwable) : CoreProblem {
         override val key: String get() = "core:sign-out:name"
+        override val perAttempt: Boolean get() = true
     }
 
     /** A part of the core could not be made, so whatever reads its keys has nothing. */
@@ -56,9 +67,14 @@ sealed interface CoreProblem {
         override val key: String get() = "core:part:${part.name}"
     }
 
-    /** A launch was asked for the pack [packId], which is not installed. */
+    /**
+     * A launch was asked for the pack [packId], which is not installed. Under a key
+     * of its own rather than the pack's launch group, whose notices are the launch
+     * driver's, so taking this one back cannot take the driver's with it.
+     */
     data class PackNotInstalled(val packId: String) : CoreProblem {
-        override val key: String get() = "pack:$packId:launch"
+        override val key: String get() = "core:pack:$packId:not-installed"
+        override val perAttempt: Boolean get() = true
     }
 }
 
@@ -69,6 +85,9 @@ interface CoreProblems {
 
     /** Takes back every report of [kind] still standing, once what it said no longer holds. */
     fun withdraw(kind: KClass<out CoreProblem>)
+
+    /** Takes back the report standing under [problem]'s key, once what it said no longer holds. */
+    fun withdraw(problem: CoreProblem)
 }
 
 /**
@@ -79,7 +98,8 @@ interface CoreProblems {
  * Each problem is told once for the life of the process under its key, however many
  * times and from however many threads it is reported, so a part missing in every
  * window and in every reload is still one notice and one record in the history. A
- * report that was withdrawn can be told again.
+ * report that was withdrawn can be told again, and so can one that answers an
+ * attempt ([CoreProblem.perAttempt]), each time the attempt fails.
  *
  * The notice is put together and pushed on [dispatcher] under [scope], never on the
  * caller's thread: a report can come from inside a frame, and reading the language
@@ -97,7 +117,11 @@ class NotifiedCoreProblems(
     private val told = ConcurrentHashMap<String, KClass<out CoreProblem>>()
 
     override fun report(problem: CoreProblem) {
-        if (told.putIfAbsent(problem.key, problem::class) != null) return
+        if (problem.perAttempt) {
+            told[problem.key] = problem::class
+        } else if (told.putIfAbsent(problem.key, problem::class) != null) {
+            return
+        }
         scope.launch(dispatcher) {
             // Withdrawn before it got here: there is nothing left to say.
             if (told[problem.key] == null) return@launch
@@ -111,6 +135,8 @@ class NotifiedCoreProblems(
                 title     = title(problem, s),
                 body      = body(problem, s),
             )
+            // Withdrawn while it was being pushed: the withdraw found nothing to take down.
+            if (told[problem.key] == null) notifications.dismiss(problem.key)
         }
     }
 
@@ -118,6 +144,10 @@ class NotifiedCoreProblems(
         told.entries.filter { it.value == kind }.forEach { (key, _) ->
             if (told.remove(key) != null) notifications.dismiss(key)
         }
+    }
+
+    override fun withdraw(problem: CoreProblem) {
+        if (told.remove(problem.key) != null) notifications.dismiss(problem.key)
     }
 
     private fun title(problem: CoreProblem, s: AppStrings): String = when (problem) {

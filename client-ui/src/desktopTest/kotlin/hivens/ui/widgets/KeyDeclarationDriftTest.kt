@@ -9,8 +9,10 @@ import hivens.widget.api.KeyDeclaration
 import hivens.widget.api.KeyOrigin
 import hivens.widget.api.flowSource
 import hivens.widget.generated.GeneratedWidgetRegistry
+import hivens.widget.model.CommandKey
 import hivens.widget.model.DefaultLayout
 import hivens.widget.model.ScopeLevel
+import hivens.widget.model.SurfaceId
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -65,6 +67,26 @@ class KeyDeclarationDriftTest {
         val listed = EditorSurfaces.all.flatMap { it.provides }
         assertEquals(handedOver, listed.toSet(), "a key a page provides that no surface lists keeps its widgets off that page too")
         assertEquals(listed.size, listed.toSet().size, "a key is handed over by one page")
+    }
+
+    // The launcher update check is the desktop's own, added by its host. A phone adds
+    // nothing, so there the key is absent, and a widget that needs it is kept off
+    // rather than drawn with a button that does nothing.
+    @Test
+    fun `every app command in the catalog is answered by the shared registry, except the host's own`() {
+        val catalog = Commands::class.java.declaredMethods
+            .filter { it.parameterCount == 0 && CommandKey::class.java.isAssignableFrom(it.returnType) }
+            .map { it.invoke(Commands) as CommandKey<*> }
+        assertTrue(catalog.isNotEmpty())
+        val unanswered = catalog.filter { it.level == ScopeLevel.App && it.id !in commands.keys() }.map { it.id }
+        assertEquals(listOf(Commands.CheckUpdate.id), unanswered)
+        assertEquals(null, commands.declarationOf(Commands.CheckUpdate.id), "absent, not answered by something that does nothing")
+        val admission = WidgetAdmission(::declarationOf) { listOf(Commands.CheckUpdate.id) }
+        assertEquals(
+            listOf(Commands.CheckUpdate.id),
+            admission.missing(GeneratedWidgetRegistry.all().keys.first(), SurfaceId("home.new"), DefaultLayout.load()),
+            "a widget that needs it is kept off where no host answers it",
+        )
     }
 
     @Test

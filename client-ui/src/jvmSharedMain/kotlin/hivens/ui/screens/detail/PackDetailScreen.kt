@@ -32,6 +32,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -169,10 +170,9 @@ fun PackDetailScreen(
     var tabIndex by rememberSaveable(pack.id) { mutableIntStateOf(0) }
     val s = LocalStrings.current
 
-    var showSettings by remember(pack.id) { mutableStateOf(initialShowSettings) }
     // Which section the sheet opens on. The gear opens it at the top; a locked
     // content row opens it where detaching is, since that is what its menu offers.
-    var settingsSection by remember(pack.id) { mutableStateOf(initialSettingsSection) }
+    val settings = rememberSettingsPanel(pack.id, initialShowSettings, initialSettingsSection)
     // Owned here rather than inside the tab, because one thing it holds -- the
     // version picker -- is a modal over the whole screen, and a modal drawn
     // inside a tab body is sized and clipped by that body.
@@ -198,7 +198,7 @@ fun PackDetailScreen(
             compact        = lowWindow,
             launchControl  = launchControl,
             onBack         = onBack,
-            onOpenSettings = { settingsSection = null; showSettings = true },
+            onOpenSettings = { settings.section = null; settings.open = true },
             onOpenFolder   = { state.openFolder() },
             // Any source that pins a version has one worth naming; this used to
             // ask whether the pack came from the mirror, which hid the version of
@@ -262,8 +262,8 @@ fun PackDetailScreen(
                     onOpenProject = onOpenProject,
                     onFindProjects = onFindProjects,
                     onOpenPackSettings = {
-                        settingsSection = PackSettingsCategory.Data
-                        showSettings = true
+                        settings.section = PackSettingsCategory.Data
+                        settings.open = true
                     },
                 )
                 1 -> FileBrowserPane(rootDir = instanceDir)
@@ -281,15 +281,43 @@ fun PackDetailScreen(
 
     // A sheet over the whole window, so it is mounted here only for its state: where
     // it draws is not this screen's bounds.
-    if (showSettings) {
+    if (settings.open) {
         PackSettingsSheet(
             pack            = pack,
             instanceDir     = instanceDir,
-            onDismiss       = { showSettings = false },
+            onDismiss       = { settings.open = false },
             onOpenVersions  = { onOpenVersions(true) },
-            initialCategory = settingsSection,
+            initialCategory = settings.section,
         )
     }
+}
+
+/** Whether a pack page's settings sheet is open, and which section it opens on. */
+@Stable
+internal class SettingsPanel(open: Boolean, section: PackSettingsCategory?) {
+    var open by mutableStateOf(open)
+    var section by mutableStateOf(section)
+}
+
+/**
+ * The settings sheet of the pack [packId], open as the history entry says at first.
+ *
+ * The router updates the page in place when the history moves between two entries of
+ * the same pack, so a change in what the entry says, [entryOpen] or [entrySection],
+ * is followed too. Read only at first, an entry that closed the settings left them
+ * open over the page it led to.
+ */
+@Composable
+internal fun rememberSettingsPanel(packId: String, entryOpen: Boolean, entrySection: PackSettingsCategory?): SettingsPanel {
+    val panel = remember(packId) { SettingsPanel(entryOpen, entrySection) }
+    var followed by remember(packId) { mutableStateOf(entryOpen to entrySection) }
+    LaunchedEffect(panel, entryOpen, entrySection) {
+        if (followed == (entryOpen to entrySection)) return@LaunchedEffect
+        followed = entryOpen to entrySection
+        panel.open = entryOpen
+        panel.section = entrySection
+    }
+    return panel
 }
 
 /**

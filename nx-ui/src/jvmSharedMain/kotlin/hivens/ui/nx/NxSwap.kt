@@ -21,6 +21,10 @@ import hivens.ui.theme.MotionRole
  * The role carries both halves, so "this panel slides in" is one argument rather
  * than an assembled transition, and a style that asks for stillness collapses it
  * everywhere at once.
+ *
+ * [contentKey] says which targets are the same content: a change between two of
+ * them updates the content in place instead of swapping it, so the two are never
+ * drawn side by side. By default every distinct target is content of its own.
  */
 @Composable
 fun <T> NxSwap(
@@ -28,6 +32,7 @@ fun <T> NxSwap(
     modifier: Modifier = Modifier,
     role: MotionRole = Motion.fade,
     label: String = "nxSwap",
+    contentKey: (T) -> Any? = { it },
     content: @Composable (T) -> Unit,
 ) {
     AnimatedContent(
@@ -35,6 +40,7 @@ fun <T> NxSwap(
         modifier       = modifier,
         transitionSpec = { role.enter togetherWith role.exit },
         label          = label,
+        contentKey     = contentKey,
     ) { value ->
         content(value)
     }

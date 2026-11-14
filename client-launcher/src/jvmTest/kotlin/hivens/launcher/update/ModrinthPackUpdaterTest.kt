@@ -39,6 +39,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 import java.io.IOException
 import java.nio.file.Files
@@ -55,6 +56,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * The Modrinth update path end to end, over a mock Modrinth and a mock CDN.
@@ -77,10 +79,24 @@ class ModrinthPackUpdaterTest {
     private class FakeRepo : IPackRepository {
         val map = LinkedHashMap<String, PackInstance>()
         private val flow = MutableStateFlow<List<PackInstance>>(emptyList())
+
+        /**
+         * Once set, the next write it matches is kept and then reported as failed, the
+         * way a store that changed its memory and could not save it fails.
+         */
+        var failAfterWriting: ((PackInstance) -> Boolean)? = null
+
         override fun observe(): StateFlow<List<PackInstance>> = flow
         override suspend fun list(): List<PackInstance> = map.values.toList()
         override suspend fun get(id: String): PackInstance? = map[id]
-        override suspend fun put(instance: PackInstance) { map[instance.id] = instance }
+        override suspend fun put(instance: PackInstance) {
+            map[instance.id] = instance
+            val fails = failAfterWriting
+            if (fails != null && fails(instance)) {
+                failAfterWriting = null
+                throw IOException("the registry could not be saved")
+            }
+        }
         override suspend fun delete(id: String) { map.remove(id) }
     }
 
@@ -450,7 +466,10 @@ class ModrinthPackUpdaterTest {
         val clientDir = h.clientDirOf(detached)
         val reattach = InstanceMutationLock.withLock(clientDir) {
             val running = launch(Dispatchers.IO) { h.instances.reattach(detached, shown.confirmation) }
-            while (Files.list(home).use { entries -> entries.noneMatch { it.fileName.toString().startsWith("apply-") } }) delay(10)
+            // Bounded, so a reattach that never takes the archive over fails here and says so.
+            withTimeout(30.seconds) {
+                while (Files.list(home).use { entries -> entries.noneMatch { it.fileName.toString().startsWith("apply-") } }) delay(10)
+            }
             failing.set(true)
             val failed = runCatching { h.instances.previewReattach(detached) }
             assertTrue(failed.isFailure, "the second preview dies on its download")
@@ -463,6 +482,72 @@ class ModrinthPackUpdaterTest {
 
         assertEquals(PackOrigin.Modrinth, h.repo.get(detached.id)?.packRef?.origin, "the reattach finished on the archive it held")
         assertEquals(fetchedBefore, h.archiveFetches.get(), "and did not have to fetch it again")
+    }
+
+    /**
+     * The player read the list, then a shipped jar changed bytes: the build would now
+     * replace a file the dialog never named. The operation itself refuses, whatever
+     * the surface that confirmed did.
+     */
+    @Test
+    fun `a reattach refuses a preview the pack no longer matches and touches nothing`() = runTest {
+        val h = Harness()
+        val installed = h.installV1()
+        h.repo.put(installed.copy(followLatest = false))
+        val detached = h.instances.detachToLocal(h.repo.get(installed.id)!!)
+        val dir = h.clientDirOf(detached)
+        val preview = h.instances.previewReattach(detached)
+        assertTrue(preview.replaced.isEmpty(), "nothing differs from the build when the player looks")
+
+        Files.writeString(dir.resolve("mods/cool.jar"), "COOL-MAD")
+
+        assertFailsWith<ReattachPreviewStaleException> { h.instances.reattach(detached, preview.confirmation) }
+        assertEquals("COOL-MAD", dir.resolve("mods/cool.jar").readText(), "the jar is the player's still")
+        assertEquals(PackOrigin.Local, h.repo.get(detached.id)?.packRef?.origin)
+        assertTrue(h.journal.listPending().isEmpty())
+        assertTrue(h.updater.listSnapshots(detached).isEmpty(), "nothing was even captured")
+    }
+
+    /** As on the mirror: undoing a reattach takes the pack off its source again, with the player's mods back. */
+    @Test
+    fun `rolling back a reattach returns the pack to its detached record`() = runTest {
+        val h = Harness()
+        val detached = h.instances.detachToLocal(h.installV1())
+        val dir = h.clientDirOf(detached)
+        Files.writeString(dir.resolve("mods/extra.jar"), "MINE")
+        val back = h.instances.reattach(detached, h.instances.previewReattach(detached).confirmation)
+        assertEquals(PackOrigin.Modrinth, back.packRef.origin)
+
+        h.updater.rollback(back, h.updater.listSnapshots(back).single().id)
+
+        val record = h.repo.get(detached.id)!!
+        assertEquals(PackOrigin.Local, record.packRef.origin, "the pack is its player's again")
+        assertEquals(detached.forkedFrom, record.forkedFrom)
+        assertEquals("MINE", dir.resolve("mods/extra.jar").readText())
+        assertEquals("COOL-MOD", dir.resolve("mods/cool.jar").readText())
+    }
+
+    /**
+     * A failure after the reattach wrote the source back onto the record: the rollback
+     * puts the files back, and has to take the source off again with them, or the
+     * record names Modrinth over the player's own mods.
+     */
+    @Test
+    fun `a reattach that fails after writing the source back returns to the detached record`() = runTest {
+        val h = Harness()
+        val detached = h.instances.detachToLocal(h.installV1())
+        val dir = h.clientDirOf(detached)
+        Files.writeString(dir.resolve("mods/extra.jar"), "MINE")
+        val preview = h.instances.previewReattach(detached)
+        h.repo.failAfterWriting = { it.packRef.origin == PackOrigin.Modrinth }
+
+        assertFailsWith<IOException> { h.instances.reattach(detached, preview.confirmation) }
+
+        val record = h.repo.get(detached.id)!!
+        assertEquals(PackOrigin.Local, record.packRef.origin)
+        assertEquals(detached.forkedFrom, record.forkedFrom)
+        assertEquals("MINE", dir.resolve("mods/extra.jar").readText())
+        assertTrue(h.journal.listPending().isEmpty(), "rolled back in process")
     }
 
     /** As on the mirror: a version the player picked is a pin, and only the latest is followed. */

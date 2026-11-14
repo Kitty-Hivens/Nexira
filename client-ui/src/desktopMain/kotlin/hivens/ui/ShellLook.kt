@@ -1,10 +1,14 @@
 package hivens.ui
 
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.text.font.FontFamily
+import hivens.ui.appearance.AppearanceStore
 import hivens.ui.customization.CustomizationSettings
 import hivens.ui.i18n.AppLocale
 import hivens.ui.theme.Theme
@@ -40,4 +44,27 @@ class ShellLook(dark: Boolean, locale: AppLocale) {
         this.uiFamily = uiFamily
         this.customization = customization
     }
+}
+
+/**
+ * Keeps [look] on what the main window draws with: the theme, the scheme and the
+ * language from [appearance], and what only the shell knows, [uiFamily] and
+ * [customization].
+ *
+ * The appearance is read here, in a restart scope of its own, so a theme or a dark
+ * scheme switched anywhere reaches the console at once. Published from the shell's
+ * scope, which did not read them, a switch reached the console only once something
+ * unrelated happened to recompose that scope.
+ */
+@Composable
+internal fun PublishShellLook(
+    look: ShellLook,
+    appearance: AppearanceStore,
+    uiFamily: FontFamily?,
+    customization: CustomizationSettings,
+) {
+    val theme = appearance.library.collectAsState().value.active
+    val dark = appearance.dark.collectAsState().value
+    val locale = appearance.locale.collectAsState().value
+    SideEffect { look.update(theme, dark, locale, uiFamily, customization) }
 }

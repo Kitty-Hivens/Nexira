@@ -19,7 +19,6 @@ import kotlin.concurrent.thread
 import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertSame
@@ -77,8 +76,9 @@ class AppCommandFallbackTest {
         assertEquals(listOf("hello", "ping"), fired)
     }
 
+    // Thrown from a click, a command a host left out took the window down.
     @Test
-    fun `a registered value is still what answers, and a key nothing answers throws when fired`() {
+    fun `a registered value is still what answers, and a key nothing answers does nothing when fired`() {
         val fired = ArrayList<String>()
         val commands = WidgetCommandRegistry().apply { register(say, command { fired += "value $it" }) }
         val app = WidgetScope.app(WidgetDataRegistry(), MemoryLevelServices.app(), Dispatchers.Unconfined, commands)
@@ -89,8 +89,8 @@ class AppCommandFallbackTest {
             pingIt = rememberAction(ping)
         }
         assertNotNull(sayIt).invoke("x")
+        assertNotNull(pingIt).invoke()
         assertEquals(listOf("value x"), fired)
-        assertFailsWith<IllegalStateException> { assertNotNull(pingIt).invoke() }
     }
 
     @Test

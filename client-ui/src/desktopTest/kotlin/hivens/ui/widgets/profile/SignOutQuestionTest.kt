@@ -7,6 +7,14 @@ import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.PointerButton
+import androidx.compose.ui.input.pointer.PointerButtons
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsNode
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.unit.Density
 import hivens.auth.AccountStore
 import hivens.auth.AuthProviderRegistry
@@ -21,6 +29,7 @@ import hivens.ui.components.SignOutRequests
 import hivens.ui.components.rememberSignOutRequest
 import hivens.ui.i18n.AppLocale
 import hivens.ui.i18n.LocaleProvider
+import hivens.ui.i18n.stringsFor
 import hivens.ui.layers.LayerHost
 import hivens.ui.layers.rememberWindowLayers
 import hivens.ui.levelServicesModule
@@ -191,6 +200,42 @@ class SignOutQuestionTest {
             scene.until("the question closing") { !requests().asking.value }
             assertEquals(listOf("signed out"), signedOut.toList())
         }
+    }
+
+    // The test above answers through the automation hook, which signs out with no
+    // dialog drawn at all. This one answers the way a person does.
+    @Test
+    fun `the question is drawn over the window and its own yes signs out`() {
+        val yes = stringsFor(AppLocale.ENGLISH).navLogout
+        var ask: (() -> Unit)? = null
+        drawn({ ask = rememberSignOutRequest() }) { scene, requests ->
+            assertNotNull(ask).invoke()
+            scene.until("the question on screen") { scene.button(yes) != null }
+            assertTrue(signedOut.isEmpty(), "nothing is signed out before the answer")
+            scene.click(assertNotNull(scene.button(yes)).boundsInRoot.center)
+            scene.until("the question closing") { !requests().asking.value }
+            assertEquals(listOf("signed out"), signedOut.toList())
+        }
+    }
+
+    /** The control on screen that says [label] and takes a click, or null. */
+    private fun ImageComposeScene.button(label: String): SemanticsNode? =
+        semanticsOwners.asSequence()
+            .flatMap { it.rootSemanticsNode.withDescendants() }
+            .firstOrNull { node ->
+                SemanticsActions.OnClick in node.config &&
+                    node.config.getOrNull(SemanticsProperties.Text).orEmpty().any { it.text == label }
+            }
+
+    private fun SemanticsNode.withDescendants(): Sequence<SemanticsNode> =
+        sequenceOf(this) + children.asSequence().flatMap { it.withDescendants() }
+
+    private fun ImageComposeScene.click(at: Offset) {
+        sendPointerEvent(PointerEventType.Move, at)
+        sendPointerEvent(PointerEventType.Press, at, buttons = PointerButtons(isPrimaryPressed = true), button = PointerButton.Primary)
+        settle(2)
+        sendPointerEvent(PointerEventType.Release, at, buttons = PointerButtons(), button = PointerButton.Primary)
+        settle(2)
     }
 
     @Test

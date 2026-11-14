@@ -37,12 +37,17 @@ class WindowLayers {
     /** What the window draws above its content right now, bottom to top. */
     internal val residents: List<LayerResident> get() = plan.order
 
+    /** Whether a modal layer holds the window now, so what it blocks must not act. */
+    val modalOpen: Boolean get() = plan.modal != null
+
     /** Shows [resident] on top of its siblings: a visible edge. */
     internal fun show(resident: LayerResident) {
         resident.stamp = tick()
         resident.shown = true
         resident.releasing = false
         resident.tookFocus = false
+        resident.trigger = null
+        resident.takenFrom = null
         shown.remove(resident)
         shown.add(resident)
     }
@@ -50,11 +55,15 @@ class WindowLayers {
     /**
      * Takes [resident] out of the order. A layer that holds the keyboard gives it back
      * first to what had it before the layer took it, while its content is still there
-     * to let go of it.
+     * to let go of it. One that let a newer layer take the keyboard leaves it there: a
+     * menu fading out after its row opened a dialog took the focus out of the dialog
+     * when the fade ended.
      */
     internal fun hide(resident: LayerResident) {
         resident.shown = false
-        if (resident.holdsFocus || resident.tookFocus) {
+        val newerHolds = !resident.holdsFocus &&
+            shown.any { it !== resident && it.shown && it.focusable && it.holdsFocus && it.stamp > resident.stamp }
+        if (!newerHolds && (resident.holdsFocus || resident.tookFocus)) {
             resident.releasing = true
             giveFocusBack(resident)
         }
@@ -66,17 +75,53 @@ class WindowLayers {
 
     /**
      * The focus back out of a leaving layer, in order: to where the caller asked, to
-     * the child of the group it was taken from that had it, and when that child is
-     * gone to the first thing in that group, so the keyboard stays in the place the
-     * layer was opened from. A layer that took the focus from nothing gives it back to
-     * nothing.
+     * the [layerTrigger] that held it when the layer appeared, to the child of the group
+     * it was taken from that had it, and when that child is gone to the first thing in
+     * that group, so the keyboard stays in the place the layer was opened from. Last,
+     * when that group was a layer that has gone meanwhile, to what that layer was
+     * opened from. A layer that took the focus from nothing gives it back to nothing.
      */
     private fun giveFocusBack(resident: LayerResident) {
         if (resident.returnFocus?.requestFocus(FocusDirection.Enter) == true) return
-        val back = resident.focusReturn ?: return
-        if (resident.focusReturnToChild && back.restoreFocusedChild()) return
-        back.requestFocus(FocusDirection.Enter)
+        if (refocus(resident.trigger)) return
+        val back = resident.focusReturn
+        if (back != null) {
+            if (resident.focusReturnToChild && back.restoreFocusedChild()) return
+            if (back.requestFocus(FocusDirection.Enter)) return
+        }
+        refocus(resident.takenFrom?.trigger)
     }
+
+    /**
+     * Focuses [start], or when it is gone, the trigger of the layer it was drawn in,
+     * outwards. Each layer is asked once, so two layers opened from each other in turn
+     * cannot keep it walking.
+     */
+    private fun refocus(start: LayerTrigger?): Boolean {
+        var at = start
+        val asked = HashSet<LayerResident>()
+        while (at != null) {
+            if (at.takeFocus()) return true
+            val owner = at.owner ?: return false
+            if (!asked.add(owner)) return false
+            at = owner.trigger
+        }
+        return false
+    }
+
+    // The marked control that holds the focus now, see [layerTrigger].
+    private var focusedTrigger: LayerTrigger? = null
+
+    internal fun triggerFocused(trigger: LayerTrigger) {
+        focusedTrigger = trigger
+    }
+
+    internal fun triggerLeft(node: LayerTriggerNode) {
+        if (focusedTrigger?.node === node) focusedTrigger = null
+    }
+
+    /** The marked control that holds the focus now, which a layer taking the focus gives it back to. */
+    internal fun triggerHoldingFocus(): LayerTrigger? = focusedTrigger
 
     /** The focus group around the window's own content, which a layer that takes the focus returns it to. */
     internal val contentFocus = FocusRequester()
@@ -86,7 +131,11 @@ class WindowLayers {
      * to give it back to: a shown layer that holds it, or the window's own content.
      */
     internal fun focusHolder(except: LayerResident): FocusRequester =
-        shown.firstOrNull { it !== except && it.focusable && it.holdsFocus }?.focus ?: contentFocus
+        layerHoldingFocus(except)?.focus ?: contentFocus
+
+    /** The shown layer other than [except] that holds the keyboard focus, null when the window's content has it. */
+    internal fun layerHoldingFocus(except: LayerResident): LayerResident? =
+        shown.firstOrNull { it !== except && it.focusable && it.holdsFocus }
 
     /** Whether [resident] is the topmost modal or a layer it was opened from. */
     internal fun holdsModal(resident: LayerResident): Boolean {

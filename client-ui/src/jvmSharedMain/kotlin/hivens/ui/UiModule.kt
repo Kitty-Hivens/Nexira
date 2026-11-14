@@ -51,6 +51,7 @@ import hivens.ui.packs.ReattachPreviews
 import hivens.ui.packs.previewReattach
 import hivens.ui.packs.reattachPack
 import hivens.ui.packs.updatePack
+import hivens.ui.packs.withdrawNoticesOfInstalledPacks
 import hivens.ui.session.SessionStore
 import hivens.ui.theme.ThemeLibrary
 import hivens.ui.theme.ThemeManager
@@ -247,11 +248,12 @@ fun uiCoreModule(
     includes(levelServicesModule, sessionModule())
 
     // What the core could not do, said in the notification centre in the person's language.
+    // A pack said to be missing is taken back once a pack of that id is installed.
     single<CoreProblems> {
         val settingsService: ISettingsService = get()
         NotifiedCoreProblems(notifications = get(), scope = get()) {
             stringsFor(AppLocale.fromTag(settingsService.getSettings().locale))
-        }
+        }.also { problems -> withdrawNoticesOfInstalledPacks(get<IPackRepository>().observe(), problems, get()) }
     }
 
     // The catalogue's own lists the filter rail is built from, read once a run.
@@ -698,7 +700,7 @@ internal fun uiCommandRegistry(
         val settings = services.get<ISettingsService>()
         val offline = services.get<OfflineAuthProvider>()
         val problems = services.get<CoreProblems>()
-        command { id -> launchPack(id, store.session, packs, actions, settings, offline, problems, app.coroutineScope) }
+        command { id -> launchPack(id, store.state.value, packs, actions, settings, offline, problems, app.coroutineScope) }
     }
     registerFactory(Commands.StopPack) { app -> command(app.services.get<PackActions>()::stop) }
     registerFactory(Commands.InstallPack) { app -> command(app.services.get<PackActions>()::install) }

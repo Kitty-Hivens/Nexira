@@ -3,6 +3,9 @@ package hivens.widget.api
 import hivens.widget.model.CommandKey
 import hivens.widget.model.ScopeLevel
 import hivens.widget.model.WidgetCommand
+import org.slf4j.LoggerFactory
+
+private val log = LoggerFactory.getLogger("hivens.widget.api.WidgetCommandRegistry")
 
 /** How a level makes its own command for a key. Run once per level, the first time the key is fired or asked for there. */
 typealias CommandFactory<P> = (LevelContext) -> WidgetCommand<P>
@@ -64,12 +67,21 @@ class WidgetCommandRegistry {
         require(id !in commands && id !in factories && id !in declared) { "duplicate widget command id '$id'" }
     }
 
+    /**
+     * Runs the command registered as a value for [key]. Where none is, it does nothing
+     * and says so in the log: a host may leave an app command out, and firing one is
+     * no place to throw.
+     */
     // Unchecked cast: register ties CommandKey<P> to WidgetCommand<P> at the call
     // site, so the only unsound path is a hand-written raw CommandKey paired with
     // a mismatched command -- the same documented seam as WidgetDataRegistry.get.
     @Suppress("UNCHECKED_CAST")
     fun <P> dispatch(key: CommandKey<P>, payload: P) {
-        val command = commands[key.id] ?: error("no widget command registered for '${key.id}'")
+        val command = commands[key.id]
+        if (command == null) {
+            log.warn("Widget command '{}' was dispatched where nothing answers it, and did nothing", key.id)
+            return
+        }
         (command as WidgetCommand<P>).run(payload)
     }
 

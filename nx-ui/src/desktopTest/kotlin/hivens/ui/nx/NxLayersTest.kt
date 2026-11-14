@@ -2,7 +2,9 @@ package hivens.ui.nx
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
@@ -33,6 +35,7 @@ import androidx.compose.ui.input.pointer.PointerButtons
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import hivens.ui.icons.NxIcon
 import hivens.ui.layers.DismissOnBack
 import hivens.ui.layers.LayerHost
 import hivens.ui.layers.WindowLayers
@@ -280,6 +283,68 @@ class NxLayersTest {
         }
     }
 
+    // A double click on a row that opens nothing (copy, open folder, a toggle): the
+    // first click closes the menu, and the second landed on it while it faded out.
+    @Test
+    fun `a menu row pressed again while the menu fades out does nothing more`() = onEventThread {
+        var picked = 0
+        var open by mutableStateOf(true)
+        LayersWindow {
+            Box(Modifier.size(20.dp)) {
+                NxContextMenu(expanded = open, onDismissRequest = { open = false }) {
+                    Box(Modifier.size(60.dp).background(MENU_INK).clickable { picked++; open = false })
+                }
+            }
+        }.use { window ->
+            window.settle(frames = 30)
+            val row = window.inkBounds(MENU_INK).centre
+            window.click(row, frames = 1)
+            assertFalse(open)
+            window.click(row, frames = 1)
+            window.settle(frames = 20)
+            assertEquals(1, picked)
+        }
+    }
+
+    // A keyboard user tabs to a control deep in the page and opens a dialog from it.
+    // Closing the dialog has to put the keyboard back on that control, not on the
+    // first control of the window.
+    @Test
+    fun `the keyboard goes back to the button a dialog was opened from`() = onEventThread {
+        val opener = FocusRequester()
+        var open by mutableStateOf(false)
+        var openerFocused = false
+        var firstFocused = false
+        LayersWindow {
+            Column(Modifier.focusGroup()) {
+                NxButton(label = "First", onClick = {}, modifier = Modifier.onFocusChanged { firstFocused = it.hasFocus })
+                Box(Modifier.focusGroup()) {
+                    NxIconButton(
+                        icon               = NxIcon.MoreVert,
+                        contentDescription = "More",
+                        onClick            = {},
+                        modifier           = Modifier.onFocusChanged { openerFocused = it.hasFocus }.focusRequester(opener),
+                    )
+                }
+            }
+            if (open) NxDialog(onDismissRequest = { open = false }) { Box(Modifier.size(100.dp)) }
+        }.use { window ->
+            window.settle()
+            opener.requestFocus()
+            window.settle()
+            assertTrue(openerFocused)
+            open = true
+            window.settle(frames = 20)
+            assertFalse(openerFocused, "the dialog took the keyboard")
+
+            window.pressEscape()
+            window.settle(frames = 20)
+            assertFalse(open)
+            assertTrue(openerFocused, "and gave it back to the button")
+            assertFalse(firstFocused)
+        }
+    }
+
     @Test
     fun `a press outside closes a menu`() = onEventThread {
         var open by mutableStateOf(true)
@@ -397,12 +462,13 @@ private class LayersWindow(content: @Composable () -> Unit) : AutoCloseable {
         settle()
     }
 
-    fun click(at: Offset) {
+    /** A press and release at [at], with [frames] frames drawn after each. */
+    fun click(at: Offset, frames: Int = 6) {
         scene.sendPointerEvent(PointerEventType.Move, at)
         scene.sendPointerEvent(PointerEventType.Press, at, buttons = PointerButtons(isPrimaryPressed = true), button = PointerButton.Primary)
-        settle()
+        settle(frames)
         scene.sendPointerEvent(PointerEventType.Release, at, buttons = PointerButtons(), button = PointerButton.Primary)
-        settle()
+        settle(frames)
     }
 
     fun press(key: Key) {

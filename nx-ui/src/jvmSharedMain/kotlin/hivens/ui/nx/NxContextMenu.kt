@@ -44,6 +44,11 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
@@ -61,6 +66,7 @@ import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.layers.AnchoredLayer
+import hivens.ui.layers.layerTrigger
 import hivens.ui.surface.NxSurface
 import hivens.ui.theme.Motion
 import hivens.ui.theme.Spacing
@@ -246,6 +252,9 @@ internal fun NxMenuPopup(
     ) {
         AnimatedVisibility(
             visibleState = states,
+            // On its way out the popup is a picture: a second click on a row during
+            // the fade ran the row's action again.
+            modifier = Modifier.inertUnless(expanded),
             // The fade is the quicker half so the menu reads as an object arriving
             // rather than as text swelling into place; the scale is the opening
             // role, which is what this is.
@@ -380,6 +389,7 @@ fun NxMenuItem(
             .clip(MaterialTheme.shapes.small)
             .background(wash)
             .hoverable(interaction, enabled = enabled)
+            .layerTrigger()
             .clickable(interactionSource = interaction, indication = null, enabled = enabled, onClick = onClick)
             .padding(horizontal = Spacing.s10, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -531,6 +541,23 @@ internal fun rememberParentInWindow(): State<IntOffset> {
     ) { _, _ -> layout(0, 0) {} }
     return at
 }
+
+/**
+ * While [live] is false, nothing inside takes a press or a key that would act: the
+ * pointer is consumed before the rows see it, and Enter and Space go no further.
+ * Escape and the arrows pass, so they still reach what is behind.
+ */
+private fun Modifier.inertUnless(live: Boolean): Modifier =
+    if (live) this else this
+        .pointerInput(Unit) {
+            awaitPointerEventScope {
+                while (true) awaitPointerEvent(PointerEventPass.Initial).changes.forEach { it.consume() }
+            }
+        }
+        .onPreviewKeyEvent { it.key in ACTIVATION_KEYS }
+
+/** The keys a focused row acts on. */
+private val ACTIVATION_KEYS = setOf(Key.Enter, Key.NumPadEnter, Key.Spacebar, Key.DirectionCenter)
 
 /** Where the trigger sits inside the menu's own box, as a fraction on each axis. */
 private fun anchorOrigin(anchorX: Int, popupX: Int, popupWidth: Int, growsDown: Boolean): TransformOrigin {

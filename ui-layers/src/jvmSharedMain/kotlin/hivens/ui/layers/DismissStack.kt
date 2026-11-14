@@ -9,9 +9,6 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.isAltPressed
-import androidx.compose.ui.input.key.isCtrlPressed
-import androidx.compose.ui.input.key.isMetaPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import java.util.concurrent.atomic.AtomicInteger
@@ -144,7 +141,7 @@ class DismissStack internal constructor(private val layers: WindowLayers) {
      * does, a key meant for a dialog included. Never consumes.
      */
     fun onPreviewKeyEvent(event: KeyEvent): Boolean {
-        if (!event.isPlainEscape()) return false
+        if (!event.isEscape()) return false
         when (event.type) {
             KeyEventType.KeyDown -> {
                 fresh = !held
@@ -166,7 +163,7 @@ class DismissStack internal constructor(private val layers: WindowLayers) {
      * opened after the host, or else this stack's top entry.
      */
     fun onKeyEvent(event: KeyEvent): Boolean {
-        if (!event.isPlainEscape()) return false
+        if (!event.isEscape()) return false
         return when (event.type) {
             KeyEventType.KeyDown -> pressTaken || !fresh
             KeyEventType.KeyUp -> pressTaken.also { pressTaken = false }
@@ -184,7 +181,7 @@ class DismissStack internal constructor(private val layers: WindowLayers) {
      * holds the keyboard ([persistentInput]): the press goes on to the stack.
      */
     internal fun onHostKeyEvent(event: KeyEvent): Boolean {
-        if (!event.isPlainEscape() || event.type != KeyEventType.KeyDown) return false
+        if (!event.isEscape() || event.type != KeyEventType.KeyDown) return false
         if (!fresh || pressTaken || !contentFieldFocused || layers.plan.modal != null) return false
         if (persistentFields.get() > 0) return false
         leaveField()
@@ -200,8 +197,12 @@ class DismissStack internal constructor(private val layers: WindowLayers) {
     }
 }
 
-private fun KeyEvent.isPlainEscape(): Boolean =
-    key == Key.Escape && !isCtrlPressed && !isAltPressed && !isMetaPressed
+/**
+ * Escape, with a modifier held or not. The window's back input turns every Escape
+ * into back whatever is held with it, so the field step and the held-key guard have
+ * to see every one too, or a held Ctrl and Escape closes one thing per repeat.
+ */
+private fun KeyEvent.isEscape(): Boolean = key == Key.Escape
 
 /**
  * Puts [onDismiss] on the window's dismiss stack while [enabled], for something

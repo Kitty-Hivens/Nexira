@@ -106,7 +106,8 @@ class SessionStore(
      * the launcher stays signed in, which is true, and says so. When they are gone
      * and only the names stayed, it signs out, since the accounts are what a session
      * stands on, and says what is left: the offline name the next start may sign in
-     * under.
+     * under. Each attempt says its own outcome: one that clears what an earlier one
+     * could not takes that one's notice back.
      */
     fun signOut(): Job =
         scope.launch {
@@ -119,10 +120,12 @@ class SessionStore(
                 problems.report(CoreProblem.SignOutFailed(e))
                 return@launch
             }
+            problems.withdraw(CoreProblem.SignOutFailed::class)
             try {
                 withContext(Dispatchers.IO) {
                     settings.updateSettings { it.copy(preferredFaceProvider = null, offlinePlayerName = null) }
                 }
+                problems.withdraw(CoreProblem.SignedOutNameKept::class)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -173,7 +176,8 @@ class SessionStore(
                 }
                 AutoLoginCoordinator.Resolution.NetworkDown -> {
                     // Loading covers only the first attempt. After it the form is
-                    // usable while the retries go on quietly.
+                    // usable while the retries go on quietly, and a sign-in made by
+                    // hand meanwhile stays.
                     _state.update { if (it is AppState.Loading) AppState.Unauthenticated else it }
                     val delayMs = AutoLoginCoordinator.retryDelayMs(attempt)
                     attempt += 1
@@ -186,7 +190,12 @@ class SessionStore(
 
     // Signed out, unless somebody signed in by hand meanwhile.
     private fun settleSignedOut() {
-        _state.update { if (it is AppState.Authenticated) it else AppState.Unauthenticated }
+        var kept = false
+        _state.update { current ->
+            kept = current is AppState.Authenticated
+            if (kept) current else AppState.Unauthenticated
+        }
+        if (kept) ActionRing.record("Auto-login found no session after a manual sign-in; the manual one stays")
     }
 
     /** One pass: what the stored account and the settings say, with the store told what the pass changed. */

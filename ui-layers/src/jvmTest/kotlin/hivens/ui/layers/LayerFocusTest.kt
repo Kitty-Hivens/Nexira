@@ -8,6 +8,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -353,6 +356,189 @@ class LayerFocusTest {
             open = false
             scene.settle()
             assertTrue(groupHasFocus, "the keyboard is back in the place the layer was opened from, not nowhere")
+        }
+    }
+
+    // A keyboard user reaches a control deep in the page, opens a dialog from it and
+    // closes it: the keyboard has to be back on that control, not on the first one of
+    // the outermost group.
+    @Test
+    fun `focus goes back to a marked trigger nested in groups without a requester`() {
+        val layers = WindowLayers()
+        val trigger = FocusRequester()
+        var open by mutableStateOf(false)
+        var at = ""
+        LayerScene(layers) {
+            LayerHost(layers, Modifier.fillMaxSize()) {
+                Box(Modifier.focusGroup()) {
+                    Column(Modifier.focusGroup()) {
+                        Target("first") { at = it }
+                        Target("trigger", Modifier.layerTrigger().focusRequester(trigger)) { at = it }
+                    }
+                }
+                Layer(visible = open, modal = true, onDismissRequest = { open = false }) { Target("inside") { at = it } }
+            }
+        }.use { scene ->
+            scene.settle()
+            focus(trigger, scene)
+            open = true
+            scene.settle()
+            at = ""
+            open = false
+            scene.settle()
+            assertEquals("trigger", at)
+        }
+    }
+
+    // The kebab, the menu it opens, and the dialog a row of the menu opens. The menu
+    // stays on screen through its fade after the row closed it, as the real one does,
+    // and the dialog focuses its own button meanwhile. The fade ending must leave the
+    // dialog the keyboard, and the dialog closing gives it back to the kebab, the row
+    // being gone by then.
+    @Test
+    fun `a dialog opened from a menu row keeps the focus through the menu's fade and gives it back to the kebab`() {
+        val layers = WindowLayers()
+        val kebab = FocusRequester()
+        val row = FocusRequester()
+        var menuOpen by mutableStateOf(false)
+        var menuShown by mutableStateOf(false)
+        var dialog by mutableStateOf(false)
+        var at = ""
+        LayerScene(layers) {
+            LayerHost(layers, Modifier.fillMaxSize()) {
+                Column(Modifier.focusGroup()) {
+                    Target("other") { at = it }
+                    Target("kebab", Modifier.layerTrigger().focusRequester(kebab)) { at = it }
+                }
+                Layer(
+                    visible = menuShown,
+                    modal = menuOpen,
+                    focusable = true,
+                    onDismissRequest = if (menuOpen) ({ menuOpen = false }) else null,
+                ) {
+                    Target("row", Modifier.layerTrigger().focusRequester(row)) { at = it }
+                }
+                Layer(visible = dialog, modal = true, onDismissRequest = { dialog = false }) {
+                    val ok = remember { FocusRequester() }
+                    Target("ok", Modifier.focusRequester(ok)) { at = it }
+                    LaunchedEffect(Unit) { ok.requestFocus() }
+                }
+            }
+        }.use { scene ->
+            scene.settle()
+            focus(kebab, scene)
+            menuOpen = true
+            menuShown = true
+            scene.settle()
+            focus(row, scene)
+            // The row's click: the menu starts its fade and the dialog opens.
+            menuOpen = false
+            dialog = true
+            scene.settle()
+            assertEquals("ok", at)
+            // The fade ends.
+            menuShown = false
+            scene.settle()
+            assertEquals("ok", at, "the menu leaving took the keyboard out of the dialog")
+            assertTrue(layers.modalOpen)
+
+            at = ""
+            dialog = false
+            scene.settle()
+            assertEquals("kebab", at)
+        }
+    }
+
+    // A row's kebab opens a confirmation, and the list moves on under it. A lazy list
+    // hands the slot of a row that left, node and all, to a row that comes into view,
+    // and closing the confirmation focused that row's kebab.
+    @Test
+    fun `a row that left a lazy list does not pass the focus on to the row reusing its slot`() {
+        val layers = WindowLayers()
+        val list = LazyListState()
+        var open by mutableStateOf(false)
+        val first = FocusRequester()
+        var at = ""
+        LayerScene(layers) {
+            LayerHost(layers, Modifier.fillMaxSize()) {
+                Column(Modifier.focusGroup()) {
+                    Target("top") { at = it }
+                    LazyColumn(Modifier.size(60.dp, 120.dp), state = list) {
+                        items((1..40).map { "row$it" }, key = { it }) { row ->
+                            val modifier = if (row == "row1") Modifier.focusRequester(first) else Modifier
+                            Target(row, Modifier.layerTrigger().then(modifier)) { at = it }
+                        }
+                    }
+                }
+                Layer(visible = open, modal = true, onDismissRequest = { open = false }) { Target("ok") { at = it } }
+            }
+        }.use { scene ->
+            scene.settle()
+            focus(first, scene)
+            assertEquals("row1", at)
+            open = true
+            scene.settle()
+            // The first jump parks the rows that left, row1's among them, for reuse,
+            // and the second takes them back for rows further down.
+            list.requestScrollToItem(20)
+            scene.settle()
+            list.requestScrollToItem(30)
+            scene.settle()
+            at = ""
+            open = false
+            scene.settle()
+            assertFalse(at.startsWith("row"), "the keyboard went to $at, a row that took a slot over")
+        }
+    }
+
+    // The rule says a field inside a layer leaves Escape to close the layer. Under a
+    // modal the host never takes Escape at all, so only a layer that is not modal
+    // shows the field kinds apart.
+    @Test
+    fun `Escape in a field of a layer that is not modal closes the layer in one press`() {
+        val layers = WindowLayers()
+        var open by mutableStateOf(true)
+        var behind = 0
+        LayerScene(layers) {
+            LayerHost(layers, Modifier.fillMaxSize()) {
+                DismissOnBack { behind++ }
+                Layer(visible = open, focusable = true, onDismissRequest = { open = false }) { FocusedField() }
+            }
+        }.use { scene ->
+            scene.settle()
+            assertTrue(layers.dismiss.fieldFocused)
+            scene.pressEscape()
+            assertFalse(open, "the layer closes on the first press")
+            assertEquals(0, behind)
+        }
+    }
+
+    // Compose reports the mouse's thumb buttons as presses too. The window turns them
+    // into back and forward, back closing the top of the stack, so the modal must not
+    // also take one as a press outside it and close a second thing. On X11 they come
+    // with no back or forward flag, which is the form the owner's own desktop sends.
+    @Test
+    fun `a thumb button press outside a modal is left to back and forward`() {
+        val layers = WindowLayers()
+        var dismissed = 0
+        LayerScene(layers) {
+            LayerHost(layers, Modifier.fillMaxSize()) {
+                Layer(visible = true, modal = true, onDismissRequest = { dismissed++ }) {
+                    Box(Modifier.align(Alignment.Center).size(40.dp))
+                }
+            }
+        }.use { scene ->
+            scene.settle()
+            // The X11 form first, while the pointer has not been down yet, which is when
+            // Compose hands a press with no button held on to what is under it.
+            for (x11 in listOf(true, false)) {
+                for (forward in listOf(false, true)) {
+                    scene.clickThumb(20f, 20f, forward = forward, x11 = x11)
+                    assertEquals(0, dismissed, "forward=$forward x11=$x11")
+                }
+            }
+            scene.click(20f, 20f)
+            assertEquals(1, dismissed, "a press of the primary button outside still closes it")
         }
     }
 

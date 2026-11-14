@@ -14,6 +14,8 @@ import hivens.ui.chrome.awtOnX11
 import hivens.ui.chrome.extraButton
 import hivens.ui.chrome.isFrom
 import hivens.ui.chrome.resendAsSidewaysWheel
+import hivens.ui.layers.LocalWindowLayers
+import hivens.ui.layers.WindowLayers
 import hivens.ui.render.SvgImageDecoder
 import hivens.ui.theme.WallpaperTone
 import java.awt.AWTEvent
@@ -36,14 +38,20 @@ internal actual fun NavigationInputs(backStack: NavBackStack) {
     // for a press in this one. Unfiltered, a thumb press in the separate console
     // window paged the main window's history behind it. The sideways wheel goes back
     // to whichever window it came from.
+    //
+    // Back is back, as Escape and the phone's gesture are: what the window's dismiss
+    // stack has open closes first, an editor step included, and history moves only
+    // when nothing is. Forward has nothing to close, and does nothing while a modal
+    // holds the window, rather than move the page behind it.
     val mainWindow by rememberUpdatedState(LocalComposeWindow.current)
+    val layers by rememberUpdatedState(LocalWindowLayers.current)
     DisposableEffect(Unit) {
         val toolkit = Toolkit.getDefaultToolkit()
         val listener = AWTEventListener { ev ->
             if (ev is MouseEvent && ev.id == MouseEvent.MOUSE_PRESSED) {
                 when (extraButton(ev.button, awtOnX11)) {
-                    ExtraButton.Back        -> if (ev.isFrom(mainWindow)) backStack.back()
-                    ExtraButton.Forward     -> if (ev.isFrom(mainWindow)) backStack.forward()
+                    ExtraButton.Back        -> if (ev.isFrom(mainWindow)) thumbBack(layers, backStack)
+                    ExtraButton.Forward     -> if (ev.isFrom(mainWindow)) thumbForward(layers, backStack)
                     ExtraButton.ScrollLeft  -> resendAsSidewaysWheel(ev, toRight = false)
                     ExtraButton.ScrollRight -> resendAsSidewaysWheel(ev, toRight = true)
                     ExtraButton.None        -> Unit
@@ -53,6 +61,17 @@ internal actual fun NavigationInputs(backStack: NavBackStack) {
         toolkit.addAWTEventListener(listener, AWTEvent.MOUSE_EVENT_MASK)
         onDispose { toolkit.removeAWTEventListener(listener) }
     }
+}
+
+/** The mouse's back button: closes the top of [layers]' dismiss stack, or moves [backStack] back when nothing is open. */
+internal fun thumbBack(layers: WindowLayers?, backStack: NavBackStack) {
+    val stack = layers?.dismiss
+    if (stack != null && stack.handlesBack) stack.dismissTop() else backStack.back()
+}
+
+/** The mouse's forward button: moves [backStack] forward unless a modal holds the window. */
+internal fun thumbForward(layers: WindowLayers?, backStack: NavBackStack) {
+    if (layers?.modalOpen != true) backStack.forward()
 }
 
 @Composable

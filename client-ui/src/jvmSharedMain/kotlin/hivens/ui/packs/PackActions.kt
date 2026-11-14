@@ -21,6 +21,7 @@ import hivens.launcher.instance.PackInstanceService
 import hivens.launcher.update.ReattachConfirmation
 import hivens.launcher.update.ReattachPreviewStaleException
 import hivens.launcher.launch.LauncherController
+import hivens.ui.AppState
 import hivens.ui.notifications.CoreProblem
 import hivens.ui.notifications.CoreProblems
 import hivens.ui.notifications.LaunchTarget
@@ -169,16 +170,26 @@ fun PackOperationService.startReattach(pack: PackInstance, instances: PackInstan
     }
 
 /**
- * Starts the game of the pack [packId] as [session], or as the offline name the
- * person chose when nobody is signed in, the way Play on a pack always did. The
- * offline name is read at the press rather than taken from whatever was drawn,
- * since what the game runs as cannot lag behind the settings. With no identity at
- * all nothing starts, which the control offering Play already says. A pack that is
- * not installed fails the way any launch does: logged and told to [problems].
+ * Starts the game of the pack [packId] as the session [state] holds, or as the
+ * offline name the person chose when nobody is signed in, the way Play on a pack
+ * always did. The offline name is read at the press rather than taken from whatever
+ * was drawn, since what the game runs as cannot lag behind the settings. With no
+ * identity at all nothing starts, which the control offering Play already says. A
+ * pack that is not installed fails the way any launch does: logged and told to
+ * [problems].
+ *
+ * Pressed while the startup sign-in is still finding out who the launcher is, the
+ * launch is refused, as the launcher's own Play control refuses it while it reads
+ * "signing in". Started at once it ran under the offline name in front of a stored
+ * account a moment from signing in. A launch is not kept waiting either: nothing
+ * would show that one is pending, and a sign-in that never settles would hold it
+ * for good.
+ *
+ * A launch that starts takes back the notice that this pack was not installed.
  */
 internal fun launchPack(
     packId: String,
-    session: SessionData?,
+    state: AppState,
     packs: IPackRepository,
     actions: PackActions,
     settings: ISettingsService,
@@ -192,15 +203,28 @@ internal fun launchPack(
         problems.report(CoreProblem.PackNotInstalled(packId))
         return
     }
-    if (session != null) {
-        val _ = actions.launch(session, pack)
-        return
+    when (state) {
+        is AppState.Authenticated -> {
+            if (actions.launch(state.session, pack)) problems.withdraw(CoreProblem.PackNotInstalled(packId))
+        }
+        AppState.Loading -> log.info("Not launching pack {}: the launcher is still signing in", packId)
+        AppState.Unauthenticated -> scope.launch {
+            val name = withContext(Dispatchers.IO) { settings.getSettings().offlinePlayerName }
+            if (name.isNullOrBlank()) return@launch
+            val identity = withContext(Dispatchers.IO) { offline.login(name, "", "") }
+            if (actions.launch(identity, pack)) problems.withdraw(CoreProblem.PackNotInstalled(packId))
+        }
     }
+}
+
+/**
+ * Takes back the notice that a pack was not installed once a pack of that id is,
+ * for as long as [scope] runs. The notice is sticky and says something that no
+ * longer holds once the pack is there.
+ */
+fun withdrawNoticesOfInstalledPacks(packs: StateFlow<List<PackInstance>>, problems: CoreProblems, scope: CoroutineScope) {
     scope.launch {
-        val name = withContext(Dispatchers.IO) { settings.getSettings().offlinePlayerName }
-        if (name.isNullOrBlank()) return@launch
-        val identity = withContext(Dispatchers.IO) { offline.login(name, "", "") }
-        val _ = actions.launch(identity, pack)
+        packs.collect { installed -> installed.forEach { problems.withdraw(CoreProblem.PackNotInstalled(it.id)) } }
     }
 }
 

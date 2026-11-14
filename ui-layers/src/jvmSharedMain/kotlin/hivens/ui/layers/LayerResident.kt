@@ -50,6 +50,12 @@ class LayerResident internal constructor(
     /** Whether [focusReturn] noted which of its children had the focus, to give it back to that one. */
     internal var focusReturnToChild = false
 
+    /** The marked control that held the focus when this layer took it, see [layerTrigger]. */
+    internal var trigger: LayerTrigger? = null
+
+    /** The layer the focus was taken from, when it was a layer rather than the window's content. */
+    internal var takenFrom: LayerResident? = null
+
     /**
      * Whether the layer is in the order. Its frame can still be composed for a pass
      * after it leaves, and must not move the focus from there.
