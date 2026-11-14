@@ -35,6 +35,7 @@ class WidgetCommandRegistry {
 
     private class Factory<P>(val level: ScopeLevel, val make: CommandFactory<P>)
 
+    @HostApi
     fun <P> register(key: CommandKey<P>, command: WidgetCommand<P>) {
         require(key.level == ScopeLevel.App) {
             "widget command '${key.id}' lives at ${key.level}: register a factory for it"
@@ -48,6 +49,7 @@ class WidgetCommandRegistry {
      * the first time it is asked for there and closed with the level if it holds
      * something to release.
      */
+    @HostApi
     fun <P> registerFactory(key: CommandKey<P>, factory: CommandFactory<P>) {
         requireNew(key.id)
         factories[key.id] = Factory(key.level, factory)
@@ -57,6 +59,7 @@ class WidgetCommandRegistry {
      * Declares [key] as one the owner of each level of its kind provides. See
      * [WidgetDataRegistry.declare], which this mirrors.
      */
+    @HostApi
     fun declare(key: CommandKey<*>) {
         require(key.level != ScopeLevel.App) { "app-wide command '${key.id}' is registered with a value" }
         requireNew(key.id)

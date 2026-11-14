@@ -31,11 +31,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import coil3.compose.SubcomposeAsyncImage
-import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
-import hivens.core.update.PackUpdateStatus
-import hivens.core.update.PackUpdateStatusHub
-import hivens.core.update.UpdateDirection
+import hivens.packs.api.PackKeys
+import hivens.packs.api.PackSource
+import hivens.packs.api.PackUpdateView
+import hivens.packs.api.PackView
 import hivens.ui.Screen
 import hivens.ui.components.SourceBadge
 import hivens.ui.components.rememberPackDeleteBlock
@@ -53,6 +53,8 @@ import hivens.ui.puppet.PuppetClick
 import hivens.ui.theme.Dimens
 import hivens.ui.theme.familyForText
 import hivens.ui.theme.decorativePair
+import hivens.widget.api.rememberScopedSource
+import hivens.widget.api.valueOrNull
 import java.time.Duration
 import java.time.Instant
 import kotlin.math.roundToInt
@@ -63,7 +65,7 @@ import hivens.ui.theme.Status
 /**
  * One Library row. Same three-layer background as the Browse card: a
  * deterministic pixel-art fill (so an art-less instance is never a flat
- * gradient), the [PackInstance.bannerUrl] image on top when the install
+ * gradient), the [PackView.bannerUrl] image on top when the install
  * captured one (transparent while loading / on failure, art shows through),
  * then a dark scrim. Avatar + title + metadata chips overlay it, quick actions
  * on the right. Whole card click-routes to [hivens.ui.screens.detail.PackDetailScreen]; the explicit
@@ -76,7 +78,7 @@ import hivens.ui.theme.Status
  */
 @Composable
 fun PackCard(
-    instance: PackInstance,
+    instance: PackView,
     onOpenDetail: () -> Unit,
     onOpenFolder: () -> Unit,
     onDelete: () -> Unit,
@@ -116,7 +118,7 @@ fun PackCard(
                 verticalAlignment     = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                PackAvatar(iconUrl = art.iconUrl, displayName = instance.displayName, hue = hueA)
+                PackAvatar(iconUrl = art.iconUrl, displayName = instance.name, hue = hueA)
 
                 Column(
                     modifier              = Modifier.weight(1f),
@@ -127,8 +129,8 @@ fun PackCard(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         Text(
-                            text       = instance.displayName,
-                            fontFamily = familyForText(instance.displayName),
+                            text       = instance.name,
+                            fontFamily = familyForText(instance.name),
                             style      = MaterialTheme.typography.titleMedium,
                             color      = Color.White,
                             fontWeight = FontWeight.SemiBold,
@@ -136,7 +138,7 @@ fun PackCard(
                             overflow   = TextOverflow.Ellipsis,
                             modifier   = Modifier.weight(1f, fill = false),
                         )
-                        if (showBadge) SourceBadge(instance.packRef.origin)
+                        if (showBadge) instance.source.packOrigin()?.let { SourceBadge(it) }
                     }
 
                     // One line, and a chip is placed at its own width or not at all.
@@ -161,7 +163,7 @@ fun PackCard(
                         // other facts say nothing.
                         // A pack with no build of its own, a local one, has no version to
                         // name, and a dash in its place read as a fact rather than as none.
-                        instance.packRef.version?.takeIf { it.isNotBlank() }?.let { version ->
+                        instance.source.version?.takeIf { it.isNotBlank() }?.let { version ->
                             NxMetaChip(
                                 version,
                                 modifier = Modifier.widthIn(max = VERSION_CHIP_MAX),
@@ -171,7 +173,7 @@ fun PackCard(
                         instance.forkedFrom?.let {
                             NxMetaChip("fork", tone = NxMetaChipTone.OnMediaAccent)
                         }
-                        LastPlayedChip(instance.lastPlayedEpochOrZero)
+                        LastPlayedChip(instance.lastPlayedEpochSecond)
                     }
                 }
 
@@ -221,8 +223,9 @@ private val VERSION_CHIP_MAX = 180.dp
 
 /**
  * The pill for a build move waiting on [packId], or nothing when none is. Read from the
- * status hub and routed to the versions screen, so every card that carries it says the
- * same thing and leads to the same place.
+ * packs module's update statuses and routed to the versions screen, so every card that
+ * carries it says the same thing and leads to the same place. Nothing where that module
+ * is not brought in.
  */
 @Composable
 internal fun PendingUpdateBadge(
@@ -231,12 +234,11 @@ internal fun PendingUpdateBadge(
     /** Over a picture by default; a row on a plane passes [NxMetaChipTone.Surface]. */
     tone: NxMetaChipTone = NxMetaChipTone.OnMedia,
 ) {
-    val hub: PackUpdateStatusHub = koinInject()
     val nav: NavRequests = koinInject()
-    val statuses by hub.statuses.collectAsState()
-    val pending = statuses[packId] as? PackUpdateStatus.Pending ?: return
+    val statuses = rememberScopedSource(PackKeys.Updates).valueOrNull() ?: return
+    val pending = statuses[packId] as? PackUpdateView.Pending ?: return
     UpdateBadgePill(
-        isRollback = pending.direction == UpdateDirection.Older,
+        isRollback = pending.direction == PackUpdateView.Pending.OLDER,
         onClick    = { nav.open(Screen.PackVersions(packId)) },
         modifier   = modifier,
         tone       = tone,
@@ -313,3 +315,7 @@ internal fun lastPlayedLabel(lastPlayedEpoch: Long): String {
 internal fun PackMetaChip(text: String, emphasis: Boolean = false) {
     NxMetaChip(text, tone = if (emphasis) NxMetaChipTone.OnMediaAccent else NxMetaChipTone.OnMedia)
 }
+
+/** The source a pack names, as the launcher's own origins know it, or null for one this build does not know. */
+internal fun PackSource.packOrigin(): PackOrigin? =
+    PackOrigin.entries.firstOrNull { it.name.equals(origin, ignoreCase = true) }

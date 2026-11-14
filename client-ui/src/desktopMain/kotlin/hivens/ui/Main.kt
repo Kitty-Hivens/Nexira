@@ -90,6 +90,7 @@ import hivens.widget.api.WidgetDataRegistry
 import hivens.ui.feature.catalogue.project.OpenProjectState
 import hivens.widget.api.SurfaceFamilies
 import hivens.ui.widgets.modules.DesktopWidgetModuleHost
+import hivens.ui.widgets.modules.offeredApis
 import hivens.ui.widgets.modules.WidgetModules
 import hivens.widget.api.WidgetRegistry
 import hivens.widget.api.WidgetServiceRegistry
@@ -126,7 +127,7 @@ val uiModule = module {
         uiCoreModule(
             builtIn = GeneratedWidgetRegistry,
             moduleHost = { directory, dataDir ->
-                DesktopWidgetModuleHost(directory, shadowDir = dataDir.resolve("cache").resolve("widget-modules"))
+                DesktopWidgetModuleHost(directory, shadowDir = dataDir.resolve("cache").resolve("widget-modules"), offered = offeredApis())
             },
             platformCommands = { registry ->
                 val updates: UpdateService = get()

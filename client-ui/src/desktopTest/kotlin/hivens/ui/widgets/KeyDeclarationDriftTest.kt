@@ -1,10 +1,16 @@
 package hivens.ui.widgets
 
+import hivens.packs.api.PacksApi
+import hivens.ui.HostKeys
 import hivens.ui.background.BackgroundSettings
 import hivens.ui.editor.EditorSurfaces
 import hivens.ui.editor.WidgetAdmission
+import hivens.ui.moduleKeys
+import hivens.ui.modulesNamedBy
 import hivens.ui.uiCommandRegistry
 import hivens.ui.uiDataRegistry
+import hivens.ui.widgets.modules.CompiledModules
+import hivens.widget.api.ContributedServices
 import hivens.widget.api.KeyDeclaration
 import hivens.widget.api.KeyOrigin
 import hivens.widget.api.flowSource
@@ -26,7 +32,8 @@ import kotlin.test.assertTrue
  */
 class KeyDeclarationDriftTest {
 
-    // The registries the launcher's module builds, from stand-in flows.
+    // The registries the launcher's module builds, from stand-in flows, with the keys of
+    // the modules the bundled document names, the way the launcher brings them in.
     private val data = uiDataRegistry(
         activity         = MutableStateFlow(emptyList()),
         notifications    = MutableStateFlow(emptyList()),
@@ -38,6 +45,15 @@ class KeyDeclarationDriftTest {
 
     private val commands = uiCommandRegistry({}, {}, {}, {})
 
+    init {
+        moduleKeys(
+            keys     = HostKeys(data, commands, ContributedServices()),
+            named    = modulesNamedBy(DefaultLayout.load()) { DefaultLayout.modules() },
+            compiled = CompiledModules,
+            jars     = emptyList(),
+        )
+    }
+
     private fun declarationOf(id: String): KeyDeclaration? = data.declarationOf(id) ?: commands.declarationOf(id)
 
     private val declared: List<KeyDeclaration> = (data.keys() + commands.keys()).mapNotNull(::declarationOf)
@@ -48,6 +64,13 @@ class KeyDeclarationDriftTest {
             descriptor.needs.filter { declarationOf(it) == null }.map { "${descriptor.kind.value} needs '$it'" }
         }
         assertEquals(emptyList(), unknown, "these widgets would be kept off every surface and drawn as misplaced everywhere")
+    }
+
+    @Test
+    fun `the bundled document names the packs module, so a fresh install has its keys`() {
+        assertEquals(listOf(PacksApi.ID), DefaultLayout.modules())
+        assertEquals(null, DefaultLayout.load().modules, "the bundled graph itself names none, so nothing written from it freezes the list")
+        assertTrue(CompiledModules.any { it.id == PacksApi.ID }, "and the build carries it")
     }
 
     @Test

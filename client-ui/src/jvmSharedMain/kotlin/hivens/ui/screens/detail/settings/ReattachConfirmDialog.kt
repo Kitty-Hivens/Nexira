@@ -13,7 +13,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -23,31 +22,34 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import hivens.core.data.PackInstance
-import hivens.core.update.CompatChange
-import hivens.launcher.update.ReattachBasis
-import hivens.launcher.update.ReattachConfirmation
-import hivens.launcher.update.ReattachPreview
+import hivens.packs.api.PackKeys
+import hivens.packs.api.ReattachConfirmation
+import hivens.packs.api.ReattachPreview
+import hivens.packs.api.ReattachPreviewView
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.nx.NxAlertDialog
 import hivens.ui.nx.NxCalloutBanner
 import hivens.ui.nx.NxCalloutTone
-import hivens.ui.packs.ReattachPreviewState
-import hivens.ui.packs.ReattachPreviews
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.OnFill
 import hivens.ui.theme.Status
 import hivens.ui.utils.shortNameList
-import org.koin.compose.koinInject
+import hivens.widget.api.rememberScopedCommand
+import hivens.widget.api.rememberScopedSource
+import hivens.widget.api.valueOrNull
 
 /**
  * Whether the move is one the update's warning names: another Minecraft or another
  * loader. An unknown grade is not that, and the dialog says what it does not know
  * through the basis line instead of claiming a move nobody measured.
  */
-private val CompatChange.movesRuntime: Boolean get() = this == CompatChange.McBump || this == CompatChange.LoaderSwap
+private val ReattachPreview.movesRuntime: Boolean get() = compat == "mc-bump" || compat == "loader-swap"
+
+/** Whether reattaching changes no file, only the record. */
+private val ReattachPreview.isEmpty: Boolean
+    get() = removed.isEmpty() && restored.isEmpty() && replaced.isEmpty() && turnedOn.isEmpty() && turnedOff.isEmpty() && kept.isEmpty()
 
 /** How many paths a list shows before it folds the rest behind a toggle. */
 private const val FOLDED_ROWS = 6
@@ -61,24 +63,27 @@ private const val FOLDED_ROWS = 6
  * and a comparison that failed leaves nothing to agree to. [onConfirm] gets what
  * the player agreed to, and the reattach does exactly that or refuses.
  *
- * The comparison is asked of [ReattachPreviews], the same store a widget reads, and
- * dropped when the dialog goes, which stops one still running.
+ * The comparison is asked of the packs module through its keys, the way any widget
+ * asks, and dropped when the dialog goes, which stops one still running. Where the
+ * packs module is not brought in there is nothing to ask, and the dialog says so.
  */
 @Composable
 internal fun ReattachConfirmDialog(
-    pack: PackInstance,
+    packId: String,
     sourceName: String,
     onConfirm: (ReattachConfirmation) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val s = LocalStrings.current
-    val previews: ReattachPreviews = koinInject()
-    DisposableEffect(pack.id) {
-        previews.request(pack)
-        onDispose { previews.forget(pack.id) }
+    val previews = rememberScopedSource(PackKeys.ReattachPreviews).valueOrNull()
+    val ask = rememberScopedCommand(PackKeys.PreviewReattach)
+    val forget = rememberScopedCommand(PackKeys.ForgetReattachPreview)
+    val available = previews != null && ask != null
+    DisposableEffect(packId, available) {
+        if (available) ask(packId)
+        onDispose { if (available) forget?.invoke(packId) }
     }
-    val all by previews.previews.collectAsState()
-    val state = all[pack.id] ?: ReattachPreviewState.Comparing
+    val state = previews?.get(packId) ?: ReattachPreviewView.Comparing
     val title = s.packSettingsReattach(sourceName)
     val container = NxTheme.colours.step(NxTheme.colours.topStep)
     OnFill(container) {
@@ -91,27 +96,32 @@ internal fun ReattachConfirmDialog(
                     modifier = Modifier.heightIn(max = 380.dp).verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    when (state) {
-                        ReattachPreviewState.Comparing -> Row(
+                    when {
+                        !available -> Text(
+                            s.packSettingsReattachUnavailable,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = NxColor.status(Status.Error, text = true),
+                        )
+                        state == ReattachPreviewView.Comparing -> Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(10.dp),
                         ) {
                             CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = NxColor.lead())
                             Text(s.packSettingsReattachComparing, style = MaterialTheme.typography.bodyMedium)
                         }
-                        is ReattachPreviewState.Failed -> Text(
+                        state is ReattachPreviewView.Failed -> Text(
                             s.packSettingsReattachCompareFailed(state.message),
                             style = MaterialTheme.typography.bodyMedium,
                             color = NxColor.status(Status.Error, text = true),
                         )
-                        is ReattachPreviewState.Ready -> PreviewBody(state.preview)
+                        state is ReattachPreviewView.Ready -> PreviewBody(state.preview)
                     }
                 }
             },
             confirmButton = {
                 // Not while files are left that could not be read: the launcher refuses
                 // that reattach, so the dialog does not offer it.
-                val ready = (state as? ReattachPreviewState.Ready)?.takeIf { it.preview.unreadable.isEmpty() }
+                val ready = (state as? ReattachPreviewView.Ready)?.takeIf { available && it.preview.unreadable.isEmpty() }
                 TextButton(
                     onClick = {
                         if (ready != null) {
@@ -140,14 +150,14 @@ internal fun ReattachConfirmDialog(
 @Composable
 private fun PreviewBody(preview: ReattachPreview) {
     val s = LocalStrings.current
-    if (preview.compat.movesRuntime) NxCalloutBanner(body = s.packVersionNeedsCare, tone = NxCalloutTone.Warning)
+    if (preview.movesRuntime) NxCalloutBanner(body = s.packVersionNeedsCare, tone = NxCalloutTone.Warning)
     if (preview.unreadable.isNotEmpty()) {
         NxCalloutBanner(body = s.packSettingsReattachUnreadable(shortNameList(preview.unreadable.map { it.substringAfterLast('/') })), tone = NxCalloutTone.Warning)
     }
     when (preview.basis) {
-        ReattachBasis.NoBaseline -> NxCalloutBanner(body = s.packSettingsReattachNoBaseline, tone = NxCalloutTone.Warning)
-        ReattachBasis.NamesOnly -> Text(s.packSettingsReattachNamesOnly, style = MaterialTheme.typography.bodySmall)
-        ReattachBasis.Full -> Unit
+        "no-baseline" -> NxCalloutBanner(body = s.packSettingsReattachNoBaseline, tone = NxCalloutTone.Warning)
+        "names-only" -> Text(s.packSettingsReattachNamesOnly, style = MaterialTheme.typography.bodySmall)
+        else -> Unit
     }
     if (preview.isEmpty) {
         Text(s.packSettingsReattachNothing, style = MaterialTheme.typography.bodyMedium)
@@ -155,7 +165,7 @@ private fun PreviewBody(preview: ReattachPreview) {
     }
     Text(s.packSettingsReattachBody(preview.toVersion), style = MaterialTheme.typography.bodyMedium)
     if (preview.removed.isNotEmpty()) PathList(s.packSettingsReattachRemoved(preview.removed.size), preview.removed)
-    val returned = preview.returned
+    val returned = (preview.restored + preview.replaced).sorted()
     if (returned.isNotEmpty()) PathList(s.packSettingsReattachReturned(returned.size), returned)
     if (preview.turnedOn.isNotEmpty()) PathList(s.packSettingsReattachTurnedOn(preview.turnedOn.size), preview.turnedOn)
     if (preview.turnedOff.isNotEmpty()) PathList(s.packSettingsReattachTurnedOff(preview.turnedOff.size), preview.turnedOff)

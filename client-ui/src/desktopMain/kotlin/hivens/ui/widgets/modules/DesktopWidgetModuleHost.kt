@@ -5,17 +5,23 @@ import hivens.widget.api.ModuleContribution
 import hivens.widget.api.WidgetRegistry
 import hivens.widget.loader.LoadedWidgetModule
 import hivens.widget.loader.WidgetModuleLoader
+import hivens.widget.model.ApiVersion
 import java.nio.file.Files
 import java.nio.file.Path
 
-/** Widget modules as jars in a folder, each opened in a class loader of its own. */
+/**
+ * Widget modules as jars in a folder, each opened in a class loader of its own.
+ * [offered] is the module APIs this build carries, which a jar built against one of
+ * them has to find in a version that serves it.
+ */
 class DesktopWidgetModuleHost(
     private val directory: Path,
     private val shadowDir: Path,
+    private val offered: Map<String, ApiVersion> = emptyMap(),
 ) : WidgetModuleHost {
 
     override fun scan(disabled: Set<String>): ModuleScan {
-        val scan = WidgetModuleLoader(directory, shadowDir = shadowDir, disabled = disabled).scan()
+        val scan = WidgetModuleLoader(directory, shadowDir = shadowDir, disabled = disabled, offered = offered).scan()
         return ModuleScan(
             loaded   = scan.loaded.map(::JarModule),
             disabled = scan.disabled.map { OffModule(it.id, it.name, it.file) },

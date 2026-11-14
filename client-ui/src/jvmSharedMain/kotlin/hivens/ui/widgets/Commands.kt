@@ -5,8 +5,6 @@ import hivens.core.data.ThemeMode
 import hivens.ui.Screen
 import hivens.ui.background.BackgroundSettings
 import hivens.ui.i18n.AppLocale
-import hivens.ui.packs.PackInstallRequest
-import hivens.ui.packs.ReattachRequest
 import hivens.widget.model.CommandKey
 import hivens.widget.model.ScopeLevel
 
@@ -27,6 +25,8 @@ import hivens.widget.model.ScopeLevel
  * are made by each level of their kind from the registry's factory, so they are there
  * wherever such a level is, whoever draws it. The history's are provided by the
  * composition's owner, so a window moves its own history.
+ *
+ * The pack commands are the packs module's, in `hivens.packs.api.PackKeys`.
  */
 object Commands {
     val ClearNotifications = CommandKey<Unit>("notifications.clear")
@@ -86,53 +86,6 @@ object Commands {
 
     /** Speaks this language from now on. Paired with [Sources.Locale]. */
     val SetLocale = CommandKey<AppLocale>("locale.set", ScopeLevel.Composition)
-
-    /**
-     * Starts the game of the pack with this id as the launcher's session, or as the
-     * offline name when nobody is signed in. A pack that is not installed fails the
-     * way any launch does, out loud. Paired with [Sources.PackLaunches].
-     */
-    val LaunchPack = CommandKey<String>("pack.launch")
-
-    /** Asks the game of the pack with this id to end. */
-    val StopPack = CommandKey<String>("pack.stop")
-
-    /** Installs a build of a catalogue pack. Its progress is in [Sources.PackInstalls]. */
-    val InstallPack = CommandKey<PackInstallRequest>("pack.install")
-
-    /** Forgets the finished install with this key. */
-    val DismissInstall = CommandKey<String>("pack.install.dismiss")
-
-    /** Stops the running install with this key and removes what it wrote. */
-    val CancelInstall = CommandKey<String>("pack.install.cancel")
-
-    /** Moves the pack with this id to its latest build. */
-    val UpdatePack = CommandKey<String>("pack.update")
-
-    /** Deletes the pack with this id and its files. Refused while its game runs or other work holds it. */
-    val DeletePack = CommandKey<String>("pack.delete")
-
-    /**
-     * Measures the detached pack with this id against its source's build: what a
-     * reattach would remove and bring back. The answer lands in
-     * [Sources.ReattachPreviews].
-     */
-    val PreviewReattach = CommandKey<String>("pack.reattach.preview")
-
-    /**
-     * Puts a detached pack back on the source it was detached from and moves it to
-     * the source's build the way an update does: its mods become the build's again,
-     * while a config edit the build did not change stays. Carries the preview the player was shown and agreed to,
-     * from [Sources.ReattachPreviews], and is refused, touching nothing, when the
-     * pack no longer measures as that preview said. Does nothing for a pack that was
-     * never detached, and is refused while its game runs or other work holds it.
-     *
-     * What the confirmation proves is that a preview was measured and that the pack
-     * still measures the same, not that a person read it. A widget could hand on a
-     * preview it never showed. That is accepted: the launcher's own surfaces show
-     * the list before they ask, and a widget is the player's own choice to install.
-     */
-    val ReattachPack = CommandKey<ReattachRequest>("pack.reattach")
 
     /** Puts the console on screen or takes it off. Paired with [Sources.ConsoleVisible]. */
     val SetConsoleVisible = CommandKey<Boolean>("console.visible.set")

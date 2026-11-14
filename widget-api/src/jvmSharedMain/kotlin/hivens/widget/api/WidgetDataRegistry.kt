@@ -32,6 +32,7 @@ class WidgetDataRegistry {
 
     private class Factory<T>(val level: ScopeLevel, val make: SourceFactory<T>)
 
+    @HostApi
     fun <T> register(key: SourceKey<T>, source: WidgetDataSource<T>) {
         // A value registered here is one for the whole app. A key of another level
         // has an answer per level, which only a factory can give.
@@ -50,6 +51,7 @@ class WidgetDataRegistry {
      * level runs [factory] the first time the key is read in it and disposes what
      * it made when the level itself goes.
      */
+    @HostApi
     fun <T> registerFactory(key: SourceKey<T>, factory: SourceFactory<T>) {
         requireNew(key.id)
         factories[key.id] = Factory(key.level, factory)
@@ -63,6 +65,7 @@ class WidgetDataRegistry {
      * reader with no level to ask, the editor deciding where a widget may stand,
      * know the key exists and where it lives.
      */
+    @HostApi
     fun declare(key: SourceKey<*>) {
         require(key.level != ScopeLevel.App) { "app-wide source '${key.id}' is registered with a value" }
         requireNew(key.id)
@@ -77,12 +80,14 @@ class WidgetDataRegistry {
      * reaches a widget drawn for use. A producer rather than a value, so each drawing
      * gets its own and nothing one of them changes leaks into another.
      */
+    @HostApi
     fun <T> declare(key: SourceKey<T>, sample: () -> T) {
         declare(key)
         samples[key.id] = sample
     }
 
     /** Registers a factory as [registerFactory] does, with a [sample] in the sense of [declare]. */
+    @HostApi
     fun <T> registerFactory(key: SourceKey<T>, sample: () -> T, factory: SourceFactory<T>) {
         registerFactory(key, factory)
         samples[key.id] = sample

@@ -20,8 +20,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import hivens.core.data.PackInstance
 import hivens.launcher.platform.PlatformPaths
+import hivens.packs.api.PackKeys
+import hivens.packs.api.PackView
 import hivens.ui.Screen
 import hivens.ui.nx.NxButton
 import hivens.ui.components.DestructiveConfirmDialog
@@ -32,7 +33,6 @@ import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import androidx.compose.foundation.layout.padding
 import hivens.ui.widgets.Commands
-import hivens.ui.widgets.Sources
 import hivens.widget.api.rememberProps
 import hivens.widget.api.rememberScopedCommand
 import hivens.widget.api.rememberScopedSource
@@ -71,13 +71,13 @@ data class LibraryBodyProps(
 fun LibraryBody(instance: WidgetInstance) {
     val p = instance.rememberProps<LibraryBodyProps>()
     val navigate = rememberScopedCommand(Commands.Navigate) ?: return
-    val instances = rememberScopedSource(Sources.PackLibrary).valueOrNull() ?: return
+    val instances = rememberScopedSource(PackKeys.Library).valueOrNull() ?: return
     // Runs on the app's level, not this composition: leaving the Library mid-delete
     // cancelled it halfway through the tree.
-    val deletePack = rememberScopedCommand(Commands.DeletePack) ?: return
+    val deletePack = rememberScopedCommand(PackKeys.DeletePack) ?: return
     val s = LocalStrings.current
     val paths: PlatformPaths = koinInject()
-    var pendingDelete by remember { mutableStateOf<PackInstance?>(null) }
+    var pendingDelete by remember { mutableStateOf<PackView?>(null) }
 
     if (instances.isEmpty()) {
         LibraryEmpty(
@@ -109,15 +109,15 @@ fun LibraryBody(instance: WidgetInstance) {
     }
 }
 
-private fun instanceDirOf(paths: PlatformPaths, instance: PackInstance): Path =
-    paths.dataDir.resolve("instances").resolve(instance.instanceDirName)
+private fun instanceDirOf(paths: PlatformPaths, instance: PackView): Path =
+    paths.dataDir.resolve("instances").resolve(instance.folder)
 
 @Composable
 private fun LibraryList(
-    instances: List<PackInstance>,
-    onOpenDetail: (PackInstance) -> Unit,
-    onOpenFolder: (PackInstance) -> Unit,
-    onDelete: (PackInstance) -> Unit,
+    instances: List<PackView>,
+    onOpenDetail: (PackView) -> Unit,
+    onOpenFolder: (PackView) -> Unit,
+    onDelete: (PackView) -> Unit,
 ) {
     LazyColumn(
         modifier            = Modifier.fillMaxSize(),

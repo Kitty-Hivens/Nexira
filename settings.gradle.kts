@@ -152,9 +152,19 @@ include(":widget-processor")
 include(":examples:widget-pixelplayer")
 include(":examples:widget-screenfx")
 include(":examples:widget-looks")
+// Not part of the launcher. A module built on the packs module's API artifact and the
+// kernel only, kept in the build so the claim that a module needs nothing else to use
+// the packs keeps compiling.
+include(":examples:packs-consumer")
 // Runtime discovery of widget modules: scans a directory for jars, checks the
 // ABI they declare, and hands back registries. Separate from :widget-api so a
 // module author compiles against the kernel without pulling in its loader.
 include(":widget-loader")
+// The packs and launch module: the keys a widget reads and fires to list, launch, stop,
+// install, update, delete and reattach packs. The API artifact is what another module
+// compiles against, the module answers the keys and is brought in only by a document
+// that names it.
+include(":packs-api")
+include(":packs")
 include(":profiler-agent")
 include(":authlib-agent")

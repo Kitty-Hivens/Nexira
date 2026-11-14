@@ -98,7 +98,10 @@ class PresetRepository(
             LoadedPreset(
                 schemaVersion = envelope.schemaVersion,
                 name          = envelope.name,
-                graph         = json.decodeFromJsonElement(LayoutGraph.serializer(), structural),
+                // A saved arrangement is how things are arranged, not which modules the
+                // launcher brings in: a list one carried would keep or drop modules for
+                // whoever loaded it, with nothing on screen saying why.
+                graph         = json.decodeFromJsonElement(LayoutGraph.serializer(), structural).copy(modules = null),
                 customization = envelope.customization,
             )
         } catch (e: Exception) {
@@ -109,14 +112,15 @@ class PresetRepository(
 
     /**
      * Writes the current layout and look under [name], stamped with the schema
-     * this build writes, so a later one knows how far to carry it.
+     * this build writes, so a later one knows how far to carry it. Without the module
+     * list, which is the person's launcher's and not the arrangement's: see [load].
      */
     fun save(name: String, graph: LayoutGraph, customization: CustomizationSettings) {
         val envelope = PresetEnvelope(
             schemaVersion = LayoutReconcile.CURRENT_SCHEMA,
             name          = name,
             createdAt     = System.currentTimeMillis(),
-            graph         = json.encodeToJsonElement(LayoutGraph.serializer(), graph).jsonObject,
+            graph         = json.encodeToJsonElement(LayoutGraph.serializer(), graph.copy(modules = null)).jsonObject,
             customization = customization,
         )
         // The hand-rolled tmp-then-rename this replaces published whole files but

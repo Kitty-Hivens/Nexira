@@ -22,7 +22,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -42,9 +41,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
-import hivens.core.data.PackInstance
-import hivens.core.update.PackUpdateStatus
-import hivens.core.update.PackUpdateStatusHub
+import hivens.packs.api.PackKeys
+import hivens.packs.api.PackUpdateView
+import hivens.packs.api.PackView
 import hivens.ui.AppState
 import hivens.ui.Screen
 import hivens.ui.components.rememberLaunchControl
@@ -65,7 +64,6 @@ import hivens.widget.api.rememberScopedCommand
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
 import hivens.widget.model.Widget
-import org.koin.compose.koinInject
 
 // The library as spines on a shelf: every pack a strip the full height of the slot,
 // side by side, and one of them opened out to the rest of the width.
@@ -88,7 +86,7 @@ import org.koin.compose.koinInject
 fun HomeNewSpines() {
     val appState = rememberScopedSource(Sources.Session).valueOrNull() ?: return
     val navigate = rememberScopedCommand(Commands.Navigate) ?: return
-    val all = rememberScopedSource(Sources.PackLibrary).valueOrNull() ?: return
+    val all = rememberScopedSource(PackKeys.Library).valueOrNull() ?: return
     val packs = remember(all) {
         all.sortedWith(RecentFirst)
     }
@@ -130,7 +128,7 @@ internal fun spinesThatFit(width: Dp, packs: Int): Int {
 
 @Composable
 private fun Spine(
-    pack: PackInstance,
+    pack: PackView,
     open: Boolean,
     appState: AppState,
     onOpenPage: () -> Unit,
@@ -172,15 +170,15 @@ private fun Spine(
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
-                        text  = if (pack.lastPlayedEpochOrZero > 0L) s.homeQuickContinue else s.homeQuickStart,
+                        text  = if (pack.lastPlayedEpochSecond > 0L) s.homeQuickContinue else s.homeQuickStart,
                         style = MaterialTheme.typography.labelLarge,
                         color = Color.White.copy(alpha = 0.7f),
                     )
                     PendingUpdateBadge(pack.id)
                 }
                 Text(
-                    text       = pack.displayName,
-                    fontFamily = familyForText(pack.displayName),
+                    text       = pack.name,
+                    fontFamily = familyForText(pack.name),
                     fontSize   = 48.sp,
                     lineHeight = 50.sp,
                     fontWeight = FontWeight.Bold,
@@ -192,9 +190,9 @@ private fun Spine(
                 Row(horizontalArrangement = Arrangement.spacedBy(32.dp)) {
                     val hours = pack.playtimeSeconds / 3600
                     if (hours > 0) OnArtNumeral(s.homeFactHours(hours), s.homeFactPlaytime)
-                    OnArtNumeral(lastPlayedLabel(pack.lastPlayedEpochOrZero), s.homeFactLastSession)
-                    pack.cachedManifest?.takeIf { it.minecraftVersion.isNotBlank() }?.let { m ->
-                        OnArtNumeral(m.minecraftVersion, loaderLabel(m.loaderName.ifBlank { "vanilla" }))
+                    OnArtNumeral(lastPlayedLabel(pack.lastPlayedEpochSecond), s.homeFactLastSession)
+                    pack.gameVersion?.let { version ->
+                        OnArtNumeral(version, loaderLabel(pack.loader ?: "vanilla"))
                     }
                 }
                 QuickLaunchButton(
@@ -209,12 +207,12 @@ private fun Spine(
 
 /** A closed spine: the name up the strip, the hours under it, a dot when a build waits. */
 @Composable
-private fun ClosedFace(pack: PackInstance, modifier: Modifier) {
+private fun ClosedFace(pack: PackView, modifier: Modifier) {
     val s = LocalStrings.current
     Column(modifier.padding(bottom = 18.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
-            text       = pack.displayName,
-            fontFamily = familyForText(pack.displayName),
+            text       = pack.name,
+            fontFamily = familyForText(pack.name),
             style      = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.SemiBold,
             color      = Color.White,
@@ -234,9 +232,8 @@ private fun ClosedFace(pack: PackInstance, modifier: Modifier) {
 /** A dot above the hours when the pack has a build waiting, the closed spine's version of the badge. */
 @Composable
 private fun PendingDot(packId: String) {
-    val hub: PackUpdateStatusHub = koinInject()
-    val statuses by hub.statuses.collectAsState()
-    if (statuses[packId] !is PackUpdateStatus.Pending) return
+    val updates = rememberScopedSource(PackKeys.Updates).valueOrNull() ?: return
+    if (updates[packId] !is PackUpdateView.Pending) return
     Spacer(Modifier.height(10.dp))
     Box(Modifier.size(8.dp).clip(RoundedCornerShape(4.dp)).background(NxColor.lead()))
 }

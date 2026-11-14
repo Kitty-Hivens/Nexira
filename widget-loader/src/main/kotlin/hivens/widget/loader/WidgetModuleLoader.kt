@@ -7,6 +7,7 @@ import hivens.widget.api.WidgetApi
 import hivens.widget.api.WidgetDescriptor
 import hivens.widget.api.WidgetRegistry
 import hivens.widget.api.widgetPropsJson
+import hivens.widget.model.ApiVersion
 import hivens.widget.model.WidgetKind
 import org.slf4j.LoggerFactory
 import java.io.InputStreamReader
@@ -97,6 +98,13 @@ data class WidgetModuleScan(
  *
  * [disabled] names modules to leave closed. Their manifest is read so they can be
  * listed and switched back on, and nothing else is.
+ *
+ * [offered] is every module API this launcher carries, by API id, at the version it
+ * carries. A jar that says in its manifest it was compiled against one of them is
+ * refused when the API is not here, or is here in a version that does not serve the
+ * one it was built against: another major, or an older minor than the jar's. An API
+ * a jar names is offered by a module compiled into the application, so a jar that
+ * only another jar could serve is refused too.
  */
 class WidgetModuleLoader(
     private val directory: Path,
@@ -104,6 +112,7 @@ class WidgetModuleLoader(
     private val shadowDir: Path? = null,
     private val disabled: Set<String> = emptySet(),
     private val contributionKinds: List<Class<out ModuleContribution>> = ModuleContribution.kinds,
+    private val offered: Map<String, ApiVersion> = emptyMap(),
 ) {
 
     private val log = LoggerFactory.getLogger(WidgetModuleLoader::class.java)
@@ -179,6 +188,8 @@ class WidgetModuleLoader(
         val name = attributes.getValue(WidgetApi.MANIFEST_NAME)?.trim()?.takeIf { it.isNotEmpty() } ?: id
 
         if (id in disabled) return DisabledWidgetModule(id, name, jar)
+
+        requirementFault(attributes.getValue(WidgetApi.MANIFEST_REQUIRES))?.let { return RejectedWidgetModule(jar, it) }
 
         val opened = runCatching { shadowCopy(jar) }.getOrElse {
             return RejectedWidgetModule(jar, "could not be copied aside to load: ${it.message}")
@@ -276,6 +287,23 @@ class WidgetModuleLoader(
             }
         }.onFailure { log.warn("Widget module '{}' language files could not be read: {}", id, it.message) }
         return if (tables.isEmpty()) ModuleStrings.EMPTY else ModuleStrings(tables)
+    }
+
+    /**
+     * Why a jar whose manifest names [declared] as the APIs it was built against cannot
+     * run here, or null when every one is offered in a version that serves it.
+     */
+    private fun requirementFault(declared: String?): String? {
+        if (declared == null) return null
+        val required = ApiVersion.parseAll(declared)
+            ?: return "${WidgetApi.MANIFEST_REQUIRES} is '$declared', which is not a list of id=major.minor"
+        required.forEach { (api, builtAgainst) ->
+            val here = offered[api] ?: return "built against the module API '$api' $builtAgainst, which this launcher does not carry"
+            if (!here.serves(builtAgainst)) {
+                return "built against the module API '$api' $builtAgainst, this launcher carries $here"
+            }
+        }
+        return null
     }
 
     /** What a module with no widgets contributes to the registry. */

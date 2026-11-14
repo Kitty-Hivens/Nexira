@@ -1,4 +1,4 @@
-package hivens.ui.packs
+package hivens.packs
 
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackInstance

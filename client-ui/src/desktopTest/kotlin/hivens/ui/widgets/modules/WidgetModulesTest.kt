@@ -116,7 +116,7 @@ class WidgetModulesTest {
 
         assertEquals("fixture/fixture.effect", effect.scope)
         assertEquals("Fixture Effect", effect.strings.get(effect.item.label, "en"))
-        assertEquals(2, (modules().state.value.entries.single() as WidgetModules.Entry.Loaded).contributions, "the fixture carries an effect and a theme")
+        assertEquals(3, (modules().state.value.entries.single() as WidgetModules.Entry.Loaded).contributions, "the fixture carries an effect, a theme and its keys")
     }
 
     @Test

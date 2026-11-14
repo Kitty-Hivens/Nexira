@@ -29,7 +29,9 @@ import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxSettingGroup
 import hivens.ui.nx.NxSettingRow
-import hivens.ui.packs.startReattach
+import hivens.packs.api.PackKeys
+import hivens.packs.api.ReattachRequest
+import hivens.widget.api.rememberScopedCommand
 import hivens.ui.platform.SystemActions
 import hivens.ui.puppet.PuppetClick
 import kotlinx.coroutines.CoroutineScope
@@ -69,6 +71,8 @@ internal fun PackDataSection(
     val service: PackInstanceService = koinInject()
     val updates: PackUpdateService = koinInject()
     val operations: PackOperationService = koinInject()
+    // Through the packs module's command, the same reattach any widget fires.
+    val reattach = rememberScopedCommand(PackKeys.ReattachPack)
     val sizes: InstanceSizeService = koinInject()
     // Both actions here rewrite the instance and outlive this sheet: deleting it
     // makes the screen behind resolve to a dead end, which disposes the sheet --
@@ -216,9 +220,9 @@ internal fun PackDataSection(
     reattachSource?.let { source ->
         if (confirmReattach) {
             ReattachConfirmDialog(
-                pack       = pack,
+                packId     = pack.id,
                 sourceName = sourceName.ifBlank { source.id },
-                onConfirm  = { confirmed -> val _ = operations.startReattach(pack, service, confirmed) },
+                onConfirm  = { confirmed -> reattach?.invoke(ReattachRequest(pack.id, confirmed)) },
                 onDismiss  = { confirmReattach = false },
             )
         }

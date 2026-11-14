@@ -98,12 +98,8 @@ fun HomeNewContinue(instance: WidgetInstance) {
             ) {
                 val hours = pack.playtimeSeconds / 3600
                 if (hours > 0) Numeral(s.homeFactHours(hours), s.homeFactPlaytime)
-                Numeral(lastPlayedLabel(pack.lastPlayedEpochOrZero), s.homeFactLastSession)
-                pack.cachedManifest?.let { m ->
-                    if (m.minecraftVersion.isNotBlank()) {
-                        Numeral(m.minecraftVersion, loaderLabel(m.loaderName.ifBlank { "vanilla" }))
-                    }
-                }
+                Numeral(lastPlayedLabel(pack.lastPlayedEpochSecond), s.homeFactLastSession)
+                pack.gameVersion?.let { version -> Numeral(version, loaderLabel(pack.loader ?: "vanilla")) }
             }
         }
         Column(
@@ -114,7 +110,7 @@ fun HomeNewContinue(instance: WidgetInstance) {
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text       = if (pack.lastPlayedEpochOrZero > 0L) s.homeQuickContinue else s.homeQuickStart,
+                    text       = if (pack.lastPlayedEpochSecond > 0L) s.homeQuickContinue else s.homeQuickStart,
                     style      = MaterialTheme.typography.labelLarge,
                     color      = NxInk.quiet,
                     modifier   = Modifier.weight(1f),
@@ -138,8 +134,8 @@ fun HomeNewContinue(instance: WidgetInstance) {
                     )
                 }
                 Text(
-                    text       = pack.displayName,
-                    fontFamily = familyForText(pack.displayName),
+                    text       = pack.name,
+                    fontFamily = familyForText(pack.name),
                     fontSize   = nameSize.sp,
                     lineHeight = (nameSize * 1.06f).sp,
                     fontWeight = FontWeight.Bold,

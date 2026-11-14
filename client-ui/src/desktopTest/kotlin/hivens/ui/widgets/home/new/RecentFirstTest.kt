@@ -1,21 +1,20 @@
 package hivens.ui.widgets.home.new
 
-import hivens.core.data.PackInstance
-import hivens.core.data.PackOrigin
-import hivens.core.data.PackReference
+import hivens.packs.api.PackSource
+import hivens.packs.api.PackView
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
 /** Which pack the home widgets lead with. */
 class RecentFirstTest {
 
-    private fun pack(id: String, installed: Long, played: Long = 0L) = PackInstance(
+    private fun pack(id: String, installed: Long, played: Long = 0L) = PackView(
         id = id,
-        packRef = PackReference(PackOrigin.Local, id, "1.0"),
-        displayName = id,
-        instanceDirName = id,
-        createdAtEpoch = installed,
-        lastPlayedEpochOrZero = played,
+        name = id,
+        source = PackSource("local", id, "1.0"),
+        folder = id,
+        createdAtEpochSecond = installed,
+        lastPlayedEpochSecond = played,
     )
 
     @Test

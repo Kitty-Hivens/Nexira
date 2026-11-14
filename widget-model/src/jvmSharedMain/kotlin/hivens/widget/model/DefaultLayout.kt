@@ -25,7 +25,18 @@ private const val DEFAULT_LAYOUT_RESOURCE = "/widget/default-layout.json"
 const val LAYOUT_SCHEMA: Int = 15
 
 object DefaultLayout {
-    fun load(json: Json = LENIENT): LayoutGraph {
+    /**
+     * The bundled arrangement. Its module list is never part of it: a graph seeded
+     * from the bundle, reset to it or saved over it says nothing about modules, and
+     * the host reads [modules] at every start, so a launcher update that brings a
+     * module in brings it to everybody on the standard interface.
+     */
+    fun load(json: Json = LENIENT): LayoutGraph = envelope(json).graph.copy(modules = null)
+
+    /** The modules the standard interface needs, by module id, which a graph that names none is read as. */
+    fun modules(json: Json = LENIENT): List<String> = envelope(json).modules
+
+    private fun envelope(json: Json): DefaultEnvelope {
         val stream = DefaultLayout::class.java.getResourceAsStream(DEFAULT_LAYOUT_RESOURCE)
             ?: error("Bundled default layout not found at classpath:$DEFAULT_LAYOUT_RESOURCE")
         val text = stream.bufferedReader(Charsets.UTF_8).use { it.readText() }
@@ -37,7 +48,7 @@ object DefaultLayout {
         check(envelope.schemaVersion == LAYOUT_SCHEMA) {
             "Bundled default layout is schema ${envelope.schemaVersion}, this build reads $LAYOUT_SCHEMA"
         }
-        return envelope.graph
+        return envelope
     }
 
     private val LENIENT: Json = Json {
@@ -49,5 +60,6 @@ object DefaultLayout {
     private data class DefaultEnvelope(
         @SerialName("schema_version") val schemaVersion: Int,
         val graph: LayoutGraph,
+        val modules: List<String> = emptyList(),
     )
 }

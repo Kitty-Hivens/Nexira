@@ -12,7 +12,9 @@ import hivens.auth.AuthProviderRegistry
 import hivens.auth.OfflineAuthProvider
 import hivens.auth.StoredAccount
 import hivens.core.api.catalogue.CataloguePack
+import hivens.core.api.catalogue.CataloguePackDetails
 import hivens.core.api.catalogue.CataloguePackVersion
+import hivens.core.api.interfaces.IPackCatalogueService
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.data.PackInstance
@@ -27,12 +29,37 @@ import hivens.core.security.SslBypassEntry
 import hivens.core.security.SslBypassStore
 import hivens.launcher.InstallSnapshot
 import hivens.core.update.CompatChange
+import hivens.core.update.PackUpdateStatus
+import hivens.core.update.PackUpdateStatusHub
+import hivens.core.update.UpdateDirection
 import hivens.launcher.PackOperation
 import hivens.launcher.PackOperationKind
 import hivens.launcher.PackOperationPhase
+import hivens.launcher.catalogue.PackCatalogueRegistry
+import hivens.launcher.instance.PackInstanceService.DeleteOutcome
 import hivens.launcher.update.ReattachConfirmation
 import hivens.launcher.update.ReattachPreview
 import hivens.launcher.platform.PlatformPaths
+import hivens.packs.PackActions
+import hivens.packs.PackOutcomes
+import hivens.packs.PacksHost
+import hivens.packs.PacksModule
+import hivens.packs.ReattachPreviewState
+import hivens.packs.ReattachPreviews
+import hivens.packs.api.InstallRequest
+import hivens.packs.api.PackKeys
+import hivens.packs.api.PackLaunch
+import hivens.packs.api.PackUpdateView
+import hivens.packs.api.PackView
+import hivens.packs.api.PacksApi
+import hivens.packs.api.ReattachPreviewView
+import hivens.packs.api.ReattachConfirmation as ConfirmationView
+import hivens.packs.api.OperationStatus
+import hivens.packs.api.PackOperationView
+import hivens.packs.api.ReattachRequest
+import hivens.packs.toPackView
+import hivens.packs.toView
+import hivens.ui.HostKeys
 import hivens.ui.AppState
 import hivens.ui.appearance.AppearanceStore
 import hivens.ui.background.BackgroundSettings
@@ -44,15 +71,12 @@ import hivens.ui.notifications.CoreProblem
 import hivens.ui.notifications.CoreProblems
 import hivens.ui.notifications.IndicationCenter
 import hivens.ui.notifications.IndicationCenter.LaunchIndication
+import hivens.ui.moduleKeys
 import hivens.ui.notifications.NotificationCenter
 import hivens.ui.notifications.NotifiedCoreProblems
 import hivens.ui.notifications.PersistedNotification
 import hivens.ui.onEventThread
-import hivens.ui.packs.PackActions
-import hivens.ui.packs.PackInstallRequest
-import hivens.ui.packs.ReattachPreviewState
-import hivens.ui.packs.ReattachPreviews
-import hivens.ui.packs.ReattachRequest
+import hivens.ui.packs.ClientPacksHost
 import hivens.ui.packs.withdrawNoticesOfInstalledPacks
 import hivens.ui.reportedTo
 import hivens.ui.session.SessionStore
@@ -64,6 +88,7 @@ import hivens.ui.uiCommandRegistry
 import hivens.ui.uiDataRegistry
 import hivens.ui.utils.GameConsoleService
 import hivens.ui.utils.PreferenceWriter
+import hivens.widget.api.ContributedServices
 import hivens.widget.api.KeyOrigin
 import hivens.widget.api.LocalScope
 import hivens.widget.api.LocalWidgetCommandRegistry
@@ -218,7 +243,7 @@ class CoreKeysTest {
     private class RecordingActions : PackActions {
         val launched = CopyOnWriteArrayList<Pair<SessionData, PackInstance>>()
         val stopped = CopyOnWriteArrayList<String>()
-        val installed = CopyOnWriteArrayList<PackInstallRequest>()
+        val installed = CopyOnWriteArrayList<Pair<CataloguePack, CataloguePackVersion>>()
         val dismissed = CopyOnWriteArrayList<String>()
         val cancelled = CopyOnWriteArrayList<String>()
         val updated = CopyOnWriteArrayList<PackInstance>()
@@ -233,8 +258,8 @@ class CoreKeysTest {
         override fun stop(packId: String) {
             stopped += packId
         }
-        override fun install(request: PackInstallRequest) {
-            installed += request
+        override fun install(pack: CataloguePack, version: CataloguePackVersion) {
+            installed += pack to version
         }
         override fun dismissInstall(key: String) {
             dismissed += key
@@ -245,8 +270,9 @@ class CoreKeysTest {
         override fun update(pack: PackInstance) {
             updated += pack
         }
-        override suspend fun delete(pack: PackInstance) {
+        override suspend fun delete(pack: PackInstance): DeleteOutcome {
             deleted += pack
+            return DeleteOutcome.Deleted
         }
         override fun reattach(pack: PackInstance, confirmed: ReattachConfirmation) {
             reattached += pack to confirmed
@@ -264,6 +290,27 @@ class CoreKeysTest {
         }
         override fun withdraw(problem: CoreProblem) {
             withdrawn += problem::class
+        }
+    }
+
+    /** A catalogue that lists one pack with one build, the way the mirror would answer for it. */
+    private class Catalogue : IPackCatalogueService {
+        override val origin: PackOrigin = PackOrigin.Mirror
+        override suspend fun search(query: String, page: Int): List<CataloguePack> = emptyList()
+        override suspend fun details(packId: String): CataloguePackDetails =
+            if (packId == "industrial") CataloguePackDetails(PackOrigin.Mirror, "industrial", "Industrial", "A pack", versions = listOf(BUILD))
+            else throw IOException("no such pack")
+        override suspend fun versions(packId: String): List<CataloguePackVersion> = details(packId).versions
+
+        companion object {
+            val BUILD = CataloguePackVersion("v5", "5", "5")
+        }
+    }
+
+    private class Hub : PackUpdateStatusHub {
+        override val statuses = MutableStateFlow<Map<String, PackUpdateStatus>>(emptyMap())
+        override fun report(id: String, status: PackUpdateStatus) {
+            statuses.value += id to status
         }
     }
 
@@ -288,27 +335,19 @@ class CoreKeysTest {
         createdAtEpoch = 1L,
     )
 
-    private val data = uiDataRegistry(
-        activity         = MutableStateFlow(emptyList()),
-        notifications    = MutableStateFlow(emptyList()),
-        doNotDisturb     = MutableStateFlow(false),
-        sslBypass        = flowSource(MutableStateFlow(false)),
-        background       = MutableStateFlow(BackgroundSettings()),
-        accountsRevision = MutableStateFlow(0),
-    )
-
-    private val commands = uiCommandRegistry({}, {}, {}, {})
-
     /**
      * The launcher's Koin with stand-ins under the services the factories read, the
-     * launcher's own level and session modules, and nothing of any shell. With
-     * [withActions] false the pack actions are missing, the way a broken install
+     * launcher's own level and session modules, and nothing of any shell. The packs
+     * module brings its keys the way the launcher brings them, through its key
+     * contribution, for a document that names it, which [withPacks] false does not.
+     * With [withActions] false the pack actions are missing, the way a broken install
      * would leave them.
      */
     private inner class Launcher(
         settings: SettingsData = SettingsData(),
         saved: SessionData? = null,
         withActions: Boolean = true,
+        withPacks: Boolean = true,
         notified: Boolean = false,
         /** What signs a stored account in at startup. */
         auth: AuthProvider = OfflineAuthProvider(),
@@ -333,6 +372,24 @@ class CoreKeysTest {
         val previews = ReattachPreviews(measure = { measured.incrementAndGet(); shownPreview }, operations = operations, scope = scope)
         val preferences = PreferenceWriter("core-keys-test")
         val indications = IndicationCenter()
+        val hub = Hub()
+        val data = uiDataRegistry(
+            activity         = MutableStateFlow(emptyList()),
+            notifications    = MutableStateFlow(emptyList()),
+            doNotDisturb     = MutableStateFlow(false),
+            sslBypass        = flowSource(MutableStateFlow(false)),
+            background       = MutableStateFlow(BackgroundSettings()),
+            accountsRevision = MutableStateFlow(0),
+        )
+        val commands = uiCommandRegistry({}, {}, {}, {})
+        val keys = HostKeys(data, commands, ContributedServices()).also { keys ->
+            moduleKeys(
+                keys     = keys,
+                named    = if (withPacks) setOf(PacksApi.ID) else emptySet(),
+                compiled = listOf(PacksModule),
+                jars     = emptyList(),
+            )
+        }
         val console = GameConsoleService(
             PlatformPaths(
                 osName = "linux",
@@ -368,10 +425,17 @@ class CoreKeysTest {
                     single<IPackRepository> { packs }
                     if (withActions) single<PackActions> { actions }
                     single { previews }
+                    single { PackOutcomes(operations, scope) }
+                    single<PackUpdateStatusHub> { hub }
+                    single { PackCatalogueRegistry(listOf(Catalogue())) }
                     single { indications }
+                    single<PacksHost> { ClientPacksHost(get(), {}, indications, reporter, scope) }
                     single { console }
                     single { appearance }
-                    single { WidgetScope.app(data, KoinLevelServicesHost.app(this), Dispatchers.Unconfined, commands, reportedTo(reporter)) }
+                    single {
+                        val services = keys.appServices(KoinLevelServicesHost.app(this), Dispatchers.Unconfined)
+                        WidgetScope.app(data, services, Dispatchers.Unconfined, commands, reportedTo(reporter, keys))
+                    }
                 },
             )
         }.also { koins += it }
@@ -440,8 +504,9 @@ class CoreKeysTest {
     )
 
     private val appWide: List<SourceKey<*>> = listOf(
-        Sources.Session, Sources.SystemSchemeAvailable, Sources.PackLibrary, Sources.PackLaunches,
-        Sources.LaunchState, Sources.PackInstalls, Sources.ReattachPreviews, Sources.ConsoleVisible,
+        Sources.Session, Sources.SystemSchemeAvailable, PackKeys.Library, PackKeys.Launches,
+        PackKeys.Launch, PackKeys.Installs, PackKeys.Updates, PackKeys.Operations, PackKeys.ReattachPreviews,
+        Sources.ConsoleVisible,
     )
 
     private val composedCommands: List<CommandKey<*>> = listOf(
@@ -449,9 +514,17 @@ class CoreKeysTest {
     )
 
     private val appCommands: List<CommandKey<*>> = listOf(
-        Commands.SignIn, Commands.SignOut, Commands.LaunchPack, Commands.StopPack, Commands.InstallPack,
-        Commands.DismissInstall, Commands.CancelInstall, Commands.UpdatePack, Commands.DeletePack, Commands.PreviewReattach,
-        Commands.ReattachPack, Commands.SetConsoleVisible,
+        Commands.SignIn, Commands.SignOut, PackKeys.LaunchPack, PackKeys.StopPack, PackKeys.InstallPack,
+        PackKeys.DismissInstall, PackKeys.CancelInstall, PackKeys.UpdatePack, PackKeys.DeletePack, PackKeys.PreviewReattach,
+        PackKeys.ReattachPack, Commands.SetConsoleVisible,
+    )
+
+    /** Every key the packs module brings, by id. */
+    private val packIds: List<String> = listOf(
+        PackKeys.LIBRARY_ID, PackKeys.LAUNCHES_ID, PackKeys.LAUNCH_ID, PackKeys.INSTALLS_ID, PackKeys.UPDATES_ID,
+        PackKeys.OPERATIONS_ID, PackKeys.REATTACH_PREVIEWS_ID, PackKeys.LAUNCH_PACK_ID, PackKeys.STOP_PACK_ID,
+        PackKeys.INSTALL_PACK_ID, PackKeys.DISMISS_INSTALL_ID, PackKeys.CANCEL_INSTALL_ID, PackKeys.UPDATE_PACK_ID,
+        PackKeys.DELETE_PACK_ID, PackKeys.PREVIEW_REATTACH_ID, PackKeys.REATTACH_PACK_ID,
     )
 
     @Test
@@ -473,7 +546,7 @@ class CoreKeysTest {
             assertEquals(key.level, declared.level)
             assertNotNull(page.findCommand(key), "${key.id} is not fired from a page below its level")
         }
-        assertEquals(listOf(pack), launcher.source(page, Sources.PackLibrary))
+        assertEquals(listOf(pack.toPackView()), launcher.source(page, PackKeys.Library))
         assertSame(launcher.appearance.library.value, launcher.source(page, Sources.ThemeLibrary))
         assertTrue(launcher.problems.reported.isEmpty(), "nothing failed: ${launcher.problems.reported}")
     }
@@ -481,13 +554,13 @@ class CoreKeysTest {
     @Test
     fun `a core service that cannot be made is one notice in the person's words, however many keys and windows`() {
         val launcher = Launcher(withActions = false, notified = true)
-        assertNull(launcher.app.find(Sources.LaunchState))
-        assertNull(launcher.app.findCommand(Commands.StopPack))
-        assertNull(launcher.app.findCommand(Commands.LaunchPack))
-        assertNull(launcher.app.find(Sources.PackInstalls))
+        assertNull(launcher.app.find(PackKeys.Launch))
+        assertNull(launcher.app.findCommand(PackKeys.StopPack))
+        assertNull(launcher.app.findCommand(PackKeys.LaunchPack))
+        assertNull(launcher.app.find(PackKeys.Installs))
         val group = launcher.center.groups.value.single()
-        assertEquals("core:part:Packs", group.sourceKey)
-        assertEquals("Packs cannot be launched or changed", group.events.single().title)
+        assertEquals("core:module:${PacksApi.ID}", group.sourceKey, "told as the module that brought the keys")
+        assertEquals("Packs did not start", group.events.single().title, "under the module's own name")
         assertTrue(group.events.none { "launch.state" in it.title || "pack.stop" in it.title }, "key ids stay in the log")
         assertEquals(1, launcher.archived.size, "one record in the history")
     }
@@ -502,7 +575,7 @@ class CoreKeysTest {
         val threads = (1..16).map { n ->
             thread {
                 start.await(5, TimeUnit.SECONDS)
-                reporter.report(CoreProblem.PartMissing(CorePart.Packs, IllegalStateException("broken $n")))
+                reporter.report(CoreProblem.PartMissing(CorePart.Session, IllegalStateException("broken $n")))
             }
         }
         threads.forEach { it.join(5_000) }
@@ -521,7 +594,7 @@ class CoreKeysTest {
         val sampled = second.child(ScopeLevel.Page)
         settled(launcher)
         listOf(first, second, sampled).forEach { level ->
-            assertSame(launcher.session, level.services.find<SessionStore>(), "no level below the app makes a store of its own")
+            assertSame(launcher.session, level.hostServices.find<SessionStore>(), "no level below the app makes a store of its own")
         }
         assertEquals("Steve", (launcher.source(first, Sources.Session) as? AppState.Authenticated)?.session?.playerName)
         launcher.fire(first, Commands.SignIn, SessionData(playerName = "Alex"))
@@ -687,7 +760,7 @@ class CoreKeysTest {
         settled(launcher)
 
         launcher.settings.current = launcher.settings.current.copy(offlinePlayerName = "Steve")
-        launcher.fire(launcher.app, Commands.LaunchPack, pack.id)
+        launcher.fire(launcher.app, PackKeys.LaunchPack, pack.id)
         awaitTrue("the offline launch") { launcher.actions.launched.isNotEmpty() }
         val (offline, launchedPack) = launcher.actions.launched.single()
         assertEquals("Steve", offline.playerName)
@@ -695,14 +768,14 @@ class CoreKeysTest {
         assertEquals(pack, launchedPack)
 
         launcher.fire(launcher.app, Commands.SignIn, SessionData(playerName = "Alex"))
-        launcher.fire(launcher.app, Commands.LaunchPack, pack.id)
+        launcher.fire(launcher.app, PackKeys.LaunchPack, pack.id)
         assertEquals("Alex", launcher.actions.launched.last().first.playerName, "a signed-in launch runs as the session, at once")
     }
 
     @Test
     fun `launching a pack that is not installed fails out loud`() {
         val launcher = Launcher()
-        launcher.fire(launcher.app, Commands.LaunchPack, "not-installed")
+        launcher.fire(launcher.app, PackKeys.LaunchPack, "not-installed")
         assertEquals(listOf<CoreProblem>(CoreProblem.PackNotInstalled("not-installed")), launcher.problems.reported.toList())
         assertTrue(launcher.actions.launched.isEmpty())
     }
@@ -712,9 +785,9 @@ class CoreKeysTest {
     @Test
     fun `a pack that is not installed is told under its own key each time it is launched`() {
         val launcher = Launcher(notified = true)
-        launcher.fire(launcher.app, Commands.LaunchPack, "not-installed")
+        launcher.fire(launcher.app, PackKeys.LaunchPack, "not-installed")
         launcher.center.dismiss("core:pack:not-installed:not-installed")
-        launcher.fire(launcher.app, Commands.LaunchPack, "not-installed")
+        launcher.fire(launcher.app, PackKeys.LaunchPack, "not-installed")
         assertEquals(listOf("core:pack:not-installed:not-installed"), launcher.center.groups.value.map { it.sourceKey })
         assertEquals(2, launcher.archived.size)
     }
@@ -732,13 +805,13 @@ class CoreKeysTest {
         assertTrue(launcher.accounts.entered.await(5, TimeUnit.SECONDS), "the startup sign-in never reached the store")
         assertIs<AppState.Loading>(store.state.value)
 
-        launcher.fire(launcher.app, Commands.LaunchPack, pack.id)
+        launcher.fire(launcher.app, PackKeys.LaunchPack, pack.id)
         hold.countDown()
         assertIs<AppState.Authenticated>(settled(launcher))
         launcher.drain()
         assertTrue(launcher.actions.launched.isEmpty(), "nothing started, then or once the sign-in settled")
 
-        launcher.fire(launcher.app, Commands.LaunchPack, pack.id)
+        launcher.fire(launcher.app, PackKeys.LaunchPack, pack.id)
         assertEquals("Alex", launcher.actions.launched.single().first.playerName, "a press after it runs as the account")
     }
 
@@ -747,12 +820,12 @@ class CoreKeysTest {
     fun `a pack said to be missing is taken back once it launches`() {
         val launcher = Launcher(notified = true)
         settled(launcher)
-        launcher.fire(launcher.app, Commands.LaunchPack, "later")
+        launcher.fire(launcher.app, PackKeys.LaunchPack, "later")
         assertTrue(launcher.center.groups.value.any { it.sourceKey == "core:pack:later:not-installed" })
 
         runBlocking { launcher.packs.put(pack.copy(id = "later", instanceDirName = "later")) }
         launcher.fire(launcher.app, Commands.SignIn, SessionData(playerName = "Alex"))
-        launcher.fire(launcher.app, Commands.LaunchPack, "later")
+        launcher.fire(launcher.app, PackKeys.LaunchPack, "later")
         assertEquals("later", launcher.actions.launched.single().second.id)
         assertTrue(launcher.center.groups.value.none { it.sourceKey == "core:pack:later:not-installed" })
     }
@@ -761,7 +834,7 @@ class CoreKeysTest {
     fun `a pack said to be missing is taken back once it is installed`() {
         val launcher = Launcher(notified = true)
         withdrawNoticesOfInstalledPacks(launcher.packs.observe(), launcher.reporter, scope)
-        launcher.fire(launcher.app, Commands.LaunchPack, "later")
+        launcher.fire(launcher.app, PackKeys.LaunchPack, "later")
         assertTrue(launcher.center.groups.value.any { it.sourceKey == "core:pack:later:not-installed" })
 
         runBlocking { launcher.packs.put(pack.copy(id = "later", instanceDirName = "later")) }
@@ -772,7 +845,7 @@ class CoreKeysTest {
     fun `nobody signed in and no offline name starts nothing`() {
         val launcher = Launcher()
         settled(launcher)
-        launcher.fire(launcher.app, Commands.LaunchPack, pack.id)
+        launcher.fire(launcher.app, PackKeys.LaunchPack, pack.id)
         launcher.drain()
         assertTrue(launcher.actions.launched.isEmpty())
     }
@@ -781,28 +854,66 @@ class CoreKeysTest {
     fun `stop, install, update, delete and reattach reach the launcher's actions with the pack they name`() {
         val launcher = Launcher()
         val app = launcher.app
-        val request = PackInstallRequest(
-            CataloguePack(PackOrigin.Mirror, "industrial", "Industrial", "A pack"),
-            CataloguePackVersion("v5", "5", "5"),
-        )
-        launcher.fire(app, Commands.StopPack, pack.id)
-        launcher.fire(app, Commands.InstallPack, request)
-        launcher.fire(app, Commands.DismissInstall, "k1")
-        launcher.fire(app, Commands.CancelInstall, "k2")
-        launcher.fire(app, Commands.UpdatePack, pack.id)
-        launcher.fire(app, Commands.DeletePack, pack.id)
-        launcher.fire(app, Commands.ReattachPack, ReattachRequest(pack.id, shownPreview.confirmation))
-        launcher.fire(app, Commands.UpdatePack, "not-installed")
-        launcher.fire(app, Commands.DeletePack, "not-installed")
-        launcher.fire(app, Commands.ReattachPack, ReattachRequest("not-installed", shownPreview.confirmation))
+        val confirmation = ConfirmationView(shownPreview.confirmation.build, shownPreview.confirmation.fingerprint)
+        launcher.fire(app, PackKeys.StopPack, pack.id)
+        launcher.fire(app, PackKeys.InstallPack, InstallRequest("mirror", "industrial", "v5"))
+        launcher.fire(app, PackKeys.InstallPack, InstallRequest("mirror", "industrial", "no-such-build"))
+        launcher.fire(app, PackKeys.InstallPack, InstallRequest("mirror", "no-such-pack", "v5"))
+        launcher.fire(app, PackKeys.InstallPack, InstallRequest("no-such-source", "industrial", "v5"))
+        launcher.fire(app, PackKeys.DismissInstall, "k1")
+        launcher.fire(app, PackKeys.CancelInstall, "k2")
+        launcher.fire(app, PackKeys.UpdatePack, pack.id)
+        launcher.fire(app, PackKeys.DeletePack, pack.id)
+        launcher.fire(app, PackKeys.ReattachPack, ReattachRequest(pack.id, confirmation))
+        launcher.fire(app, PackKeys.UpdatePack, "not-installed")
+        launcher.fire(app, PackKeys.DeletePack, "not-installed")
+        launcher.fire(app, PackKeys.ReattachPack, ReattachRequest("not-installed", confirmation))
         launcher.drain()
         assertEquals(listOf(pack.id), launcher.actions.stopped)
-        assertEquals(listOf(request), launcher.actions.installed)
+        assertEquals(
+            listOf(CataloguePack(PackOrigin.Mirror, "industrial", "Industrial", "A pack") to Catalogue.BUILD),
+            launcher.actions.installed.toList(),
+            "the build the request names, looked up in its source, and nothing for a request the source cannot answer",
+        )
         assertEquals(listOf("k1"), launcher.actions.dismissed)
         assertEquals(listOf("k2"), launcher.actions.cancelled)
         assertEquals(listOf(pack), launcher.actions.updated)
         assertEquals(listOf(pack to shownPreview.confirmation), launcher.actions.reattached, "with the preview the player agreed to")
         assertEquals(listOf(pack), launcher.actions.deleted)
+        assertEquals(
+            PackOperationView("delete", OperationStatus.Done()),
+            launcher.source(app, PackKeys.Operations)[pack.id],
+            "the delete's outcome is read back, since the command gives none",
+        )
+    }
+
+    @Test
+    fun `waiting updates and the work on each pack read as the packs API's plain data`() {
+        val launcher = Launcher()
+        val app = launcher.app
+        launcher.hub.report(pack.id, PackUpdateStatus.Pending("6", UpdateDirection.Older, CompatChange.McBump, held = true))
+        awaitTrue("the waiting build") { launcher.source(app, PackKeys.Updates)[pack.id] != null }
+        assertEquals(
+            PackUpdateView.Pending("6", PackUpdateView.Pending.OLDER, "mc-bump", held = true),
+            launcher.source(app, PackKeys.Updates)[pack.id],
+        )
+        operations.value = mapOf(pack.id to PackOperation(pack.id, PackOperationKind.Update, PackOperationPhase.Running(3, 9, "a.jar")))
+        awaitTrue("the update under way") { launcher.source(app, PackKeys.Operations)[pack.id] != null }
+        assertEquals(PackOperationView("update", OperationStatus.Running(3, 9)), launcher.source(app, PackKeys.Operations)[pack.id])
+        operations.value = mapOf(pack.id to PackOperation(pack.id, PackOperationKind.Update, PackOperationPhase.Failed("disk full")))
+        awaitTrue("the update's failure") { launcher.source(app, PackKeys.Operations)[pack.id]?.status is OperationStatus.Failed }
+        assertEquals(PackOperationView("update", OperationStatus.Failed("failed", "disk full")), launcher.source(app, PackKeys.Operations)[pack.id])
+    }
+
+    @Test
+    fun `a document that does not name the packs module has none of its keys, and nothing is said to be broken`() {
+        val launcher = Launcher(withPacks = false, notified = true)
+        val page = launcher.composition().child(ScopeLevel.Page)
+        packIds.forEach { id -> assertNull(launcher.app.declarationOf(id), "$id is declared without the module") }
+        assertNull(page.find(PackKeys.Library))
+        assertNull(page.findCommand(PackKeys.LaunchPack))
+        assertNotNull(page.find(Sources.Session), "the host's own keys are there all the same")
+        assertTrue(launcher.center.groups.value.isEmpty(), "a module left out is not a part that failed: ${launcher.center.groups.value}")
     }
 
     /**
@@ -815,29 +926,29 @@ class CoreKeysTest {
     fun `a reattach preview is asked for by command, read from its source, and measured again after work on the pack`() {
         val launcher = Launcher()
         val app = launcher.app
-        launcher.fire(app, Commands.PreviewReattach, pack.id)
-        launcher.fire(app, Commands.PreviewReattach, "not-installed")
-        awaitTrue("the preview") { launcher.source(app, Sources.ReattachPreviews)[pack.id] is ReattachPreviewState.Ready }
+        launcher.fire(app, PackKeys.PreviewReattach, pack.id)
+        launcher.fire(app, PackKeys.PreviewReattach, "not-installed")
+        awaitTrue("the preview") { launcher.source(app, PackKeys.ReattachPreviews)[pack.id] is ReattachPreviewView.Ready }
         assertEquals(
-            mapOf<String, ReattachPreviewState>(pack.id to ReattachPreviewState.Ready(shownPreview)),
-            launcher.source(app, Sources.ReattachPreviews),
+            mapOf(pack.id to ReattachPreviewState.Ready(shownPreview).toView()),
+            launcher.source(app, PackKeys.ReattachPreviews),
         )
 
         assertEquals(1, launcher.measured.get())
 
         operations.value = mapOf(pack.id to PackOperation(pack.id, PackOperationKind.Repair, PackOperationPhase.Running(0, 0, "")))
-        awaitTrue("comparing while the work runs") { launcher.source(app, Sources.ReattachPreviews)[pack.id] == ReattachPreviewState.Comparing }
+        awaitTrue("comparing while the work runs") { launcher.source(app, PackKeys.ReattachPreviews)[pack.id] == ReattachPreviewView.Comparing }
         operations.value = mapOf(pack.id to PackOperation(pack.id, PackOperationKind.Repair, PackOperationPhase.Running(5, 9, "a.jar")))
         operations.value = mapOf(pack.id to PackOperation(pack.id, PackOperationKind.Repair, PackOperationPhase.Repaired(1, 0)))
         // The end is the last change sent, and the collector takes changes in order, so
         // once the end has been measured nothing is left that could measure again.
         awaitTrue("measured again once it ended") {
-            launcher.measured.get() == 2 && launcher.source(app, Sources.ReattachPreviews)[pack.id] is ReattachPreviewState.Ready
+            launcher.measured.get() == 2 && launcher.source(app, PackKeys.ReattachPreviews)[pack.id] is ReattachPreviewView.Ready
         }
         assertEquals(2, launcher.measured.get(), "progress within the work is not news")
 
         launcher.previews.forget(pack.id)
-        assertTrue(launcher.source(app, Sources.ReattachPreviews).isEmpty(), "and gone once nobody wants it")
+        awaitTrue("and gone once nobody wants it") { launcher.source(app, PackKeys.ReattachPreviews).isEmpty() }
     }
 
     /**
@@ -874,9 +985,9 @@ class CoreKeysTest {
     fun `the launches source lists the packs in flight and drops one that ended`() {
         val launcher = Launcher()
         launcher.indications.setLaunchIndication(pack.id, LaunchIndication.Running)
-        assertEquals(mapOf(pack.id to LaunchIndication.Running), launcher.source(launcher.app, Sources.PackLaunches))
+        awaitTrue("the pack in flight") { launcher.source(launcher.app, PackKeys.Launches) == mapOf(pack.id to PackLaunch.Running) }
         launcher.indications.setLaunchIndication(pack.id, null)
-        assertEquals(emptyMap(), launcher.source(launcher.app, Sources.PackLaunches))
+        awaitTrue("the pack dropped once it ended") { launcher.source(launcher.app, PackKeys.Launches).isEmpty() }
     }
 
     // ── Appearance and console ────────────────────────────────────────
@@ -955,7 +1066,7 @@ class CoreKeysTest {
     @Test
     fun `a widget under a window and a composition reads and fires them with nothing else drawn`() {
         val launcher = Launcher(SettingsData(offlinePlayerName = "Steve"))
-        var packs: List<PackInstance>? = null
+        var packs: List<PackView>? = null
         var session: AppState? = null
         var dark: Boolean? = null
         var launch: ((String) -> Unit)? = null
@@ -964,18 +1075,18 @@ class CoreKeysTest {
         onEventThread {
             val scene = ImageComposeScene(100, 100, density = Density(1f)) {
                 CompositionLocalProvider(
-                    LocalWidgetDataRegistry provides data,
-                    LocalWidgetCommandRegistry provides commands,
+                    LocalWidgetDataRegistry provides launcher.data,
+                    LocalWidgetCommandRegistry provides launcher.commands,
                     LocalScope provides launcher.app,
                 ) {
                     ChildLevel(ScopeLevel.Window) {
                         ChildLevel(ScopeLevel.Composition) {
-                            packs = rememberScopedSource(Sources.PackLibrary).valueOrNull()
+                            packs = rememberScopedSource(PackKeys.Library).valueOrNull()
                             session = rememberScopedSource(Sources.Session).valueOrNull()
                             dark = rememberScopedSource(Sources.DarkTheme).valueOrNull()
-                            launch = rememberScopedCommand(Commands.LaunchPack)
+                            launch = rememberScopedCommand(PackKeys.LaunchPack)
                             // The plain app read, which a command a factory makes answers too.
-                            stop = rememberCommand(Commands.StopPack)
+                            stop = rememberCommand(PackKeys.StopPack)
                             val setConsole = rememberCommand(Commands.SetConsoleVisible)
                             show = { setConsole(true) }
                         }
@@ -996,7 +1107,7 @@ class CoreKeysTest {
                 scene.close()
             }
         }
-        assertEquals(listOf(pack), packs)
+        assertEquals(listOf(pack.toPackView()), packs)
         assertEquals("Steve", (session as? AppState.Authenticated)?.session?.playerName)
         assertEquals(true, dark)
         assertNotNull(launch).invoke(pack.id)

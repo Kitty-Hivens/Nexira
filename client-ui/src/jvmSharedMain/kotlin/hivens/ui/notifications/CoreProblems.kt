@@ -10,9 +10,10 @@ import java.util.concurrent.ConcurrentHashMap
 import kotlin.reflect.KClass
 
 /**
- * The parts of the launcher's core, by what the person loses when one does not
- * start. A key that cannot be made is told under its part, so one broken service
- * is one notice however many keys it backs.
+ * The parts of the host, by what the person loses when one does not start. A key
+ * that cannot be made is told under its part, so one broken service is one notice
+ * however many keys it backs. A key a module brought is told as that module, see
+ * [CoreProblem.ModuleMissing].
  */
 enum class CorePart {
     /** Signing in and out. */
@@ -20,9 +21,6 @@ enum class CorePart {
 
     /** Themes, the dark scheme and the language. */
     Appearance,
-
-    /** The packs and what is done to them. */
-    Packs,
 
     /** The console. */
     Console,
@@ -65,6 +63,15 @@ sealed interface CoreProblem {
     /** A part of the core could not be made, so whatever reads its keys has nothing. */
     data class PartMissing(val part: CorePart, val cause: Throwable) : CoreProblem {
         override val key: String get() = "core:part:${part.name}"
+    }
+
+    /**
+     * A module the launcher brought in could not make one of its keys, so whatever
+     * reads its keys has nothing. Told once per module, however many of its keys and
+     * levels fail, under the module's [name] as the person reads it.
+     */
+    data class ModuleMissing(val moduleId: String, val name: String, val cause: Throwable) : CoreProblem {
+        override val key: String get() = "core:module:$moduleId"
     }
 
     /**
@@ -158,10 +165,10 @@ class NotifiedCoreProblems(
         is CoreProblem.PartMissing -> when (problem.part) {
             CorePart.Session -> s.notifCoreSessionMissingTitle
             CorePart.Appearance -> s.notifCoreAppearanceMissingTitle
-            CorePart.Packs -> s.notifCorePacksMissingTitle
             CorePart.Console -> s.notifCoreConsoleMissingTitle
             CorePart.Other -> s.notifCorePartMissingTitle
         }
+        is CoreProblem.ModuleMissing -> s.notifCoreModuleMissingTitle(problem.name)
     }
 
     private fun body(problem: CoreProblem, s: AppStrings): String = when (problem) {
@@ -170,6 +177,7 @@ class NotifiedCoreProblems(
         is CoreProblem.SignedOutNameKept -> s.notifSignOutNameKeptBody
         is CoreProblem.PackNotInstalled -> s.notifReasonNotInstalled
         is CoreProblem.PartMissing -> s.notifCorePartMissingBody
+        is CoreProblem.ModuleMissing -> s.notifCorePartMissingBody
     }
 
     private fun detail(cause: Throwable, s: AppStrings): String =

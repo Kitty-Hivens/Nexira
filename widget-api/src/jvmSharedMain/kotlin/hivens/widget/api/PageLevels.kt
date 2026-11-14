@@ -55,6 +55,7 @@ class PageLevels internal constructor(private val parent: WidgetScope) {
     }
 
     /** The entries in the history now. A level whose entry is not among them goes once nothing holds it. */
+    @HostApi
     fun keep(keys: Set<String>) {
         kept = keys
         fresh.clear()

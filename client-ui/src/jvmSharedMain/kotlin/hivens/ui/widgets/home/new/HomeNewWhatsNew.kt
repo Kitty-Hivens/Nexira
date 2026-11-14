@@ -13,10 +13,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.config.Branding
-import hivens.core.data.PackInstance
-import hivens.core.update.PackUpdateStatus
-import hivens.core.update.PackUpdateStatusHub
-import hivens.core.update.UpdateDirection
+import hivens.packs.api.PackKeys
+import hivens.packs.api.PackUpdateView
+import hivens.packs.api.PackView
 import hivens.ui.Screen
 import hivens.ui.components.LauncherUpdateState
 import hivens.ui.i18n.LocalStrings
@@ -26,7 +25,6 @@ import hivens.ui.nx.NxRow
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
 import hivens.ui.widgets.Commands
-import hivens.ui.widgets.Sources
 import hivens.widget.api.rememberScopedCommand
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
@@ -49,18 +47,17 @@ import org.koin.compose.koinInject
     surface = """{"fill":"panel"}""",
     minWidth = 240, minHeight = 60,
     maxWidth = 2400, maxHeight = 800,
-    needs = ["nav.open", "packs.library"],
+    needs = ["nav.open", "packs.library", "packs.updates"],
 )
 @Composable
 @Suppress("UNUSED_PARAMETER")
 fun HomeNewWhatsNew(instance: WidgetInstance) {
     val navigate = rememberScopedCommand(Commands.Navigate) ?: return
-    val packs = rememberScopedSource(Sources.PackLibrary).valueOrNull() ?: return
+    val packs = rememberScopedSource(PackKeys.Library).valueOrNull() ?: return
     val s = LocalStrings.current
     val updateState: LauncherUpdateState = koinInject()
     val launcher by updateState.available.collectAsState()
-    val hub: PackUpdateStatusHub = koinInject()
-    val statuses by hub.statuses.collectAsState()
+    val statuses = rememberScopedSource(PackKeys.Updates).valueOrNull() ?: return
 
     val packNews = remember(packs, statuses) { packNews(packs, statuses) }
     if (launcher == null && packNews.isEmpty()) return
@@ -85,18 +82,18 @@ fun HomeNewWhatsNew(instance: WidgetInstance) {
         }
         packNews.forEach { (pack, status) ->
             NxRow(
-                title    = pack.displayName,
+                title    = pack.name,
                 subtitle = when (status) {
-                    is PackUpdateStatus.Pending ->
-                        if (status.direction == UpdateDirection.Older) s.homeWhatsNewPackRollback(status.toVersion)
+                    is PackUpdateView.Pending ->
+                        if (status.direction == PackUpdateView.Pending.OLDER) s.homeWhatsNewPackRollback(status.toVersion)
                         else s.homeWhatsNewPackReady(status.toVersion)
-                    is PackUpdateStatus.Updated -> s.homeWhatsNewPackUpdated(status.toVersion)
+                    is PackUpdateView.Updated -> s.homeWhatsNewPackUpdated(status.toVersion)
                     else -> null
                 },
                 icon     = when (status) {
-                    is PackUpdateStatus.Updated -> NxIcon.CheckCircle
-                    is PackUpdateStatus.Pending ->
-                        if (status.direction == UpdateDirection.Older) NxIcon.History else NxIcon.Update
+                    is PackUpdateView.Updated -> NxIcon.CheckCircle
+                    is PackUpdateView.Pending ->
+                        if (status.direction == PackUpdateView.Pending.OLDER) NxIcon.History else NxIcon.Update
                     else -> NxIcon.Update
                 },
                 iconTint = NxColor.lead(),
@@ -113,14 +110,14 @@ fun HomeNewWhatsNew(instance: WidgetInstance) {
  * here; a failure is the notification's to report and the pack page's to explain.
  */
 internal fun packNews(
-    packs: List<PackInstance>,
-    statuses: Map<String, PackUpdateStatus>,
-): List<Pair<PackInstance, PackUpdateStatus>> =
+    packs: List<PackView>,
+    statuses: Map<String, PackUpdateView>,
+): List<Pair<PackView, PackUpdateView>> =
     packs
         .sortedWith(RecentFirst)
         .mapNotNull { pack ->
             when (val status = statuses[pack.id]) {
-                is PackUpdateStatus.Pending, is PackUpdateStatus.Updated -> pack to status
+                is PackUpdateView.Pending, is PackUpdateView.Updated -> pack to status
                 else -> null
             }
         }

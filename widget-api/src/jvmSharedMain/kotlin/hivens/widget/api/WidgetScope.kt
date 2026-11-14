@@ -52,11 +52,19 @@ interface LevelContext {
     val coroutineScope: CoroutineScope
 
     /**
-     * The level's services, to read. One the host declared for this kind of level is
-     * made once per level and closed with it, and any other is seen from the levels
-     * above. Making and closing them is the level's own business, not the reader's.
+     * The level's services, to read, as a module may see them. One declared for this
+     * kind of level is made once per level and closed with it, and any other is seen
+     * from the levels above. Making and closing them is the level's own business, not
+     * the reader's.
      */
     val services: LevelServices
+
+    /**
+     * The host's own services at this level as well, for the host's factories and for
+     * a module the host trusts with them. For anything else the same as [services].
+     */
+    @HostApi
+    val hostServices: LevelServices get() = services
 
     /** Another key's source as this level sees it, read at that key's own level. Null where it is missing. */
     fun <T> find(key: SourceKey<T>): WidgetDataSource<T>?
@@ -99,9 +107,12 @@ class WidgetScope private constructor(
     private val host: LevelServicesHost,
     context: CoroutineContext,
     private val failures: FactoryFailures,
-) : LevelContext, AutoCloseable {
+) : LevelContext {
 
     override val services: LevelServices = host.services
+
+    @HostApi
+    override val hostServices: LevelServices = host.hostServices
 
     private val job = SupervisorJob(context[Job])
 
@@ -135,6 +146,12 @@ class WidgetScope private constructor(
 
     private val providedCommands = ConcurrentHashMap<String, MutableState<WidgetCommand<*>?>>()
 
+    // How often what factories made for an id was dropped, as snapshot state, so a
+    // composable that read the key reads it again once it was.
+    private val revisions = ConcurrentHashMap<String, MutableState<Int>>()
+
+    private fun revisionOf(id: String): MutableState<Int> = revisions.computeIfAbsent(id) { mutableStateOf(0) }
+
     // The keys this thread is making a source for right now, to catch a factory
     // that reads its own key before it recurses into a stack overflow.
     private val making = ThreadLocal<HashSet<String>>()
@@ -145,6 +162,7 @@ class WidgetScope private constructor(
         private set
 
     /** Creates a level of kind [level] inside this one. Its owner closes it, and this level's own close does too. */
+    @HostApi
     fun child(level: ScopeLevel): WidgetScope {
         require(level > this.level) { "a $level level cannot sit inside a ${this.level} level" }
         synchronized(lock) {
@@ -159,6 +177,7 @@ class WidgetScope private constructor(
      * Owned here rather than by whoever draws the pages, so a router that leaves
      * the composition and comes back finds them, and none of them outlives this level.
      */
+    @HostApi
     val pages: PageLevels
         get() = synchronized(lock) {
             check(!closed) { "a ${this.level} level that was disposed keeps no pages" }
@@ -179,6 +198,7 @@ class WidgetScope private constructor(
     override fun <T> find(key: SourceKey<T>): WidgetDataSource<T>? = nearest(key.level)?.sourceAt(key)
 
     /** Provides [value] for [key] as a constant until the returned handle is closed. See [provideSource]. */
+    @HostApi
     fun <T> provide(key: SourceKey<T>, value: T): AutoCloseable =
         provideSource(key, flowSource(MutableStateFlow(value).asStateFlow()))
 
@@ -191,6 +211,7 @@ class WidgetScope private constructor(
      * A second provision replaces the first, and closing the first one's handle
      * then leaves the second in place.
      */
+    @HostApi
     fun <T> provideSource(key: SourceKey<T>, source: WidgetDataSource<T>): AutoCloseable {
         require(key.level == level) { "widget data source '${key.id}' lives at ${key.level}, not at $level" }
         require(level != ScopeLevel.App) { "app-wide source '${key.id}' belongs in the WidgetDataRegistry" }
@@ -215,6 +236,7 @@ class WidgetScope private constructor(
         (slotOf(key.id).value as WidgetDataSource<T>?)?.let { return it }
         if (level == ScopeLevel.App) registry.find(key)?.let { return it }
         val factory = registry.factoryFor(key) ?: return null
+        val _ = revisionOf(key.id).value
         synchronized(lock) {
             if (closed) return null
             made[key.id]?.let { return it as WidgetDataSource<T> }
@@ -287,6 +309,7 @@ class WidgetScope private constructor(
      * closed, the way [provideSource] does for a source: for an owner outside the
      * composition. A subtree uses [ProvideScopedCommand] instead.
      */
+    @HostApi
     fun <P> provideCommand(key: CommandKey<P>, command: WidgetCommand<P>): AutoCloseable {
         require(key.level == level) { "widget command '${key.id}' lives at ${key.level}, not at $level" }
         require(level != ScopeLevel.App) { "app-wide command '${key.id}' belongs in the WidgetCommandRegistry" }
@@ -311,6 +334,7 @@ class WidgetScope private constructor(
         (commandSlotOf(key.id).value as WidgetCommand<P>?)?.let { return it }
         if (level == ScopeLevel.App) commands.find(key)?.let { return it }
         val factory = commands.factoryFor(key) ?: return null
+        val _ = revisionOf(COMMAND_MARK + key.id).value
         val marked = COMMAND_MARK + key.id
         synchronized(lock) {
             if (closed) return null
@@ -339,6 +363,7 @@ class WidgetScope private constructor(
      * that took effect does nothing. A caller asking on every frame would
      * otherwise run every failing factory, and log its failure, on every frame.
      */
+    @HostApi
     fun retryFailed() {
         synchronized(lock) {
             val now = clock()
@@ -347,6 +372,36 @@ class WidgetScope private constructor(
             lastRetry = now
             failed.clear()
         }
+    }
+
+    /**
+     * Drops what the factories of [ids], sources and commands alike, made in this level
+     * and every level below, closes it, and forgets that any of them failed, so the
+     * next read makes them afresh. A composable that read one of them reads it again.
+     *
+     * For the host when the code behind a factory changed under a live tree: a module
+     * loaded again, whose old sources would otherwise go on running code of a class
+     * loader that is closed.
+     */
+    @HostApi
+    fun forgetMade(ids: Set<String>) {
+        if (ids.isEmpty()) return
+        val dropped = ArrayList<Any>()
+        val kids = synchronized(lock) {
+            ids.forEach { id ->
+                made.remove(id)?.let(dropped::add)
+                madeCommands.remove(id)?.let(dropped::add)
+                failed.remove(id)
+                failed.remove(COMMAND_MARK + id)
+            }
+            children.toList()
+        }
+        dropped.forEach { if (it is AutoCloseable) it.closeLogged("a source of a module that changed") }
+        ids.forEach { id ->
+            revisionOf(id).value += 1
+            revisionOf(COMMAND_MARK + id).value += 1
+        }
+        kids.forEach { it.forgetMade(ids) }
     }
 
     // When retryFailed last took effect, on [clock], null before it ever did.
@@ -389,8 +444,13 @@ class WidgetScope private constructor(
      * attached, so one broken source cannot keep the others or the services alive.
      * An owner closing from inside a frame uses [closeLogged] instead, because a
      * throw there takes the window down.
+     *
+     * A level is deliberately not an [AutoCloseable], so that this call carries the
+     * host marker: a marker on an override of [AutoCloseable.close] would not reach a
+     * call made through the interface.
      */
-    override fun close() {
+    @HostApi
+    fun close() {
         val kids: List<WidgetScope>
         val sources: List<Any>
         synchronized(lock) {
@@ -437,6 +497,7 @@ class WidgetScope private constructor(
          * cancelling its job stops them all. [failures] hears of every factory in the
          * tree that could not make what it was asked for.
          */
+        @HostApi
         fun app(
             registry: WidgetDataRegistry,
             services: LevelServicesHost,
@@ -459,6 +520,15 @@ internal const val RETRY_INTERVAL_MS: Long = 1_000L
  * the log.
  */
 internal fun AutoCloseable.closeLogged(what: String) {
+    try {
+        close()
+    } catch (e: Exception) {
+        log.error("Closing {} failed", what, e)
+    }
+}
+
+/** [AutoCloseable.closeLogged] for a level, which is not an AutoCloseable so that its close can carry the host marker. */
+internal fun WidgetScope.closeLogged(what: String) {
     try {
         close()
     } catch (e: Exception) {

@@ -3,9 +3,11 @@ package hivens.ui.widgets.home.new
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import hivens.core.data.PackInstance
+import hivens.packs.api.PackKeys
+import hivens.packs.api.PackView
 import hivens.ui.components.LaunchControl
 import hivens.ui.components.rememberLaunchControl
+import hivens.ui.feature.catalogue.project.loaderLabel
 import hivens.ui.nx.PlayButton
 import hivens.ui.nx.PlayGround
 import hivens.ui.nx.PlayLayout
@@ -22,7 +24,7 @@ import hivens.widget.api.valueOrNull
  * whether a pack can be played or why not.
  */
 internal class QuickLaunchTarget(
-    val target: PackInstance,
+    val target: PackView,
     val control: LaunchControl,
 )
 
@@ -36,9 +38,9 @@ internal class QuickLaunchTarget(
 @Composable
 internal fun rememberQuickLaunchTarget(playLabel: String? = null): QuickLaunchTarget? {
     val appState = rememberScopedSource(Sources.Session).valueOrNull() ?: return null
-    val all = rememberScopedSource(Sources.PackLibrary).valueOrNull() ?: return null
+    val all = rememberScopedSource(PackKeys.Library).valueOrNull() ?: return null
 
-    val target: PackInstance = remember(all) { all.minWithOrNull(RecentFirst) } ?: return null
+    val target: PackView = remember(all) { all.minWithOrNull(RecentFirst) } ?: return null
 
     return QuickLaunchTarget(target, rememberLaunchControl(target, appState, playLabel))
 }
@@ -53,8 +55,17 @@ internal fun rememberQuickLaunchTarget(playLabel: String? = null): QuickLaunchTa
  * reached the second: the first answers null only for an empty list, so with no
  * pack played yet the target was whichever the repository happened to list first.
  */
-internal val RecentFirst: Comparator<PackInstance> =
-    compareByDescending<PackInstance> { it.lastPlayedEpochOrZero }.thenByDescending { it.createdAtEpoch }
+internal val RecentFirst: Comparator<PackView> =
+    compareByDescending<PackView> { it.lastPlayedEpochSecond }.thenByDescending { it.createdAtEpochSecond }
+
+/**
+ * What the pack runs on, as the home widgets caption it: the game version and the
+ * loader when it is not vanilla. Empty before the pack was first prepared, when the
+ * record does not know either.
+ */
+internal fun PackView.runsOn(): String =
+    listOfNotNull(gameVersion, loader?.takeIf { !it.equals("vanilla", ignoreCase = true) }?.let(::loaderLabel))
+        .joinToString(" · ")
 
 /**
  * The shared launch pill for the home widgets. [ground] is what the widget draws it

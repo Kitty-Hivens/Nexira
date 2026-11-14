@@ -72,6 +72,13 @@ kotlin {
     // (java-plugin modules only) skips them; set it here so org.gradle.jvm.version
     // matches the JDK 27 leaf modules instead of falling back to the daemon JVM.
     jvmToolchain(27)
+
+    // The host wires the scope tree and the registries, which the widget kernel fences
+    // off from modules behind its host marker.
+    compilerOptions {
+        optIn.add("hivens.widget.api.HostApi")
+    }
+
     jvm("desktop") {
         // Every other module already runs on the platform; this one was still on
         // JUnit 4 purely by KMP default, which left it out of the build-wide
@@ -142,6 +149,10 @@ kotlin {
                 implementation(project(":client-launcher"))
                 implementation(project(":client-media"))
                 implementation(project(":widget-api"))
+                // The packs module: its API is what the built-in widgets read, and the
+                // module itself is compiled in and handed to the host as a CompiledModule.
+                implementation(project(":packs-api"))
+                implementation(project(":packs"))
                 implementation(project(":nx-ui"))
                 implementation(project(":ui-layers"))
                 implementation(project(":client-i18n"))
@@ -913,5 +924,12 @@ tasks.named<Test>("desktopTest") {
     systemProperty(
         "nexira.test.fixtureModuleJar",
         rootProject.layout.projectDirectory.file("widget-loader/build/fixtures/fixture-module.jar").asFile.absolutePath,
+    )
+    // A module built on the packs API, for the tests that switch a jar on and see its
+    // keys come in. Off the test classpath for the same reason as the fixture.
+    dependsOn(":examples:packs-consumer:jar")
+    systemProperty(
+        "nexira.test.packsConsumerJar",
+        rootProject.layout.projectDirectory.file("examples/packs-consumer/build/libs/packs-consumer.jar").asFile.absolutePath,
     )
 }

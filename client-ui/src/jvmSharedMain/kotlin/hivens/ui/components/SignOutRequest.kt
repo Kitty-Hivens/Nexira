@@ -50,7 +50,7 @@ class SignOutRequests {
 @Composable
 private fun rememberSignOutRequests(): SignOutRequests? {
     val window = LocalScope.current?.nearest(ScopeLevel.Window)
-    return remember(window) { window?.services?.find<SignOutRequests>() }
+    return remember(window) { window?.hostServices?.find<SignOutRequests>() }
 }
 
 /**

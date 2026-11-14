@@ -59,7 +59,7 @@ fun LaunchButtonWidget(instance: WidgetInstance) {
     val p = instance.rememberProps<LaunchButtonProps>()
     val s = LocalStrings.current
     val quickLaunch = rememberQuickLaunchTarget(p.label.ifBlank { s.launchTileReady }) ?: return
-    LaunchTile(quickLaunch.control, quickLaunch.target.displayName)
+    LaunchTile(quickLaunch.control, quickLaunch.target.name)
 }
 
 /**

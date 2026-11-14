@@ -1,9 +1,17 @@
 package hivens.widget.loader
 
+import hivens.widget.api.ContributedServices
+import hivens.widget.api.HostApi
+import hivens.widget.api.KeyContribution
+import hivens.widget.api.ModuleKeysResult
 import hivens.widget.api.ModuleValues
 import hivens.widget.api.ScreenEffect
 import hivens.widget.api.ThemeContribution
 import hivens.widget.api.WidgetApi
+import hivens.widget.api.WidgetCommandRegistry
+import hivens.widget.api.WidgetDataRegistry
+import hivens.widget.api.registerModuleKeys
+import hivens.widget.model.ApiVersion
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.jar.Attributes
@@ -59,8 +67,8 @@ class WidgetModuleLoaderTest {
     }
 
     /** Scans, remembering what it opened. */
-    private fun scan(dir: Path = modules): WidgetModuleScan =
-        WidgetModuleLoader(dir).scan().also { opened += it.loaded }
+    private fun scan(dir: Path = modules, offered: Map<String, ApiVersion> = emptyMap()): WidgetModuleScan =
+        WidgetModuleLoader(dir, offered = offered).scan().also { opened += it.loaded }
 
     @Test
     fun `a well-formed module is loaded, named, and brings its widgets`() {
@@ -361,6 +369,73 @@ class WidgetModuleLoaderTest {
         assertEquals(WidgetModuleScan(), scan(tmp.resolve("nothing-here")))
     }
 
+    // -- module APIs ----------------------------------------------------------
+
+    @Test
+    fun `a jar built against an older minor of an API offered here loads`() {
+        install("older-minor.jar", requires = "nexira.packs=1.0")
+
+        val scan = scan(offered = mapOf("nexira.packs" to ApiVersion(1, 3)))
+
+        assertEquals(emptyList(), scan.rejected)
+        assertEquals("fixture", scan.loaded.single().id)
+    }
+
+    @Test
+    fun `a jar built against another major of an API is refused, naming both versions`() {
+        install("other-major.jar", requires = "nexira.packs=2.0")
+
+        val scan = scan(offered = mapOf("nexira.packs" to ApiVersion(1, 3)))
+
+        assertEquals(emptyList(), scan.loaded)
+        val reason = scan.rejected.single().reason
+        assertTrue("2.0" in reason && "1.3" in reason, reason)
+    }
+
+    @Test
+    fun `a jar built against a newer minor than the one here is refused`() {
+        install("newer-minor.jar", requires = "nexira.packs=1.4")
+
+        val scan = scan(offered = mapOf("nexira.packs" to ApiVersion(1, 3)))
+
+        assertEquals(emptyList(), scan.loaded)
+        assertTrue("1.4" in scan.rejected.single().reason, scan.rejected.single().reason)
+    }
+
+    @Test
+    fun `a jar built against an API nothing here offers is refused by the API's name`() {
+        install("unknown-api.jar", requires = "nexira.packs=1.0, someone.else=1.0")
+
+        val scan = scan(offered = mapOf("nexira.packs" to ApiVersion(1, 0)))
+
+        assertEquals(emptyList(), scan.loaded)
+        assertTrue("someone.else" in scan.rejected.single().reason, scan.rejected.single().reason)
+    }
+
+    @Test
+    fun `a requirement that is not id=major-minor is refused rather than ignored`() {
+        install("garbled.jar", requires = "nexira.packs=one")
+
+        val scan = scan(offered = mapOf("nexira.packs" to ApiVersion(1, 0)))
+
+        assertEquals(emptyList(), scan.loaded)
+        assertTrue(WidgetApi.MANIFEST_REQUIRES in scan.rejected.single().reason, scan.rejected.single().reason)
+    }
+
+    @OptIn(HostApi::class)
+    @Test
+    fun `a jar's key contribution is found in it and registers its keys`() {
+        install("good.jar")
+
+        val keys = scan().loaded.single().contributions.filterIsInstance<KeyContribution>().single()
+        val sources = WidgetDataRegistry()
+        val result = registerModuleKeys("fixture", keys, sources, WidgetCommandRegistry(), ContributedServices())
+
+        assertTrue(result is ModuleKeysResult.Registered, "$result")
+        assertTrue(keys.javaClass.classLoader !== javaClass.classLoader, "the contribution resolved through the parent loader")
+        assertEquals("sample", sources.sampleOf("fixture.greeting")?.invoke())
+    }
+
     // -- loading without a restart -------------------------------------------
 
     @Test
@@ -443,12 +518,14 @@ class WidgetModuleLoaderTest {
         withService: Boolean = true,
         withRegistryService: Boolean = true,
         extra: Map<String, String> = emptyMap(),
+        requires: String? = null,
     ) {
         val manifest = Manifest().apply {
             mainAttributes[Attributes.Name.MANIFEST_VERSION] = "1.0"
             (apiText ?: api?.toString())?.let { mainAttributes.putValue(WidgetApi.MANIFEST_VERSION, it) }
             id?.let { mainAttributes.putValue(WidgetApi.MANIFEST_ID, it) }
             name?.let { mainAttributes.putValue(WidgetApi.MANIFEST_NAME, it) }
+            requires?.let { mainAttributes.putValue(WidgetApi.MANIFEST_REQUIRES, it) }
         }
         JarFile(fixtureJar.toFile()).use { source ->
             JarOutputStream(Files.newOutputStream(modules.resolve(fileName)), manifest).use { out ->

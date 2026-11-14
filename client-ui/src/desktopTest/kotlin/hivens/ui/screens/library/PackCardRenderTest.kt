@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
@@ -20,19 +21,21 @@ import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
 import hivens.core.data.PackReference
 import hivens.core.net.TransferEngine
-import hivens.core.update.CompatChange
-import hivens.core.update.PackUpdateStatus
-import hivens.core.update.PackUpdateStatusHub
-import hivens.core.update.UpdateDirection
 import hivens.launcher.catalogue.PackArtResolver
 import hivens.launcher.modrinth.ModrinthClient
 import hivens.launcher.smrt.SmrtPackClient
+import hivens.packs.api.PackKeys
+import hivens.packs.api.PackUpdateView
+import hivens.packs.toPackView
 import hivens.ui.i18n.AppLocale
 import hivens.ui.i18n.LocaleProvider
 import hivens.ui.navigation.NavRequests
 import hivens.ui.notifications.IndicationCenter
 import hivens.ui.feature.catalogue.browse.BrowsePackCard
 import hivens.ui.theme.NxTheme
+import hivens.widget.api.LocalWidgetDataRegistry
+import hivens.widget.api.WidgetDataRegistry
+import hivens.widget.api.flowSource
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import org.jetbrains.skia.EncodedImageFormat
@@ -108,9 +111,9 @@ class PackCardRenderTest {
         override suspend fun delete(id: String) {}
     }
 
-    private class FakeHub(pending: Map<String, PackUpdateStatus>) : PackUpdateStatusHub {
-        override val statuses = MutableStateFlow(pending)
-        override fun report(id: String, status: PackUpdateStatus) {}
+    /** The packs module's update statuses, as it would answer them: a build waiting for the plain pack. */
+    private val keys = WidgetDataRegistry().apply {
+        register(PackKeys.Updates, flowSource(MutableStateFlow(mapOf("inst-1" to PackUpdateView.Pending("2.8.1", PackUpdateView.Pending.NEWER, "same")))))
     }
 
     /** Selected only if something asks for the network, which is what must not happen here. */
@@ -124,17 +127,6 @@ class PackCardRenderTest {
                     single<IPackRepository> { FakeRepo(listOf(instance, forked)) }
                     single { PackArtResolver(ModrinthClient(http, TransferEngine(http)), SmrtPackClient(http)) }
                     single { IndicationCenter() }
-                    single<PackUpdateStatusHub> {
-                        FakeHub(
-                            mapOf(
-                                "inst-1" to PackUpdateStatus.Pending(
-                                    toVersion = "2.8.1",
-                                    direction = UpdateDirection.Newer,
-                                    compat = CompatChange.Same,
-                                ),
-                            ),
-                        )
-                    }
                     single { NavRequests() }
                     // The card asks whether the pack may be deleted right now.
                     single<RunningPackSource> {
@@ -154,11 +146,13 @@ class PackCardRenderTest {
         val scene = ImageComposeScene((520 * d).toInt(), (480 * d).toInt(), density = Density(d)) {
             LocaleProvider(AppLocale.RUSSIAN) {
                 NxTheme(dark = dark) {
-                    Box(Modifier.fillMaxSize().background(NxColor.page).padding(16.dp)) {
-                        Column(
-                            modifier = Modifier.width(488.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
-                        ) { body() }
+                    CompositionLocalProvider(LocalWidgetDataRegistry provides keys) {
+                        Box(Modifier.fillMaxSize().background(NxColor.page).padding(16.dp)) {
+                            Column(
+                                modifier = Modifier.width(488.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp),
+                            ) { body() }
+                        }
                     }
                 }
             }
@@ -181,8 +175,8 @@ class PackCardRenderTest {
             sheet("pack-cards-${if (dark) "dark" else "light"}", dark) {
                 // Library: a plain pack carrying the update badge in its corner, and
                 // a fork whose version string is long enough to crowd the row.
-                PackCard(instance, onOpenDetail = {}, onOpenFolder = {}, onDelete = {})
-                PackCard(forked, onOpenDetail = {}, onOpenFolder = {}, onDelete = {})
+                PackCard(instance.toPackView(), onOpenDetail = {}, onOpenFolder = {}, onDelete = {})
+                PackCard(forked.toPackView(), onOpenDetail = {}, onOpenFolder = {}, onDelete = {})
                 // Browse: a title, a tagline and four chips in the same height.
                 BrowsePackCard(catalogue, onClick = {})
             }

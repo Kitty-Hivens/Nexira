@@ -1,4 +1,4 @@
-package hivens.ui.packs
+package hivens.packs
 
 import hivens.auth.AuthProvider
 import hivens.core.api.catalogue.CataloguePack
@@ -18,14 +18,11 @@ import hivens.launcher.PackOperationKind
 import hivens.launcher.PackOperationPhase
 import hivens.launcher.PackOperationService
 import hivens.launcher.instance.PackInstanceService
+import hivens.launcher.instance.PackInstanceService.DeleteOutcome
+import hivens.launcher.launch.LauncherController
 import hivens.launcher.update.ReattachConfirmation
 import hivens.launcher.update.ReattachPreviewStaleException
-import hivens.launcher.launch.LauncherController
-import hivens.ui.AppState
-import hivens.ui.notifications.CoreProblem
-import hivens.ui.notifications.CoreProblems
-import hivens.ui.notifications.LaunchTarget
-import hivens.ui.notifications.drivers.LaunchDriver
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.StateFlow
@@ -35,16 +32,12 @@ import org.slf4j.LoggerFactory
 
 private val log = LoggerFactory.getLogger("PackActions")
 
-/** A catalogue pack and the build of it to install. */
-data class PackInstallRequest(val pack: CataloguePack, val version: CataloguePackVersion)
-
 /**
- * What the launcher does to packs, as the pack commands ask for it.
+ * What the module does to packs, as the pack commands ask for it.
  *
  * One seam over the launcher's controller and its install, operation and instance
  * services, so a command reads the same whatever is behind it and a test can stand
- * a fake in for all of them. Each action is what the screen offering it did before
- * it was a command.
+ * a fake in for all of them.
  */
 interface PackActions {
     /** What the one launch the launcher runs at a time is doing. */
@@ -60,7 +53,7 @@ interface PackActions {
     fun stop(packId: String)
 
     /** Installs a catalogue pack, or does nothing when the same build is already being installed. */
-    fun install(request: PackInstallRequest)
+    fun install(pack: CataloguePack, version: CataloguePackVersion)
 
     /** Forgets a finished install. */
     fun dismissInstall(key: String)
@@ -71,8 +64,8 @@ interface PackActions {
     /** Moves [pack] to its latest build, or does nothing when other work on it is under way. */
     fun update(pack: PackInstance)
 
-    /** Deletes [pack] and its files, or does nothing when its game is running or other work on it is under way. */
-    suspend fun delete(pack: PackInstance)
+    /** Deletes [pack] and its files, or leaves it when its game is running or other work on it is under way, and says which. */
+    suspend fun delete(pack: PackInstance): DeleteOutcome
 
     /**
      * Puts the detached [pack] back on its source's build as the preview [confirmed]
@@ -83,10 +76,10 @@ interface PackActions {
     fun reattach(pack: PackInstance, confirmed: ReattachConfirmation)
 }
 
-/** [PackActions] over the launcher's own services. */
+/** [PackActions] over the launcher's own services. [host] hears of each launch that starts. */
 class LauncherPackActions(
     private val controller: LauncherController,
-    private val driver: LaunchDriver,
+    private val host: PacksHost,
     private val installService: PackInstallService,
     private val operations: PackOperationService,
     private val updater: PackUpdater,
@@ -100,14 +93,14 @@ class LauncherPackActions(
 
     override fun launch(session: SessionData, pack: PackInstance): Boolean {
         val started = controller.launchPackInstance(session, pack)
-        if (started) driver.observe(LaunchTarget(pack))
+        if (started) host.launched(pack)
         return started
     }
 
     override fun stop(packId: String) = controller.abort(packId)
 
-    override fun install(request: PackInstallRequest) {
-        val _ = installService.start(request.pack, request.version)
+    override fun install(pack: CataloguePack, version: CataloguePackVersion) {
+        val _ = installService.start(pack, version)
     }
 
     override fun dismissInstall(key: String) = installService.dismiss(key)
@@ -118,9 +111,10 @@ class LauncherPackActions(
         val _ = operations.startLatestUpdate(pack, updater, hub)
     }
 
-    override suspend fun delete(pack: PackInstance) {
+    override suspend fun delete(pack: PackInstance): DeleteOutcome {
         val outcome = instances.deleteCompletely(pack)
-        if (outcome != PackInstanceService.DeleteOutcome.Deleted) log.info("Pack {} was not deleted: {}", pack.id, outcome)
+        if (outcome != DeleteOutcome.Deleted) log.info("Pack {} was not deleted: {}", pack.id, outcome)
+        return outcome
     }
 
     override fun reattach(pack: PackInstance, confirmed: ReattachConfirmation) {
@@ -170,13 +164,12 @@ fun PackOperationService.startReattach(pack: PackInstance, instances: PackInstan
     }
 
 /**
- * Starts the game of the pack [packId] as the session [state] holds, or as the
- * offline name the person chose when nobody is signed in, the way Play on a pack
- * always did. The offline name is read at the press rather than taken from whatever
- * was drawn, since what the game runs as cannot lag behind the settings. With no
- * identity at all nothing starts, which the control offering Play already says. A
- * pack that is not installed fails the way any launch does: logged and told to
- * [problems].
+ * Starts the game of the pack [packId] as [identity] says, or as the offline name the
+ * person chose when nobody is signed in, the way Play on a pack always did. The
+ * offline name is read at the press rather than taken from whatever was drawn, since
+ * what the game runs as cannot lag behind the settings. With no identity at all
+ * nothing starts, which the control offering Play already says. A pack that is not
+ * installed fails the way any launch does: logged and told to the host.
  *
  * Pressed while the startup sign-in is still finding out who the launcher is, the
  * launch is refused, as the launcher's own Play control refuses it while it reads
@@ -189,49 +182,53 @@ fun PackOperationService.startReattach(pack: PackInstance, instances: PackInstan
  */
 internal fun launchPack(
     packId: String,
-    state: AppState,
+    identity: LaunchIdentity,
     packs: IPackRepository,
     actions: PackActions,
     settings: ISettingsService,
     offline: AuthProvider,
-    problems: CoreProblems,
+    host: PacksHost,
     scope: CoroutineScope,
 ) {
     val pack = packs.observe().value.firstOrNull { it.id == packId }
     if (pack == null) {
         log.error("Asked to launch pack {}, which is not installed", packId)
-        problems.report(CoreProblem.PackNotInstalled(packId))
+        host.packMissing(packId)
         return
     }
-    when (state) {
-        is AppState.Authenticated -> {
-            if (actions.launch(state.session, pack)) problems.withdraw(CoreProblem.PackNotInstalled(packId))
+    when (identity) {
+        is LaunchIdentity.SignedIn -> {
+            if (actions.launch(identity.session, pack)) host.packFound(packId)
         }
-        AppState.Loading -> log.info("Not launching pack {}: the launcher is still signing in", packId)
-        AppState.Unauthenticated -> scope.launch {
+        LaunchIdentity.Resolving -> log.info("Not launching pack {}: the launcher is still signing in", packId)
+        LaunchIdentity.Nobody -> scope.launch {
             val name = withContext(Dispatchers.IO) { settings.getSettings().offlinePlayerName }
             if (name.isNullOrBlank()) return@launch
-            val identity = withContext(Dispatchers.IO) { offline.login(name, "", "") }
-            if (actions.launch(identity, pack)) problems.withdraw(CoreProblem.PackNotInstalled(packId))
+            val session = withContext(Dispatchers.IO) { offline.login(name, "", "") }
+            if (actions.launch(session, pack)) host.packFound(packId)
         }
     }
 }
 
 /**
- * Takes back the notice that a pack was not installed once a pack of that id is,
- * for as long as [scope] runs. The notice is sticky and says something that no
- * longer holds once the pack is there.
+ * Deletes the pack [packId] on [scope], the way the pack's own delete does, and
+ * tells [outcomes] how it went. A pack that is not installed is left alone.
  */
-fun withdrawNoticesOfInstalledPacks(packs: StateFlow<List<PackInstance>>, problems: CoreProblems, scope: CoroutineScope) {
-    scope.launch {
-        packs.collect { installed -> installed.forEach { problems.withdraw(CoreProblem.PackNotInstalled(it.id)) } }
-    }
-}
-
-/** Deletes the pack [packId] on [scope], the way the pack's own delete does. A pack that is not installed is left alone. */
-internal fun deletePack(packId: String, packs: IPackRepository, actions: PackActions, scope: CoroutineScope) {
+internal fun deletePack(packId: String, packs: IPackRepository, actions: PackActions, outcomes: PackOutcomes, scope: CoroutineScope) {
     val pack = packs.observe().value.firstOrNull { it.id == packId } ?: return
-    scope.launch { actions.delete(pack) }
+    outcomes.deleting(packId)
+    scope.launch {
+        val outcome = try {
+            actions.delete(pack)
+        } catch (e: CancellationException) {
+            outcomes.deleteFailed(packId, e)
+            throw e
+        } catch (e: Exception) {
+            outcomes.deleteFailed(packId, e)
+            throw e
+        }
+        outcomes.deleted(packId, outcome)
+    }
 }
 
 /** Updates the pack [packId] to its latest build. A pack that is not installed is left alone. */
@@ -240,10 +237,10 @@ internal fun updatePack(packId: String, packs: IPackRepository, actions: PackAct
     actions.update(pack)
 }
 
-/** Puts the detached pack [request] names back on its source as its preview said. A pack that is not installed is left alone. */
-internal fun reattachPack(request: ReattachRequest, packs: IPackRepository, actions: PackActions) {
-    val pack = packs.observe().value.firstOrNull { it.id == request.packId } ?: return
-    actions.reattach(pack, request.confirmation)
+/** Puts the detached pack [packId] back on its source as [confirmed] said. A pack that is not installed is left alone. */
+internal fun reattachPack(packId: String, confirmed: ReattachConfirmation, packs: IPackRepository, actions: PackActions) {
+    val pack = packs.observe().value.firstOrNull { it.id == packId } ?: return
+    actions.reattach(pack, confirmed)
 }
 
 /** Measures the pack [packId] against its source for a reattach. A pack that is not installed is left alone. */

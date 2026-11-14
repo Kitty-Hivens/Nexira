@@ -15,6 +15,8 @@ import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.zIndex
 import hivens.core.launch.LaunchControlMode
+import hivens.packs.api.PackKeys
+import hivens.packs.api.PackView
 import hivens.ui.components.rememberLaunchControl
 import hivens.ui.nx.PlayGround
 import hivens.ui.nx.PlayLayout
@@ -50,7 +52,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
-import hivens.core.data.PackInstance
 import hivens.ui.AppState
 import hivens.ui.Screen
 import hivens.ui.effects.pixelArtBackground
@@ -59,7 +60,6 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.screens.library.lastPlayedLabel
 import hivens.ui.screens.library.rememberPackArt
-import hivens.ui.feature.catalogue.project.loaderLabel
 import hivens.ui.theme.familyForText
 import hivens.ui.theme.decorativePair
 import hivens.ui.widgets.Commands
@@ -116,7 +116,7 @@ fun HomeNewRecent(instance: WidgetInstance) {
     val appState = rememberScopedSource(Sources.Session).valueOrNull() ?: return
     val navigate = rememberScopedCommand(Commands.Navigate) ?: return
     val s = LocalStrings.current
-    val all = rememberScopedSource(Sources.PackLibrary).valueOrNull() ?: return
+    val all = rememberScopedSource(PackKeys.Library).valueOrNull() ?: return
 
     if (all.isEmpty()) {
         EmptyPacksCta(onBrowse = { navigate(Screen.Browse) })
@@ -190,7 +190,7 @@ internal fun tileBudget(columns: Int, rows: Int, maxTiles: Int): Int {
 // launch that is under way keeps its control showing, so a tile does not hide
 // that its pack is starting the moment the pointer leaves.
 @Composable
-private fun PackTile(pack: PackInstance, appState: AppState, onClick: () -> Unit, modifier: Modifier) {
+private fun PackTile(pack: PackView, appState: AppState, onClick: () -> Unit, modifier: Modifier) {
     val (hueA, hueB) = decorativePair(pack.id)
     val art = rememberPackArt(pack)
     val interaction = remember { MutableInteractionSource() }
@@ -200,13 +200,7 @@ private fun PackTile(pack: PackInstance, appState: AppState, onClick: () -> Unit
         animationSpec = spring(dampingRatio = LIFT_DAMPING, stiffness = Spring.StiffnessMediumLow),
     )
     val control = rememberLaunchControl(pack, appState)
-    val runsOn = pack.cachedManifest?.let { m ->
-        listOfNotNull(
-            m.minecraftVersion.takeIf { it.isNotBlank() },
-            m.loaderName.takeIf { it.isNotBlank() && !it.equals("vanilla", ignoreCase = true) }?.let(::loaderLabel),
-        ).joinToString(" · ")
-    }
-    val caption = listOfNotNull(runsOn?.takeIf { it.isNotBlank() }, lastPlayedLabel(pack.lastPlayedEpochOrZero))
+    val caption = listOfNotNull(pack.runsOn().takeIf { it.isNotBlank() }, lastPlayedLabel(pack.lastPlayedEpochSecond))
         .joinToString(" · ")
     val shape = MaterialTheme.shapes.medium
     BoxWithConstraints(
@@ -259,8 +253,8 @@ private fun PackTile(pack: PackInstance, appState: AppState, onClick: () -> Unit
             modifier = Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(if (roomy) 16.dp else 12.dp),
         ) {
             Text(
-                text       = pack.displayName,
-                fontFamily = familyForText(pack.displayName),
+                text       = pack.name,
+                fontFamily = familyForText(pack.name),
                 style      = if (roomy) MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleSmall,
                 color      = Color.White,
                 fontWeight = FontWeight.SemiBold,

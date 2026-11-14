@@ -60,8 +60,15 @@ interface LevelServices {
  */
 interface LevelServicesHost : AutoCloseable {
 
-    /** What the level this handle serves shows of its services. */
+    /** What the level this handle serves shows of its services to modules and their widgets. */
     val services: LevelServices
+
+    /**
+     * What the level shows the host, which may be more than [services]: a host that
+     * keeps parts of its own graph from modules answers them here only. The same as
+     * [services] unless the host says otherwise.
+     */
+    val hostServices: LevelServices get() = services
 
     /** The handle for a level of kind [level] made inside the one this handle serves. That level closes it. */
     fun child(level: ScopeLevel): LevelServicesHost

@@ -1,16 +1,11 @@
 package hivens.ui.widgets
 
 import hivens.core.activity.Activity
-import hivens.core.data.PackInstance
 import hivens.core.data.ThemeMode
-import hivens.core.launch.LaunchState
-import hivens.launcher.InstallSnapshot
 import hivens.ui.AppState
 import hivens.ui.background.BackgroundSettings
 import hivens.ui.i18n.AppLocale
 import hivens.ui.navigation.NavState
-import hivens.ui.packs.ReattachPreviewState
-import hivens.ui.notifications.IndicationCenter.LaunchIndication
 import hivens.ui.notifications.PersistedNotification
 import hivens.ui.feature.catalogue.project.OpenProject
 import hivens.ui.host.HostWindowState
@@ -31,6 +26,9 @@ import hivens.widget.model.SourceKey
  * services, so they exist wherever such a level does, whoever draws it. The few only
  * a level's owner has, its history and its window, are declared in the registry so
  * the editor knows where they live, and the owner provides them.
+ *
+ * The packs and what is done to them are not here: they are the packs module's keys,
+ * in `hivens.packs.api.PackKeys`, and exist only where the document names that module.
  */
 object Sources {
     /**
@@ -103,36 +101,6 @@ object Sources {
 
     /** The language the composition speaks. Changed through [Commands.SetLocale]. */
     val Locale = SourceKey<AppLocale>("locale", ScopeLevel.Composition)
-
-    /** Every pack installed, in the order the store keeps them. */
-    val PackLibrary = SourceKey<List<PackInstance>>("packs.library")
-
-    /**
-     * Every pack with a launch in flight and where it stands, by pack id. A pack with
-     * nothing in flight is absent. Moved by [Commands.LaunchPack] and [Commands.StopPack].
-     */
-    val PackLaunches = SourceKey<Map<String, LaunchIndication>>("packs.launches")
-
-    /** What the one launch the launcher runs at a time is doing, from preparing to the game's exit. */
-    val LaunchState = SourceKey<LaunchState>("launch.state")
-
-    /**
-     * Every pack install there is, running or finished and not yet dismissed, by its
-     * key. Started by [Commands.InstallPack].
-     */
-    val PackInstalls = SourceKey<Map<String, InstallSnapshot>>("packs.installs")
-
-    /**
-     * The latest reattach preview of each detached pack that asked for one, by pack
-     * id, asked for with [Commands.PreviewReattach]. When an operation on the pack (an
-     * update, a repair, a reattach) starts or ends its preview is measured again, and
-     * reads as comparing while that operation runs. Other changes to the files, an
-     * edit on the Content tab among them, do not refresh it. A preview goes a while
-     * after it answered if nobody asks again. A reattach is refused unless the pack
-     * still measures as the confirmed preview said, so a preview older than the
-     * files can at worst be refused, never applied.
-     */
-    val ReattachPreviews = SourceKey<Map<String, ReattachPreviewState>>("packs.reattach.previews")
 
     /** Whether the console is asked to be on screen. Changed through [Commands.SetConsoleVisible]. */
     val ConsoleVisible = SourceKey<Boolean>("console.visible")

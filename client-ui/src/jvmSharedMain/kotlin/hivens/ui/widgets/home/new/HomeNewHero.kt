@@ -92,7 +92,7 @@ fun HomeNewHero(instance: WidgetInstance) {
     val (hueA, hueB) = decorativePair(target.id)
     val art = rememberPackArt(target)
 
-    val eyebrow = if (target.lastPlayedEpochOrZero > 0L) s.homeQuickContinue else s.homeQuickStart
+    val eyebrow = if (target.lastPlayedEpochSecond > 0L) s.homeQuickContinue else s.homeQuickStart
     val openDetail = { navigate(Screen.PackDetail(target.id)) }
 
     BoxWithConstraints(Modifier.fillMaxWidth().padding(top = 12.dp)) {
@@ -146,7 +146,7 @@ fun HomeNewHero(instance: WidgetInstance) {
                     contentScale       = ContentScale.Crop,
                     modifier           = Modifier.size(if (tall) 64.dp else 44.dp).clip(RoundedCornerShape(if (tall) 14.dp else 10.dp)),
                     loading            = { Box(Modifier.fillMaxSize().background(hueA)) },
-                    error              = { InitialsAvatar(target.displayName, hueA) },
+                    error              = { InitialsAvatar(target.name, hueA) },
                 )
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(
@@ -156,8 +156,8 @@ fun HomeNewHero(instance: WidgetInstance) {
                         fontWeight = FontWeight.Medium,
                     )
                     Text(
-                        text       = target.displayName,
-                        fontFamily = familyForText(target.displayName),
+                        text       = target.name,
+                        fontFamily = familyForText(target.name),
                         style      = if (tall) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.titleLarge,
                         color      = Color.White,
                         fontWeight = FontWeight.SemiBold,
@@ -166,10 +166,10 @@ fun HomeNewHero(instance: WidgetInstance) {
                     )
                     if (p.showMeta) {
                         val meta = buildList {
-                            target.packRef.version?.let { add(it) }
+                            target.source.version?.let { add(it) }
                             val hours = target.playtimeSeconds / 3600
                             if (hours > 0) add(s.homeHeroPlaytime(hours))
-                            if (target.lastPlayedEpochOrZero > 0L) add(lastPlayedLabel(target.lastPlayedEpochOrZero))
+                            if (target.lastPlayedEpochSecond > 0L) add(lastPlayedLabel(target.lastPlayedEpochSecond))
                         }
                         if (meta.isNotEmpty()) {
                             Text(

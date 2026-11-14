@@ -1,12 +1,15 @@
 package hivens.ui.screens.library
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackInstance
 import hivens.launcher.catalogue.PackArt
 import hivens.launcher.catalogue.PackArtResolver
+import hivens.packs.api.PackView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
@@ -47,4 +50,20 @@ fun rememberPackArt(instance: PackInstance): PackArt {
         value = withContext(Dispatchers.IO) { resolver.resolve(instance) }
     }
     return art
+}
+
+/**
+ * The cover of a pack a widget read from the packs module, resolved as the record's.
+ *
+ * The resolver asks the pack's source, which it finds through the record, so the record
+ * of [pack]'s id is looked up in the library. Until the library has it, which is only
+ * the moment a pack is installed or removed, the art captured at install stands in.
+ */
+@Composable
+fun rememberPackArt(pack: PackView): PackArt {
+    val packs: IPackRepository = koinInject()
+    val library by packs.observe().collectAsState()
+    val record = remember(pack.id, library) { library.firstOrNull { it.id == pack.id } }
+        ?: return PackArt(pack.iconUrl, pack.bannerUrl)
+    return rememberPackArt(record)
 }

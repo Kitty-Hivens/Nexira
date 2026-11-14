@@ -63,11 +63,16 @@ import kotlin.time.Duration.Companion.milliseconds
  * traversal in the editor. [load] runs the same sweep on the
  * post-migration graph and falls back to the bundled default on a
  * collision, so a migration that mints a clashing id can't persist one.
+ *
+ * The standard module list, [standardModules], is never held or written: a graph that
+ * names exactly it is kept as one that names none, so a later build whose standard
+ * list grew reads the file as asking for the new list.
  */
 class LayoutGraphRepository(
     private val file: Path,
     private val json: Json,
     private val scope: CoroutineScope,
+    private val standardModules: () -> List<String> = { emptyList() },
     private val defaultGraph: () -> LayoutGraph,
 ) {
 
@@ -143,7 +148,7 @@ class LayoutGraphRepository(
      */
     suspend fun update(validate: Boolean = true, transform: (LayoutGraph) -> LayoutGraph) {
         mutex.withLock {
-            val next = transform(state.value)
+            val next = transform(state.value).withoutStandardModules()
             if (next == state.value) return@withLock
 
             // Tree-wide instanceId uniqueness check. Walks the whole tree
@@ -211,7 +216,8 @@ class LayoutGraphRepository(
      *
      * The screens somebody made stay, content and all. A reset is about how the
      * launcher's own surfaces are arranged, and a screen made and filled by hand is
-     * not an arrangement of anything the default knows.
+     * not an arrangement of anything the default knows. A module list chosen by hand
+     * goes back to the standard one, which the bundled default stands for.
      */
     suspend fun resetAll() {
         update { current -> defaultGraph().withScreensFrom(current) }
@@ -297,7 +303,7 @@ class LayoutGraphRepository(
             }
             val def = defaultGraph()
             val structural = JsonMigrations.apply(envelope.schemaVersion, envelope.graph)
-            val decoded = json.decodeFromJsonElement(LayoutGraph.serializer(), structural)
+            val decoded = json.decodeFromJsonElement(LayoutGraph.serializer(), structural).withoutStandardModules()
             // Migrate + seed missing default surfaces/slots + sweep instanceId
             // uniqueness via the shared reconciler. A migration or merge that
             // mints a colliding id would silently break every findByInstanceId
@@ -380,6 +386,16 @@ class LayoutGraphRepository(
         } catch (e: Exception) {
             log.error("Failed to persist layout graph at {}", file, e)
         }
+    }
+
+    /**
+     * This graph with the module list it names dropped when that list is the standard
+     * one, in any order, so the standard list is read afresh at every start and never
+     * frozen into the file.
+     */
+    private fun LayoutGraph.withoutStandardModules(): LayoutGraph {
+        val named = modules ?: return this
+        return if (named.toSet() == standardModules().toSet()) copy(modules = null) else this
     }
 
     /** What a read pulled off disk before the structural ladder runs. */

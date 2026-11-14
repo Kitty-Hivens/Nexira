@@ -7,7 +7,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import hivens.core.api.interfaces.ISettingsService
-import hivens.core.data.PackInstance
 import hivens.core.launch.InstanceWork
 import hivens.core.launch.InstanceWorkRegistry
 import hivens.core.launch.LaunchBlock
@@ -19,6 +18,8 @@ import hivens.launcher.PackOperationService
 import hivens.launcher.instance.InstanceContentUpdater
 import hivens.launcher.launch.LauncherController
 import hivens.launcher.platform.PlatformPaths
+import hivens.packs.api.PackKeys
+import hivens.packs.api.PackView
 import hivens.ui.AppState
 import hivens.ui.Screen
 import hivens.ui.i18n.AppStrings
@@ -30,7 +31,6 @@ import hivens.ui.notifications.IndicationCenter
 import hivens.ui.notifications.IndicationCenter.Companion.controlMode
 import hivens.ui.notifications.IndicationCenter.LaunchIndication
 import hivens.ui.nx.PlayTone
-import hivens.ui.widgets.Commands
 import hivens.widget.api.rememberScopedCommand
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -73,9 +73,27 @@ data class LaunchControl(
     val actionable: Boolean get() = tone == PlayTone.Ready
 }
 
+/**
+ * What [pack]'s launch control shows and does now, as [appState] has the launcher
+ * signed in. Play and Stop fire the packs module's commands, so a control drawn where
+ * that module is not brought in offers a press that does nothing.
+ */
 @Composable
 fun rememberLaunchControl(
-    pack: PackInstance,
+    pack: PackView,
+    appState: AppState,
+    playLabel: String? = null,
+): LaunchControl = rememberLaunchControl(pack.id, pack.folder, appState, playLabel)
+
+/**
+ * The launch control of the pack [packId], whose folder under the instances folder is
+ * [folder], for a surface that holds the pack's record rather than the packs module's
+ * view of it, the pack page.
+ */
+@Composable
+fun rememberLaunchControl(
+    packId: String,
+    folder: String,
     appState: AppState,
     playLabel: String? = null,
 ): LaunchControl {
@@ -91,12 +109,12 @@ fun rememberLaunchControl(
     val contentUpdater: InstanceContentUpdater = koinInject()
     // Play and Stop are the pack commands, so a press does here what it does from
     // any other widget: Play runs as the composition's session, or offline.
-    val launchPack = rememberScopedCommand(Commands.LaunchPack)
-    val stopPack = rememberScopedCommand(Commands.StopPack)
+    val launchPack = rememberScopedCommand(PackKeys.LaunchPack)
+    val stopPack = rememberScopedCommand(PackKeys.StopPack)
 
-    val indication by indications.launchIndication(pack.id).collectAsState()
+    val indication by indications.launchIndication(packId).collectAsState()
     val works by registry.current.collectAsState()
-    val work = works[pack.id]
+    val work = works[packId]
     // Collapsed to the one question asked of it: Downloading republishes per
     // progress callback, and no control here repaints at frame rate for another
     // pack's download.
@@ -112,9 +130,9 @@ fun rememberLaunchControl(
     }
     // Re-asked when the record changes and when work on it ends, which are the two
     // moments the folder can have appeared or gone.
-    val present by produceState(true, pack.instanceDirName, work) {
+    val present by produceState(true, folder, work) {
         value = withContext(Dispatchers.IO) {
-            Files.isDirectory(paths.dataDir.resolve("instances").resolve(pack.instanceDirName))
+            Files.isDirectory(paths.dataDir.resolve("instances").resolve(folder))
         }
     }
 
@@ -134,7 +152,7 @@ fun rememberLaunchControl(
         )
     }
 
-    val launch: () -> Unit = { launchPack?.invoke(pack.id) }
+    val launch: () -> Unit = { launchPack?.invoke(packId) }
 
     // The share of whatever the control is waiting on, where its source counts. An
     // update or repair started from the pack reports files done; a content batch
@@ -142,17 +160,17 @@ fun rememberLaunchControl(
     // as work of unknown size.
     val workProgress: Float? = when (work) {
         InstanceWork.Update, InstanceWork.Repair ->
-            (runningOperations[pack.id]?.phase as? PackOperationPhase.Running)
+            (runningOperations[packId]?.phase as? PackOperationPhase.Running)
                 ?.takeIf { it.total > 0 }?.let { it.current.toFloat() / it.total }
         InstanceWork.ContentUpdate ->
-            contentRuns[contentUpdater.keyOf(paths.dataDir.resolve("instances").resolve(pack.instanceDirName))]
+            contentRuns[contentUpdater.keyOf(paths.dataDir.resolve("instances").resolve(folder))]
                 ?.takeIf { it.total > 0 }?.let { it.done.toFloat() / it.total }
         else -> null
     }
 
     return when {
         mode == LaunchControlMode.Stop -> LaunchControl(
-            mode, null, s.packPlayExit, NxIcon.Stop, PlayTone.Ready, null, onClick = { stopPack?.invoke(pack.id) },
+            mode, null, s.packPlayExit, NxIcon.Stop, PlayTone.Ready, null, onClick = { stopPack?.invoke(packId) },
         )
         mode == LaunchControlMode.Wait -> LaunchControl(
             mode, null,

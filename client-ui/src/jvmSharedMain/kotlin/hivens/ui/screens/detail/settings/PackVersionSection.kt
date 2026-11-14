@@ -28,7 +28,7 @@ import hivens.core.update.UpdateDirection
 import hivens.core.update.VersionChannel
 import hivens.launcher.PackOperation
 import hivens.launcher.PackOperationPhase
-import hivens.ui.widgets.Commands
+import hivens.packs.api.PackKeys
 import hivens.widget.api.rememberScopedCommand
 import hivens.ui.components.ChannelChip
 import hivens.ui.components.formatBuildTimestamp
@@ -76,7 +76,7 @@ internal fun PackVersionSection(
     val updater: PackUpdater = koinInject()
     val mirror: IMirrorPackClient = koinInject()
     val hub: PackUpdateStatusHub = koinInject()
-    val updatePack = rememberScopedCommand(Commands.UpdatePack)
+    val updatePack = rememberScopedCommand(PackKeys.UpdatePack)
     // A check is cheap and belongs to the window; an apply outlives it and is the
     // registry's. See applyLatest.
     val scope = rememberCoroutineScope()

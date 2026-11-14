@@ -29,4 +29,13 @@ object WidgetApi {
 
     /** Jar manifest attribute carrying the human-readable name. Optional. */
     const val MANIFEST_NAME = "Nexira-Module-Name"
+
+    /**
+     * Jar manifest attribute naming the module APIs the jar was compiled against, as
+     * `id=major.minor` entries separated by commas (see [hivens.widget.model.ApiVersion.parseAll]).
+     * Optional: a module that uses no other module's API leaves it out. The loader
+     * refuses a jar that names an API nothing here offers, or offers in a version that
+     * does not serve the one it was built against.
+     */
+    const val MANIFEST_REQUIRES = "Nexira-Module-Requires"
 }

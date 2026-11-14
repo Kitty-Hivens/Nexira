@@ -130,6 +130,18 @@ fun SurfaceLayout(slots: Map<SlotId, SlotContent>): SurfaceLayout =
 data class LayoutGraph(
     val surfaces: Map<SurfaceId, SurfaceLayout> = emptyMap(),
     val screens: List<ScreenSpec> = emptyList(),
+    /**
+     * The modules this arrangement needs, by module id. The host brings in the keys,
+     * factories and services of these before it draws, so a key of a module not
+     * listed is absent and a widget that needs it stands misplaced.
+     *
+     * Null means the arrangement does not say, and the host takes the standard list,
+     * `DefaultLayout.modules`, at every start. That is every arrangement the launcher
+     * writes itself: the standard list is never stored, so an update that brings a
+     * module brings it to everybody who did not choose otherwise. A list here is a
+     * choice made by hand, an empty one included, and kept as it is.
+     */
+    val modules: List<String>? = null,
 ) {
     companion object {
         val EMPTY: LayoutGraph = LayoutGraph()

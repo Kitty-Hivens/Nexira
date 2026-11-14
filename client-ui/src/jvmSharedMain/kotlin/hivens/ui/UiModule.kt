@@ -1,7 +1,6 @@
 package hivens.ui
 
 import hivens.auth.AuthProviderRegistry
-import hivens.auth.OfflineAuthProvider
 import hivens.auth.RefreshableAuthProvider
 import hivens.config.Storage
 import hivens.core.api.interfaces.IPackRepository
@@ -11,12 +10,9 @@ import hivens.core.activity.ActivityRegistry
 import hivens.core.data.SessionData
 import hivens.core.data.ThemeMode
 import hivens.core.io.AtomicFiles
-import hivens.core.launch.LaunchState
 import hivens.core.security.SslBypassStore
 import hivens.core.update.PackUpdateStatusHub
 import hivens.launcher.PackInstallService
-import hivens.launcher.PackOperationService
-import hivens.launcher.instance.PackInstanceService
 import hivens.launcher.instance.InstanceContentUpdater
 import hivens.launcher.network.ServerProtocolConfig
 import hivens.launcher.platform.PlatformPaths
@@ -42,15 +38,9 @@ import hivens.ui.editor.palette.sampleOpenProject
 import hivens.ui.feature.catalogue.project.OpenProjectState
 import hivens.ui.feature.catalogue.project.ProjectPageSource
 import hivens.ui.feature.catalogue.project.sampleProjectPage
+import hivens.packs.PacksHost
 import hivens.ui.navigation.NavState
-import hivens.ui.packs.LauncherPackActions
-import hivens.ui.packs.PackActions
-import hivens.ui.packs.deletePack
-import hivens.ui.packs.launchPack
-import hivens.ui.packs.ReattachPreviews
-import hivens.ui.packs.previewReattach
-import hivens.ui.packs.reattachPack
-import hivens.ui.packs.updatePack
+import hivens.ui.packs.ClientPacksHost
 import hivens.ui.packs.withdrawNoticesOfInstalledPacks
 import hivens.ui.session.SessionStore
 import hivens.ui.theme.ThemeLibrary
@@ -72,6 +62,7 @@ import hivens.ui.notifications.CoreProblem
 import hivens.ui.notifications.CorePart
 import hivens.ui.notifications.CoreProblems
 import hivens.ui.notifications.IndicationCenter
+import hivens.ui.notifications.LaunchTarget
 import hivens.ui.notifications.NotificationArchiveStore
 import hivens.ui.notifications.NotifiedCoreProblems
 import hivens.ui.notifications.NotificationCenter
@@ -93,6 +84,7 @@ import hivens.ui.widgets.about.OpenUpdateDialog
 import hivens.ui.widgets.about.sampleUpdateCheck
 import hivens.ui.widgets.about.systemFactsReadOff
 import hivens.ui.widgets.levelServices
+import hivens.ui.widgets.modules.CompiledModules
 import hivens.ui.widgets.modules.WidgetModuleHost
 import hivens.ui.widgets.modules.WidgetModules
 import hivens.ui.widgets.profile.AccountChanges
@@ -103,7 +95,12 @@ import hivens.ui.widgets.state.WidgetStateGc
 import hivens.ui.widgets.state.WidgetStateStore
 import hivens.ui.widgets.themepicker.ThemeSelectionSource
 import hivens.ui.widgets.themepicker.sampleThemeSelection
+import hivens.widget.api.CompiledModule
+import hivens.widget.api.ContributedServices
 import hivens.widget.api.FactoryFailures
+import hivens.widget.api.KeyContribution
+import hivens.widget.api.LevelServicesHost
+import hivens.widget.api.ModuleKeysResult
 import hivens.widget.api.SurfaceFamilies
 import hivens.widget.api.WidgetCommandRegistry
 import hivens.widget.api.WidgetDataRegistry
@@ -113,7 +110,9 @@ import hivens.widget.api.WidgetServiceRegistry
 import hivens.widget.api.command
 import hivens.widget.api.flowSource
 import hivens.widget.api.get
+import hivens.widget.api.registerModuleKeys
 import hivens.widget.model.DefaultLayout
+import hivens.widget.model.LayoutGraph
 import hivens.widget.model.ScopeLevel
 import hivens.widget.model.WidgetDataSource
 import kotlinx.coroutines.CoroutineScope
@@ -122,12 +121,15 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import org.koin.core.module.Module
 import org.koin.core.module.dsl.onClose
 import org.koin.core.module.dsl.withOptions
 import org.koin.core.scope.Scope
 import org.koin.dsl.module
+import org.slf4j.LoggerFactory
 import java.nio.file.Path
+import kotlin.coroutines.CoroutineContext
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -193,12 +195,17 @@ fun sessionModule(): Module = module {
  * the build (generated per target), how modules are loaded from the widgets directory, any
  * commands only that host can run, and how many windows it can show. Everything else a
  * host binds on its own.
+ *
+ * [compiled] is every module compiled into the build. Which of them, and which of the
+ * jars in the widgets directory, bring their keys in is the document's decision: see
+ * [moduleKeys].
  */
 fun uiCoreModule(
     builtIn: WidgetRegistry,
     moduleHost: (widgetsDir: Path, dataDir: Path) -> WidgetModuleHost,
     platformCommands: Scope.(WidgetCommandRegistry) -> Unit = {},
     windowPolicy: WindowPolicy = WindowPolicy.Unlimited,
+    compiled: List<CompiledModule> = CompiledModules,
 ): Module = module {
     // The windows the launcher has open. One for the process: it outlives a shell
     // restarted after a crash, and each window leaves it as its shell goes.
@@ -315,48 +322,62 @@ fun uiCoreModule(
         )
     }
 
-    // What the pack commands do, over the launcher's own services.
-    single<PackActions> {
-        LauncherPackActions(
-            controller     = get(),
-            driver         = get(),
-            installService = get(),
-            operations     = get(),
-            updater        = get(),
-            hub            = get(),
-            instances      = get(),
+    // What the packs module needs from the application around it: who a launch runs
+    // as, the launch notices, and where a missing pack is said.
+    single<PacksHost> {
+        val driver: LaunchDriver = get()
+        ClientPacksHost(
+            session     = get(),
+            onLaunched  = { pack -> driver.observe(LaunchTarget(pack)) },
+            indications = get(),
+            problems    = get(),
+            scope       = get(),
         )
     }
 
-    // The reattach previews, one per pack that asked, for the screen and any widget
-    // alike. A reattach runs only on one of them.
-    single {
-        val instances: PackInstanceService = get()
-        val packs: IPackRepository = get()
-        ReattachPreviews(
-            // The record as it is when measured, not as it was asked about: a
-            // preview measured again after work on the pack reads what that work left.
-            measure    = { pack -> instances.previewReattach(packs.get(pack.id) ?: pack) },
-            operations = get<PackOperationService>().operations,
-            scope      = get(),
-            discard    = instances::discardReattachPreview,
-        )
-    }
-
-    // Reactive data sources widgets bind to via rememberSource -- decouples a
-    // widget from the concrete service backing its data. Populated eagerly so
-    // the registry is complete before the first widget composes.
+    // The app's keys: the host's own, those of every compiled module the document
+    // names, and those of every jar module that is switched on. Made together and
+    // complete before the first widget composes, so nothing reads a registry that a
+    // module has not reached yet.
     single {
         val appScope: CoroutineScope = get()
-        uiDataRegistry(
-            activity         = get<ActivityRegistry>().activities,
-            notifications    = get<NotificationArchiveStore>().log,
-            doNotDisturb     = get<NotificationCenter>().doNotDisturb,
-            sslBypass        = sslBypassSource(get(), get<ServerProtocolConfig>().sslBypassHost, appScope),
-            background       = get<BackgroundManager>().settings,
-            accountsRevision = get<AccountChanges>().revision,
+        val accounts: AccountChanges = get()
+        val archive: NotificationArchiveStore = get()
+        val center: NotificationCenter = get()
+        val backgrounds: BackgroundManager = get()
+        val koin: Scope = this
+        val keys = HostKeys(
+            sources = uiDataRegistry(
+                activity         = get<ActivityRegistry>().activities,
+                notifications    = archive.log,
+                doNotDisturb     = center.doNotDisturb,
+                sslBypass        = sslBypassSource(get(), get<ServerProtocolConfig>().sslBypassHost, appScope),
+                background       = backgrounds.settings,
+                accountsRevision = accounts.revision,
+            ),
+            // Reactive write side: commands widgets fire via rememberCommand /
+            // rememberAction without injecting the backing service. What only some
+            // hosts can do is added by the host.
+            commands = uiCommandRegistry(
+                clearNotifications = { archive.clear() },
+                setDoNotDisturb    = { center.setDoNotDisturb(it) },
+                updateBackground   = { change -> backgrounds.update(change) },
+                accountsChanged    = { accounts.changed() },
+            ).apply { koin.platformCommands(this) },
+            services = ContributedServices(),
         )
-    }
+        val modules: WidgetModules = get()
+        moduleKeys(
+            keys     = keys,
+            named    = modulesNamedBy(get<LayoutGraphRepository>().value()) { DefaultLayout.modules(get()) },
+            compiled = compiled,
+            jars     = jarKeysOf(modules),
+            onCrash  = modules::switchOffAfterCrash,
+        )
+        keys
+    } withOptions { onClose { it?.close() } }
+    single { get<HostKeys>().sources }
+    single { get<HostKeys>().commands }
 
     // The root of the scope tree. Its app values are the registries here, and the
     // windows, compositions and pages below it are made by their owners. Under the
@@ -364,32 +385,23 @@ fun uiCoreModule(
     // A factory that cannot make its key is said out loud: a core service that did
     // not start leaves Play doing nothing and the library empty, which nobody could
     // tell from a launcher that has no packs.
+    //
+    // Its services are Koin's with the services the modules declared laid over them,
+    // which close with the keys, so a module's services stop with Koin.
+    //
+    // A jar module read again while the launcher runs answers its keys with its new
+    // code, and what its old code made is dropped here as it does.
     single {
+        val appScope: CoroutineScope = get()
+        val keys: HostKeys = get()
+        val settings: ISettingsService = get()
         WidgetScope.app(
             registry = get(),
-            services = KoinLevelServicesHost.app(this),
-            context  = get<CoroutineScope>().coroutineContext,
+            services = keys.appServices(KoinLevelServicesHost.app(this), appScope.coroutineContext),
+            context  = appScope.coroutineContext,
             commands = get(),
-            failures = reportedTo(get()),
-        )
-    }
-
-    // Reactive write side: commands widgets fire via rememberCommand /
-    // rememberAction without injecting the backing service. Services resolved
-    // eagerly, like the data registry above. ClearNotifications is consumed by the
-    // notification-history widget. What only some hosts can do is added by the host.
-    single {
-        val archive: NotificationArchiveStore = get()
-        val center: NotificationCenter = get()
-        val backgrounds: BackgroundManager = get()
-        val accounts: AccountChanges = get()
-        val scope: Scope = this
-        uiCommandRegistry(
-            clearNotifications = { archive.clear() },
-            setDoNotDisturb    = { center.setDoNotDisturb(it) },
-            updateBackground   = { change -> backgrounds.update(change) },
-            accountsChanged    = { accounts.changed() },
-        ).apply { scope.platformCommands(this) }
+            failures = reportedTo(get(), keys) { AppLocale.fromTag(settings.getSettings().locale).tag },
+        ).also { app -> followModuleReloads(get<WidgetModules>().state, keys, app, appScope) }
     }
 
     // Widget layout graph persistence. Default graph lives at
@@ -404,6 +416,7 @@ fun uiCoreModule(
             json         = get(),
             scope        = get(),
             defaultGraph = { DefaultLayout.load(get()) },
+            standardModules = { DefaultLayout.modules(get()) },
         )
     }
 
@@ -559,9 +572,21 @@ fun uiCoreModule(
     }
 }
 
-/** Every factory of the scope tree that could not make its key, told to [problems] as a part that is missing. */
-internal fun reportedTo(problems: CoreProblems): FactoryFailures =
-    FactoryFailures { id, _, cause -> problems.report(CoreProblem.PartMissing(corePartOf(id), cause)) }
+/**
+ * Every factory of the scope tree that could not make its key, told to [problems]:
+ * a key a module brought as that module, by its own name in the language [localeTag]
+ * says, and one of the host's as the part of the host it belongs to.
+ */
+internal fun reportedTo(problems: CoreProblems, keys: HostKeys? = null, localeTag: () -> String = { "en" }): FactoryFailures =
+    FactoryFailures { id, _, cause ->
+        val owner = keys?.ownerOf(id)
+        val problem = if (owner != null) {
+            CoreProblem.ModuleMissing(owner.moduleId, owner.name(localeTag()), cause)
+        } else {
+            CoreProblem.PartMissing(corePartOf(id), cause)
+        }
+        problems.report(problem)
+    }
 
 /**
  * The part of the core the key [id] stands for, which is what a person is told is
@@ -575,12 +600,6 @@ private val CORE_PARTS: Map<String, CorePart> = buildMap {
         Sources.ThemeLibrary.id, Sources.DarkTheme.id, Sources.ThemeMode.id, Sources.SystemSchemeAvailable.id, Sources.Locale.id,
         Commands.ApplyTheme.id, Commands.SetDarkTheme.id, Commands.SetThemeMode.id, Commands.SetLocale.id,
     ).forEach { put(it, CorePart.Appearance) }
-    listOf(
-        Sources.PackLibrary.id, Sources.PackLaunches.id, Sources.LaunchState.id, Sources.PackInstalls.id,
-        Commands.LaunchPack.id, Commands.StopPack.id, Commands.InstallPack.id, Commands.DismissInstall.id,
-        Commands.CancelInstall.id, Commands.UpdatePack.id, Commands.DeletePack.id, Commands.ReattachPack.id,
-        Commands.PreviewReattach.id, Sources.ReattachPreviews.id,
-    ).forEach { put(it, CorePart.Packs) }
     listOf(Sources.ConsoleVisible.id, Commands.SetConsoleVisible.id).forEach { put(it, CorePart.Console) }
 }
 
@@ -602,7 +621,7 @@ internal fun uiDataRegistry(
     register(Sources.DoNotDisturb, flowSource(doNotDisturb))
     // Read off the window's own state, the one its pages publish into.
     registerFactory(Sources.OpenProject, sample = ::sampleOpenProject) { window ->
-        flowSource(window.services.get<OpenProjectState>().open)
+        flowSource(window.hostServices.get<OpenProjectState>().open)
     }
     // What the window's owner provides when it opens the window: its state as the host reads it.
     declare(Sources.Window) { HostWindowState.Sample }
@@ -620,42 +639,26 @@ internal fun uiDataRegistry(
     // sample the palette and the editor show a widget on where no level of its kind
     // is above: display data, never handed to a widget drawn for use.
     registerFactory(Sources.Session, sample = { AppState.Authenticated(SessionData(playerName = "Steve")) }) { app ->
-        flowSource(app.services.get<SessionStore>().state)
+        flowSource(app.hostServices.get<SessionStore>().state)
     }
     // How the composition looks and speaks, read off the app's one appearance store.
     registerFactory(Sources.ThemeLibrary, sample = ::ThemeLibrary) { composition ->
-        flowSource(composition.services.get<AppearanceStore>().library)
+        flowSource(composition.hostServices.get<AppearanceStore>().library)
     }
     registerFactory(Sources.DarkTheme, sample = { true }) { composition ->
-        flowSource(composition.services.get<AppearanceStore>().dark)
+        flowSource(composition.hostServices.get<AppearanceStore>().dark)
     }
     registerFactory(Sources.ThemeMode, sample = { ThemeMode.Manual }) { composition ->
-        flowSource(composition.services.get<AppearanceStore>().mode)
+        flowSource(composition.hostServices.get<AppearanceStore>().mode)
     }
     registerFactory(Sources.SystemSchemeAvailable, sample = { false }) { app ->
-        flowSource(app.services.get<AppearanceStore>().systemSchemeAvailable)
+        flowSource(app.hostServices.get<AppearanceStore>().systemSchemeAvailable)
     }
     registerFactory(Sources.Locale, sample = { AppLocale.ENGLISH }) { composition ->
-        flowSource(composition.services.get<AppearanceStore>().locale)
-    }
-    // The packs and what is being done to them, for the whole app.
-    registerFactory(Sources.PackLibrary, sample = { emptyList() }) { app ->
-        flowSource(app.services.get<IPackRepository>().observe())
-    }
-    registerFactory(Sources.PackLaunches, sample = { emptyMap() }) { app ->
-        flowSource(app.services.get<IndicationCenter>().launches)
-    }
-    registerFactory(Sources.LaunchState, sample = { LaunchState.Idle }) { app ->
-        flowSource(app.services.get<PackActions>().launchState)
-    }
-    registerFactory(Sources.PackInstalls, sample = { emptyMap() }) { app ->
-        flowSource(app.services.get<PackActions>().installs)
-    }
-    registerFactory(Sources.ReattachPreviews, sample = { emptyMap() }) { app ->
-        flowSource(app.services.get<ReattachPreviews>().previews)
+        flowSource(composition.hostServices.get<AppearanceStore>().locale)
     }
     registerFactory(Sources.ConsoleVisible, sample = { false }) { app ->
-        flowSource(app.services.get<GameConsoleService>().visible)
+        flowSource(app.hostServices.get<GameConsoleService>().visible)
     }
     // What the composition's owner provides around every surface it draws, with the
     // sample in the sense above.
@@ -682,53 +685,18 @@ internal fun uiCommandRegistry(
     register(Commands.UpdateBackground, command(updateBackground))
     register(Commands.AccountsChanged, command { accountsChanged() })
     // The launcher's session, through the app's one store.
-    registerFactory(Commands.SignIn) { app -> command(app.services.get<SessionStore>()::signIn) }
+    registerFactory(Commands.SignIn) { app -> command(app.hostServices.get<SessionStore>()::signIn) }
     registerFactory(Commands.SignOut) { app ->
-        val store = app.services.get<SessionStore>()
+        val store = app.hostServices.get<SessionStore>()
         command { val _ = store.signOut() }
     }
     // How the composition looks and speaks, through the app's appearance store.
-    registerFactory(Commands.ApplyTheme) { composition -> command(composition.services.get<AppearanceStore>()::select) }
-    registerFactory(Commands.SetDarkTheme) { composition -> command(composition.services.get<AppearanceStore>()::setDark) }
-    registerFactory(Commands.SetThemeMode) { composition -> command(composition.services.get<AppearanceStore>()::setMode) }
-    registerFactory(Commands.SetLocale) { composition -> command(composition.services.get<AppearanceStore>()::setLocale) }
-    // What is done to packs is the same whoever asks. A launch runs as the launcher's session.
-    registerFactory(Commands.LaunchPack) { app ->
-        val services = app.services
-        val store = services.get<SessionStore>()
-        val packs = services.get<IPackRepository>()
-        val actions = services.get<PackActions>()
-        val settings = services.get<ISettingsService>()
-        val offline = services.get<OfflineAuthProvider>()
-        val problems = services.get<CoreProblems>()
-        command { id -> launchPack(id, store.state.value, packs, actions, settings, offline, problems, app.coroutineScope) }
-    }
-    registerFactory(Commands.StopPack) { app -> command(app.services.get<PackActions>()::stop) }
-    registerFactory(Commands.InstallPack) { app -> command(app.services.get<PackActions>()::install) }
-    registerFactory(Commands.DismissInstall) { app -> command(app.services.get<PackActions>()::dismissInstall) }
-    registerFactory(Commands.CancelInstall) { app -> command(app.services.get<PackActions>()::cancelInstall) }
-    registerFactory(Commands.UpdatePack) { app ->
-        val packs = app.services.get<IPackRepository>()
-        val actions = app.services.get<PackActions>()
-        command { id -> updatePack(id, packs, actions) }
-    }
-    registerFactory(Commands.DeletePack) { app ->
-        val packs = app.services.get<IPackRepository>()
-        val actions = app.services.get<PackActions>()
-        command { id -> deletePack(id, packs, actions, app.coroutineScope) }
-    }
-    registerFactory(Commands.PreviewReattach) { app ->
-        val packs = app.services.get<IPackRepository>()
-        val previews = app.services.get<ReattachPreviews>()
-        command { id -> previewReattach(id, packs, previews) }
-    }
-    registerFactory(Commands.ReattachPack) { app ->
-        val packs = app.services.get<IPackRepository>()
-        val actions = app.services.get<PackActions>()
-        command { request -> reattachPack(request, packs, actions) }
-    }
+    registerFactory(Commands.ApplyTheme) { composition -> command(composition.hostServices.get<AppearanceStore>()::select) }
+    registerFactory(Commands.SetDarkTheme) { composition -> command(composition.hostServices.get<AppearanceStore>()::setDark) }
+    registerFactory(Commands.SetThemeMode) { composition -> command(composition.hostServices.get<AppearanceStore>()::setMode) }
+    registerFactory(Commands.SetLocale) { composition -> command(composition.hostServices.get<AppearanceStore>()::setLocale) }
     registerFactory(Commands.SetConsoleVisible) { app ->
-        val console = app.services.get<GameConsoleService>()
+        val console = app.hostServices.get<GameConsoleService>()
         command { visible -> if (visible) console.show() else console.hide() }
     }
     // What the composition's owner provides: its history.
@@ -754,3 +722,154 @@ internal fun uiCommandRegistry(
  */
 private fun sslBypassSource(store: SslBypassStore, host: String, scope: CoroutineScope): WidgetDataSource<Boolean> =
     flowSource(store.bypasses.map { store.isBypassed(host) }.stateIn(scope, SharingStarted.Eagerly, store.isBypassed(host)))
+
+/** A module that brought keys: its id, and its name in the language a tag says. */
+internal class ModuleOwner(val moduleId: String, val name: (localeTag: String) -> String)
+
+/**
+ * The app's registries and the services modules declared, made together so a module's
+ * keys are in before anything reads them, with who brought each key.
+ *
+ * Holds the app level's handle on the services once [appServices] made it, and closes
+ * it with itself, which closes what the modules made for the app.
+ */
+internal class HostKeys(
+    val sources: WidgetDataRegistry,
+    val commands: WidgetCommandRegistry,
+    val services: ContributedServices,
+) : AutoCloseable {
+    private var app: LevelServicesHost? = null
+
+    private val owners = HashMap<String, ModuleOwner>()
+
+    /** The key ids each jar module brought, by module id, and its contribution as it was when they were made. */
+    internal val jars = HashMap<String, Pair<Set<String>, JarKeys>>()
+
+    /** The module that brought the key [id], or null for one of the host's own. */
+    @Synchronized
+    fun ownerOf(id: String): ModuleOwner? = owners[id]
+
+    @Synchronized
+    internal fun own(ids: Set<String>, owner: ModuleOwner) = ids.forEach { owners[it] = owner }
+
+    /** The app level's services: [koin] with the modules' services laid over it. Made once. */
+    @Synchronized
+    fun appServices(koin: LevelServicesHost, context: CoroutineContext): LevelServicesHost =
+        app ?: services.host(koin, context).also { app = it }
+
+    @Synchronized
+    override fun close() {
+        app?.close()
+        app = null
+    }
+}
+
+/**
+ * The key contribution [contributionId] of the jar module [moduleId], whose name is
+ * [name], as [current] answers it now: null once the module is switched off or gone,
+ * another instance once the folder was read again.
+ */
+internal class JarKeys(
+    val moduleId: String,
+    val name: String,
+    val contributionId: String,
+    val current: () -> KeyContribution?,
+)
+
+/** The key contributions of every jar module [modules] has loaded, each followed as the modules change. */
+internal fun jarKeysOf(modules: WidgetModules): List<JarKeys> =
+    modules.state.value.of<KeyContribution>().map { loaded ->
+        JarKeys(loaded.moduleId, loaded.moduleName, loaded.item.id) {
+            modules.state.value.of<KeyContribution>().firstOrNull { it.moduleId == loaded.moduleId && it.item.id == loaded.item.id }?.item
+        }
+    }
+
+/**
+ * The ids of the modules [graph] names, or, where it names none at all, the standard
+ * list. A graph the launcher wrote itself never names the standard list, so it is
+ * read here as whatever the standard list is in this build.
+ */
+internal fun modulesNamedBy(graph: LayoutGraph, standard: () -> List<String>): Set<String> =
+    (graph.modules ?: standard()).toSet()
+
+/**
+ * Registers into [keys] the keys of the modules the launcher brings in:
+ *
+ * - every module compiled into the build, out of [compiled], that [named] names. A
+ *   module the document does not name brings no keys, which leaves a widget that
+ *   needs one misplaced rather than drawn on nothing. These are trusted with the
+ *   host's own services.
+ * - every jar module in [jars], which are the ones switched on in the module list.
+ *   Switching a jar on is how a person declares it, so it needs no name in the
+ *   document as well. A jar is not trusted with the host's services.
+ *
+ * A name nothing here carries is logged and otherwise left alone, since its jar may
+ * simply not be installed. A module whose keys cannot all be registered registers
+ * none and is logged by name. One whose own code threw while declaring them is handed
+ * to [onCrash], the way a module that crashed the interface is, which switches it off.
+ *
+ * A jar's keys are registered at startup: one switched on later brings them at the
+ * next start. One read again while the launcher runs answers them with its new code,
+ * and one switched off leaves them missing, see [followModuleReloads].
+ */
+internal fun moduleKeys(
+    keys: HostKeys,
+    named: Set<String>,
+    compiled: List<CompiledModule>,
+    jars: List<JarKeys>,
+    onCrash: (moduleId: String, failure: Throwable) -> Unit = { _, _ -> },
+) {
+    val carried = compiled.map { it.id }.toSet() + jars.map { it.moduleId }
+    (named - carried).forEach { moduleKeysLog.warn("The interface names the module '{}', which this launcher does not carry", it) }
+    compiled.filter { it.id in named }.forEach { module ->
+        val owner = ModuleOwner(module.id) { tag -> module.strings.get(module.name, tag) }
+        module.contributions.filterIsInstance<KeyContribution>().forEach { contribution ->
+            val result = registerModuleKeys(module.id, contribution, keys.sources, keys.commands, keys.services, trusted = true)
+            settle(keys, module.id, owner, result) { /* a compiled module cannot be switched off */ }
+        }
+    }
+    jars.forEach { jar ->
+        val result = registerModuleKeys(jar.moduleId, jar.current, keys.sources, keys.commands, keys.services, trusted = false)
+        settle(keys, jar.moduleId, ModuleOwner(jar.moduleId) { jar.name }, result) { cause -> onCrash(jar.moduleId, cause) }
+        if (result is ModuleKeysResult.Registered) {
+            synchronized(keys) { keys.jars[jar.moduleId + "/" + jar.contributionId] = result.ids to jar }
+        }
+    }
+}
+
+private fun settle(keys: HostKeys, moduleId: String, owner: ModuleOwner, result: ModuleKeysResult, crashed: (Throwable) -> Unit) {
+    when (result) {
+        is ModuleKeysResult.Registered -> keys.own(result.ids, owner)
+        is ModuleKeysResult.Refused -> {
+            moduleKeysLog.error("Module '{}' brought no keys: {}", moduleId, result.reason, result.cause)
+            result.cause?.let(crashed)
+        }
+    }
+}
+
+/**
+ * Drops what [app]'s levels made from a jar module's keys whenever [modules] carry
+ * another instance of its contribution, a reload or a switch off, so nothing goes on
+ * running code of a class loader the module list is about to close. The next read
+ * makes the key afresh from the module as it is then, or finds it missing.
+ */
+internal fun followModuleReloads(modules: StateFlow<WidgetModules.Snapshot>, keys: HostKeys, app: WidgetScope, scope: CoroutineScope) {
+    val followed = synchronized(keys) { keys.jars.values.toList() }
+    if (followed.isEmpty()) return
+    val seen = HashMap<String, KeyContribution?>()
+    followed.forEach { (_, jar) -> seen[jar.moduleId + "/" + jar.contributionId] = jar.current() }
+    scope.launch {
+        modules.collect {
+            followed.forEach { (ids, jar) ->
+                val at = jar.moduleId + "/" + jar.contributionId
+                val now = jar.current()
+                if (now !== seen[at]) {
+                    seen[at] = now
+                    app.forgetMade(ids)
+                }
+            }
+        }
+    }
+}
+
+private val moduleKeysLog = LoggerFactory.getLogger("ModuleKeys")

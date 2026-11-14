@@ -1,3 +1,25 @@
+public final class hivens/widget/model/ApiVersion : java/lang/Comparable {
+	public static final field Companion Lhivens/widget/model/ApiVersion$Companion;
+	public fun <init> (II)V
+	public fun compareTo (Lhivens/widget/model/ApiVersion;)I
+	public synthetic fun compareTo (Ljava/lang/Object;)I
+	public final fun component1 ()I
+	public final fun component2 ()I
+	public final fun copy (II)Lhivens/widget/model/ApiVersion;
+	public static synthetic fun copy$default (Lhivens/widget/model/ApiVersion;IIILjava/lang/Object;)Lhivens/widget/model/ApiVersion;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getMajor ()I
+	public final fun getMinor ()I
+	public fun hashCode ()I
+	public final fun serves (Lhivens/widget/model/ApiVersion;)Z
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/widget/model/ApiVersion$Companion {
+	public final fun parse (Ljava/lang/String;)Lhivens/widget/model/ApiVersion;
+	public final fun parseAll (Ljava/lang/String;)Ljava/util/Map;
+}
+
 public final class hivens/widget/model/BundledPresets {
 	public static final field INSTANCE Lhivens/widget/model/BundledPresets;
 	public final fun getIDS ()Ljava/util/List;
@@ -23,6 +45,8 @@ public final class hivens/widget/model/DefaultLayout {
 	public static final field INSTANCE Lhivens/widget/model/DefaultLayout;
 	public final fun load (Lkotlinx/serialization/json/Json;)Lhivens/widget/model/LayoutGraph;
 	public static synthetic fun load$default (Lhivens/widget/model/DefaultLayout;Lkotlinx/serialization/json/Json;ILjava/lang/Object;)Lhivens/widget/model/LayoutGraph;
+	public final fun modules (Lkotlinx/serialization/json/Json;)Ljava/util/List;
+	public static synthetic fun modules$default (Lhivens/widget/model/DefaultLayout;Lkotlinx/serialization/json/Json;ILjava/lang/Object;)Ljava/util/List;
 }
 
 public final class hivens/widget/model/DefaultLayoutKt {
@@ -223,13 +247,15 @@ public abstract interface annotation class hivens/widget/model/InjectService : j
 public final class hivens/widget/model/LayoutGraph {
 	public static final field Companion Lhivens/widget/model/LayoutGraph$Companion;
 	public fun <init> ()V
-	public fun <init> (Ljava/util/Map;Ljava/util/List;)V
-	public synthetic fun <init> (Ljava/util/Map;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/util/Map;Ljava/util/List;Ljava/util/List;)V
+	public synthetic fun <init> (Ljava/util/Map;Ljava/util/List;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/util/Map;
 	public final fun component2 ()Ljava/util/List;
-	public final fun copy (Ljava/util/Map;Ljava/util/List;)Lhivens/widget/model/LayoutGraph;
-	public static synthetic fun copy$default (Lhivens/widget/model/LayoutGraph;Ljava/util/Map;Ljava/util/List;ILjava/lang/Object;)Lhivens/widget/model/LayoutGraph;
+	public final fun component3 ()Ljava/util/List;
+	public final fun copy (Ljava/util/Map;Ljava/util/List;Ljava/util/List;)Lhivens/widget/model/LayoutGraph;
+	public static synthetic fun copy$default (Lhivens/widget/model/LayoutGraph;Ljava/util/Map;Ljava/util/List;Ljava/util/List;ILjava/lang/Object;)Lhivens/widget/model/LayoutGraph;
 	public fun equals (Ljava/lang/Object;)Z
+	public final fun getModules ()Ljava/util/List;
 	public final fun getScreens ()Ljava/util/List;
 	public final fun getSurfaces ()Ljava/util/Map;
 	public fun hashCode ()I

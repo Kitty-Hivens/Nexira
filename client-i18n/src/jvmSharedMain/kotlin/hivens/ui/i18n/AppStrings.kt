@@ -1337,6 +1337,8 @@ interface AppStrings {
     val packSettingsReattachComparing: String
     /** The comparison did not run, and [message] says why. */
     fun packSettingsReattachCompareFailed(message: String): String
+    /** The comparison cannot be asked for at all, because the module that measures packs is not brought in. */
+    val packSettingsReattachUnavailable: String
     /** No file changes, so reattaching only restores the link to the source. */
     val packSettingsReattachNothing: String
     /** A warning line in the dialog when the pack has no record of what its build placed, so every file that differs from the build is replaced and none is kept as the player's edit. */
@@ -1504,8 +1506,8 @@ interface AppStrings {
     val notifCorePartMissingTitle: String
     /** Body under that title, pointing at the log for the details. */
     val notifCorePartMissingBody: String
-    /** Title when the core part that launches and changes packs did not start. */
-    val notifCorePacksMissingTitle: String
+    /** Title when a module the launcher brings in did not start, [module] being its name. Which key failed goes to the log only. */
+    fun notifCoreModuleMissingTitle(module: String): String
     /** Title when the core part that signs in did not start. */
     val notifCoreSessionMissingTitle: String
     /** Title when the core part that holds themes and the language did not start. */

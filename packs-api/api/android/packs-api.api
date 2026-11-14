@@ -1,0 +1,508 @@
+public final class hivens/packs/api/InstallRequest {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lhivens/packs/api/InstallRequest;
+	public static synthetic fun copy$default (Lhivens/packs/api/InstallRequest;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lhivens/packs/api/InstallRequest;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getOrigin ()Ljava/lang/String;
+	public final fun getPackId ()Ljava/lang/String;
+	public final fun getVersionId ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class hivens/packs/api/InstallStatus {
+}
+
+public final class hivens/packs/api/InstallStatus$Cancelled : hivens/packs/api/InstallStatus {
+	public static final field INSTANCE Lhivens/packs/api/InstallStatus$Cancelled;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/packs/api/InstallStatus$Failed : hivens/packs/api/InstallStatus {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lhivens/packs/api/InstallStatus$Failed;
+	public static synthetic fun copy$default (Lhivens/packs/api/InstallStatus$Failed;Ljava/lang/String;ILjava/lang/Object;)Lhivens/packs/api/InstallStatus$Failed;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getMessage ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/packs/api/InstallStatus$Running : hivens/packs/api/InstallStatus {
+	public fun <init> (IILjava/lang/String;)V
+	public final fun component1 ()I
+	public final fun component2 ()I
+	public final fun component3 ()Ljava/lang/String;
+	public final fun copy (IILjava/lang/String;)Lhivens/packs/api/InstallStatus$Running;
+	public static synthetic fun copy$default (Lhivens/packs/api/InstallStatus$Running;IILjava/lang/String;ILjava/lang/Object;)Lhivens/packs/api/InstallStatus$Running;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDone ()I
+	public final fun getFile ()Ljava/lang/String;
+	public final fun getTotal ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/packs/api/InstallStatus$Succeeded : hivens/packs/api/InstallStatus {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lhivens/packs/api/InstallStatus$Succeeded;
+	public static synthetic fun copy$default (Lhivens/packs/api/InstallStatus$Succeeded;Ljava/lang/String;ILjava/lang/Object;)Lhivens/packs/api/InstallStatus$Succeeded;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getPackId ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/packs/api/InstallView {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lhivens/packs/api/InstallStatus;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lhivens/packs/api/InstallStatus;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component5 ()Ljava/lang/String;
+	public final fun component6 ()Ljava/lang/String;
+	public final fun component7 ()Lhivens/packs/api/InstallStatus;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lhivens/packs/api/InstallStatus;)Lhivens/packs/api/InstallView;
+	public static synthetic fun copy$default (Lhivens/packs/api/InstallView;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lhivens/packs/api/InstallStatus;ILjava/lang/Object;)Lhivens/packs/api/InstallView;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getIconUrl ()Ljava/lang/String;
+	public final fun getKey ()Ljava/lang/String;
+	public final fun getOrigin ()Ljava/lang/String;
+	public final fun getPackId ()Ljava/lang/String;
+	public final fun getStatus ()Lhivens/packs/api/InstallStatus;
+	public final fun getTitle ()Ljava/lang/String;
+	public final fun getVersionId ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class hivens/packs/api/LaunchView {
+}
+
+public final class hivens/packs/api/LaunchView$Downloading : hivens/packs/api/LaunchView {
+	public fun <init> (IIJJJ)V
+	public final fun component1 ()I
+	public final fun component2 ()I
+	public final fun component3 ()J
+	public final fun component4 ()J
+	public final fun component5 ()J
+	public final fun copy (IIJJJ)Lhivens/packs/api/LaunchView$Downloading;
+	public static synthetic fun copy$default (Lhivens/packs/api/LaunchView$Downloading;IIJJJILjava/lang/Object;)Lhivens/packs/api/LaunchView$Downloading;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBytesPerSecond ()J
+	public final fun getDownloadedBytes ()J
+	public final fun getFile ()I
+	public final fun getFiles ()I
+	public final fun getTotalBytes ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/packs/api/LaunchView$Failed : hivens/packs/api/LaunchView {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;)Lhivens/packs/api/LaunchView$Failed;
+	public static synthetic fun copy$default (Lhivens/packs/api/LaunchView$Failed;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lhivens/packs/api/LaunchView$Failed;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCode ()Ljava/lang/String;
+	public final fun getDetail ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/packs/api/LaunchView$Idle : hivens/packs/api/LaunchView {
+	public static final field INSTANCE Lhivens/packs/api/LaunchView$Idle;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/packs/api/LaunchView$Preparing : hivens/packs/api/LaunchView {
+	public fun <init> (Ljava/lang/String;F)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()F
+	public final fun copy (Ljava/lang/String;F)Lhivens/packs/api/LaunchView$Preparing;
+	public static synthetic fun copy$default (Lhivens/packs/api/LaunchView$Preparing;Ljava/lang/String;FILjava/lang/Object;)Lhivens/packs/api/LaunchView$Preparing;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getProgress ()F
+	public final fun getStage ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/packs/api/LaunchView$Running : hivens/packs/api/LaunchView {
+	public static final field INSTANCE Lhivens/packs/api/LaunchView$Running;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/packs/api/LaunchView$Stopping : hivens/packs/api/LaunchView {
+	public static final field INSTANCE Lhivens/packs/api/LaunchView$Stopping;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class hivens/packs/api/OperationStatus {
+}
+
+public final class hivens/packs/api/OperationStatus$Done : hivens/packs/api/OperationStatus {
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lhivens/packs/api/OperationStatus$Done;
+	public static synthetic fun copy$default (Lhivens/packs/api/OperationStatus$Done;Ljava/lang/String;ILjava/lang/Object;)Lhivens/packs/api/OperationStatus$Done;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getVersion ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/packs/api/OperationStatus$Failed : hivens/packs/api/OperationStatus {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;)Lhivens/packs/api/OperationStatus$Failed;
+	public static synthetic fun copy$default (Lhivens/packs/api/OperationStatus$Failed;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lhivens/packs/api/OperationStatus$Failed;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCode ()Ljava/lang/String;
+	public final fun getMessage ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/packs/api/OperationStatus$Running : hivens/packs/api/OperationStatus {
+	public fun <init> (II)V
+	public final fun component1 ()I
+	public final fun component2 ()I
+	public final fun copy (II)Lhivens/packs/api/OperationStatus$Running;
+	public static synthetic fun copy$default (Lhivens/packs/api/OperationStatus$Running;IIILjava/lang/Object;)Lhivens/packs/api/OperationStatus$Running;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDone ()I
+	public final fun getTotal ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/packs/api/PackKeys {
+	public static final field CANCEL_INSTALL_ID Ljava/lang/String;
+	public static final field DELETE_PACK_ID Ljava/lang/String;
+	public static final field DISMISS_INSTALL_ID Ljava/lang/String;
+	public static final field FORGET_REATTACH_PREVIEW_ID Ljava/lang/String;
+	public static final field INSTALLS_ID Ljava/lang/String;
+	public static final field INSTALL_PACK_ID Ljava/lang/String;
+	public static final field INSTANCE Lhivens/packs/api/PackKeys;
+	public static final field LAUNCHES_ID Ljava/lang/String;
+	public static final field LAUNCH_ID Ljava/lang/String;
+	public static final field LAUNCH_PACK_ID Ljava/lang/String;
+	public static final field LIBRARY_ID Ljava/lang/String;
+	public static final field OPERATIONS_ID Ljava/lang/String;
+	public static final field PREVIEW_REATTACH_ID Ljava/lang/String;
+	public static final field REATTACH_PACK_ID Ljava/lang/String;
+	public static final field REATTACH_PREVIEWS_ID Ljava/lang/String;
+	public static final field STOP_PACK_ID Ljava/lang/String;
+	public static final field UPDATES_ID Ljava/lang/String;
+	public static final field UPDATE_PACK_ID Ljava/lang/String;
+	public final fun getCancelInstall ()Lhivens/widget/model/CommandKey;
+	public final fun getDeletePack ()Lhivens/widget/model/CommandKey;
+	public final fun getDismissInstall ()Lhivens/widget/model/CommandKey;
+	public final fun getForgetReattachPreview ()Lhivens/widget/model/CommandKey;
+	public final fun getInstallPack ()Lhivens/widget/model/CommandKey;
+	public final fun getInstalls ()Lhivens/widget/model/SourceKey;
+	public final fun getLaunch ()Lhivens/widget/model/SourceKey;
+	public final fun getLaunchPack ()Lhivens/widget/model/CommandKey;
+	public final fun getLaunches ()Lhivens/widget/model/SourceKey;
+	public final fun getLibrary ()Lhivens/widget/model/SourceKey;
+	public final fun getOperations ()Lhivens/widget/model/SourceKey;
+	public final fun getPreviewReattach ()Lhivens/widget/model/CommandKey;
+	public final fun getReattachPack ()Lhivens/widget/model/CommandKey;
+	public final fun getReattachPreviews ()Lhivens/widget/model/SourceKey;
+	public final fun getStopPack ()Lhivens/widget/model/CommandKey;
+	public final fun getUpdatePack ()Lhivens/widget/model/CommandKey;
+	public final fun getUpdates ()Lhivens/widget/model/SourceKey;
+}
+
+public abstract interface class hivens/packs/api/PackLaunch {
+}
+
+public final class hivens/packs/api/PackLaunch$Downloading : hivens/packs/api/PackLaunch {
+	public fun <init> (Ljava/lang/Float;)V
+	public final fun component1 ()Ljava/lang/Float;
+	public final fun copy (Ljava/lang/Float;)Lhivens/packs/api/PackLaunch$Downloading;
+	public static synthetic fun copy$default (Lhivens/packs/api/PackLaunch$Downloading;Ljava/lang/Float;ILjava/lang/Object;)Lhivens/packs/api/PackLaunch$Downloading;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getProgress ()Ljava/lang/Float;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/packs/api/PackLaunch$Failed : hivens/packs/api/PackLaunch {
+	public static final field INSTANCE Lhivens/packs/api/PackLaunch$Failed;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/packs/api/PackLaunch$Preparing : hivens/packs/api/PackLaunch {
+	public static final field INSTANCE Lhivens/packs/api/PackLaunch$Preparing;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/packs/api/PackLaunch$Running : hivens/packs/api/PackLaunch {
+	public static final field INSTANCE Lhivens/packs/api/PackLaunch$Running;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/packs/api/PackLaunch$Stopping : hivens/packs/api/PackLaunch {
+	public static final field INSTANCE Lhivens/packs/api/PackLaunch$Stopping;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/packs/api/PackOperationView {
+	public fun <init> (Ljava/lang/String;Lhivens/packs/api/OperationStatus;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Lhivens/packs/api/OperationStatus;
+	public final fun copy (Ljava/lang/String;Lhivens/packs/api/OperationStatus;)Lhivens/packs/api/PackOperationView;
+	public static synthetic fun copy$default (Lhivens/packs/api/PackOperationView;Ljava/lang/String;Lhivens/packs/api/OperationStatus;ILjava/lang/Object;)Lhivens/packs/api/PackOperationView;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getKind ()Ljava/lang/String;
+	public final fun getStatus ()Lhivens/packs/api/OperationStatus;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/packs/api/PackSource {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lhivens/packs/api/PackSource;
+	public static synthetic fun copy$default (Lhivens/packs/api/PackSource;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lhivens/packs/api/PackSource;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getId ()Ljava/lang/String;
+	public final fun getOrigin ()Ljava/lang/String;
+	public final fun getVersion ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class hivens/packs/api/PackUpdateView {
+}
+
+public final class hivens/packs/api/PackUpdateView$Checking : hivens/packs/api/PackUpdateView {
+	public static final field INSTANCE Lhivens/packs/api/PackUpdateView$Checking;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/packs/api/PackUpdateView$Failed : hivens/packs/api/PackUpdateView {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lhivens/packs/api/PackUpdateView$Failed;
+	public static synthetic fun copy$default (Lhivens/packs/api/PackUpdateView$Failed;Ljava/lang/String;ILjava/lang/Object;)Lhivens/packs/api/PackUpdateView$Failed;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getReason ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/packs/api/PackUpdateView$Pending : hivens/packs/api/PackUpdateView {
+	public static final field Companion Lhivens/packs/api/PackUpdateView$Pending$Companion;
+	public static final field NEWER Ljava/lang/String;
+	public static final field OLDER Ljava/lang/String;
+	public static final field UNKNOWN Ljava/lang/String;
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Z)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Z
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Z)Lhivens/packs/api/PackUpdateView$Pending;
+	public static synthetic fun copy$default (Lhivens/packs/api/PackUpdateView$Pending;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZILjava/lang/Object;)Lhivens/packs/api/PackUpdateView$Pending;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCompat ()Ljava/lang/String;
+	public final fun getDirection ()Ljava/lang/String;
+	public final fun getHeld ()Z
+	public final fun getToVersion ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/packs/api/PackUpdateView$Pending$Companion {
+}
+
+public final class hivens/packs/api/PackUpdateView$UpToDate : hivens/packs/api/PackUpdateView {
+	public static final field INSTANCE Lhivens/packs/api/PackUpdateView$UpToDate;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/packs/api/PackUpdateView$Updated : hivens/packs/api/PackUpdateView {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lhivens/packs/api/PackUpdateView$Updated;
+	public static synthetic fun copy$default (Lhivens/packs/api/PackUpdateView$Updated;Ljava/lang/String;ILjava/lang/Object;)Lhivens/packs/api/PackUpdateView$Updated;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getToVersion ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/packs/api/PackView {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Lhivens/packs/api/PackSource;Lhivens/packs/api/PackSource;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JJJZ)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Lhivens/packs/api/PackSource;Lhivens/packs/api/PackSource;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JJJZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component10 ()Ljava/lang/String;
+	public final fun component11 ()Ljava/lang/String;
+	public final fun component12 ()J
+	public final fun component13 ()J
+	public final fun component14 ()J
+	public final fun component15 ()Z
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Lhivens/packs/api/PackSource;
+	public final fun component4 ()Lhivens/packs/api/PackSource;
+	public final fun component5 ()Ljava/lang/String;
+	public final fun component6 ()Ljava/lang/String;
+	public final fun component7 ()Ljava/lang/String;
+	public final fun component8 ()Ljava/lang/String;
+	public final fun component9 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Lhivens/packs/api/PackSource;Lhivens/packs/api/PackSource;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JJJZ)Lhivens/packs/api/PackView;
+	public static synthetic fun copy$default (Lhivens/packs/api/PackView;Ljava/lang/String;Ljava/lang/String;Lhivens/packs/api/PackSource;Lhivens/packs/api/PackSource;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JJJZILjava/lang/Object;)Lhivens/packs/api/PackView;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBannerUrl ()Ljava/lang/String;
+	public final fun getCreatedAtEpochSecond ()J
+	public final fun getFolder ()Ljava/lang/String;
+	public final fun getFollowLatest ()Z
+	public final fun getForkedFrom ()Lhivens/packs/api/PackSource;
+	public final fun getGameVersion ()Ljava/lang/String;
+	public final fun getIconUrl ()Ljava/lang/String;
+	public final fun getId ()Ljava/lang/String;
+	public final fun getLastPlayedEpochSecond ()J
+	public final fun getLoader ()Ljava/lang/String;
+	public final fun getLoaderVersion ()Ljava/lang/String;
+	public final fun getName ()Ljava/lang/String;
+	public final fun getPackVersion ()Ljava/lang/String;
+	public final fun getPlaytimeSeconds ()J
+	public final fun getSource ()Lhivens/packs/api/PackSource;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/packs/api/PacksApi {
+	public static final field ID Ljava/lang/String;
+	public static final field INSTANCE Lhivens/packs/api/PacksApi;
+	public final fun getVERSION ()Lhivens/widget/model/ApiVersion;
+}
+
+public final class hivens/packs/api/ReattachConfirmation {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;)Lhivens/packs/api/ReattachConfirmation;
+	public static synthetic fun copy$default (Lhivens/packs/api/ReattachConfirmation;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lhivens/packs/api/ReattachConfirmation;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBuild ()Ljava/lang/String;
+	public final fun getFingerprint ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/packs/api/ReattachPreview {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/util/List;Lhivens/packs/api/ReattachConfirmation;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/util/List;Lhivens/packs/api/ReattachConfirmation;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component10 ()Ljava/util/List;
+	public final fun component11 ()Lhivens/packs/api/ReattachConfirmation;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/util/List;
+	public final fun component4 ()Ljava/util/List;
+	public final fun component5 ()Ljava/util/List;
+	public final fun component6 ()Ljava/util/List;
+	public final fun component7 ()Ljava/util/List;
+	public final fun component8 ()Ljava/util/List;
+	public final fun component9 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/util/List;Lhivens/packs/api/ReattachConfirmation;)Lhivens/packs/api/ReattachPreview;
+	public static synthetic fun copy$default (Lhivens/packs/api/ReattachPreview;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/util/List;Lhivens/packs/api/ReattachConfirmation;ILjava/lang/Object;)Lhivens/packs/api/ReattachPreview;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBasis ()Ljava/lang/String;
+	public final fun getCompat ()Ljava/lang/String;
+	public final fun getConfirmation ()Lhivens/packs/api/ReattachConfirmation;
+	public final fun getKept ()Ljava/util/List;
+	public final fun getRemoved ()Ljava/util/List;
+	public final fun getReplaced ()Ljava/util/List;
+	public final fun getRestored ()Ljava/util/List;
+	public final fun getToVersion ()Ljava/lang/String;
+	public final fun getTurnedOff ()Ljava/util/List;
+	public final fun getTurnedOn ()Ljava/util/List;
+	public final fun getUnreadable ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class hivens/packs/api/ReattachPreviewView {
+}
+
+public final class hivens/packs/api/ReattachPreviewView$Comparing : hivens/packs/api/ReattachPreviewView {
+	public static final field INSTANCE Lhivens/packs/api/ReattachPreviewView$Comparing;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/packs/api/ReattachPreviewView$Failed : hivens/packs/api/ReattachPreviewView {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lhivens/packs/api/ReattachPreviewView$Failed;
+	public static synthetic fun copy$default (Lhivens/packs/api/ReattachPreviewView$Failed;Ljava/lang/String;ILjava/lang/Object;)Lhivens/packs/api/ReattachPreviewView$Failed;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getMessage ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/packs/api/ReattachPreviewView$Ready : hivens/packs/api/ReattachPreviewView {
+	public fun <init> (Lhivens/packs/api/ReattachPreview;)V
+	public final fun component1 ()Lhivens/packs/api/ReattachPreview;
+	public final fun copy (Lhivens/packs/api/ReattachPreview;)Lhivens/packs/api/ReattachPreviewView$Ready;
+	public static synthetic fun copy$default (Lhivens/packs/api/ReattachPreviewView$Ready;Lhivens/packs/api/ReattachPreview;ILjava/lang/Object;)Lhivens/packs/api/ReattachPreviewView$Ready;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getPreview ()Lhivens/packs/api/ReattachPreview;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/packs/api/ReattachRequest {
+	public fun <init> (Ljava/lang/String;Lhivens/packs/api/ReattachConfirmation;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Lhivens/packs/api/ReattachConfirmation;
+	public final fun copy (Ljava/lang/String;Lhivens/packs/api/ReattachConfirmation;)Lhivens/packs/api/ReattachRequest;
+	public static synthetic fun copy$default (Lhivens/packs/api/ReattachRequest;Ljava/lang/String;Lhivens/packs/api/ReattachConfirmation;ILjava/lang/Object;)Lhivens/packs/api/ReattachRequest;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getConfirmation ()Lhivens/packs/api/ReattachConfirmation;
+	public final fun getPackId ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+

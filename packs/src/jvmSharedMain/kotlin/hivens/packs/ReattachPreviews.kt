@@ -1,8 +1,7 @@
-package hivens.ui.packs
+package hivens.packs
 
 import hivens.core.data.PackInstance
 import hivens.launcher.PackOperation
-import hivens.launcher.update.ReattachConfirmation
 import hivens.launcher.update.ReattachPreview
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -17,9 +16,6 @@ import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
-
-/** A detached pack to put back on its source, and the preview the player agreed to. */
-data class ReattachRequest(val packId: String, val confirmation: ReattachConfirmation)
 
 /** Where the comparison of a detached pack against its source's build stands. */
 sealed interface ReattachPreviewState {

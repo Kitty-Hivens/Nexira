@@ -16,6 +16,7 @@ import hivens.widget.model.CommandKey
 import hivens.widget.model.ScopeLevel
 import hivens.widget.model.SourceKey
 import hivens.widget.model.WidgetCommand
+import org.slf4j.LoggerFactory
 
 /**
  * What a widget finds for a key where it stands.
@@ -225,6 +226,10 @@ fun WidgetScope.hasSamples(ids: List<String>): Boolean = ids.all { sampleOf(it) 
  *
  * For the palette and the editor, which show what a widget looks like. A sample is
  * display data, and a widget drawn for use is never drawn through this.
+ *
+ * A sample is a module's code, so one that fails, a module's that left among them,
+ * is logged and leaves its key missing, the way a failing factory does, rather than
+ * taking the gallery down with it.
  */
 @Composable
 fun ProvideSamples(ids: List<String>, content: @Composable () -> Unit) {
@@ -234,10 +239,22 @@ fun ProvideSamples(ids: List<String>, content: @Composable () -> Unit) {
         content()
         return
     }
-    val sampled = missing.mapNotNull { scope.declarationOf(it) }.filter { scope.sampleOf(it.id) != null }
-    val host = rememberSampleLevels(scope, sampled.mapTo(HashSet()) { it.level })
+    val sampled = remember(scope, missing) {
+        missing.mapNotNull { scope.declarationOf(it) }.mapNotNull { declaration ->
+            val sample = scope.sampleOf(declaration.id) ?: return@mapNotNull null
+            try {
+                declaration to sample()
+            } catch (e: Exception) {
+                sampleLog.warn("The sample of '{}' could not be made, so it stays missing", declaration.id, e)
+                null
+            }
+        }
+    }
+    val host = rememberSampleLevels(scope, sampled.mapTo(HashSet()) { it.first.level })
     CompositionLocalProvider(LocalScope provides host) { SampleOverlays(sampled, content) }
 }
+
+private val sampleLog = LoggerFactory.getLogger("hivens.widget.api.ProvideSamples")
 
 /**
  * [scope], with a level of each of [kinds] made under it where none is above, in
@@ -256,16 +273,13 @@ private fun rememberSampleLevels(scope: WidgetScope, kinds: Set<ScopeLevel>): Wi
     return at
 }
 
-/** Puts the sample of each of [rest] over its level, one overlay inside the next. */
+/** Puts each of [rest]'s sample over its level, one overlay inside the next. */
 @Composable
-private fun SampleOverlays(rest: List<KeyDeclaration>, content: @Composable () -> Unit) {
-    val first = rest.firstOrNull()
-    if (first == null) {
+private fun SampleOverlays(rest: List<Pair<KeyDeclaration, Any?>>, content: @Composable () -> Unit) {
+    val (first, sample) = rest.firstOrNull() ?: run {
         content()
         return
     }
-    val scope = LocalScope.current
-    val sample = remember(first.id) { scope?.sampleOf(first.id)?.invoke() }
     val local = if (first.kind == KeyKind.Source) LocalOverlay else LocalCommandOverlay
     CompositionLocalProvider(local provides rememberOverlay(local.current, first.level, first.id, sample)) {
         SampleOverlays(rest.drop(1), content)
@@ -277,6 +291,7 @@ private fun SampleOverlays(rest: List<KeyDeclaration>, content: @Composable () -
  * when the caller leaves the composition or [parent] changes. For an owner whose
  * lifetime is its place in the composition, the way a window's shell is.
  */
+@HostApi
 @Composable
 fun rememberChildScope(parent: WidgetScope, level: ScopeLevel): WidgetScope =
     remember(parent, level) { HeldLevel(parent.child(level)) }.level

@@ -508,11 +508,14 @@ class EditModeController(
      * saved arrangement knows nothing of a screen made after it was saved, and
      * loaded as it stood it deleted that screen, and the widget state behind its
      * notes went with the next sweep. Recorded like a reset, so loading the wrong
-     * one is a step back rather than a loss.
+     * one is a step back rather than a loss. Which modules the launcher brings in stays
+     * as it was: that is not something an arrangement decides.
      */
     fun loadArrangement(saved: LayoutGraph) {
         scope.launch(writeDispatcher) {
-            edit(key = null) { current -> ScreenLinks.ensureLinks(saved.withScreensFrom(current)) }
+            edit(key = null) { current ->
+                ScreenLinks.ensureLinks(saved.withScreensFrom(current).copy(modules = current.modules))
+            }
         }
     }
 

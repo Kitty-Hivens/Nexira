@@ -40,8 +40,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
-import hivens.core.data.PackInstance
 import hivens.core.launch.LaunchControlMode
+import hivens.packs.api.PackKeys
+import hivens.packs.api.PackView
 import hivens.ui.AppState
 import hivens.ui.Screen
 import hivens.ui.components.rememberLaunchControl
@@ -54,7 +55,6 @@ import hivens.ui.nx.PlayLayout
 import hivens.ui.screens.library.PendingUpdateBadge
 import hivens.ui.screens.library.lastPlayedLabel
 import hivens.ui.screens.library.rememberPackArt
-import hivens.ui.feature.catalogue.project.loaderLabel
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.decorativePair
 import hivens.ui.theme.familyForText
@@ -108,7 +108,7 @@ fun HomeNewPackList(instance: WidgetInstance) {
     val appState = rememberScopedSource(Sources.Session).valueOrNull() ?: return
     val navigate = rememberScopedCommand(Commands.Navigate) ?: return
     val s = LocalStrings.current
-    val all = rememberScopedSource(Sources.PackLibrary).valueOrNull() ?: return
+    val all = rememberScopedSource(PackKeys.Library).valueOrNull() ?: return
     val continued = rememberQuickLaunchTarget()?.target
 
     // An empty library is where somebody starts, and this is the widget that says how.
@@ -197,7 +197,7 @@ internal data class PackListColumns(val runsOn: Boolean, val played: Boolean, va
 }
 
 @Composable
-private fun PackRow(pack: PackInstance, columns: PackListColumns, appState: AppState, navigate: (Screen) -> Unit) {
+private fun PackRow(pack: PackView, columns: PackListColumns, appState: AppState, navigate: (Screen) -> Unit) {
     val s = LocalStrings.current
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
@@ -217,8 +217,8 @@ private fun PackRow(pack: PackInstance, columns: PackListColumns, appState: AppS
     ) {
         PackMark(pack, Modifier.size(MARK))
         Text(
-            text       = pack.displayName,
-            fontFamily = familyForText(pack.displayName),
+            text       = pack.name,
+            fontFamily = familyForText(pack.name),
             color      = NxInk.main,
             fontWeight = FontWeight.Medium,
             maxLines   = 1,
@@ -227,12 +227,7 @@ private fun PackRow(pack: PackInstance, columns: PackListColumns, appState: AppS
         )
         if (columns.runsOn) {
             Text(
-                text     = pack.cachedManifest?.let { m ->
-                    listOfNotNull(
-                        m.minecraftVersion.takeIf { it.isNotBlank() },
-                        m.loaderName.takeIf { it.isNotBlank() && !it.equals("vanilla", ignoreCase = true) }?.let(::loaderLabel),
-                    ).joinToString(" · ")
-                }.orEmpty(),
+                text     = pack.runsOn(),
                 style    = MaterialTheme.typography.bodySmall,
                 color    = NxInk.quiet,
                 maxLines = 1,
@@ -241,7 +236,7 @@ private fun PackRow(pack: PackInstance, columns: PackListColumns, appState: AppS
         }
         if (columns.played) {
             Text(
-                text     = lastPlayedLabel(pack.lastPlayedEpochOrZero),
+                text     = lastPlayedLabel(pack.lastPlayedEpochSecond),
                 style    = MaterialTheme.typography.bodySmall,
                 color    = NxInk.quiet,
                 maxLines = 1,
@@ -285,7 +280,7 @@ private fun RowPlay(quickLaunch: QuickLaunchTarget, visible: Boolean) {
 
 /** The pack's icon when it has one, a square of its fill when it does not. */
 @Composable
-private fun PackMark(pack: PackInstance, modifier: Modifier) {
+private fun PackMark(pack: PackView, modifier: Modifier) {
     val art = rememberPackArt(pack)
     val (hueA, hueB) = decorativePair(pack.id)
     val shape = RoundedCornerShape(8.dp)

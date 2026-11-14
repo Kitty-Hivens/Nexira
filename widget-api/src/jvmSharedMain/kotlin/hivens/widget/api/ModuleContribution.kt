@@ -2,7 +2,7 @@ package hivens.widget.api
 
 /**
  * Something a module adds to the launcher besides widgets: a screen effect, a theme, a particle
- * field. Every kind of contribution shares this much, which is what lets the loader, the module
+ * field, the keys it answers. Every kind of contribution shares this much, which is what lets the loader, the module
  * list and the settings treat them alike without knowing any of them.
  *
  * A module carries its contributions as services, one service file per kind in
@@ -27,6 +27,7 @@ interface ModuleContribution {
             ScreenEffect::class.java,
             ThemeContribution::class.java,
             ParticleContribution::class.java,
+            KeyContribution::class.java,
         )
 
         /**

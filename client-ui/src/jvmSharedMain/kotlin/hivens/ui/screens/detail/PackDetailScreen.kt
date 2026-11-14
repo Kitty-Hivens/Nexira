@@ -180,7 +180,7 @@ fun PackDetailScreen(
     val contentState = rememberContentTabState(pack)
     // The same decision the home widgets make: whether this pack can be played, and
     // when not, why not in words the control can show.
-    val launchControl = rememberLaunchControl(pack, appState)
+    val launchControl = rememberLaunchControl(pack.id, pack.instanceDirName, appState)
 
     // The hero's play/abort are the only way to drive a pack launch, so the control
     // surface has to reach them -- a scenario that cannot start a launch cannot check

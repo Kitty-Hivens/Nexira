@@ -51,7 +51,7 @@ fun HomeNewQuickLaunch(instance: WidgetInstance) {
     val quickLaunch = rememberQuickLaunchTarget(p.buttonLabel.ifBlank { s.homeQuickButton }) ?: return
     val target = quickLaunch.target
 
-    val label = if (target.lastPlayedEpochOrZero > 0L) s.homeQuickContinue else s.homeQuickStart
+    val label = if (target.lastPlayedEpochSecond > 0L) s.homeQuickContinue else s.homeQuickStart
 
     Column(
         modifier = Modifier
@@ -72,13 +72,13 @@ fun HomeNewQuickLaunch(instance: WidgetInstance) {
         ) {
             Column(Modifier.weight(1f)) {
                 Text(
-                    text       = target.displayName,
+                    text       = target.name,
                     style      = MaterialTheme.typography.titleMedium,
                     color      = NxInk.main,
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
-                    text  = target.packRef.id,
+                    text  = target.source.id,
                     style = MaterialTheme.typography.bodySmall,
                     color = NxInk.quiet,
                 )

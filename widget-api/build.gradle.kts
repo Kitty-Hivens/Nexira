@@ -27,6 +27,12 @@ kotlin {
     @OptIn(ExperimentalAbiValidation::class)
     abiValidation()
 
+    // The kernel is the plumbing the host marker fences off for modules, so it uses
+    // its own host operations freely, in its sources and its tests alike.
+    compilerOptions {
+        optIn.add("hivens.widget.api.HostApi")
+    }
+
     jvm()
     android {
         namespace = "hivens.widget.api"
