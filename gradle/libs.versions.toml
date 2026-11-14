@@ -26,7 +26,7 @@ media3            = "1.11.1"
 activityCompose   = "1.13.0"
 
 # ── Core libraries ───────────────────────────────────────────────────────────
-ktor              = "3.6.0"
+ktor              = "3.6.1"
 # Test-only. Pinned to whatever ktor-client-okhttp resolves, so the
 # certificate helper matches the TLS stack under test.
 okhttp            = "5.5.1"
