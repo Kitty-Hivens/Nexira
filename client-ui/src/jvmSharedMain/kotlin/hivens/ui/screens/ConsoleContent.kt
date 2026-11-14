@@ -32,7 +32,6 @@ import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -75,6 +74,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import hivens.ui.i18n.AppStrings
@@ -1275,7 +1275,7 @@ private fun CommandInputRow(
 // ── Status footer (always visible) ──────────────────────────────────────────
 
 @Composable
-private fun StatusFooter(
+internal fun StatusFooter(
     strings: AppStrings,
     filtered: Int,
     total: Int,
@@ -1303,23 +1303,33 @@ private fun StatusFooter(
         } else {
             strings.consoleStatusLines(filtered, total)
         }
-        Text(
-            text       = linesText,
-            color      = NxInk.quiet,
-            fontFamily = LocalMonoFamily.current,
-            fontSize   = 10.sp,
-        )
-        Spacer(Modifier.width(12.dp))
-        Text(
-            text       = strings.consoleStatusFiltered(warnCount, errorCount),
-            color      = NxInk.quiet,
-            fontFamily = LocalMonoFamily.current,
-            fontSize   = 10.sp,
-        )
-
-        Spacer(Modifier.weight(1f))
+        // The counts give way where the row is short, never the follow chip: it is
+        // the one control on the row, and squeezed into it on a phone held upright it
+        // was cut to a sliver.
+        Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text       = linesText,
+                color      = NxInk.quiet,
+                fontFamily = LocalMonoFamily.current,
+                fontSize   = 10.sp,
+                maxLines   = 1,
+                overflow   = TextOverflow.Ellipsis,
+                modifier   = Modifier.weight(1f, fill = false),
+            )
+            Spacer(Modifier.width(12.dp))
+            Text(
+                text       = strings.consoleStatusFiltered(warnCount, errorCount),
+                color      = NxInk.quiet,
+                fontFamily = LocalMonoFamily.current,
+                fontSize   = 10.sp,
+                maxLines   = 1,
+                overflow   = TextOverflow.Ellipsis,
+                modifier   = Modifier.weight(1f, fill = false),
+            )
+        }
 
         if (searchActive) {
+            Spacer(Modifier.width(12.dp))
             // "+" suffix marks that matches hit MAX_SEARCH_MATCHES and the rest
             // were not highlighted -- F3 still steps through the first cap-worth.
             Text(
@@ -1327,23 +1337,34 @@ private fun StatusFooter(
                 color      = NxInk.quiet,
                 fontFamily = LocalMonoFamily.current,
                 fontSize   = 10.sp,
+                maxLines   = 1,
             )
-            Spacer(Modifier.width(12.dp))
         }
+        Spacer(Modifier.width(12.dp))
 
         // Follow / paused chip: clickable when paused to resume tailing.
         // success doubles as "everything is on track"; pause uses warm
         // orange so the chip reads as a deliberate halt rather than an
         // error, which the error status would conflate with ERROR severity.
+        // Its own size, like the severity chips: a Material text button forced
+        // into the slim row kept its padding inside and left the label a few
+        // pixels of height.
         val followText  = if (following) strings.consoleStatusFollow else strings.consoleStatusPaused
         val followColor = if (following) NxColor.status(Status.Success, text = true) else CONSOLE_PAUSE_ACCENT
-        TextButton(onClick = onResumeFollow, modifier = Modifier.height(20.dp)) {
+        Box(
+            modifier = Modifier
+                .clip(MaterialTheme.shapes.small)
+                .clickable(onClick = onResumeFollow)
+                .padding(horizontal = 8.dp, vertical = 2.dp),
+            contentAlignment = Alignment.Center,
+        ) {
             Text(
                 text       = followText,
                 color      = followColor,
                 fontFamily = LocalMonoFamily.current,
                 fontWeight = FontWeight.Bold,
                 fontSize   = 10.sp,
+                maxLines   = 1,
             )
         }
     }

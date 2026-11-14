@@ -9,6 +9,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -171,7 +172,7 @@ fun VersionPickerWindow(
     Layer(visible = true, modal = true, onDismissRequest = onDismiss, dismissOnOutsidePress = false) {
         val focus = remember { FocusRequester() }
         LaunchedEffect(Unit) { focus.requestFocus() }
-        Box(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
                 .background(NxColor.page.copy(alpha = 0.55f))
@@ -180,6 +181,8 @@ fun VersionPickerWindow(
                 .clickable(remember { MutableInteractionSource() }, indication = null, onClick = onDismiss),
             contentAlignment = Alignment.Center,
         ) {
+            // A phone held upright has no width to give away to a margin this wide.
+            val margin = if (maxWidth < NARROW_WINDOW) NARROW_MARGIN else WINDOW_MARGIN
             NxSurface(
                 kind = SurfaceKind.Dialog,
                 modifier = Modifier
@@ -187,7 +190,7 @@ fun VersionPickerWindow(
                     // fraction cannot express this in either order: `fillMax` fixes
                     // the size, so a ceiling after it has nothing to clamp, and a
                     // ceiling before it makes the fraction a fraction of the ceiling.
-                    .padding(horizontal = WINDOW_MARGIN, vertical = WINDOW_MARGIN)
+                    .padding(horizontal = margin, vertical = margin)
                     .widthIn(max = CARD_WIDTH)
                     .heightIn(max = CARD_HEIGHT)
                     .fillMaxWidth()
@@ -260,20 +263,38 @@ fun VersionBrowser(
     val selected = versions.firstOrNull { it.id == selectedId }
     LaunchedEffect(selected) { onSelectionChange(selected) }
 
-    Row(modifier) {
-        VersionRail(
-            versions = shown,
-            loading = loading,
-            query = query,
-            onQuery = { query = it },
-            selectedId = selectedId,
-            onSelect = { selectedId = it },
-            hiddenCount = hiddenCount,
-            showIncompatible = showIncompatible,
-            onToggleIncompatible = { showIncompatible = !showIncompatible },
-        )
-        Box(Modifier.width(1.dp).fillMaxHeight().background(NxInk.line))
-        DetailPane(selected, Modifier.weight(1f).fillMaxHeight(), detailAction)
+    // Side by side where the notes keep a readable measure beside the rail, the
+    // notes under the list where they do not. The rail is a fixed measure, so on a
+    // phone held upright it took nearly all of the card and left the notes a column
+    // so narrow that a date stood one character per line.
+    BoxWithConstraints(modifier) {
+        val rail: @Composable (Modifier) -> Unit = { railModifier ->
+            VersionRail(
+                versions = shown,
+                loading = loading,
+                query = query,
+                onQuery = { query = it },
+                selectedId = selectedId,
+                onSelect = { selectedId = it },
+                hiddenCount = hiddenCount,
+                showIncompatible = showIncompatible,
+                onToggleIncompatible = { showIncompatible = !showIncompatible },
+                modifier = railModifier,
+            )
+        }
+        if (maxWidth >= RAIL_WIDTH + DETAIL_MIN_WIDTH) {
+            Row(Modifier.fillMaxSize()) {
+                rail(Modifier.width(RAIL_WIDTH).fillMaxHeight())
+                Box(Modifier.width(1.dp).fillMaxHeight().background(NxInk.line))
+                DetailPane(selected, Modifier.weight(1f).fillMaxHeight(), detailAction)
+            }
+        } else {
+            Column(Modifier.fillMaxSize()) {
+                rail(Modifier.fillMaxWidth().weight(1f))
+                HorizontalDivider(color = NxInk.line)
+                DetailPane(selected, Modifier.fillMaxWidth().weight(1f), detailAction)
+            }
+        }
     }
 }
 
@@ -287,6 +308,13 @@ private val WINDOW_MARGIN = 48.dp
 
 /** The rail is a fixed measure: a list of numbers wants the same room everywhere. */
 private val RAIL_WIDTH = 300.dp
+
+/** The narrowest the notes go beside the rail. Narrower, they go under it. */
+private val DETAIL_MIN_WIDTH = 280.dp
+
+/** Under this width the window keeps only a slim margin. */
+private val NARROW_WINDOW = 600.dp
+private val NARROW_MARGIN = 12.dp
 
 /** One row, and it is a constant so the list reads as a column rather than a stack. */
 private val ROW_HEIGHT = 40.dp
@@ -336,6 +364,7 @@ private fun VersionRail(
     hiddenCount: Int,
     showIncompatible: Boolean,
     onToggleIncompatible: () -> Unit,
+    modifier: Modifier,
 ) {
     val s = LocalStrings.current
     // Its own plane. The list and the notes have to read as two places, not as
@@ -354,7 +383,7 @@ private fun VersionRail(
         kind = SurfaceKind.Panel,
         borderWidthDp = 0f,
         shape = RectangleShape,
-        modifier = Modifier.width(RAIL_WIDTH).fillMaxHeight(),
+        modifier = modifier,
     ) {
         Box(Modifier.fillMaxSize()) {
             Column(Modifier.fillMaxSize()) {

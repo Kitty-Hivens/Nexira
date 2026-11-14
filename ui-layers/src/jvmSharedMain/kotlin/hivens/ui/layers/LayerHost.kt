@@ -3,6 +3,7 @@ package hivens.ui.layers
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -202,6 +203,8 @@ private fun BoxScope.ResidentFrame(
             .matchParentSize()
             // A layer under the gate is out of reach of a screen reader too.
             .semantics { if (!layers.plan.takesInput(layers.plan.rankOf(resident))) hideFromAccessibility() }
+            // Ends at the top of the software keyboard, see [Layer].
+            .then(if (resident.liftsOverKeyboard) Modifier.imePadding() else Modifier)
             .then(if (focusable) Modifier.layerFocus(resident, layers, redirect) else Modifier),
     ) {
         CompositionLocalProvider(context) {

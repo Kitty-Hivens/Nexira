@@ -91,6 +91,7 @@ fun AnchoredLayer(
         dismissOnOutsidePress = dismissOnOutsidePress,
         returnFocus = returnFocus,
         yieldsToField = yieldsToField,
+        liftsOverKeyboard = false,
     ) {
         Anchored({ anchor }, position, body = modal, content)
     }

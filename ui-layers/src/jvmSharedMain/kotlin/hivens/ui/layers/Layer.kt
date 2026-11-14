@@ -3,6 +3,7 @@ package hivens.ui.layers
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.currentCompositionLocalContext
@@ -47,7 +48,10 @@ import androidx.compose.ui.window.PopupProperties
  *
  * [content] is composed with the composition locals of this call site, so it keeps
  * the theme, the strings and the scope of where it was opened. [BoxScope] places
- * it in the window.
+ * it in the window above the software keyboard, as a window resized for it would:
+ * a layer draws over the whole window, and a dialog's buttons sat under the
+ * keyboard its own field brought up. An [AnchoredLayer] keeps its own account of
+ * the keyboard, and its frame runs to the window's edge.
  *
  * Outside a [LayerHost] there is no order to stand in. A [modal] layer then opens
  * as a Compose popup over the whole window, which still blocks what is under it and
@@ -66,10 +70,13 @@ fun Layer(
     content: @Composable BoxScope.() -> Unit,
 ) = ShowLayer(
     visible, modal, staysUsable, pinnedTop, focusable, onDismissRequest, dismissOnOutsidePress,
-    returnFocus, yieldsToField = false, content,
+    returnFocus, yieldsToField = false, liftsOverKeyboard = true, content,
 )
 
-/** [Layer], with [yieldsToField] for the layers [AnchoredLayer] places. */
+/**
+ * [Layer], with [yieldsToField] for the layers [AnchoredLayer] places, and
+ * [liftsOverKeyboard] off for them, which place themselves clear of the keyboard.
+ */
 @Composable
 internal fun ShowLayer(
     visible: Boolean,
@@ -81,12 +88,17 @@ internal fun ShowLayer(
     dismissOnOutsidePress: Boolean,
     returnFocus: FocusRequester?,
     yieldsToField: Boolean,
+    liftsOverKeyboard: Boolean,
     content: @Composable BoxScope.() -> Unit,
 ) {
     val layers = LocalWindowLayers.current
     if (layers == null) {
         if (visible) {
-            if (modal) WindowPopup(focusable, onDismissRequest, dismissOnOutsidePress, content) else Box(content = content)
+            if (modal) {
+                WindowPopup(focusable, onDismissRequest, dismissOnOutsidePress, liftsOverKeyboard, content)
+            } else {
+                Box(content = content)
+            }
         }
         return
     }
@@ -111,6 +123,7 @@ internal fun ShowLayer(
     resident.pinnedTop = pinnedTop
     resident.focusable = focusable
     resident.yieldsToField = yieldsToField
+    resident.liftsOverKeyboard = liftsOverKeyboard
     resident.returnFocus = returnFocus
     resident.onOutsidePress = requestDismiss.takeIf { dismissible && dismissOnOutsidePress }
     resident.context = currentCompositionLocalContext
@@ -135,6 +148,7 @@ private fun WindowPopup(
     focusable: Boolean,
     onDismissRequest: (() -> Unit)?,
     dismissOnOutsidePress: Boolean,
+    liftsOverKeyboard: Boolean,
     content: @Composable BoxScope.() -> Unit,
 ) {
     Popup(
@@ -143,7 +157,7 @@ private fun WindowPopup(
     ) {
         Box(Modifier.fillMaxSize()) {
             if (onDismissRequest != null && dismissOnOutsidePress) OutsidePress(onDismissRequest)
-            Box(Modifier.matchParentSize(), content = content)
+            Box(Modifier.matchParentSize().then(if (liftsOverKeyboard) Modifier.imePadding() else Modifier), content = content)
         }
     }
 }

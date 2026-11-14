@@ -30,6 +30,8 @@ class LayerResident internal constructor(
     internal var focusable by mutableStateOf(false)
     /** Whether a focusable layer leaves the keyboard in a text field that holds it as the layer appears. */
     internal var yieldsToField = false
+    /** Whether the layer's frame ends at the top of the software keyboard rather than at the window's edge. */
+    internal var liftsOverKeyboard by mutableStateOf(false)
     /** What a press outside a modal asks for, null when such a press closes nothing. */
     internal var onOutsidePress by mutableStateOf<(() -> Unit)?>(null)
     internal var context by mutableStateOf<CompositionLocalContext?>(null)
