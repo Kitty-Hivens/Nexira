@@ -97,9 +97,10 @@ class WidgetCommandRegistry {
 
     /**
      * The sample of the command [id] in the sense of [WidgetDataRegistry.declare]: one
-     * that does nothing, for every command that lives below the app. A widget drawn on
-     * samples is there to be looked at, so whatever it fires has to go nowhere. Null
-     * for an app command, which is always there, and for an id nothing here names.
+     * that does nothing, for every command a factory makes or an owner provides,
+     * whatever its level. A widget drawn on samples is there to be looked at, so
+     * whatever it fires has to go nowhere. Null for a command registered as a value,
+     * which is always there, and for an id nothing here names.
      */
     fun sampleOf(id: String): (() -> Any?)? = if (id in factories || id in declared) SAMPLE else null
 

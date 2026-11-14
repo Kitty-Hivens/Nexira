@@ -38,7 +38,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -51,7 +50,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
-import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackInstance
 import hivens.ui.AppState
 import hivens.ui.Screen
@@ -75,7 +73,6 @@ import hivens.widget.model.PropRange
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 import kotlinx.serialization.Serializable
-import org.koin.compose.koinInject
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxColor
 
@@ -111,7 +108,7 @@ data class RecentProps(
     surface = """{"fill":"panel"}""",
     minWidth = 240, minHeight = 120,
     maxWidth = 2400, maxHeight = 1600,
-    needs = ["app.state", "nav.open"],
+    needs = ["app.state", "nav.open", "packs.library", "pack.launch"],
 )
 @Composable
 fun HomeNewRecent(instance: WidgetInstance) {
@@ -119,8 +116,7 @@ fun HomeNewRecent(instance: WidgetInstance) {
     val appState = rememberScopedSource(Sources.Session).valueOrNull() ?: return
     val navigate = rememberScopedCommand(Commands.Navigate) ?: return
     val s = LocalStrings.current
-    val repo: IPackRepository = koinInject()
-    val all by remember { repo.observe() }.collectAsState()
+    val all = rememberScopedSource(Sources.PackLibrary).valueOrNull() ?: return
 
     if (all.isEmpty()) {
         EmptyPacksCta(onBrowse = { navigate(Screen.Browse) })

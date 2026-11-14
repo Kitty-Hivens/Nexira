@@ -1451,6 +1451,30 @@ interface AppStrings {
     fun notifReasonInternalDetail(detail: String): String
     val notifReasonAuthFail: String
     fun notifReasonAuthFailDetail(detail: String): String
+    /** Body of a failed launch when the pack asked for is not installed. */
+    val notifReasonNotInstalled: String
+    /** Title when the launcher's own startup sign-in threw an error, as opposed to a rejected password. */
+    val notifSignInFailedTitle: String
+    /** Title when signing out failed, so the saved accounts may still be on this device. */
+    val notifSignOutFailedTitle: String
+    /** Title when a core part of the launcher did not start. Which part it was goes to the log only. */
+    val notifCorePartMissingTitle: String
+    /** Body under that title, pointing at the log for the details. */
+    val notifCorePartMissingBody: String
+    /** Title when the core part that launches and changes packs did not start. */
+    val notifCorePacksMissingTitle: String
+    /** Title when the core part that signs in did not start. */
+    val notifCoreSessionMissingTitle: String
+    /** Title when the core part that holds themes and the language did not start. */
+    val notifCoreAppearanceMissingTitle: String
+    /** Title when the core part behind the console did not start. */
+    val notifCoreConsoleMissingTitle: String
+    /** Title when the accounts were removed but saving the settings failed, so the offline name is still stored. */
+    val notifSignOutNameKeptTitle: String
+    /** Body under that title, saying what the kept name means for the next start. */
+    val notifSignOutNameKeptBody: String
+    /** Title of a failed launch for a pack that is not installed and whose name is not known. */
+    val notifLaunchNotInstalledTitle: String
     val notifReasonOfflineNoClient: String
     val notifReasonTwoFactorExpired: String
     fun notifReasonMissingAuthProvider(providerKey: String): String

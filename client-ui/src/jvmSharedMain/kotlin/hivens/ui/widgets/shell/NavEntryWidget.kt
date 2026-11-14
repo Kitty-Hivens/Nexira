@@ -30,18 +30,17 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import hivens.ui.AppState
 import hivens.ui.Screen
+import hivens.ui.components.rememberSignOutRequest
 import hivens.ui.customization.LocalCustomization
 import hivens.ui.customization.NavSelectionStyle
 import hivens.ui.easter.LocalAprilFools
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.utils.GameConsoleService
 import hivens.ui.widgets.Commands
 import hivens.ui.widgets.Sources
 import hivens.ui.widgets.toWidgetColorOrNull
 import hivens.widget.api.rememberProps
-import hivens.widget.api.rememberScopedAction
 import hivens.widget.api.rememberScopedCommand
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
@@ -50,7 +49,6 @@ import hivens.widget.model.WidgetInstance
 import kotlin.math.sin
 import kotlin.random.Random
 import kotlinx.serialization.Serializable
-import org.koin.compose.koinInject
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.Status
@@ -76,7 +74,7 @@ data class NavEntryProps(
     id = "nav.entry",
     displayName = "widget.nav.entry",
     propsClass = NavEntryProps::class,
-    needs = ["nav.state", "nav.switch", "app.state", "auth.signOut"],
+    needs = ["nav.state", "nav.switch", "app.state", "auth.signOut", "console.visible", "console.visible.set"],
 )
 @Composable
 fun NavEntry(instance: WidgetInstance) {
@@ -140,13 +138,14 @@ fun NavEntry(instance: WidgetInstance) {
             onClick      = { switchTab(Screen.About) },
         )
         NavTarget.Console -> {
-            val gameConsole: GameConsoleService = koinInject()
+            val visible = rememberScopedSource(Sources.ConsoleVisible).valueOrNull() ?: return
+            val setVisible = rememberScopedCommand(Commands.SetConsoleVisible) ?: return
             NavSlot(
                 icon          = NxIcon.Build,
                 phase         = 0.0f,
-                active        = gameConsole.shouldShowConsole,
+                active        = visible,
                 chaosEligible = false,
-                onClick       = { if (gameConsole.shouldShowConsole) gameConsole.hide() else gameConsole.show() },
+                onClick       = { setVisible(!visible) },
             )
         }
         NavTarget.Logout -> {
@@ -155,7 +154,8 @@ fun NavEntry(instance: WidgetInstance) {
             // free of auth-state vocabulary.
             val appState = rememberScopedSource(Sources.Session).valueOrNull()
             if (appState !is AppState.Authenticated) return
-            val signOut = rememberScopedAction(Commands.SignOut) ?: return
+            // Asks first, through the window's sign-out question.
+            val signOut = rememberSignOutRequest() ?: return
             NavSlot(
                 icon          = NxIcon.ExitToApp,
                 phase         = 0.0f,

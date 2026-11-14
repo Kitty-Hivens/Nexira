@@ -69,7 +69,23 @@ class GameConsoleService(
     /** Coalesced, off-thread view of the buffer. Consumed via `collectAsState`. */
     val snapshot: StateFlow<ConsoleSnapshot> = _snapshot.asStateFlow()
 
-    var shouldShowConsole by mutableStateOf(false)
+    private var shown by mutableStateOf(false)
+
+    private val _visible = MutableStateFlow(false)
+
+    /**
+     * Whether the console is asked to be on screen, for a reader outside the
+     * composition, which a source is. The same value as [shouldShowConsole].
+     */
+    val visible: StateFlow<Boolean> = _visible.asStateFlow()
+
+    /** Whether the console is asked to be on screen. Compose state, so a window drawing it hears the change. */
+    var shouldShowConsole: Boolean
+        get() = shown
+        set(value) {
+            shown = value
+            _visible.value = value
+        }
 
     /**
      * Command sink: set by the [hivens.ui.notifications.drivers.LaunchDriver]

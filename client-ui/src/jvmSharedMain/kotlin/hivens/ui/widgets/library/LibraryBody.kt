@@ -11,7 +11,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -21,9 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackInstance
-import hivens.launcher.instance.PackInstanceService
 import hivens.launcher.platform.PlatformPaths
 import hivens.ui.Screen
 import hivens.ui.nx.NxButton
@@ -35,14 +32,15 @@ import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import androidx.compose.foundation.layout.padding
 import hivens.ui.widgets.Commands
+import hivens.ui.widgets.Sources
 import hivens.widget.api.rememberProps
 import hivens.widget.api.rememberScopedCommand
+import hivens.widget.api.rememberScopedSource
+import hivens.widget.api.valueOrNull
 import hivens.widget.model.PropLabel
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 import java.nio.file.Path
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import org.koin.compose.koinInject
 import hivens.ui.theme.NxInk
@@ -67,21 +65,19 @@ data class LibraryBodyProps(
     propsClass = LibraryBodyProps::class,
     minWidth = 320, minHeight = 200,
     maxWidth = 2400, maxHeight = 1600,
-    needs = ["nav.open"],
+    needs = ["nav.open", "packs.library", "pack.delete"],
 )
 @Composable
 fun LibraryBody(instance: WidgetInstance) {
     val p = instance.rememberProps<LibraryBodyProps>()
     val navigate = rememberScopedCommand(Commands.Navigate) ?: return
-    val s = LocalStrings.current
-    val repo: IPackRepository = koinInject()
-    val paths: PlatformPaths = koinInject()
-    val packInstanceService: PackInstanceService = koinInject()
-    // The app's scope, not this composition's: leaving the Library mid-delete
+    val instances = rememberScopedSource(Sources.PackLibrary).valueOrNull() ?: return
+    // Runs on the app's level, not this composition: leaving the Library mid-delete
     // cancelled it halfway through the tree.
-    val scope: CoroutineScope = koinInject()
+    val deletePack = rememberScopedCommand(Commands.DeletePack) ?: return
+    val s = LocalStrings.current
+    val paths: PlatformPaths = koinInject()
     var pendingDelete by remember { mutableStateOf<PackInstance?>(null) }
-    val instances by remember { repo.observe() }.collectAsState()
 
     if (instances.isEmpty()) {
         LibraryEmpty(
@@ -106,7 +102,7 @@ fun LibraryBody(instance: WidgetInstance) {
             onConfirm    = {
                 // Files first, registry second (locked jar -> keep the entry, no
                 // orphaned data); ordering lives in PackInstanceService now.
-                scope.launch { packInstanceService.deleteCompletely(target) }
+                deletePack(target.id)
             },
             onDismiss    = { pendingDelete = null },
         )

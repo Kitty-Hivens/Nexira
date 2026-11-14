@@ -65,6 +65,7 @@ import hivens.ui.chrome.LocalWindowCapabilities
 import hivens.ui.chrome.LocalWindowFrame
 import hivens.ui.chrome.WindowControlsMode
 import hivens.ui.chrome.resolved
+import hivens.ui.components.rememberSignOutRequest
 import hivens.ui.editor.EditModeController
 import hivens.ui.editor.EditModeState
 import hivens.ui.editor.LocalEditMode
@@ -79,7 +80,6 @@ import hivens.ui.widgets.Sources
 import hivens.widget.api.LocalSlotPath
 import hivens.widget.api.SlotRenderer
 import hivens.widget.api.rememberProps
-import hivens.widget.api.rememberScopedAction
 import hivens.widget.api.rememberScopedCommand
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
@@ -236,7 +236,8 @@ fun ShellLeftRegion(instance: WidgetInstance) {
     }
     val appState = rememberScopedSource(Sources.Session).valueOrNull() ?: return
     val switchTab = rememberScopedCommand(Commands.SwitchTab) ?: return
-    val signOut = rememberScopedAction(Commands.SignOut) ?: return
+    // Asks first, through the window's sign-out question.
+    val signOut = rememberSignOutRequest() ?: return
     Row(Modifier.fillMaxHeight()) {
         // The width lands on the rail, not on the row that also holds the divider.
         // On the row, the surface took whatever the divider left, so a named width

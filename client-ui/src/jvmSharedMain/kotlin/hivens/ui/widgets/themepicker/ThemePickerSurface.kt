@@ -28,12 +28,14 @@ import hivens.ui.puppet.PuppetScreen
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.NxInk
-import hivens.ui.theme.ThemeLibrary
 import hivens.ui.widgets.Commands
+import hivens.ui.widgets.Sources
 import hivens.widget.api.ProvideScoped
 import hivens.widget.api.SlotRenderer
 import hivens.widget.api.rememberScopedAction
 import hivens.widget.api.rememberScopedCommand
+import hivens.widget.api.rememberScopedSource
+import hivens.widget.api.valueOrNull
 import hivens.widget.model.SlotId
 import hivens.widget.model.SurfaceId
 
@@ -42,9 +44,11 @@ private const val SURFACE = "theme.picker"
 // theme.picker surface composable. AppLayout routes Screen.ThemePicker here. Puts the
 // pending choice over its page for the child widgets and lays out two slots side by
 // side (grid and preview). The title and Apply are surface chrome rather than
-// widgets: without them the screen loses its whole purpose.
+// widgets: without them the screen loses its whole purpose. Apply puts the choice in
+// use and leaves the picker.
 @Composable
-fun ThemePickerSurface(library: ThemeLibrary) {
+fun ThemePickerSurface() {
+    val library = rememberScopedSource(Sources.ThemeLibrary).valueOrNull() ?: return
     val s = LocalStrings.current
     val themes = library.all
     // Keyless remember: the pending selection survives an outside change of the
@@ -52,10 +56,18 @@ fun ThemePickerSurface(library: ThemeLibrary) {
     val selected = remember { ThemeSelection(library.active) }
     val apply = rememberScopedCommand(Commands.ApplyTheme)
     val back = rememberScopedAction(Commands.Back)
+    // Leaves only once the choice is in use: with nothing to apply it, Apply does
+    // nothing at all rather than walk away from a choice that did not land.
+    val applyAndLeave: () -> Unit = {
+        if (apply != null) {
+            apply(selected.theme.id)
+            back?.invoke()
+        }
+    }
 
     PuppetScreen("ThemePicker")
     PuppetClick("themePicker.back") { back?.invoke() }
-    PuppetClick("themePicker.apply") { apply?.invoke(selected.theme.id) }
+    PuppetClick("themePicker.apply") { applyAndLeave() }
     themes.forEach { theme ->
         PuppetClick("themePicker.select.${theme.id}") { selected.theme = theme }
     }
@@ -83,7 +95,7 @@ fun ThemePickerSurface(library: ThemeLibrary) {
                     Flexible("theme_picker_apply_btn", FlexibleKind.Button) {
                         NxButton(
                             label = s.themePickerApply,
-                            onClick = { apply?.invoke(selected.theme.id) },
+                            onClick = applyAndLeave,
                             style = NxButtonStyle.Primary,
                         )
                     }

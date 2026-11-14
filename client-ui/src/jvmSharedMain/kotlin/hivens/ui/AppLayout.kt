@@ -9,7 +9,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import hivens.core.data.SessionData
 import hivens.core.data.ThemeMode
 import hivens.ui.background.BackgroundSettings
 import hivens.ui.chrome.LocalWindowClass
@@ -17,7 +16,7 @@ import hivens.ui.chrome.rememberWindowClass
 import hivens.ui.background.hasUsableImage
 import hivens.ui.customization.CustomizationSettings
 import hivens.ui.editor.EditorSurfaceHost
-import hivens.ui.i18n.AppLocale
+import hivens.ui.i18n.LocalAppLocale
 import androidx.compose.runtime.saveable.SaveableStateHolder
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import hivens.ui.nx.NxSwap
@@ -37,7 +36,6 @@ import hivens.ui.theme.ThemeLibrary
 import hivens.ui.theme.Plane
 import hivens.ui.theme.Backdrop
 import hivens.ui.theme.LocalPlane
-import hivens.ui.utils.GameConsoleService
 import hivens.ui.utils.releaseFocusOnPress
 import hivens.ui.widgets.about.AboutSurface
 import hivens.ui.widgets.bgsettings.BgSettingsSurface
@@ -51,7 +49,6 @@ import hivens.ui.feature.catalogue.project.rememberNavigatingLinkFollower
 import hivens.ui.feature.catalogue.project.ModVersionScreen
 import hivens.ui.screens.custom.CustomScreen
 import hivens.ui.navigation.NavState
-import hivens.ui.widgets.ChildLevel
 import hivens.ui.widgets.Commands
 import hivens.ui.widgets.LevelHost
 import hivens.ui.widgets.MisplacedWidget
@@ -64,6 +61,9 @@ import hivens.widget.api.ProvideScoped
 import hivens.widget.api.ProvideScopedCommand
 import hivens.widget.api.SlotRenderer
 import hivens.widget.api.rememberLatestCommand
+import hivens.widget.api.rememberScopedCommand
+import hivens.widget.api.rememberScopedSource
+import hivens.widget.api.valueOrNull
 import hivens.widget.model.ScopeLevel
 import hivens.widget.model.SlotId
 import hivens.widget.model.SurfaceId
@@ -87,17 +87,6 @@ fun AppLayout(
     trail: List<Screen>,
     history: List<Screen> = trail,
     onPopTo: (Screen) -> Unit,
-    onLogin: (SessionData) -> Unit,
-    onLogout: () -> Unit,
-    isDarkTheme: Boolean,
-    onToggleDarkTheme: () -> Unit,
-    themeMode: ThemeMode = ThemeMode.Manual,
-    onThemeModeChanged: (ThemeMode) -> Unit = {},
-    systemThemeAvailable: Boolean = false,
-    themeLibrary: ThemeLibrary,
-    onThemeSelected: (String) -> Unit,
-    currentLocale: AppLocale,
-    onLocaleChanged: (AppLocale) -> Unit,
     backgroundSettings: BackgroundSettings = BackgroundSettings(),
     onBackgroundSettingsChanged: (BackgroundSettings.() -> BackgroundSettings) -> Unit = {},
     customization: CustomizationSettings = CustomizationSettings(),
@@ -105,6 +94,18 @@ fun AppLayout(
 ) {
     val windowClass = rememberWindowClass()
     val browse: BrowseController = koinInject()
+
+    // How the composition looks and speaks, read and changed the way a widget does,
+    // for the screens that still take it as arguments.
+    val isDarkTheme = rememberScopedSource(Sources.DarkTheme).valueOrNull() ?: true
+    val themeMode = rememberScopedSource(Sources.ThemeMode).valueOrNull() ?: ThemeMode.Manual
+    val systemThemeAvailable = rememberScopedSource(Sources.SystemSchemeAvailable).valueOrNull() ?: false
+    val themeLibrary = rememberScopedSource(Sources.ThemeLibrary).valueOrNull() ?: ThemeLibrary()
+    val currentLocale = rememberScopedSource(Sources.Locale).valueOrNull() ?: LocalAppLocale.current
+    val setDark = rememberScopedCommand(Commands.SetDarkTheme)
+    val onToggleDarkTheme: () -> Unit = { setDark?.invoke(!isDarkTheme) }
+    val onThemeModeChanged = rememberScopedCommand(Commands.SetThemeMode) ?: {}
+    val onLocaleChanged = rememberScopedCommand(Commands.SetLocale) ?: {}
 
     // Whoever signs in reports it upward, and the shell's own state is what comes
     // back down here -- so this is derived rather than held. It used to be a var
@@ -167,7 +168,7 @@ fun AppLayout(
                             onOpenAbout                  = { onScreenChange(Screen.About) },
                         )
 
-                    Screen.ThemePicker -> ThemePickerSurface(library = themeLibrary)
+                    Screen.ThemePicker -> ThemePickerSurface()
 
                     Screen.About ->
                         AboutSurface(onBack = onBack)
@@ -260,29 +261,20 @@ fun AppLayout(
         }
     } // end centerBody
 
-    // The composition's level, around everything it draws, the editor included.
-    ChildLevel(ScopeLevel.Composition) {
-    // What this composition's widgets read and fire: its history, who it is signed in
-    // as, the themes it draws with. Put over its level around the editor too, so a
-    // widget the palette draws reads the same answers as one on a surface, and a
-    // widget anywhere in the shell finds them, where a context provided by one screen
-    // pinned its widgets to that screen.
+    // What this composition's widgets fire to move its history and read of where it
+    // stands, put over the composition's level, which AppRoot made around everything
+    // it draws. Around the editor too, so a widget the palette draws reads the same
+    // answers as one on a surface, and a widget anywhere in the shell finds them,
+    // where a context provided by one screen pinned its widgets to that screen.
+    // Everything else a widget reads here, the session and the appearance among it,
+    // the level makes for itself.
     ProvideComposition(
         nav          = NavState(currentScreen, trail, canGoBack, canGoForward),
-        appState     = appState,
-        themeLibrary = themeLibrary,
-        isDarkTheme  = isDarkTheme,
         navigate     = onScreenChange,
         switchTab    = onSwitchTab,
         back         = onBack,
         forward      = onForward,
         popTo        = onPopTo,
-        signIn       = onLogin,
-        signOut      = onLogout,
-        applyTheme   = { id ->
-            onThemeSelected(id)
-            onBack()
-        },
     ) {
     // The editor host wraps the WHOLE shell (rails included) so its decorators
     // reach rail widgets; it puts its own chrome back over the content pane from
@@ -313,14 +305,13 @@ fun AppLayout(
         }
     }
     } // end ProvideComposition
-    } // end ChildLevel(Composition)
 }
 
 /**
- * Puts the composition's own sources and commands over its level for [content]:
- * the keys [Sources] and [Commands] declare at the composition level. Each command is
- * one object for the composition's life that runs the latest lambda it was handed,
- * so a reader does not recompose because the shell did.
+ * Puts the composition's history over its level for [content]: where it stands
+ * and the commands that move it, the keys only the owner of the history can answer.
+ * Each command is one object for the composition's life that runs the latest
+ * lambda it was handed, so a reader does not recompose because the shell did.
  *
  * Widgets that cannot stand without one of them draw the placeholder for a widget
  * that stands where something it reads has no answer, which is also put here.
@@ -328,17 +319,11 @@ fun AppLayout(
 @Composable
 private fun ProvideComposition(
     nav: NavState,
-    appState: AppState,
-    themeLibrary: ThemeLibrary,
-    isDarkTheme: Boolean,
     navigate: (Screen) -> Unit,
     switchTab: (Screen) -> Unit,
     back: () -> Unit,
     forward: () -> Unit,
     popTo: (Screen) -> Unit,
-    signIn: (SessionData) -> Unit,
-    signOut: () -> Unit,
-    applyTheme: (String) -> Unit,
     content: @Composable () -> Unit,
 ) {
     val navigateCommand = rememberLatestCommand(navigate)
@@ -346,28 +331,13 @@ private fun ProvideComposition(
     val backCommand = rememberLatestCommand<Unit> { back() }
     val forwardCommand = rememberLatestCommand<Unit> { forward() }
     val popToCommand = rememberLatestCommand(popTo)
-    val signInCommand = rememberLatestCommand(signIn)
-    val signOutCommand = rememberLatestCommand<Unit> { signOut() }
-    val applyThemeCommand = rememberLatestCommand(applyTheme)
     ProvideScoped(Sources.Navigation, nav) {
-    ProvideScoped(Sources.Session, appState) {
-    ProvideScoped(Sources.ThemeLibrary, themeLibrary) {
-    ProvideScoped(Sources.DarkTheme, isDarkTheme) {
     ProvideScopedCommand(Commands.Navigate, navigateCommand) {
     ProvideScopedCommand(Commands.SwitchTab, switchTabCommand) {
     ProvideScopedCommand(Commands.Back, backCommand) {
     ProvideScopedCommand(Commands.Forward, forwardCommand) {
     ProvideScopedCommand(Commands.PopTo, popToCommand) {
-    ProvideScopedCommand(Commands.SignIn, signInCommand) {
-    ProvideScopedCommand(Commands.SignOut, signOutCommand) {
-    ProvideScopedCommand(Commands.ApplyTheme, applyThemeCommand) {
         CompositionLocalProvider(LocalMisplacedWidget provides MisplacedWidget, content = content)
-    }
-    }
-    }
-    }
-    }
-    }
     }
     }
     }
@@ -407,7 +377,8 @@ fun AppSidebar(
     onLogout: () -> Unit,
     modifier: Modifier = Modifier.width(64.dp).fillMaxHeight(),
 ) {
-    val gameConsole: GameConsoleService = koinInject()
+    val consoleVisible = rememberScopedSource(Sources.ConsoleVisible).valueOrNull() == true
+    val setConsoleVisible = rememberScopedCommand(Commands.SetConsoleVisible)
 
     // Puppet: sidebar navigation. Direct onScreenChange calls keep
     // test runs deterministic regardless of the AprilFools chaos
@@ -419,10 +390,7 @@ fun AppSidebar(
     PuppetClick("nav.wardrobe") { onSwitchTab(Screen.Wardrobe) }
     PuppetClick("nav.settings") { onSwitchTab(Screen.Settings) }
     PuppetClick("nav.about")    { onSwitchTab(Screen.About) }
-    PuppetClick("nav.console")  {
-        if (gameConsole.shouldShowConsole) gameConsole.hide()
-        else gameConsole.show()
-    }
+    PuppetClick("nav.console")  { setConsoleVisible?.invoke(!consoleVisible) }
     if (isAuthenticated) {
         PuppetClick("nav.logout") { onLogout() }
     }

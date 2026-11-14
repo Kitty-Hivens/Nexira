@@ -42,6 +42,7 @@ import hivens.core.data.releasingFace
 import hivens.core.data.SessionData
 import hivens.auth.AccountStore
 import hivens.ui.LoginPanel
+import hivens.ui.components.rememberSignOutRequest
 import hivens.ui.flexible.Flexible
 import hivens.ui.flexible.FlexibleKind
 import hivens.ui.nx.NxButton
@@ -133,7 +134,9 @@ fun ProfileAccountSectionWidget() {
 @Composable
 private fun SmartyCraftAccount(session: SessionData, onChanged: () -> Unit) {
     val signIn = rememberScopedCommand(Commands.SignIn) ?: return
-    val signOutAll = rememberScopedAction(Commands.SignOut) ?: return
+    // A full sign-out asks first, through the window's sign-out question, which
+    // stays open when this section leaves once its account is gone.
+    val signOutAll = rememberSignOutRequest() ?: return
     val credentials: AccountStore = koinInject()
     val settingsService: ISettingsService = koinInject()
     val s = LocalStrings.current

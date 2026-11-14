@@ -3,6 +3,8 @@ package hivens.ui.notifications
 import hivens.core.launch.LaunchControlMode
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import java.util.concurrent.ConcurrentHashMap
 
 // Per-pack launch-state flows created lazily and cached; never shrinks (bounded
@@ -40,6 +42,15 @@ class IndicationCenter {
     private val launchFlows: ConcurrentHashMap<String, MutableStateFlow<LaunchIndication?>> =
         ConcurrentHashMap()
 
+    private val _launches = MutableStateFlow<Map<String, LaunchIndication>>(emptyMap())
+
+    /**
+     * Every pack with a launch in flight and where it stands, the same values the
+     * per-pack flows carry. A pack with nothing in flight is absent. For a reader
+     * that lists packs and would otherwise collect one flow per row.
+     */
+    val launches: StateFlow<Map<String, LaunchIndication>> = _launches.asStateFlow()
+
     /** The same instance for the same pack, every call: a reader collects it
      *  directly and a fresh wrapper per call would re-subscribe per recomposition. */
     fun launchIndication(packInstanceId: String): StateFlow<LaunchIndication?> =
@@ -47,5 +58,6 @@ class IndicationCenter {
 
     fun setLaunchIndication(packInstanceId: String, value: LaunchIndication?) {
         launchFlows.computeIfAbsent(packInstanceId) { MutableStateFlow(null) }.value = value
+        _launches.update { all -> if (value == null) all - packInstanceId else all + (packInstanceId to value) }
     }
 }

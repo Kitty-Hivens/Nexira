@@ -71,7 +71,7 @@ data class ContinueProps(
     surface = """{"fill":"panel"}""",
     minWidth = 280, minHeight = 160,
     maxWidth = 2400, maxHeight = 640,
-    needs = ["app.state", "nav.open"],
+    needs = ["app.state", "nav.open", "packs.library", "pack.launch"],
 )
 @Composable
 fun HomeNewContinue(instance: WidgetInstance) {

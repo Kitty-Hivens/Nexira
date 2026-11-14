@@ -25,12 +25,11 @@ import hivens.core.update.PackUpdateStatusHub
 import hivens.core.update.PackUpdater
 import hivens.core.update.UpdateCheck
 import hivens.core.update.UpdateDirection
-import hivens.core.update.UpdateOutcome
 import hivens.core.update.VersionChannel
 import hivens.launcher.PackOperation
-import hivens.launcher.PackOperationKind
 import hivens.launcher.PackOperationPhase
-import hivens.launcher.PackOperationService
+import hivens.ui.widgets.Commands
+import hivens.widget.api.rememberScopedCommand
 import hivens.ui.components.ChannelChip
 import hivens.ui.components.formatBuildTimestamp
 import hivens.ui.components.rememberRunningPackGuard
@@ -77,7 +76,7 @@ internal fun PackVersionSection(
     val updater: PackUpdater = koinInject()
     val mirror: IMirrorPackClient = koinInject()
     val hub: PackUpdateStatusHub = koinInject()
-    val operations: PackOperationService = koinInject()
+    val updatePack = rememberScopedCommand(Commands.UpdatePack)
     // A check is cheap and belongs to the window; an apply outlives it and is the
     // registry's. See applyLatest.
     val scope = rememberCoroutineScope()
@@ -154,17 +153,9 @@ internal fun PackVersionSection(
         // run (it is blocking, so cancellation cannot stop it) and the files come
         // back, but the user is left with an update that silently did not happen
         // and a snapshot nobody cleans up. The same lesson is already written down
-        // on LauncherController.setOptionalModsAsync.
-        operations.start(pack, PackOperationKind.Update) { progress ->
-            val outcome = updater.applyUpdate(pack, null) { c, t, p ->
-                progress(c, t, p.substringAfterLast('/'))
-            }
-            // Reported from inside the operation, not from the section: the badges
-            // this feeds have to agree with reality whether or not the window that
-            // started the apply is still open.
-            hub.report(pack.id, PackUpdateStatus.UpToDate)
-            PackOperationPhase.Updated((outcome as? UpdateOutcome.Applied)?.toVersion ?: current)
-        }
+        // on LauncherController.setOptionalModsAsync. The pack command does exactly
+        // that, the same as from any other widget.
+        updatePack?.invoke(pack.id)
     }
 
     NxSettingGroup(s.packVersionSection) {

@@ -42,6 +42,7 @@ data class QuickLaunchProps(
     displayName = "widget.home.new.quicklaunch",
     propsClass = QuickLaunchProps::class,
     surface = """{"fill":"panel","padding":{"top":12.0}}""",
+    needs = ["app.state", "packs.library", "pack.launch"],
 )
 @Composable
 fun HomeNewQuickLaunch(instance: WidgetInstance) {

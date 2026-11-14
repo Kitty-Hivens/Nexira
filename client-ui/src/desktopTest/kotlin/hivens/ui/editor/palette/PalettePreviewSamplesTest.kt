@@ -6,12 +6,17 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
+import hivens.core.api.interfaces.ISettingsService
+import hivens.core.data.SettingsData
+import hivens.ui.appearance.AppearanceStore
 import hivens.ui.background.BackgroundSettings
 import hivens.ui.i18n.AppLocale
 import hivens.ui.i18n.LocaleProvider
 import hivens.ui.onEventThread
 import hivens.ui.theme.NxTheme
+import hivens.ui.theme.ThemeManager
 import hivens.ui.uiCommandRegistry
+import hivens.ui.utils.PreferenceWriter
 import hivens.ui.uiDataRegistry
 import hivens.ui.widgets.ChildLevel
 import hivens.ui.widgets.KoinLevelServicesHost
@@ -32,11 +37,17 @@ import hivens.widget.generated.GeneratedWidgetRegistry
 import hivens.widget.model.DefaultLayout
 import hivens.widget.model.ScopeLevel
 import hivens.widget.model.WidgetKind
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
 import org.koin.dsl.koinApplication
 import org.koin.dsl.module
+import java.nio.file.Files
+import java.nio.file.Path
+import kotlin.io.path.ExperimentalPathApi
+import kotlin.io.path.deleteRecursively
+import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertIs
 
@@ -59,6 +70,33 @@ class PalettePreviewSamplesTest {
 
     private val commands = uiCommandRegistry({}, {}, {}, {})
 
+    /**
+     * What the composition's level reads the theme keys from, the way the launcher's
+     * does: they are the composition's own and answered wherever it is, so only the
+     * page's keys are left for the samples to stand in for.
+     */
+    private val themes: Path = Files.createTempDirectory("palette-preview-samples")
+
+    @OptIn(ExperimentalPathApi::class)
+    @AfterTest
+    fun tearDown() {
+        themes.deleteRecursively()
+    }
+
+    private val appearance = AppearanceStore(
+        settings    = object : ISettingsService {
+            private var current = SettingsData()
+            override fun getSettings(): SettingsData = current
+            override fun saveSettings(settings: SettingsData) {
+                current = settings
+            }
+        },
+        preferences = PreferenceWriter("palette-preview-samples-test"),
+        themes      = ThemeManager(themes) { _, _ -> },
+        contributed = MutableStateFlow(emptyList()),
+        scope       = CoroutineScope(Dispatchers.Unconfined),
+    )
+
     /** The theme picker's keys as declared before they had samples. */
     private val bare = WidgetDataRegistry().apply {
         declare(Sources.ThemeLibrary)
@@ -69,7 +107,12 @@ class PalettePreviewSamplesTest {
     /** What the gallery makes of [kind], drawn the way the palette draws it, under a composition like the editor's. */
     private fun previewOf(kind: String, data: WidgetDataRegistry, commands: WidgetCommandRegistry): WidgetPreview {
         val app: WidgetScope = koinApplication {
-            modules(module { single { WidgetScope.app(data, KoinLevelServicesHost.app(this), Dispatchers.Unconfined, commands) } })
+            modules(
+                module {
+                    single { appearance }
+                    single { WidgetScope.app(data, KoinLevelServicesHost.app(this), Dispatchers.Unconfined, commands) }
+                },
+            )
         }.koin.get()
         val widget = WidgetKind(kind)
         return onEventThread {

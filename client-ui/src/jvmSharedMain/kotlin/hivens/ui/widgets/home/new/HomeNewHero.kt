@@ -80,7 +80,7 @@ data class HeroProps(
     propsClass = HeroProps::class,
     minWidth = 280, minHeight = 140,
     maxWidth = 1600, maxHeight = 640,
-    needs = ["app.state", "nav.open"],
+    needs = ["app.state", "nav.open", "packs.library", "pack.launch"],
 )
 @Composable
 fun HomeNewHero(instance: WidgetInstance) {

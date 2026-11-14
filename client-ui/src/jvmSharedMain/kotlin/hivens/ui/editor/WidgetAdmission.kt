@@ -20,8 +20,9 @@ import hivens.widget.model.WidgetKind
  * - A key of the app or of a window answers on every surface, because every surface
  *   is drawn in a window.
  * - A key of the composition answers on every surface too. The editor arranges the
- *   surfaces of the one composition it is part of, and that composition's owner
- *   provides every composition key it declares, around the editor as well.
+ *   surfaces of the one composition it is part of, and every composition key is
+ *   there around the editor as well, made by the composition's level or provided
+ *   by its owner.
  * - A key of a page answers only on a surface drawn in a page, which a screen's own
  *   surface is and a shell surface is not. There a key a factory makes is on every
  *   page, and one a page's owner hands it is only on the surfaces whose screen does

@@ -6,6 +6,15 @@ public final class hivens/widget/api/CompositeWidgetRegistry : hivens/widget/api
 	public final fun getShadowed ()Ljava/util/List;
 }
 
+public abstract interface class hivens/widget/api/FactoryFailures {
+	public static final field Companion Lhivens/widget/api/FactoryFailures$Companion;
+	public abstract fun failed (Ljava/lang/String;Lhivens/widget/model/ScopeLevel;Ljava/lang/Exception;)V
+}
+
+public final class hivens/widget/api/FactoryFailures$Companion {
+	public final fun getNone ()Lhivens/widget/api/FactoryFailures;
+}
+
 public final class hivens/widget/api/GridGeometry {
 	public static final field $stable I
 	public fun <init> (FFIZ)V
@@ -597,8 +606,8 @@ public final class hivens/widget/api/WidgetScope : hivens/widget/api/LevelContex
 }
 
 public final class hivens/widget/api/WidgetScope$Companion {
-	public final fun app (Lhivens/widget/api/WidgetDataRegistry;Lhivens/widget/api/LevelServicesHost;Lkotlin/coroutines/CoroutineContext;Lhivens/widget/api/WidgetCommandRegistry;)Lhivens/widget/api/WidgetScope;
-	public static synthetic fun app$default (Lhivens/widget/api/WidgetScope$Companion;Lhivens/widget/api/WidgetDataRegistry;Lhivens/widget/api/LevelServicesHost;Lkotlin/coroutines/CoroutineContext;Lhivens/widget/api/WidgetCommandRegistry;ILjava/lang/Object;)Lhivens/widget/api/WidgetScope;
+	public final fun app (Lhivens/widget/api/WidgetDataRegistry;Lhivens/widget/api/LevelServicesHost;Lkotlin/coroutines/CoroutineContext;Lhivens/widget/api/WidgetCommandRegistry;Lhivens/widget/api/FactoryFailures;)Lhivens/widget/api/WidgetScope;
+	public static synthetic fun app$default (Lhivens/widget/api/WidgetScope$Companion;Lhivens/widget/api/WidgetDataRegistry;Lhivens/widget/api/LevelServicesHost;Lkotlin/coroutines/CoroutineContext;Lhivens/widget/api/WidgetCommandRegistry;Lhivens/widget/api/FactoryFailures;ILjava/lang/Object;)Lhivens/widget/api/WidgetScope;
 }
 
 public final class hivens/widget/api/WidgetScopeHelpersKt {

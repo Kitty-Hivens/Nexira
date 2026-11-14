@@ -82,7 +82,6 @@ class ScopedKeysTest {
         register(SourceKey<String>("test.app"), flowSource(MutableStateFlow("app")))
         registerFactory(ProfileSelectionSource) { flowSource(MutableStateFlow(ProfileSelection())) }
         declare(Sources.Navigation)
-        declare(Sources.Session)
         declare(SourceKey<String>("test.page.owned", ScopeLevel.Page))
     }
 

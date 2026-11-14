@@ -23,8 +23,11 @@ fun <P> suspendCommand(scope: CoroutineScope, block: suspend (P) -> Unit): Widge
 /**
  * Binds a widget to a command by [key] and returns a dispatcher: the widget says
  * what it wants to happen, not which service does it. Memoized on the id. Errors
- * if the key is unregistered -- a command is app-static, so a miss is a wiring
- * bug, the same contract as [rememberSource].
+ * on dispatch if nothing answers the key: an app command is always there, so a
+ * miss is a wiring bug, the same contract as [rememberSource].
+ *
+ * Answered the way [rememberSource] answers an app source: the registry's command,
+ * or else the one the app level makes from the registry's factory for the key.
  *
  * App keys only, for the reason [rememberSource] takes only those: a command of
  * another level can be missing where a widget stands, and [rememberScopedCommand]
@@ -34,7 +37,8 @@ fun <P> suspendCommand(scope: CoroutineScope, block: suspend (P) -> Unit): Widge
 fun <P> rememberCommand(key: CommandKey<P>): (P) -> Unit {
     requireApp(key)
     val registry = LocalWidgetCommandRegistry.current
-    return remember(key.id) { { payload: P -> registry.dispatch(key, payload) } }
+    val scope = LocalScope.current
+    return remember(key.id, registry, scope) { { payload: P -> appCommand(key, registry, scope).run(payload) } }
 }
 
 /**
@@ -47,8 +51,13 @@ fun <P> rememberCommand(key: CommandKey<P>): (P) -> Unit {
 fun rememberAction(key: CommandKey<Unit>): () -> Unit {
     requireApp(key)
     val registry = LocalWidgetCommandRegistry.current
-    return remember(key.id) { { registry.dispatch(key) } }
+    val scope = LocalScope.current
+    return remember(key.id, registry, scope) { { appCommand(key, registry, scope).run(Unit) } }
 }
+
+/** What answers the app command [key] at the moment it is fired. Throws when nothing does. */
+private fun <P> appCommand(key: CommandKey<P>, registry: WidgetCommandRegistry, scope: WidgetScope?): WidgetCommand<P> =
+    registry.find(key) ?: scope?.findCommand(key) ?: error("no widget command registered for '${key.id}'")
 
 private fun requireApp(key: CommandKey<*>) {
     require(key.level == ScopeLevel.App) {

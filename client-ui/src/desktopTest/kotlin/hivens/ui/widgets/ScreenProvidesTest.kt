@@ -42,6 +42,7 @@ import hivens.widget.api.LocalSurfaceFamilies
 import hivens.widget.api.LocalWidgetCommandRegistry
 import hivens.widget.api.LocalWidgetDataRegistry
 import hivens.widget.api.LocalWidgetRegistry
+import hivens.widget.api.ProvideScoped
 import hivens.widget.api.SurfaceFamilies
 import hivens.widget.api.WidgetDescriptor
 import hivens.widget.api.WidgetRegistry
@@ -163,7 +164,9 @@ class ScreenProvidesTest {
 
     @Test
     fun `the theme picker hands its widgets what its surface lists`() {
-        val (drew, missed) = probe("theme.picker") { ThemePickerSurface(library = ThemeLibrary()) }
+        // The library is put over the composition rather than read off an appearance
+        // store, which this probe's Koin does not hold.
+        val (drew, missed) = probe("theme.picker") { ProvideScoped(Sources.ThemeLibrary, ThemeLibrary()) { ThemePickerSurface() } }
         assertEquals(emptySet(), missed)
         assertTrue(drew.isNotEmpty())
     }

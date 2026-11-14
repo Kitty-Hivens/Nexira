@@ -24,8 +24,6 @@ import hivens.core.data.ModuleId
 import hivens.core.data.PackAuthRequirement
 import hivens.core.launch.LaunchLogEvent
 import hivens.core.data.ThemeMode
-import hivens.core.data.darkThemeFor
-import hivens.core.data.resolveInitialThemeMode
 import hivens.launcher.legacy.RetiredClientScanner
 import hivens.launcher.update.ApplyRecovery
 import hivens.launcher.update.PackAutoUpdateService
@@ -80,7 +78,7 @@ import hivens.ui.easter.LocalAprilFools
 import hivens.ui.editor.EditModeController
 import hivens.ui.editor.WidgetGraphReconciler
 import hivens.ui.generated.resources.Res
-import hivens.ui.i18n.AppLocale
+import hivens.ui.appearance.AppearanceStore
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.i18n.LocaleProvider
 import hivens.ui.layers.LayerHost
@@ -96,7 +94,6 @@ import hivens.ui.theme.nexiraCjkFamily
 import hivens.ui.theme.SystemTheme
 import hivens.ui.theme.ThemeRevealHost
 import hivens.ui.theme.rememberThemeReveal
-import hivens.ui.theme.ThemeManager
 import hivens.ui.screens.detail.settings.PackSettingsCategory
 import hivens.core.data.PackOrigin
 import hivens.core.data.SessionData
@@ -133,7 +130,6 @@ import hivens.ui.host.WindowOwner
 import hivens.ui.host.WindowRegistry
 import hivens.ui.widgets.WidgetSurface
 import hivens.ui.widgets.modules.WidgetModules
-import hivens.ui.widgets.modules.toThemes
 import hivens.ui.widgets.state.WidgetStateStore
 import hivens.widget.api.LocalWidgetCommandRegistry
 import hivens.widget.api.LocalWidgetDataRegistry
@@ -326,42 +322,27 @@ fun FrameWindowScope.AppShellContent(
         isWindowVisible = true
     }
 
-    var isDarkTheme   by remember { mutableStateOf(settings.isDarkTheme) }
-    // Which source drives dark/light: the manual toggle, the OS scheme, or the
-    // wallpaper's brightness. Both automatic sources write through isDarkTheme (and
-    // persist it), so everything downstream keeps reading one boolean.
-    var themeMode by remember { mutableStateOf(resolveInitialThemeMode(settings)) }
+    // How the launcher looks and speaks lives in the appearance store, which every
+    // composition reads through its sources. The shell draws with the same values
+    // and feeds the store what only a host can see: whether the system's scheme can
+    // be read, what it says, and how bright the wallpaper is. Made here, during the
+    // first composition, so a theme file from a newer build is on record before the
+    // read-only notice below looks.
+    val appearance: AppearanceStore = koinInject()
+    val isDarkTheme by appearance.dark.collectAsState()
+    val themeMode by appearance.mode.collectAsState()
+    val currentLocale by appearance.locale.collectAsState()
     // Whether the OS scheme is readable at all (no portal backend on Linux -> no).
     // Probed once; drives the System chip's enabled state in the theme island.
-    var systemThemeAvailable by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { systemThemeAvailable = withContext(Dispatchers.IO) { SystemTheme.probe() } != null }
-    var wallpaperLuminance by remember { mutableStateOf<Float?>(null) }
-
-    // Applying an automatic source: set the flag and persist it, so the next cold
-    // start opens on what was last observed instead of flashing the old scheme.
-    // darkThemeFor returns null when nothing should change, which keeps a
-    // wallpaper crossfade from writing the settings file on every tick.
-    val applyAutomaticDark: (Boolean?) -> Unit = { wanted ->
-        if (wanted != null) {
-            isDarkTheme = wanted
-            preferences.write("the colour scheme") { settingsService.updateSettings { it.copy(isDarkTheme = wanted) } }
-        }
-    }
-
-    LaunchedEffect(themeMode, wallpaperLuminance) {
-        applyAutomaticDark(darkThemeFor(themeMode, isDarkTheme, wallpaperLuminance = wallpaperLuminance))
+    LaunchedEffect(Unit) {
+        appearance.setSystemSchemeAvailable(withContext(Dispatchers.IO) { SystemTheme.probe() } != null)
     }
     // System mode: follow the OS scheme while the mode is active -- the cold flow
     // (portal signal on Linux, polling fallback) runs only while collected, so the
     // other modes cost nothing.
     LaunchedEffect(themeMode) {
         if (themeMode != ThemeMode.System) return@LaunchedEffect
-        SystemTheme.observe().collect { dark ->
-            applyAutomaticDark(darkThemeFor(themeMode, isDarkTheme, systemDark = dark))
-        }
-    }
-    var currentLocale by remember {
-        mutableStateOf(AppLocale.fromTag(settings.locale))
+        SystemTheme.observe().collect { dark -> appearance.systemSchemeChanged(dark) }
     }
 
     // The chaos engine is a plain singleton rather than a composable, so it is
@@ -678,20 +659,8 @@ fun FrameWindowScope.AppShellContent(
         }
         val packAutoUpdateService: PackAutoUpdateService = koinInject()
         val applyRecovery: ApplyRecovery = koinInject()
-        val themeManager  = remember { ThemeManager(dataDirectory, AtomicFiles::writeString) }
-        var storedThemes  by remember {
-            val loaded = themeManager.load()
-            // The manager decides read-only on its own, in a module that cannot see
-            // the notice registry, so the fact is carried across here. This runs
-            // during composition and the notice above is a LaunchedEffect, which
-            // runs after it, so the ordering holds.
-            if (themeManager.readOnly) NewerBuildData.record(ReadOnlyStore.Theme)
-            mutableStateOf(loaded)
-        }
         // The stored library with the themes the loaded modules bring, which are never stored.
-        val moduleSnapshot by widgetModules.state.collectAsState()
-        val moduleThemes = remember(moduleSnapshot, currentLocale) { moduleSnapshot.themes.toThemes(currentLocale.tag) }
-        val themeLibrary = storedThemes.copy(contributed = moduleThemes)
+        val themeLibrary by appearance.library.collectAsState()
 
         // Customization extension: persisted choices for whether surfaces blur
         // and how the nav rail draws its selection. Provided via
@@ -990,58 +959,9 @@ fun FrameWindowScope.AppShellContent(
                     )
                 } else {
                     AppRoot(
-                        onWallpaperLuminance = { wallpaperLuminance = it },
-                        onWallpaperColours   = { colours ->
-                            // Stored with the selection, so the wallpaper theme opens in
-                            // itself next time. Written only when the picture changed.
-                            if (colours != themeLibrary.wallpaper) {
-                                val library = storedThemes.copy(wallpaper = colours)
-                                storedThemes = library
-                                preferences.write("the wallpaper colours") { themeManager.save(library) }
-                            }
-                        },
                         onRealExit   = quit,
                         onHideToTray = if (tray.canBeReady) {{ isWindowVisible = false }}
                         else null,
-                        isDarkTheme          = isDarkTheme,
-                        onToggleDarkTheme    = {
-                            // An explicit flip always wins: leaving an automatic mode
-                            // drops back to Manual in the same save.
-                            isDarkTheme = !isDarkTheme
-                            themeMode = ThemeMode.Manual
-                            val dark = isDarkTheme
-                            preferences.write("the colour scheme") {
-                                settingsService.updateSettings { it.copy(
-                                    isDarkTheme = dark,
-                                    themeMode = ThemeMode.Manual,
-                                    themeFromWallpaper = false,
-                                ) }
-                            }
-                        },
-                        themeMode = themeMode,
-                        onThemeModeChanged = { mode ->
-                            themeMode = mode
-                            // themeFromWallpaper mirrors the mode so a downgrade to a
-                            // pre-mode build keeps the wallpaper opt-in coherent.
-                            preferences.write("the theme mode") {
-                                settingsService.updateSettings { it.copy(
-                                    themeMode = mode,
-                                    themeFromWallpaper = mode == ThemeMode.Wallpaper,
-                                ) }
-                            }
-                        },
-                        systemThemeAvailable = systemThemeAvailable,
-                        themeLibrary         = themeLibrary,
-                        onThemeSelected      = { id ->
-                            val library = storedThemes.copy(selected = id)
-                            storedThemes = library
-                            preferences.write("the theme") { themeManager.save(library) }
-                        },
-                        currentLocale   = currentLocale,
-                        onLocaleChanged = { newLocale ->
-                            currentLocale = newLocale
-                            preferences.write("the language") { settingsService.updateSettings { it.copy(locale = newLocale.tag) } }
-                        },
                         customization              = customization,
                         onCustomizationChanged     = { newCustomization ->
                             customization = newCustomization

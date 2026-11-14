@@ -6,8 +6,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import hivens.auth.OfflineAuthProvider
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.data.PackInstance
 import hivens.core.launch.InstanceWork
@@ -32,12 +30,11 @@ import hivens.ui.notifications.IndicationCenter
 import hivens.ui.notifications.IndicationCenter.Companion.controlMode
 import hivens.ui.notifications.IndicationCenter.LaunchIndication
 import hivens.ui.nx.PlayTone
-import hivens.ui.notifications.LaunchTarget
-import hivens.ui.notifications.drivers.LaunchDriver
+import hivens.ui.widgets.Commands
+import hivens.widget.api.rememberScopedCommand
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 import java.nio.file.Files
@@ -85,16 +82,17 @@ fun rememberLaunchControl(
     val session = (appState as? AppState.Authenticated)?.session
     val s = LocalStrings.current
     val controller: LauncherController = koinInject()
-    val launchDriver: LaunchDriver = koinInject()
     val indications: IndicationCenter = koinInject()
     val registry: InstanceWorkRegistry = koinInject()
     val settingsService: ISettingsService = koinInject()
-    val offlineProvider: OfflineAuthProvider = koinInject()
     val navRequests: NavRequests = koinInject()
     val paths: PlatformPaths = koinInject()
     val operations: PackOperationService = koinInject()
     val contentUpdater: InstanceContentUpdater = koinInject()
-    val scope = rememberCoroutineScope()
+    // Play and Stop are the pack commands, so a press does here what it does from
+    // any other widget: Play runs as the composition's session, or offline.
+    val launchPack = rememberScopedCommand(Commands.LaunchPack)
+    val stopPack = rememberScopedCommand(Commands.StopPack)
 
     val indication by indications.launchIndication(pack.id).collectAsState()
     val works by registry.current.collectAsState()
@@ -136,21 +134,7 @@ fun rememberLaunchControl(
         )
     }
 
-    val launch: () -> Unit = launch@{
-        if (session != null) {
-            if (controller.launchPackInstance(session, pack)) launchDriver.observe(LaunchTarget(pack))
-            return@launch
-        }
-        // Re-read at the click rather than launched under the name the control was
-        // drawn with: what decides the label can lag by a frame, what the game runs
-        // as cannot.
-        scope.launch {
-            val name = withContext(Dispatchers.IO) { settingsService.getSettings().offlinePlayerName }
-            if (name.isNullOrBlank()) return@launch
-            val offline = withContext(Dispatchers.IO) { offlineProvider.login(name, "", "") }
-            if (controller.launchPackInstance(offline, pack)) launchDriver.observe(LaunchTarget(pack))
-        }
-    }
+    val launch: () -> Unit = { launchPack?.invoke(pack.id) }
 
     // The share of whatever the control is waiting on, where its source counts. An
     // update or repair started from the pack reports files done; a content batch
@@ -168,7 +152,7 @@ fun rememberLaunchControl(
 
     return when {
         mode == LaunchControlMode.Stop -> LaunchControl(
-            mode, null, s.packPlayExit, NxIcon.Stop, PlayTone.Ready, null, onClick = { controller.abort(pack.id) },
+            mode, null, s.packPlayExit, NxIcon.Stop, PlayTone.Ready, null, onClick = { stopPack?.invoke(pack.id) },
         )
         mode == LaunchControlMode.Wait -> LaunchControl(
             mode, null,

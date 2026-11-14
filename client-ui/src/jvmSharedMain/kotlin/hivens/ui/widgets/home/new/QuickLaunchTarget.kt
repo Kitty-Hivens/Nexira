@@ -1,11 +1,8 @@
 package hivens.ui.widgets.home.new
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackInstance
 import hivens.ui.components.LaunchControl
 import hivens.ui.components.rememberLaunchControl
@@ -15,7 +12,6 @@ import hivens.ui.nx.PlayLayout
 import hivens.ui.widgets.Sources
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
-import org.koin.compose.koinInject
 
 /**
  * The pack the home launch widgets offer, and its launch control.
@@ -40,8 +36,7 @@ internal class QuickLaunchTarget(
 @Composable
 internal fun rememberQuickLaunchTarget(playLabel: String? = null): QuickLaunchTarget? {
     val appState = rememberScopedSource(Sources.Session).valueOrNull() ?: return null
-    val repo: IPackRepository = koinInject()
-    val all by remember { repo.observe() }.collectAsState()
+    val all = rememberScopedSource(Sources.PackLibrary).valueOrNull() ?: return null
 
     val target: PackInstance = remember(all) { all.minWithOrNull(RecentFirst) } ?: return null
 

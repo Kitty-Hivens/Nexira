@@ -35,15 +35,10 @@ import androidx.activity.compose.BackHandler
 import hivens.auth.AccountStore
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.data.PackAuthRequirement
-import hivens.core.data.ReadOnlyStore
-import hivens.core.data.ThemeMode
-import hivens.core.data.darkThemeFor
-import hivens.core.data.resolveInitialThemeMode
 import hivens.core.diag.ActionRing
 import hivens.core.io.AtomicFiles
 import hivens.core.launch.LaunchLogEvent
 import hivens.core.launch.LaunchState
-import hivens.core.data.NewerBuildData
 import hivens.launcher.launch.LauncherController
 import hivens.launcher.update.ApplyRecovery
 import hivens.launcher.update.PackAutoUpdateService
@@ -59,7 +54,7 @@ import hivens.ui.debug.IdentityWidgetDecorator
 import hivens.ui.easter.AprilFoolsLoader
 import hivens.ui.easter.LocalAprilFools
 import hivens.ui.editor.WidgetGraphReconciler
-import hivens.ui.i18n.AppLocale
+import hivens.ui.appearance.AppearanceStore
 import hivens.ui.i18n.LocaleProvider
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.layers.DismissOnBack
@@ -73,8 +68,6 @@ import hivens.ui.surface.SurfaceKind
 import hivens.ui.text.needsCjkFace
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.ThemeLibrary
-import hivens.ui.theme.ThemeManager
 import hivens.ui.theme.ThemeRevealHost
 import hivens.ui.theme.nexiraCjkFamily
 import hivens.ui.theme.rememberThemeReveal
@@ -166,23 +159,19 @@ fun AndroidShell() {
         )
     }
 
-    var isDarkTheme by remember { mutableStateOf(settings.isDarkTheme) }
-    var themeMode by remember { mutableStateOf(resolveInitialThemeMode(settings)) }
-    var currentLocale by remember { mutableStateOf(AppLocale.fromTag(settings.locale)) }
+    // How the launcher looks and speaks lives in the appearance store, which every
+    // composition reads through its sources. The shell draws with the same values and
+    // feeds the store the system's scheme, which a phone can always read.
+    val appearance: AppearanceStore = koinInject()
+    remember { appearance.setSystemSchemeAvailable(true) }
+    val isDarkTheme by appearance.dark.collectAsState()
+    val themeMode by appearance.mode.collectAsState()
+    val currentLocale by appearance.locale.collectAsState()
 
-    // Both automatic sources write through isDarkTheme, so everything downstream reads one
-    // boolean. The wallpaper source needs a wallpaper, which a phone does not draw.
+    // The store listens to the source the mode names, so the scheme is handed over
+    // whenever it or the mode changes. AppRoot hands it what the wallpaper shows.
     val systemDark = isSystemInDarkTheme()
-    val applyAutomaticDark: (Boolean?) -> Unit = { wanted ->
-        if (wanted != null) {
-            isDarkTheme = wanted
-            preferences.write("the colour scheme") { settingsService.updateSettings { it.copy(isDarkTheme = wanted) } }
-        }
-    }
-    var wallpaperLuminance by remember { mutableStateOf<Float?>(null) }
-    LaunchedEffect(themeMode, systemDark, wallpaperLuminance) {
-        applyAutomaticDark(darkThemeFor(themeMode, isDarkTheme, systemDark = systemDark, wallpaperLuminance = wallpaperLuminance))
-    }
+    LaunchedEffect(themeMode, systemDark) { appearance.systemSchemeChanged(systemDark) }
 
     LaunchedEffect(Unit) {
         val before = layoutGraphRepo.value()
@@ -233,12 +222,7 @@ fun AndroidShell() {
             val s = LocalStrings.current
             val uiFamily = if (needsCjkFace(s.settingsTitle + s.navLibrary + s.aboutTitle)) nexiraCjkFamily() else null
 
-            val themeManager = remember { ThemeManager(dataDirectory, AtomicFiles::writeString) }
-            var themeLibrary by remember {
-                val loaded = themeManager.load()
-                if (themeManager.readOnly) NewerBuildData.record(ReadOnlyStore.Theme)
-                mutableStateOf(loaded)
-            }
+            val themeLibrary by appearance.library.collectAsState()
             val customizationJson = remember { Json { ignoreUnknownKeys = true; encodeDefaults = true; coerceInputValues = true } }
             val customizationManager = remember { CustomizationManager(dataDirectory, customizationJson, AtomicFiles::writeString) }
             var customization by remember { mutableStateOf(customizationManager.load()) }
@@ -314,46 +298,8 @@ fun AndroidShell() {
                         // content by them (see the shell regions), so nothing is padded out here.
                         Box(Modifier.fillMaxSize().background(NxColor.page)) {
                             AppRoot(
-                                onWallpaperLuminance = { wallpaperLuminance = it },
-                                onWallpaperColours = { colours ->
-                                    // Stored with the selection, so the wallpaper theme opens in
-                                    // itself next time. Written only when the picture changed.
-                                    if (colours != themeLibrary.wallpaper) {
-                                        val library = themeLibrary.copy(wallpaper = colours)
-                                        themeLibrary = library
-                                        preferences.write("the wallpaper colours") { themeManager.save(library) }
-                                    }
-                                },
                                 onRealExit = {},
                                 onHideToTray = null,
-                                isDarkTheme = isDarkTheme,
-                                onToggleDarkTheme = {
-                                    isDarkTheme = !isDarkTheme
-                                    themeMode = ThemeMode.Manual
-                                    val dark = isDarkTheme
-                                    preferences.write("the colour scheme") {
-                                        settingsService.updateSettings { it.copy(isDarkTheme = dark, themeMode = ThemeMode.Manual, themeFromWallpaper = false) }
-                                    }
-                                },
-                                themeMode = themeMode,
-                                onThemeModeChanged = { mode ->
-                                    themeMode = mode
-                                    preferences.write("the theme mode") {
-                                        settingsService.updateSettings { it.copy(themeMode = mode, themeFromWallpaper = mode == ThemeMode.Wallpaper) }
-                                    }
-                                },
-                                systemThemeAvailable = true,
-                                themeLibrary = themeLibrary,
-                                onThemeSelected = { id ->
-                                    val library = themeLibrary.copy(selected = id)
-                                    themeLibrary = library
-                                    preferences.write("the theme") { themeManager.save(library) }
-                                },
-                                currentLocale = currentLocale,
-                                onLocaleChanged = { locale ->
-                                    currentLocale = locale
-                                    preferences.write("the language") { settingsService.updateSettings { it.copy(locale = locale.tag) } }
-                                },
                                 customization = customization,
                                 onCustomizationChanged = { updated ->
                                     customization = updated

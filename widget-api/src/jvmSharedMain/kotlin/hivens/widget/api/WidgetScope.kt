@@ -22,6 +22,26 @@ private val log = LoggerFactory.getLogger("hivens.widget.api.WidgetScope")
 /** How a level makes its own source for a key. Run once per level, the first time the key is read there. */
 typealias SourceFactory<T> = (LevelContext) -> WidgetDataSource<T>
 
+/**
+ * Told when a factory could not make the source or command of an id for a level, so
+ * the key is left missing there and a widget reading it draws as if it stood where
+ * the key has no answer. For the host, which has to make such a failure visible.
+ *
+ * Told once per key and level, and only once the key really is missing: a factory
+ * that failed while another run of it for the same level succeeded is not told.
+ * Called on whichever thread read the key, which may be the composition's, so an
+ * implementation hands anything slow elsewhere and returns at once.
+ */
+fun interface FactoryFailures {
+    /** The factory for [id] could not make it for a level of kind [level], and threw [cause]. */
+    fun failed(id: String, level: ScopeLevel, cause: Exception)
+
+    companion object {
+        /** Hears nothing. */
+        val None: FactoryFailures = FactoryFailures { _, _, _ -> }
+    }
+}
+
 /** What a level hands the factory making a source in it. */
 interface LevelContext {
     /** The kind of level the source is made in. */
@@ -67,7 +87,8 @@ interface LevelContext {
  *
  * Safe to read from any thread. A factory runs outside the level's lock, so it may
  * read other keys of the same level, and one that fails or reads its own key
- * leaves the key missing in this level and says so in the log once.
+ * leaves the key missing in this level and says so once, in the log and to the
+ * tree's [FactoryFailures].
  */
 class WidgetScope private constructor(
     override val level: ScopeLevel,
@@ -76,6 +97,7 @@ class WidgetScope private constructor(
     private val commands: WidgetCommandRegistry,
     private val host: LevelServicesHost,
     context: CoroutineContext,
+    private val failures: FactoryFailures,
 ) : LevelContext, AutoCloseable {
 
     override val services: LevelServices = host.services
@@ -93,6 +115,14 @@ class WidgetScope private constructor(
     // Ids of both kinds, a command's carrying COMMAND_MARK, so a source and a
     // command that share an id fail apart.
     private val failed = HashSet<String>()
+
+    // Runs of a factory under way on this level, and the first failure among the
+    // runs of one key, by the same marked ids. A failure is told only when the last
+    // run ends with nothing stored, so a run that lost to a sibling run that made the
+    // key is not reported as a missing key.
+    private val runs = HashMap<String, Int>()
+
+    private val causes = HashMap<String, Exception>()
 
     private val children = ArrayList<WidgetScope>()
 
@@ -119,7 +149,7 @@ class WidgetScope private constructor(
         synchronized(lock) {
             check(!closed) { "a ${this.level} level that was disposed cannot take a $level level" }
             val own = host.child(level)
-            return WidgetScope(level, this, registry, commands, own, coroutineScope.coroutineContext).also { children += it }
+            return WidgetScope(level, this, registry, commands, own, coroutineScope.coroutineContext, failures).also { children += it }
         }
     }
 
@@ -188,30 +218,65 @@ class WidgetScope private constructor(
             if (closed) return null
             made[key.id]?.let { return it as WidgetDataSource<T> }
             if (key.id in failed) return null
+            runs[key.id] = (runs[key.id] ?: 0) + 1
         }
         val mine = making.get() ?: HashSet<String>().also { making.set(it) }
         if (!mine.add(key.id)) {
-            fail(key, IllegalStateException("the factory for '${key.id}' reads its own key"))
-            return null
+            val cause = IllegalStateException("the factory for '${key.id}' reads its own key")
+            return endRun(key.id, key.id, made, null, cause, "source") as WidgetDataSource<T>?
         }
-        val fresh = try {
+        val fresh: WidgetDataSource<T> = try {
             factory(this)
         } catch (e: Exception) {
-            fail(key, e)
-            return null
+            return endRun(key.id, key.id, made, null, e, "source") as WidgetDataSource<T>?
         } finally {
             mine.remove(key.id)
         }
-        // Another thread may have made one meanwhile. The first one stored is the
-        // answer for the level's whole life, and the other is closed unseen.
-        val kept = synchronized(lock) { if (closed) null else made.getOrPut(key.id) { fresh } }
-        if (kept !== fresh && fresh is AutoCloseable) fresh.closeLogged("a duplicate source for '${key.id}'")
-        return kept as WidgetDataSource<T>?
+        return endRun(key.id, key.id, made, fresh, null, "source") as WidgetDataSource<T>?
     }
 
-    private fun fail(key: SourceKey<*>, cause: Exception) {
-        val first = synchronized(lock) { failed.add(key.id) }
-        if (first) log.error("No source for '{}' in a {} level: its factory failed", key.id, level, cause)
+    /**
+     * Ends one run of the factory for [id], counted under [marked]: [fresh] is what
+     * the run made, or null with [cause] when it threw. Answers what the level holds
+     * for the key afterwards. The first value stored is the answer for the level's
+     * whole life, and one made meanwhile by another thread is closed unseen.
+     *
+     * A failure is logged and told only when the last run under way has ended and
+     * nothing was stored, so a run that failed beside one that made the key says
+     * nothing about a key that works.
+     */
+    private fun <V : Any> endRun(id: String, marked: String, store: HashMap<String, V>, fresh: V?, cause: Exception?, what: String): V? {
+        var report: Exception? = null
+        val kept = synchronized(lock) {
+            val left = (runs[marked] ?: 1) - 1
+            if (left > 0) runs[marked] = left else runs.remove(marked)
+            if (cause != null) causes.putIfAbsent(marked, cause)
+            val kept = when {
+                closed -> null
+                fresh != null -> store.getOrPut(id) { fresh }
+                else -> store[id]
+            }
+            if (left == 0) {
+                val first = causes.remove(marked)
+                if (kept == null && first != null && !closed && failed.add(marked)) report = first
+            }
+            kept
+        }
+        if (fresh != null && kept !== fresh && fresh is AutoCloseable) fresh.closeLogged("a duplicate $what for '$id'")
+        report?.let { e ->
+            log.error("No {} for '{}' in a {} level: its factory failed", what, id, level, e)
+            tell(id, e)
+        }
+        return kept
+    }
+
+    // A listener that throws must not turn a missing key into a failed read.
+    private fun tell(id: String, cause: Exception) {
+        try {
+            failures.failed(id, level, cause)
+        } catch (e: Exception) {
+            log.error("Telling the host that '{}' failed failed itself", id, e)
+        }
     }
 
     override fun <P> findCommand(key: CommandKey<P>): WidgetCommand<P>? = nearest(key.level)?.commandAt(key)
@@ -250,17 +315,14 @@ class WidgetScope private constructor(
             if (closed) return null
             madeCommands[key.id]?.let { return it as WidgetCommand<P> }
             if (marked in failed) return null
+            runs[marked] = (runs[marked] ?: 0) + 1
         }
-        val fresh = try {
+        val fresh: WidgetCommand<P> = try {
             factory(this)
         } catch (e: Exception) {
-            val first = synchronized(lock) { failed.add(marked) }
-            if (first) log.error("No command for '{}' in a {} level: its factory failed", key.id, level, e)
-            return null
+            return endRun(key.id, marked, madeCommands, null, e, "command") as WidgetCommand<P>?
         }
-        val kept = synchronized(lock) { if (closed) null else madeCommands.getOrPut(key.id) { fresh } }
-        if (kept !== fresh && fresh is AutoCloseable) fresh.closeLogged("a duplicate command for '${key.id}'")
-        return kept as WidgetCommand<P>?
+        return endRun(key.id, marked, madeCommands, fresh, null, "command") as WidgetCommand<P>?
     }
 
     /** Where [id] lives and what answers it, as the registries of this tree have it. Sources first. */
@@ -342,14 +404,16 @@ class WidgetScope private constructor(
          * the host's handle for the app, which every level below gets its own from,
          * which the levels keep to themselves and which stays the caller's to close.
          * [context] is the coroutine context every level's coroutines run under, so
-         * cancelling its job stops them all.
+         * cancelling its job stops them all. [failures] hears of every factory in the
+         * tree that could not make what it was asked for.
          */
         fun app(
             registry: WidgetDataRegistry,
             services: LevelServicesHost,
             context: CoroutineContext = Dispatchers.Default,
             commands: WidgetCommandRegistry = WidgetCommandRegistry(),
-        ): WidgetScope = WidgetScope(ScopeLevel.App, null, registry, commands, services, context)
+            failures: FactoryFailures = FactoryFailures.None,
+        ): WidgetScope = WidgetScope(ScopeLevel.App, null, registry, commands, services, context, failures)
     }
 }
 

@@ -21,33 +21,24 @@ import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.annotation.ExperimentalCoilApi
 import coil3.network.NetworkFetcher
 import coil3.network.cachecontrol.CacheControlCacheStrategy
-import hivens.auth.AccountStore
-import hivens.auth.AuthProvider
-import hivens.auth.AuthProviderRegistry
-import hivens.auth.RefreshableAuthProvider
-import hivens.core.api.interfaces.ISettingsService
-import hivens.core.data.PackAuthRequirement
-import hivens.core.data.ThemeMode
-import hivens.core.diag.ActionRing
-import hivens.core.security.SslBypassStore
-import hivens.launcher.bootstrap.AutoLoginCoordinator
+import hivens.ui.appearance.AppearanceStore
 import hivens.ui.background.BackgroundManager
 import hivens.ui.background.BackgroundSettings
-import hivens.ui.components.DestructiveConfirmDialog
+import hivens.ui.components.SignOutPrompt
 import hivens.ui.customization.CustomizationSettings
 import hivens.ui.easter.LocalAprilFools
-import hivens.ui.i18n.AppLocale
-import hivens.ui.i18n.LocalStrings
 import hivens.ui.navigation.NavRequests
 import hivens.ui.notifications.render.NotificationStack
-import hivens.ui.puppet.PuppetClick
 import hivens.ui.theme.NxColor
-import hivens.ui.theme.ThemeLibrary
 import hivens.ui.theme.WallpaperTone
+import hivens.ui.widgets.ChildLevel
+import hivens.ui.widgets.Sources
 import hivens.widget.api.LocalLayoutGraph
+import hivens.widget.api.rememberScopedSource
+import hivens.widget.api.valueOrNull
+import hivens.widget.model.ScopeLevel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import okhttp3.Call
@@ -57,7 +48,6 @@ import hivens.ui.widgets.modules.WidgetLabels
 import hivens.ui.widgets.modules.WidgetModules
 import org.koin.compose.getKoin
 import org.koin.compose.koinInject
-import org.slf4j.LoggerFactory
 import java.nio.file.Path
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -80,35 +70,25 @@ internal expect fun WallpaperLayer(
 /** The image decoders the host adds on top of the common ones. */
 internal expect fun ComponentRegistry.Builder.addPlatformDecoders()
 
+/**
+ * The launcher's interface inside one window: its composition level, the history,
+ * the wallpaper and the layout.
+ *
+ * The composition's level is made here, around everything it draws. Who the
+ * launcher is signed in as and how it looks are read through the sources like any
+ * widget reads them, and what the wallpaper shows is handed to the appearance store,
+ * which decides the dark scheme and the wallpaper theme from it.
+ */
 @Composable
 fun AppRoot(
-    onWallpaperLuminance: (Float?) -> Unit,
-    onWallpaperColours: (List<Int>) -> Unit,
-    isDarkTheme: Boolean,
     onRealExit: () -> Unit,
     onHideToTray: (() -> Unit)?,
-    onToggleDarkTheme: () -> Unit,
-    themeMode: ThemeMode,
-    onThemeModeChanged: (ThemeMode) -> Unit,
-    systemThemeAvailable: Boolean,
-    themeLibrary: ThemeLibrary,
-    onThemeSelected: (String) -> Unit,
-    currentLocale: AppLocale,
-    onLocaleChanged: (AppLocale) -> Unit,
     customization: CustomizationSettings,
     onCustomizationChanged: (CustomizationSettings) -> Unit,
 ) {
-    val credentialsManager: AccountStore = koinInject()
-    val authService: AuthProvider              = koinInject()
-    val settingsService: ISettingsService      = koinInject()
+    val appearance: AppearanceStore            = koinInject()
     val dataDirectory: Path                    = koinInject()
     val json: Json                             = koinInject()
-    val authRegistry: AuthProviderRegistry     = koinInject()
-    val bypassStore: SslBypassStore            = koinInject()
-    // Present only when a Microsoft client id is configured -- the registry holds
-    // the refreshable provider exactly then, so auto-login is gated by its presence.
-    val msaProvider: RefreshableAuthProvider?  =
-        authRegistry.all.filterIsInstance<RefreshableAuthProvider>().firstOrNull()
     // Smartycraft-routed Call.Factory for Coil's image fetcher. The
     // bypass / direct routing rule lives in Modules.kt alongside the
     // same rule for the Ktor HttpClientProvider; both must agree or
@@ -150,37 +130,10 @@ fun AppRoot(
         }
     }
 
-    var appState      by remember { mutableStateOf<AppState>(AppState.Loading) }
     // Navigation history. navigate() pushes detail screens and resets on a
     // top-level destination; back() pops to the actual previous screen instead
     // of a per-screen hardcoded return target.
     val backStack     = remember { NavBackStack(Screen.Home) }
-    var pendingLogout by remember { mutableStateOf(false) }
-    // Clearing every account takes the face choice with it: it names a provider
-    // that no longer has one, and nothing surfaces the setting again until two
-    // accounts are back, so it would decide the face of a session the user set
-    // up long after making it.
-    //
-    // The offline name goes too, whichever identity was fronting the shell. It is
-    // the only record of the offline identity, and startup signs that identity
-    // back in from it when no account is stored, which after this is always: kept
-    // because the face happened to be an online account, it had the next start
-    // sign straight back in under a name the user had just signed out of. The
-    // offline mode switch stays as it is. It says how to play rather than who
-    // plays, and with no name and no account it has nobody to sign in.
-    //
-    // The store is cleared off the UI thread, since every secret it deletes is a
-    // keyring call, and the shell signs out once it has been.
-    val logoutScope = rememberCoroutineScope()
-    val doLogout: () -> Unit = {
-        logoutScope.launch {
-            withContext(Dispatchers.IO) {
-                credentialsManager.clear()
-                settingsService.updateSettings { it.copy(preferredFaceProvider = null, offlinePlayerName = null) }
-            }
-            appState = AppState.Unauthenticated
-        }
-    }
 
     NavigationInputs(backStack)
 
@@ -212,104 +165,6 @@ fun AppRoot(
         withContext(Dispatchers.IO) { backgroundManager.flush() }
     }
 
-    // ── Auto-login with offline mode support ──────────────────────────────
-    // Business logic lives in AutoLoginCoordinator; the Composable maps the
-    // resolution into the local AppState machine. Network-shaped failures
-    // retry on a capped backoff for the app's lifetime (a launcher left open
-    // signs itself in when the network returns); rejections and missing
-    // credentials stop -- looping on those hammers the upstream for nothing.
-    // A bypass policy flip restarts the effect for an immediate fresh attempt
-    // with a reset ladder (the flip is a user action). A manual login racing
-    // the loop wins: the loop re-reads the state each pass, and a pass whose
-    // sign-in was already in flight checks it again once the answer is back.
-    val autoLoginBypasses by bypassStore.bypasses.collectAsState()
-    LaunchedEffect(autoLoginBypasses) {
-        var attempt = 0
-        while (appState !is AppState.Authenticated) {
-            val settings = withContext(Dispatchers.IO) { settingsService.getSettings() }
-            val saved = withContext(Dispatchers.IO) {
-                credentialsManager.primarySession(settings.preferredFaceProvider)
-            }
-            val resolution = withContext(Dispatchers.IO) {
-                AutoLoginCoordinator.resolveSession(
-                    settings     = settings,
-                    saved        = saved,
-                    authService  = authService,
-                    msaProvider  = msaProvider,
-                )
-            }
-            when (resolution) {
-                is AutoLoginCoordinator.Resolution.Success -> {
-                    val session = resolution.session
-                    // A silent MSA refresh rotates the refresh token; persist it so
-                    // the next start uses the fresh one instead of re-spending the
-                    // stored token. A rotation is not a choice of account, so it never
-                    // takes the active slot: it used to, on every start, so "active"
-                    // came to mean whichever account the boot happened to refresh, and
-                    // a manual sign-in that won the race below lost the slot too.
-                    if (session.refreshToken != null && session.refreshToken != saved?.refreshToken) {
-                        withContext(Dispatchers.IO) {
-                            credentialsManager.saveAccount(
-                                session,
-                                PackAuthRequirement.Microsoft.PROVIDER_KEY,
-                                makeActive = false,
-                            )
-                        }
-                    }
-                    // The sign-in that just ran met the 2FA gate, and it is the only
-                    // thing that could have told us. Unpersisted, the coordinator would
-                    // spend another login on the next start -- and each one invalidates
-                    // whatever session the player has in hand.
-                    // The sign-in retired the uid the store holds, and whatever is
-                    // signed later from the stored account, a skin upload among them,
-                    // needs the one it minted.
-                    if (resolution.signedIn) {
-                        withContext(Dispatchers.IO) {
-                            runCatching {
-                                credentialsManager.refreshStored(PackAuthRequirement.SmartyCraft.PROVIDER_KEY, session)
-                            }.onFailure {
-                                LoggerFactory.getLogger("AppShell").warn("Auto-login could not record the refreshed session", it)
-                            }
-                        }
-                    }
-                    if (session.twoFactor && saved?.twoFactor != true) {
-                        withContext(Dispatchers.IO) {
-                            credentialsManager.markTwoFactor(PackAuthRequirement.SmartyCraft.PROVIDER_KEY)
-                        }
-                        ActionRing.record("Auto-login met the second factor: the SmartyCraft account is marked")
-                    }
-                    // The form stays usable while a pass is in flight, so the user may
-                    // have signed in by hand while this one waited on the network.
-                    if (appState is AppState.Authenticated) {
-                        ActionRing.record("Auto-login answered after a manual sign-in; the manual one stays")
-                        return@LaunchedEffect
-                    }
-                    appState = AppState.Authenticated(session)
-                    return@LaunchedEffect
-                }
-                AutoLoginCoordinator.Resolution.NoCredentials,
-                AutoLoginCoordinator.Resolution.Rejected,
-                // The certificate decision belongs to the user. Dropping to the
-                // login form routes them to the prompt that asks for it, which
-                // also grants the bypass and restores silent auto-login from the
-                // next start.
-                AutoLoginCoordinator.Resolution.CertificateUntrusted -> {
-                    appState = AppState.Unauthenticated
-                    return@LaunchedEffect
-                }
-                AutoLoginCoordinator.Resolution.NetworkDown -> {
-                    // The startup spinner covers only the first attempt; after it
-                    // the login form is usable while the loop retries silently.
-                    if (appState is AppState.Loading) appState = AppState.Unauthenticated
-                    val delayMs = AutoLoginCoordinator.retryDelayMs(attempt)
-                    attempt += 1
-                    ActionRing.record("Auto-login: network down, retry #$attempt in ${delayMs / 1000}s")
-                    delay(delayMs.milliseconds)
-                }
-            }
-        }
-    }
-
     // ── Render: background behind layout ──────────────────────────────────
     val mousePos    = remember { mutableStateOf(Offset(0.5f, 0.5f)) }
     val mousePxPos  = remember { mutableStateOf(Offset.Zero) }
@@ -319,7 +174,7 @@ fun AppRoot(
     // wallpaper theme is made of.
     var tone by remember { mutableStateOf(WallpaperTone.NONE) }
 
-    LaunchedEffect(tone.avgLuminance) { onWallpaperLuminance(tone.avgLuminance) }
+    LaunchedEffect(tone.avgLuminance) { appearance.wallpaperLuminanceChanged(tone.avgLuminance) }
 
     // What the person switched on to look through, if a module brought it. Read where the shell does,
     // so an effect switched on or a module switched off takes hold on the next frame.
@@ -329,6 +184,11 @@ fun AppRoot(
     // Names of a module's widgets in the person's language, which the editor panels read.
     val widgetStrings = modules?.state?.collectAsState()?.value?.widgetStrings.orEmpty()
     val widgetLabels = remember(widgetStrings) { WidgetLabels { widgetStrings[it] } }
+    // The composition's level, around everything it draws, the editor included. The
+    // session is read here through the same key a widget reads. Missing, it stays on
+    // Loading, and the failure that left it missing has been said out loud already.
+    ChildLevel(ScopeLevel.Composition) {
+    val appState = rememberScopedSource(Sources.Session).valueOrNull() ?: AppState.Loading
     CompositionLocalProvider(LocalWidgetLabels provides widgetLabels) {
     ScreenEffectHost(
         effects       = effects,
@@ -369,7 +229,7 @@ fun AppRoot(
               mousePosProvider = { mousePos.value },
               // Colours are passed on as reported and not from the initial state, which
               // would clear the stored ones on every start before the picture decoded.
-              onTone           = { tone = it; onWallpaperColours(it.colours) },
+              onTone           = { tone = it; appearance.setWallpaperColours(it.colours) },
               // The one setting a player widget can move while the wallpaper is what
               // its transport is pointed at. Through the same state the appearance
               // panel writes, so the two sliders are one value and the debounce above
@@ -396,17 +256,6 @@ fun AppRoot(
                   trail = backStack.trail,
                   history = backStack.history,
                   onPopTo = backStack::popTo,
-                  onLogin = { session -> appState = AppState.Authenticated(session) },
-                  onLogout = { pendingLogout = true },
-                  isDarkTheme = isDarkTheme,
-                  onToggleDarkTheme = onToggleDarkTheme,
-                  themeMode = themeMode,
-                  onThemeModeChanged = onThemeModeChanged,
-                  systemThemeAvailable = systemThemeAvailable,
-                  themeLibrary = themeLibrary,
-                  onThemeSelected = onThemeSelected,
-                  currentLocale = currentLocale,
-                  onLocaleChanged = onLocaleChanged,
                   backgroundSettings = backgroundSettings,
                   onBackgroundSettingsChanged = { change -> backgroundManager.update(change) },
                   customization              = customization,
@@ -415,22 +264,13 @@ fun AppRoot(
 
               NotificationStack()
 
-              if (pendingLogout) {
-                  val s = LocalStrings.current
-                  DestructiveConfirmDialog(
-                      title        = s.logoutConfirmTitle,
-                      body         = s.logoutConfirmBody,
-                      confirmLabel = s.navLogout,
-                      onConfirm    = doLogout,
-                      onDismiss    = { pendingLogout = false },
-                  )
-              }
-              // Automation bypass for the now two-step logout (request -> confirm).
-              PuppetClick("logout.confirm") { doLogout() }
+              // The window's open sign-out question, asked by whichever widget offered it.
+              SignOutPrompt()
           }
         }
     }
     }
+    } // end ChildLevel(Composition)
 }
 
 /** Experimental in Coil, so the opt-in is kept to this one factory rather than to the whole shell. */

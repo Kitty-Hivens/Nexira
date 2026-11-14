@@ -42,7 +42,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
-import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackInstance
 import hivens.core.update.PackUpdateStatus
 import hivens.core.update.PackUpdateStatusHub
@@ -83,14 +82,13 @@ import org.koin.compose.koinInject
     displayName = "widget.home.new.spines",
     minWidth = 480, minHeight = 240,
     maxWidth = 2400, maxHeight = 1600,
-    needs = ["app.state", "nav.open"],
+    needs = ["app.state", "nav.open", "packs.library", "pack.launch"],
 )
 @Composable
 fun HomeNewSpines() {
     val appState = rememberScopedSource(Sources.Session).valueOrNull() ?: return
     val navigate = rememberScopedCommand(Commands.Navigate) ?: return
-    val repo: IPackRepository = koinInject()
-    val all by remember { repo.observe() }.collectAsState()
+    val all = rememberScopedSource(Sources.PackLibrary).valueOrNull() ?: return
     val packs = remember(all) {
         all.sortedWith(RecentFirst)
     }
