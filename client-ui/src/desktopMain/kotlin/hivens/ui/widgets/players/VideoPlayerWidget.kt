@@ -14,13 +14,19 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import dev.hivens.skinema.compose.VideoScale
@@ -63,12 +69,35 @@ fun VideoPlayerWidget(instance: WidgetInstance) {
     // two views of one viewing rather than two separate starts.
     val handoff = remember(url) { VideoHandoff() }
 
+    // The inline player leaves the composition while the fullscreen one plays, and
+    // its fullscreen button with it, so the keyboard cannot find its way back on its
+    // own: closing the fullscreen player sent it to the first control of the page. It
+    // is handed to the inline player once that is drawn again, if it was there when
+    // the fullscreen one opened.
+    val inlineFocus = remember { FocusRequester() }
+    val focusInside = remember { FocusInside() }
+    var focusBack by remember(url) { mutableStateOf(false) }
+    LaunchedEffect(expanded, focusBack) {
+        if (expanded || !focusBack) return@LaunchedEffect
+        // The cached file is resolved again before the inline player draws, a frame
+        // or a few after the fullscreen one went.
+        repeat(FOCUS_BACK_FRAMES) {
+            withFrameNanos { }
+            if (inlineFocus.requestFocus(FocusDirection.Enter)) {
+                focusBack = false
+                return@LaunchedEffect
+            }
+        }
+        focusBack = false
+    }
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .aspectRatio(16f / 9f)
             .clip(MaterialTheme.shapes.medium)
-            .background(Color.Black),
+            .background(Color.Black)
+            .onFocusChanged { focusInside.value = it.hasFocus },
         contentAlignment = Alignment.Center,
     ) {
         when {
@@ -76,14 +105,17 @@ fun VideoPlayerWidget(instance: WidgetInstance) {
             // While expanded, drop the inline player so only the fullscreen one decodes.
             playing && !expanded -> VideoMedia(
                 url                 = url,
-                modifier            = Modifier.fillMaxSize(),
+                modifier            = Modifier.fillMaxSize().focusRequester(inlineFocus),
                 autoPlay            = true,
                 loop                = false,
                 audio               = true,
                 showControls        = true,
                 scale               = VideoScale.Fit,
                 handoff             = handoff,
-                onRequestFullscreen = { expanded = true },
+                onRequestFullscreen = {
+                    focusBack = focusInside.value
+                    expanded = true
+                },
                 // Stopping the download drops back to the poster, which is where
                 // pressing play again starts from.
                 onCancelled         = { playing = false },
@@ -96,6 +128,14 @@ fun VideoPlayerWidget(instance: WidgetInstance) {
         FullscreenVideoWithHandoff(url = url, handoff = handoff, onDismiss = { expanded = false })
     }
 }
+
+/** Whether the keyboard focus is in the widget, as its last focus event said. */
+private class FocusInside {
+    var value = false
+}
+
+/** How many frames the inline player gets to come back before the focus stops waiting for it. */
+private const val FOCUS_BACK_FRAMES = 30
 
 @Composable
 private fun PlayPoster(onClick: () -> Unit) {

@@ -1,7 +1,12 @@
 package hivens.core.jvm
 
+import java.io.ByteArrayOutputStream
+import java.io.IOException
+import java.io.PrintStream
+import java.nio.file.AccessDeniedException
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -80,6 +85,37 @@ class SystemHardwareTest {
     @Test
     fun `swap total is null when only the header is present`() {
         assertNull(SystemHardware.swapTotalMbFromProcSwaps("Filename\tType\tSize\tUsed\tPriority\n"))
+    }
+
+    // Android's SELinux policy denies /proc/swaps to an app on every read. That is
+    // "unknown", not a failure to throw or to log a stack for.
+    @Test
+    fun `a denied swap read is unknown and logs no warning`() {
+        val logged = stderrOf {
+            assertNull(SystemHardware.swapTotalMbFrom { throw AccessDeniedException("/proc/swaps") })
+            assertNull(SystemHardware.swapTotalMbFrom { throw SecurityException("denied") })
+        }
+        assertFalse("WARN" in logged || "AccessDeniedException" in logged, "a denial was logged as a failure:\n$logged")
+    }
+
+    /** What the test logger, which writes to the standard error stream, printed while [block] ran. */
+    private fun stderrOf(block: () -> Unit): String {
+        val original = System.err
+        val captured = ByteArrayOutputStream()
+        System.setErr(PrintStream(captured, true))
+        try {
+            block()
+        } finally {
+            System.setErr(original)
+        }
+        return captured.toString()
+    }
+
+    @Test
+    fun `a broken or missing swap table is unknown`() {
+        assertNull(SystemHardware.swapTotalMbFrom { throw IOException("gone") })
+        assertNull(SystemHardware.swapTotalMbFrom { null })
+        assertEquals(1024, SystemHardware.swapTotalMbFrom { "Filename\tType\tSize\tUsed\tPriority\n/dev/zram0 partition 1048576 0 100\n" })
     }
 
     @Test

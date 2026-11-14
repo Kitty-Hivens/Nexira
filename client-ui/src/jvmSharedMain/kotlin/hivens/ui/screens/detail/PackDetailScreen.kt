@@ -73,6 +73,7 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
+import hivens.ui.layers.layerTrigger
 import hivens.ui.nx.CenteredProgress
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
@@ -470,6 +471,7 @@ private fun LogSessionPicker(
                 .clip(MaterialTheme.shapes.small)
                 .background(wash)
                 .hoverable(interaction)
+                .layerTrigger()
                 .clickable(interactionSource = interaction, indication = null) { open = true }
                 .padding(horizontal = 8.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -648,9 +650,10 @@ private fun Hero(
     }
 }
 
+/** A round icon button over the hero's banner. It opens the settings sheet and the fullscreen video, so it marks itself for the focus to come back to. */
 @Composable
-private fun HeroAction(icon: IconKey, contentDescription: String?, onClick: () -> Unit) {
-    IconButton(onClick = onClick) {
+internal fun HeroAction(icon: IconKey, contentDescription: String?, onClick: () -> Unit) {
+    IconButton(onClick = onClick, modifier = Modifier.layerTrigger()) {
         Symbol(icon, contentDescription = contentDescription, tint = Color.White)
     }
 }

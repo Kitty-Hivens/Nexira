@@ -95,6 +95,9 @@ internal class LayerScene(
         settle()
     }
 
+    /** [event] to whatever holds the focus and nothing else: no hooks, no back, no frame after it. */
+    fun send(event: KeyEvent): Boolean = scene.sendKeyEvent(event)
+
     /** A whole press of Escape, with Ctrl held when [ctrl]. */
     fun pressEscape(ctrl: Boolean = false) {
         escape(KeyEventType.KeyDown, ctrl)

@@ -1,7 +1,10 @@
 package hivens.ui
 
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.setValue
 
 /**
  * Center-router navigation history. Replaces the launcher's old single
@@ -10,11 +13,19 @@ import androidx.compose.runtime.mutableStateListOf
  *
  * Invariant: the stack is never empty -- entry 0 is always a root.
  *
+ * Back walks the history until it reaches home, the root the stack was made with,
+ * and never further: what happens when it is asked for at home is the composition's
+ * business, which [backsAtRoot] tells it about. Leaving the app is not one of the
+ * answers, whatever host the history lives in.
+ *
  * Resetting belongs to the ACTION, not to the destination. [switchTo] is what the
- * nav rail does: it clears the history and makes the target the new root, because
- * switching tabs is a fresh context rather than an ever-growing push history.
- * [navigate] pushes, so Back unwinds the exact path that opened a screen -- Browse
- * -> pack detail -> installed detail backs out the way it was entered.
+ * nav rail does: the history becomes home and the target, because switching tabs
+ * is a fresh context rather than an ever-growing push history, while back from a
+ * rail section still has somewhere to go. It used to clear everything and make the
+ * target the new root, which left back from Library nowhere to go, and on a phone
+ * a back with nowhere to go took the person out of the launcher. [navigate] pushes, so Back unwinds
+ * the exact path that opened a screen -- Browse -> pack detail -> installed detail
+ * backs out the way it was entered.
  *
  * They used to be one call deciding by a set of destinations, which worked until a
  * screen appeared in both roles. About is a rail entry AND a link inside Settings;
@@ -24,6 +35,10 @@ import androidx.compose.runtime.mutableStateListOf
  */
 @Stable
 class NavBackStack(root: Screen) {
+    // What a rail switch keeps under the screen it opens, so back from any rail
+    // section comes home.
+    private val home = root
+
     private val entries = mutableStateListOf(root)
 
     // Screens popped by back() / popTo(), available to forward(). Cleared by
@@ -54,6 +69,17 @@ class NavBackStack(root: Screen) {
     val canGoForward: Boolean get() = forwardStack.isNotEmpty()
 
     /**
+     * How many times [back] was asked for at the root, where the history had
+     * nowhere left to go. The host never lets such a back take the person out of
+     * the app, so this is how whatever the composition wants to happen there hears
+     * of it: a question
+     * before leaving, say, which watches the count move. Nothing in the default
+     * composition does, and back at the root simply does nothing there.
+     */
+    var backsAtRoot: Int by mutableIntStateOf(0)
+        private set
+
+    /**
      * Go to [screen], keeping the way back. Re-selecting the current screen is a
      * no-op; the forward path is discarded, because moving somewhere new branches
      * off it.
@@ -65,15 +91,17 @@ class NavBackStack(root: Screen) {
     }
 
     /**
-     * Switch to [screen] as a fresh context: history cleared, [screen] the new root.
-     * What the nav rail does, so hopping among its entries cannot pile up a
-     * "Profile > Wardrobe > About > Wardrobe" trail.
+     * Switch to [screen] as a fresh context: the history becomes home and [screen],
+     * or home alone when [screen] is home. What the nav rail does, so hopping among
+     * its entries cannot pile up a "Profile > Wardrobe > About > Wardrobe" trail,
+     * and back from any of them comes home. The forward path is discarded.
      */
     fun switchTo(screen: Screen) {
         forwardStack.clear()
-        if (screen == current && entries.size == 1) return
+        val fresh = if (screen == home) listOf(home) else listOf(home, screen)
+        if (entries.toList() == fresh) return
         entries.clear()
-        entries.add(screen)
+        entries.addAll(fresh)
     }
 
     /**
@@ -86,10 +114,15 @@ class NavBackStack(root: Screen) {
         entries[entries.lastIndex] = screen
     }
 
-    /** Pop one entry onto the forward stack. No-op at the root; returns whether
-     *  anything was popped. */
+    /**
+     * Pop one entry onto the forward stack, returning whether anything was popped.
+     * At the root nothing moves, and the press is counted in [backsAtRoot].
+     */
     fun back(): Boolean {
-        if (entries.size <= 1) return false
+        if (entries.size <= 1) {
+            backsAtRoot++
+            return false
+        }
         forwardStack.add(entries.removeAt(entries.lastIndex))
         return true
     }

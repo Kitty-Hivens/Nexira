@@ -60,6 +60,7 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
+import hivens.ui.layers.layerTrigger
 import hivens.ui.navigation.NavRequests
 import hivens.ui.nx.NxChoiceItem
 import hivens.ui.nx.NxChoiceMenu
@@ -165,6 +166,7 @@ private fun SortPicker(c: BrowseController, wordless: Boolean) {
                 .clip(MaterialTheme.shapes.medium)
                 .background(fill)
                 .hoverable(interaction)
+                .layerTrigger()
                 .clickable(interactionSource = interaction, indication = null) { open = true }
                 .padding(start = 12.dp, end = 8.dp, top = 7.dp, bottom = 7.dp),
             verticalAlignment = Alignment.CenterVertically,

@@ -87,6 +87,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
+import hivens.ui.layers.layerTrigger
 import hivens.ui.theme.Motion
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
@@ -961,6 +962,7 @@ private fun EmbedBlock(el: Element, onLink: (String) -> Unit) {
             .aspectRatio(16f / 9f)
             .clip(MaterialTheme.shapes.small)
             .background(Color.Black)
+            .layerTrigger()
             .clickable { onLink(watch) },
         contentAlignment = Alignment.Center,
     ) {
@@ -1156,6 +1158,7 @@ private fun ImageRunBlock(items: List<ImgItem>, onLink: (String) -> Unit, center
                     .then(
                         if (href != null) Modifier
                             .hoverable(interaction)
+                            .layerTrigger()
                             .clickable(interactionSource = interaction, indication = null) { onLink(href) }
                         else Modifier,
                     ),
@@ -1190,7 +1193,7 @@ private fun ImageRunBlock(items: List<ImgItem>, onLink: (String) -> Unit, center
         for (item in items) {
             val href = item.href
             Box(
-                modifier         = if (href != null) Modifier.clickable { onLink(href) } else Modifier,
+                modifier         = if (href != null) Modifier.layerTrigger().clickable { onLink(href) } else Modifier,
                 contentAlignment = Alignment.Center,
             ) {
                 // Through the same gate a lone image goes through. Reached

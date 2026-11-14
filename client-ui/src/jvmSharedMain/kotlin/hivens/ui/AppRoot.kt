@@ -54,7 +54,11 @@ import kotlin.time.Duration.Companion.milliseconds
 /** The most the image cache keeps on disk before it evicts the least recently used. */
 private const val IMAGE_CACHE_BYTES = 256L * 1024 * 1024
 
-/** Whatever the host feeds into the history besides the screens: thumb buttons on a desktop, the system back gesture on a phone. */
+/**
+ * Whatever the host feeds into the history besides the screens: thumb buttons on a
+ * desktop, the system back gesture on a phone. A back with nowhere to go stays in
+ * the history as [NavBackStack.backsAtRoot] and never reaches the host as a way out.
+ */
 @Composable
 internal expect fun NavigationInputs(backStack: NavBackStack)
 
@@ -130,9 +134,9 @@ fun AppRoot(
         }
     }
 
-    // Navigation history. navigate() pushes detail screens and resets on a
-    // top-level destination; back() pops to the actual previous screen instead
-    // of a per-screen hardcoded return target.
+    // Navigation history, with Home as its home. navigate() pushes, a rail switch
+    // leaves Home and the section, and back() pops to the actual previous screen
+    // instead of a per-screen hardcoded return target. At Home back goes nowhere.
     val backStack     = remember { NavBackStack(Screen.Home) }
 
     NavigationInputs(backStack)
@@ -256,6 +260,7 @@ fun AppRoot(
                   trail = backStack.trail,
                   history = backStack.history,
                   onPopTo = backStack::popTo,
+                  backsAtRoot = backStack.backsAtRoot,
                   backgroundSettings = backgroundSettings,
                   onBackgroundSettingsChanged = { change -> backgroundManager.update(change) },
                   customization              = customization,

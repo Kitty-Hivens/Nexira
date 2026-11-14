@@ -3,10 +3,14 @@ package hivens.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.mandatorySystemGestures
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.tappableElement
 import androidx.compose.foundation.layout.union
@@ -19,19 +23,17 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.foundation.focusable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import hivens.ui.chrome.ShellChord
 import hivens.ui.chrome.resolveShellChord
 import hivens.ui.editor.EditModeController
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
+import hivens.ui.chrome.EscapeAsBack
+import hivens.ui.chrome.keepsFocus
 import hivens.auth.AccountStore
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.data.PackAuthRequirement
@@ -57,7 +59,7 @@ import hivens.ui.editor.WidgetGraphReconciler
 import hivens.ui.appearance.AppearanceStore
 import hivens.ui.i18n.LocaleProvider
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.layers.DismissOnBack
+import hivens.ui.layers.Layer
 import hivens.ui.layers.LayerHost
 import hivens.ui.layers.rememberWindowLayers
 import hivens.ui.layout.LayoutGraphRepository
@@ -109,7 +111,6 @@ import hivens.widget.model.DefaultLayout
 import hivens.widget.model.walkInstances
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import org.koin.compose.koinInject
@@ -263,19 +264,20 @@ fun AndroidShell() {
                 // the theme, as on the desktop: the host belongs to the window, and a layer takes
                 // its theme from where it is opened.
                 val layers = rememberWindowLayers()
-                val focus = remember { FocusRequester() }
-                val refocus = rememberCoroutineScope()
-                LaunchedEffect(Unit) { focus.requestFocus() }
+                // Escape becomes the activity's back here, the path the system's own back
+                // takes: the dismiss stack's handler first, then the history, then the hold.
+                val backDispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
+                val escape = remember(layers, backDispatcher) {
+                    EscapeAsBack(layers.dismiss) { backDispatcher?.onBackPressed() }
+                }
                 // Around the layers rather than inside the window's own content, so a key
                 // from a menu or a dialog that holds the focus passes these hooks as well.
                 Box(
                     Modifier
                         .fillMaxSize()
-                        .focusRequester(focus)
                         // The shell's keys are read here, so they stop when nothing in the
                         // shell holds the focus, as after Escape takes it from a field.
-                        .onFocusChanged { if (!it.hasFocus) refocus.launch { focus.requestFocus() } }
-                        .focusable()
+                        .keepsFocus()
                         .onPreviewKeyEvent { ev ->
                             layers.dismiss.onPreviewKeyEvent(ev)
                             val resolved = resolveShellChord(
@@ -295,8 +297,10 @@ fun AndroidShell() {
                             resolved.consume
                         }
                         // A hardware Escape, after whatever holds the focus has had it and
-                        // before the system turns it into back: a held key's repeats stop here.
-                        .onKeyEvent(layers.dismiss::onKeyEvent),
+                        // before the root of the window takes it for a focus step: made back
+                        // here, as the system never does once the root has taken it. A held
+                        // key's repeats stop here.
+                        .onKeyEvent(escape::onKeyEvent),
                 ) {
                 LayerHost(layers, Modifier.fillMaxSize()) {
                 val themeReveal = rememberThemeReveal()
@@ -322,14 +326,28 @@ fun AndroidShell() {
                             // gets the gesture only when nothing is open.
                             BackHandler(enabled = layers.dismiss.handlesBack) { layers.dismiss.dismissTop() }
 
-                            if (gameConsole.shouldShowConsole) {
-                                DismissOnBack { gameConsole.hide() }
+                            // The console over the whole window, as a modal layer: Escape and back close
+                            // it through the window's stack, and the keyboard goes back to the rail entry
+                            // that opened it. Drawn in place it had nowhere to give the keyboard back to.
+                            Layer(
+                                visible = gameConsole.shouldShowConsole,
+                                modal = true,
+                                onDismissRequest = { gameConsole.hide() },
+                                dismissOnOutsidePress = false,
+                            ) {
                                 val settingsStore: ConsoleSettingsStore = koinInject()
                                 val consoleSettings by settingsStore.settings.collectAsState()
                                 NxSurface(SurfaceKind.Page, Modifier.fillMaxSize()) {
-                                    // Not safeDrawing: a phone on its side reports its camera as a band the height of the
-                                    // screen, and the gesture bar needs nothing kept clear under it.
-                                    Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.statusBars.union(WindowInsets.tappableElement).union(WindowInsets.ime))) {
+                                    // The bars, the gesture bar among them, the strip along the bottom where a swipe is
+                                    // the system's, and the keyboard: the status row at the bottom lay under the gesture
+                                    // bar with its toggle cut off. Not safeDrawing, which also keeps out the cutout, and a
+                                    // phone on its side reports its camera as a band the height of the screen.
+                                    val clear = WindowInsets.statusBars
+                                        .union(WindowInsets.navigationBars)
+                                        .union(WindowInsets.mandatorySystemGestures.only(WindowInsetsSides.Bottom))
+                                        .union(WindowInsets.tappableElement)
+                                        .union(WindowInsets.ime)
+                                    Box(Modifier.fillMaxSize().windowInsetsPadding(clear)) {
                                         ConsoleContent(settings = consoleSettings, onSettingsChange = settingsStore::update)
                                     }
                                 }

@@ -108,4 +108,8 @@ dependencies {
     // The probe wants the shared code's own logging in logcat: slf4j has no binding on
     // Android, and this one writes to System.err, which logcat carries.
     implementation(libs.slf4j.simple)
+
+    // Local tests on the JVM, for what the activity does that needs no device. The
+    // JUnit 4 flavour, the runner the Android plugin's unit tests use.
+    testImplementation(kotlin("test-junit"))
 }

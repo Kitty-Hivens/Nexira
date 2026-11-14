@@ -1,5 +1,6 @@
 package hivens.ui.layers
 
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
@@ -16,6 +17,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
@@ -358,14 +360,83 @@ class DismissStackTest {
         assertFalse(stack.onKeyEvent(escapeEvent(KeyEventType.KeyDown)), "after the reset a press is a first press again")
     }
 
+    // Android's shell hears keys only while something under it holds the focus. A
+    // field let it go on the press, and the release, sent at once as adb sends it,
+    // reached nobody: the next press read as a repeat and closed nothing.
     @Test
-    fun `on Android a repeat is taken so the system does not turn it into back`() {
+    fun `on Android a release that reached nobody does not swallow the next press`() {
+        val layers = WindowLayers()
+        var closed = 0
+        layers.dismiss.push(null) { closed++ }
+        val field = FocusRequester()
+        val root = FocusRequester()
+        var nextRepeat = 0
+        LayerScene {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .focusRequester(root)
+                    .onPreviewKeyEvent { layers.dismiss.onPreviewEscape(it.type, nextRepeat); false }
+                    .onKeyEvent {
+                        val taken = layers.dismiss.onKeyEvent(it)
+                        if (!taken && it.type == KeyEventType.KeyDown) layers.dismiss.dismissTop()
+                        true
+                    }
+                    .focusable(),
+            ) {
+                LayerHost(layers, Modifier.fillMaxSize()) { Field(Modifier.focusRequester(field)) }
+            }
+        }.use { scene ->
+            scene.settle()
+            field.requestFocus()
+            scene.settle()
+            // Down and up with no frame between: the field lets the focus go on the
+            // down, so the up finds nothing focused.
+            scene.send(escapeEvent(KeyEventType.KeyDown))
+            scene.send(escapeEvent(KeyEventType.KeyUp))
+            assertEquals(0, closed, "the first press only took the keyboard out of the field")
+            // The shell takes the focus back a frame later.
+            scene.settle()
+            root.requestFocus()
+            scene.settle()
+
+            scene.send(escapeEvent(KeyEventType.KeyDown))
+            assertEquals(1, closed, "the next press was swallowed as a repeat")
+            nextRepeat = 1
+            scene.send(escapeEvent(KeyEventType.KeyDown))
+            nextRepeat = 0
+            scene.send(escapeEvent(KeyEventType.KeyUp))
+            assertEquals(1, closed, "a real repeat still closes nothing")
+        }
+    }
+
+    // A desktop window hears every edge at its root, but the release of a press the
+    // host took can still be used by whatever holds the focus before the window's
+    // key hook sees it. The next press is a press all the same.
+    @Test
+    fun `a press the host took does not take the next press when its release went elsewhere`() {
+        val layers = WindowLayers()
+        val stack = layers.dismiss
+        stack.fieldOpened()
+        stack.onPreviewEscape(KeyEventType.KeyDown, repeat = null)
+        assertTrue(stack.onHostKeyEvent(escapeEvent(KeyEventType.KeyDown)), "the field step takes the press")
+        stack.fieldClosed()
+        stack.onPreviewEscape(KeyEventType.KeyUp, repeat = null)
+
+        stack.onPreviewEscape(KeyEventType.KeyDown, repeat = null)
+        assertFalse(stack.onKeyEvent(escapeEvent(KeyEventType.KeyDown)), "the next press goes on to back")
+        stack.onPreviewEscape(KeyEventType.KeyDown, repeat = null)
+        assertTrue(stack.onKeyEvent(escapeEvent(KeyEventType.KeyDown)), "and its repeats are still taken")
+    }
+
+    @Test
+    fun `on Android a repeat is taken so the shell does not turn it into back`() {
         val layers = WindowLayers()
         var closed = 0
         layers.dismiss.push(null) { closed++ }
         val stack = layers.dismiss
-        // The fallback key reaches back only for a key the window did not take, and
-        // the window's key hook is the last thing to see it before that.
+        // The shell makes back of a key the window did not take, and the window's key
+        // hook is the last thing to see it before that.
         stack.onPreviewKeyEvent(escapeEvent(KeyEventType.KeyDown))
         assertFalse(stack.onKeyEvent(escapeEvent(KeyEventType.KeyDown)))
         stack.dismissTop()

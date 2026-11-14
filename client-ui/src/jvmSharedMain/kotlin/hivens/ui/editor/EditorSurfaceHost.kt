@@ -92,6 +92,7 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
+import hivens.ui.layers.layerTrigger
 import hivens.ui.layout.LayoutGraphRepository
 import hivens.ui.layout.LayoutReconcile
 import hivens.ui.nx.NxAlertDialog
@@ -754,7 +755,7 @@ fun EditorSurfaceHost(
                         // left alone, which is true of one of the two.
                         dismissButton = {
                             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                TextButton(onClick = {
+                                TextButton(modifier = Modifier.layerTrigger(), onClick = {
                                     resetSurfaceConfirm = false
                                     resetAllConfirm = true
                                 }) { Text(s.editorResetAll) }
@@ -1393,6 +1394,7 @@ private fun ToolChip(
             modifier = Modifier
                 .clip(CHIP_SHAPE)
                 .background(bg)
+                .layerTrigger()
                 .clickable(enabled = enabled) { onClick() }
                 .padding(horizontal = if (compact) 7.dp else 10.dp, vertical = 5.dp),
         ) {

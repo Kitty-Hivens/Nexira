@@ -14,4 +14,12 @@ data class NavState(
     val trail: List<Screen>,
     val canGoBack: Boolean,
     val canGoForward: Boolean,
+    /**
+     * How many times back was asked for at the root, where the history had nowhere
+     * left to go. Back never takes the person out of the app, so a composition that
+     * wants something to happen there, a question before leaving for one, watches
+     * this move. The
+     * launcher's own composition does nothing with it.
+     */
+    val backsAtRoot: Int = 0,
 )

@@ -142,20 +142,40 @@ class DismissStack internal constructor(private val layers: WindowLayers) {
      */
     fun onPreviewKeyEvent(event: KeyEvent): Boolean {
         if (!event.isEscape()) return false
-        when (event.type) {
+        onPreviewEscape(event.type, event.repeatCountOrNull())
+        return false
+    }
+
+    /**
+     * One edge of Escape as the preview hook saw it. [repeat] is the platform's own
+     * count of the repeats before this edge, null where it keeps none.
+     *
+     * Android counts them on every event, so a press is told from a repeat by the
+     * event alone. The Android shell's hooks hear keys only while something under
+     * them holds the focus, and a release that came while a field had just let it
+     * go reached nobody: the next press then read as a repeat and was swallowed. A
+     * desktop window hears every edge at its root, where the held flag is enough.
+     *
+     * A new press also ends what was left of the last one, so a press the host took
+     * whose release went elsewhere does not take the next press with it.
+     */
+    internal fun onPreviewEscape(type: KeyEventType, repeat: Int?) {
+        when (type) {
             KeyEventType.KeyDown -> {
-                fresh = !held
+                fresh = if (repeat != null) repeat == 0 else !held
+                if (fresh) pressTaken = false
                 held = true
             }
             KeyEventType.KeyUp -> held = false
         }
-        return false
     }
 
     /**
      * For the window's key hook, which sees a key after everything focused has had
      * it and before the platform turns an unused Escape into back: the window's back
-     * input on the desktop, the system's fallback key on Android.
+     * input on the desktop. Android's Compose takes such an Escape for a step of the
+     * focus instead and the system never sees it unused, so the Android host makes
+     * back of a press this leaves alone itself.
      *
      * Takes the repeats of a held Escape and the half of a press the host used, so
      * one press never closes two things. A first press is left alone, and goes on to
@@ -203,6 +223,9 @@ class DismissStack internal constructor(private val layers: WindowLayers) {
  * to see every one too, or a held Ctrl and Escape closes one thing per repeat.
  */
 private fun KeyEvent.isEscape(): Boolean = key == Key.Escape
+
+/** How many repeats came before this key event, as the platform counts them, or null where it does not. */
+internal expect fun KeyEvent.repeatCountOrNull(): Int?
 
 /**
  * Puts [onDismiss] on the window's dismiss stack while [enabled], for something

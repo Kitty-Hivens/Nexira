@@ -14,6 +14,7 @@ import org.slf4j.LoggerFactory
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.concurrent.ConcurrentHashMap
 import java.util.zip.ZipInputStream
 import java.util.stream.Collectors
 import hivens.core.io.IconProcessor
@@ -100,6 +101,24 @@ class InstalledContent(
  */
 class ScanReport(val items: List<InstalledContent>, val unreadable: List<Path>)
 
+/**
+ * The archives already said to be unreadable this run.
+ *
+ * A pack's folder is scanned several times for one opening of its page, by more than
+ * one scanner, and each scan said the same broken archive again. An archive is known
+ * by its path, size and modification time, so one replaced on disk is a new archive
+ * and is said again.
+ */
+private object UnreadableArchives {
+    private val seen: MutableSet<String> = ConcurrentHashMap.newKeySet()
+
+    /** Whether [file] is said to be unreadable for the first time this run. */
+    fun firstSighting(file: Path): Boolean {
+        val stamp = runCatching { "${Files.size(file)}:${Files.getLastModifiedTime(file).toMillis()}" }.getOrDefault("")
+        return seen.add("${file.toAbsolutePath().normalize()}|$stamp")
+    }
+}
+
 /** Where this item actually sits under [instanceDir], disabled suffix and all. */
 fun InstalledContent.pathIn(instanceDir: Path): Path =
     instanceDir.resolve(kind.folderName())
@@ -175,7 +194,11 @@ class InstanceContentScanner(
             .mapNotNull {
                 beforeEach()
                 runCatching { read(it, kind) }.getOrElse { e ->
-                    log.warn("Skipping unreadable content at {}: {}", it, e.message)
+                    if (UnreadableArchives.firstSighting(it)) {
+                        log.warn("Skipping unreadable content at {}: {}", it, e.message)
+                    } else {
+                        log.debug("Skipping unreadable content at {} again: {}", it, e.message)
+                    }
                     unreadable?.add(it)
                     null
                 }

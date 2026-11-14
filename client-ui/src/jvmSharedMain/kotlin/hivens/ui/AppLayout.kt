@@ -87,6 +87,7 @@ fun AppLayout(
     trail: List<Screen>,
     history: List<Screen> = trail,
     onPopTo: (Screen) -> Unit,
+    backsAtRoot: Int = 0,
     backgroundSettings: BackgroundSettings = BackgroundSettings(),
     onBackgroundSettingsChanged: (BackgroundSettings.() -> BackgroundSettings) -> Unit = {},
     customization: CustomizationSettings = CustomizationSettings(),
@@ -251,7 +252,7 @@ fun AppLayout(
     // Everything else a widget reads here, the session and the appearance among it,
     // the level makes for itself.
     ProvideComposition(
-        nav          = NavState(currentScreen, trail, canGoBack, canGoForward),
+        nav          = NavState(currentScreen, trail, canGoBack, canGoForward, backsAtRoot),
         navigate     = onScreenChange,
         switchTab    = onSwitchTab,
         back         = onBack,

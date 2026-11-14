@@ -76,6 +76,7 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
+import hivens.ui.layers.layerTrigger
 import hivens.ui.nx.NxMetaChip
 import hivens.ui.nx.NxMetaChipTone
 import hivens.ui.nx.NxTooltip
@@ -752,7 +753,7 @@ private fun OutlinedAction(
             .background(fill)
             .border(1.dp, edge.copy(alpha = if (onClick != null) 0.85f else 0.5f), shape)
             .hoverable(interaction, enabled = onClick != null)
-            .then(if (onClick != null) Modifier.clickable(interactionSource = interaction, indication = null, onClick = onClick) else Modifier)
+            .then(if (onClick != null) Modifier.layerTrigger().clickable(interactionSource = interaction, indication = null, onClick = onClick) else Modifier)
             .padding(horizontal = 12.dp, vertical = 7.dp),
         verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),

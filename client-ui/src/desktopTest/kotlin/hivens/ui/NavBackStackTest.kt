@@ -71,13 +71,59 @@ class NavBackStackTest {
     }
 
     @Test
-    fun switchingTabsResetsHistory() {
+    fun switchingTabsResetsHistoryToHomeAndTheTab() {
         val nav = NavBackStack(Screen.Home)
         nav.navigate(Screen.PackDetail("inst-1"))
         assertTrue(nav.canGoBack)
         nav.switchTo(Screen.Library)
         assertEquals(Screen.Library, nav.current)
-        assertFalse(nav.canGoBack)
+        assertEquals(listOf(Screen.Home, Screen.Library), nav.trail, "the detail left the history, home stayed under the tab")
+    }
+
+    /**
+     * Back from a rail section comes home rather than having nowhere to go. On a
+     * phone a back with nowhere to go took the person out of the launcher, which is
+     * what back from Library did while a rail switch cleared the history.
+     */
+    @Test
+    fun backFromARailSectionComesHome() {
+        val nav = NavBackStack(Screen.Home)
+        nav.switchTo(Screen.Library)
+        assertTrue(nav.canGoBack, "a rail section has home under it")
+        assertTrue(nav.back())
+        assertEquals(Screen.Home, nav.current)
+        assertFalse(nav.canGoBack, "home is the root")
+        assertTrue(nav.forward(), "and the section is still there to go forward to")
+        assertEquals(Screen.Library, nav.current)
+    }
+
+    @Test
+    fun switchingHomeLeavesHomeAlone() {
+        val nav = NavBackStack(Screen.Home)
+        nav.switchTo(Screen.Library)
+        nav.navigate(Screen.PackDetail("inst-1"))
+        nav.switchTo(Screen.Home)
+        assertEquals(listOf(Screen.Home), nav.trail)
+        assertFalse(nav.canGoForward, "a switch is a fresh start, forward included")
+    }
+
+    /**
+     * What a composition hears of a back at the root, where the history has nowhere
+     * to go and the host does not leave the app for it. A back that moved the
+     * history is not one of them.
+     */
+    @Test
+    fun aBackAtTheRootIsCountedAndMovesNothing() {
+        val nav = NavBackStack(Screen.Home)
+        nav.switchTo(Screen.Settings)
+        assertTrue(nav.back())
+        assertEquals(0, nav.backsAtRoot, "a back that went somewhere is not one at the root")
+
+        assertFalse(nav.back())
+        assertFalse(nav.back())
+        assertEquals(2, nav.backsAtRoot)
+        assertEquals(listOf(Screen.Home), nav.trail)
+        assertTrue(nav.canGoForward, "the forward path is left alone")
     }
 
     /**
@@ -106,8 +152,7 @@ class NavBackStackTest {
 
         nav.switchTo(Screen.Library)
         nav.switchTo(Screen.Library)
-        assertEquals(Screen.Library, nav.current)
-        assertFalse(nav.canGoBack, "the rail entry you are already on stays a single root")
+        assertEquals(listOf(Screen.Home, Screen.Library), nav.trail, "the rail entry you are already on stays one entry over home")
     }
 
     @Test
@@ -202,7 +247,7 @@ class NavBackStackTest {
             "a screen Back stepped off is still reachable by Forward",
         )
         nav.switchTo(Screen.Library)
-        assertEquals(listOf(Screen.Library), nav.history)
+        assertEquals(listOf(Screen.Browse, Screen.Library), nav.history, "the root the history was made with stays as its home")
     }
 
     @Test
@@ -234,7 +279,7 @@ class NavBackStackTest {
         nav.switchTo(Screen.Settings)
         nav.switchTo(Screen.Profile)
         assertEquals(Screen.Profile, nav.current)
-        assertFalse(nav.canGoBack)
+        assertEquals(listOf(Screen.Home, Screen.Profile), nav.trail)
     }
 
     @Test
@@ -247,8 +292,7 @@ class NavBackStackTest {
         nav.switchTo(Screen.Wardrobe)
         nav.switchTo(Screen.About)
         assertEquals(Screen.About, nav.current)
-        assertEquals(listOf(Screen.About), nav.trail)
-        assertFalse(nav.canGoBack)
+        assertEquals(listOf(Screen.Profile, Screen.About), nav.trail)
     }
 
     @Test

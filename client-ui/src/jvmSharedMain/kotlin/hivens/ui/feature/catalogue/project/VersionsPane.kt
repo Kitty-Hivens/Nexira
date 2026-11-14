@@ -69,6 +69,7 @@ import hivens.ui.nx.NxVerticalScrollbar
 import hivens.ui.nx.RetryStateBlock
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
+import hivens.ui.layers.layerTrigger
 import hivens.ui.utils.humanSize
 import kotlinx.coroutines.launch
 import hivens.ui.theme.NxInk
@@ -450,6 +451,7 @@ private fun FilterDropdown(
                 Modifier
                     .clip(MaterialTheme.shapes.large)
                     .background(fill)
+                    .layerTrigger()
                     .clickable { open = true }
                     .padding(horizontal = 10.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,

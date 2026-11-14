@@ -14,6 +14,8 @@ class NexiraActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // Before the content, so the shell's own back handlers are all asked first.
+        holdBackAtRoot(onBackPressedDispatcher)
         // The system file picker is opened through the activity.
         FileKit.init(this)
         setContent { AndroidShell() }

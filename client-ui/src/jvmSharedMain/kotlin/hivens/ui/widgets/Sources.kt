@@ -59,7 +59,10 @@ object Sources {
      */
     val Window = SourceKey<HostWindowState>("window.state", ScopeLevel.Window)
 
-    /** Where the composition's history stands. Moved by the navigation commands in [Commands]. */
+    /**
+     * Where the composition's history stands, and how often back was asked for with
+     * nowhere left to go. Moved by the navigation commands in [Commands].
+     */
     val Navigation = SourceKey<NavState>("nav.state", ScopeLevel.Composition)
 
     /**

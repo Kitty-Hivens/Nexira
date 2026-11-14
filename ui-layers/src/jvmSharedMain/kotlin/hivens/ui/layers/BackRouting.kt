@@ -11,7 +11,8 @@ import androidx.compose.runtime.Composable
  * popup and dialog registers its own back handler when it opens. On Android it does
  * nothing: popups and dialogs are windows of their own there and take back before
  * the activity sees it, and the shell asks the stack from its back handler, placed
- * after the navigation's so the stack is asked first.
+ * after the navigation's so the stack is asked first. An Escape reaches that handler
+ * only because the shell makes back of it, see [DismissStack.onKeyEvent].
  */
 @Composable
 internal expect fun RouteBackToStack(stack: DismissStack)

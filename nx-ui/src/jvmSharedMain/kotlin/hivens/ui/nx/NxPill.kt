@@ -9,6 +9,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.style.TextDecoration
+import hivens.ui.layers.layerTrigger
 import hivens.ui.theme.Motion
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -86,7 +87,7 @@ internal fun NxPill(
             // it is measured against and a press at the edge is not lost to it.
             .then(
                 if (onClick != null) {
-                    Modifier.hoverable(interaction).clickable(interactionSource = interaction, indication = null, onClick = onClick)
+                    Modifier.hoverable(interaction).layerTrigger().clickable(interactionSource = interaction, indication = null, onClick = onClick)
                 } else {
                     Modifier
                 },

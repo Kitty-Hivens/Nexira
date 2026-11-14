@@ -1,6 +1,7 @@
 package hivens.core.jvm
 
 import org.slf4j.LoggerFactory
+import java.nio.file.AccessDeniedException
 import java.nio.file.Paths
 import kotlin.io.path.exists
 import kotlin.io.path.readText
@@ -48,9 +49,28 @@ object SystemHardware {
         return CpuInfo(cores, logical, min, max)
     }
 
-    private fun readSwap(): Int? = runCatching {
-        Paths.get("/proc/swaps").takeIf { it.exists() }?.readText()?.let(::swapTotalMbFromProcSwaps)
-    }.getOrElse { logger.warn("swaps read failed", it); null }
+    private fun readSwap(): Int? = swapTotalMbFrom { Paths.get("/proc/swaps").takeIf { it.exists() }?.readText() }
+
+    /**
+     * Total swap from what [read] returns of /proc/swaps, or null when it cannot say.
+     *
+     * A denied read is an answer, not a failure: Android's SELinux policy keeps an app
+     * out of /proc/swaps on every read, and the full stack it was logged with said
+     * nothing more than "unknown". It is said once, at debug level, since the value
+     * is read once a run.
+     */
+    internal fun swapTotalMbFrom(read: () -> String?): Int? = try {
+        read()?.let(::swapTotalMbFromProcSwaps)
+    } catch (e: AccessDeniedException) {
+        logger.debug("Swap is unknown here: {} is not readable", e.file)
+        null
+    } catch (e: SecurityException) {
+        logger.debug("Swap is unknown here: {}", e.message)
+        null
+    } catch (e: Exception) {
+        logger.warn("swaps read failed", e)
+        null
+    }
 
     private fun readCpuFreqMhz(): Pair<Int?, Int?> {
         val dir = Paths.get("/sys/devices/system/cpu/cpu0/cpufreq")

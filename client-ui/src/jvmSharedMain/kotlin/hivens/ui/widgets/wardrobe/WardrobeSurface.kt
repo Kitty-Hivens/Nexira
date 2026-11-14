@@ -61,6 +61,7 @@ import hivens.ui.surface.SurfaceKind
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
+import hivens.ui.layers.layerTrigger
 import hivens.ui.identity.ClanRole
 import hivens.ui.identity.ClanRoleProvider
 import hivens.ui.identity.DefaultSkinProvider
@@ -586,7 +587,7 @@ private fun SkinCard(
                 CardCaption(name, Modifier.weight(1f, fill = false))
                 // Default skins are read-only (not library entries), so no delete.
                 onDelete?.let { del ->
-                    IconButton(onClick = del, modifier = Modifier.size(24.dp)) {
+                    IconButton(onClick = del, modifier = Modifier.size(24.dp).layerTrigger()) {
                         Symbol(NxIcon.Delete, s.accountRemove, tint = NxInk.quiet, size = 16.dp)
                     }
                 }
@@ -674,7 +675,7 @@ private fun CapeCard(
             }
             Row(Modifier.height(CardCaptionHeight), verticalAlignment = Alignment.CenterVertically) {
                 CardCaption(name, Modifier.weight(1f, fill = false))
-                IconButton(onClick = onDelete, modifier = Modifier.size(24.dp)) {
+                IconButton(onClick = onDelete, modifier = Modifier.size(24.dp).layerTrigger()) {
                     Symbol(NxIcon.Delete, s.accountRemove, tint = NxInk.quiet, size = 16.dp)
                 }
             }

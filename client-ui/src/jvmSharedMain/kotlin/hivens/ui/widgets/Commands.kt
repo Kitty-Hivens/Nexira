@@ -44,9 +44,16 @@ object Commands {
     /** Goes to a screen, keeping the way back. */
     val Navigate = CommandKey<Screen>("nav.open", ScopeLevel.Composition)
 
-    /** Goes to a screen as a fresh start, the way a rail entry does: the history is dropped. */
+    /**
+     * Goes to a screen as a fresh start, the way a rail entry does: the history
+     * becomes the composition's home and that screen, so back from it comes home.
+     */
     val SwitchTab = CommandKey<Screen>("nav.switch", ScopeLevel.Composition)
 
+    /**
+     * Steps back one screen. At the root it moves nothing and is counted in
+     * [Sources.Navigation], for a composition that answers a back with nowhere to go.
+     */
     val Back = CommandKey<Unit>("nav.back", ScopeLevel.Composition)
     val Forward = CommandKey<Unit>("nav.forward", ScopeLevel.Composition)
 

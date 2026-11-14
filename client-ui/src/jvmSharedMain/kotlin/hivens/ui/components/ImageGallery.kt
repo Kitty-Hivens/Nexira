@@ -64,6 +64,7 @@ import hivens.core.api.dto.modrinth.ModrinthGalleryImage
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.layers.Layer
+import hivens.ui.layers.layerTrigger
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.Motion
@@ -269,6 +270,7 @@ private fun GalleryCell(item: GalleryMedia, modifier: Modifier, onClick: () -> U
         modifier = modifier
             .fillMaxHeight()
             .clip(shape)
+            .layerTrigger()
             .clickable(interactionSource = interaction, indication = null, onClick = onClick),
     ) {
         Column(Modifier.fillMaxWidth()) {

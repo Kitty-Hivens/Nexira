@@ -6,6 +6,13 @@ import hivens.core.jvm.SystemMemory
 import hivens.widget.model.CommandKey
 import hivens.widget.model.ScopeLevel
 import hivens.widget.model.SourceKey
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
+import org.slf4j.LoggerFactory
 
 // Tri-state machine the update widget reads and the surface drives.
 // Public so the widget files across this package can branch on it;
@@ -45,10 +52,39 @@ class SystemFacts(
     val cpu: SystemHardware.CpuInfo,
 ) {
     companion object {
+        /** Asks the OS, which reads files under /proc and /sys. Not for the main thread. */
         fun read(): SystemFacts = SystemFacts(
             ramMb  = SystemMemory.totalPhysicalMbOrNull() ?: 0,
             swapMb = SystemHardware.swapTotalMb,
             cpu    = SystemHardware.cpu,
         )
+
+        /** What the card shows until [read] answers: everything unknown but the thread count the runtime knows. */
+        fun unknown(): SystemFacts = SystemFacts(
+            ramMb  = 0,
+            swapMb = null,
+            cpu    = SystemHardware.CpuInfo(null, Runtime.getRuntime().availableProcessors(), null, null),
+        )
     }
+}
+
+/**
+ * The facts as a value that starts unknown and is filled in by [read] on [io].
+ *
+ * The source is made the first time the About card asks, which is in the middle of
+ * laying the page out on the main thread, and reading the files there stalled it.
+ * A read that fails leaves the facts unknown.
+ */
+internal fun systemFactsReadOff(
+    scope: CoroutineScope,
+    io: CoroutineDispatcher = Dispatchers.IO,
+    read: () -> SystemFacts = SystemFacts::read,
+): StateFlow<SystemFacts> {
+    val facts = MutableStateFlow(SystemFacts.unknown())
+    scope.launch(io) {
+        runCatching(read)
+            .onSuccess { facts.value = it }
+            .onFailure { LoggerFactory.getLogger("SystemFacts").warn("The machine's memory and processor could not be read", it) }
+    }
+    return facts
 }

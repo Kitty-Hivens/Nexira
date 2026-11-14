@@ -167,7 +167,7 @@ internal fun AppearanceSection(
         val customChromeAvailable = LocalCustomChromeAvailable.current && host.customChromeSupported
         NxToggle(
             label       = s.settingsCustomChrome,
-            checked     = form.useCustomChrome,
+            checked     = shownChecked(form.useCustomChrome, customChromeAvailable),
             description = s.settingsCustomChromeDesc,
             icon        = NxIcon.Computer,
             enabled     = customChromeAvailable,
@@ -179,7 +179,7 @@ internal fun AppearanceSection(
                 color = NxInk.quiet,
             )
         }
-        PuppetToggle("settings.useCustomChrome", form.useCustomChrome, enabled = customChromeAvailable) {
+        PuppetToggle("settings.useCustomChrome", shownChecked(form.useCustomChrome, customChromeAvailable), enabled = customChromeAvailable) {
             form.useCustomChrome = it; save()
         }
     }
@@ -189,7 +189,7 @@ internal fun AppearanceSection(
     NxSection(s.settingsSectionBehavior) {
         val host = rememberHostActions()
         NxToggle(
-            s.settingsCloseAfterLaunch, form.closeAfterStart,
+            s.settingsCloseAfterLaunch, shownChecked(form.closeAfterStart, host.hideAfterLaunchSupported),
             description = s.settingsCloseAfterLaunchDesc, icon = NxIcon.MoveToInbox,
             enabled = host.hideAfterLaunchSupported,
         ) {
@@ -198,7 +198,7 @@ internal fun AppearanceSection(
         if (!host.hideAfterLaunchSupported) {
             Text(text = s.settingsUnsupportedHere, style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
         }
-        PuppetToggle("settings.closeAfterStart", form.closeAfterStart, enabled = host.hideAfterLaunchSupported) { form.closeAfterStart = it; save() }
+        PuppetToggle("settings.closeAfterStart", shownChecked(form.closeAfterStart, host.hideAfterLaunchSupported), enabled = host.hideAfterLaunchSupported) { form.closeAfterStart = it; save() }
 
         NxToggle(s.settingsOfflineMode, form.isOfflineMode, description = s.settingsOfflineModeDesc, icon = NxIcon.WifiOff, accent = NxColor.status(Status.Error)) {
             form.isOfflineMode = it; save()
@@ -206,6 +206,15 @@ internal fun AppearanceSection(
         PuppetToggle("settings.offlineMode", form.isOfflineMode) { form.isOfflineMode = it; save() }
     }
 }
+
+/**
+ * What the switch of a setting shows: the stored value where the setting can act,
+ * off where it cannot. A switch drawn on over "not supported on this device" claimed
+ * a title bar a phone never draws. The stored value is left as it is, so the setting
+ * comes back as it was on a host that has it. The automation hook reads the same,
+ * as every other toggle's reports what its switch shows.
+ */
+internal fun shownChecked(stored: Boolean, available: Boolean): Boolean = stored && available
 
 // Static day/night colours -- the sun stays warm-orange and the moon cool-blue
 // regardless of palette, so the dark-theme toggle reads as day/night at a glance.

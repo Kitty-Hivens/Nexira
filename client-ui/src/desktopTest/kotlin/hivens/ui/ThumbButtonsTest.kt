@@ -41,6 +41,22 @@ class ThumbButtonsTest {
         assertEquals(Screen.Library, nav.current, "with nothing open it is history back")
     }
 
+    // Nothing a thumb press does reaches the window itself: at the root the history
+    // stays where it is, and the composition is told that back had nowhere to go.
+    @Test
+    fun `back at the root moves nothing and is counted as a back at the root`() {
+        val layers = WindowLayers()
+        val nav = NavBackStack(Screen.Home)
+        thumbBack(layers, nav)
+        assertEquals(listOf<Screen>(Screen.Home), nav.trail)
+        assertEquals(1, nav.backsAtRoot)
+
+        nav.switchTo(Screen.Library)
+        thumbBack(layers, nav)
+        assertEquals(Screen.Home, nav.current, "back from a rail section comes home")
+        assertEquals(1, nav.backsAtRoot)
+    }
+
     @Test
     fun `under a modal neither button moves the page behind it`() {
         val layers = WindowLayers()

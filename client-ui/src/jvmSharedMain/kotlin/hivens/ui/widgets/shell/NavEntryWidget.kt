@@ -37,6 +37,7 @@ import hivens.ui.easter.LocalAprilFools
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
+import hivens.ui.layers.layerTrigger
 import hivens.ui.widgets.Commands
 import hivens.ui.widgets.Sources
 import hivens.ui.widgets.toWidgetColorOrNull
@@ -249,6 +250,8 @@ internal fun NavSlot(
                 // Taller than the icon so the slots tile flush (rail spacing is 0)
                 // and the breathing room between buttons stays inside the hit area.
                 .height(54.dp)
+                // Sign out asks first, in a dialog that gives the keyboard back here.
+                .layerTrigger()
                 .selectable(
                     selected          = active,
                     enabled           = enabled,

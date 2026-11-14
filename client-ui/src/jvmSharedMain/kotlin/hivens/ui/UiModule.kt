@@ -90,8 +90,8 @@ import hivens.ui.widgets.KoinLevelServicesHost
 import hivens.ui.widgets.Sources
 import hivens.ui.widgets.about.AboutUpdateSource
 import hivens.ui.widgets.about.OpenUpdateDialog
-import hivens.ui.widgets.about.SystemFacts
 import hivens.ui.widgets.about.sampleUpdateCheck
+import hivens.ui.widgets.about.systemFactsReadOff
 import hivens.ui.widgets.levelServices
 import hivens.ui.widgets.modules.WidgetModuleHost
 import hivens.ui.widgets.modules.WidgetModules
@@ -610,8 +610,9 @@ internal fun uiDataRegistry(
     register(Sources.Background, flowSource(background))
     register(Sources.AccountsRevision, flowSource(accountsRevision))
     // Read the first time a card asks rather than at startup: asking the OS is slow,
-    // and most runs never open the page that shows it.
-    registerFactory(Sources.SystemInfo) { flowSource(MutableStateFlow(SystemFacts.read())) }
+    // and most runs never open the page that shows it. The card asks while the page
+    // is laid out, so the files are read off that thread.
+    registerFactory(Sources.SystemInfo) { app -> flowSource(systemFactsReadOff(app.coroutineScope)) }
     // One per page, so a profile page kept in the history comes back on the section
     // it was left on.
     registerFactory(ProfileSelectionSource, sample = ::ProfileSelection) { flowSource(MutableStateFlow(ProfileSelection())) }

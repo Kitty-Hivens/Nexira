@@ -9,9 +9,16 @@ import hivens.ui.background.CustomBackground
 import hivens.ui.background.rememberDeviceTilt
 import hivens.ui.theme.WallpaperTone
 
+/**
+ * The system's back, for as long as the composition draws: one step back in the
+ * history, or at the root a back counted for the composition to answer. Always
+ * enabled, so a back at the root reaches the composition instead of falling through
+ * to the system, which would take the person out of the launcher. The shell's
+ * dismiss stack registers after this one and is asked first.
+ */
 @Composable
 internal actual fun NavigationInputs(backStack: NavBackStack) {
-    BackHandler(enabled = backStack.canGoBack) { backStack.back() }
+    BackHandler(enabled = true) { backStack.back() }
 }
 
 @Composable

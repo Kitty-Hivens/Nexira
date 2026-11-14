@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.ByteArrayOutputStream
+import java.io.PrintStream
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.zip.ZipEntry
@@ -294,5 +295,27 @@ class InstanceContentScannerTest {
             "fabric.mod.json" to """{"id":"serverthing","version":"1","environment":"server","depends":{"lib":"*"}}""".toByteArray(),
         ))
         assertTrue(InstanceContentScanner().scan(dir).single().requires.isEmpty())
+    }
+
+    // A pack's folder is scanned several times for one opening of its page, by more
+    // than one scanner, and a broken archive was warned about on every scan.
+    @Test
+    fun `an unreadable archive is warned about once a run and still reported every scan`() = runBlocking {
+        val broken = dir.resolve("mods").resolve("ReplayMod-once.jar.disabled")
+        Files.createDirectories(broken.parent)
+        Files.write(broken, "not a zip".toByteArray())
+
+        val original = System.err
+        val captured = ByteArrayOutputStream()
+        System.setErr(PrintStream(captured, true))
+        val reports = try {
+            List(3) { InstanceContentScanner().scanReport(dir) }
+        } finally {
+            System.setErr(original)
+        }
+
+        assertTrue(reports.all { it.unreadable == listOf(broken) }, "every scan still names the archive it skipped")
+        val warnings = captured.toString().lines().count { "WARN" in it && "ReplayMod-once.jar.disabled" in it }
+        assertEquals(1, warnings, "warned $warnings times:\n$captured")
     }
 }

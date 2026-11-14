@@ -39,6 +39,7 @@ import hivens.ui.Screen
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
+import hivens.ui.layers.layerTrigger
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxChoiceFooterItem
@@ -221,6 +222,7 @@ fun LibraryScreen(
             val onLead = NxColor.on(lead)
             FloatingActionButton(
                 onClick = { menuOpen = true },
+                modifier = Modifier.layerTrigger(),
                 containerColor = lead,
                 contentColor = onLead,
             ) {

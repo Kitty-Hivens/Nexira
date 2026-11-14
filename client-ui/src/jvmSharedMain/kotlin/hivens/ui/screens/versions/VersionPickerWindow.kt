@@ -59,7 +59,7 @@ import hivens.ui.components.formatBuildTimestamp
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.layers.DismissOnBack
+import hivens.ui.layers.Layer
 import hivens.ui.nx.CenteredProgress
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
@@ -161,56 +161,59 @@ fun VersionPickerWindow(
     val busy = busyVersionId != null
     var selected by remember(versions) { mutableStateOf<PickerVersion?>(null) }
 
-    // In-composition overlay rather than a Popup: the window belongs to the app's
-    // own surface stack, so it inherits the theme, sizes against the app window,
-    // and cannot outlive its host as a separate top-level layer. Scrim dismisses,
-    // Esc and back dismiss through the window's stack, the card swallows its own clicks.
-    // The focus is taken so a field behind the scrim does not keep the keyboard.
-    DismissOnBack(onDismiss = onDismiss)
-    val focus = remember { FocusRequester() }
-    LaunchedEffect(Unit) { focus.requestFocus() }
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(NxColor.page.copy(alpha = 0.55f))
-            .focusRequester(focus)
-            .focusable()
-            .clickable(remember { MutableInteractionSource() }, indication = null, onClick = onDismiss),
-        contentAlignment = Alignment.Center,
-    ) {
-        NxSurface(
-            kind = SurfaceKind.Dialog,
+    // A modal layer of the window rather than a Popup: it keeps the theme of where
+    // it was opened, sizes against the app window, and goes with its host. Scrim
+    // dismisses, Esc and back dismiss through the window's stack, the card swallows
+    // its own clicks. The focus is taken so a field behind the scrim does not keep
+    // the keyboard, and the layer gives it back to the control that opened it. Drawn
+    // in place it had nowhere to give it back to, and the keyboard landed on the
+    // first control of the page.
+    Layer(visible = true, modal = true, onDismissRequest = onDismiss, dismissOnOutsidePress = false) {
+        val focus = remember { FocusRequester() }
+        LaunchedEffect(Unit) { focus.requestFocus() }
+        Box(
             modifier = Modifier
-                // Margin first, then the ceiling, then take what is left. A
-                // fraction cannot express this in either order: `fillMax` fixes
-                // the size, so a ceiling after it has nothing to clamp, and a
-                // ceiling before it makes the fraction a fraction of the ceiling.
-                .padding(horizontal = WINDOW_MARGIN, vertical = WINDOW_MARGIN)
-                .widthIn(max = CARD_WIDTH)
-                .heightIn(max = CARD_HEIGHT)
-                .fillMaxWidth()
-                .fillMaxHeight()
-                .clickable(remember { MutableInteractionSource() }, indication = null, onClick = {}),
+                .fillMaxSize()
+                .background(NxColor.page.copy(alpha = 0.55f))
+                .focusRequester(focus)
+                .focusable()
+                .clickable(remember { MutableInteractionSource() }, indication = null, onClick = onDismiss),
+            contentAlignment = Alignment.Center,
         ) {
-            Column(Modifier.fillMaxSize()) {
-                Header(title, packName, packIcon, onDismiss)
-                HorizontalDivider(color = NxInk.line)
-                VersionBrowser(
-                    versions = versions,
-                    loading = loading,
-                    onSelectionChange = { selected = it },
-                    modifier = Modifier.weight(1f).fillMaxWidth(),
-                )
-                val picked = selected
-                Footer(
-                    warning = warning,
-                    selected = picked,
-                    intent = picked?.let(intentFor),
-                    busy = busy,
-                    busyThis = picked != null && picked.id == busyVersionId,
-                    onConfirm = { picked?.let(onConfirm) },
-                    onDismiss = onDismiss,
-                )
+            NxSurface(
+                kind = SurfaceKind.Dialog,
+                modifier = Modifier
+                    // Margin first, then the ceiling, then take what is left. A
+                    // fraction cannot express this in either order: `fillMax` fixes
+                    // the size, so a ceiling after it has nothing to clamp, and a
+                    // ceiling before it makes the fraction a fraction of the ceiling.
+                    .padding(horizontal = WINDOW_MARGIN, vertical = WINDOW_MARGIN)
+                    .widthIn(max = CARD_WIDTH)
+                    .heightIn(max = CARD_HEIGHT)
+                    .fillMaxWidth()
+                    .fillMaxHeight()
+                    .clickable(remember { MutableInteractionSource() }, indication = null, onClick = {}),
+            ) {
+                Column(Modifier.fillMaxSize()) {
+                    Header(title, packName, packIcon, onDismiss)
+                    HorizontalDivider(color = NxInk.line)
+                    VersionBrowser(
+                        versions = versions,
+                        loading = loading,
+                        onSelectionChange = { selected = it },
+                        modifier = Modifier.weight(1f).fillMaxWidth(),
+                    )
+                    val picked = selected
+                    Footer(
+                        warning = warning,
+                        selected = picked,
+                        intent = picked?.let(intentFor),
+                        busy = busy,
+                        busyThis = picked != null && picked.id == busyVersionId,
+                        onConfirm = { picked?.let(onConfirm) },
+                        onDismiss = onDismiss,
+                    )
+                }
             }
         }
     }

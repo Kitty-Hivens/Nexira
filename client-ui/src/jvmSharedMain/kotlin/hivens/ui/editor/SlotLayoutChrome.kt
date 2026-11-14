@@ -41,6 +41,7 @@ import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
+import hivens.ui.layers.layerTrigger
 import hivens.ui.nx.NxContextMenu
 import hivens.ui.nx.NxIconButton
 import hivens.ui.nx.NxMenuItem
@@ -188,7 +189,7 @@ private fun SlotSelectionHandle(onClick: () -> Unit) {
         shape = MaterialTheme.shapes.small,
     ) {
         Box(
-            modifier         = Modifier.size(SLOT_HANDLE_SIZE).clickable(onClick = onClick),
+            modifier         = Modifier.size(SLOT_HANDLE_SIZE).layerTrigger().clickable(onClick = onClick),
             contentAlignment = Alignment.Center,
         ) {
             Symbol(NxIcon.ViewQuilt, contentDescription = s.editorSlotLayoutHandle, tint = NxColor.lead(), size = 16.dp)
