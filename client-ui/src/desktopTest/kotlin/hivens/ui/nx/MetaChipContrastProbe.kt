@@ -20,12 +20,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
-import hivens.core.data.PackOrigin
 import hivens.i18n.api.LocalTranslator
+import hivens.launcher.sources.EngineSources
 import hivens.themes.Themes
 import hivens.ui.components.SourceBadge
+import hivens.ui.components.loadedSources
 import hivens.ui.i18n.NexiraStrings
 import hivens.ui.theme.NxTheme
+import hivens.widget.api.LocalWidgetDataRegistry
 import org.jetbrains.skia.EncodedImageFormat
 import java.nio.file.Files
 import java.nio.file.Path
@@ -65,7 +67,8 @@ class MetaChipContrastProbe {
         )
         val scene = ImageComposeScene(980, 60 + banners.size * 2 * 96, density = Density(1f)) {
             NxTheme(Themes.default, dark = true) {
-                CompositionLocalProvider(LocalTranslator provides NexiraStrings.translator("ru")) {
+                // The badge names its source among the ones brought in, as a host lists them.
+                CompositionLocalProvider(LocalTranslator provides NexiraStrings.translator("ru"), LocalWidgetDataRegistry provides loadedSources()) {
                     Box(Modifier.fillMaxSize().background(NxColor.page).padding(16.dp)) {
                         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             banners.forEach { (name, fill) ->
@@ -83,7 +86,7 @@ class MetaChipContrastProbe {
                                                 color = Color.White,
                                                 fontWeight = FontWeight.SemiBold,
                                             )
-                                            SourceBadge(PackOrigin.Mirror)
+                                            SourceBadge(EngineSources.Mirror)
                                             NxMetaChip("1.21.1-0.4.2", tone = NxMetaChipTone.OnMedia)
                                             NxMetaChip("fork", tone = NxMetaChipTone.OnMediaAccent)
                                             NxMetaChip("вчера", tone = NxMetaChipTone.OnMedia)

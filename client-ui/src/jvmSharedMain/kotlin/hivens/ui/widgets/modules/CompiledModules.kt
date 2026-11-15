@@ -4,6 +4,8 @@ import hivens.accounts.AccountsModule
 import hivens.catalogue.CatalogueModule
 import hivens.i18n.I18nModule
 import hivens.packs.PacksModule
+import hivens.source.mirror.MirrorSourceModule
+import hivens.source.modrinth.ModrinthSourceModule
 import hivens.themes.ThemesModule
 import hivens.widget.api.CompiledModule
 import hivens.widget.api.ModuleContribution
@@ -13,7 +15,8 @@ import hivens.widget.model.ApiVersion
  * The modules compiled into this build. Carrying one is not using it: the host brings
  * in a module's keys only where the document names it, the same as a jar's.
  */
-val CompiledModules: List<CompiledModule> = listOf(I18nModule, ThemesModule, PacksModule, AccountsModule, CatalogueModule)
+val CompiledModules: List<CompiledModule> =
+    listOf(I18nModule, ThemesModule, PacksModule, AccountsModule, CatalogueModule, MirrorSourceModule, ModrinthSourceModule)
 
 /**
  * The kinds of contribution read out of every jar: the ones the widget kernel declares and

@@ -23,6 +23,7 @@ import hivens.launcher.launch.RunningPackSource
 import hivens.launcher.modrinth.ModrinthClient
 import hivens.launcher.smrt.SmrtPackClient
 import hivens.launcher.smrt.SmrtSyncService
+import hivens.launcher.sources.EngineSources
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -193,7 +194,7 @@ class PackUpdateServiceTest {
             snapshots = snapshots,
             journal = journal,
             sizes = InstanceSizeService(dataDir, CoroutineScope(Dispatchers.Unconfined)),
-            reattachers = mapOf(PackOrigin.Mirror to service),
+            reattachers = mapOf(EngineSources.Mirror to service),
         )
 
         fun serveV2() { manifestBody = v2Body }
@@ -245,7 +246,7 @@ class PackUpdateServiceTest {
             sync.sync(v1, clientDir, enabledState = enabled)
             val instance = PackInstance(
                 id = "i1",
-                packRef = PackReference(PackOrigin.Mirror, "test", v1.packVersion),
+                packRef = PackReference(EngineSources.Mirror, "test", v1.packVersion),
                 displayName = "Test",
                 instanceDirName = "inst",
                 createdAtEpoch = 0L,
@@ -630,7 +631,7 @@ class PackUpdateServiceTest {
 
         val back = h.reattachAsShown(detached)
 
-        assertEquals(PackReference(PackOrigin.Mirror, "test", V1), back.packRef)
+        assertEquals(PackReference(EngineSources.Mirror, "test", V1), back.packRef)
         assertNull(back.forkedFrom, "the fork note goes with the fork")
         assertEquals(PackAuthRequirement.SmartyCraft("Industrial"), back.cachedManifest?.authRequirement, "bound to its server again")
         assertEquals(V1, back.pinnedPackVersion)

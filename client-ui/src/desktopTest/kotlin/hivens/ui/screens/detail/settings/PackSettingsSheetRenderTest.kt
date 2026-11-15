@@ -1,6 +1,7 @@
 package hivens.ui.screens.detail.settings
 
 import androidx.compose.foundation.background
+import androidx.compose.runtime.CompositionLocalProvider
 import hivens.core.launch.InstanceWorkRegistry
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,14 +15,16 @@ import hivens.core.api.dto.smrt.SmrtPackSummary
 import hivens.core.api.interfaces.IMirrorPackClient
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackInstance
-import hivens.core.data.PackOrigin
 import hivens.core.data.PackReference
 import hivens.core.update.PackUpdater
 import hivens.launcher.PackOperationService
 import hivens.launcher.instance.InstanceSizeService
+import hivens.launcher.sources.EngineSources
 import hivens.themes.Themes
+import hivens.ui.components.loadedSources
 import hivens.ui.host.HostKoin
 import hivens.ui.theme.NxTheme
+import hivens.widget.api.LocalWidgetDataRegistry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -94,7 +97,7 @@ class PackSettingsSheetRenderTest {
 
     private val pack = PackInstance(
         id = "1",
-        packRef = PackReference(PackOrigin.Mirror, "industrial", "5"),
+        packRef = PackReference(EngineSources.Mirror, "industrial", "5"),
         displayName = "Индустриальная",
         instanceDirName = "industrial",
         createdAtEpoch = 0L,
@@ -120,11 +123,14 @@ class PackSettingsSheetRenderTest {
         Files.createDirectories(out.parent)
         val scene = ImageComposeScene(width, height, density = Density(1f)) {
             HostKoin(app) {
-                NxTheme(Themes.default, dark = true) {
-                    // A vivid backdrop so any bleed-through of the sheet shows up as a
-                    // pink tint -- proves the sheet is opaque and the page beside it is not.
-                    Box(Modifier.fillMaxSize().background(Color(BACKDROP))) {
-                        PackSettingsSheet(pack = pack, instanceDir = Path.of("/tmp/render"), onDismiss = {})
+                // The sheet names the pack's source among the ones brought in, as a host lists them.
+                CompositionLocalProvider(LocalWidgetDataRegistry provides loadedSources()) {
+                    NxTheme(Themes.default, dark = true) {
+                        // A vivid backdrop so any bleed-through of the sheet shows up as a
+                        // pink tint, which proves the sheet is opaque and the page beside it is not.
+                        Box(Modifier.fillMaxSize().background(Color(BACKDROP))) {
+                            PackSettingsSheet(pack = pack, instanceDir = Path.of("/tmp/render"), onDismiss = {})
+                        }
                     }
                 }
             }

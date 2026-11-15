@@ -51,6 +51,9 @@ interface InstallWork {
     suspend fun packOf(id: String): PackInstance?
 
     val instancesDir: Path
+
+    /** Whether the launcher installs a project the project source [source] found, null for a project page's. */
+    fun installsFrom(source: String?): Boolean = true
 }
 
 /**
@@ -118,7 +121,14 @@ class InstallChoices(
 
     private fun read(opened: Any, subject: InstallSubject) {
         reading?.cancel()
-        edit(opened) { it.copy(candidates = null, failed = false) }
+        if (!launcher.installsFrom(subject.source)) {
+            // Asked of the launcher's own installer, the project's id would be looked up
+            // at a source that did not list it.
+            log.info("not offering an install of {}: the source '{}' cannot install it yet", subject.projectId, subject.source)
+            edit(opened) { it.copy(candidates = emptyList(), failed = false, unsupported = true) }
+            return
+        }
+        edit(opened) { it.copy(candidates = null, failed = false, unsupported = false) }
         reading = scope.launch {
             try {
                 val builds = withContext(Dispatchers.IO) { launcher.listVersions(subject.projectId) }

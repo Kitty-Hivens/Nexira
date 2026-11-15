@@ -10,10 +10,10 @@ import hivens.core.data.CachedManifestSnapshot
 import hivens.core.data.InstanceRuntime
 import hivens.core.data.OptionalContentRules
 import hivens.core.data.PackInstance
-import hivens.core.data.PackOrigin
 import hivens.core.data.PackReference
 import hivens.launcher.runtime.RuntimeProvisioner
 import hivens.launcher.smrt.SmrtSyncService
+import hivens.launcher.sources.EngineSources
 import org.slf4j.LoggerFactory
 import java.nio.file.Path
 import java.time.Instant
@@ -95,7 +95,7 @@ class PackInstaller(
         val instance = PackInstance(
             id                    = instanceId,
             packRef               = PackReference(
-                origin  = PackOrigin.Mirror,
+                origin  = EngineSources.Mirror,
                 id      = packId,
                 // A mirror build that declares no version floats, same as the
                 // mrpack and CurseForge installers resolve it. The empty string

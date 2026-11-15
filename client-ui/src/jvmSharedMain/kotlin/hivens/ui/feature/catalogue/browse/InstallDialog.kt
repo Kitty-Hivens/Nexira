@@ -227,6 +227,8 @@ private fun SubjectBlock(subject: InstallSubject) {
 private class InstallDialogModel(
     val candidates: List<InstallCandidate>?,
     val failed: Boolean,
+    /** The source the project was found in cannot install it yet. */
+    val unsupported: Boolean,
     val listing: List<ProjectBuild>,
     val newPackLoaders: List<String?>,
     val rows: Map<String, CandidateState>,
@@ -259,6 +261,7 @@ private fun rememberInstallDialogModel(subject: InstallSubject): InstallDialogMo
     return InstallDialogModel(
         candidates = choice?.candidates,
         failed = choice?.failed == true,
+        unsupported = choice?.unsupported == true,
         listing = listing,
         newPackLoaders = newPackLoaders(listing),
         rows = choice?.rows.orEmpty(),
@@ -340,6 +343,7 @@ private fun ExistingPacks(model: InstallDialogModel) {
             list == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = NxColor.lead(), strokeWidth = 2.dp, modifier = Modifier.size(24.dp))
             }
+            model.unsupported -> Note(s.text("installSourceCannotInstall"))
             model.failed -> Note(s.text("installPickerFailed"), retry = model.retry)
             else -> {
                 val shown = list

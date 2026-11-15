@@ -30,25 +30,13 @@ object ProjectTypes {
     const val MODPACK: String = "modpack"
 }
 
-/** The pack sources a catalogue lists packs from, by the name the packs API gives them. */
-object PackOrigins {
-    const val MIRROR: String = "mirror"
-    const val MODRINTH: String = "modrinth"
-    const val SMARTYCRAFT: String = "smartycraft"
-    const val LOCAL: String = "local"
-    const val UNKNOWN: String = "unknown"
-}
-
 /**
- * The catalogue project type a search for [kind] from [origin] is for: the kind's own,
- * or modpacks while packs are listed from the catalogue. Null where packs are listed
- * from a source that is not the catalogue, which has no filters to offer.
+ * The catalogue project type a search for [kind] is for: the kind's own, or for packs
+ * the type their source lists them as through a project search ([SourceView.packType]).
+ * Null where packs are listed by a source that lists them itself, which has no project
+ * filters to offer.
  */
-fun catalogueTypeOf(kind: ProjectKind?, origin: String): String? = when {
-    kind != null -> kind.projectType
-    origin == PackOrigins.MODRINTH -> ProjectTypes.MODPACK
-    else -> null
-}
+fun catalogueTypeOf(kind: ProjectKind?, packType: String?): String? = kind?.projectType ?: packType
 
 /**
  * What a catalogue filter narrows. Each one is a field of the catalogue's search
@@ -100,7 +88,8 @@ enum class BrowseSort(val index: String) {
 
 /**
  * The pack Browse installs into, read off disk: what it runs and the kinds it takes
- * from the player. A mirror pack takes no mods, and a pack with no loader runs none.
+ * from the player. A pack whose source keeps its mods takes none, and a pack with no
+ * loader runs none.
  */
 data class BrowseTarget(
     val packId: String,
@@ -123,12 +112,12 @@ data class BrowseTarget(
 data class BrowseView(
     /** What is searched. Null stands for packs. */
     val kind: ProjectKind? = null,
-    /** The source packs come from as the person picked it, null until they did. */
+    /** The source packs come from as the person picked it, by id, null until they did. */
     val pickedOrigin: String? = null,
-    /** The source packs are listed from: the one picked, else the first one this build carries. */
-    val origin: String = PackOrigins.MIRROR,
-    /** Every pack source this build carries, in the order the rail lists them. */
-    val origins: List<String> = emptyList(),
+    /** The id of the source packs are listed from: the one picked, else the first one brought in, blank with none. */
+    val origin: String = "",
+    /** Every pack source the modules brought in, in the order the rail lists them. */
+    val sources: List<SourceView> = emptyList(),
     val query: String = "",
     val sort: BrowseSort = BrowseSort.Relevance,
     /** The pack installs go into, by id. Null means none is chosen, and a result then opens its page. */
@@ -149,27 +138,33 @@ data class BrowseView(
     val locked: List<SearchFilter> = emptyList(),
     /** Leaves out what the target pack already holds. */
     val hideInstalled: Boolean = false,
-    /** Lists the mirror's own packs. */
-    val mirrorOwn: Boolean = true,
-    /** Lists the packs the mirror's community built. */
-    val mirrorCommunity: Boolean = true,
+    /**
+     * The options of the sources' own filters the person switched off, whose packs are
+     * not listed. Every option is on until switched off, see [SourceFilter].
+     */
+    val hidden: Set<SourceOption> = emptySet(),
 ) {
+    /** The ids of [sources], in the same order. */
+    val origins: List<String> get() = sources.map { it.id }
+
+    /** The source packs are listed from, null where none is brought in. */
+    val source: SourceView? get() = sources.firstOrNull { it.id == origin }
+
     /** The catalogue project type searched now, see [catalogueTypeOf]. */
-    val type: String? get() = catalogueTypeOf(kind, origin)
+    val type: String? get() = catalogueTypeOf(kind, source?.packType)
 
     /** What the person chose for [type]. */
     fun chosenFor(type: String): Set<SearchFilter> = chosen[type].orEmpty()
 
+    /** Whether [option] is listed, which every option is until the person switches it off. */
+    fun lists(option: SourceOption): Boolean = option !in hidden
+
     /**
-     * Whether [card] is listed under the person's choice of who built it. The choice
-     * is the mirror's, the one source that lists a community beside its own packs, so a
-     * pack from any other source is always listed.
+     * Whether [card] is listed under the person's choices in its source's own filters:
+     * it is unless an option it falls under is switched off.
      */
-    fun shows(card: CatalogueCard): Boolean = when {
-        card.origin != PackOrigins.MIRROR -> true
-        card.community -> mirrorCommunity
-        else -> mirrorOwn
-    }
+    fun shows(card: CatalogueCard): Boolean =
+        card.facets.none { (filter, option) -> SourceOption(card.origin, filter, option) in hidden }
 }
 
 /** A filter of a project type, for the commands that choose, exclude or drop one. */
@@ -187,7 +182,7 @@ data class TagSearch(val type: String, val filters: Set<SearchFilter>, val packI
 
 /** A pack as a catalogue lists it, whichever source lists it. */
 data class CatalogueCard(
-    /** The source's name, see [PackOrigins]. */
+    /** The id of the source that lists it, see [SourceView.id]. */
     val origin: String,
     /** The source's own id for the pack. */
     val id: String,
@@ -203,6 +198,11 @@ data class CatalogueCard(
     val community: Boolean = false,
     /** Who built it, for a byline. Null where the source itself did. */
     val author: String? = null,
+    /**
+     * The option of each of its source's filters the pack falls under, by filter id
+     * ([SourceFilter.id]) to option id. A filter it names no option of leaves it listed.
+     */
+    val facets: Map<String, String> = emptyMap(),
 ) {
     /** The pack's identity across sources, since two sources may both have a pack "1". */
     val key: String get() = "$origin:$id"
@@ -234,6 +234,7 @@ data class ProjectHit(
  */
 data class SearchQuestion(
     val kind: ProjectKind?,
+    /** The id of the source packs are listed from. */
     val origin: String,
     /** The catalogue project type, null for packs listed from a source that is not the catalogue. */
     val type: String?,
@@ -255,6 +256,9 @@ sealed interface SearchStatus {
     /** The source answered and listed nothing. */
     data object Empty : SearchStatus
 
+    /** No module brought in brings a source that lists what is searched, so nobody was asked. */
+    data object NoSource : SearchStatus
+
     /** The search could not be run. [message] is the source's own words, null where there were none. */
     data class Failed(val message: String? = null) : SearchStatus
 }
@@ -269,12 +273,14 @@ data class ResultsScroll(val question: SearchQuestion, val mark: ScrollMark)
  * What the window's search found, and the installs started from it.
  *
  * Packs land in [packs] and projects in [projects], by which [question] asked. A pack
- * list is kept whole, so the person's choice of who built a pack is applied by the
- * reader with [BrowseView.shows] and taking it back asks the source nothing.
+ * list is kept whole, so the person's choices in the source's own filters are applied
+ * by the reader with [BrowseView.shows] and taking one back asks the source nothing.
  */
 data class SearchResults(
     /** The search these results answer, null before the first one was asked. */
     val question: SearchQuestion? = null,
+    /** The id of the project source that answered a project search, null for a pack listing or where none did. */
+    val projectSource: String? = null,
     val status: SearchStatus = SearchStatus.Loading,
     val packs: List<CatalogueCard> = emptyList(),
     val projects: List<ProjectHit> = emptyList(),

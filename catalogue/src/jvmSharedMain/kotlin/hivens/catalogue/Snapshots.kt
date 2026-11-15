@@ -2,17 +2,17 @@ package hivens.catalogue
 
 import hivens.catalogue.api.BrowseSort
 import hivens.catalogue.api.CatalogueCard
+import hivens.catalogue.api.PackDetails
 import hivens.catalogue.api.ProjectHit
 import hivens.catalogue.api.ScrollMark
 import hivens.catalogue.api.SearchFilter
-import hivens.core.api.catalogue.CataloguePackDetails
 
 /**
  * What a pack listing was last showing for a source and a query, kept for as long as
  * the app runs.
  *
- * The catalogue cache underneath answers a repeated search without the network, but it
- * answers from a coroutine, and a list that has to await an answer draws something in
+ * A source's own cache answers a repeated search without the network, but it answers
+ * from a coroutine, and a list that has to await an answer draws something in
  * the meantime. Drawing a spinner over a list the person was reading a second ago is
  * the part that shows. This holds the list itself, so the reader paints it at once and
  * the refresh replaces it silently.
@@ -34,13 +34,13 @@ class PackSnapshots {
     private val byKey = LinkedHashMap<String, Snapshot>()
 
     /** The last page read for a pack, so returning to it paints what was there. */
-    private val detailsByKey = LinkedHashMap<String, CataloguePackDetails>()
+    private val detailsByKey = LinkedHashMap<String, PackDetails>()
 
     @Synchronized
-    fun details(origin: String, packId: String): CataloguePackDetails? = detailsByKey["$origin|$packId"]
+    fun details(origin: String, packId: String): PackDetails? = detailsByKey["$origin|$packId"]
 
     @Synchronized
-    fun putDetails(origin: String, packId: String, details: CataloguePackDetails) {
+    fun putDetails(origin: String, packId: String, details: PackDetails) {
         val k = "$origin|$packId"
         detailsByKey.remove(k)
         detailsByKey[k] = details

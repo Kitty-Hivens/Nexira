@@ -23,7 +23,12 @@ package hivens.widget.api
  *    no longer the kernel's, and a module compiled in declares the kinds of contribution its
  *    API adds ([CompiledModule.contributionKinds]). [SettingsDomain.imported] is handed the
  *    value a domain holds, so taking a choice back from the former settings file keeps what
- *    that file never held.
+ *    that file never held. The host hands the modules it trusts what the modules brought in
+ *    contribute of the kinds the compiled modules take, compiled modules' contributions
+ *    among them ([TakenContributions], [TakenContribution]): the catalogue module's sources
+ *    reach it that way. A trusted module's service maker gets another module's view of a
+ *    level's services ([ServiceContext.servicesOf]), to run that module's code with what
+ *    that module may use.
  */
 object WidgetApi {
     const val VERSION: Int = 3

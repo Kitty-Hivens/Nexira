@@ -2,10 +2,10 @@ package hivens.launcher.update
 
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackInstance
-import hivens.core.data.PackOrigin
 import hivens.core.data.PackReference
 import hivens.core.io.InstanceMutationLock
 import hivens.core.launch.InstanceWorkRegistry
+import hivens.launcher.sources.EngineSources
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -49,7 +49,7 @@ class ApplyRecoveryTest {
 
     private fun instance(id: String, dir: String, followLatest: Boolean = true) = PackInstance(
         id = id,
-        packRef = PackReference(PackOrigin.Mirror, "pack", "5"),
+        packRef = PackReference(EngineSources.Mirror, "pack", "5"),
         displayName = dir,
         instanceDirName = dir,
         createdAtEpoch = 0L,

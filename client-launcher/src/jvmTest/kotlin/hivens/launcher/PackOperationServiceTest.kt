@@ -1,11 +1,11 @@
 package hivens.launcher
 
 import hivens.core.data.PackInstance
-import hivens.core.data.PackOrigin
 import hivens.core.data.PackReference
 import hivens.core.launch.InstanceWork
 import hivens.core.launch.InstanceWorkRegistry
 import hivens.launcher.instance.InstanceSizeService
+import hivens.launcher.sources.EngineSources
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -35,7 +35,7 @@ class PackOperationServiceTest {
 
     private val instance = PackInstance(
         id = "inst-1",
-        packRef = PackReference(PackOrigin.Mirror, "Industrial", "5"),
+        packRef = PackReference(EngineSources.Mirror, "Industrial", "5"),
         displayName = "Industrial",
         instanceDirName = "industrial",
         createdAtEpoch = 0L,

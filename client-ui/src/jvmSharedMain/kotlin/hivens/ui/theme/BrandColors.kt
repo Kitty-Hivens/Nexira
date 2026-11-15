@@ -7,6 +7,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import hivens.core.api.dto.smrt.SmrtSource
 import hivens.core.data.PackOrigin
+import hivens.launcher.sources.EngineSources
 
 // Two kinds of colour that are not the theme's.
 //
@@ -36,14 +37,16 @@ private val Local = BrandPair(Color(0xFF9CA3AF), Color(0xFF64748B))
 @Composable @ReadOnlyComposable
 private fun BrandPair.now(): Color = if (NxTheme.isDark) dark else light
 
-/** The brand colour of a pack's origin. */
+/**
+ * The brand colour of a pack's origin. A source with no brand here, a module's own or
+ * one that is not loaded, is drawn in the local grey.
+ */
 @Composable @ReadOnlyComposable
 fun originColor(origin: PackOrigin): Color = when (origin) {
-    PackOrigin.Smartycraft -> Smartycraft.now()
-    PackOrigin.Mirror      -> Mirror.now()
-    PackOrigin.Modrinth    -> Modrinth.now()
-    PackOrigin.Local,
-    PackOrigin.Unknown     -> Local.now()
+    PackOrigin.Smartycraft  -> Smartycraft.now()
+    EngineSources.Mirror    -> Mirror.now()
+    EngineSources.Modrinth  -> Modrinth.now()
+    else                    -> Local.now()
 }
 
 /** The brand colour of a mirror source type; follows [originColor]'s mapping. */

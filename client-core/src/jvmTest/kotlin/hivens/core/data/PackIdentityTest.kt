@@ -12,7 +12,7 @@ class PackIdentityTest {
 
     private fun instance(
         id: String = "8f14e45f-ea0d-4f8a-9c2b-1f2d3e4a5b6c",
-        packRef: PackReference = PackReference(PackOrigin.Mirror, "industrial", "2026.01.01"),
+        packRef: PackReference = PackReference(PackOrigin("Mirror"), "industrial", "2026.01.01"),
         instanceDirName: String = "industrial-8f14e45f",
         forkedFrom: PackReference? = null,
         pinnedPackVersion: String? = "2026.01.01",
@@ -28,7 +28,7 @@ class PackIdentityTest {
 
     @Test
     fun `a reference with an id and a pin is valid`() {
-        assertTrue(PackIdentity.isValid(PackReference(PackOrigin.Mirror, "industrial", "2026.01.01")))
+        assertTrue(PackIdentity.isValid(PackReference(PackOrigin("Mirror"), "industrial", "2026.01.01")))
     }
 
     @Test
@@ -38,13 +38,13 @@ class PackIdentityTest {
 
     @Test
     fun `a reference without an id names no pack`() {
-        assertFalse(PackIdentity.isValid(PackReference(PackOrigin.Mirror, "")))
-        assertFalse(PackIdentity.isValid(PackReference(PackOrigin.Mirror, "   ")))
+        assertFalse(PackIdentity.isValid(PackReference(PackOrigin("Mirror"), "")))
+        assertFalse(PackIdentity.isValid(PackReference(PackOrigin("Mirror"), "   ")))
     }
 
     @Test
     fun `a blank version is neither a pin nor floating`() {
-        assertFalse(PackIdentity.isValid(PackReference(PackOrigin.Mirror, "industrial", "")))
+        assertFalse(PackIdentity.isValid(PackReference(PackOrigin("Mirror"), "industrial", "")))
     }
 
     @Test
@@ -64,7 +64,7 @@ class PackIdentityTest {
         assertTrue(blankDir.message!!.contains("instanceDirName"), blankDir.message)
 
         val danglingRef = assertFailsWith<IllegalArgumentException> {
-            PackIdentity.require(instance(packRef = PackReference(PackOrigin.Mirror, "")))
+            PackIdentity.require(instance(packRef = PackReference(PackOrigin("Mirror"), "")))
         }
         assertTrue(danglingRef.message!!.contains("packRef"), danglingRef.message)
 
@@ -81,7 +81,7 @@ class PackIdentityTest {
 
     @Test
     fun `a fork of a well-formed reference is accepted`() {
-        val forked = instance(forkedFrom = PackReference(PackOrigin.Mirror, "industrial", "2025.12.01"))
+        val forked = instance(forkedFrom = PackReference(PackOrigin("Mirror"), "industrial", "2025.12.01"))
         assertSame(forked, PackIdentity.require(forked))
     }
 
@@ -89,8 +89,8 @@ class PackIdentityTest {
     fun `normalize turns every blank version into an absent one`() {
         val repaired = PackIdentity.normalize(
             instance(
-                packRef = PackReference(PackOrigin.Mirror, "industrial", ""),
-                forkedFrom = PackReference(PackOrigin.Mirror, "industrial", ""),
+                packRef = PackReference(PackOrigin("Mirror"), "industrial", ""),
+                forkedFrom = PackReference(PackOrigin("Mirror"), "industrial", ""),
                 pinnedPackVersion = "",
             ),
         )

@@ -54,10 +54,11 @@ import hivens.catalogue.api.CatalogueKeys
 import hivens.catalogue.api.FilterClear
 import hivens.catalogue.api.FilterField
 import hivens.catalogue.api.FilterPick
-import hivens.catalogue.api.PackOrigins
 import hivens.catalogue.api.ProjectKind
 import hivens.catalogue.api.ProjectTarget
 import hivens.catalogue.api.SearchResults
+import hivens.catalogue.api.SourceIcon
+import hivens.catalogue.api.SourceView
 import hivens.catalogue.api.catalogueTypeOf
 import hivens.i18n.api.Strings
 import hivens.ui.Screen
@@ -119,9 +120,9 @@ fun BrowseSearchWidget(instance: WidgetInstance) {
             onValueChange = type,
             placeholder   = searchPlaceholder(browse.kind, s),
             modifier      = Modifier.padding(bottom = 10.dp),
-            // The catalogue sorts its own lists and not the mirror's, which comes in the
-            // order the mirror publishes it.
-            trailing      = if (browse.kind != null || browse.origin == PackOrigins.MODRINTH) {
+            // A project search is sorted. A source that lists its packs itself lists them
+            // in its own order.
+            trailing      = if (browse.type != null) {
                 { SortPicker(browse.sort, wordless = narrow) }
             } else {
                 null
@@ -228,8 +229,9 @@ fun BrowseResultsWidget(instance: WidgetInstance) {
         val mine = results.question?.let { it.kind == kind && it.origin == from } == true
         if (mine) last[0] = results
         val shown = if (mine) results else last[0] ?: SearchResults()
-        if (catalogueTypeOf(kind, from) == null) {
-            PackBrowse(shown, openPack, shown = browse::shows)
+        if (catalogueTypeOf(kind, browse.sources.firstOrNull { it.id == from }?.packType) == null) {
+            val source = browse.sources.firstOrNull { it.id == from }
+            PackBrowse(shown, openPack, shown = browse::shows, sourceName = source?.let { sourceLabel(it) } ?: from)
         } else {
             ProjectResults(results = shown, kind = kind, onOpenProject = openProject, onOpenPack = openPack)
         }
@@ -411,7 +413,7 @@ fun BrowseScopeWidget(instance: WidgetInstance) {
     val setKind = rememberScopedCommand(CatalogueKeys.SetKind)
     val setOrigin = rememberScopedCommand(CatalogueKeys.SetOrigin)
     val s = nexiraStrings()
-    val origins = browse.origins
+    val sources = browse.sources
     val target = browse.target
 
     RailBlock(s.text("browseRailFind")) {
@@ -440,29 +442,21 @@ fun BrowseScopeWidget(instance: WidgetInstance) {
             }
         }
         AnimatedVisibility(
-            visible = browse.kind == null && origins.size > 1,
+            visible = browse.kind == null && sources.size > 1,
             enter   = Motion.reveal.enter,
             exit    = Motion.reveal.exit,
         ) {
             RailGroup {
                 RailLabel(s.text("browseRailSource"))
-                SourceSwitch(origins, browse.origin) { setOrigin?.invoke(it) }
+                SourceSwitch(sources, browse.origin) { setOrigin?.invoke(it) }
             }
         }
-        origins.forEach { o -> PuppetClick("browse.source.${PUPPET_ORIGIN_NAMES[o] ?: o}") { setOrigin?.invoke(o) } }
+        // A driver clicks a source by its id.
+        sources.forEach { o -> PuppetClick("browse.source.${o.id}") { setOrigin?.invoke(o.id) } }
     }
 }
 
 internal val TILE_GAP = 6.dp
-
-/** The names a driver clicks a source by, which were the engine's own before the module named them in lower case. */
-private val PUPPET_ORIGIN_NAMES = mapOf(
-    PackOrigins.MIRROR to "Mirror",
-    PackOrigins.MODRINTH to "Modrinth",
-    PackOrigins.SMARTYCRAFT to "Smartycraft",
-    PackOrigins.LOCAL to "Local",
-    PackOrigins.UNKNOWN to "Unknown",
-)
 
 private fun kindIcon(kind: ProjectKind?): IconKey = when (kind) {
     null -> NxIcon.Inventory2
@@ -471,18 +465,11 @@ private fun kindIcon(kind: ProjectKind?): IconKey = when (kind) {
     ProjectKind.ShaderPack -> NxIcon.LightMode
 }
 
-private fun originIcon(origin: String): IconKey = when (origin) {
-    PackOrigins.MIRROR -> NxIcon.Storage
-    PackOrigins.MODRINTH -> NxIcon.Public
-    PackOrigins.SMARTYCRAFT -> NxIcon.Lan
-    PackOrigins.LOCAL -> NxIcon.Folder
-    else -> NxIcon.Language
-}
-
 /**
  * One choice as a tile: its mark over its name, filled with the accent while chosen.
  * With [glyphFill] the mark fills in as it is chosen, for a tile that is switched on
- * and off rather than picked from a set.
+ * and off rather than picked from a set. A [sourceIcon] is a source's own mark, drawn
+ * in place of [icon].
  */
 @Composable
 internal fun KindTile(
@@ -492,6 +479,7 @@ internal fun KindTile(
     dimmed: Boolean,
     onClick: () -> Unit,
     glyphFill: Boolean = false,
+    sourceIcon: SourceIcon? = null,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
@@ -538,7 +526,11 @@ internal fun KindTile(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(5.dp, Alignment.CenterVertically),
     ) {
-        Symbol(icon, contentDescription = null, tint = ink, fill = solid, size = 22.dp, modifier = Modifier.offset(y = (-2).dp * lift))
+        if (sourceIcon != null) {
+            SourceMark(sourceIcon, tint = ink, size = 22.dp, fill = solid, modifier = Modifier.offset(y = (-2).dp * lift))
+        } else {
+            Symbol(icon, contentDescription = null, tint = ink, fill = solid, size = 22.dp, modifier = Modifier.offset(y = (-2).dp * lift))
+        }
         Text(
             label,
             style = MaterialTheme.typography.labelLarge,
@@ -558,13 +550,13 @@ private val TILE_HEIGHT = 64.dp
  * one, rather than buttons that light up in turn.
  */
 @Composable
-private fun SourceSwitch(origins: List<String>, selected: String, onSelect: (String) -> Unit) {
+private fun SourceSwitch(sources: List<SourceView>, selected: String, onSelect: (String) -> Unit) {
     val shape = MaterialTheme.shapes.medium
     BoxWithConstraints(
         Modifier.fillMaxWidth().height(SWITCH_HEIGHT).clip(shape).background(NxColor.wash(NxInk.quiet, 0.08f)).padding(3.dp),
     ) {
-        val cell = maxWidth / origins.size
-        val index = origins.indexOf(selected).coerceAtLeast(0)
+        val cell = maxWidth / sources.size
+        val index = sources.indexOfFirst { it.id == selected }.coerceAtLeast(0)
         val at by animateDpAsState(cell * index, animationSpec = Motion.track.of(), label = "sourceThumb")
         Box(
             Modifier.offset(x = at).width(cell).fillMaxSize()
@@ -572,20 +564,20 @@ private fun SourceSwitch(origins: List<String>, selected: String, onSelect: (Str
                 .background(NxColor.wash(NxColor.lead(), 0.22f)),
         )
         Row(Modifier.fillMaxSize()) {
-            origins.forEach { origin ->
-                val chosen = origin == selected
+            sources.forEach { source ->
+                val chosen = source.id == selected
                 val ink by animateColorAsState(
                     if (chosen) NxColor.lead() else NxInk.quiet,
                     animationSpec = Motion.colorShift.of(),
                     label = "sourceInk",
                 )
                 Row(
-                    Modifier.weight(1f).fillMaxSize().clip(MaterialTheme.shapes.small).clickable { onSelect(origin) },
+                    Modifier.weight(1f).fillMaxSize().clip(MaterialTheme.shapes.small).clickable { onSelect(source.id) },
                     horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Symbol(originIcon(origin), contentDescription = null, tint = ink, size = 16.dp)
-                    Text(originLabel(origin), style = MaterialTheme.typography.labelLarge, color = ink, fontWeight = if (chosen) FontWeight.SemiBold else FontWeight.Medium, maxLines = 1)
+                    SourceMark(source.icon, tint = ink, size = 16.dp)
+                    Text(sourceLabel(source), style = MaterialTheme.typography.labelLarge, color = ink, fontWeight = if (chosen) FontWeight.SemiBold else FontWeight.Medium, maxLines = 1)
                 }
             }
         }

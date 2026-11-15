@@ -522,10 +522,12 @@ public abstract interface class hivens/widget/api/ServiceContext {
 	public fun getHostServices ()Lhivens/widget/api/LevelServices;
 	public abstract fun getLevel ()Lhivens/widget/model/ScopeLevel;
 	public abstract fun getServices ()Lhivens/widget/api/LevelServices;
+	public fun servicesOf (Ljava/lang/String;)Lhivens/widget/api/LevelServices;
 }
 
 public final class hivens/widget/api/ServiceContext$DefaultImpls {
 	public static fun getHostServices (Lhivens/widget/api/ServiceContext;)Lhivens/widget/api/LevelServices;
+	public static fun servicesOf (Lhivens/widget/api/ServiceContext;Ljava/lang/String;)Lhivens/widget/api/LevelServices;
 }
 
 public abstract interface class hivens/widget/api/SettingsChange {
@@ -593,6 +595,22 @@ public final class hivens/widget/api/SurfaceFamilyKt {
 	public static final fun activeFamilyOf-IOSq_pM (Ljava/lang/String;Landroidx/compose/runtime/Composer;I)Ljava/lang/String;
 	public static final fun getLocalFamilyOverrides ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 	public static final fun getLocalSurfaceFamilies ()Landroidx/compose/runtime/ProvidableCompositionLocal;
+}
+
+public final class hivens/widget/api/TakenContribution {
+	public static final field $stable I
+	public fun <init> (Ljava/lang/String;Lhivens/widget/api/ModuleContribution;)V
+	public final fun getItem ()Lhivens/widget/api/ModuleContribution;
+	public final fun getModuleId ()Ljava/lang/String;
+}
+
+public abstract interface class hivens/widget/api/TakenContributions {
+	public abstract fun getAll ()Lkotlinx/coroutines/flow/StateFlow;
+	public fun getCompiledIn ()Ljava/util/List;
+}
+
+public final class hivens/widget/api/TakenContributions$DefaultImpls {
+	public static fun getCompiledIn (Lhivens/widget/api/TakenContributions;)Ljava/util/List;
 }
 
 public final class hivens/widget/api/ViewportExtent {

@@ -32,7 +32,6 @@ import androidx.compose.ui.unit.dp
 import hivens.catalogue.api.CatalogueKeys
 import hivens.catalogue.api.GameVersionTag
 import hivens.catalogue.api.PackDetails
-import hivens.catalogue.api.PackOrigins
 import hivens.catalogue.api.PackPageStatus
 import hivens.catalogue.api.PackVisit
 import hivens.catalogue.api.ProjectBuild
@@ -254,7 +253,7 @@ internal val CataloguePackPageSource: SourceKey<CataloguePackPage> = SourceKey("
 internal fun sampleCataloguePackPage(): CataloguePackPage {
     val build = ProjectBuild(id = "1.0.0", name = "1.0.0", versionNumber = "1.0.0", versionType = "release", gameVersions = emptyList(), loaders = emptyList(), datePublished = "")
     val details = PackDetails(
-        origin = PackOrigins.MIRROR,
+        origin = "sample",
         id = "sample",
         title = "Sample Pack",
         tagline = "A pack as this page shows one.",

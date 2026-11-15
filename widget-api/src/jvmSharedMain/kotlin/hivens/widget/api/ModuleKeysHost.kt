@@ -511,6 +511,13 @@ class ContributedServices {
             override val services: LevelServices = WithStores(this@Shelf.services, stores)
             override val hostServices: LevelServices =
                 if (declaration.trusted) WithStores(this@Shelf.hostServices, stores) else services
+
+            override fun servicesOf(moduleId: String): LevelServices =
+                if (declaration.trusted) {
+                    WithStores(this@Shelf.services, OwnedStores.of(this@Shelf.hostServices, moduleId, this@ContributedServices))
+                } else {
+                    WithoutSettings(this@Shelf.services)
+                }
         }
 
         // One gate per service type, held while its maker runs.

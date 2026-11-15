@@ -61,6 +61,9 @@ sealed interface InstallProblem {
 
     /** It ran and left the build that was asked for out, for [reason]. */
     data class LeftOut(val reason: SkipReason) : InstallProblem
+
+    /** The source the project was found in cannot install it yet, so nothing was asked of any other. */
+    data object SourceCannotInstall : InstallProblem
 }
 
 /** What an install that asks where is for, as its dialog names it. */
@@ -69,6 +72,11 @@ data class InstallSubject(
     val title: String,
     val iconUrl: String? = null,
     val author: String = "",
+    /**
+     * The id of the project source it was found in ([SearchResults.projectSource]), null
+     * for a project page, whose project is the one source the launcher installs from.
+     */
+    val source: String? = null,
 )
 
 /** How one pack answers whether the project can go into it. */
@@ -139,6 +147,8 @@ data class InstallChoiceView(
     val candidates: List<InstallCandidate>? = null,
     /** The project's build list could not be read, so no pack has an answer. */
     val failed: Boolean = false,
+    /** The source the project was found in cannot install it yet, so no pack was asked. */
+    val unsupported: Boolean = false,
     /** The project's builds, for what a pack made for it could run. */
     val listing: List<ProjectBuild> = emptyList(),
     /** Installs started into a pack, by pack id. A pack nothing was started for is absent. */

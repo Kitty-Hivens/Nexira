@@ -9,6 +9,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.core.data.PackInstance
+import hivens.ui.components.sourceName
 import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.NxField
 import hivens.ui.nx.NxSettingBlock
@@ -48,7 +49,7 @@ internal fun PackGeneralSection(pack: PackInstance, save: (PackEdit) -> Unit) {
     }
 
     NxSettingGroup(s.text("packSettingsSource")) {
-        NxSettingRow(s.text("packSettingsSource")) { Value(pack.packRef.origin.name) }
+        NxSettingRow(s.text("packSettingsSource")) { Value(sourceName(pack.packRef.origin)) }
         pack.cachedManifest?.let { manifest ->
             NxSettingRow(s.text("packSettingsLoader")) { Value(runtimeLine(manifest, s)) }
         }

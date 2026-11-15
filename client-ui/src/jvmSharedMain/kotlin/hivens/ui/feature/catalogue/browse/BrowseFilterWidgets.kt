@@ -48,8 +48,9 @@ import androidx.compose.ui.unit.dp
 import hivens.catalogue.api.CatalogueKeys
 import hivens.catalogue.api.FilterField
 import hivens.catalogue.api.FilterPick
-import hivens.catalogue.api.PackOrigins
 import hivens.catalogue.api.SearchFilter
+import hivens.catalogue.api.SourceOption
+import hivens.i18n.api.strings
 import hivens.ui.components.LoaderGlyph
 import hivens.ui.components.hasLoaderGlyph
 import hivens.ui.i18n.nexiraStrings
@@ -146,44 +147,40 @@ fun BrowseInstalledFilterWidget(instance: WidgetInstance) {
 }
 
 /**
- * Whose mirror packs are listed: the mirror's own, its community's, or both. Only
- * there while packs are listed from the mirror, the one source with a community.
+ * The ways the source packs are listed from splits its own list, a block for each
+ * filter it declares, named and worded by the source. Only there while packs are listed
+ * from a source that declares one. The widget keeps the id it had while the one such
+ * filter was who built a mirror pack, so a layout that placed it keeps it.
  */
 @Widget(id = "browse.filter.builtBy", displayName = "widget.browse.filter.builtBy", surface = CARD)
 @Composable
-fun BrowseBuiltByFilterWidget(instance: WidgetInstance) {
+fun BrowseSourceFiltersWidget(instance: WidgetInstance) {
     val browse = rememberScopedSource(CatalogueKeys.Browse).valueOrNull() ?: return
     // Flipped where the view is kept, since the view read here arrives a frame late.
-    val toggleOwn = rememberScopedAction(CatalogueKeys.ToggleMirrorOwn)
-    val toggleCommunity = rememberScopedAction(CatalogueKeys.ToggleMirrorCommunity)
-    val s = nexiraStrings()
-    if (browse.kind != null || browse.origin != PackOrigins.MIRROR) return
-    PuppetClick("browse.filter.builtBy.own") { toggleOwn?.invoke() }
-    PuppetClick("browse.filter.builtBy.community") { toggleCommunity?.invoke() }
-    // Two tiles switched on and off rather than two switches: the same plane as the
-    // kind tiles above, so the rail reads as one set of controls, with the mark
-    // filling in for what is listed.
-    RailBlock(s.text("browseFilterBuiltBy")) {
-        Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(TILE_GAP)) {
-            Box(Modifier.weight(1f).fillMaxHeight()) {
-                KindTile(
-                    label = originLabel(PackOrigins.MIRROR),
-                    icon = NxIcon.Verified,
-                    selected = browse.mirrorOwn,
-                    dimmed = false,
-                    onClick = { toggleOwn?.invoke() },
-                    glyphFill = true,
-                )
-            }
-            Box(Modifier.weight(1f).fillMaxHeight()) {
-                KindTile(
-                    label = s.text("browseFilterCommunity"),
-                    icon = NxIcon.Groups,
-                    selected = browse.mirrorCommunity,
-                    dimmed = false,
-                    onClick = { toggleCommunity?.invoke() },
-                    glyphFill = true,
-                )
+    val toggle = rememberScopedCommand(CatalogueKeys.ToggleSourceOption)
+    val source = browse.source?.takeIf { browse.kind == null } ?: return
+    val words = strings(source.module)
+    source.filters.forEach { filter ->
+        val options = filter.options.map { SourceOption(source.id, filter.id, it.id) to it }
+        options.forEach { (pick, _) -> PuppetClick("browse.filter.${filter.id}.${pick.option}") { toggle?.invoke(pick) } }
+        // Tiles switched on and off rather than switches: the same plane as the kind
+        // tiles above, so the rail reads as one set of controls, with the mark filling
+        // in for what is listed.
+        RailBlock(words.text(filter.label)) {
+            Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(TILE_GAP)) {
+                options.forEach { (pick, option) ->
+                    Box(Modifier.weight(1f).fillMaxHeight()) {
+                        KindTile(
+                            label = words.text(option.label),
+                            icon = NxIcon.Language,
+                            sourceIcon = option.icon,
+                            selected = browse.lists(pick),
+                            dimmed = false,
+                            onClick = { toggle?.invoke(pick) },
+                            glyphFill = true,
+                        )
+                    }
+                }
             }
         }
     }

@@ -18,6 +18,7 @@ import hivens.core.launch.InstanceWorkRegistry
 import hivens.launcher.instance.InstanceBusyException
 import hivens.launcher.instance.InstanceSizeService
 import hivens.launcher.instance.PackInstanceService
+import hivens.launcher.sources.EngineSources
 import hivens.launcher.update.PackUpdateService
 import hivens.ui.i18n.nexiraStrings
 import hivens.ui.utils.humanSize
@@ -142,7 +143,7 @@ internal fun PackDataSection(
         }
         // Mirror-only: a repair measures the instance against a published manifest,
         // and a local or imported pack has none to measure against.
-        if (pack.packRef.origin == PackOrigin.Mirror) {
+        if (pack.packRef.origin == EngineSources.Mirror) {
             NxSettingRow(s.text("packSettingsRepair"), detail = s.text("packSettingsRepairDesc")) {
                 PuppetClick("packSettings.data.repair") { runningGuard.run(::runRepair) }
                 NxButton(

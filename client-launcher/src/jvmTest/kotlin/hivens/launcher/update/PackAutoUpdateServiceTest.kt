@@ -17,6 +17,7 @@ import hivens.core.update.UpdateCheck
 import hivens.core.update.UpdateDirection
 import hivens.core.update.UpdateOutcome
 import hivens.core.update.UpdatePlan
+import hivens.launcher.sources.EngineSources
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.Flow
@@ -70,7 +71,7 @@ class PackAutoUpdateServiceTest {
         override suspend fun rollback(instance: PackInstance, snapshotId: String): PackInstance = instance
     }
 
-    private fun instance(id: String, origin: PackOrigin = PackOrigin.Mirror, followLatest: Boolean = true) =
+    private fun instance(id: String, origin: PackOrigin = EngineSources.Mirror, followLatest: Boolean = true) =
         PackInstance(
             id = id,
             packRef = PackReference(origin, id, "2026.01.01"),
@@ -283,7 +284,7 @@ class PackAutoUpdateServiceTest {
     fun `an instance from another source is updated once something handles it`() = runTest {
         // The behaviour this replaced: the pass tested for the mirror by name, so
         // a Modrinth instance was never even checked no matter what could update it.
-        val repo = FakeRepo(listOf(instance("mr", origin = PackOrigin.Modrinth)))
+        val repo = FakeRepo(listOf(instance("mr", origin = EngineSources.Modrinth)))
         val updater = FakeUpdater(mapOf("mr" to available(CompatChange.Same)))
         val service = PackAutoUpdateService(repo, updater, { settings() }, InstanceWorkRegistry(), { null })
 

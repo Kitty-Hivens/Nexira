@@ -28,6 +28,7 @@ import hivens.core.update.UpdateDirection
 import hivens.core.update.VersionChannel
 import hivens.launcher.PackOperation
 import hivens.launcher.PackOperationPhase
+import hivens.launcher.sources.EngineSources
 import hivens.packs.api.PackKeys
 import hivens.ui.i18n.nexiraStrings
 import hivens.widget.api.rememberScopedCommand
@@ -97,7 +98,7 @@ internal fun PackVersionSection(
     // do not render. Asked of the mirror only for a mirror pack: the section also
     // serves a Modrinth instance, whose id the mirror has never heard of, and asking
     // anyway spent two requests on a pair of 404s.
-    val isMirror = pack.packRef.origin == PackOrigin.Mirror
+    val isMirror = pack.packRef.origin == EngineSources.Mirror
     val installedChannel by produceState<VersionChannel?>(null, pack.id, current) {
         if (!isMirror) return@produceState
         value = bestEffort { mirror.fetchManifestVersion(pack.packRef.id, current).versionChannel }

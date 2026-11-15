@@ -1,10 +1,11 @@
 package hivens.packs.api
 
 /**
- * Where a pack comes from: the name of its source and the pack's id there, with the
- * build it points at where it points at one. [origin] is the source's name in lower
- * case, `mirror`, `modrinth`, `curseforge` or `local` among them, and a reader treats
- * one it does not know as just another source.
+ * Where a pack comes from: the id of its source and the pack's id there, with the
+ * build it points at where it points at one. [origin] is the source's id exactly as the
+ * pack's record carries it, `Local` for a pack of the user's own and otherwise the id a
+ * source module declares, and a reader treats one it does not know as a source whose
+ * module is not brought in.
  */
 data class PackSource(
     val origin: String,
@@ -94,8 +95,9 @@ sealed interface LaunchView {
     data class Failed(val code: String, val detail: String? = null) : LaunchView
 }
 
-/** One build of a catalogue pack to install, by the source's name (see [PackSource.origin]) and its ids there. */
+/** One build of a catalogue pack to install, by the source's id (see [PackSource.origin]) and its ids there. */
 data class InstallRequest(
+    /** The source's id exactly as a record carries it. Another spelling, `mirror` for `Mirror` say, names no source. */
     val origin: String,
     val packId: String,
     val versionId: String,
@@ -105,6 +107,7 @@ data class InstallRequest(
 data class InstallView(
     /** What [PackKeys.DismissInstall] and [PackKeys.CancelInstall] take. */
     val key: String,
+    /** The id of the source it is installed from, as [PackSource.origin] gives it. */
     val origin: String,
     val packId: String,
     val versionId: String,

@@ -51,11 +51,11 @@ import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
 import hivens.catalogue.api.CatalogueCard
 import hivens.catalogue.api.CatalogueKeys
-import hivens.catalogue.api.PackOrigins
 import hivens.catalogue.api.ResultsScroll
 import hivens.catalogue.api.ScrollMark
 import hivens.catalogue.api.SearchResults
 import hivens.catalogue.api.SearchStatus
+import hivens.i18n.api.Strings
 import hivens.ui.RIGHT_RAIL_SURFACE
 import hivens.ui.RailFamily
 import hivens.ui.i18n.nexiraStrings
@@ -83,8 +83,8 @@ import hivens.widget.model.SlotId
 import hivens.widget.model.SurfaceId
 import java.util.UUID
 /**
- * Browse = the catalogue of everything installable: packs from every registered
- * source, and mods, resource packs and shaders from Modrinth.
+ * Browse = the catalogue of everything installable: packs from every source the modules
+ * brought in, and mods, resource packs and shaders from the project sources.
  *
  * The screen is a widget surface and owns none of its controls. What is searched,
  * in what order and into which pack is chosen in the right rail's browse family;
@@ -172,6 +172,8 @@ internal fun PackBrowse(
      * what it hid without asking the source again.
      */
     shown: (CatalogueCard) -> Boolean = { true },
+    /** What the source packs are listed from is called, for what the list says when it has nothing to show. */
+    sourceName: String = "",
 ) {
     val s = nexiraStrings()
     val imageContext = LocalPlatformContext.current
@@ -195,8 +197,12 @@ internal fun PackBrowse(
 
     when (val status = results.status) {
         SearchStatus.Loading -> BrowseLoading()
-        SearchStatus.Empty -> BrowseEmpty(onRetry = { retry?.invoke() })
-        is SearchStatus.Failed -> BrowseError(message = status.message ?: s.text("browseErrorMessage"), onRetry = { retry?.invoke() })
+        SearchStatus.Empty, SearchStatus.NoSource -> BrowseEmpty(
+            notice = checkNotNull(browseNotice(status, sourceName, s)),
+            // Nobody was asked where no source is loaded, so there is nothing to ask again.
+            onRetry = if (status == SearchStatus.Empty) fun() { retry?.invoke() } else null,
+        )
+        is SearchStatus.Failed -> BrowseError(notice = checkNotNull(browseNotice(status, sourceName, s)), onRetry = { retry?.invoke() })
         SearchStatus.Loaded -> {
             val visible = results.packs.filter(shown)
             if (visible.isEmpty()) {
@@ -376,14 +382,6 @@ internal fun SearchField(
     }
 }
 
-internal fun originLabel(origin: String): String = when (origin) {
-    PackOrigins.MIRROR -> "Hivens"
-    PackOrigins.MODRINTH -> "Modrinth"
-    PackOrigins.SMARTYCRAFT -> "SmartyCraft"
-    PackOrigins.LOCAL -> "Local"
-    else -> "Other"
-}
-
 @Composable
 internal fun BrowseLoading() {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -395,8 +393,25 @@ internal fun BrowseLoading() {
     }
 }
 
+/** What Browse says over a list with nothing to show: a title and the words under it. */
+internal data class BrowseNotice(val title: String, val message: String)
+
+/**
+ * What a pack list with nothing to show says for [status], in the name of the source
+ * called [source], or null for a list that shows something or is still on its way.
+ * No source loaded is its own case: nothing was asked, so nothing is said to be empty
+ * or unreachable.
+ */
+internal fun browseNotice(status: SearchStatus, source: String, s: Strings): BrowseNotice? = when (status) {
+    SearchStatus.Empty -> BrowseNotice(s.text("browseEmptyTitle"), s.text("browseEmptyMessage", source))
+    is SearchStatus.Failed -> BrowseNotice(s.text("browseErrorTitle", source), status.message ?: s.text("browseErrorMessage", source))
+    SearchStatus.NoSource -> BrowseNotice(s.text("browseNoSourceTitle"), s.text("browseNoSourceMessage"))
+    SearchStatus.Loading, SearchStatus.Loaded -> null
+}
+
+/** [notice] centred, with a retry under it where [onRetry] is one. */
 @Composable
-private fun BrowseEmpty(onRetry: () -> Unit) {
+internal fun BrowseEmpty(notice: BrowseNotice, onRetry: (() -> Unit)?) {
     val s = nexiraStrings()
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(
@@ -404,29 +419,29 @@ private fun BrowseEmpty(onRetry: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
-                text       = s.text("browseEmptyTitle"),
+                text       = notice.title,
                 style      = MaterialTheme.typography.titleLarge,
                 color      = NxInk.main,
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
-                text      = s.text("browseEmptyMessage"),
+                text      = notice.message,
                 style     = MaterialTheme.typography.bodyMedium,
                 color     = NxInk.quiet,
                 textAlign = TextAlign.Center,
                 modifier  = Modifier.widthIn(max = 420.dp),
             )
-            NxButton(label = s.text("browseRetry"), onClick = onRetry)
+            onRetry?.let { NxButton(label = s.text("browseRetry"), onClick = it) }
         }
     }
 }
 
 @Composable
-private fun BrowseError(message: String, onRetry: () -> Unit) {
+private fun BrowseError(notice: BrowseNotice, onRetry: () -> Unit) {
     val s = nexiraStrings()
     RetryStateBlock(
-        title      = s.text("browseErrorTitle"),
-        message    = message,
+        title      = notice.title,
+        message    = notice.message,
         retryLabel = s.text("browseRetry"),
         onRetry    = onRetry,
         modifier   = Modifier.fillMaxSize(),

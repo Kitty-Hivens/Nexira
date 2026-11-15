@@ -29,6 +29,7 @@ import dev.hivens.libvault.VaultConfig
 import dev.hivens.libvault.VaultTier
 import hivens.auth.CredentialsManager
 import hivens.launcher.smrt.SmrtPackClient
+import hivens.launcher.sources.EngineSources
 import io.mockk.coEvery
 import io.mockk.coJustRun
 import io.mockk.coVerify
@@ -230,7 +231,7 @@ class LauncherControllerTest {
         val instance = hivens.core.data.PackInstance(
             id                    = "i-1",
             packRef               = hivens.core.data.PackReference(
-                origin  = hivens.core.data.PackOrigin.Mirror,
+                origin  = EngineSources.Mirror,
                 id      = "modern-explorer",
                 version = "2026.05.26.1",
             ),
@@ -308,7 +309,7 @@ class LauncherControllerTest {
         val instance = hivens.core.data.PackInstance(
             id                    = "i-running",
             packRef               = hivens.core.data.PackReference(
-                origin  = hivens.core.data.PackOrigin.Mirror,
+                origin  = EngineSources.Mirror,
                 id      = "modern-explorer",
                 version = "2026.05.26.1",
             ),
@@ -342,7 +343,7 @@ class LauncherControllerTest {
     private fun packInstance(id: String) = hivens.core.data.PackInstance(
         id                    = id,
         packRef               = hivens.core.data.PackReference(
-            origin  = hivens.core.data.PackOrigin.Mirror,
+            origin  = EngineSources.Mirror,
             id      = "modern-explorer",
             version = "2026.05.26.1",
         ),
@@ -610,7 +611,7 @@ class LauncherControllerTest {
         packId: String = "test-sc",
         serverId: String = "Industrial",
         authRequirement: PackAuthRequirement? = PackAuthRequirement.SmartyCraft(serverId),
-        origin: PackOrigin = PackOrigin.Mirror,
+        origin: PackOrigin = EngineSources.Mirror,
     ): hivens.core.data.PackInstance {
         val instance = hivens.core.data.PackInstance(
             id                    = id,
@@ -938,6 +939,38 @@ class LauncherControllerTest {
         assertEquals(true, sessionPassed.captured.offline)
     }
 
+    /**
+     * A pack from a source no module brings, a source the build has never heard of:
+     * nothing the launch does asks its source, so it plays from what it has on disk.
+     */
+    @Test
+    fun `a pack whose source is not loaded launches from what it has on disk`() = runTest {
+        every { settingsService.getSettings() } returns SettingsData()
+        coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/opt/jdk8/bin/java")
+        val handle = mockk<LaunchHandle>()
+        coEvery { handle.awaitExit() } returns 0
+        val spawned = slot<String>()
+        coEvery {
+            launcherService.launchPackClient(
+                sessionData = any(), manifest = any(), runtime = any(),
+                clientRootPath = any(), javaPathOverride = any(),
+                adaptiveEnabled = any(), redirectAuthHost = any(), boundLaunch = any(),
+                seal = any(), displayName = capture(spawned), onLog = any(),
+            )
+        } returns SpawnResult.Started(handle)
+        coJustRun { packRepository.put(any()) }
+
+        val controller = newController(this)
+        controller.launchPackInstance(
+            currentSession = SessionData(playerName = "tester", uuid = "u", accessToken = "tok"),
+            packInstance   = scBoundPackInstance(displayName = "Cozy", authRequirement = null, origin = PackOrigin("Curseforge")),
+        )
+        advanceUntilIdle()
+
+        assertEquals("Cozy", spawned.captured, "the game was started")
+        assertEquals(LaunchState.Idle, controller.state.value, "and the launch ended clean")
+    }
+
     @Test
     fun `auth-mechanism settings are forwarded to launchPackClient`() = runTest {
         // The two Smarty auth knobs (network agent / SC authlib swap) must reach
@@ -1004,7 +1037,7 @@ class LauncherControllerTest {
         val controller = newController(this)
         controller.launchPackInstance(
             currentSession = SessionData(playerName = "tester", uuid = "u", accessToken = "ms-token"),
-            packInstance   = scBoundPackInstance(authRequirement = null, origin = PackOrigin.Mirror),
+            packInstance   = scBoundPackInstance(authRequirement = null, origin = EngineSources.Mirror),
         )
         advanceUntilIdle()
 
@@ -1664,7 +1697,7 @@ class LauncherControllerTest {
         val instance = hivens.core.data.PackInstance(
             id                    = "i-mr",
             packRef               = hivens.core.data.PackReference(
-                origin  = hivens.core.data.PackOrigin.Modrinth,
+                origin  = EngineSources.Modrinth,
                 id      = "sodium",
                 version = "1",
             ),

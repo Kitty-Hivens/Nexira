@@ -2,12 +2,12 @@ package hivens.ui.notifications.drivers
 
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackInstance
-import hivens.core.data.PackOrigin
 import hivens.core.data.PackReference
 import hivens.core.update.CompatChange
 import hivens.core.update.PackUpdateStatus
 import hivens.core.update.PackUpdateStatusHub
 import hivens.core.update.UpdateDirection
+import hivens.launcher.sources.EngineSources
 import hivens.ui.i18n.NexiraStrings
 import hivens.ui.navigation.MainWindowRequests
 import hivens.ui.notifications.Kind
@@ -50,7 +50,7 @@ class PackUpdateDriverTest {
 
     private val instance = PackInstance(
         id = "industrial",
-        packRef = PackReference(PackOrigin.Mirror, "industrial", "2026.01.01"),
+        packRef = PackReference(EngineSources.Mirror, "industrial", "2026.01.01"),
         displayName = "Industrial",
         instanceDirName = "industrial",
         createdAtEpoch = 0L,

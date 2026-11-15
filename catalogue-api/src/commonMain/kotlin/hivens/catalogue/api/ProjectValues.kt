@@ -192,6 +192,13 @@ data class InstalledFile(
 data class BuildFile(val filename: String, val size: Long, val primary: Boolean)
 
 /**
+ * Where a build is fetched as one archive, the sha1 the source publishes for it and its
+ * size, -1 where the source does not say. The archive carries the index that pins every
+ * other file, so it is the one download nothing else vouches for.
+ */
+data class BuildDownload(val url: String, val sha1: String? = null, val size: Long = -1L)
+
+/**
  * One build of a project or of a pack, as a version table, a changelog and a build's
  * own page read it. A field a source does not publish stays null.
  */
@@ -211,6 +218,8 @@ data class ProjectBuild(
     val files: List<BuildFile> = emptyList(),
     val modsCount: Int? = null,
     val sizeBytes: Long? = null,
+    /** The one archive an install fetches, where the source serves a build as one. */
+    val download: BuildDownload? = null,
 ) {
     /** The name a row shows: the number where there is one. */
     val label: String get() = versionNumber.ifBlank { name }

@@ -63,7 +63,7 @@ class PackOperationsTest {
         dir.deleteRecursively()
     }
 
-    private val source = PackReference(PackOrigin.Mirror, "industrial", "5")
+    private val source = PackReference(PackOrigin("Shelf"), "industrial", "5")
 
     /** A pack its player detached from [source]. */
     private val detached = PackInstance(
@@ -121,7 +121,7 @@ class PackOperationsTest {
         snapshots = PackSnapshotService(dir, Json),
         journal = ApplyJournal(dir, Json),
         sizes = InstanceSizeService(dir, scope),
-        reattachers = mapOf(PackOrigin.Mirror to reattacher),
+        reattachers = mapOf(PackOrigin("Shelf") to reattacher),
     )
 
     private fun ended(id: String): PackOperation = runBlocking {

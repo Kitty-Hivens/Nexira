@@ -35,10 +35,9 @@ data class Pack(
     val bannerUrl: String? = null,
     val tags: List<String> = emptyList(),
     /**
-     * Where to fetch the v2 pack manifest from. Set for [PackOrigin.Mirror]
-     * and [PackOrigin.Modrinth]; null for [PackOrigin.Smartycraft] (the
-     * SC API has its own manifest endpoint that the SC adapter knows
-     * about) and [PackOrigin.Local] (no remote manifest).
+     * Where to fetch the v2 pack manifest from, for a source that serves one.
+     * Null for [PackOrigin.Smartycraft] (the SC API had its own manifest
+     * endpoint) and [PackOrigin.Local] (no remote manifest).
      */
     val manifestUrl: String? = null,
     /**

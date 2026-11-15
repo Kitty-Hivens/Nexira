@@ -1,10 +1,10 @@
 package hivens.launcher.catalogue
 
 import hivens.core.data.PackInstance
-import hivens.core.data.PackOrigin
 import hivens.core.data.PackReference
 import hivens.launcher.modrinth.ModrinthClient
 import hivens.launcher.smrt.SmrtPackClient
+import hivens.launcher.sources.EngineSources
 import kotlinx.coroutines.CancellationException
 import org.slf4j.LoggerFactory
 import java.util.concurrent.ConcurrentHashMap
@@ -84,15 +84,15 @@ class PackArtResolver(
         val source = sourceOf(instance)
         val fromSource = try {
             when (source.origin) {
-                PackOrigin.Modrinth -> modrinth.resolveProject(source.id).let { p ->
+                EngineSources.Modrinth -> modrinth.resolveProject(source.id).let { p ->
                     PackArt(
                         iconUrl   = p.iconUrl,
                         // Full-res (raw_url) -- the hero banner upscales a 350px `url` thumbnail.
                         bannerUrl = (p.gallery.firstOrNull { it.featured } ?: p.gallery.firstOrNull())?.let { it.rawUrl ?: it.url },
                     )
                 }
-                PackOrigin.Mirror -> mirror.fetchSummary(source.id).let { PackArt(it.iconUrl, it.bannerUrl) }
-                else              -> PackArt.NONE
+                EngineSources.Mirror -> mirror.fetchSummary(source.id).let { PackArt(it.iconUrl, it.bannerUrl) }
+                else                 -> PackArt.NONE
             }.also { cache[key] = it }
         } catch (e: CancellationException) {
             throw e

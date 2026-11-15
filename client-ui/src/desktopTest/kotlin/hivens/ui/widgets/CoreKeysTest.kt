@@ -21,12 +21,18 @@ import hivens.auth.OfflineAuthProvider
 import hivens.auth.StoredAccount
 import hivens.catalogue.CatalogueModule
 import hivens.catalogue.api.CatalogueApi
+import hivens.catalogue.api.CatalogueCard
 import hivens.catalogue.api.CatalogueKeys
+import hivens.catalogue.api.PackDetails
+import hivens.catalogue.api.PackListing
+import hivens.catalogue.api.PackSourceContribution
+import hivens.catalogue.api.ProjectBuild
+import hivens.catalogue.api.SourceFilter
+import hivens.catalogue.api.SourceFilterOption
+import hivens.catalogue.api.SourceView
 import hivens.core.api.HttpClientProvider
 import hivens.core.api.catalogue.CataloguePack
-import hivens.core.api.catalogue.CataloguePackDetails
 import hivens.core.api.catalogue.CataloguePackVersion
-import hivens.core.api.interfaces.IPackCatalogueService
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.data.PackInstance
@@ -47,7 +53,6 @@ import hivens.core.update.UpdateDirection
 import hivens.launcher.PackOperation
 import hivens.launcher.PackOperationKind
 import hivens.launcher.PackOperationPhase
-import hivens.launcher.catalogue.PackCatalogueRegistry
 import hivens.launcher.modrinth.ModrinthClient
 import hivens.launcher.network.CertificateTrustGate
 import hivens.launcher.instance.PackInstanceService.DeleteOutcome
@@ -119,6 +124,10 @@ import hivens.ui.uiDataRegistry
 import hivens.ui.utils.GameConsoleService
 import hivens.ui.utils.PreferenceWriter
 import hivens.widget.api.ContributedServices
+import hivens.widget.api.LevelServices
+import hivens.widget.api.ModuleContribution
+import hivens.widget.api.TakenContribution
+import hivens.widget.api.TakenContributions
 import hivens.widget.api.KeyContribution
 import hivens.widget.api.KeyOrigin
 import hivens.widget.api.LocalScope
@@ -338,18 +347,55 @@ class CoreKeysTest {
         }
     }
 
-    /** A catalogue that lists one pack with one build, the way the mirror would answer for it. */
-    private class Catalogue : IPackCatalogueService {
-        override val origin: PackOrigin = PackOrigin.Mirror
-        override suspend fun search(query: String, page: Int): List<CataloguePack> = emptyList()
-        override suspend fun details(packId: String): CataloguePackDetails =
-            if (packId == "industrial") CataloguePackDetails(PackOrigin.Mirror, "industrial", "Industrial", "A pack", versions = listOf(BUILD))
-            else throw IOException("no such pack")
-        override suspend fun versions(packId: String): List<CataloguePackVersion> = details(packId).versions
+    /**
+     * A source a module of the test's own brings, the way a third party would: one pack
+     * with one build, and a filter of its own over its list.
+     */
+    private object Shelf : PackSourceContribution, PackListing {
+        override val id: String = "Shelf"
+        override val label: String = "shelf.name"
+        override val paged: Boolean = false
+        override val filters: List<SourceFilter> =
+            listOf(SourceFilter("shelf", "shelf.filter", listOf(SourceFilterOption("dusty", "shelf.dusty"), SourceFilterOption("new", "shelf.new"))))
 
-        companion object {
-            val BUILD = CataloguePackVersion("v5", "5", "5")
+        /** How many times it was opened, across every launcher the tests stand up. */
+        val opened = AtomicInteger()
+
+        override fun open(services: LevelServices): PackListing = this.also { opened.incrementAndGet() }
+        override suspend fun search(query: String, page: Int): List<CatalogueCard> = emptyList()
+        override suspend fun details(packId: String): PackDetails = when (packId) {
+            "industrial" -> PackDetails(id, "industrial", "Industrial", "A pack", versions = listOf(BUILD))
+            // A pack whose page needs a class the source's jar does not carry.
+            "unlinked" -> throw NoClassDefFoundError("hivens/shelf/Missing")
+            else -> throw IOException("no such pack")
         }
+        override suspend fun versions(packId: String): List<ProjectBuild> = details(packId).versions
+
+        val BUILD = ProjectBuild("v5", "5", "5", "release", emptyList(), emptyList(), "")
+
+        /** The build as the engine's installer is handed it. */
+        val INSTALLED = CataloguePackVersion("v5", "5", "5")
+
+        /** What the module that brings it is called by: the namespace of its words. */
+        const val MODULE = "test.shelf"
+
+        val taken = object : TakenContributions {
+            override val all = MutableStateFlow(
+                listOf<TakenContribution<ModuleContribution>>(TakenContribution(MODULE, Shelf), TakenContribution("test.cracked", Cracked)),
+            )
+        }
+    }
+
+    /**
+     * A source whose module was built against another launcher: its declaration cannot
+     * link, so the catalogue leaves it out, and nothing installs from it either, though it
+     * would answer for the same pack.
+     */
+    private object Cracked : PackSourceContribution {
+        override val id: String = "Cracked"
+        override val label: String = "cracked.name"
+        override val filters: List<SourceFilter> get() = throw NoClassDefFoundError("hivens/catalogue/api/SomethingNewer")
+        override fun open(services: LevelServices): PackListing = Shelf
     }
 
     private class Hub : PackUpdateStatusHub {
@@ -374,7 +420,7 @@ class CoreKeysTest {
 
     private val pack = PackInstance(
         id = "p1",
-        packRef = PackReference(PackOrigin.Mirror, "industrial", "5"),
+        packRef = PackReference(PackOrigin(Shelf.id), "industrial", "5"),
         displayName = "Industrial",
         instanceDirName = "industrial",
         createdAtEpoch = 1L,
@@ -483,7 +529,7 @@ class CoreKeysTest {
                     single { previews }
                     single { PackOutcomes(operations, scope) }
                     single<PackUpdateStatusHub> { hub }
-                    single { PackCatalogueRegistry(listOf(Catalogue())) }
+                    single<TakenContributions> { Shelf.taken }
                     single { paths }
                     // Stood up and never reached: whatever a page asks of the network fails.
                     single {
@@ -953,9 +999,27 @@ class CoreKeysTest {
         val app = launcher.app
         val confirmation = ConfirmationView(shownPreview.confirmation.build, shownPreview.confirmation.fingerprint)
         launcher.fire(app, PackKeys.StopPack, pack.id)
-        launcher.fire(app, PackKeys.InstallPack, InstallRequest("mirror", "industrial", "v5"))
-        launcher.fire(app, PackKeys.InstallPack, InstallRequest("mirror", "industrial", "no-such-build"))
-        launcher.fire(app, PackKeys.InstallPack, InstallRequest("mirror", "no-such-pack", "v5"))
+        val opened = Shelf.opened.get()
+        // A source that cannot link while answering is logged, and nothing reaches the
+        // thread's last handler, which in the launcher is the crash reporter. The app level
+        // runs on this thread until its work suspends, so this is where it would land.
+        val thread = Thread.currentThread()
+        val lastHandler = thread.uncaughtExceptionHandler
+        val uncaught = CopyOnWriteArrayList<Throwable>()
+        thread.uncaughtExceptionHandler = Thread.UncaughtExceptionHandler { _, e -> uncaught += e }
+        try {
+            launcher.fire(app, PackKeys.InstallPack, InstallRequest(Shelf.id, "unlinked", "v5"))
+            launcher.drain()
+        } finally {
+            thread.uncaughtExceptionHandler = lastHandler
+        }
+        assertEquals(emptyList(), uncaught.map { it.javaClass.simpleName }, "the install caught what the source could not link")
+        launcher.fire(app, PackKeys.InstallPack, InstallRequest(Shelf.id, "industrial", "v5"))
+        launcher.fire(app, PackKeys.InstallPack, InstallRequest(Shelf.id, "industrial", "no-such-build"))
+        launcher.fire(app, PackKeys.InstallPack, InstallRequest(Shelf.id, "no-such-pack", "v5"))
+        // The id exactly as the record carries it, and a source the catalogue refused is no source.
+        launcher.fire(app, PackKeys.InstallPack, InstallRequest(Shelf.id.lowercase(), "industrial", "v5"))
+        launcher.fire(app, PackKeys.InstallPack, InstallRequest(Cracked.id, "industrial", "v5"))
         launcher.fire(app, PackKeys.InstallPack, InstallRequest("no-such-source", "industrial", "v5"))
         launcher.fire(app, PackKeys.DismissInstall, "k1")
         launcher.fire(app, PackKeys.CancelInstall, "k2")
@@ -968,10 +1032,11 @@ class CoreKeysTest {
         launcher.drain()
         assertEquals(listOf(pack.id), launcher.actions.stopped)
         assertEquals(
-            listOf(CataloguePack(PackOrigin.Mirror, "industrial", "Industrial", "A pack") to Catalogue.BUILD),
+            listOf(CataloguePack(PackOrigin(Shelf.id), "industrial", "Industrial", "A pack") to Shelf.INSTALLED),
             launcher.actions.installed.toList(),
             "the build the request names, looked up in its source, and nothing for a request the source cannot answer",
         )
+        assertEquals(opened + 1, Shelf.opened.get(), "every install reads the one listing the catalogue opened")
         assertEquals(listOf("k1"), launcher.actions.dismissed)
         assertEquals(listOf("k2"), launcher.actions.cancelled)
         assertEquals(listOf(pack), launcher.actions.updated)
@@ -1037,13 +1102,13 @@ class CoreKeysTest {
 
     /** Every key the catalogue module brings, by id. */
     private val catalogueIds: List<String> = listOf(
-        CatalogueKeys.TAGS_ID, CatalogueKeys.LOAD_TAGS_ID, CatalogueKeys.BROWSE_ID, CatalogueKeys.RESULTS_ID,
+        CatalogueKeys.TAGS_ID, CatalogueKeys.LOAD_TAGS_ID, CatalogueKeys.SOURCES_ID, CatalogueKeys.BROWSE_ID, CatalogueKeys.RESULTS_ID,
         CatalogueKeys.OPEN_PROJECT_ID, CatalogueKeys.NAMES_ID, CatalogueKeys.INSTALL_CHOICE_ID, CatalogueKeys.SET_KIND_ID,
         CatalogueKeys.SET_ORIGIN_ID, CatalogueKeys.SET_QUERY_ID, CatalogueKeys.SET_SORT_ID, CatalogueKeys.SET_TARGET_ID,
         CatalogueKeys.AIM_ID, CatalogueKeys.TOGGLE_FILTER_ID, CatalogueKeys.EXCLUDE_FILTER_ID, CatalogueKeys.REMOVE_FILTER_ID,
         CatalogueKeys.CLEAR_FILTERS_ID, CatalogueKeys.SEARCH_FOR_ID, CatalogueKeys.UNLOCK_ID, CatalogueKeys.RELOCK_ID,
-        CatalogueKeys.HIDE_INSTALLED_ID, CatalogueKeys.MIRROR_OWN_ID, CatalogueKeys.MIRROR_COMMUNITY_ID,
-        CatalogueKeys.TOGGLE_HIDE_INSTALLED_ID, CatalogueKeys.TOGGLE_MIRROR_OWN_ID, CatalogueKeys.TOGGLE_MIRROR_COMMUNITY_ID,
+        CatalogueKeys.HIDE_INSTALLED_ID, CatalogueKeys.SOURCE_OPTION_ID,
+        CatalogueKeys.TOGGLE_HIDE_INSTALLED_ID, CatalogueKeys.TOGGLE_SOURCE_OPTION_ID,
         CatalogueKeys.MORE_RESULTS_ID, CatalogueKeys.RETRY_RESULTS_ID, CatalogueKeys.SHOW_RESULTS_ID, CatalogueKeys.HIDE_RESULTS_ID, CatalogueKeys.SCROLL_RESULTS_ID,
         CatalogueKeys.INSTALL_RESULT_ID, CatalogueKeys.CHOOSE_INSTALL_ID, CatalogueKeys.INSTALL_INTO_ID,
         CatalogueKeys.INSTALL_NEW_PACK_ID, CatalogueKeys.RETRY_CHOICE_ID, CatalogueKeys.DISMISS_INSTALL_ID,
@@ -1086,7 +1151,12 @@ class CoreKeysTest {
         assertEquals("sodium", launcher.source(window, CatalogueKeys.Browse).query, "a page fires into its window's browse")
         assertEquals("", launcher.source(other, CatalogueKeys.Browse).query, "a second window browses on its own")
         assertSame(window.find(CatalogueKeys.Browse), page.find(CatalogueKeys.Browse), "a page below a window reads that window's")
-        assertEquals(listOf("mirror"), launcher.source(window, CatalogueKeys.Browse).origins, "the sources the build carries, by name")
+        assertEquals(
+            listOf(SourceView(Shelf.id, Shelf.MODULE, Shelf.label, filters = Shelf.filters)),
+            launcher.source(window, CatalogueKeys.Browse).sources,
+            "the sources the modules brought in, as each declares itself",
+        )
+        assertEquals(launcher.source(window, CatalogueKeys.Browse).sources, launcher.source(launcher.app, CatalogueKeys.Sources))
 
         assertNull(page.current(CatalogueKeys.ProjectPage), "a page shows no project until one is shown")
         assertTrue(page.find(CatalogueKeys.ProjectPage) !== sibling.find(CatalogueKeys.ProjectPage), "two pages do not share one")

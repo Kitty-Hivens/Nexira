@@ -31,10 +31,8 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import coil3.compose.SubcomposeAsyncImage
 import hivens.catalogue.api.CatalogueCard
-import hivens.catalogue.api.PackOrigins
 import hivens.ui.components.SourceBadge
 import hivens.ui.effects.pixelArtBackground
-import hivens.ui.i18n.modrinthCategory
 import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
@@ -48,8 +46,10 @@ import hivens.ui.theme.decorativePair
  * One Browse row. Same shape as Library's PackCard (banner-as-bg + avatar +
  * title + chips + chevron) so the surfaces read as one design language. The
  * whole card is a click target into the source's detail screen. The source
- * badge follows [CatalogueCard.origin], so the card stays source-neutral across
- * the mirror, Modrinth and future sources.
+ * badge follows [CatalogueCard.origin], so the card stays source-neutral. A card
+ * lists the tags its source gave it as they are: a source whose tags are the
+ * catalogue's categories lists its packs through the project search, whose cards
+ * put them into words.
  *
  * Background layers, back to front: a deterministic pixel-art fill (so a packless
  * banner is never a flat green), the real banner image on top when the source
@@ -164,12 +164,7 @@ fun BrowsePackCard(
                 ) {
                     pack.mcVersion?.let { NxMetaChip("MC $it", tone = NxMetaChipTone.OnMedia) }
                     if (narrow) SourceBadge(pack.origin)
-                    pack.tags.take(CARD_TAGS).forEach { tag ->
-                        NxMetaChip(
-                            if (pack.origin == PackOrigins.MODRINTH) s.modrinthCategory(tag) else tag,
-                            tone = NxMetaChipTone.OnMedia,
-                        )
-                    }
+                    pack.tags.take(CARD_TAGS).forEach { tag -> NxMetaChip(tag, tone = NxMetaChipTone.OnMedia) }
                     val hidden = pack.tags.size - CARD_TAGS
                     if (hidden > 0) NxMetaChip("+$hidden", tone = NxMetaChipTone.OnMedia)
                 }

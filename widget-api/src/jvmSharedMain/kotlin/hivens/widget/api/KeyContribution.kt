@@ -118,6 +118,25 @@ interface ServiceContext {
      */
     @HostApi
     val hostServices: LevelServices get() = services
+
+    /**
+     * The services at that level as the module [moduleId] sees them: what modules declared,
+     * the host types the host exposed to every module, and the settings domains [moduleId]
+     * declared and no other. For a service that runs another module's code with what that
+     * module may use, a contribution the service takes say, and not with its own. Only a
+     * module the host trusts is handed this. For any other the answer carries no settings
+     * at all, and neither does this default, for a host that keeps none.
+     */
+    @HostApi
+    fun servicesOf(moduleId: String): LevelServices = WithoutSettings(services)
+}
+
+/** [inner] with no [SettingsStores] in it. */
+internal class WithoutSettings(private val inner: LevelServices) : LevelServices {
+    override fun <T : Any> find(type: KClass<T>): T? = if (type == SettingsStores::class) null else inner.find(type)
+
+    override fun <T : Any> get(type: KClass<T>): T =
+        find(type) ?: if (type == SettingsStores::class) throw NoSuchElementException("no settings are handed over here") else inner.get(type)
 }
 
 /**
@@ -147,17 +166,19 @@ interface CompiledModule {
     val apiPackages: Map<String, Set<String>> get() = emptyMap()
 
     /**
-     * The kinds of contribution this module takes from the jars, each an interface in one of
-     * its APIs, the themes module's theme say. The host has the loader read them beside the
-     * kinds the kernel declares ([ModuleContribution.kinds]) and hands what it finds to the
-     * module. A jar that brings one names the API in its manifest, without which it cannot
-     * see the interface.
+     * The kinds of contribution this module takes from the other modules, each an interface
+     * in one of its APIs, the themes module's theme say. The host has the loader read them
+     * beside the kinds the kernel declares ([ModuleContribution.kinds]) and hands what the
+     * jars and the compiled modules brought in carry to the module, see [TakenContributions].
+     * A jar that brings one names the API in its manifest, without which it cannot see the
+     * interface.
      */
     val contributionKinds: List<Class<out ModuleContribution>> get() = emptyList()
 
     /**
-     * What it adds. The host reads its [KeyContribution]s, and of a compiled module
-     * nothing else yet: effects, themes and particle fields come from jars only.
+     * What it adds. The host reads its [KeyContribution]s, and hands its contributions of
+     * the kinds the compiled modules take to them through [TakenContributions] the way it
+     * hands a jar's. Effects and particle fields come from jars only.
      */
     val contributions: List<ModuleContribution>
 }

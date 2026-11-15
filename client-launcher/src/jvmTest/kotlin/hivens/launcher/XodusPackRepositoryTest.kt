@@ -3,6 +3,7 @@ package hivens.launcher
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
 import hivens.core.data.PackReference
+import hivens.launcher.sources.EngineSources
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -40,7 +41,7 @@ class XodusPackRepositoryTest {
 
     private fun instance(id: String) = PackInstance(
         id = id,
-        packRef = PackReference(PackOrigin.Mirror, "pack", "2026.01.01"),
+        packRef = PackReference(EngineSources.Mirror, "pack", "2026.01.01"),
         displayName = id,
         instanceDirName = id,
         createdAtEpoch = 0L,
@@ -72,6 +73,17 @@ class XodusPackRepositoryTest {
         repos.first().close() // release the db lock before reopening the same dir
         val reopened = XodusPackRepository(d.resolve("db"), d.resolve("packs.json"), json).also { repos.add(it) }
         assertEquals(listOf("keep"), reopened.list().map { it.id })
+    }
+
+    /** A source module that is not loaded is no reason to lose its packs, nor the record of where they came from. */
+    @Test
+    fun `a pack from a source no module brings is stored and listed under its source`() = runTest {
+        val d = tempData()
+        val orphan = instance("cozy").copy(packRef = PackReference(PackOrigin("Curseforge"), "cozy", "1.0"))
+        repo(d).put(orphan)
+        repos.first().close()
+        val reopened = XodusPackRepository(d.resolve("db"), d.resolve("packs.json"), json).also { repos.add(it) }
+        assertEquals(listOf(orphan), reopened.list())
     }
 
     @Test
@@ -111,7 +123,7 @@ class XodusPackRepositoryTest {
     fun `a reference that names no pack never reaches the registry`() = runTest {
         val r = repo(tempData())
         r.put(instance("a"))
-        val dangling = instance("b").copy(packRef = PackReference(PackOrigin.Mirror, ""))
+        val dangling = instance("b").copy(packRef = PackReference(EngineSources.Mirror, ""))
         assertFailsWith<IllegalArgumentException> { r.put(dangling) }
         assertNull(r.get("b"))
         assertEquals(listOf("a"), r.list().map { it.id })
@@ -121,7 +133,7 @@ class XodusPackRepositoryTest {
     fun `a blank version written by an older build loads as floating`() = runTest {
         val d = tempData()
         val stored = instance("legacy").copy(
-            packRef = PackReference(PackOrigin.Mirror, "pack", ""),
+            packRef = PackReference(EngineSources.Mirror, "pack", ""),
             pinnedPackVersion = "",
         )
         Files.writeString(

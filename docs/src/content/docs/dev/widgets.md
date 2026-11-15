@@ -102,7 +102,7 @@ These always come from the launcher, and a copy in your jar is ignored. That is 
 To use another module's API, for example the packs, the accounts, the catalogue or the language module, name it in the manifest beside the other attributes:
 
 ```kotlin
-"Nexira-Module-Requires" to "nexira.i18n=1.0, nexira.themes=1.0, nexira.packs=1.0, nexira.accounts=1.0, nexira.catalogue=1.0",
+"Nexira-Module-Requires" to "nexira.i18n=1.0, nexira.themes=1.0, nexira.packs=2.0, nexira.accounts=1.0, nexira.catalogue=1.0",
 ```
 
 | API id             | Artifact         | Package                | What it is for                                              |
@@ -111,9 +111,13 @@ To use another module's API, for example the packs, the accounts, the catalogue 
 | `nexira.themes`    | `:themes-api`    | `hivens.themes.api`    | The theme in use, the choice, and bringing a theme          |
 | `nexira.packs`     | `:packs-api`     | `hivens.packs.api`     | Listing, launching, installing and updating packs           |
 | `nexira.accounts`  | `:accounts-api`  | `hivens.accounts.api`  | Who is signed in, the stored accounts, signing in and out   |
-| `nexira.catalogue` | `:catalogue-api` | `hivens.catalogue.api` | Searching the catalogue and putting a project into a pack   |
+| `nexira.catalogue` | `:catalogue-api` | `hivens.catalogue.api` | Searching, installing a project, and bringing a source      |
 
 Each entry is an API id and the version you compiled against. The launcher refuses your jar, with the reason in the log, when it does not carry that API or carries a version that does not serve yours: another major version, or an older minor one. An API you name is visible to your module. One you do not name is not, even when the launcher carries it.
+
+:::note[Moving from earlier launchers]
+`nexira.packs` is 2.0. A pack's `source.origin`, an install's `origin` and an `InstallRequest`'s `origin` are the source's id exactly as the pack's record carries it, `Mirror` or `Local` say, where 1.0 gave the name in lower case. A request is matched by that id exactly, so `mirror` names no source. Rebuild against 2.0 and compare origins as the ids they are.
+:::
 
 ### Everything else goes in your jar
 
@@ -230,6 +234,50 @@ fun ThemeCount() {
 :::note[Moving from earlier launchers]
 `ThemeContribution` and `ThemeScheme` were in the widget kernel, `hivens.widget.api`. They are the themes module's now, in `hivens.themes.api`, with the same members. Change the imports, rename the service file to `META-INF/services/hivens.themes.api.ThemeContribution`, and name `nexira.themes` in the manifest.
 :::
+
+## Catalogue sources
+
+The catalogue is an engine over sources. Every source it lists packs from, and every source it searches mods, resource packs and shaders in, is a module's contribution: the Hivens mirror and Modrinth ship as two modules of their own, `nexira.source.mirror` and `nexira.source.modrinth`, and a source of yours is a third one beside them. Nothing in the launcher names a source.
+
+To bring one, name `nexira.catalogue` in the manifest, compile against `:catalogue-api`, and implement `PackSourceContribution`:
+
+```kotlin
+class Shelf : PackSourceContribution {
+    override val id = "Shelf"                   // what every pack record from it carries, for ever
+    override val label = "shelf.name"           // a key into your words: shelf.name=The Shelf
+    override val icon = SourceIcon.Glyph(NxIcon.Inventory2.codepoint)
+    override val paged = false                  // it answers with its whole listing
+    override val filters = listOf(
+        SourceFilter("era", "shelf.era", listOf(SourceFilterOption("dusty", "shelf.dusty"), SourceFilterOption("new", "shelf.new"))),
+    )
+
+    override fun open(services: LevelServices): PackListing = ShelfListing()
+}
+
+class ShelfListing : PackListing {
+    override suspend fun search(query: String, page: Int) = listOf(
+        CatalogueCard("Shelf", "old", "Old", "From the attic", facets = mapOf("era" to "dusty")),
+    )
+    override suspend fun details(packId: String) = PackDetails("Shelf", packId, "Old", "From the attic")
+    override suspend fun versions(packId: String) = emptyList<ProjectBuild>()
+}
+```
+
+and list it in `META-INF/services/hivens.catalogue.api.PackSourceContribution`. Browse offers it beside the others under your label and icon, lists its packs while it is picked, and opens a pack's page through `details`. `searchStream` and `detailsStream` default to the single answer: a source that keeps a copy hands the kept answer first and the fresh one behind it, and one that is watched can go on handing changes, which Browse collects only while somebody is shown the list.
+
+`filters` are the ways your source splits its own list. Browse shows each as a block of switches, titled and worded by your labels, while your packs are listed, every option on until the person turns it off. A card says which option it falls under in `facets`, by the filter's id, and turning an option off hides those cards where the list is shown without asking your source again. What the person turned off is kept per window.
+
+`id` is written into every pack installed from your source, so it never changes. A pack whose source module is off or gone still lists, opens and plays, and its badge says the source is not loaded. Installing, updating and reattaching a pack are still the launcher's own and only reach the mirror and Modrinth, so a third source lists and shows its packs but does not install them yet.
+
+The catalogue refuses a source, and says why in the log, when its id is one the launcher keeps for itself (`Local`, `Smartycraft` and `Unknown`), one that a source compiled into the launcher declares, whether or not that module is switched on, or one a module listed before yours already brought. Of two modules bringing the same id the first keeps it, and the log names both. Ids are compared exactly, so `shelf` and `Shelf` are two sources.
+
+A source whose own code throws, an exception or a class its jar cannot link, is left out and named in the log, and every other source goes on working.
+
+A source that searches projects by the catalogue's project types, filters and sorts implements `ProjectSearchContribution`: `types` names the project types it searches (`mod`, `resourcepack`, `shader`, `modpack`), and its searcher answers a search and the lists the filters are built from. A pack source whose packs that search lists names the type in `packType`, the way Modrinth's modpacks are searched.
+
+A project of a third project source is listed and searched, but the launcher installs projects from Modrinth alone, so its install dialog says it cannot install from that source and nothing else is asked.
+
+`open` is called once for the app with the services as your own module sees them: the app's services and your module's own settings stores, never another module's. Browse, a pack's page and every install read the one listing it returns. A module loaded again brings a new instance of the source, which is opened again, and what read the old one reads the new one. A source that needs more than the services declares a service of its own through its `KeyContribution` and reads it there.
 
 ## Installing while you work
 

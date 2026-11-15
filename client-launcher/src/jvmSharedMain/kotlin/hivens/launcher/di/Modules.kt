@@ -55,7 +55,6 @@ import hivens.core.api.dto.smrt.SmrtCommunityPack
 import hivens.core.api.dto.smrt.SmrtPackListing
 import hivens.core.api.dto.smrt.SmrtPackManifest
 import hivens.core.api.dto.smrt.SmrtPackSummary
-import hivens.core.cache.Cache
 import hivens.core.cache.CacheConfig
 import hivens.core.cache.read
 import hivens.core.cache.StaleMode
@@ -80,7 +79,6 @@ import hivens.core.api.dto.smrt.SmrtManifestVersions
 import hivens.launcher.cache.SmrtPackCaches
 import hivens.core.io.IconProcessor
 import hivens.core.security.SslBypassStore
-import hivens.core.data.PackOrigin
 import hivens.core.update.PackUpdater
 import hivens.core.update.PackUpdateStatusHub
 import hivens.launcher.instance.ContentInstaller
@@ -97,16 +95,12 @@ import hivens.launcher.news.CuratedNewsFeed
 import hivens.launcher.news.SmartyCraftNewsFeed
 import hivens.launcher.news.toNewsItem
 import hivens.launcher.news.SyndicationNewsFeed
-import hivens.launcher.catalogue.MirrorPackCatalogue
-import hivens.launcher.catalogue.ModrinthPackCatalogue
 import hivens.launcher.catalogue.PackArtResolver
-import hivens.launcher.catalogue.CachedPackCatalogue
-import hivens.core.api.catalogue.CataloguePack
-import hivens.launcher.catalogue.PackCatalogueRegistry
 import hivens.launcher.modrinth.ModrinthClient
 import hivens.launcher.smrt.SmrtAuthlibSwapper
 import hivens.launcher.smrt.SmrtPackClient
 import hivens.launcher.smrt.SmrtSyncService
+import hivens.launcher.sources.EngineSources
 import hivens.launcher.update.ApplyJournal
 import hivens.launcher.update.ApplyRecovery
 import hivens.launcher.update.PackAutoUpdateService
@@ -492,23 +486,9 @@ val mirrorModule = module {
     single { InstallTargets(modrinth = get(), index = get(), repository = get(), dataDir = get()) }
     single { SmrtSyncService(get(), get()) }
 
-    // Pack-catalogue read side: one provider per browsable source, indexed by
-    // origin so the Browse UI stays source-agnostic.
-    single {
-        val settings = get<ISettingsService>()
-        val reading = getOrNull<ReadingLanguage>()
-        MirrorPackCatalogue(get(), languages = { reading?.tags() ?: listOf(settings.getSettings().locale) })
-    }
-    single { ModrinthPackCatalogue(get()) }
-    single {
-        val searches = catalogueSearchCache()
-        PackCatalogueRegistry(
-            listOf(
-                get<MirrorPackCatalogue>(),
-                CachedPackCatalogue(get<ModrinthPackCatalogue>(), searches),
-            ),
-        )
-    }
+    // What a source lists, a pack's page and its builds are the source modules' own,
+    // which the catalogue module takes as contributions. Nothing here lists them.
+
     // Resolves an installed instance's native cover from its source when the
     // install didn't capture one (pre-field instances), so Library cards and the
     // PackDetail hero show real art instead of the pixel placeholder.
@@ -557,8 +537,8 @@ val mirrorModule = module {
             sizes = get(),
             knownArt = art::cached,
             reattachers = mapOf(
-                PackOrigin.Mirror to get<PackUpdateService>(),
-                PackOrigin.Modrinth to get<ModrinthPackUpdater>(),
+                EngineSources.Mirror to get<PackUpdateService>(),
+                EngineSources.Modrinth to get<ModrinthPackUpdater>(),
             ),
         )
     }
@@ -610,8 +590,8 @@ val mirrorModule = module {
     single<PackUpdater> {
         RoutingPackUpdater(
             mapOf(
-                PackOrigin.Mirror to get<PackUpdateService>(),
-                PackOrigin.Modrinth to get<ModrinthPackUpdater>(),
+                EngineSources.Mirror to get<PackUpdateService>(),
+                EngineSources.Modrinth to get<ModrinthPackUpdater>(),
             ),
         )
     }
@@ -875,7 +855,7 @@ private fun Scope.smrtPackCaches(): SmrtPackCaches {
         // answered once with nothing would otherwise serve that nothing for weeks,
         // across restarts -- the case shouldStore is documented for. Kept long
         // because it is what Browse draws while it asks: an open Browse polls the
-        // mirror itself (MirrorPackCatalogue), so the TTL is only when an ambient
+        // mirror itself (the mirror source module's listing), so the TTL is only when an ambient
         // read considers the copy worth asking about again.
         listing = f.create(
             "pack-listing",
@@ -957,24 +937,6 @@ private fun Scope.modIconCaches(): ModIconCaches {
         fileHash = f.create("file-sha1", String.serializer(), CacheConfig(ttlMs = 365 * day, maxEntries = 4096)),
     )
 }
-
-/**
- * In-memory catalogue-search cache (single-flight + 5-min SWR), keyed by source,
- * page and query. Held in memory only on purpose: a listing written to disk
- * would be the first thing shown on the next launch, and a catalogue is exactly
- * the sort of thing that has moved on by then. An empty result is not stored, so
- * a source that was briefly unreachable does not leave an empty Browse behind it.
- */
-private fun Scope.catalogueSearchCache(): Cache<List<CataloguePack>> =
-    get<CacheFactory>().createInMemory(
-        "catalogue-search",
-        CacheConfig(
-            ttlMs = 5 * 60_000L,
-            staleTtlMs = Long.MAX_VALUE,
-            maxEntries = 64,
-            shouldStore = { it.isNotEmpty() },
-        ),
-    )
 
 /**
  * In-memory news-page cache (single-flight + 10-min SWR), keyed by page number.

@@ -4,8 +4,8 @@ import hivens.core.api.catalogue.CataloguePack
 import hivens.core.api.catalogue.CataloguePackVersion
 import hivens.core.data.InstanceRuntime
 import hivens.core.data.PackInstance
-import hivens.core.data.PackOrigin
 import hivens.core.data.PackReference
+import hivens.launcher.sources.EngineSources
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
@@ -39,13 +39,13 @@ class PackInstallServiceTest {
     }
 
     private val pack = CataloguePack(
-        origin = PackOrigin.Mirror, id = "Industrial", title = "Industrial", tagline = "",
+        origin = EngineSources.Mirror, id = "Industrial", title = "Industrial", tagline = "",
     )
     private val version = CataloguePackVersion(id = "2026.05.23", name = "May", versionNumber = "2026.05.23")
 
     private fun instance(id: String) = PackInstance(
         id = id,
-        packRef = PackReference(PackOrigin.Mirror, "Industrial", "2026.05.23"),
+        packRef = PackReference(EngineSources.Mirror, "Industrial", "2026.05.23"),
         displayName = "Industrial",
         instanceDirName = "Industrial-$id",
         createdAtEpoch = 1_700_000_000L,

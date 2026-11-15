@@ -7,15 +7,16 @@ import hivens.catalogue.api.ENV_CLIENT
 import hivens.catalogue.api.ENV_SERVER
 import hivens.catalogue.api.FilterField
 import hivens.catalogue.api.FilterPick
-import hivens.catalogue.api.PackOrigins
 import hivens.catalogue.api.ProjectKind
 import hivens.catalogue.api.ProjectTarget
 import hivens.catalogue.api.SearchFilter
+import hivens.catalogue.api.SourceView
 import hivens.catalogue.api.TagSearch
 import hivens.ui.Screen
 import hivens.ui.feature.catalogue.project.Environment
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
 import java.nio.file.Path
 import kotlin.test.Test
@@ -44,7 +45,7 @@ class CatalogueSearchTest {
      * named as the target stays named without being read off a disk the test has not got.
      */
     private fun browse() = BrowseState(
-        origins = listOf(PackOrigins.MIRROR, PackOrigins.MODRINTH),
+        sources = MutableStateFlow(listOf(SourceView("Shelf", "test.shelf", "name"), SourceView("Searched", "test.searched", "name", packType = MODPACK))),
         packOf = { null },
         instancesDir = Path.of("/nonexistent"),
         scope = CoroutineScope(Job().apply { cancel() }),
@@ -116,12 +117,12 @@ class CatalogueSearchTest {
     }
 
     @Test
-    fun `a modpack tag lists the catalogue's packs`() {
+    fun `a modpack tag lists the packs of the source that searches them as modpacks`() {
         val c = browse()
-        c.setOrigin(PackOrigins.MIRROR)
+        c.setOrigin("Shelf")
         c.searchFor(TagSearch(MODPACK, setOf(SearchFilter(FilterField.Category, "adventure")), packId = null))
         assertNull(c.view.value.kind)
-        assertEquals(PackOrigins.MODRINTH, c.view.value.origin)
+        assertEquals("Searched", c.view.value.origin)
     }
 
     @Test

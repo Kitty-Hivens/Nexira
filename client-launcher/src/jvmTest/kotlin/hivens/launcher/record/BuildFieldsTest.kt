@@ -4,8 +4,8 @@ import hivens.core.data.CachedManifestSnapshot
 import hivens.core.data.ContentToggle
 import hivens.core.data.InstanceRuntime
 import hivens.core.data.PackInstance
-import hivens.core.data.PackOrigin
 import hivens.core.data.PackReference
+import hivens.launcher.sources.EngineSources
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -13,7 +13,7 @@ class BuildFieldsTest {
 
     private val snapshot = PackInstance(
         id = "1",
-        packRef = PackReference(PackOrigin.Mirror, "pack", "5"),
+        packRef = PackReference(EngineSources.Mirror, "pack", "5"),
         displayName = "Before",
         instanceDirName = "inst",
         createdAtEpoch = 0L,

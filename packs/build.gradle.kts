@@ -14,6 +14,8 @@ plugins {
 // never client-ui: what it needs from the application around it, the launch notices,
 // comes in through PacksHost, which the host implements. Who a launch runs as is the
 // accounts module's, read through the service it keeps for the modules the host trusts.
+// A catalogue pack is installed from the source that lists it, as the catalogue module
+// opened it and hands it to the modules the host trusts, by the catalogue API's contract.
 kotlin {
     // KMP modules don't apply the `java` plugin, so the root's toolchain pin skips
     // them. Set here, org.gradle.jvm.version matches the JDK 27 modules.
@@ -41,6 +43,8 @@ kotlin {
                 api(project(":packs-api"))
                 api(project(":widget-api"))
                 implementation(project(":accounts"))
+                // What a pack is installed from: the sources the catalogue lists from.
+                implementation(project(":catalogue-api"))
                 implementation(project(":client-core"))
                 implementation(project(":client-launcher"))
                 implementation(project(":client-auth"))

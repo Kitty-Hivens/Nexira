@@ -18,6 +18,7 @@ import hivens.launcher.content.ContentKind
 import hivens.launcher.launch.RunningPackSource
 import hivens.launcher.modrinth.ModrinthClient
 import hivens.launcher.record.PackFileRecord
+import hivens.launcher.sources.EngineSources
 import hivens.test.testTransferEngine
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
@@ -485,7 +486,7 @@ class ModInstallerTest {
         val c = Catalogue()
         val v1 = c.publish("sodium", "sodium-1")
         val v2 = c.publish("sodium", "sodium-2")
-        val p = pack(origin = PackOrigin.Modrinth)
+        val p = pack(origin = EngineSources.Modrinth)
         put(p, "mods", "sodium-1.jar", c.body(v1))
         Files.writeString(p.dir.resolve(PackFileRecord.FILE_NAME), "${sha1(c.body(v1))} 0 0 - mods/sodium-1.jar\n")
 
@@ -506,7 +507,7 @@ class ModInstallerTest {
         val own2 = c.publish("faithful", "faithful-2", fileName = "faithful-2.zip", loaders = listOf("minecraft"))
         val mine1 = c.publish("stay", "stay-1", fileName = "stay-1.zip", loaders = listOf("minecraft"))
         val mine2 = c.publish("stay", "stay-2", fileName = "stay-2.zip", loaders = listOf("minecraft"))
-        val p = pack(origin = PackOrigin.Mirror)
+        val p = pack(origin = EngineSources.Mirror)
         repo.put(
             repo.get(p.id)!!.copy(
                 installedManifest = fileManifestOf(mapOf("resourcepacks/faithful-1.zip" to FileData(sha1 = sha1(c.body(own1)), size = 1))),
@@ -528,7 +529,7 @@ class ModInstallerTest {
         val c = Catalogue()
         val v1 = c.publish("sodium", "sodium-1")
         val v2 = c.publish("sodium", "sodium-2")
-        val p = pack(origin = PackOrigin.Modrinth)
+        val p = pack(origin = EngineSources.Modrinth)
         put(p, "mods", "sodium-1.jar", c.body(v1))
         Files.writeString(p.dir.resolve(PackFileRecord.FILE_NAME), "abc 0 0 - mods/other.jar\n")
 
@@ -678,7 +679,7 @@ class ModInstallerTest {
         val c = Catalogue()
         val mod = c.publish("sodium", "sodium-1")
         val rp = c.publish("faithful", "faithful-1", fileName = "faithful.zip", loaders = listOf("minecraft"))
-        val p = pack(origin = PackOrigin.Mirror)
+        val p = pack(origin = EngineSources.Mirror)
 
         assertFalse(c.install(p, mod).ok, "the roster sweep would delete it before a bound launch")
         assertTrue(c.install(p, rp).ok)
@@ -690,8 +691,8 @@ class ModInstallerTest {
     fun `a Modrinth pack takes the player's files only while it keeps a record`() = runTest {
         val c = Catalogue()
         val mod = c.publish("sodium", "sodium-1")
-        val bare = pack(origin = PackOrigin.Modrinth)
-        val recorded = pack(origin = PackOrigin.Modrinth)
+        val bare = pack(origin = EngineSources.Modrinth)
+        val recorded = pack(origin = EngineSources.Modrinth)
         Files.writeString(recorded.dir.resolve(PackFileRecord.FILE_NAME), "")
 
         assertFalse(c.install(bare, mod).ok)
@@ -817,7 +818,7 @@ class ModInstallerTest {
         val has = pack()
         put(has, "mods", "sodium.jar", c.body(v1))
         val wrongLoader = pack(loader = "forge", mc = "1.12.2")
-        val mirror = pack(origin = PackOrigin.Mirror)
+        val mirror = pack(origin = EngineSources.Mirror)
 
         val answers = c.targets().forProject("sodium").associate { it.pack.id to it.verdict }
 
@@ -832,7 +833,7 @@ class ModInstallerTest {
     fun `a resource pack fits a mirror pack and a pack with no loader`() = runTest {
         val c = Catalogue()
         val rp = c.publish("faithful", "faithful-1", fileName = "faithful.zip", loaders = listOf("minecraft"))
-        val mirror = pack(origin = PackOrigin.Mirror)
+        val mirror = pack(origin = EngineSources.Mirror)
         val vanilla = pack(loader = "vanilla")
 
         val answers = c.targets().forProject("faithful").associate { it.pack.id to it.verdict }
@@ -868,7 +869,7 @@ class ModInstallerTest {
         val has = pack()
         put(has, "mods", "renamed.jar", c.body(v1))
         put(has, "mods", "other.jar", c.body(other))
-        val mirror = pack(origin = PackOrigin.Mirror)
+        val mirror = pack(origin = EngineSources.Mirror)
         put(mirror, "resourcepacks", "faithful.zip", jar("the pack's own"))
         val smarty = pack(origin = PackOrigin.Smartycraft)
         put(smarty, "mods", "server-mod.jar", jar("the server's own"))

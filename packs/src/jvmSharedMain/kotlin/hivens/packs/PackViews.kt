@@ -46,7 +46,7 @@ fun PackInstance.toPackView(): PackView = PackView(
     followLatest = followLatest,
 )
 
-private fun PackReference.toSource(): PackSource = PackSource(origin.name.lowercase(), id, version)
+private fun PackReference.toSource(): PackSource = PackSource(origin.id, id, version)
 
 /** The launcher's one launch as a widget reads it. The running game's handle stays in the engine. */
 fun LaunchState.toView(): LaunchView = when (this) {
@@ -72,7 +72,7 @@ private fun LaunchError.toFailed(): LaunchView.Failed = when (this) {
 /** One install as a widget reads it. */
 fun InstallSnapshot.toView(): InstallView = InstallView(
     key = key,
-    origin = origin.name.lowercase(),
+    origin = origin.id,
     packId = packId,
     versionId = versionId,
     title = title,

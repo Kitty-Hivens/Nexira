@@ -8,7 +8,6 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Density
-import hivens.catalogue.api.PackOrigins
 import hivens.catalogue.api.ProjectTarget
 import hivens.themes.Themes
 import hivens.themes.api.ThemesKeys
@@ -175,7 +174,7 @@ class ScreenProvidesTest {
     @Test
     fun `a catalogue pack's page hands its widgets what its surface lists`() {
         val (drew, missed) = probe("catalogue.pack") {
-            CataloguePackDetailScreen(origin = PackOrigins.MIRROR, packId = "probe", onBack = {}, onInstalled = {})
+            CataloguePackDetailScreen(origin = "Mirror", packId = "probe", onBack = {}, onInstalled = {})
         }
         assertEquals(emptySet(), missed)
         assertTrue(drew.isNotEmpty())

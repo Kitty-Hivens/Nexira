@@ -31,9 +31,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import coil3.compose.SubcomposeAsyncImage
-import hivens.core.data.PackOrigin
 import hivens.packs.api.PackKeys
-import hivens.packs.api.PackSource
 import hivens.packs.api.PackUpdateView
 import hivens.packs.api.PackView
 import hivens.ui.Screen
@@ -73,8 +71,8 @@ import hivens.ui.theme.Status
  * detail hop.
  *
  * Source-badge is the small chip next to the title; it differentiates cards
- * from the four [PackOrigin] values at a glance, so one list can hold every
- * source instead of splitting per origin.
+ * by source at a glance, so one list can hold every source instead of
+ * splitting per origin, and says so where a pack's source is not loaded.
  */
 @Composable
 fun PackCard(
@@ -138,7 +136,7 @@ fun PackCard(
                             overflow   = TextOverflow.Ellipsis,
                             modifier   = Modifier.weight(1f, fill = false),
                         )
-                        if (showBadge) instance.source.packOrigin()?.let { SourceBadge(it) }
+                        if (showBadge) SourceBadge(instance.source.origin)
                     }
 
                     // One line, and a chip is placed at its own width or not at all.
@@ -315,7 +313,3 @@ internal fun lastPlayedLabel(lastPlayedEpoch: Long): String {
 internal fun PackMetaChip(text: String, emphasis: Boolean = false) {
     NxMetaChip(text, tone = if (emphasis) NxMetaChipTone.OnMediaAccent else NxMetaChipTone.OnMedia)
 }
-
-/** The source a pack names, as the launcher's own origins know it, or null for one this build does not know. */
-internal fun PackSource.packOrigin(): PackOrigin? =
-    PackOrigin.entries.firstOrNull { it.name.equals(origin, ignoreCase = true) }

@@ -1,7 +1,6 @@
 package hivens.catalogue
 
 import hivens.catalogue.api.CatalogueCard
-import hivens.catalogue.api.PackOrigins
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
@@ -16,7 +15,7 @@ import kotlin.test.assertNotEquals
  */
 class PackPagingTest {
 
-    private fun pack(id: String, origin: String = PackOrigins.MODRINTH) =
+    private fun pack(id: String, origin: String = "Shelf") =
         CatalogueCard(origin = origin, id = id, title = id, tagline = "")
 
     @Test fun `two packs are told apart`() {
@@ -24,7 +23,7 @@ class PackPagingTest {
     }
 
     @Test fun `the same id on two sources is two packs`() {
-        assertNotEquals(pack("1", PackOrigins.MIRROR).key, pack("1", PackOrigins.MODRINTH).key)
+        assertNotEquals(pack("1", "Shelf").key, pack("1", "Other").key)
     }
 
     @Test fun `a page of new entries arrives whole`() {

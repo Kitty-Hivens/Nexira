@@ -12,11 +12,8 @@ import hivens.catalogue.api.SearchQuestion
 import hivens.catalogue.api.SearchResults
 import hivens.catalogue.api.SearchStatus
 import hivens.catalogue.api.BrowseSort
-import hivens.catalogue.api.catalogueTypeOf
-import hivens.core.api.interfaces.IPackCatalogueService
 import hivens.launcher.instance.ContentDestination
 import hivens.launcher.instance.ModInstaller
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -44,9 +41,9 @@ private val log = LoggerFactory.getLogger("hivens.catalogue.Browse")
 /**
  * The entries of [page] that are not already in [shown], in the page's own order.
  *
- * A catalogue takes a page number and only some of them honour it, the mirror answering
- * with its whole listing every time, so a page is accepted by what is new in it, and a
- * page that adds nothing is the end. That reading holds for a source that pages and for
+ * A source takes a page number and only some honour it, one that answers with its whole
+ * listing every time among them, so a page is accepted by what is new in it, and a page
+ * that adds nothing is the end. That reading holds for a source that pages and for
  * one that does not, and keeps a repeat from reaching a keyed list twice.
  */
 internal fun newIn(page: List<CatalogueCard>, shown: List<CatalogueCard>): List<CatalogueCard> {
@@ -54,17 +51,27 @@ internal fun newIn(page: List<CatalogueCard>, shown: List<CatalogueCard>): List<
     return page.filterNot { it.key in seen }
 }
 
-/** What a project search asks of the catalogue and of the pack it installs into. */
+/** What a project search asks of the project source that searches its type, and of the pack it installs into. */
 interface ProjectCatalogue {
-    /** One page of results for [type] narrowed by [filters], from [offset] in the catalogue's [sort]. */
+    /** The id of the project source that searches [type], or null where none is brought in. */
+    fun sourceOf(type: String): String?
+
+    /** One page of results for [type] narrowed by [filters], from [offset] in [sort]'s order. Empty where no source searches [type]. */
     suspend fun search(type: String, query: String, filters: Set<SearchFilter>, offset: Int, limit: Int, sort: BrowseSort): List<ProjectHit>
 
-    /** Installs the newest build of [projectId] that runs on [pack] into it, or null when none does. */
-    suspend fun installNewest(projectId: String, pack: ContentDestination.Pack): ModInstaller.Outcome?
+    /**
+     * Installs the newest build of [projectId], found by a search for [type], that runs on
+     * [pack] into it, or null when none does. Throws [SourceCannotInstall] where the source
+     * that found it cannot install it yet.
+     */
+    suspend fun installNewest(type: String, projectId: String, pack: ContentDestination.Pack): ModInstaller.Outcome?
 
     /** The projects the pack in [dir] already carries. */
     suspend fun presentProjects(dir: Path): Set<String>
 }
+
+/** The project source [source] found a project the launcher cannot install from it yet. */
+class SourceCannotInstall(val source: String?) : Exception("the source '$source' cannot install a project yet")
 
 /**
  * What one window's search found, as [SearchResults], and the installs started from it.
@@ -78,7 +85,7 @@ interface ProjectCatalogue {
  *
  * A search runs only while somebody [show]s the results. Nothing reaches the network
  * or the pack's folders while nobody does: a source that answers with a stream that
- * goes on, the mirror polling its listing, is collected only while the results are
+ * goes on, one that polls its listing say, is collected only while the results are
  * shown. The words and the filters are still followed meanwhile.
  *
  * Every search is kept for a return to it, see [PackSnapshots] and [ProjectSnapshots],
@@ -95,7 +102,8 @@ interface ProjectCatalogue {
 @OptIn(ExperimentalCoroutinesApi::class)
 class SearchService(
     private val browse: BrowseState,
-    private val catalogueFor: (origin: String) -> IPackCatalogueService?,
+    /** The pack source with an id, opened, or null where none is brought in. */
+    private val catalogueFor: (origin: String) -> OpenPackSource?,
     private val projects: ProjectCatalogue,
     private val packSnapshots: PackSnapshots,
     private val projectSnapshots: ProjectSnapshots,
@@ -106,6 +114,12 @@ class SearchService(
     serial: CoroutineDispatcher = Dispatchers.Default.limitedParallelism(1),
     /** Where the catalogue and the pack's folders are read. */
     private val io: CoroutineDispatcher = Dispatchers.IO,
+    /**
+     * Moves whenever the modules exchange a source for another instance of it, a jar
+     * loaded again say ([SourceShelf.generation]). The search shown then runs again on the
+     * source as it is now, and stops reading the one its module let go.
+     */
+    private val sourceGeneration: StateFlow<Int> = MutableStateFlow(0),
 ) {
     private val scope = CoroutineScope(scope.coroutineContext + serial)
     private val work = CoroutineScope(work.coroutineContext + serial)
@@ -155,14 +169,14 @@ class SearchService(
             val showing = viewers.map { if (it.names.isEmpty()) null else it.showings }.distinctUntilChanged()
             // A hidden ask cancels the run under way, the stream it collects included,
             // and leaves its results and its snapshots as they stand.
-            combine(shape, submitted, asks, showing) { s, q, _, on -> Ask(s, q, on != null) }.collectLatest { ask ->
+            combine(shape, submitted, asks, showing, sourceGeneration) { s, q, _, on, _ -> Ask(s, q, on != null) }.collectLatest { ask ->
                 if (ask.shown) run(ask.shape, ask.query)
             }
         }
     }
 
     private fun shapeOf(view: BrowseView): Shape {
-        val type = catalogueTypeOf(view.kind, view.origin)
+        val type = view.type
         if (type == null) return Shape(null, view.origin, null, view.sort, emptySet(), null, false)
         val destination = browse.target?.takeIf { it.view.takes(view.kind) }?.destination
         return Shape(
@@ -215,6 +229,13 @@ class SearchService(
             runPacks(s, query)
         } else {
             packRun = null
+            if (projects.sourceOf(s.type) == null) {
+                // Nobody to ask, which reads apart from a source that answered with nothing.
+                log.info("browse: no module brings a source that searches '{}'", s.type)
+                projectRun = null
+                _results.value = SearchResults(question = question(s, query), status = SearchStatus.NoSource)
+                return
+            }
             val search = projectRun?.takeIf { it.first == s }?.second ?: newProjectSearch(s).also { projectRun = s to it }
             search.search(query)
         }
@@ -233,7 +254,7 @@ class SearchService(
                 val hidden = excluded.map { SearchFilter(FilterField.Project, it, excluded = true) }
                 withContext(io) { projects.search(type, q, s.filters + hidden, offset, limit, s.sort) }
             },
-            installInto = { id -> target?.let { t -> withContext(io) { projects.installNewest(id, t) } } },
+            installInto = { id -> target?.let { t -> withContext(io) { projects.installNewest(type, id, t) } } },
             presentProjects = { val dir = target?.dir; if (dir == null) emptySet() else withContext(io) { projects.presentProjects(dir) } },
             hideInstalled = s.hiding,
             session = projectSnapshots,
@@ -248,6 +269,7 @@ class SearchService(
         val results = search.results
         _results.value = SearchResults(
             question = question(s, search.shownQuery ?: search.asked ?: submitted.value),
+            projectSource = s.type?.let(projects::sourceOf),
             status = when {
                 results == null -> SearchStatus.Loading
                 search.searchFailed -> SearchStatus.Failed()
@@ -274,7 +296,7 @@ class SearchService(
         var page = 0
         var endReached = false
         var scroll = ScrollMark()
-        var catalogue: IPackCatalogueService? = null
+        var catalogue: OpenPackSource? = null
 
         /** Counts the first pages that replaced the list. A later page asked for before one of them follows the list it replaced. */
         var firstPages = 0
@@ -325,8 +347,8 @@ class SearchService(
         run.publish()
         val catalogue = catalogueFor(origin)
         if (catalogue == null) {
-            log.warn("browse: no catalogue is registered for {}", origin)
-            if (run.status != SearchStatus.Loaded) run.status = SearchStatus.Empty
+            log.warn("browse: no module brings the source '{}'", origin)
+            run.status = SearchStatus.NoSource
             run.publish()
             return
         }
@@ -337,8 +359,7 @@ class SearchService(
         try {
             // Stale first, fresh behind it. An equal list is not news, so a refresh that
             // found nothing new costs the reader nothing.
-            catalogue.searchStream(query, page = 0).flowOn(io).collect { found ->
-                val packs = found.map { it.toCard() }
+            catalogue.listing.searchStream(query, page = 0).flowOn(io).collect { packs ->
                 if (packs.isEmpty()) {
                     // Answered, with nothing in it, which a report has to tell from a failure.
                     log.info("browse: {} listed no packs for query \"{}\"", origin, query)
@@ -386,9 +407,9 @@ class SearchService(
                 toTop++
                 run.publish()
             }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
+            // A source's own code may fail to link as well as throw.
+            if (!e.isSourceFault) throw e
             // Logged before it is decided what to show, because the branch that shows
             // nothing is the one that most needs a record.
             log.warn("browse: {} failed for query \"{}\"", origin, query, e)
@@ -405,7 +426,7 @@ class SearchService(
         if (run.pagingFor == list || run.endReached) return
         run.pagingFor = list
         try {
-            val next = withContext(io) { catalogue.search(run.query, page = run.page + 1) }.map { it.toCard() }
+            val next = withContext(io) { catalogue.listing.search(run.query, page = run.page + 1) }
             // A fresh first page that landed meanwhile replaced the list this one follows.
             if (packRun !== run || run.firstPages != list) return
             val fresh = newIn(next, current)
@@ -417,9 +438,8 @@ class SearchService(
                 run.keep()
             }
             run.publish()
-        } catch (e: CancellationException) {
-            throw e
-        } catch (_: Exception) {
+        } catch (e: Throwable) {
+            if (!e.isSourceFault) throw e
             // A failure is not an ending. Marking the listing finished on one refused
             // request takes the rest of the catalogue away until the words are typed
             // again. The next scroll asks again.

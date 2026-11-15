@@ -46,14 +46,14 @@ class PackViewsTest {
     fun `a pack reads as its plain facts, the build installed and what it runs on`() {
         val pack = PackInstance(
             id = "p1",
-            packRef = PackReference(PackOrigin.Mirror, "industrial", "5"),
+            packRef = PackReference(PackOrigin("Mirror"), "industrial", "5"),
             displayName = "Industrial",
             instanceDirName = "industrial-dir",
             createdAtEpoch = 100,
             lastPlayedEpochOrZero = 200,
             playtimeSeconds = 7200,
             pinnedPackVersion = "5.1",
-            forkedFrom = PackReference(PackOrigin.Modrinth, "upstream", null),
+            forkedFrom = PackReference(PackOrigin("Modrinth"), "upstream", null),
             cachedManifest = CachedManifestSnapshot("1.21.1", "neoforge", "21.1.0", 21),
             iconUrl = "icon",
             bannerUrl = "banner",
@@ -63,8 +63,9 @@ class PackViewsTest {
             PackView(
                 id = "p1",
                 name = "Industrial",
-                source = PackSource("mirror", "industrial", "5"),
-                forkedFrom = PackSource("modrinth", "upstream", null),
+                // The source's id as the record carries it.
+                source = PackSource("Mirror", "industrial", "5"),
+                forkedFrom = PackSource("Modrinth", "upstream", null),
                 packVersion = "5.1",
                 gameVersion = "1.21.1",
                 loader = "neoforge",
@@ -79,6 +80,12 @@ class PackViewsTest {
             ),
             pack.toPackView(),
         )
+    }
+
+    @Test
+    fun `a pack from a source no module brings lists under that source's id`() {
+        val pack = PackInstance("p", PackReference(PackOrigin("Curseforge"), "cozy", "1"), "Cozy", "cozy", 0)
+        assertEquals(PackSource("Curseforge", "cozy", "1"), pack.toPackView().source)
     }
 
     @Test

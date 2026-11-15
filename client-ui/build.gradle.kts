@@ -160,6 +160,10 @@ kotlin {
                 // The catalogue module, the same way.
                 implementation(project(":catalogue-api"))
                 implementation(project(":catalogue"))
+                // The catalogue's two sources, compiled in. Nothing compiles against them:
+                // the catalogue takes their contributions.
+                implementation(project(":source-mirror"))
+                implementation(project(":source-modrinth"))
                 // The language module, the same way, except that the host makes its engine
                 // before any module loads: the window the launcher boots in already speaks.
                 implementation(project(":i18n-api"))

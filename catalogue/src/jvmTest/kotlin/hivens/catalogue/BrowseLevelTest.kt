@@ -3,19 +3,21 @@ package hivens.catalogue
 import hivens.catalogue.api.CatalogueKeys
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackInstance
-import hivens.launcher.catalogue.PackCatalogueRegistry
 import hivens.launcher.platform.PlatformPaths
 import hivens.widget.api.ContributedServices
 import hivens.widget.api.HostApi
 import hivens.widget.api.LevelServices
 import hivens.widget.api.LevelServicesHost
+import hivens.widget.api.ModuleContribution
 import hivens.widget.api.ModuleKeysResult
+import hivens.widget.api.TakenContributions
 import hivens.widget.api.WidgetCommandRegistry
 import hivens.widget.api.WidgetDataRegistry
 import hivens.widget.api.WidgetScope
 import hivens.widget.api.current
 import hivens.widget.api.find
 import hivens.widget.api.get
+import hivens.widget.api.TakenContribution
 import hivens.widget.api.registerModuleKeys
 import hivens.widget.model.ScopeLevel
 import kotlinx.coroutines.Dispatchers
@@ -56,7 +58,9 @@ class BrowseLevelTest {
     /** The engine's services the window's browse is made from, and nothing else. */
     private inner class Engine : LevelServicesHost {
         private val held: Map<KClass<*>, Any> = mapOf(
-            PackCatalogueRegistry::class to PackCatalogueRegistry(emptyList()),
+            TakenContributions::class to object : TakenContributions {
+                override val all = MutableStateFlow(emptyList<TakenContribution<ModuleContribution>>())
+            },
             IPackRepository::class to NoPacks,
             PlatformPaths::class to PlatformPaths(osName = "linux", home = dir, bootstrapDataDir = { null }, env = { name -> if (name == "NEXIRA_DATA_DIR") dir.toString() else null }),
         )
@@ -113,10 +117,10 @@ class BrowseLevelTest {
         val app = app()
         val first = app.child(ScopeLevel.Window)
         val second = app.child(ScopeLevel.Window)
-        first.services.get<OpenProjects>().name("pack:mirror:Industrial", "Industrial")
+        first.services.get<OpenProjects>().name("pack:Shelf:Industrial", "Industrial")
 
-        assertEquals("Industrial", second.current(CatalogueKeys.Names)?.get("pack:mirror:Industrial"))
-        assertEquals("Industrial", app.current(CatalogueKeys.Names)?.get("pack:mirror:Industrial"))
+        assertEquals("Industrial", second.current(CatalogueKeys.Names)?.get("pack:Shelf:Industrial"))
+        assertEquals("Industrial", app.current(CatalogueKeys.Names)?.get("pack:Shelf:Industrial"))
         app.close()
     }
 }

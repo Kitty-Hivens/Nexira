@@ -7,10 +7,10 @@ import hivens.core.data.PackInstance
 import hivens.core.time.Clock
 import hivens.core.update.PackUpdateStatus
 import hivens.core.update.PackUpdateStatusHub
-import hivens.core.data.PackOrigin
 import hivens.launcher.InstallPhase
 import hivens.launcher.InstallSnapshot
 import hivens.launcher.instance.InstanceContentUpdater
+import hivens.launcher.sources.EngineSources
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -149,7 +149,7 @@ class ActivityDriverStaleTest {
         val reg = ActivityRegistry(scope = this, clock = Clock { 0L }, terminalHoldMs = 60_000)
         val installs = MutableStateFlow<Map<String, InstallSnapshot>>(emptyMap())
         driver(reg, FakeHub(), installs = installs).start()
-        val failed = InstallSnapshot("import:a", PackOrigin.Mirror, "a", "", "a.mrpack", null, InstallPhase.Failed("bad archive"))
+        val failed = InstallSnapshot("import:a", EngineSources.Mirror, "a", "", "a.mrpack", null, InstallPhase.Failed("bad archive"))
 
         installs.value = mapOf(failed.key to failed)
         runCurrent()

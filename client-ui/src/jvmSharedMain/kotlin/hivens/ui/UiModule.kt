@@ -89,6 +89,7 @@ import hivens.ui.widgets.modules.WidgetModuleHost
 import hivens.ui.widgets.modules.WidgetModules
 import hivens.ui.widgets.modules.followModuleThemes
 import hivens.ui.widgets.modules.followModuleWords
+import hivens.ui.widgets.modules.hostTakenContributions
 import hivens.ui.widgets.modules.take
 import hivens.ui.widgets.profile.ProfileSelection
 import hivens.ui.widgets.profile.ProfileSelectionSource
@@ -105,6 +106,7 @@ import hivens.widget.api.LevelServicesHost
 import hivens.widget.api.ModuleKeysResult
 import hivens.widget.api.SettingsStores
 import hivens.widget.api.SurfaceFamilies
+import hivens.widget.api.TakenContributions
 import hivens.widget.api.WidgetCommandRegistry
 import hivens.widget.api.WidgetDataRegistry
 import hivens.widget.api.WidgetRegistry
@@ -300,6 +302,19 @@ fun uiCoreModule(
         )
     }
     single<WidgetRegistry> { get<WidgetModules>().registry }
+
+    // What the modules brought in contribute of the kinds the compiled modules take: the
+    // compiled modules the document names and the jars switched on, as the jars change.
+    // The modules the host trusts read it through their host view, the catalogue module
+    // its sources. The document's list is read once, as it is for the keys.
+    single<TakenContributions> {
+        hostTakenContributions(
+            named    = modulesNamedBy(get<LayoutGraphRepository>().value()) { DefaultLayout.modules(get()) },
+            compiled = compiled,
+            jars     = get<WidgetModules>().state,
+            scope    = get(),
+        )
+    }
 
     // Cross-widget service registry (Phase D). One global instance per
     // launcher process. Provider widgets register via provideService

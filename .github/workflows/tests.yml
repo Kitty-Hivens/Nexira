@@ -108,7 +108,7 @@ jobs:
           :client-easter:desktopTest :nx-ui:desktopTest :ui-layers:test
           :widget-api:test :widget-model:test :widget-processor:test :widget-loader:test
           :packs-api:test :packs:test :accounts-api:test :accounts:test
-          :catalogue-api:test :catalogue:test :i18n-api:test :i18n:test :themes-api:test :themes:test
+          :catalogue-api:test :catalogue:test :source-mirror:test :source-modrinth:test :i18n-api:test :i18n:test :themes-api:test :themes:test
           :authlib-agent:test :profiler-agent:test
           :experimental:client-boot:test :examples:widget-pixelplayer:test :examples:widget-screenfx:test :examples:widget-looks:test
           :examples:packs-consumer:test :examples:accounts-consumer:test :examples:catalogue-consumer:test

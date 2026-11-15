@@ -1,17 +1,17 @@
 package hivens.catalogue
 
 import hivens.catalogue.api.BrowseSort
-import hivens.catalogue.api.PackOrigins
+import hivens.catalogue.api.CatalogueCard
+import hivens.catalogue.api.PackDetails
+import hivens.catalogue.api.PackListing
+import hivens.catalogue.api.ProjectBuild
 import hivens.catalogue.api.ProjectHit
 import hivens.catalogue.api.ProjectKind
 import hivens.catalogue.api.ResultsScroll
 import hivens.catalogue.api.ScrollMark
 import hivens.catalogue.api.SearchFilter
 import hivens.catalogue.api.SearchStatus
-import hivens.core.api.catalogue.CataloguePack
-import hivens.core.api.catalogue.CataloguePackDetails
-import hivens.core.api.catalogue.CataloguePackVersion
-import hivens.core.api.interfaces.IPackCatalogueService
+import hivens.catalogue.api.SourceView
 import hivens.core.data.CachedManifestSnapshot
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
@@ -27,6 +27,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -73,7 +74,7 @@ class SearchServiceTest {
     private fun TestScope.window(): CoroutineScope =
         CoroutineScope(SupervisorJob() + StandardTestDispatcher(testScheduler)).also { windows += it }
 
-    private fun card(id: String) = CataloguePack(PackOrigin.Mirror, id, id, "")
+    private fun card(id: String) = CatalogueCard(SHELF.id, id, id, "")
 
     private fun pack(id: String) = PackInstance(
         id = id,
@@ -86,25 +87,24 @@ class SearchServiceTest {
 
     /** A pack source whose first page is [stream] and whose later pages are [page]. */
     private class Source(
-        private val stream: suspend (call: Int) -> Flow<List<CataloguePack>>,
-        private val page: suspend (call: Int, page: Int) -> List<CataloguePack> = { _, _ -> emptyList() },
-    ) : IPackCatalogueService {
-        override val origin: PackOrigin = PackOrigin.Mirror
+        private val stream: suspend (call: Int) -> Flow<List<CatalogueCard>>,
+        private val page: suspend (call: Int, page: Int) -> List<CatalogueCard> = { _, _ -> emptyList() },
+    ) : PackListing {
         val asked = mutableListOf<String>()
         val pages = mutableListOf<Int>()
 
-        override suspend fun search(query: String, page: Int): List<CataloguePack> {
+        override suspend fun search(query: String, page: Int): List<CatalogueCard> {
             pages += page
             return page(pages.size, page)
         }
 
-        override fun searchStream(query: String, page: Int): Flow<List<CataloguePack>> = flow {
+        override fun searchStream(query: String, page: Int): Flow<List<CatalogueCard>> = flow {
             asked += query
             stream(asked.size).collect { emit(it) }
         }
 
-        override suspend fun details(packId: String): CataloguePackDetails = error("no pack page in a search test")
-        override suspend fun versions(packId: String): List<CataloguePackVersion> = emptyList()
+        override suspend fun details(packId: String): PackDetails = error("no pack page in a search test")
+        override suspend fun versions(packId: String): List<ProjectBuild> = emptyList()
     }
 
     /** The catalogue's projects and the installer, as a project search asks them. */
@@ -113,12 +113,14 @@ class SearchServiceTest {
         val searched = mutableListOf<String>()
         val installs = mutableListOf<Pair<String, String>>()
 
+        override fun sourceOf(type: String): String = "Searched"
+
         override suspend fun search(type: String, query: String, filters: Set<SearchFilter>, offset: Int, limit: Int, sort: BrowseSort): List<ProjectHit> {
             searched += query
             return if (offset == 0) listOf(ProjectHit("sodium"), ProjectHit("iris")) else emptyList()
         }
 
-        override suspend fun installNewest(projectId: String, pack: ContentDestination.Pack): ModInstaller.Outcome {
+        override suspend fun installNewest(type: String, projectId: String, pack: ContentDestination.Pack): ModInstaller.Outcome {
             installs += projectId to pack.instanceId
             return ModInstaller.Outcome(installed = listOf("$projectId.jar"))
         }
@@ -128,12 +130,12 @@ class SearchServiceTest {
 
     private fun TestScope.browse(vararg packs: PackInstance): BrowseState {
         val byId = packs.associateBy { it.id }
-        return BrowseState(listOf(PackOrigins.MIRROR), { byId[it] }, dir, window(), io = StandardTestDispatcher(testScheduler))
+        return BrowseState(MutableStateFlow(listOf(SHELF)), { byId[it] }, dir, window(), io = StandardTestDispatcher(testScheduler))
     }
 
     private fun TestScope.service(
         browse: BrowseState,
-        packs: IPackCatalogueService? = null,
+        packs: PackListing? = null,
         projects: ProjectCatalogue = Projects(),
         packSnapshots: PackSnapshots = PackSnapshots(),
     ): SearchService {
@@ -141,7 +143,7 @@ class SearchServiceTest {
         val window = window()
         return SearchService(
             browse = browse,
-            catalogueFor = { if (it == PackOrigins.MIRROR) packs else null },
+            catalogueFor = { if (it == SHELF.id) packs?.let { listing -> OpenPackSource(listing, paged = true) } else null },
             projects = projects,
             packSnapshots = packSnapshots,
             projectSnapshots = ProjectSnapshots { 0L },
@@ -182,7 +184,7 @@ class SearchServiceTest {
 
     @Test
     fun `showing again after leaving shows the kept list at once and asks the source behind it`() = runTest {
-        val fresh = CompletableDeferred<List<CataloguePack>>()
+        val fresh = CompletableDeferred<List<CatalogueCard>>()
         val source = Source(stream = { call -> flow { emit(if (call == 1) listOf(card("a")) else fresh.await()) } })
         val search = service(browse(), packs = source)
         search.show("browse")
@@ -234,7 +236,7 @@ class SearchServiceTest {
         assertEquals(1, source.asked.size)
     }
 
-    /** A source that polls for as long as it is collected, the way the mirror's listing does. */
+    /** A source that polls for as long as it is collected. */
     private fun polling(polls: () -> Unit) = Source(
         stream = {
             flow {
@@ -333,7 +335,7 @@ class SearchServiceTest {
     @Test
     fun `a fresh first page drops a later page asked for the list it replaced`() = runTest {
         val refreshed = CompletableDeferred<Unit>()
-        val secondPage = CompletableDeferred<List<CataloguePack>>()
+        val secondPage = CompletableDeferred<List<CatalogueCard>>()
         val source = Source(
             stream = {
                 flow {
@@ -358,7 +360,7 @@ class SearchServiceTest {
         advanceUntilIdle()
 
         assertEquals(listOf("x", "y"), search.results.value.packs.map { it.id })
-        assertEquals(listOf("x", "y"), snapshots.get(PackOrigins.MIRROR, "")?.packs?.map { it.id }, "nor kept for a return")
+        assertEquals(listOf("x", "y"), snapshots.get(SHELF.id, "")?.packs?.map { it.id }, "nor kept for a return")
         assertFalse(search.results.value.endReached)
 
         search.more()
@@ -401,7 +403,7 @@ class SearchServiceTest {
             val steps = Steps()
             val work = CoroutineScope(SupervisorJob())
             val packs = mapOf("a" to pack("a"), "b" to pack("b"))
-            val browse = BrowseState(listOf(PackOrigins.MIRROR), { id -> packs[id] }, dir, CoroutineScope(Dispatchers.Unconfined), io = Dispatchers.Unconfined)
+            val browse = BrowseState(MutableStateFlow(listOf(SHELF)), { id -> packs[id] }, dir, CoroutineScope(Dispatchers.Unconfined), io = Dispatchers.Unconfined)
             browse.setKind(ProjectKind.Mod)
             browse.setTarget("a")
             val projects = Projects()
@@ -434,5 +436,10 @@ class SearchServiceTest {
             clickedAt++
         }
         assertTrue(clickedAt > 1, "the next search took more than one step to show")
+    }
+
+    private companion object {
+        /** The one pack source a window here lists from. */
+        val SHELF = SourceView("Shelf", "test.shelf", "name")
     }
 }

@@ -9,8 +9,10 @@ plugins {
 // What another module compiles against to read and fire the catalogue module's keys:
 // the key ids as constants, the typed keys, the plain data they carry and the rule
 // that folds game versions into ranges, which every reader of a version list needs
-// to agree on. No Compose and no launcher type. The module that answers the keys is
-// :catalogue.
+// to agree on. Also what a module implements to bring a source the catalogue lists
+// from: the source contributions, which need the widget kernel and so live in the JVM
+// source set. No launcher type. The module that answers the keys and takes the
+// sources is :catalogue.
 kotlin {
     // KMP modules don't apply the `java` plugin, so the root's toolchain pin skips
     // them. Set here, org.gradle.jvm.version matches the JDK 27 modules.
@@ -32,15 +34,28 @@ kotlin {
     }
 
     sourceSets {
+        val jvmSharedMain = create("jvmSharedMain") {
+            dependsOn(getByName("commonMain"))
+        }
+        getByName("jvmMain").dependsOn(jvmSharedMain)
+        getByName("androidMain").dependsOn(jvmSharedMain)
+
         getByName("commonMain") {
             dependencies {
                 api(project(":widget-model"))
             }
         }
 
+        getByName("jvmSharedMain") {
+            dependencies {
+                api(project(":widget-api"))
+            }
+        }
+
         getByName("jvmTest") {
             dependencies {
                 implementation(kotlin("test"))
+                implementation(libs.kotlinx.coroutines.test)
             }
         }
     }

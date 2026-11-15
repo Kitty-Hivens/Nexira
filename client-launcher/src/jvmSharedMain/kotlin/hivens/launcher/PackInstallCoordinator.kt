@@ -3,10 +3,10 @@ package hivens.launcher
 import hivens.core.api.catalogue.CataloguePack
 import hivens.core.api.catalogue.CataloguePackVersion
 import hivens.core.data.PackInstance
-import hivens.core.data.PackOrigin
 import hivens.launcher.mrpack.MrpackInstaller
 import hivens.launcher.mrpack.MrpackSource
 import hivens.launcher.smrt.SmrtPackClient
+import hivens.launcher.sources.EngineSources
 import java.io.IOException
 import java.nio.file.Path
 
@@ -32,12 +32,12 @@ class PackInstallCoordinator(
         onReserveDir: (Path) -> Unit = {},
         progress: (current: Int, total: Int, filename: String) -> Unit = { _, _, _ -> },
     ): PackInstance = when (pack.origin) {
-        PackOrigin.Mirror -> {
+        EngineSources.Mirror -> {
             val summary = mirrorClient.fetchSummary(pack.id)
             val manifest = mirrorClient.fetchManifestVersion(pack.id, version.id)
             mirrorInstaller.install(pack.id, summary, manifest, onReserveDir, progress)
         }
-        PackOrigin.Modrinth -> {
+        EngineSources.Modrinth -> {
             val url = version.downloadUrl
                 ?: throw IOException("Modrinth version ${version.id} carries no .mrpack download URL")
             val sha1 = version.downloadSha1
@@ -46,7 +46,7 @@ class PackInstallCoordinator(
                 url = url,
                 sha1 = sha1,
                 size = version.downloadSize,
-                source = MrpackSource(PackOrigin.Modrinth, pack.id, version.versionNumber, buildKey = version.id),
+                source = MrpackSource(EngineSources.Modrinth, pack.id, version.versionNumber, buildKey = version.id),
                 iconUrl = pack.iconUrl,
                 bannerUrl = pack.bannerUrl,
                 onReserveDir = onReserveDir,

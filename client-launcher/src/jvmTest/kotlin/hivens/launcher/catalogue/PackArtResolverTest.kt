@@ -7,6 +7,7 @@ import hivens.core.data.PackOrigin
 import hivens.core.data.PackReference
 import hivens.launcher.modrinth.ModrinthClient
 import hivens.launcher.smrt.SmrtPackClient
+import hivens.launcher.sources.EngineSources
 import hivens.test.testTransferEngine
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
@@ -31,7 +32,7 @@ class PackArtResolverTest {
 
     private val instance = PackInstance(
         id = "inst",
-        packRef = PackReference(PackOrigin.Modrinth, "AABBCCDD"),
+        packRef = PackReference(EngineSources.Modrinth, "AABBCCDD"),
         displayName = "P",
         instanceDirName = "P",
         createdAtEpoch = 1_700_000_000L,

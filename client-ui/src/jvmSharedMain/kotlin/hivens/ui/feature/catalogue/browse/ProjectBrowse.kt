@@ -56,7 +56,6 @@ import hivens.catalogue.api.CatalogueKeys
 import hivens.catalogue.api.InstallProblem
 import hivens.catalogue.api.InstallRefusal
 import hivens.catalogue.api.InstallSubject
-import hivens.catalogue.api.PackOrigins
 import hivens.catalogue.api.ProjectHit
 import hivens.catalogue.api.ProjectKind
 import hivens.catalogue.api.ProjectTarget
@@ -106,6 +105,7 @@ internal fun InstallProblem.label(s: Strings): String = when (this) {
     }
     InstallProblem.NotLanded -> s.text("contentInstallFailed")
     is InstallProblem.LeftOut -> reason.reason(s)
+    InstallProblem.SourceCannotInstall -> s.text("installSourceCannotInstall")
 }
 
 /** Why an install left a project out, in the reader's words. */
@@ -164,6 +164,7 @@ internal fun ProjectResults(
         SearchStatus.Empty -> Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text(s.text("contentEmpty"), style = MaterialTheme.typography.bodyMedium, color = NxInk.quiet)
         }
+        SearchStatus.NoSource -> BrowseEmpty(notice = checkNotNull(browseNotice(SearchStatus.NoSource, "", s)), onRetry = null)
         SearchStatus.Loaded -> BoxWithConstraints(modifier.fillMaxSize()) {
             // The catalogue's own break: a narrow column takes the small icon so the
             // title keeps its width.
@@ -195,11 +196,11 @@ internal fun ProjectResults(
                     items(items = results.projects, key = { it.projectId }) { hit ->
                         val id = hit.projectId
                         val open = if (kind == null) {
-                            { onOpenPack(modpackOf(hit)) }
+                            { onOpenPack(modpackOf(hit, question?.origin.orEmpty())) }
                         } else {
                             { onOpenProject(ProjectTarget.Catalogue(id, packId)) }
                         }
-                        val subject = InstallSubject(id, hit.title, hit.iconUrl, hit.author)
+                        val subject = InstallSubject(id, hit.title, hit.iconUrl, hit.author, source = results.projectSource)
                         val install = if (packId != null) {
                             { installResult?.invoke(id); Unit }
                         } else {
@@ -242,9 +243,9 @@ internal fun ProjectResults(
     }
 }
 
-/** A catalogue modpack as the pack page opens it. */
-private fun modpackOf(hit: ProjectHit) = CatalogueCard(
-    origin = PackOrigins.MODRINTH,
+/** A modpack the project search found, as the pack page of the source it was listed from opens it. */
+private fun modpackOf(hit: ProjectHit, origin: String) = CatalogueCard(
+    origin = origin,
     id = hit.projectId,
     title = hit.title,
     tagline = hit.description,

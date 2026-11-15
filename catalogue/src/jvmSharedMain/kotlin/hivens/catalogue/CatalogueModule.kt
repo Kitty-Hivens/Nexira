@@ -1,6 +1,6 @@
 // The catalogue module is compiled into the application and trusted with the host's own
-// services, the engine's catalogues, clients and installers, which it reads through the
-// host view of each level.
+// services, the engine's clients and installers and the contributions the modules brought
+// in, which it reads through the host view of each level.
 @file:OptIn(HostApi::class)
 
 package hivens.catalogue
@@ -11,6 +11,9 @@ import hivens.catalogue.api.CatalogueApi
 import hivens.catalogue.api.CatalogueKeys
 import hivens.catalogue.api.CatalogueTags
 import hivens.catalogue.api.GameVersionGroup
+import hivens.catalogue.api.PackSourceContribution
+import hivens.catalogue.api.PackSources
+import hivens.catalogue.api.ProjectSearchContribution
 import hivens.catalogue.api.OpenProject
 import hivens.catalogue.api.ProjectHit
 import hivens.catalogue.api.ProjectLink
@@ -22,12 +25,10 @@ import hivens.catalogue.api.SearchFilter
 import hivens.catalogue.api.SearchResults
 import hivens.catalogue.api.SearchStatus
 import hivens.core.api.dto.modrinth.ModrinthVersion
-import hivens.core.api.interfaces.IPackCatalogueService
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackInstance
 import hivens.launcher.InstallSnapshot
 import hivens.launcher.PackInstallService
-import hivens.launcher.catalogue.PackCatalogueRegistry
 import hivens.launcher.imports.LocalPackCreator
 import hivens.launcher.instance.ContentDestination
 import hivens.launcher.instance.InstallTargets
@@ -36,6 +37,7 @@ import hivens.launcher.instance.ModInstaller
 import hivens.launcher.modrinth.ModrinthClient
 import hivens.launcher.platform.PlatformPaths
 import hivens.launcher.smrt.SmrtPackClient
+import hivens.launcher.sources.EngineSources
 import hivens.widget.api.CompiledModule
 import hivens.widget.api.HostApi
 import hivens.widget.api.KeyContribution
@@ -44,15 +46,19 @@ import hivens.widget.api.LevelServices
 import hivens.widget.api.ModuleContribution
 import hivens.widget.api.ModuleKeys
 import hivens.widget.api.ModuleStrings
+import hivens.widget.api.TakenContributions
 import hivens.widget.api.command
 import hivens.widget.api.find
 import hivens.widget.api.flowSource
 import hivens.widget.api.get
+import hivens.widget.api.hostService
 import hivens.widget.api.service
 import hivens.widget.model.ApiVersion
 import hivens.widget.model.ScopeLevel
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import org.slf4j.LoggerFactory
 import java.nio.file.Path
 
 /**
@@ -74,6 +80,9 @@ object CatalogueModule : CompiledModule {
 
     // The API's own object lives in the API artifact's package, so the package is read off it.
     override val apiPackages: Map<String, Set<String>> = mapOf(CatalogueApi.ID to setOf(CatalogueApi::class.java.name.substringBeforeLast('.')))
+
+    // The sources: every module, compiled in or a jar, brings its own as one of these.
+    override val contributionKinds: List<Class<out ModuleContribution>> = listOf(PackSourceContribution::class.java, ProjectSearchContribution::class.java)
     override val contributions: List<ModuleContribution> = listOf(CatalogueKeysContribution)
 
     private const val NAME = "catalogue.name"
@@ -83,15 +92,19 @@ object CatalogueModule : CompiledModule {
 class CatalogueWork(val scope: CoroutineScope)
 
 /**
- * Every key in [CatalogueKeys], answered over the launcher's engine, and the services
- * behind them: the catalogue's lists, what searches have shown and what the pages
- * visited were called for the app, what Browse searches, its results, the rail's
- * project and the install that asks where for each window, and a project, a build and
- * a pack page for each page.
+ * Every key in [CatalogueKeys], answered over the sources the modules brought in and the
+ * launcher's engine, and the services behind them: the sources, the lists the filters
+ * are built from, what searches have shown and what the pages visited were called for
+ * the app, what Browse searches, its results, the rail's project and the install that
+ * asks where for each window, and a project, a build and a pack page for each page.
  *
- * The engine's services are the host's, read through the level's host services, which
- * the host opens to the modules compiled into it. Nothing here carries a secret, so the
- * module's own services are plain ones.
+ * The sources are the [PackSourceContribution] and [ProjectSearchContribution]
+ * contributions the host hands over through [TakenContributions], each opened with the
+ * services its own module sees, and handed to the modules the host trusts as
+ * [PackSources], the packs module's installs among them. The engine's services are the
+ * host's, read through the level's host services, which the host opens to the modules
+ * compiled into it. Nothing here carries a secret, so the module's own services are
+ * plain ones.
  */
 object CatalogueKeysContribution : KeyContribution {
     override val id: String = "catalogue.keys"
@@ -101,15 +114,24 @@ object CatalogueKeysContribution : KeyContribution {
         // ── App ─────────────────────────────────────────────────────────
         keys.service(ScopeLevel.App) { context -> CatalogueWork(context.coroutineScope) }
         keys.service(ScopeLevel.App) { context ->
-            val modrinth = context.hostServices.get<ModrinthClient>()
-            CatalogueTagsService(
-                read = { CatalogueTagsService.readAll(modrinth::gameVersions, modrinth::categoryTags, modrinth::loaderTags) },
+            // A host that hands over no contributions has no sources, and the catalogue lists nothing.
+            val contributions = context.hostServices.find<TakenContributions>()
+            SourceShelf(
+                taken = contributions?.all ?: MutableStateFlow(emptyList()),
+                servicesOf = context::servicesOf,
                 scope = context.coroutineScope,
+                compiledIn = contributions?.compiledIn.orEmpty(),
             )
         }
+        // The sources as an install reaches them: the ones the shelf took, opened once.
+        keys.hostService(ScopeLevel.App) { context -> context.services.get<SourceShelf>() as PackSources }
         keys.service(ScopeLevel.App) { context ->
-            val modrinth = context.hostServices.get<ModrinthClient>()
-            GameVersionList { modrinth.gameVersions().map { it.toTag() } }
+            val shelf = context.services.get<SourceShelf>()
+            CatalogueTagsService(read = { shelf.anySearcher()?.tags() }, scope = context.coroutineScope)
+        }
+        keys.service(ScopeLevel.App) { context ->
+            val shelf = context.services.get<SourceShelf>()
+            GameVersionList { shelf.anySearcher()?.gameVersions().orEmpty() }
         }
         keys.service(ScopeLevel.App) { _ -> PackSnapshots() }
         keys.service(ScopeLevel.App) { _ -> ProjectSnapshots() }
@@ -119,7 +141,7 @@ object CatalogueKeysContribution : KeyContribution {
         keys.service(ScopeLevel.Window) { context ->
             val host = context.hostServices
             BrowseState(
-                origins = host.get<PackCatalogueRegistry>().origins.map { it.apiName },
+                sources = context.services.get<SourceShelf>().views,
                 packs = host.get<IPackRepository>(),
                 instancesDir = host.instancesDir(),
                 scope = context.coroutineScope,
@@ -127,14 +149,16 @@ object CatalogueKeysContribution : KeyContribution {
         }
         keys.service(ScopeLevel.Window) { context ->
             val host = context.hostServices
+            val shelf = context.services.get<SourceShelf>()
             SearchService(
                 browse = context.services.get<BrowseState>(),
-                catalogueFor = host.catalogues(),
-                projects = EngineProjects(host.get<ModrinthClient>(), host.get<ModInstaller>()),
+                catalogueFor = shelf::pack,
+                projects = ShelfProjects(shelf, host),
                 packSnapshots = context.services.get<PackSnapshots>(),
                 projectSnapshots = context.services.get<ProjectSnapshots>(),
                 scope = context.coroutineScope,
                 work = context.services.get<CatalogueWork>().scope,
+                sourceGeneration = shelf.generation,
             )
         }
         keys.service(ScopeLevel.Window) { context -> OpenProjects(context.services.get<PageNames>()) }
@@ -164,18 +188,21 @@ object CatalogueKeysContribution : KeyContribution {
         }
         keys.service(ScopeLevel.Page) { context ->
             val tags = context.services.get<CatalogueTagsService>()
+            val shelf = context.services.get<SourceShelf>()
             PackPageModel(
-                catalogueFor = context.hostServices.catalogues(),
+                catalogueFor = shelf::pack,
                 snapshots = context.services.get<PackSnapshots>(),
                 open = context.services.get<OpenProjects>(),
                 tags = tags.tags,
                 ensureTags = tags::ensure,
                 scope = context.coroutineScope,
+                sourceGeneration = shelf.generation,
             )
         }
 
         // ── Sources ─────────────────────────────────────────────────────
         keys.source(CatalogueKeys.Tags, sample = { CatalogueTags() }) { app -> flowSource(app.services.get<CatalogueTagsService>().tags) }
+        keys.source(CatalogueKeys.Sources, sample = { emptyList() }) { app -> flowSource(app.services.get<SourceShelf>().views) }
         keys.source(CatalogueKeys.Browse, sample = { BrowseView() }) { window -> flowSource(window.services.get<BrowseState>().view) }
         keys.source(CatalogueKeys.Results, sample = ::sampleResults) { window -> flowSource(window.services.get<SearchService>().results) }
         keys.source(CatalogueKeys.OpenProject, sample = ::sampleOpenProject) { window -> flowSource(window.services.get<OpenProjects>().open) }
@@ -204,20 +231,12 @@ object CatalogueKeysContribution : KeyContribution {
         keys.command(CatalogueKeys.Unlock) { window -> command(window.browse()::unlock) }
         keys.command(CatalogueKeys.Relock) { window -> command(window.browse()::relock) }
         keys.command(CatalogueKeys.SetHideInstalled) { window -> command(window.browse()::setHideInstalled) }
-        keys.command(CatalogueKeys.SetMirrorOwn) { window -> command(window.browse()::setMirrorOwn) }
-        keys.command(CatalogueKeys.SetMirrorCommunity) { window -> command(window.browse()::setMirrorCommunity) }
+        keys.command(CatalogueKeys.SetSourceOption) { window -> command(window.browse()::setSourceOption) }
         keys.command(CatalogueKeys.ToggleHideInstalled) { window ->
             val browse = window.browse()
             command { browse.toggleHideInstalled() }
         }
-        keys.command(CatalogueKeys.ToggleMirrorOwn) { window ->
-            val browse = window.browse()
-            command { browse.toggleMirrorOwn() }
-        }
-        keys.command(CatalogueKeys.ToggleMirrorCommunity) { window ->
-            val browse = window.browse()
-            command { browse.toggleMirrorCommunity() }
-        }
+        keys.command(CatalogueKeys.ToggleSourceOption) { window -> command(window.browse()::toggleSourceOption) }
         keys.command(CatalogueKeys.MoreResults) { window ->
             val search = window.services.get<SearchService>()
             command { search.more() }
@@ -291,27 +310,47 @@ private fun LevelContext.browse(): BrowseState = services.get<BrowseState>()
 /** The folder every pack's folder sits in. */
 private fun LevelServices.instancesDir(): Path = get<PlatformPaths>().dataDir.resolve(INSTANCES_DIR)
 
-/** The engine's catalogue for a source's name, or null for one this build does not carry. */
-private fun LevelServices.catalogues(): (String) -> IPackCatalogueService? {
-    val registry = get<PackCatalogueRegistry>()
-    return { origin -> originNamed(origin)?.let(registry::forOrigin) }
-}
-
 private const val INSTANCES_DIR = "instances"
 
-/** The catalogue client and the installer as a project search asks for them. */
-private class EngineProjects(private val modrinth: ModrinthClient, private val installer: ModInstaller) : ProjectCatalogue {
-    override suspend fun search(type: String, query: String, filters: Set<SearchFilter>, offset: Int, limit: Int, sort: BrowseSort): List<ProjectHit> =
-        modrinth.search(type, query, filters.map { it.toEngine() }, offset, limit, sort.index).hits.map { it.toHit() }
+private val log = LoggerFactory.getLogger("hivens.catalogue.Module")
 
-    override suspend fun installNewest(projectId: String, pack: ContentDestination.Pack): ModInstaller.Outcome? =
-        modrinth.newestMatchingVersion(projectId, pack.mcVersion, pack.loader)?.let { installer.install(pack.dir, it, pack.mcVersion, pack.loader) }
+/**
+ * The one project source whose projects the engine installs, by id, until installs move
+ * into the sources. A project another source found is not installed through it: its id
+ * would be looked up at a source that never listed it.
+ */
+private val ENGINE_INSTALLS: String = EngineSources.Modrinth.id
 
-    override suspend fun presentProjects(dir: Path): Set<String> = installer.presentProjects(dir)
+/**
+ * A project search as the window's search asks for one: the search from the project
+ * source that searches the type, and the install of a result into the target pack and
+ * what that pack holds from the engine, which still installs projects itself, from the
+ * one source it knows.
+ */
+internal class ShelfProjects(private val shelf: SourceShelf, private val host: LevelServices) : ProjectCatalogue {
+    override fun sourceOf(type: String): String? = shelf.searcher(type)?.id
+
+    override suspend fun search(type: String, query: String, filters: Set<SearchFilter>, offset: Int, limit: Int, sort: BrowseSort): List<ProjectHit> {
+        val source = shelf.searcher(type)
+        if (source == null) {
+            log.info("browse: no module brings a source that searches '{}'", type)
+            return emptyList()
+        }
+        return source.searcher.search(type, query, filters, offset, limit, sort)
+    }
+
+    override suspend fun installNewest(type: String, projectId: String, pack: ContentDestination.Pack): ModInstaller.Outcome? {
+        val source = sourceOf(type)
+        if (source != ENGINE_INSTALLS) throw SourceCannotInstall(source)
+        return host.get<ModrinthClient>().newestMatchingVersion(projectId, pack.mcVersion, pack.loader)
+            ?.let { host.get<ModInstaller>().install(pack.dir, it, pack.mcVersion, pack.loader) }
+    }
+
+    override suspend fun presentProjects(dir: Path): Set<String> = host.get<ModInstaller>().presentProjects(dir)
 }
 
 /** The engine as the install that asks where needs it. */
-private class EngineInstallWork(private val host: LevelServices) : InstallWork {
+internal class EngineInstallWork(private val host: LevelServices) : InstallWork {
     private val modrinth get() = host.get<ModrinthClient>()
     private val installService get() = host.get<PackInstallService>()
 
@@ -335,6 +374,8 @@ private class EngineInstallWork(private val host: LevelServices) : InstallWork {
     override suspend fun packOf(id: String): PackInstance? = host.get<IPackRepository>().get(id)
 
     override val instancesDir: Path get() = host.instancesDir()
+
+    override fun installsFrom(source: String?): Boolean = source == null || source == ENGINE_INSTALLS
 }
 
 /** What the palette shows the results on: one project, found. */

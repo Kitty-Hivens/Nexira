@@ -2,8 +2,9 @@ package hivens.catalogue
 
 import hivens.catalogue.api.BrowseView
 import hivens.catalogue.api.FilterField
-import hivens.catalogue.api.PackOrigins
 import hivens.catalogue.api.ProjectKind
+import hivens.catalogue.api.ProjectTypes
+import hivens.catalogue.api.SourceView
 import hivens.core.data.CachedManifestSnapshot
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
@@ -13,6 +14,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -51,7 +53,11 @@ class BrowseTargetReadTest {
     @Volatile
     private var answer: () -> PackInstance? = { pack("1.21.1") }
 
-    private val browse = BrowseState(listOf(PackOrigins.MIRROR, PackOrigins.MODRINTH), { answer() }, instancesDir, scope)
+    private val sources = MutableStateFlow(
+        listOf(SourceView("Shelf", "test.shelf", "name"), SourceView("Searched", "test.searched", "name", packType = ProjectTypes.MODPACK)),
+    )
+
+    private val browse = BrowseState(sources, { answer() }, instancesDir, scope)
 
     private fun await(what: String, until: (BrowseView) -> Boolean): BrowseView = runBlocking {
         try {
@@ -113,8 +119,9 @@ class BrowseTargetReadTest {
     }
 
     @Test
-    fun `a mirror pack takes no mods and a pack with no loader runs none`() {
-        val mirror = ContentDestination.Pack.of(pack("1.21.1", PackOrigin.Mirror), instancesDir)
+    fun `a pack whose source keeps its mods takes none and a pack with no loader runs none`() {
+        // The engine still installs the mirror's packs itself, and keeps their mods.
+        val mirror = ContentDestination.Pack.of(pack("1.21.1", PackOrigin("Mirror")), instancesDir)
         assertEquals(listOf(ProjectKind.ResourcePack, ProjectKind.ShaderPack), BrowseState.kindsFor(mirror))
         val vanilla = ContentDestination.Pack.of(pack("1.21.1"), instancesDir).copy(loader = "")
         assertFalse(ProjectKind.Mod in BrowseState.kindsFor(vanilla))

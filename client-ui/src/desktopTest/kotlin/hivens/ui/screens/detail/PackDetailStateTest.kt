@@ -2,8 +2,8 @@ package hivens.ui.screens.detail
 
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackInstance
-import hivens.core.data.PackOrigin
 import hivens.core.data.PackReference
+import hivens.launcher.sources.EngineSources
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.StateFlow
@@ -36,7 +36,7 @@ class PackDetailStateTest {
 
     private fun pack(id: String = "inst-1", name: String = "Industrial") = PackInstance(
         id = id,
-        packRef = PackReference(PackOrigin.Mirror, name, "5"),
+        packRef = PackReference(EngineSources.Mirror, name, "5"),
         displayName = name,
         instanceDirName = name.lowercase(),
         createdAtEpoch = 0L,

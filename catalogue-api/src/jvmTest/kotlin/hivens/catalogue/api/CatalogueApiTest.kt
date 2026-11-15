@@ -21,6 +21,7 @@ class CatalogueApiTest {
     private val keys: List<Triple<String, Any, ScopeLevel>> = listOf(
         Triple(CatalogueKeys.TAGS_ID, CatalogueKeys.Tags, ScopeLevel.App),
         Triple(CatalogueKeys.LOAD_TAGS_ID, CatalogueKeys.LoadTags, ScopeLevel.App),
+        Triple(CatalogueKeys.SOURCES_ID, CatalogueKeys.Sources, ScopeLevel.App),
         Triple(CatalogueKeys.NAMES_ID, CatalogueKeys.Names, ScopeLevel.App),
         Triple(CatalogueKeys.BROWSE_ID, CatalogueKeys.Browse, ScopeLevel.Window),
         Triple(CatalogueKeys.RESULTS_ID, CatalogueKeys.Results, ScopeLevel.Window),
@@ -40,11 +41,9 @@ class CatalogueApiTest {
         Triple(CatalogueKeys.UNLOCK_ID, CatalogueKeys.Unlock, ScopeLevel.Window),
         Triple(CatalogueKeys.RELOCK_ID, CatalogueKeys.Relock, ScopeLevel.Window),
         Triple(CatalogueKeys.HIDE_INSTALLED_ID, CatalogueKeys.SetHideInstalled, ScopeLevel.Window),
-        Triple(CatalogueKeys.MIRROR_OWN_ID, CatalogueKeys.SetMirrorOwn, ScopeLevel.Window),
-        Triple(CatalogueKeys.MIRROR_COMMUNITY_ID, CatalogueKeys.SetMirrorCommunity, ScopeLevel.Window),
+        Triple(CatalogueKeys.SOURCE_OPTION_ID, CatalogueKeys.SetSourceOption, ScopeLevel.Window),
         Triple(CatalogueKeys.TOGGLE_HIDE_INSTALLED_ID, CatalogueKeys.ToggleHideInstalled, ScopeLevel.Window),
-        Triple(CatalogueKeys.TOGGLE_MIRROR_OWN_ID, CatalogueKeys.ToggleMirrorOwn, ScopeLevel.Window),
-        Triple(CatalogueKeys.TOGGLE_MIRROR_COMMUNITY_ID, CatalogueKeys.ToggleMirrorCommunity, ScopeLevel.Window),
+        Triple(CatalogueKeys.TOGGLE_SOURCE_OPTION_ID, CatalogueKeys.ToggleSourceOption, ScopeLevel.Window),
         Triple(CatalogueKeys.MORE_RESULTS_ID, CatalogueKeys.MoreResults, ScopeLevel.Window),
         Triple(CatalogueKeys.RETRY_RESULTS_ID, CatalogueKeys.RetryResults, ScopeLevel.Window),
         Triple(CatalogueKeys.SHOW_RESULTS_ID, CatalogueKeys.ShowResults, ScopeLevel.Window),
@@ -106,17 +105,29 @@ class CatalogueApiTest {
     @Test
     fun `a kind's project type and a search's type are the catalogue's own words`() {
         assertEquals(listOf("mod", "resourcepack", "shader"), ProjectKind.entries.map { it.projectType })
-        assertEquals("modpack", catalogueTypeOf(null, PackOrigins.MODRINTH))
-        assertEquals(null, catalogueTypeOf(null, PackOrigins.MIRROR))
-        assertEquals("shader", catalogueTypeOf(ProjectKind.ShaderPack, PackOrigins.MIRROR))
+        assertEquals("modpack", catalogueTypeOf(null, ProjectTypes.MODPACK))
+        assertEquals(null, catalogueTypeOf(null, null))
+        assertEquals("shader", catalogueTypeOf(ProjectKind.ShaderPack, null))
     }
 
     @Test
-    fun `the community choice is the mirror's alone`() {
-        val view = BrowseView(mirrorOwn = false, mirrorCommunity = true)
-        assertFalse(view.shows(CatalogueCard(PackOrigins.MIRROR, "own", "Own", "")))
-        assertTrue(view.shows(CatalogueCard(PackOrigins.MIRROR, "theirs", "Theirs", "", community = true)))
-        assertTrue(view.shows(CatalogueCard(PackOrigins.MODRINTH, "any", "Any", "")))
+    fun `the type of a pack search is the one its source declares`() {
+        val listed = SourceView("Listed", "listed.module", "name")
+        val searched = SourceView("Searched", "searched.module", "name", packType = ProjectTypes.MODPACK)
+        assertEquals(null, BrowseView(origin = "Listed", sources = listOf(listed, searched)).type)
+        assertEquals("modpack", BrowseView(origin = "Searched", sources = listOf(listed, searched)).type)
+        assertEquals(null, BrowseView(origin = "Gone", sources = listOf(listed, searched)).type)
+    }
+
+    @Test
+    fun `an option switched off hides the cards of its own source that fall under it, and nothing else`() {
+        val view = BrowseView(hidden = setOf(SourceOption("Shelf", "builtBy", "own")))
+        assertFalse(view.shows(CatalogueCard("Shelf", "own", "Own", "", facets = mapOf("builtBy" to "own"))))
+        assertTrue(view.shows(CatalogueCard("Shelf", "theirs", "Theirs", "", facets = mapOf("builtBy" to "community"))))
+        assertTrue(view.shows(CatalogueCard("Shelf", "plain", "Plain", "")), "a card that names no option is listed")
+        assertTrue(view.shows(CatalogueCard("Other", "own", "Own", "", facets = mapOf("builtBy" to "own"))), "another source's option of the same name is its own")
+        assertFalse(view.lists(SourceOption("Shelf", "builtBy", "own")))
+        assertTrue(view.lists(SourceOption("Shelf", "builtBy", "community")))
     }
 
     private val all = listOf(
@@ -146,7 +157,7 @@ class CatalogueApiTest {
     fun `a pack's build with no choice made is the one the source points at, else the newest`() {
         val newest = ProjectBuild("b2", "2", "2", "release", emptyList(), emptyList(), "")
         val pointed = ProjectBuild("b1", "1", "1", "beta", emptyList(), emptyList(), "")
-        assertEquals(pointed, PackDetails("mirror", "p", "P", "", versions = listOf(newest, pointed), latestVersionId = "b1").latest)
-        assertEquals(newest, PackDetails("mirror", "p", "P", "", versions = listOf(newest, pointed)).latest)
+        assertEquals(pointed, PackDetails("Shelf", "p", "P", "", versions = listOf(newest, pointed), latestVersionId = "b1").latest)
+        assertEquals(newest, PackDetails("Shelf", "p", "P", "", versions = listOf(newest, pointed)).latest)
     }
 }

@@ -21,6 +21,11 @@ object PacksApi {
      *
      * The module builds stamp their manifests from the `nexira.packsApi` Gradle
      * property, which a test holds equal to this.
+     *
+     * 2.0: [PackSource.origin], [InstallView.origin] and [InstallRequest.origin] carry the
+     * source's id exactly as a pack's record carries it (`Mirror`, `Local`), where 1.0 gave
+     * the source's name in lower case (`mirror`). An install request is matched by that id
+     * exactly, case included.
      */
-    val VERSION: ApiVersion = ApiVersion(1, 0)
+    val VERSION: ApiVersion = ApiVersion(2, 0)
 }

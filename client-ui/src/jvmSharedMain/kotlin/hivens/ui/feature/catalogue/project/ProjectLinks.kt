@@ -6,8 +6,8 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.UriHandler
-import hivens.catalogue.api.PackOrigins
 import hivens.catalogue.api.ProjectTarget
+import hivens.launcher.sources.EngineSources
 import hivens.ui.Screen
 import hivens.ui.navigation.NavRequests
 import hivens.ui.render.openInBrowser
@@ -99,12 +99,13 @@ fun rememberLinkFollower(intoInstanceId: String? = null): (String) -> Unit {
 /**
  * Where a link leads inside the app, or null for an address the app does not draw.
  * A modpack opens on its pack page, which installs it as a pack of its own rather
- * than into [intoInstanceId].
+ * than into [intoInstanceId]. Telling a Modrinth address apart is still the shell's,
+ * until a source can claim the addresses it serves.
  */
 fun linkScreen(url: String, intoInstanceId: String?): Screen? {
     val link = modrinthProjectLink(url) ?: return null
     return if (link.modpack) {
-        Screen.CataloguePackDetail(PackOrigins.MODRINTH, link.slug)
+        Screen.CataloguePackDetail(EngineSources.Modrinth.id, link.slug)
     } else {
         Screen.ModDetail(ProjectTarget.Catalogue(link.slug, intoInstanceId))
     }

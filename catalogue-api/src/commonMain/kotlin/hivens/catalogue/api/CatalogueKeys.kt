@@ -8,7 +8,7 @@ import hivens.widget.model.SourceKey
  * Every key the catalogue module answers: the id as a constant, for `needs` and for
  * the document, and the typed key a widget reads or fires.
  *
- * The catalogue's own lists and what the pages visited were called live at the app
+ * The catalogue's own lists, the sources and what the pages visited were called live at the app
  * level. What Browse searches, its results, the install that asks where and the
  * project the rail describes live at the window level, one of each per window, so a
  * second window browses on its own and a trip to a project page comes back to the
@@ -22,6 +22,7 @@ import hivens.widget.model.SourceKey
 object CatalogueKeys {
     const val TAGS_ID: String = "catalogue.tags"
     const val LOAD_TAGS_ID: String = "catalogue.tags.load"
+    const val SOURCES_ID: String = "catalogue.sources"
 
     const val BROWSE_ID: String = "catalogue.browse"
     const val RESULTS_ID: String = "catalogue.results"
@@ -43,11 +44,9 @@ object CatalogueKeys {
     const val UNLOCK_ID: String = "catalogue.browse.unlock"
     const val RELOCK_ID: String = "catalogue.browse.relock"
     const val HIDE_INSTALLED_ID: String = "catalogue.browse.hideInstalled"
-    const val MIRROR_OWN_ID: String = "catalogue.browse.mirrorOwn"
-    const val MIRROR_COMMUNITY_ID: String = "catalogue.browse.mirrorCommunity"
+    const val SOURCE_OPTION_ID: String = "catalogue.browse.sourceOption"
     const val TOGGLE_HIDE_INSTALLED_ID: String = "catalogue.browse.hideInstalled.toggle"
-    const val TOGGLE_MIRROR_OWN_ID: String = "catalogue.browse.mirrorOwn.toggle"
-    const val TOGGLE_MIRROR_COMMUNITY_ID: String = "catalogue.browse.mirrorCommunity.toggle"
+    const val TOGGLE_SOURCE_OPTION_ID: String = "catalogue.browse.sourceOption.toggle"
     const val MORE_RESULTS_ID: String = "catalogue.results.more"
     const val RETRY_RESULTS_ID: String = "catalogue.results.retry"
     const val SHOW_RESULTS_ID: String = "catalogue.results.show"
@@ -85,6 +84,12 @@ object CatalogueKeys {
     val LoadTags: CommandKey<Unit> = CommandKey(LOAD_TAGS_ID)
 
     /**
+     * Every pack source the modules brought in, in the order Browse lists them, as they
+     * change. A pack whose source is not among them has its source missing.
+     */
+    val Sources: SourceKey<List<SourceView>> = SourceKey(SOURCES_ID)
+
+    /**
      * What the pages visited lately in any window were called, by target key, for a
      * trail of them. Kept for the app, so a crumb in a second window names a page the
      * first one read.
@@ -112,7 +117,7 @@ object CatalogueKeys {
     /** Searches this kind, null for packs. */
     val SetKind: CommandKey<ProjectKind?> = CommandKey(SET_KIND_ID, ScopeLevel.Window)
 
-    /** Lists packs from this source, see [PackOrigins]. */
+    /** Lists packs from the source with this id, see [SourceView.id]. */
     val SetOrigin: CommandKey<String> = CommandKey(SET_ORIGIN_ID, ScopeLevel.Window)
 
     /** Searches for these words. A search follows the words a moment after the last change. */
@@ -153,9 +158,8 @@ object CatalogueKeys {
 
     val SetHideInstalled: CommandKey<Boolean> = CommandKey(HIDE_INSTALLED_ID, ScopeLevel.Window)
 
-    val SetMirrorOwn: CommandKey<Boolean> = CommandKey(MIRROR_OWN_ID, ScopeLevel.Window)
-
-    val SetMirrorCommunity: CommandKey<Boolean> = CommandKey(MIRROR_COMMUNITY_ID, ScopeLevel.Window)
+    /** Lists the packs under an option of a source's own filter, or leaves them out, see [BrowseView.hidden]. */
+    val SetSourceOption: CommandKey<SourceOptionSet> = CommandKey(SOURCE_OPTION_ID, ScopeLevel.Window)
 
     /**
      * Turns [BrowseView.hideInstalled] the other way from where it stands when the
@@ -164,11 +168,8 @@ object CatalogueKeys {
      */
     val ToggleHideInstalled: CommandKey<Unit> = CommandKey(TOGGLE_HIDE_INSTALLED_ID, ScopeLevel.Window)
 
-    /** Turns [BrowseView.mirrorOwn] the other way, see [ToggleHideInstalled]. */
-    val ToggleMirrorOwn: CommandKey<Unit> = CommandKey(TOGGLE_MIRROR_OWN_ID, ScopeLevel.Window)
-
-    /** Turns [BrowseView.mirrorCommunity] the other way, see [ToggleHideInstalled]. */
-    val ToggleMirrorCommunity: CommandKey<Unit> = CommandKey(TOGGLE_MIRROR_COMMUNITY_ID, ScopeLevel.Window)
+    /** Turns an option of a source's own filter the other way, see [ToggleHideInstalled]. */
+    val ToggleSourceOption: CommandKey<SourceOption> = CommandKey(TOGGLE_SOURCE_OPTION_ID, ScopeLevel.Window)
 
     /** Reads the next page of [Results], unless it has none or one is on its way. */
     val MoreResults: CommandKey<Unit> = CommandKey(MORE_RESULTS_ID, ScopeLevel.Window)

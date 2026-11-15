@@ -8,8 +8,6 @@ import hivens.catalogue.api.PackPageView
 import hivens.catalogue.api.ProjectSource
 import hivens.catalogue.api.gameVersionChips
 import hivens.catalogue.api.packTargetKey
-import hivens.core.api.interfaces.IPackCatalogueService
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -17,6 +15,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.update
@@ -35,13 +34,16 @@ import kotlinx.coroutines.launch
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class PackPageModel(
-    private val catalogueFor: (origin: String) -> IPackCatalogueService?,
+    /** The pack source with an id, opened, or null where none is brought in. */
+    private val catalogueFor: (origin: String) -> OpenPackSource?,
     private val snapshots: PackSnapshots,
     private val open: OpenProjects,
     private val tags: StateFlow<CatalogueTags?>,
     /** Starts reading [tags] where they are not read yet. */
     private val ensureTags: () -> Unit,
     scope: CoroutineScope,
+    /** Moves when the modules exchange a source for another instance of it, which the page reads again from. */
+    private val sourceGeneration: StateFlow<Int> = MutableStateFlow(0),
 ) {
     private val scope = CoroutineScope(scope.coroutineContext + Dispatchers.Default.limitedParallelism(1))
 
@@ -61,7 +63,7 @@ class PackPageModel(
             loading?.cancel()
             publishing?.cancel()
             val kept = snapshots.details(origin, packId)
-            _view.value = PackPageView(origin, packId, visit, kept?.let { PackPageStatus.Loaded(it.toDetails()) } ?: PackPageStatus.Loading)
+            _view.value = PackPageView(origin, packId, visit, kept?.let { PackPageStatus.Loaded(it) } ?: PackPageStatus.Loading)
             true
         }
         open.claim(visit)
@@ -69,7 +71,7 @@ class PackPageModel(
         ensureTags()
         synchronized(this) {
             publishing = scope.launch { follow(visit) }
-            loading = scope.launch { load(visit) }
+            loading = scope.launch { sourceGeneration.collectLatest { load(visit) } }
         }
     }
 
@@ -89,7 +91,7 @@ class PackPageModel(
         synchronized(this) {
             val visit = _view.value?.visit ?: return
             loading?.cancel()
-            loading = scope.launch { load(visit) }
+            loading = scope.launch { sourceGeneration.collectLatest { load(visit) } }
         }
     }
 
@@ -102,15 +104,16 @@ class PackPageModel(
         // Only a page with nothing on it says it is loading. A refresh behind a page
         // already read replaces it when it lands.
         if (page.status !is PackPageStatus.Loaded) edit(visit) { it.copy(status = PackPageStatus.Loading) }
-        val catalogue = catalogueFor(page.origin) ?: return edit(visit) { it.copy(status = PackPageStatus.Failed()) }
+        // A page kept from before its source left still shows what it read.
+        val catalogue = catalogueFor(page.origin)
+            ?: return edit(visit) { if (it.status is PackPageStatus.Loaded) it else it.copy(status = PackPageStatus.Failed()) }
         try {
-            catalogue.detailsStream(page.packId).flowOn(Dispatchers.IO).collect { details ->
+            catalogue.listing.detailsStream(page.packId).flowOn(Dispatchers.IO).collect { details ->
                 snapshots.putDetails(page.origin, page.packId, details)
-                edit(visit) { it.copy(status = PackPageStatus.Loaded(details.toDetails())) }
+                edit(visit) { it.copy(status = PackPageStatus.Loaded(details)) }
             }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
+            if (!e.isSourceFault) throw e
             // A source that failed while a page of its own is shown keeps showing it.
             edit(visit) { if (it.status is PackPageStatus.Loaded) it else it.copy(status = PackPageStatus.Failed(e.message)) }
         }

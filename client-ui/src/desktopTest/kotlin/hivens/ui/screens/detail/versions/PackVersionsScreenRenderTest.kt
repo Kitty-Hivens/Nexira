@@ -22,7 +22,6 @@ import hivens.core.api.dto.smrt.SmrtSource
 import hivens.core.api.interfaces.IMirrorPackClient
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackInstance
-import hivens.core.data.PackOrigin
 import hivens.core.data.PackReference
 import hivens.core.smrt.ModIconResolver
 import hivens.core.update.CompatChange
@@ -37,6 +36,7 @@ import hivens.core.update.UpdatePlan
 import hivens.launcher.PackOperationService
 import hivens.launcher.instance.InstanceSizeService
 import hivens.launcher.launch.RunningPackSource
+import hivens.launcher.sources.EngineSources
 import hivens.themes.Themes
 import hivens.ui.host.HostKoin
 import hivens.ui.theme.NxTheme
@@ -74,7 +74,7 @@ class PackVersionsScreenRenderTest {
 
     private val pack = PackInstance(
         id = "1",
-        packRef = PackReference(PackOrigin.Mirror, "Create", "0.1.1"),
+        packRef = PackReference(EngineSources.Mirror, "Create", "0.1.1"),
         displayName = "Create",
         instanceDirName = "create",
         createdAtEpoch = 0L,

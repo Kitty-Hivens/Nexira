@@ -7,10 +7,12 @@ import hivens.catalogue.api.BrowseView
 import hivens.catalogue.api.FilterClear
 import hivens.catalogue.api.FilterField
 import hivens.catalogue.api.FilterPick
-import hivens.catalogue.api.PackOrigins
 import hivens.catalogue.api.ProjectKind
 import hivens.catalogue.api.ProjectTypes
 import hivens.catalogue.api.SearchFilter
+import hivens.catalogue.api.SourceOption
+import hivens.catalogue.api.SourceOptionSet
+import hivens.catalogue.api.SourceView
 import hivens.catalogue.api.TagSearch
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackInstance
@@ -43,10 +45,15 @@ private val log = LoggerFactory.getLogger("hivens.catalogue.Browse")
  * The pack installs go into is read off disk here, the one place that owns that work,
  * off the thread that asked. Its folder and what it runs are kept beside the view for
  * the search, which installs into it.
+ *
+ * The sources come and go with their modules, and the view follows them. A source the
+ * person picked that leaves is still the one they picked, and listed from again when it
+ * comes back. What they switched off in a source's own filters is kept per window the
+ * same way, by the source's id.
  */
 class BrowseState(
-    /** Every pack source this build carries, in the order the rail lists them. */
-    private val origins: List<String>,
+    /** Every pack source the modules brought in, in the order the rail lists them, as they change. */
+    private val sources: StateFlow<List<SourceView>>,
     /** The pack with an id, as the library holds it. */
     private val packOf: suspend (String) -> PackInstance?,
     /** The folder every pack's folder sits in. */
@@ -55,8 +62,8 @@ class BrowseState(
     /** Where the pack is read off disk. */
     private val io: CoroutineDispatcher = Dispatchers.IO,
 ) {
-    constructor(origins: List<String>, packs: IPackRepository, instancesDir: Path, scope: CoroutineScope) :
-        this(origins, { id -> packs.get(id) }, instancesDir, scope)
+    constructor(sources: StateFlow<List<SourceView>>, packs: IPackRepository, instancesDir: Path, scope: CoroutineScope) :
+        this(sources, { id -> packs.get(id) }, instancesDir, scope)
 
     private data class State(
         val kind: ProjectKind? = null,
@@ -69,8 +76,7 @@ class BrowseState(
         val chosen: Map<String, Set<SearchFilter>> = emptyMap(),
         val unlocked: Set<FilterField> = emptySet(),
         val hideInstalled: Boolean = false,
-        val mirrorOwn: Boolean = true,
-        val mirrorCommunity: Boolean = true,
+        val hidden: Set<SourceOption> = emptySet(),
     )
 
     /** The chosen pack read off disk: what a widget is shown of it, and where an install goes. */
@@ -82,6 +88,12 @@ class BrowseState(
     val view: StateFlow<BrowseView> = _view.asStateFlow()
 
     private var reading: Job? = null
+
+    init {
+        // Every list is taken, the first one too: one that changed between the view's
+        // first reading and this collector's start is otherwise never shown.
+        scope.launch { sources.collect { change { it } } }
+    }
 
     /** The resolved target, only while it is still the one chosen. */
     val target: Resolved? get() = synchronized(this) { state.resolved?.takeIf { it.view.packId == state.targetId } }
@@ -103,15 +115,11 @@ class BrowseState(
 
     fun setHideInstalled(hide: Boolean) = change { it.copy(hideInstalled = hide) }
 
-    fun setMirrorOwn(listed: Boolean) = change { it.copy(mirrorOwn = listed) }
-
-    fun setMirrorCommunity(listed: Boolean) = change { it.copy(mirrorCommunity = listed) }
+    fun setSourceOption(set: SourceOptionSet) = change { it.copy(hidden = if (set.listed) it.hidden - set.option else it.hidden + set.option) }
 
     fun toggleHideInstalled() = change { it.copy(hideInstalled = !it.hideInstalled) }
 
-    fun toggleMirrorOwn() = change { it.copy(mirrorOwn = !it.mirrorOwn) }
-
-    fun toggleMirrorCommunity() = change { it.copy(mirrorCommunity = !it.mirrorCommunity) }
+    fun toggleSourceOption(option: SourceOption) = change { it.copy(hidden = if (option in it.hidden) it.hidden - option else it.hidden + option) }
 
     fun unlock(field: FilterField) = change { it.copy(unlocked = it.unlocked + field) }
 
@@ -169,7 +177,8 @@ class BrowseState(
      * A fresh search for [search]'s type narrowed by its filters alone: nothing typed,
      * the type's other choices dropped, and its pack as the target. A field the pack
      * would decide is taken out of its hands, because the tag that was clicked is the
-     * question.
+     * question. A search for packs lists them from the source whose packs are searched
+     * as that type.
      */
     fun searchFor(search: TagSearch) {
         val searched = BROWSE_TYPES[search.type] ?: if (search.type == ProjectTypes.MODPACK) null else return
@@ -178,7 +187,7 @@ class BrowseState(
             val taken = search.filters.map { it.field }.filter { it in PACK_FIELDS && it !in retargeted.unlocked }.toSet()
             retargeted.copy(
                 kind = searched,
-                origin = if (searched == null) PackOrigins.MODRINTH else retargeted.origin,
+                origin = if (searched == null) sources.value.firstOrNull { it.packType == search.type }?.id ?: retargeted.origin else retargeted.origin,
                 query = "",
                 chosen = retargeted.chosen + (search.type to search.filters),
                 unlocked = retargeted.unlocked + taken,
@@ -245,11 +254,12 @@ class BrowseState(
 
     private fun render(s: State): BrowseView {
         val target = s.resolved?.takeIf { it.view.packId == s.targetId }
+        val listed = sources.value
         return BrowseView(
             kind = s.kind,
             pickedOrigin = s.origin,
-            origin = activeOrigin(s.origin, origins),
-            origins = origins,
+            origin = activeOrigin(s.origin, listed.map { it.id }),
+            sources = listed,
             query = s.query,
             sort = s.sort,
             targetId = s.targetId,
@@ -258,8 +268,7 @@ class BrowseState(
             unlocked = s.unlocked,
             locked = lockedFor(s, s.kind),
             hideInstalled = s.hideInstalled,
-            mirrorOwn = s.mirrorOwn,
-            mirrorCommunity = s.mirrorCommunity,
+            hidden = s.hidden,
         )
     }
 
@@ -285,14 +294,15 @@ class BrowseState(
         /** The project types Browse searches, with the kind it lists each under. */
         private val BROWSE_TYPES: Map<String, ProjectKind?> = BROWSE_KINDS.filterNotNull().associateBy { it.projectType }
 
-        /** The source packs are listed from: the one picked, else the first registered. */
+        /** The source packs are listed from: the one picked, else the first brought in, blank with none. */
         fun activeOrigin(picked: String?, origins: List<String>): String =
-            picked?.takeIf { it in origins } ?: origins.firstOrNull() ?: PackOrigins.MIRROR
+            picked?.takeIf { it in origins } ?: origins.firstOrNull() ?: ""
 
         /**
          * The kinds a pack takes from the player, in the order the rail lists them. A
-         * mirror pack never takes mods, and a pack with no loader runs none, so a row
-         * offering to install one there would offer something that cannot happen.
+         * pack whose source keeps its mods never takes one, and a pack with no loader
+         * runs none, so a row offering to install one there would offer something that
+         * cannot happen.
          */
         fun kindsFor(target: ContentDestination.Pack): List<ProjectKind> {
             val keepsRecord = Files.isDirectory(target.dir) && PackPlacedContent.paths(target.dir) != null

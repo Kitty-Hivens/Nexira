@@ -1,8 +1,7 @@
-package hivens.launcher.catalogue
+package hivens.source.modrinth
 
 import hivens.test.testTransferEngine
 import hivens.core.api.HttpClientProvider
-import hivens.core.data.PackOrigin
 import hivens.launcher.modrinth.ModrinthClient
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
@@ -16,7 +15,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-class ModrinthPackCatalogueTest {
+class ModrinthListingTest {
 
     private val searchJson =
         """{"hits":[{"project_id":"AABBCCDD","slug":"cobblemon","title":"Cobblemon",""" +
@@ -34,7 +33,7 @@ class ModrinthPackCatalogueTest {
             """"files":[{"hashes":{"sha1":"deadbeef"},"url":"https://cdn/cobblemon-1.5.mrpack",""" +
             """"filename":"cobblemon-1.5.mrpack","primary":true,"size":42}]}]"""
 
-    private fun catalogue(): ModrinthPackCatalogue {
+    private fun catalogue(): ModrinthListing {
         val engine = MockEngine { req ->
             val body = when (req.url.encodedPath) {
                 "/v2/search" -> searchJson
@@ -49,7 +48,7 @@ class ModrinthPackCatalogueTest {
             }
         }
         val provider = HttpClientProvider { HttpClient(engine) }
-        return ModrinthPackCatalogue(ModrinthClient(provider, testTransferEngine(provider)))
+        return ModrinthListing(ModrinthClient(provider, testTransferEngine(provider)))
     }
 
     @Test
@@ -57,7 +56,7 @@ class ModrinthPackCatalogueTest {
         val packs = catalogue().search("cobblemon")
         assertEquals(1, packs.size)
         val p = packs.first()
-        assertEquals(PackOrigin.Modrinth, p.origin)
+        assertEquals("Modrinth", p.origin, "the id every Modrinth pack record carries")
         assertEquals("AABBCCDD", p.id)
         assertEquals("Cobblemon", p.title)
         assertEquals("Catch and battle", p.tagline)
@@ -98,6 +97,9 @@ class ModrinthPackCatalogueTest {
         assertEquals("ver1", v.id)
         assertEquals("1.5.0", v.versionNumber)
         assertEquals(listOf("fabric"), v.loaders)
-        assertEquals("https://cdn/cobblemon-1.5.mrpack", v.downloadUrl)
+        assertEquals("https://cdn/cobblemon-1.5.mrpack", v.download?.url)
+        assertEquals("deadbeef", v.download?.sha1, "the archive is the one download nothing else vouches for")
+        assertEquals(42L, v.download?.size)
+        assertEquals("release", v.versionType)
     }
 }

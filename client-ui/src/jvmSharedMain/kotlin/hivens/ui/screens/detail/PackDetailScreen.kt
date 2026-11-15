@@ -66,6 +66,7 @@ import hivens.i18n.api.Strings
 import hivens.ui.components.BannerVideo
 import hivens.ui.components.FullscreenVideo
 import hivens.ui.components.LaunchControl
+import hivens.ui.components.sourceName
 import hivens.ui.components.isVideoUrl
 import hivens.ui.components.rememberLaunchControl
 import hivens.ui.effects.pixelArtBackground
@@ -712,13 +713,7 @@ private fun PackTabBar(selected: Int, onSelect: (Int) -> Unit) {
 
 @Composable
 private fun SourceChip(origin: PackOrigin) {
-    val label = when (origin) {
-        PackOrigin.Mirror      -> "Mirror"
-        PackOrigin.Modrinth    -> "Modrinth"
-        PackOrigin.Smartycraft -> "SmartyCraft"
-        PackOrigin.Local       -> "Local"
-        PackOrigin.Unknown     -> "Other"
-    }
+    val label = sourceName(origin)
     val fill = originColor(origin).copy(alpha = 0.9f)
     Box(
         modifier = Modifier

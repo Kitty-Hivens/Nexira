@@ -1,7 +1,6 @@
 package hivens.catalogue
 
 import hivens.catalogue.api.CatalogueCard
-import hivens.catalogue.api.PackOrigins
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -9,16 +8,16 @@ import kotlin.test.assertNull
 
 class PackSnapshotsTest {
 
-    private fun pack(id: String) = CatalogueCard(origin = PackOrigins.MODRINTH, id = id, title = id, tagline = "")
+    private fun pack(id: String) = CatalogueCard(origin = "Searched", id = id, title = id, tagline = "")
 
     private fun snapshot(vararg ids: String, nextPage: Int = 0, endReached: Boolean = false) =
         PackSnapshots.Snapshot(ids.map(::pack), nextPage, endReached)
 
     @Test fun `a source is handed back what it was last showing`() {
         val session = PackSnapshots()
-        session.put(PackOrigins.MODRINTH, "create", snapshot("a", "b", nextPage = 2))
+        session.put("Searched", "create", snapshot("a", "b", nextPage = 2))
 
-        val back = session.get(PackOrigins.MODRINTH, "create")
+        val back = session.get("Searched", "create")
 
         assertNotNull(back)
         assertEquals(listOf("a", "b"), back.packs.map { it.id })
@@ -27,24 +26,24 @@ class PackSnapshotsTest {
 
     @Test fun `two sources do not share a list`() {
         val session = PackSnapshots()
-        session.put(PackOrigins.MODRINTH, "", snapshot("create"))
+        session.put("Searched", "", snapshot("create"))
 
-        assertNull(session.get(PackOrigins.MIRROR, ""), "the mirror must not be handed Modrinth's catalogue")
+        assertNull(session.get("Shelf", ""), "one source must not be handed another's list")
     }
 
     @Test fun `the difference between two spellings of a query is a keystroke`() {
         val session = PackSnapshots()
-        session.put(PackOrigins.MODRINTH, "Create", snapshot("a"))
+        session.put("Searched", "Create", snapshot("a"))
 
-        assertNotNull(session.get(PackOrigins.MODRINTH, "  create "))
+        assertNotNull(session.get("Searched", "  create "))
     }
 
     @Test fun `typing towards a query does not grow the map without end`() {
         val session = PackSnapshots()
-        repeat(40) { session.put(PackOrigins.MODRINTH, "q$it", snapshot("a")) }
+        repeat(40) { session.put("Searched", "q$it", snapshot("a")) }
 
-        assertNull(session.get(PackOrigins.MODRINTH, "q0"), "the oldest goes out")
-        assertNotNull(session.get(PackOrigins.MODRINTH, "q39"), "the newest stays")
+        assertNull(session.get("Searched", "q0"), "the oldest goes out")
+        assertNotNull(session.get("Searched", "q39"), "the newest stays")
     }
 
     /**
@@ -56,36 +55,36 @@ class PackSnapshotsTest {
      */
     @Test fun `nothing is not remembered`() {
         val session = PackSnapshots()
-        session.put(PackOrigins.MODRINTH, "create", snapshot(endReached = true))
+        session.put("Searched", "create", snapshot(endReached = true))
 
-        assertNull(session.get(PackOrigins.MODRINTH, "create"))
+        assertNull(session.get("Searched", "create"))
     }
 
     @Test fun `an empty answer forgets the list it replaces`() {
         // A source that has genuinely stopped listing something must not leave the
         // last good list to be restored over the empty state that says so.
         val session = PackSnapshots()
-        session.put(PackOrigins.MODRINTH, "create", snapshot("a", "b"))
-        session.put(PackOrigins.MODRINTH, "create", snapshot())
+        session.put("Searched", "create", snapshot("a", "b"))
+        session.put("Searched", "create", snapshot())
 
-        assertNull(session.get(PackOrigins.MODRINTH, "create"))
+        assertNull(session.get("Searched", "create"))
     }
 
     @Test fun `an empty answer for one query leaves another alone`() {
         val session = PackSnapshots()
-        session.put(PackOrigins.MODRINTH, "create", snapshot("a"))
-        session.put(PackOrigins.MODRINTH, "tech", snapshot())
+        session.put("Searched", "create", snapshot("a"))
+        session.put("Searched", "tech", snapshot())
 
-        assertNotNull(session.get(PackOrigins.MODRINTH, "create"))
+        assertNotNull(session.get("Searched", "create"))
     }
 
     @Test fun `looking at a list again keeps it from being the oldest`() {
         val session = PackSnapshots()
-        session.put(PackOrigins.MODRINTH, "keep", snapshot("a"))
-        repeat(20) { session.put(PackOrigins.MODRINTH, "q$it", snapshot("a")) }
-        session.put(PackOrigins.MODRINTH, "keep", snapshot("a", "b"))
-        repeat(20) { session.put(PackOrigins.MODRINTH, "r$it", snapshot("a")) }
+        session.put("Searched", "keep", snapshot("a"))
+        repeat(20) { session.put("Searched", "q$it", snapshot("a")) }
+        session.put("Searched", "keep", snapshot("a", "b"))
+        repeat(20) { session.put("Searched", "r$it", snapshot("a")) }
 
-        assertNotNull(session.get(PackOrigins.MODRINTH, "keep"))
+        assertNotNull(session.get("Searched", "keep"))
     }
 }

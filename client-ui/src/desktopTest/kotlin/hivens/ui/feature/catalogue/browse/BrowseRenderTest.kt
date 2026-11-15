@@ -28,7 +28,12 @@ import hivens.catalogue.api.CategoryTag
 import hivens.catalogue.api.FilterField
 import hivens.catalogue.api.GameVersionTag
 import hivens.catalogue.api.LoaderTag
-import hivens.catalogue.api.PackOrigins
+import hivens.catalogue.api.SourceOption
+import hivens.catalogue.api.SourceView
+import hivens.source.mirror.MirrorPackSource
+import hivens.source.mirror.MirrorSourceModule
+import hivens.source.modrinth.ModrinthPackSource
+import hivens.source.modrinth.ModrinthSourceModule
 import hivens.catalogue.api.ProjectHit
 import hivens.catalogue.api.ProjectKind
 import hivens.catalogue.api.SearchFilter
@@ -44,8 +49,8 @@ import hivens.launcher.modrinth.acceptedLoaders
 import hivens.launcher.smrt.SmrtPackClient
 import hivens.themes.Themes
 import hivens.ui.host.HostKoin
-import hivens.ui.i18n.ShippedLanguageProvider
 import hivens.ui.widgets.KoinLevelServicesHost
+import hivens.widget.api.LocalWidgetDataRegistry
 import kotlinx.coroutines.Dispatchers
 import hivens.ui.settle
 import hivens.ui.surface.NxSurface
@@ -57,7 +62,6 @@ import hivens.ui.widgets.WidgetSurface
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.LocalScope
 import hivens.widget.api.LocalWidgetCommandRegistry
-import hivens.widget.api.LocalWidgetDataRegistry
 import hivens.widget.api.LocalSurfaceFamilies
 import hivens.widget.api.LocalWidgetRegistry
 import hivens.widget.api.LocalWidgetSurfaceRenderer
@@ -173,12 +177,12 @@ class BrowseRenderTest {
         sheet("browse-pack-cards-mirror", width = 900, height = 340) {
             Caption("свой пак зеркала и пак сообщества с подписью владельца")
             BrowsePackCard(
-                CatalogueCard(PackOrigins.MIRROR, "industrial", "Industrial", "Тяжёлая промышленность.", tags = listOf("tech"), mcVersion = "1.12.2"),
+                CatalogueCard(MirrorPackSource.id, "industrial", "Industrial", "Тяжёлая промышленность.", tags = listOf("tech"), mcVersion = "1.12.2"),
                 onClick = {},
             )
             BrowsePackCard(
                 CatalogueCard(
-                    PackOrigins.MIRROR, "u/7/cozy", "Cozy Valley", "Фермы, уют и ни одного крипера.",
+                    MirrorPackSource.id, "u/7/cozy", "Cozy Valley", "Фермы, уют и ни одного крипера.",
                     tags = listOf("farming"), mcVersion = "1.21.1", community = true, author = "alex",
                 ),
                 onClick = {},
@@ -235,13 +239,18 @@ class BrowseRenderTest {
     )
 
     /** The window's browse, as the catalogue module would hold it. Each sheet sets it. */
-    private val browse = MutableStateFlow(BrowseView(origins = listOf(PackOrigins.MIRROR, PackOrigins.MODRINTH)))
+    /** The two sources the build carries, as each module declares itself. */
+    private val mirror = SourceView(MirrorPackSource.id, MirrorSourceModule.ID, MirrorPackSource.label, MirrorPackSource.icon, MirrorPackSource.filters)
+    private val modrinth = SourceView(ModrinthPackSource.id, ModrinthSourceModule.ID, ModrinthPackSource.label, ModrinthPackSource.icon, packType = ModrinthPackSource.packType)
+
+    private val browse = MutableStateFlow(BrowseView(sources = listOf(mirror, modrinth)))
 
     /** What the search box was asked to search for. */
     private val asked = ArrayList<String>()
 
     private val sources = WidgetDataRegistry().apply {
         register(CatalogueKeys.Tags, flowSource(MutableStateFlow<CatalogueTags?>(tags)))
+        register(CatalogueKeys.Sources, flowSource(MutableStateFlow(listOf(mirror, modrinth))))
         registerFactory(CatalogueKeys.Browse) { flowSource(browse) }
     }
 
@@ -322,10 +331,12 @@ class BrowseRenderTest {
                 browse.value = browse.value.copy(kind = ProjectKind.Mod, targetId = local.id, target = target, locked = lockedBy(target, ProjectKind.Mod))
             },
             "browse-rail-resourcepacks" to { browse.value = browse.value.copy(kind = ProjectKind.ResourcePack, targetId = null, target = null, locked = emptyList()) },
-            "browse-rail-packs-mirror" to { browse.value = browse.value.copy(kind = null, pickedOrigin = PackOrigins.MIRROR, origin = PackOrigins.MIRROR) },
-            "browse-rail-packs-mirror-own" to { browse.value = browse.value.copy(mirrorCommunity = false) },
+            "browse-rail-packs-mirror" to { browse.value = browse.value.copy(kind = null, pickedOrigin = mirror.id, origin = mirror.id) },
+            "browse-rail-packs-mirror-own" to {
+                browse.value = browse.value.copy(hidden = setOf(SourceOption(mirror.id, MirrorPackSource.BUILT_BY, MirrorPackSource.COMMUNITY)))
+            },
             "browse-rail-packs-modrinth" to {
-                browse.value = browse.value.copy(kind = null, pickedOrigin = PackOrigins.MODRINTH, origin = PackOrigins.MODRINTH, mirrorCommunity = true)
+                browse.value = browse.value.copy(kind = null, pickedOrigin = modrinth.id, origin = modrinth.id, hidden = emptySet())
             },
         ).forEach { (name, arrange) ->
             arrange()
@@ -369,13 +380,16 @@ class BrowseRenderTest {
         val d = 2f
         val scene = ImageComposeScene((width * d).toInt(), (height * d).toInt(), density = Density(d)) {
             HostKoin(koin) {
-                ShippedLanguageProvider("ru") {
-                    NxTheme(Themes.default, dark = true) {
-                        Box(Modifier.fillMaxSize().background(NxColor.page).padding(20.dp)) {
-                            if (padded) {
-                                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) { body() }
-                            } else {
-                                Row { body() }
+                // A pack card's badge names its source among the ones brought in.
+                CompositionLocalProvider(LocalWidgetDataRegistry provides sources) {
+                    ModuleLanguageProvider("ru", listOf(MirrorSourceModule, ModrinthSourceModule)) {
+                        NxTheme(Themes.default, dark = true) {
+                            Box(Modifier.fillMaxSize().background(NxColor.page).padding(20.dp)) {
+                                if (padded) {
+                                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) { body() }
+                                } else {
+                                    Row { body() }
+                                }
                             }
                         }
                     }

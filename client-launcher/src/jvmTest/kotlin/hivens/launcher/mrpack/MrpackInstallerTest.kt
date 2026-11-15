@@ -9,6 +9,7 @@ import hivens.core.data.PackOrigin
 import hivens.launcher.runtime.RuntimeProvisioner
 import hivens.launcher.runtime.loader.LoaderRegistry
 import hivens.launcher.record.PackFileRecord
+import hivens.launcher.sources.EngineSources
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -182,10 +183,10 @@ class MrpackInstallerTest {
 
         val instance = installer.install(
             buildMrpack(),
-            source = MrpackSource(PackOrigin.Modrinth, id = "AABBCCDD", version = "1.5.0"),
+            source = MrpackSource(EngineSources.Modrinth, id = "AABBCCDD", version = "1.5.0"),
         )
 
-        assertEquals(PackOrigin.Modrinth, instance.packRef.origin, "Modrinth install is tracked, not Local")
+        assertEquals(EngineSources.Modrinth, instance.packRef.origin, "Modrinth install is tracked, not Local")
         assertEquals("AABBCCDD", instance.packRef.id, "pack id is the Modrinth project id")
         assertEquals("1.5.0", instance.packRef.version)
         assertEquals("1.5.0", instance.pinnedPackVersion, "pinned to the installed Modrinth version")
@@ -396,7 +397,7 @@ class MrpackInstallerTest {
         val updated = installer.update(
             instance,
             buildVersionedPack(second = true),
-            source = MrpackSource(PackOrigin.Modrinth, id = "AABBCCDD", version = "2.0.0"),
+            source = MrpackSource(EngineSources.Modrinth, id = "AABBCCDD", version = "2.0.0"),
         )
 
         assertEquals("2.0.0", updated.pinnedPackVersion)
@@ -519,7 +520,7 @@ class MrpackInstallerTest {
             urlInstaller(served, repo, dataDir).installFromUrl(
                 url = ARCHIVE_URL,
                 sha1 = sha1(published),
-                source = MrpackSource(PackOrigin.Modrinth, id = "AABBCCDD", version = "1.0.0"),
+                source = MrpackSource(EngineSources.Modrinth, id = "AABBCCDD", version = "1.0.0"),
             )
         }.onSuccess { error("an archive with the wrong bytes must not install") }
 
@@ -536,7 +537,7 @@ class MrpackInstallerTest {
             url = ARCHIVE_URL,
             sha1 = sha1(bytes),
             size = bytes.size.toLong(),
-            source = MrpackSource(PackOrigin.Modrinth, id = "AABBCCDD", version = "1.0.0"),
+            source = MrpackSource(EngineSources.Modrinth, id = "AABBCCDD", version = "1.0.0"),
         )
 
         assertEquals("Test Pack", instance.displayName)

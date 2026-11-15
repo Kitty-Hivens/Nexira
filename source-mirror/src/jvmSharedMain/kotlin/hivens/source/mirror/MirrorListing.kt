@@ -1,10 +1,11 @@
-package hivens.launcher.catalogue
+package hivens.source.mirror
 
-import hivens.core.api.catalogue.CatalogueCreator
-import hivens.core.api.catalogue.CatalogueGalleryItem
-import hivens.core.api.catalogue.CataloguePack
-import hivens.core.api.catalogue.CataloguePackDetails
-import hivens.core.api.catalogue.CataloguePackVersion
+import hivens.catalogue.api.CatalogueCard
+import hivens.catalogue.api.GalleryItem
+import hivens.catalogue.api.PackDetails
+import hivens.catalogue.api.PackListing
+import hivens.catalogue.api.ProjectBuild
+import hivens.catalogue.api.ProjectCreator
 import hivens.core.api.dto.smrt.SmrtCommunityPack
 import hivens.core.api.dto.smrt.SmrtManifestVersions
 import hivens.core.api.dto.smrt.SmrtPackListing
@@ -12,8 +13,7 @@ import hivens.core.api.dto.smrt.SmrtPackManifest
 import hivens.core.api.dto.smrt.SmrtPackSummary
 import hivens.core.api.dto.smrt.inLanguage
 import hivens.core.api.dto.smrt.toDomain
-import hivens.core.api.interfaces.IPackCatalogueService
-import hivens.core.data.PackOrigin
+import hivens.core.update.VersionChannel
 import hivens.launcher.smrt.SmrtPackClient
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
@@ -32,8 +32,9 @@ import org.slf4j.LoggerFactory
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * The Hivens mirror as a [IPackCatalogueService]. The mirror has no query
- * endpoint, so [search] lists everything and filters client-side.
+ * What the Hivens mirror answers as a source: its listing, a pack's page and its
+ * builds. The mirror has no query endpoint, so [search] lists everything and filters
+ * client-side.
  *
  * Its own packs and its community's are two listings, and one list here: the
  * official ones first, in the mirror's order, then the community's, each with the
@@ -42,31 +43,32 @@ import kotlin.time.Duration.Companion.milliseconds
  * smaller half of the answer, so a failure there leaves the official packs on
  * screen rather than taking them down with it. [details]
  * carries the full retained build list so the Browse install picker can offer
- * any version -- the coordinator installs the picked build's own manifest --
- * degrading to the single latest when the listing is unavailable.
+ * any version (the installer takes the picked build's own manifest), and
+ * degrades to the single latest when the listing is unavailable.
  *
- * Not wrapped in [CachedPackCatalogue]: a search is a filter over the listing,
- * which [SmrtPackClient] already keeps on disk, and a second cache over it took
- * the inner one's stale answer as a fresh one of its own.
+ * Not wrapped in a search cache: a search is a filter over the listing, which
+ * [SmrtPackClient] already keeps on disk, and a second cache over it took the inner
+ * one's stale answer as a fresh one of its own.
  *
  * The mirror carries its text per language beside the untagged copy. It is
  * picked here, where the wire shape becomes the catalogue's, by [languages]: the
  * reader's tags, best first, asked on every read so a change of interface language reaches
- * the next answer. The catalogue's models keep one string per field, and no
+ * the next answer. The catalogue's values keep one string per field, and no
  * screen that draws them has to know there were several.
+ *
+ * Each card says whose it is under [MirrorPackSource.BUILT_BY]: the mirror's own or
+ * its community's.
  */
-class MirrorPackCatalogue(
+class MirrorListing(
     private val client: SmrtPackClient,
     private val pollIntervalMs: Long = POLL_INTERVAL_MS,
     private val languages: () -> List<String> = { emptyList() },
-) : IPackCatalogueService {
-    private val log = LoggerFactory.getLogger(MirrorPackCatalogue::class.java)
+) : PackListing {
+    private val log = LoggerFactory.getLogger(MirrorListing::class.java)
 
-    override val origin = PackOrigin.Mirror
+    private val origin: String = MirrorPackSource.ID
 
-    override val paged = false
-
-    override suspend fun search(query: String, page: Int): List<CataloguePack> =
+    override suspend fun search(query: String, page: Int): List<CatalogueCard> =
         matching(client.listPacks(), communityOrNone(forceRefresh = false), query)
 
     /**
@@ -80,8 +82,8 @@ class MirrorPackCatalogue(
      * what is shown and asks again on the next one. Only a failure before anything
      * was shown ends the stream, since then there is nothing to keep.
      */
-    override fun searchStream(query: String, page: Int): Flow<List<CataloguePack>> = flow {
-        var last: List<CataloguePack>? = null
+    override fun searchStream(query: String, page: Int): Flow<List<CatalogueCard>> = flow {
+        var last: List<CatalogueCard>? = null
         var community: List<SmrtCommunityPack> = emptyList()
         // The stored listing is handed over before the refresh behind it is asked,
         // so that refresh can fail with a list already on screen. Thrown on from
@@ -138,7 +140,7 @@ class MirrorPackCatalogue(
         null
     }
 
-    private fun matching(listing: SmrtPackListing, community: List<SmrtCommunityPack>?, query: String): List<CataloguePack> {
+    private fun matching(listing: SmrtPackListing, community: List<SmrtCommunityPack>?, query: String): List<CatalogueCard> {
         val tags = languages()
         val official = listing.packs.map { it to null }
         // A pack listed in both is the mirror's own: a promotion moves it across.
@@ -152,7 +154,7 @@ class MirrorPackCatalogue(
                     tagline.contains(query, ignoreCase = true)
             }
             .map { (s, owner, tagline) ->
-                CataloguePack(
+                CatalogueCard(
                     origin = origin,
                     id = s.packId,
                     title = s.displayName,
@@ -163,13 +165,14 @@ class MirrorPackCatalogue(
                     mcVersion = s.minecraftVersion,
                     community = owner != null,
                     author = owner,
+                    facets = mapOf(MirrorPackSource.BUILT_BY to if (owner != null) MirrorPackSource.COMMUNITY else MirrorPackSource.OWN),
                 )
             }
     }
 
     private fun taglineOf(s: SmrtPackSummary, tags: List<String>): String = inLanguage(s.tagline, s.taglineI18n, tags) ?: s.tagline
 
-    override suspend fun details(packId: String): CataloguePackDetails = coroutineScope {
+    override suspend fun details(packId: String): PackDetails = coroutineScope {
         // Summary + manifest + build listing in parallel: the manifest carries
         // loader, Java and the sign-in the pack needs, the listing feeds the
         // versions (server order, newest first) and names the latest build.
@@ -186,7 +189,7 @@ class MirrorPackCatalogue(
      * stored ends the stream, since then there is no page. The build listing is the
      * optional third, as it is for [details].
      */
-    override fun detailsStream(packId: String): Flow<CataloguePackDetails> = combine(
+    override fun detailsStream(packId: String): Flow<PackDetails> = combine(
         client.summaryStream(packId).keepingLast("summary", packId),
         client.manifestStream(packId).keepingLast("manifest", packId),
         client.buildsStream(packId).optional(packId),
@@ -215,7 +218,7 @@ class MirrorPackCatalogue(
         )
     }
 
-    private suspend fun detailsOf(s: SmrtPackSummary, m: SmrtPackManifest, listing: SmrtManifestVersions?): CataloguePackDetails {
+    private suspend fun detailsOf(s: SmrtPackSummary, m: SmrtPackManifest, listing: SmrtManifestVersions?): PackDetails {
         // The summary names a community pack's owner by account id only. The
         // login is the community listing's, read from its stored copy as a rule.
         val owner = if (s.tier == COMMUNITY_TIER) {
@@ -227,23 +230,23 @@ class MirrorPackCatalogue(
         val versions = listing?.builds.orEmpty()
             .map { it.forLanguage(tags) }
             .map { b ->
-                CataloguePackVersion(
+                ProjectBuild(
                     id = b.versionNumber,
                     name = b.versionNumber,
                     versionNumber = b.versionNumber,
+                    versionType = b.channel.wire,
                     // A build that names its own runtime is read for it, so a pack
                     // that moved loader or game version says which build did.
-                    mcVersions = listOf(b.minecraftVersion ?: m.minecraft.version),
+                    gameVersions = listOf(b.minecraftVersion ?: m.minecraft.version),
                     loaders = listOf(b.loaderName ?: m.loader.name),
-                    channel = b.channel,
-                    publishedAt = b.datePublished,
+                    datePublished = b.datePublished.orEmpty(),
                     changelog = b.changelog,
                     modsCount = b.modsCount,
                     sizeBytes = b.sizeBytes,
                 )
             }
             .ifEmpty { listOf(versionOf(s, m)) }
-        return CataloguePackDetails(
+        return PackDetails(
             origin = origin,
             id = s.packId,
             title = s.displayName,
@@ -252,27 +255,39 @@ class MirrorPackCatalogue(
             bannerUrl = s.bannerUrl,
             // The mirror publishes URLs and no captions, so one size serves both
             // the grid and the lightbox and the shots go uncaptioned.
-            gallery = s.galleryUrls.map { CatalogueGalleryItem(full = it, thumb = it) },
+            gallery = galleryOf(s),
             bodyMarkdown = inLanguage(s.descriptionMd, s.descriptionMdI18n, tags),
             tags = s.tags,
             runtimeLabel = "Java ${m.java.major}",
             versions = versions,
-            gameVersions = versions.flatMap { it.mcVersions }.distinct(),
+            gameVersions = versions.flatMap { it.gameVersions }.distinct(),
             loaders = versions.flatMap { it.loaders }.distinct(),
             updatedAt = s.latestBuiltAt,
             // The pointer the mirror serves as current, which a curator may have
-            // left on a beta; the listing's newest is not necessarily it.
+            // left on a beta. The listing's newest is not necessarily it.
             latestVersionId = listing?.latest ?: s.latestPackVersion,
-            auth = m.auth?.toDomain(),
+            signIn = m.auth?.toDomain()?.providerKeys.orEmpty(),
             // No avatar: the only picture of a member is their GitHub one, and the
             // page asking GitHub for it would tell GitHub who looked at the pack.
-            creators = owner?.let { listOf(CatalogueCreator(name = it, role = OWNER_ROLE, owner = true)) }.orEmpty(),
+            creators = owner?.let { listOf(ProjectCreator(name = it, role = OWNER_ROLE, owner = true)) }.orEmpty(),
         )
     }
 
-    override suspend fun versions(packId: String): List<CataloguePackVersion> = coroutineScope {
+    /**
+     * The pack's shots, its banner first where it is kept apart from them: a picture a
+     * curator chose to lead with belongs at the head of the gallery. The mirror
+     * publishes URLs and no captions, so one size serves both the grid and the
+     * lightbox and the shots go uncaptioned.
+     */
+    private fun galleryOf(s: SmrtPackSummary): List<GalleryItem> {
+        val shots = s.galleryUrls.map { GalleryItem(full = it, thumb = it) }
+        val banner = s.bannerUrl ?: return shots
+        return if (s.galleryUrls.contains(banner)) shots else listOf(GalleryItem(full = banner, thumb = banner)) + shots
+    }
+
+    override suspend fun versions(packId: String): List<ProjectBuild> = coroutineScope {
         // Summary (for the MC hint) + the retained build listing in parallel. Server
-        // order is canonical (publish date ranks across channels; tuples do not). A
+        // order is canonical (publish date ranks across channels, tuples do not). A
         // mirror that has no versions endpoint (or errors) degrades to the single latest.
         val summaryD = async { client.fetchSummary(packId) }
         val buildsD = async { runCatching { client.listBuilds(packId).builds }.getOrDefault(emptyList()) }
@@ -281,25 +296,27 @@ class MirrorPackCatalogue(
         val builds = buildsD.await().map { it.forLanguage(tags) }
         if (builds.isEmpty()) listOf(versionOf(s, null))
         else builds.map { b ->
-            CataloguePackVersion(
+            ProjectBuild(
                 id = b.versionNumber,
                 name = b.versionNumber,
                 versionNumber = b.versionNumber,
-                mcVersions = listOf(s.minecraftVersion),
+                versionType = b.channel.wire,
+                gameVersions = listOf(s.minecraftVersion),
                 loaders = emptyList(),
-                channel = b.channel,
-                publishedAt = b.datePublished,
+                datePublished = b.datePublished.orEmpty(),
                 changelog = b.changelog,
             )
         }
     }
 
-    private fun versionOf(s: SmrtPackSummary, m: SmrtPackManifest?) = CataloguePackVersion(
+    private fun versionOf(s: SmrtPackSummary, m: SmrtPackManifest?) = ProjectBuild(
         id = s.latestPackVersion,
         name = s.latestPackVersion,
         versionNumber = s.latestPackVersion,
-        mcVersions = listOf(m?.minecraft?.version ?: s.minecraftVersion),
+        versionType = VersionChannel.Release.wire,
+        gameVersions = listOf(m?.minecraft?.version ?: s.minecraftVersion),
         loaders = m?.loader?.name?.let { listOf(it) } ?: emptyList(),
+        datePublished = "",
     )
 
     companion object {

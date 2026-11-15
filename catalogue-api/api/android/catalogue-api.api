@@ -32,15 +32,14 @@ public final class hivens/catalogue/api/BrowseTarget {
 
 public final class hivens/catalogue/api/BrowseView {
 	public fun <init> ()V
-	public fun <init> (Lhivens/catalogue/api/ProjectKind;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Lhivens/catalogue/api/BrowseSort;Ljava/lang/String;Lhivens/catalogue/api/BrowseTarget;Ljava/util/Map;Ljava/util/Set;Ljava/util/List;ZZZ)V
-	public synthetic fun <init> (Lhivens/catalogue/api/ProjectKind;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Lhivens/catalogue/api/BrowseSort;Ljava/lang/String;Lhivens/catalogue/api/BrowseTarget;Ljava/util/Map;Ljava/util/Set;Ljava/util/List;ZZZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lhivens/catalogue/api/ProjectKind;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Lhivens/catalogue/api/BrowseSort;Ljava/lang/String;Lhivens/catalogue/api/BrowseTarget;Ljava/util/Map;Ljava/util/Set;Ljava/util/List;ZLjava/util/Set;)V
+	public synthetic fun <init> (Lhivens/catalogue/api/ProjectKind;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Lhivens/catalogue/api/BrowseSort;Ljava/lang/String;Lhivens/catalogue/api/BrowseTarget;Ljava/util/Map;Ljava/util/Set;Ljava/util/List;ZLjava/util/Set;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun chosenFor (Ljava/lang/String;)Ljava/util/Set;
 	public final fun component1 ()Lhivens/catalogue/api/ProjectKind;
 	public final fun component10 ()Ljava/util/Set;
 	public final fun component11 ()Ljava/util/List;
 	public final fun component12 ()Z
-	public final fun component13 ()Z
-	public final fun component14 ()Z
+	public final fun component13 ()Ljava/util/Set;
 	public final fun component2 ()Ljava/lang/String;
 	public final fun component3 ()Ljava/lang/String;
 	public final fun component4 ()Ljava/util/List;
@@ -49,26 +48,44 @@ public final class hivens/catalogue/api/BrowseView {
 	public final fun component7 ()Ljava/lang/String;
 	public final fun component8 ()Lhivens/catalogue/api/BrowseTarget;
 	public final fun component9 ()Ljava/util/Map;
-	public final fun copy (Lhivens/catalogue/api/ProjectKind;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Lhivens/catalogue/api/BrowseSort;Ljava/lang/String;Lhivens/catalogue/api/BrowseTarget;Ljava/util/Map;Ljava/util/Set;Ljava/util/List;ZZZ)Lhivens/catalogue/api/BrowseView;
-	public static synthetic fun copy$default (Lhivens/catalogue/api/BrowseView;Lhivens/catalogue/api/ProjectKind;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Lhivens/catalogue/api/BrowseSort;Ljava/lang/String;Lhivens/catalogue/api/BrowseTarget;Ljava/util/Map;Ljava/util/Set;Ljava/util/List;ZZZILjava/lang/Object;)Lhivens/catalogue/api/BrowseView;
+	public final fun copy (Lhivens/catalogue/api/ProjectKind;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Lhivens/catalogue/api/BrowseSort;Ljava/lang/String;Lhivens/catalogue/api/BrowseTarget;Ljava/util/Map;Ljava/util/Set;Ljava/util/List;ZLjava/util/Set;)Lhivens/catalogue/api/BrowseView;
+	public static synthetic fun copy$default (Lhivens/catalogue/api/BrowseView;Lhivens/catalogue/api/ProjectKind;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Lhivens/catalogue/api/BrowseSort;Ljava/lang/String;Lhivens/catalogue/api/BrowseTarget;Ljava/util/Map;Ljava/util/Set;Ljava/util/List;ZLjava/util/Set;ILjava/lang/Object;)Lhivens/catalogue/api/BrowseView;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getChosen ()Ljava/util/Map;
+	public final fun getHidden ()Ljava/util/Set;
 	public final fun getHideInstalled ()Z
 	public final fun getKind ()Lhivens/catalogue/api/ProjectKind;
 	public final fun getLocked ()Ljava/util/List;
-	public final fun getMirrorCommunity ()Z
-	public final fun getMirrorOwn ()Z
 	public final fun getOrigin ()Ljava/lang/String;
 	public final fun getOrigins ()Ljava/util/List;
 	public final fun getPickedOrigin ()Ljava/lang/String;
 	public final fun getQuery ()Ljava/lang/String;
 	public final fun getSort ()Lhivens/catalogue/api/BrowseSort;
+	public final fun getSource ()Lhivens/catalogue/api/SourceView;
+	public final fun getSources ()Ljava/util/List;
 	public final fun getTarget ()Lhivens/catalogue/api/BrowseTarget;
 	public final fun getTargetId ()Ljava/lang/String;
 	public final fun getType ()Ljava/lang/String;
 	public final fun getUnlocked ()Ljava/util/Set;
 	public fun hashCode ()I
+	public final fun lists (Lhivens/catalogue/api/SourceOption;)Z
 	public final fun shows (Lhivens/catalogue/api/CatalogueCard;)Z
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/catalogue/api/BuildDownload {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;J)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;JILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()J
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;J)Lhivens/catalogue/api/BuildDownload;
+	public static synthetic fun copy$default (Lhivens/catalogue/api/BuildDownload;Ljava/lang/String;Ljava/lang/String;JILjava/lang/Object;)Lhivens/catalogue/api/BuildDownload;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getSha1 ()Ljava/lang/String;
+	public final fun getSize ()J
+	public final fun getUrl ()Ljava/lang/String;
+	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
 
@@ -174,10 +191,11 @@ public final class hivens/catalogue/api/CatalogueApi {
 }
 
 public final class hivens/catalogue/api/CatalogueCard {
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;ZLjava/lang/String;)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;ZLjava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;ZLjava/lang/String;Ljava/util/Map;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;ZLjava/lang/String;Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component10 ()Ljava/lang/String;
+	public final fun component11 ()Ljava/util/Map;
 	public final fun component2 ()Ljava/lang/String;
 	public final fun component3 ()Ljava/lang/String;
 	public final fun component4 ()Ljava/lang/String;
@@ -186,12 +204,13 @@ public final class hivens/catalogue/api/CatalogueCard {
 	public final fun component7 ()Ljava/util/List;
 	public final fun component8 ()Ljava/lang/String;
 	public final fun component9 ()Z
-	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;ZLjava/lang/String;)Lhivens/catalogue/api/CatalogueCard;
-	public static synthetic fun copy$default (Lhivens/catalogue/api/CatalogueCard;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;ZLjava/lang/String;ILjava/lang/Object;)Lhivens/catalogue/api/CatalogueCard;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;ZLjava/lang/String;Ljava/util/Map;)Lhivens/catalogue/api/CatalogueCard;
+	public static synthetic fun copy$default (Lhivens/catalogue/api/CatalogueCard;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;ZLjava/lang/String;Ljava/util/Map;ILjava/lang/Object;)Lhivens/catalogue/api/CatalogueCard;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAuthor ()Ljava/lang/String;
 	public final fun getBannerUrl ()Ljava/lang/String;
 	public final fun getCommunity ()Z
+	public final fun getFacets ()Ljava/util/Map;
 	public final fun getIconUrl ()Ljava/lang/String;
 	public final fun getId ()Ljava/lang/String;
 	public final fun getKey ()Ljava/lang/String;
@@ -224,8 +243,6 @@ public final class hivens/catalogue/api/CatalogueKeys {
 	public static final field INSTANCE Lhivens/catalogue/api/CatalogueKeys;
 	public static final field LOAD_TAGS_ID Ljava/lang/String;
 	public static final field LOAD_VERSIONS_ID Ljava/lang/String;
-	public static final field MIRROR_COMMUNITY_ID Ljava/lang/String;
-	public static final field MIRROR_OWN_ID Ljava/lang/String;
 	public static final field MORE_RESULTS_ID Ljava/lang/String;
 	public static final field NAMES_ID Ljava/lang/String;
 	public static final field OPEN_PROJECT_ID Ljava/lang/String;
@@ -251,11 +268,12 @@ public final class hivens/catalogue/api/CatalogueKeys {
 	public static final field SHOW_PACK_ID Ljava/lang/String;
 	public static final field SHOW_PROJECT_ID Ljava/lang/String;
 	public static final field SHOW_RESULTS_ID Ljava/lang/String;
+	public static final field SOURCES_ID Ljava/lang/String;
+	public static final field SOURCE_OPTION_ID Ljava/lang/String;
 	public static final field TAGS_ID Ljava/lang/String;
 	public static final field TOGGLE_FILTER_ID Ljava/lang/String;
 	public static final field TOGGLE_HIDE_INSTALLED_ID Ljava/lang/String;
-	public static final field TOGGLE_MIRROR_COMMUNITY_ID Ljava/lang/String;
-	public static final field TOGGLE_MIRROR_OWN_ID Ljava/lang/String;
+	public static final field TOGGLE_SOURCE_OPTION_ID Ljava/lang/String;
 	public static final field UNLOCK_ID Ljava/lang/String;
 	public final fun getAim ()Lhivens/widget/model/CommandKey;
 	public final fun getBrowse ()Lhivens/widget/model/SourceKey;
@@ -292,21 +310,20 @@ public final class hivens/catalogue/api/CatalogueKeys {
 	public final fun getSearchFor ()Lhivens/widget/model/CommandKey;
 	public final fun getSetHideInstalled ()Lhivens/widget/model/CommandKey;
 	public final fun getSetKind ()Lhivens/widget/model/CommandKey;
-	public final fun getSetMirrorCommunity ()Lhivens/widget/model/CommandKey;
-	public final fun getSetMirrorOwn ()Lhivens/widget/model/CommandKey;
 	public final fun getSetOrigin ()Lhivens/widget/model/CommandKey;
 	public final fun getSetQuery ()Lhivens/widget/model/CommandKey;
 	public final fun getSetSort ()Lhivens/widget/model/CommandKey;
+	public final fun getSetSourceOption ()Lhivens/widget/model/CommandKey;
 	public final fun getSetTarget ()Lhivens/widget/model/CommandKey;
 	public final fun getShowBuild ()Lhivens/widget/model/CommandKey;
 	public final fun getShowPack ()Lhivens/widget/model/CommandKey;
 	public final fun getShowProject ()Lhivens/widget/model/CommandKey;
 	public final fun getShowResults ()Lhivens/widget/model/CommandKey;
+	public final fun getSources ()Lhivens/widget/model/SourceKey;
 	public final fun getTags ()Lhivens/widget/model/SourceKey;
 	public final fun getToggleFilter ()Lhivens/widget/model/CommandKey;
 	public final fun getToggleHideInstalled ()Lhivens/widget/model/CommandKey;
-	public final fun getToggleMirrorCommunity ()Lhivens/widget/model/CommandKey;
-	public final fun getToggleMirrorOwn ()Lhivens/widget/model/CommandKey;
+	public final fun getToggleSourceOption ()Lhivens/widget/model/CommandKey;
 	public final fun getUnlock ()Lhivens/widget/model/CommandKey;
 }
 
@@ -530,16 +547,17 @@ public final class hivens/catalogue/api/InstallCandidate {
 }
 
 public final class hivens/catalogue/api/InstallChoiceView {
-	public fun <init> (Lhivens/catalogue/api/InstallSubject;Ljava/util/List;ZLjava/util/List;Ljava/util/Map;Lhivens/catalogue/api/NewPackState;)V
-	public synthetic fun <init> (Lhivens/catalogue/api/InstallSubject;Ljava/util/List;ZLjava/util/List;Ljava/util/Map;Lhivens/catalogue/api/NewPackState;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lhivens/catalogue/api/InstallSubject;Ljava/util/List;ZZLjava/util/List;Ljava/util/Map;Lhivens/catalogue/api/NewPackState;)V
+	public synthetic fun <init> (Lhivens/catalogue/api/InstallSubject;Ljava/util/List;ZZLjava/util/List;Ljava/util/Map;Lhivens/catalogue/api/NewPackState;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lhivens/catalogue/api/InstallSubject;
 	public final fun component2 ()Ljava/util/List;
 	public final fun component3 ()Z
-	public final fun component4 ()Ljava/util/List;
-	public final fun component5 ()Ljava/util/Map;
-	public final fun component6 ()Lhivens/catalogue/api/NewPackState;
-	public final fun copy (Lhivens/catalogue/api/InstallSubject;Ljava/util/List;ZLjava/util/List;Ljava/util/Map;Lhivens/catalogue/api/NewPackState;)Lhivens/catalogue/api/InstallChoiceView;
-	public static synthetic fun copy$default (Lhivens/catalogue/api/InstallChoiceView;Lhivens/catalogue/api/InstallSubject;Ljava/util/List;ZLjava/util/List;Ljava/util/Map;Lhivens/catalogue/api/NewPackState;ILjava/lang/Object;)Lhivens/catalogue/api/InstallChoiceView;
+	public final fun component4 ()Z
+	public final fun component5 ()Ljava/util/List;
+	public final fun component6 ()Ljava/util/Map;
+	public final fun component7 ()Lhivens/catalogue/api/NewPackState;
+	public final fun copy (Lhivens/catalogue/api/InstallSubject;Ljava/util/List;ZZLjava/util/List;Ljava/util/Map;Lhivens/catalogue/api/NewPackState;)Lhivens/catalogue/api/InstallChoiceView;
+	public static synthetic fun copy$default (Lhivens/catalogue/api/InstallChoiceView;Lhivens/catalogue/api/InstallSubject;Ljava/util/List;ZZLjava/util/List;Ljava/util/Map;Lhivens/catalogue/api/NewPackState;ILjava/lang/Object;)Lhivens/catalogue/api/InstallChoiceView;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getCandidates ()Ljava/util/List;
 	public final fun getFailed ()Z
@@ -547,6 +565,7 @@ public final class hivens/catalogue/api/InstallChoiceView {
 	public final fun getNewPack ()Lhivens/catalogue/api/NewPackState;
 	public final fun getRows ()Ljava/util/Map;
 	public final fun getSubject ()Lhivens/catalogue/api/InstallSubject;
+	public final fun getUnsupported ()Z
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
@@ -629,6 +648,13 @@ public final class hivens/catalogue/api/InstallProblem$Refused : hivens/catalogu
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class hivens/catalogue/api/InstallProblem$SourceCannotInstall : hivens/catalogue/api/InstallProblem {
+	public static final field INSTANCE Lhivens/catalogue/api/InstallProblem$SourceCannotInstall;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class hivens/catalogue/api/InstallRefusal : java/lang/Enum {
 	public static final field Busy Lhivens/catalogue/api/InstallRefusal;
 	public static final field GameRunning Lhivens/catalogue/api/InstallRefusal;
@@ -638,18 +664,20 @@ public final class hivens/catalogue/api/InstallRefusal : java/lang/Enum {
 }
 
 public final class hivens/catalogue/api/InstallSubject {
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component2 ()Ljava/lang/String;
 	public final fun component3 ()Ljava/lang/String;
 	public final fun component4 ()Ljava/lang/String;
-	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lhivens/catalogue/api/InstallSubject;
-	public static synthetic fun copy$default (Lhivens/catalogue/api/InstallSubject;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lhivens/catalogue/api/InstallSubject;
+	public final fun component5 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lhivens/catalogue/api/InstallSubject;
+	public static synthetic fun copy$default (Lhivens/catalogue/api/InstallSubject;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lhivens/catalogue/api/InstallSubject;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAuthor ()Ljava/lang/String;
 	public final fun getIconUrl ()Ljava/lang/String;
 	public final fun getProjectId ()Ljava/lang/String;
+	public final fun getSource ()Ljava/lang/String;
 	public final fun getTitle ()Ljava/lang/String;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
@@ -931,13 +959,21 @@ public final class hivens/catalogue/api/PackDetails {
 	public fun toString ()Ljava/lang/String;
 }
 
-public final class hivens/catalogue/api/PackOrigins {
-	public static final field INSTANCE Lhivens/catalogue/api/PackOrigins;
-	public static final field LOCAL Ljava/lang/String;
-	public static final field MIRROR Ljava/lang/String;
-	public static final field MODRINTH Ljava/lang/String;
-	public static final field SMARTYCRAFT Ljava/lang/String;
-	public static final field UNKNOWN Ljava/lang/String;
+public abstract interface class hivens/catalogue/api/PackListing {
+	public abstract fun details (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun detailsStream (Ljava/lang/String;)Lkotlinx/coroutines/flow/Flow;
+	public abstract fun search (Ljava/lang/String;ILkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun search$default (Lhivens/catalogue/api/PackListing;Ljava/lang/String;ILkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public fun searchStream (Ljava/lang/String;I)Lkotlinx/coroutines/flow/Flow;
+	public static synthetic fun searchStream$default (Lhivens/catalogue/api/PackListing;Ljava/lang/String;IILjava/lang/Object;)Lkotlinx/coroutines/flow/Flow;
+	public abstract fun versions (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class hivens/catalogue/api/PackListing$DefaultImpls {
+	public static fun detailsStream (Lhivens/catalogue/api/PackListing;Ljava/lang/String;)Lkotlinx/coroutines/flow/Flow;
+	public static synthetic fun search$default (Lhivens/catalogue/api/PackListing;Ljava/lang/String;ILkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static fun searchStream (Lhivens/catalogue/api/PackListing;Ljava/lang/String;I)Lkotlinx/coroutines/flow/Flow;
+	public static synthetic fun searchStream$default (Lhivens/catalogue/api/PackListing;Ljava/lang/String;IILjava/lang/Object;)Lkotlinx/coroutines/flow/Flow;
 }
 
 public abstract interface class hivens/catalogue/api/PackPageStatus {
@@ -993,6 +1029,26 @@ public final class hivens/catalogue/api/PackPageView {
 	public fun toString ()Ljava/lang/String;
 }
 
+public abstract interface class hivens/catalogue/api/PackSourceContribution : hivens/widget/api/ModuleContribution {
+	public fun getFilters ()Ljava/util/List;
+	public fun getIcon ()Lhivens/catalogue/api/SourceIcon;
+	public fun getPackType ()Ljava/lang/String;
+	public fun getPaged ()Z
+	public abstract fun open (Lhivens/widget/api/LevelServices;)Lhivens/catalogue/api/PackListing;
+}
+
+public final class hivens/catalogue/api/PackSourceContribution$DefaultImpls {
+	public static fun getFilters (Lhivens/catalogue/api/PackSourceContribution;)Ljava/util/List;
+	public static fun getIcon (Lhivens/catalogue/api/PackSourceContribution;)Lhivens/catalogue/api/SourceIcon;
+	public static fun getPackType (Lhivens/catalogue/api/PackSourceContribution;)Ljava/lang/String;
+	public static fun getPaged (Lhivens/catalogue/api/PackSourceContribution;)Z
+	public static fun getSettings (Lhivens/catalogue/api/PackSourceContribution;)Ljava/util/List;
+}
+
+public abstract interface class hivens/catalogue/api/PackSources {
+	public abstract fun listing (Ljava/lang/String;)Lhivens/catalogue/api/PackListing;
+}
+
 public final class hivens/catalogue/api/PackVisit {
 	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
 	public final fun component1 ()Ljava/lang/String;
@@ -1009,12 +1065,13 @@ public final class hivens/catalogue/api/PackVisit {
 }
 
 public final class hivens/catalogue/api/ProjectBuild {
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/Long;Ljava/lang/String;Ljava/util/List;Ljava/lang/Integer;Ljava/lang/Long;)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/Long;Ljava/lang/String;Ljava/util/List;Ljava/lang/Integer;Ljava/lang/Long;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/Long;Ljava/lang/String;Ljava/util/List;Ljava/lang/Integer;Ljava/lang/Long;Lhivens/catalogue/api/BuildDownload;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/Long;Ljava/lang/String;Ljava/util/List;Ljava/lang/Integer;Ljava/lang/Long;Lhivens/catalogue/api/BuildDownload;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component10 ()Ljava/util/List;
 	public final fun component11 ()Ljava/lang/Integer;
 	public final fun component12 ()Ljava/lang/Long;
+	public final fun component13 ()Lhivens/catalogue/api/BuildDownload;
 	public final fun component2 ()Ljava/lang/String;
 	public final fun component3 ()Ljava/lang/String;
 	public final fun component4 ()Ljava/lang/String;
@@ -1023,11 +1080,12 @@ public final class hivens/catalogue/api/ProjectBuild {
 	public final fun component7 ()Ljava/lang/String;
 	public final fun component8 ()Ljava/lang/Long;
 	public final fun component9 ()Ljava/lang/String;
-	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/Long;Ljava/lang/String;Ljava/util/List;Ljava/lang/Integer;Ljava/lang/Long;)Lhivens/catalogue/api/ProjectBuild;
-	public static synthetic fun copy$default (Lhivens/catalogue/api/ProjectBuild;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/Long;Ljava/lang/String;Ljava/util/List;Ljava/lang/Integer;Ljava/lang/Long;ILjava/lang/Object;)Lhivens/catalogue/api/ProjectBuild;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/Long;Ljava/lang/String;Ljava/util/List;Ljava/lang/Integer;Ljava/lang/Long;Lhivens/catalogue/api/BuildDownload;)Lhivens/catalogue/api/ProjectBuild;
+	public static synthetic fun copy$default (Lhivens/catalogue/api/ProjectBuild;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/Long;Ljava/lang/String;Ljava/util/List;Ljava/lang/Integer;Ljava/lang/Long;Lhivens/catalogue/api/BuildDownload;ILjava/lang/Object;)Lhivens/catalogue/api/ProjectBuild;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getChangelog ()Ljava/lang/String;
 	public final fun getDatePublished ()Ljava/lang/String;
+	public final fun getDownload ()Lhivens/catalogue/api/BuildDownload;
 	public final fun getDownloads ()Ljava/lang/Long;
 	public final fun getFiles ()Ljava/util/List;
 	public final fun getGameVersions ()Ljava/util/List;
@@ -1252,6 +1310,25 @@ public final class hivens/catalogue/api/ProjectPageView {
 	public fun toString ()Ljava/lang/String;
 }
 
+public abstract interface class hivens/catalogue/api/ProjectSearchContribution : hivens/widget/api/ModuleContribution {
+	public abstract fun getTypes ()Ljava/util/Set;
+	public abstract fun open (Lhivens/widget/api/LevelServices;)Lhivens/catalogue/api/ProjectSearcher;
+}
+
+public final class hivens/catalogue/api/ProjectSearchContribution$DefaultImpls {
+	public static fun getSettings (Lhivens/catalogue/api/ProjectSearchContribution;)Ljava/util/List;
+}
+
+public abstract interface class hivens/catalogue/api/ProjectSearcher {
+	public fun gameVersions (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun search (Ljava/lang/String;Ljava/lang/String;Ljava/util/Set;IILhivens/catalogue/api/BrowseSort;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun tags (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class hivens/catalogue/api/ProjectSearcher$DefaultImpls {
+	public static fun gameVersions (Lhivens/catalogue/api/ProjectSearcher;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
 public final class hivens/catalogue/api/ProjectSource : java/lang/Enum {
 	public static final field Catalogue Lhivens/catalogue/api/ProjectSource;
 	public static final field Local Lhivens/catalogue/api/ProjectSource;
@@ -1400,27 +1477,29 @@ public final class hivens/catalogue/api/SearchQuestion {
 
 public final class hivens/catalogue/api/SearchResults {
 	public fun <init> ()V
-	public fun <init> (Lhivens/catalogue/api/SearchQuestion;Lhivens/catalogue/api/SearchStatus;Ljava/util/List;Ljava/util/List;ZLhivens/catalogue/api/ScrollMark;ILjava/util/Set;Ljava/util/Set;Ljava/util/Map;Ljava/util/Map;)V
-	public synthetic fun <init> (Lhivens/catalogue/api/SearchQuestion;Lhivens/catalogue/api/SearchStatus;Ljava/util/List;Ljava/util/List;ZLhivens/catalogue/api/ScrollMark;ILjava/util/Set;Ljava/util/Set;Ljava/util/Map;Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lhivens/catalogue/api/SearchQuestion;Ljava/lang/String;Lhivens/catalogue/api/SearchStatus;Ljava/util/List;Ljava/util/List;ZLhivens/catalogue/api/ScrollMark;ILjava/util/Set;Ljava/util/Set;Ljava/util/Map;Ljava/util/Map;)V
+	public synthetic fun <init> (Lhivens/catalogue/api/SearchQuestion;Ljava/lang/String;Lhivens/catalogue/api/SearchStatus;Ljava/util/List;Ljava/util/List;ZLhivens/catalogue/api/ScrollMark;ILjava/util/Set;Ljava/util/Set;Ljava/util/Map;Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lhivens/catalogue/api/SearchQuestion;
-	public final fun component10 ()Ljava/util/Map;
+	public final fun component10 ()Ljava/util/Set;
 	public final fun component11 ()Ljava/util/Map;
-	public final fun component2 ()Lhivens/catalogue/api/SearchStatus;
-	public final fun component3 ()Ljava/util/List;
+	public final fun component12 ()Ljava/util/Map;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Lhivens/catalogue/api/SearchStatus;
 	public final fun component4 ()Ljava/util/List;
-	public final fun component5 ()Z
-	public final fun component6 ()Lhivens/catalogue/api/ScrollMark;
-	public final fun component7 ()I
-	public final fun component8 ()Ljava/util/Set;
+	public final fun component5 ()Ljava/util/List;
+	public final fun component6 ()Z
+	public final fun component7 ()Lhivens/catalogue/api/ScrollMark;
+	public final fun component8 ()I
 	public final fun component9 ()Ljava/util/Set;
-	public final fun copy (Lhivens/catalogue/api/SearchQuestion;Lhivens/catalogue/api/SearchStatus;Ljava/util/List;Ljava/util/List;ZLhivens/catalogue/api/ScrollMark;ILjava/util/Set;Ljava/util/Set;Ljava/util/Map;Ljava/util/Map;)Lhivens/catalogue/api/SearchResults;
-	public static synthetic fun copy$default (Lhivens/catalogue/api/SearchResults;Lhivens/catalogue/api/SearchQuestion;Lhivens/catalogue/api/SearchStatus;Ljava/util/List;Ljava/util/List;ZLhivens/catalogue/api/ScrollMark;ILjava/util/Set;Ljava/util/Set;Ljava/util/Map;Ljava/util/Map;ILjava/lang/Object;)Lhivens/catalogue/api/SearchResults;
+	public final fun copy (Lhivens/catalogue/api/SearchQuestion;Ljava/lang/String;Lhivens/catalogue/api/SearchStatus;Ljava/util/List;Ljava/util/List;ZLhivens/catalogue/api/ScrollMark;ILjava/util/Set;Ljava/util/Set;Ljava/util/Map;Ljava/util/Map;)Lhivens/catalogue/api/SearchResults;
+	public static synthetic fun copy$default (Lhivens/catalogue/api/SearchResults;Lhivens/catalogue/api/SearchQuestion;Ljava/lang/String;Lhivens/catalogue/api/SearchStatus;Ljava/util/List;Ljava/util/List;ZLhivens/catalogue/api/ScrollMark;ILjava/util/Set;Ljava/util/Set;Ljava/util/Map;Ljava/util/Map;ILjava/lang/Object;)Lhivens/catalogue/api/SearchResults;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getEndReached ()Z
 	public final fun getMissing ()Ljava/util/Map;
 	public final fun getPacks ()Ljava/util/List;
 	public final fun getPresent ()Ljava/util/Set;
 	public final fun getProblems ()Ljava/util/Map;
+	public final fun getProjectSource ()Ljava/lang/String;
 	public final fun getProjects ()Ljava/util/List;
 	public final fun getQuestion ()Lhivens/catalogue/api/SearchQuestion;
 	public final fun getScroll ()Lhivens/catalogue/api/ScrollMark;
@@ -1468,6 +1547,13 @@ public final class hivens/catalogue/api/SearchStatus$Loading : hivens/catalogue/
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class hivens/catalogue/api/SearchStatus$NoSource : hivens/catalogue/api/SearchStatus {
+	public static final field INSTANCE Lhivens/catalogue/api/SearchStatus$NoSource;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class hivens/catalogue/api/SearchValuesKt {
 	public static final field ENV_CLIENT Ljava/lang/String;
 	public static final field ENV_SERVER Ljava/lang/String;
@@ -1491,6 +1577,112 @@ public final class hivens/catalogue/api/SkipReason : java/lang/Enum {
 	public static fun getEntries ()Lkotlin/enums/EnumEntries;
 	public static fun valueOf (Ljava/lang/String;)Lhivens/catalogue/api/SkipReason;
 	public static fun values ()[Lhivens/catalogue/api/SkipReason;
+}
+
+public final class hivens/catalogue/api/SourceFilter {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/List;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/util/List;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/util/List;)Lhivens/catalogue/api/SourceFilter;
+	public static synthetic fun copy$default (Lhivens/catalogue/api/SourceFilter;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;ILjava/lang/Object;)Lhivens/catalogue/api/SourceFilter;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getId ()Ljava/lang/String;
+	public final fun getLabel ()Ljava/lang/String;
+	public final fun getOptions ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/catalogue/api/SourceFilterOption {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Lhivens/catalogue/api/SourceIcon;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Lhivens/catalogue/api/SourceIcon;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Lhivens/catalogue/api/SourceIcon;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Lhivens/catalogue/api/SourceIcon;)Lhivens/catalogue/api/SourceFilterOption;
+	public static synthetic fun copy$default (Lhivens/catalogue/api/SourceFilterOption;Ljava/lang/String;Ljava/lang/String;Lhivens/catalogue/api/SourceIcon;ILjava/lang/Object;)Lhivens/catalogue/api/SourceFilterOption;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getIcon ()Lhivens/catalogue/api/SourceIcon;
+	public final fun getId ()Ljava/lang/String;
+	public final fun getLabel ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class hivens/catalogue/api/SourceIcon {
+}
+
+public final class hivens/catalogue/api/SourceIcon$Glyph : hivens/catalogue/api/SourceIcon {
+	public fun <init> (I)V
+	public final fun component1 ()I
+	public final fun copy (I)Lhivens/catalogue/api/SourceIcon$Glyph;
+	public static synthetic fun copy$default (Lhivens/catalogue/api/SourceIcon$Glyph;IILjava/lang/Object;)Lhivens/catalogue/api/SourceIcon$Glyph;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCodepoint ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/catalogue/api/SourceIcon$Svg : hivens/catalogue/api/SourceIcon {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lhivens/catalogue/api/SourceIcon$Svg;
+	public static synthetic fun copy$default (Lhivens/catalogue/api/SourceIcon$Svg;Ljava/lang/String;ILjava/lang/Object;)Lhivens/catalogue/api/SourceIcon$Svg;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getMarkup ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/catalogue/api/SourceOption {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lhivens/catalogue/api/SourceOption;
+	public static synthetic fun copy$default (Lhivens/catalogue/api/SourceOption;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lhivens/catalogue/api/SourceOption;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getFilter ()Ljava/lang/String;
+	public final fun getOption ()Ljava/lang/String;
+	public final fun getSource ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/catalogue/api/SourceOptionSet {
+	public fun <init> (Lhivens/catalogue/api/SourceOption;Z)V
+	public final fun component1 ()Lhivens/catalogue/api/SourceOption;
+	public final fun component2 ()Z
+	public final fun copy (Lhivens/catalogue/api/SourceOption;Z)Lhivens/catalogue/api/SourceOptionSet;
+	public static synthetic fun copy$default (Lhivens/catalogue/api/SourceOptionSet;Lhivens/catalogue/api/SourceOption;ZILjava/lang/Object;)Lhivens/catalogue/api/SourceOptionSet;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getListed ()Z
+	public final fun getOption ()Lhivens/catalogue/api/SourceOption;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/catalogue/api/SourceView {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lhivens/catalogue/api/SourceIcon;Ljava/util/List;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lhivens/catalogue/api/SourceIcon;Ljava/util/List;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Lhivens/catalogue/api/SourceIcon;
+	public final fun component5 ()Ljava/util/List;
+	public final fun component6 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lhivens/catalogue/api/SourceIcon;Ljava/util/List;Ljava/lang/String;)Lhivens/catalogue/api/SourceView;
+	public static synthetic fun copy$default (Lhivens/catalogue/api/SourceView;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lhivens/catalogue/api/SourceIcon;Ljava/util/List;Ljava/lang/String;ILjava/lang/Object;)Lhivens/catalogue/api/SourceView;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getFilters ()Ljava/util/List;
+	public final fun getIcon ()Lhivens/catalogue/api/SourceIcon;
+	public final fun getId ()Ljava/lang/String;
+	public final fun getLabel ()Ljava/lang/String;
+	public final fun getModule ()Ljava/lang/String;
+	public final fun getPackType ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
 }
 
 public final class hivens/catalogue/api/TagSearch {

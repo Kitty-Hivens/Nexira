@@ -52,7 +52,7 @@ class ShelfTest {
     }
 
     private fun view(id: String, name: String, played: Long) =
-        PackView(id = id, name = name, source = PackSource("mirror", id), folder = id, createdAtEpochSecond = 0, lastPlayedEpochSecond = played)
+        PackView(id = id, name = name, source = PackSource("Mirror", id), folder = id, createdAtEpochSecond = 0, lastPlayedEpochSecond = played)
 
     private val library = MutableStateFlow(listOf(view("a", "Alpha", played = 10), view("b", "Beta", played = 50)))
     private val launches = MutableStateFlow(mapOf<String, PackLaunch>("b" to PackLaunch.Running))

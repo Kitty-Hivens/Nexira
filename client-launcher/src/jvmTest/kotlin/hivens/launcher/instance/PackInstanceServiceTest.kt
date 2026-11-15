@@ -13,6 +13,7 @@ import hivens.core.update.CompatChange
 import hivens.launcher.catalogue.PackArt
 import hivens.launcher.instance.PackInstanceService.DeleteOutcome
 import hivens.launcher.launch.RunningPackSource
+import hivens.launcher.sources.EngineSources
 import hivens.launcher.update.ApplyJournal
 import hivens.launcher.update.PackReattacher
 import hivens.launcher.update.PackSnapshotService
@@ -97,7 +98,7 @@ class PackInstanceServiceTest {
     }
     private val json = Json { ignoreUnknownKeys = true }
 
-    private fun instance(id: String, dir: String = id, origin: PackOrigin = PackOrigin.Mirror) = PackInstance(
+    private fun instance(id: String, dir: String = id, origin: PackOrigin = EngineSources.Mirror) = PackInstance(
         id = id,
         packRef = PackReference(origin, "pack", "2026.01.01"),
         displayName = id,
@@ -137,7 +138,7 @@ class PackInstanceServiceTest {
     fun `detachToLocal flips origin to Local and records provenance`() = runTest {
         val data = Files.createTempDirectory("pis")
         val repo = FakeRepo()
-        val pack = instance("1", origin = PackOrigin.Mirror)
+        val pack = instance("1", origin = EngineSources.Mirror)
         repo.put(pack)
 
         val detached = service(repo, data).detachToLocal(pack)
@@ -160,7 +161,7 @@ class PackInstanceServiceTest {
         repo.put(pack)
         val known = PackArt(iconUrl = null, bannerUrl = "https://cdn/banner.png")
 
-        val detached = service(repo, data, knownArt = { if (it.packRef.origin == PackOrigin.Mirror) known else null }).detachToLocal(pack)
+        val detached = service(repo, data, knownArt = { if (it.packRef.origin == EngineSources.Mirror) known else null }).detachToLocal(pack)
 
         assertEquals("https://cdn/banner.png", detached.bannerUrl, "the source's banner, kept for good")
         assertEquals("https://cdn/captured-icon.png", detached.iconUrl, "a field nothing new is known for keeps what it had")
@@ -172,10 +173,10 @@ class PackInstanceServiceTest {
         val data = Files.createTempDirectory("pis")
         val repo = FakeRepo()
         val source = RecordingReattacher()
-        val reattachers = mapOf<PackOrigin, PackReattacher>(PackOrigin.Mirror to source, PackOrigin.Modrinth to source)
+        val reattachers = mapOf<PackOrigin, PackReattacher>(EngineSources.Mirror to source, EngineSources.Modrinth to source)
         val local = instance("1", origin = PackOrigin.Local)
         val fromLocal = instance("2", origin = PackOrigin.Local).copy(forkedFrom = PackReference(PackOrigin.Local, "base"))
-        val mirror = instance("3", origin = PackOrigin.Mirror)
+        val mirror = instance("3", origin = EngineSources.Mirror)
         listOf(local, fromLocal, mirror).forEach { repo.put(it) }
         val service = service(repo, data, reattachers = reattachers)
 
@@ -194,8 +195,8 @@ class PackInstanceServiceTest {
         val repo = FakeRepo()
         val mirror = RecordingReattacher()
         val modrinth = RecordingReattacher()
-        val service = service(repo, data, reattachers = mapOf(PackOrigin.Mirror to mirror, PackOrigin.Modrinth to modrinth))
-        val fromModrinth = instance("1", origin = PackOrigin.Modrinth)
+        val service = service(repo, data, reattachers = mapOf(EngineSources.Mirror to mirror, EngineSources.Modrinth to modrinth))
+        val fromModrinth = instance("1", origin = EngineSources.Modrinth)
         repo.put(fromModrinth)
         val detached = service.detachToLocal(fromModrinth)
 
@@ -262,7 +263,7 @@ class PackInstanceServiceTest {
         val data = Files.createTempDirectory("pis")
         val repo = FakeRepo()
         val source = RecordingReattacher()
-        val service = service(repo, data, reattachers = mapOf(PackOrigin.Mirror to source))
+        val service = service(repo, data, reattachers = mapOf(EngineSources.Mirror to source))
         val pack = instance("1")
         repo.put(pack)
         val detached = service.detachToLocal(pack)

@@ -56,6 +56,7 @@ import hivens.launcher.PackOperation
 import hivens.launcher.PackOperationKind
 import hivens.launcher.PackOperationPhase
 import hivens.launcher.PackOperationService
+import hivens.launcher.sources.EngineSources
 import hivens.ui.components.ChannelChip
 import hivens.ui.components.label
 import hivens.ui.i18n.nexiraStrings
@@ -185,7 +186,7 @@ fun PackSettingsSheet(
     /** Show an edit that something else persists -- optional content goes through the launcher. */
     val adopt: (PackEdit) -> Unit = { change -> edit = edit?.then(change, persistNext = false) ?: Edit(change, persist = false) }
 
-    val isMirror = pack.packRef.origin == PackOrigin.Mirror
+    val isMirror = pack.packRef.origin == EngineSources.Mirror
     // Whether anything can offer this instance other builds, asked of the updater
     // rather than inferred from where the pack came from.
     val updater: PackUpdater = koinInject()

@@ -5,22 +5,23 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 /**
- * Persisted-enum forward-compat for [Pack] / [PackReference]: an origin or
- * loader a newer build wrote folds to the [Unknown] sentinel under the
- * production Json (coercion on), instead of silently coercing to a wrong real
- * constant (which would pick the wrong auth/sync path or the wrong classpath).
+ * Persisted forward-compat for [Pack] / [PackReference] under the production Json
+ * (coercion on): a loader a newer build wrote folds to the [PackLoader.Unknown]
+ * sentinel instead of silently coercing to a wrong real constant (the wrong
+ * classpath), and an origin is an open source id kept exactly as written, so a pack
+ * from a source module this build does not carry keeps its source.
  */
 class PackSerializationTest {
 
     private val json = Json { ignoreUnknownKeys = true; coerceInputValues = true; isLenient = true }
 
     @Test
-    fun `unknown origin folds to PackOrigin Unknown, sibling fields survive`() {
+    fun `an origin no build declares is kept as written, sibling fields survive`() {
         val pack = json.decodeFromString(
             Pack.serializer(),
             """{"id":"x","origin":"Steam","displayName":"X","mcVersion":"1.21.1","loader":"Forge"}""",
         )
-        assertEquals(PackOrigin.Unknown, pack.origin)
+        assertEquals(PackOrigin("Steam"), pack.origin)
         assertEquals("X", pack.displayName)
         assertEquals("1.21.1", pack.mcVersion)
         assertEquals(PackLoader.Forge, pack.loader)
@@ -33,7 +34,7 @@ class PackSerializationTest {
             """{"id":"x","origin":"Mirror","displayName":"X","mcVersion":"1.21.1","loader":"FutureLoader"}""",
         )
         assertEquals(PackLoader.Unknown, pack.loader)
-        assertEquals(PackOrigin.Mirror, pack.origin)
+        assertEquals(PackOrigin("Mirror"), pack.origin)
     }
 
     @Test
@@ -42,7 +43,7 @@ class PackSerializationTest {
             Pack.serializer(),
             """{"id":"x","origin":"Modrinth","displayName":"X","mcVersion":"1.21.1","loader":"NeoForge"}""",
         )
-        assertEquals(PackOrigin.Modrinth, pack.origin)
+        assertEquals(PackOrigin("Modrinth"), pack.origin)
         assertEquals(PackLoader.NeoForge, pack.loader)
     }
 
@@ -65,9 +66,10 @@ class PackSerializationTest {
     }
 
     @Test
-    fun `unknown origin in a PackReference folds to Unknown`() {
+    fun `an origin no build declares in a PackReference is kept as written`() {
         val ref = json.decodeFromString(PackReference.serializer(), """{"origin":"Steam","id":"abc"}""")
-        assertEquals(PackOrigin.Unknown, ref.origin)
+        assertEquals(PackOrigin("Steam"), ref.origin)
         assertEquals("abc", ref.id)
+        assertEquals("""{"origin":"Steam","id":"abc"}""", json.encodeToString(PackReference.serializer(), ref), "written back unchanged")
     }
 }

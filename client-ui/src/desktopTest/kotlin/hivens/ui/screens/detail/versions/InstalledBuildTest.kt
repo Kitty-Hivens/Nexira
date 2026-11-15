@@ -2,9 +2,9 @@ package hivens.ui.screens.detail.versions
 
 import hivens.core.data.CachedManifestSnapshot
 import hivens.core.data.PackInstance
-import hivens.core.data.PackOrigin
 import hivens.core.data.PackReference
 import hivens.core.update.PackBuild
+import hivens.launcher.sources.EngineSources
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -21,7 +21,7 @@ class InstalledBuildTest {
         loader: String? = null,
     ) = PackInstance(
         id = "i",
-        packRef = PackReference(PackOrigin.Modrinth, "MNW3LUwK", version),
+        packRef = PackReference(EngineSources.Modrinth, "MNW3LUwK", version),
         displayName = "Remarkably Optimized",
         instanceDirName = "remarkably",
         createdAtEpoch = 0L,

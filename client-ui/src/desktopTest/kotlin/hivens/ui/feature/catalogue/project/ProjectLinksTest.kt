@@ -1,6 +1,5 @@
 package hivens.ui.feature.catalogue.project
 
-import hivens.catalogue.api.PackOrigins
 import hivens.catalogue.api.ProjectTarget
 import hivens.ui.Screen
 import kotlin.test.Test
@@ -43,7 +42,7 @@ class ProjectLinksTest {
     @Test
     fun `a modpack link opens its own page, never one aimed at a pack`() {
         assertEquals(
-            Screen.CataloguePackDetail(PackOrigins.MODRINTH, "fabulously-optimized"),
+            Screen.CataloguePackDetail("Modrinth", "fabulously-optimized"),
             linkScreen("https://modrinth.com/modpack/fabulously-optimized", "pack-1"),
         )
         assertNull(linkScreen("https://example.com/mod/sodium", "pack-1"))

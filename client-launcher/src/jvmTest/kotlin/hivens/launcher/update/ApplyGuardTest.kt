@@ -2,8 +2,8 @@ package hivens.launcher.update
 
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackInstance
-import hivens.core.data.PackOrigin
 import hivens.core.data.PackReference
+import hivens.launcher.sources.EngineSources
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -57,7 +57,7 @@ class ApplyGuardTest {
         val guard = ApplyGuard(snapshots, journal, repo)
         val before = PackInstance(
             id = "1",
-            packRef = PackReference(PackOrigin.Mirror, "pack", "1"),
+            packRef = PackReference(EngineSources.Mirror, "pack", "1"),
             displayName = DIR,
             instanceDirName = DIR,
             createdAtEpoch = 0L,

@@ -295,9 +295,8 @@ internal class ProjectSearch(
 
     private suspend fun fetch(q: String, offset: Int): List<ProjectHit>? = try {
         search(q, offset, PAGE_SIZE, hidden.take(MAX_EXCLUDED))
-    } catch (e: CancellationException) {
-        throw e
-    } catch (e: Exception) {
+    } catch (e: Throwable) {
+        if (!e.isSourceFault) throw e
         log.warn("searching {} for \"{}\" failed", kind ?: ProjectTypes.MODPACK, q, e)
         null
     }
@@ -317,6 +316,9 @@ internal class ProjectSearch(
             if (outcome?.ok == true) present = present + outcome.present + id
             if (outcome?.ok == true && outcome.missing.isNotEmpty()) missing = missing + (id to outcome.missing.size)
             if (outcome == null) InstallProblem.NoBuild else problemOf(outcome)
+        } catch (e: SourceCannotInstall) {
+            log.info("not installing {}: {}", id, e.message)
+            InstallProblem.SourceCannotInstall
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {

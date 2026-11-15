@@ -12,10 +12,12 @@ import androidx.compose.ui.unit.Density
 import hivens.catalogue.api.BrowseTarget
 import hivens.catalogue.api.BrowseView
 import hivens.catalogue.api.CatalogueKeys
-import hivens.catalogue.api.PackOrigins
 import hivens.catalogue.api.ProjectKind
+import hivens.catalogue.api.SourceOption
+import hivens.catalogue.api.SourceView
+import hivens.source.mirror.MirrorPackSource
+import hivens.source.mirror.MirrorSourceModule
 import hivens.themes.Themes
-import hivens.ui.i18n.ShippedLanguageProvider
 import hivens.ui.puppet.PuppetRegistry
 import hivens.ui.theme.NxTheme
 import hivens.widget.api.ContributedServices
@@ -60,7 +62,10 @@ class BrowseCommandsTest {
         override fun close() = Unit
     }
 
-    private val browse = MutableStateFlow(BrowseView(origins = listOf(PackOrigins.MIRROR)))
+    /** The mirror source as the catalogue lists it, its filter as the module declares it. */
+    private val mirror = SourceView(MirrorPackSource.id, MirrorSourceModule.ID, MirrorPackSource.label, MirrorPackSource.icon, MirrorPackSource.filters)
+
+    private val browse = MutableStateFlow(BrowseView(origin = mirror.id, sources = listOf(mirror)))
     /** Who showed the results and who stopped, in order. */
     private val shown = ArrayList<String>()
     private val hidden = ArrayList<String>()
@@ -71,11 +76,9 @@ class BrowseCommandsTest {
 
     private val commands = WidgetCommandRegistry().apply {
         registerFactory(CatalogueKeys.ToggleHideInstalled) { command { browse.update { it.copy(hideInstalled = !it.hideInstalled) } } }
-        registerFactory(CatalogueKeys.ToggleMirrorOwn) { command { browse.update { it.copy(mirrorOwn = !it.mirrorOwn) } } }
-        registerFactory(CatalogueKeys.ToggleMirrorCommunity) { command { browse.update { it.copy(mirrorCommunity = !it.mirrorCommunity) } } }
+        registerFactory(CatalogueKeys.ToggleSourceOption) { command { o -> browse.update { it.copy(hidden = if (o in it.hidden) it.hidden - o else it.hidden + o) } } }
         registerFactory(CatalogueKeys.SetHideInstalled) { command { hide -> browse.update { it.copy(hideInstalled = hide) } } }
-        registerFactory(CatalogueKeys.SetMirrorOwn) { command { listed -> browse.update { it.copy(mirrorOwn = listed) } } }
-        registerFactory(CatalogueKeys.SetMirrorCommunity) { command { listed -> browse.update { it.copy(mirrorCommunity = listed) } } }
+        registerFactory(CatalogueKeys.SetSourceOption) { command { set -> browse.update { it.copy(hidden = if (set.listed) it.hidden - set.option else it.hidden + set.option) } } }
         registerFactory(CatalogueKeys.SetTarget) { command { _ -> } }
         registerFactory(CatalogueKeys.ShowResults) { command { viewer -> shown += viewer } }
         registerFactory(CatalogueKeys.HideResults) { command { viewer -> hidden += viewer } }
@@ -91,7 +94,7 @@ class BrowseCommandsTest {
             LocalWidgetRegistry provides GeneratedWidgetRegistry,
             LocalScope provides window,
         ) {
-            ShippedLanguageProvider("en") { NxTheme(Themes.default, dark = true) { content() } }
+            ModuleLanguageProvider("en", listOf(MirrorSourceModule)) { NxTheme(Themes.default, dark = true) { content() } }
         }
     }
 
@@ -105,8 +108,8 @@ class BrowseCommandsTest {
     /** The view a widget reads arrives a frame late, so two clicks before the next frame read the same one. */
     @Test
     fun `two quick clicks on a switch are two turns, not the same one twice`() {
-        browse.value = browse.value.copy(kind = null, origin = PackOrigins.MIRROR)
-        val builtBy = scene { BrowseBuiltByFilterWidget(WidgetInstance(WidgetKind("browse.filter.builtBy"), "builtBy")) }
+        browse.value = browse.value.copy(kind = null, origin = mirror.id)
+        val builtBy = scene { BrowseSourceFiltersWidget(WidgetInstance(WidgetKind("browse.filter.builtBy"), "builtBy")) }
         try {
             builtBy.frames()
             click("browse.filter.builtBy.own")
@@ -115,8 +118,8 @@ class BrowseCommandsTest {
         } finally {
             builtBy.close()
         }
-        assertTrue(browse.value.mirrorOwn, "turned off and on again")
-        assertFalse(browse.value.mirrorCommunity)
+        assertTrue(browse.value.lists(SourceOption(mirror.id, MirrorPackSource.BUILT_BY, MirrorPackSource.OWN)), "turned off and on again")
+        assertFalse(browse.value.lists(SourceOption(mirror.id, MirrorPackSource.BUILT_BY, MirrorPackSource.COMMUNITY)))
 
         browse.value = browse.value.copy(
             kind = ProjectKind.Mod,

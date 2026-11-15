@@ -1,9 +1,9 @@
 package hivens.launcher.update
 
 import hivens.core.data.PackInstance
-import hivens.core.data.PackOrigin
 import hivens.core.data.PackReference
 import hivens.core.io.AtomicFiles
+import hivens.launcher.sources.EngineSources
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
@@ -22,7 +22,7 @@ class PackSnapshotServiceTest {
 
     private fun instance(dir: String) = PackInstance(
         id = "1",
-        packRef = PackReference(PackOrigin.Mirror, "pack", "5"),
+        packRef = PackReference(EngineSources.Mirror, "pack", "5"),
         displayName = dir,
         instanceDirName = dir,
         createdAtEpoch = 0L,

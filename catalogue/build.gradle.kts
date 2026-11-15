@@ -5,17 +5,18 @@ plugins {
     alias(libs.plugins.android.kmp.library)
 }
 
-// The catalogue module: answers the keys :catalogue-api names, over the launcher's
-// engine: its pack catalogues, the Modrinth and mirror clients and their caches, and the
-// installers that put a project into a pack. It brings them through the widget kernel's
-// key contribution, the way a module jar does, so a document that does not name it has
-// none of them. Compiled into the application for now and handed to the host as a
-// CompiledModule.
+// The catalogue module: answers the keys :catalogue-api names, over the sources the
+// modules bring, which it takes as contributions of the API's source contract and names
+// none of, and over the launcher's engine for what is not a source's yet: the project and
+// build pages and the installs that put a project into a pack. It brings its keys through
+// the widget kernel's key contribution, the way a module jar does, so a document that does
+// not name it has none of them. Compiled into the application for now and handed to the
+// host as a CompiledModule.
 //
-// It knows the engine (client-core, client-launcher) and the kernel, and never client-ui:
-// what a person reads is put into words by the widgets, and the module hands them plain
-// data. Installing a whole pack is the packs module's command, which a widget fires with
-// the build a pack page names.
+// It knows the engine (client-core, client-launcher) and the kernel, and never client-ui
+// or a source module: what a person reads is put into words by the widgets, and the module
+// hands them plain data. Installing a whole pack is the packs module's command, which a
+// widget fires with the build a pack page names.
 kotlin {
     // KMP modules don't apply the `java` plugin, so the root's toolchain pin skips
     // them. Set here, org.gradle.jvm.version matches the JDK 27 modules.

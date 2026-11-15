@@ -19,7 +19,6 @@ import hivens.core.api.interfaces.IJavaManager
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.data.InstanceRuntime
 import hivens.core.data.PackInstance
-import hivens.core.data.PackOrigin
 import hivens.core.jvm.AutomaticHeap
 import hivens.core.jvm.JvmArgsPresets
 import hivens.core.jvm.JvmConfig
@@ -27,6 +26,7 @@ import hivens.core.jvm.SystemMemory
 import hivens.launcher.ProfilerProfileStore
 import hivens.launcher.component.EarlyLoadingScreen
 import hivens.launcher.component.JvmHeapArgs
+import hivens.launcher.sources.EngineSources
 import hivens.ui.components.JvmArgsBuilderDialog
 import hivens.ui.components.RamSelector
 import hivens.ui.i18n.nexiraStrings
@@ -272,6 +272,6 @@ internal fun PackRuntimeSection(
  */
 private fun requiredJavaMajor(pack: PackInstance, javaManager: IJavaManager): Int? {
     val manifest = pack.cachedManifest ?: return null
-    if (pack.packRef.origin == PackOrigin.Mirror) return manifest.javaMajor
+    if (pack.packRef.origin == EngineSources.Mirror) return manifest.javaMajor
     return javaManager.detectJavaVersion(manifest.minecraftVersion)
 }

@@ -7,16 +7,19 @@ package hivens.packs
 import hivens.accounts.LaunchIdentity
 import hivens.accounts.LaunchSessions
 import hivens.auth.OfflineAuthProvider
+import hivens.catalogue.api.PackDetails
+import hivens.catalogue.api.PackSources
+import hivens.catalogue.api.ProjectBuild
 import hivens.core.api.catalogue.CataloguePack
-import hivens.core.api.catalogue.CataloguePackDetails
+import hivens.core.api.catalogue.CataloguePackVersion
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.data.PackOrigin
 import hivens.core.update.PackUpdateStatusHub
 import hivens.core.update.PackUpdater
+import hivens.core.update.VersionChannel
 import hivens.launcher.PackInstallService
 import hivens.launcher.PackOperationService
-import hivens.launcher.catalogue.PackCatalogueRegistry
 import hivens.launcher.instance.PackInstanceService
 import hivens.launcher.launch.LauncherController
 import hivens.packs.api.InstallRequest
@@ -156,8 +159,7 @@ object PackKeysContribution : KeyContribution {
         keys.command(PackKeys.StopPack) { app -> command(app.hostServices.get<PackActions>()::stop) }
         keys.command(PackKeys.InstallPack) { app ->
             val actions = app.hostServices.get<PackActions>()
-            val catalogues = app.hostServices.get<PackCatalogueRegistry>()
-            command { request -> install(request, catalogues, actions, app.coroutineScope) }
+            command { request -> install(request, app.hostServices.find<PackSources>(), actions, app.coroutineScope) }
         }
         keys.command(PackKeys.DismissInstall) { app -> command(app.hostServices.get<PackActions>()::dismissInstall) }
         keys.command(PackKeys.CancelInstall) { app -> command(app.hostServices.get<PackActions>()::cancelInstall) }
@@ -194,15 +196,17 @@ private fun <A, B> mapped(flow: StateFlow<A>, scope: CoroutineScope, transform: 
     flowSource(flow.map(transform).stateIn(scope, SharingStarted.Eagerly, transform(flow.value)))
 
 /**
- * Looks [request] up in its source and installs that build. The source answers over
- * the network, so this runs on [scope]. A source this build does not know, a pack it
- * does not list, or a build the pack does not have installs nothing and is logged.
+ * Looks [request] up in its source and installs that build. The source is the one the
+ * catalogue lists, by its id exactly as the request names it, opened where the catalogue
+ * opened it, so a source the catalogue refused is not installed from either. It answers
+ * over the network, so this runs on [scope]. No catalogue, a source it does not list, a
+ * pack the source does not list, or a build the pack does not have installs nothing and
+ * is logged.
  */
-private fun install(request: InstallRequest, catalogues: PackCatalogueRegistry, actions: PackActions, scope: CoroutineScope) {
-    val origin = PackOrigin.entries.firstOrNull { it.name.equals(request.origin, ignoreCase = true) }
-    val catalogue = origin?.let(catalogues::forOrigin)
+private fun install(request: InstallRequest, sources: PackSources?, actions: PackActions, scope: CoroutineScope) {
+    val catalogue = sources?.listing(request.origin)
     if (catalogue == null) {
-        log.warn("Not installing {}: no catalogue answers for the source '{}'", request.packId, request.origin)
+        log.warn("Not installing {}: the catalogue lists no source '{}'", request.packId, request.origin)
         return
     }
     scope.launch {
@@ -214,15 +218,33 @@ private fun install(request: InstallRequest, catalogues: PackCatalogueRegistry, 
                 log.warn("Not installing {}: its source lists no build {}", request.packId, request.versionId)
                 return@launch
             }
-            actions.install(details.toCataloguePack(), version)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            log.warn("Not installing {}: its source could not be asked", request.packId, e)
+            actions.install(details.toCataloguePack(), version.toCataloguePackVersion())
+        } catch (e: Throwable) {
+            // A source's own code may fail to link as well as throw. Neither takes the command down.
+            if (e is CancellationException || (e !is Exception && e !is LinkageError)) throw e
+            log.warn("Not installing {}: its source '{}' could not be asked", request.packId, request.origin, e)
         }
     }
 }
 
-/** The pack a page describes, as the card an install takes, the way the catalogue's own page installs it. */
-private fun CataloguePackDetails.toCataloguePack(): CataloguePack =
-    CataloguePack(origin = origin, id = id, title = title, tagline = tagline, iconUrl = iconUrl, bannerUrl = bannerUrl)
+/** The pack a page describes, as the card the engine's installer takes. */
+internal fun PackDetails.toCataloguePack(): CataloguePack =
+    CataloguePack(origin = PackOrigin(origin), id = id, title = title, tagline = tagline, iconUrl = iconUrl, bannerUrl = bannerUrl)
+
+/** A build as the engine's installer takes it. */
+internal fun ProjectBuild.toCataloguePackVersion(): CataloguePackVersion = CataloguePackVersion(
+    id = id,
+    name = name,
+    versionNumber = versionNumber,
+    mcVersions = gameVersions,
+    loaders = loaders,
+    downloadUrl = download?.url,
+    downloadSha1 = download?.sha1,
+    downloadSize = download?.size ?: -1L,
+    channel = VersionChannel.of(versionType, versionNumber),
+    publishedAt = datePublished.ifBlank { null },
+    changelog = changelog,
+    downloads = downloads,
+    modsCount = modsCount,
+    sizeBytes = sizeBytes,
+)

@@ -38,6 +38,7 @@ import hivens.launcher.instance.swapFor
 import hivens.launcher.launch.LauncherController
 import hivens.launcher.modrinth.ModrinthClient
 import hivens.launcher.platform.PlatformPaths
+import hivens.launcher.sources.EngineSources
 import hivens.ui.utils.FileDialogSettings
 import hivens.ui.utils.pickFiles
 import io.github.vinceglb.filekit.dialogs.FileKitType
@@ -158,7 +159,7 @@ internal class ContentTabState(
      * tracked pack into a local one without the tab being rebuilt.
      */
     val isLocal: Boolean get() = instance.packRef.origin == PackOrigin.Local
-    val isMirror: Boolean get() = instance.packRef.origin == PackOrigin.Mirror
+    val isMirror: Boolean get() = instance.packRef.origin == EngineSources.Mirror
 
     /**
      * Selection keys for the files the pack itself placed, or null when this

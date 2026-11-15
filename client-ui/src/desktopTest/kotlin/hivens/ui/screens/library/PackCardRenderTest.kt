@@ -16,7 +16,8 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import hivens.core.api.HttpClientProvider
 import hivens.catalogue.api.CatalogueCard
-import hivens.catalogue.api.PackOrigins
+import hivens.catalogue.api.CatalogueKeys
+import hivens.catalogue.api.SourceView
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
@@ -25,6 +26,7 @@ import hivens.core.net.TransferEngine
 import hivens.launcher.catalogue.PackArtResolver
 import hivens.launcher.modrinth.ModrinthClient
 import hivens.launcher.smrt.SmrtPackClient
+import hivens.launcher.sources.EngineSources
 import hivens.packs.api.PackKeys
 import hivens.packs.api.PackUpdateView
 import hivens.packs.toPackView
@@ -78,7 +80,7 @@ class PackCardRenderTest {
     // are what this sheet is of -- draw over exactly what they draw over live.
     private val instance = PackInstance(
         id = "inst-1",
-        packRef = PackReference(PackOrigin.Mirror, "Industrial", "2.8.0+1.21.11"),
+        packRef = PackReference(EngineSources.Mirror, "Industrial", "2.8.0+1.21.11"),
         displayName = "Industrial",
         instanceDirName = "industrial",
         createdAtEpoch = 0L,
@@ -88,17 +90,27 @@ class PackCardRenderTest {
     /** A fork, played recently, on a source whose version string is long. */
     private val forked = PackInstance(
         id = "inst-2",
-        packRef = PackReference(PackOrigin.Modrinth, "Prominence II", "SNAPSHOT-0.0.0-2026.07.17"),
+        packRef = PackReference(EngineSources.Modrinth, "Prominence II", "SNAPSHOT-0.0.0-2026.07.17"),
         displayName = "Prominence II Hasturian Era",
         instanceDirName = "prominence",
         createdAtEpoch = 0L,
         lastPlayedEpochOrZero = System.currentTimeMillis() / 1000 - 3 * 3600,
-        forkedFrom = PackReference(PackOrigin.Mirror, "Industrial", "2.8.0"),
+        forkedFrom = PackReference(EngineSources.Mirror, "Industrial", "2.8.0"),
+        iconUrl = "",
+    )
+
+    /** A pack whose source module is not brought in: it lists, and its badge says so. */
+    private val orphan = PackInstance(
+        id = "inst-3",
+        packRef = PackReference(PackOrigin("Curseforge"), "cozy", "1.0"),
+        displayName = "Cozy Valley",
+        instanceDirName = "cozy",
+        createdAtEpoch = 0L,
         iconUrl = "",
     )
 
     private val catalogue = CatalogueCard(
-        origin = PackOrigins.MIRROR,
+        origin = EngineSources.Mirror.id,
         id = "cat-1",
         title = "Fabulously Optimized",
         tagline = "Стабильный набор оптимизаций и удобств",
@@ -118,6 +130,11 @@ class PackCardRenderTest {
     /** The packs module's update statuses, as it would answer them: a build waiting for the plain pack. */
     private val keys = WidgetDataRegistry().apply {
         register(PackKeys.Updates, flowSource(MutableStateFlow(mapOf("inst-1" to PackUpdateView.Pending("2.8.1", PackUpdateView.Pending.NEWER, "same")))))
+        // The two sources the build carries, brought in. The orphan's is not among them.
+        register(
+            CatalogueKeys.Sources,
+            flowSource(MutableStateFlow(listOf(SourceView(EngineSources.Mirror.id, "nexira.source.mirror", "source.name"), SourceView(EngineSources.Modrinth.id, "nexira.source.modrinth", "source.name")))),
+        )
     }
 
     /** Selected only if something asks for the network, which is what must not happen here. */
@@ -128,7 +145,7 @@ class PackCardRenderTest {
         return koinApplication {
             modules(
                 module {
-                    single<IPackRepository> { FakeRepo(listOf(instance, forked)) }
+                    single<IPackRepository> { FakeRepo(listOf(instance, forked, orphan)) }
                     single { PackArtResolver(ModrinthClient(http, TransferEngine(http)), SmrtPackClient(http)) }
                     single { IndicationCenter() }
                     single { NavRequests() }
@@ -183,6 +200,7 @@ class PackCardRenderTest {
                 // a fork whose version string is long enough to crowd the row.
                 PackCard(instance.toPackView(), onOpenDetail = {}, onOpenFolder = {}, onDelete = {})
                 PackCard(forked.toPackView(), onOpenDetail = {}, onOpenFolder = {}, onDelete = {})
+                PackCard(orphan.toPackView(), onOpenDetail = {}, onOpenFolder = {}, onDelete = {})
                 // Browse: a title, a tagline and four chips in the same height.
                 BrowsePackCard(catalogue, onClick = {})
             }

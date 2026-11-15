@@ -14,6 +14,7 @@ import hivens.launcher.modrinth.Placement
 import hivens.launcher.modrinth.PlacementRefusal
 import hivens.launcher.modrinth.chooseBuild
 import hivens.launcher.modrinth.placementIn
+import hivens.launcher.sources.EngineSources
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
@@ -54,7 +55,7 @@ sealed interface ContentDestination {
                     ?.takeIf { it.isNotBlank() && !it.equals("vanilla", ignoreCase = true) }
                     ?.lowercase()
                     .orEmpty(),
-                packFiles = if (instance.packRef.origin == PackOrigin.Mirror) instance.installedManifest?.flatten()?.keys else null,
+                packFiles = if (instance.packRef.origin == EngineSources.Mirror) instance.installedManifest?.flatten()?.keys else null,
             )
         }
     }
@@ -477,7 +478,7 @@ class ContentInstaller(
  */
 fun takesFromPlayer(origin: PackOrigin, kind: ContentKind, keepsRecord: Boolean): Boolean = when (origin) {
     PackOrigin.Local -> true
-    PackOrigin.Mirror -> kind != ContentKind.Mod
+    EngineSources.Mirror -> kind != ContentKind.Mod
     else -> keepsRecord
 }
 

@@ -1,7 +1,7 @@
-package hivens.launcher.catalogue
+package hivens.source.mirror
 
+import hivens.catalogue.api.CatalogueCard
 import hivens.core.api.HttpClientProvider
-import hivens.core.api.catalogue.CataloguePack
 import hivens.core.api.dto.smrt.SmrtManifestVersions
 import hivens.core.api.dto.smrt.SmrtPackListing
 import hivens.core.api.dto.smrt.SmrtPackManifest
@@ -33,7 +33,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 
-class MirrorPackCatalogueTest {
+class MirrorListingTest {
 
     private val lenientJson = Json { ignoreUnknownKeys = true }
 
@@ -76,13 +76,13 @@ class MirrorPackCatalogueTest {
         return SmrtPackClient(HttpClientProvider { client }, "https://mirror.test", caches = caches) to calls
     }
 
-    private fun ids(answers: List<List<CataloguePack>>) = answers.map { a -> a.map { it.id } }
+    private fun ids(answers: List<List<CatalogueCard>>) = answers.map { a -> a.map { it.id } }
 
     @Test
     fun `a pack published while Browse is open arrives on the next poll`() = runBlocking {
         val (client, _) = mirror(listing("a"), listing("a", "b"))
         val answers = withTimeout(5_000) {
-            MirrorPackCatalogue(client, pollIntervalMs = 10).searchStream("").take(2).toList()
+            MirrorListing(client, pollIntervalMs = 10).searchStream("").take(2).toList()
         }
         assertEquals(listOf(listOf("a"), listOf("a", "b")), ids(answers))
     }
@@ -91,7 +91,7 @@ class MirrorPackCatalogueTest {
     fun `an unchanged answer is not handed on again`() = runBlocking {
         val (client, calls) = mirror(listing("a"), listing("a"), listing("a"), listing("a", "b"))
         val answers = withTimeout(5_000) {
-            MirrorPackCatalogue(client, pollIntervalMs = 10).searchStream("").take(2).toList()
+            MirrorListing(client, pollIntervalMs = 10).searchStream("").take(2).toList()
         }
         assertEquals(listOf(listOf("a"), listOf("a", "b")), ids(answers))
         assertEquals(4, calls.get(), "the two identical polls were asked and swallowed")
@@ -101,7 +101,7 @@ class MirrorPackCatalogueTest {
     fun `a failed poll keeps the stream and the next one is heard`() = runBlocking {
         val (client, _) = mirror(listing("a"), null, listing("a", "b"))
         val answers = withTimeout(5_000) {
-            MirrorPackCatalogue(client, pollIntervalMs = 10).searchStream("").take(2).toList()
+            MirrorListing(client, pollIntervalMs = 10).searchStream("").take(2).toList()
         }
         assertEquals(listOf(listOf("a"), listOf("a", "b")), ids(answers))
     }
@@ -116,7 +116,7 @@ class MirrorPackCatalogueTest {
     fun `a card reads in the reader's language where the curator wrote it, and untagged where not`() = runBlocking {
         val (client, _) = mirror(translated)
         var tag = "en"
-        val catalogue = MirrorPackCatalogue(client, languages = { listOf(tag) })
+        val catalogue = MirrorListing(client, languages = { listOf(tag) })
         assertEquals(listOf("Heavy industry.", "Без перевода"), catalogue.search("").map { it.tagline })
         tag = "de"
         assertEquals(listOf("Тяжёлая промышленность.", "Без перевода"), catalogue.search("").map { it.tagline })
@@ -125,7 +125,7 @@ class MirrorPackCatalogueTest {
     @Test
     fun `a search matches the tagline the reader sees`() = runBlocking {
         val (client, _) = mirror(translated)
-        val catalogue = MirrorPackCatalogue(client, languages = { listOf("en") })
+        val catalogue = MirrorListing(client, languages = { listOf("en") })
         assertEquals(listOf("t"), catalogue.search("industry").map { it.id })
     }
 
@@ -147,7 +147,7 @@ class MirrorPackCatalogueTest {
         val caches = SmrtPackCaches(FailingRefreshCache(stored), PassthroughCache(), PassthroughCache(), PassthroughCache())
         val (client, _) = mirror(listing("a", "b"), caches = caches)
         val answers = withTimeout(5_000) {
-            MirrorPackCatalogue(client, pollIntervalMs = 10).searchStream("").take(2).toList()
+            MirrorListing(client, pollIntervalMs = 10).searchStream("").take(2).toList()
         }
         assertEquals(listOf(listOf("a"), listOf("a", "b")), ids(answers))
     }
@@ -157,18 +157,24 @@ class MirrorPackCatalogueTest {
     @Test
     fun `the community's packs follow the mirror's own, each with its owner`() = runBlocking {
         val (client, _) = mirror(listing("a", "b"), community = "[${member("u/7/cozy", "alex")},${member("b", "sam")}]")
-        val packs = MirrorPackCatalogue(client).search("")
+        val packs = MirrorListing(client).search("")
         assertEquals(listOf("a", "b", "u/7/cozy"), packs.map { it.id }, "a pack in both listings is the mirror's own")
         assertEquals(listOf(null, null, "alex"), packs.map { it.author })
         assertEquals(listOf(false, false, true), packs.map { it.community })
+        assertEquals(
+            listOf(MirrorPackSource.OWN, MirrorPackSource.OWN, MirrorPackSource.COMMUNITY),
+            packs.map { it.facets[MirrorPackSource.BUILT_BY] },
+            "each card says under which option of the source's own filter it falls",
+        )
+        assertEquals(setOf("Mirror"), packs.map { it.origin }.toSet(), "the id every mirror pack record carries")
     }
 
     @Test
     fun `a community listing that fails leaves the mirror's own packs`() = runBlocking {
         val (client, _) = mirror(listing("a"), community = null)
-        assertEquals(listOf("a"), MirrorPackCatalogue(client).search("").map { it.id })
+        assertEquals(listOf("a"), MirrorListing(client).search("").map { it.id })
         val answers = withTimeout(5_000) {
-            MirrorPackCatalogue(client, pollIntervalMs = 10).searchStream("").take(1).toList()
+            MirrorListing(client, pollIntervalMs = 10).searchStream("").take(1).toList()
         }
         assertEquals(listOf(listOf("a")), ids(answers))
     }
@@ -177,15 +183,14 @@ class MirrorPackCatalogueTest {
     fun `the community's packs join the stream`() = runBlocking {
         val (client, _) = mirror(listing("a"), community = "[${member("u/7/cozy", "alex")}]")
         val joined = withTimeout(5_000) {
-            MirrorPackCatalogue(client, pollIntervalMs = 10_000).searchStream("").first { list -> list.any { it.community } }
+            MirrorListing(client, pollIntervalMs = 10_000).searchStream("").first { list -> list.any { it.community } }
         }
         assertEquals(listOf("a", "u/7/cozy"), joined.map { it.id })
     }
 
     @Test
     fun `the mirror answers its whole listing, so it does not page`() {
-        val (client, _) = mirror(listing("a"))
-        assertFalse(MirrorPackCatalogue(client).paged)
+        assertFalse(MirrorPackSource.paged)
     }
 
     /** A cache holding [stored] past its age: a single read hands it back, a stream hands it and then the load. */
@@ -229,7 +234,7 @@ class MirrorPackCatalogueTest {
             "/v1/packs/P/manifest/versions" to buildsOf("0.3.1"),
             caches = storedAt030(),
         )
-        val pages = withTimeout(5_000) { MirrorPackCatalogue(client).detailsStream("P").toList() }
+        val pages = withTimeout(5_000) { MirrorListing(client).detailsStream("P").toList() }
 
         assertEquals("0.3.0", pages.first().latestVersionId)
         assertEquals("0.3.1", pages.last().latestVersionId)
@@ -240,7 +245,7 @@ class MirrorPackCatalogueTest {
     @Test
     fun `a pack page keeps the stored read when the mirror cannot be asked`() = runBlocking {
         val client = routed(caches = storedAt030())
-        val pages = withTimeout(5_000) { MirrorPackCatalogue(client).detailsStream("P").toList() }
+        val pages = withTimeout(5_000) { MirrorListing(client).detailsStream("P").toList() }
 
         assertEquals(listOf("0.3.0"), pages.map { it.latestVersionId })
         assertEquals("Java 17", pages.single().runtimeLabel)
@@ -279,16 +284,34 @@ class MirrorPackCatalogueTest {
                 {"version_number":"0.3.1","version_type":"release","minecraft_version":"1.12.2",
                  "loader":{"name":"forge","version":"14.23.5"},"mods_count":175}]}""",
         )
-        val d = MirrorPackCatalogue(client).details("Industrial")
+        val d = MirrorListing(client).details("Industrial")
         assertEquals("0.3.1", d.latestVersionId, "the mirror's pointer, not the newest build")
         assertEquals(listOf("cleanroom", "forge"), d.loaders, "each build says what it ran on")
         assertEquals(listOf("1.12.2"), d.gameVersions)
         assertEquals("Java 21", d.runtimeLabel)
-        assertEquals(PackAuthRequirement.SmartyCraft("Industrial"), d.auth)
+        assertEquals(PackAuthRequirement.SmartyCraft("Industrial").providerKeys, d.signIn)
         assertEquals("2026-10-01T10:00:00Z", d.updatedAt)
         assertEquals(listOf(180, 175), d.versions.map { it.modsCount })
         assertEquals(900L, d.versions.first().sizeBytes)
         assertEquals(emptyList(), d.creators, "the mirror's own pack credits nobody")
+    }
+
+    /** A pack page with [banner] and [shots] as the summary publishes them. */
+    private suspend fun galleryOf(banner: String?, vararg shots: String): List<String> {
+        val bannerField = banner?.let { ""","banner_url":"$it"""" }.orEmpty()
+        val gallery = shots.joinToString(",") { "\"$it\"" }
+        val client = routed(
+            "/v1/packs/P" to """{"pack_id":"P","display_name":"P","tagline":"t","minecraft_version":"1.21.1","latest_pack_version":"1"$bannerField,"gallery_urls":[$gallery]}""",
+            "/v1/packs/P/manifest" to manifestOf("1", 21),
+        )
+        return MirrorListing(client).details("P").gallery.map { it.full }
+    }
+
+    @Test
+    fun `a banner the mirror keeps apart leads the gallery, and is not shown twice`() = runBlocking {
+        assertEquals(listOf("b.png", "s.png"), galleryOf("b.png", "s.png"))
+        assertEquals(listOf("b.png"), galleryOf("b.png", "b.png"))
+        assertEquals(emptyList(), galleryOf(null))
     }
 
     @Test
@@ -302,7 +325,7 @@ class MirrorPackCatalogueTest {
             "/v1/community" to """[{"summary":{"pack_id":"u/7/cozy","display_name":"Cozy","tagline":"t",
                 "minecraft_version":"1.21.1","latest_pack_version":"1","tier":"community"},"owner_login":"alex"}]""",
         )
-        val d = MirrorPackCatalogue(client).details("u/7/cozy")
+        val d = MirrorListing(client).details("u/7/cozy")
         assertEquals("Cozy", d.title)
         assertEquals(listOf("alex"), d.creators.map { it.name })
         assertEquals(null, d.creators.single().avatarUrl, "no picture is asked of anyone else for it")

@@ -20,6 +20,7 @@ import hivens.launcher.record.PackFileRecord
 import hivens.launcher.runtime.RuntimeProvisioner
 import hivens.launcher.runtime.loader.LoaderRegistry
 import hivens.launcher.smrt.SmrtSyncService
+import hivens.launcher.sources.EngineSources
 import hivens.test.testTransferEngine
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
@@ -216,12 +217,12 @@ class ModrinthPackUpdaterTest {
             snapshots = snapshots,
             journal = journal,
             sizes = InstanceSizeService(dataDir, CoroutineScope(Dispatchers.Unconfined)),
-            reattachers = mapOf(PackOrigin.Modrinth to updater),
+            reattachers = mapOf(EngineSources.Modrinth to updater),
         )
 
         suspend fun installV1(): PackInstance {
             val archive = tempDir("dl").resolve("v1.mrpack").also { Files.write(it, packV1) }
-            return installer.install(archive, MrpackSource(PackOrigin.Modrinth, PROJECT, V1, buildKey = "v1id"))
+            return installer.install(archive, MrpackSource(EngineSources.Modrinth, PROJECT, V1, buildKey = "v1id"))
         }
 
         fun clientDirOf(instance: PackInstance): Path = dataDir.resolve("instances").resolve(instance.instanceDirName)
@@ -328,7 +329,7 @@ class ModrinthPackUpdaterTest {
 
         val back = h.instances.reattach(detached, preview.confirmation)
 
-        assertEquals(PackReference(PackOrigin.Modrinth, PROJECT, V2), back.packRef)
+        assertEquals(PackReference(EngineSources.Modrinth, PROJECT, V2), back.packRef)
         assertEquals(null, back.forkedFrom)
         assertEquals("v2id", back.installedBuildKey)
         assertEquals(back, h.repo.get(detached.id))
@@ -419,7 +420,7 @@ class ModrinthPackUpdaterTest {
         val archive = tempDir("dl").resolve("v2.mrpack").also { Files.write(it, h.packV2) }
 
         // The record as the update read it before the detach.
-        h.installer.update(installed, archive, MrpackSource(PackOrigin.Modrinth, PROJECT, V2, buildKey = "v2id"))
+        h.installer.update(installed, archive, MrpackSource(EngineSources.Modrinth, PROJECT, V2, buildKey = "v2id"))
 
         val record = h.repo.get(installed.id)!!
         assertEquals(PackOrigin.Local, record.packRef.origin, "still detached")
@@ -480,7 +481,7 @@ class ModrinthPackUpdaterTest {
         val fetchedBefore = h.archiveFetches.get()
         reattach.join()
 
-        assertEquals(PackOrigin.Modrinth, h.repo.get(detached.id)?.packRef?.origin, "the reattach finished on the archive it held")
+        assertEquals(EngineSources.Modrinth, h.repo.get(detached.id)?.packRef?.origin, "the reattach finished on the archive it held")
         assertEquals(fetchedBefore, h.archiveFetches.get(), "and did not have to fetch it again")
     }
 
@@ -516,7 +517,7 @@ class ModrinthPackUpdaterTest {
         val dir = h.clientDirOf(detached)
         Files.writeString(dir.resolve("mods/extra.jar"), "MINE")
         val back = h.instances.reattach(detached, h.instances.previewReattach(detached).confirmation)
-        assertEquals(PackOrigin.Modrinth, back.packRef.origin)
+        assertEquals(EngineSources.Modrinth, back.packRef.origin)
 
         h.updater.rollback(back, h.updater.listSnapshots(back).single().id)
 
@@ -539,7 +540,7 @@ class ModrinthPackUpdaterTest {
         val dir = h.clientDirOf(detached)
         Files.writeString(dir.resolve("mods/extra.jar"), "MINE")
         val preview = h.instances.previewReattach(detached)
-        h.repo.failAfterWriting = { it.packRef.origin == PackOrigin.Modrinth }
+        h.repo.failAfterWriting = { it.packRef.origin == EngineSources.Modrinth }
 
         assertFailsWith<IOException> { h.instances.reattach(detached, preview.confirmation) }
 
