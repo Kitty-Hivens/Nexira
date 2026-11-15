@@ -1,5 +1,6 @@
 // The Modrinth source is compiled into the application and trusted with the host's own
-// services: it reads Modrinth through the engine's client, which only the host holds.
+// services: it reads Modrinth through the engine's client and installs and updates through
+// the engine's archive installer and updater, which only the host holds.
 @file:OptIn(HostApi::class)
 
 package hivens.source.modrinth
@@ -11,10 +12,17 @@ import hivens.catalogue.api.ProjectSearchContribution
 import hivens.catalogue.api.ProjectSearcher
 import hivens.catalogue.api.ProjectTypes
 import hivens.catalogue.api.SourceIcon
+import hivens.core.api.interfaces.IPackRepository
 import hivens.core.cache.CacheConfig
 import hivens.launcher.cache.CacheFactory
 import hivens.launcher.modrinth.ModrinthClient
+import hivens.launcher.mrpack.MrpackInstaller
+import hivens.launcher.smrt.ModStraySweep
 import hivens.launcher.sources.EngineSources
+import hivens.launcher.sources.SourcePackWork
+import hivens.launcher.update.ApplyJournal
+import hivens.launcher.update.ArchivePackUpdater
+import hivens.launcher.update.PackSnapshotService
 import hivens.ui.icons.NxIcon
 import hivens.widget.api.CompiledModule
 import hivens.widget.api.HostApi
@@ -26,6 +34,7 @@ import hivens.widget.api.ModuleStrings
 import hivens.widget.api.get
 import hivens.widget.api.service
 import hivens.widget.model.ScopeLevel
+import java.nio.file.Path
 
 /**
  * Modrinth as a source of the catalogue, as the application carries it: compiled in,
@@ -50,12 +59,19 @@ object ModrinthSourceModule : CompiledModule {
     private const val NAME = "modrinth.name"
 }
 
-/** The pack listing, through a search cache for the app, and the project search, both read through the engine's client. */
-private class ModrinthAnswers(val packs: PackListing, val projects: ProjectSearcher)
+/**
+ * The pack listing, through a search cache for the app, which is also what Modrinth does
+ * to the packs it installs, and the project search, all read through the engine's client.
+ */
+private class ModrinthAnswers(val packs: ModrinthPacks, val projects: ProjectSearcher)
+
+/** Modrinth's pack listing, answering as well for what Modrinth does to its packs. */
+private class ModrinthPacks(listing: PackListing, work: SourcePackWork) : PackListing by listing, SourcePackWork by work
 
 /**
  * Makes what answers for Modrinth, once for the app, where the module is trusted with
- * the engine's Modrinth client. The two sources hand the catalogue that.
+ * the engine's Modrinth client, its archive installer and the update machinery. The two
+ * sources hand the catalogue that, and the pack source hands the engine its work.
  */
 object ModrinthSourceKeys : KeyContribution {
     override val id: String = "modrinth.source"
@@ -78,7 +94,21 @@ object ModrinthSourceKeys : KeyContribution {
                     shouldStore = { it.isNotEmpty() },
                 ),
             )
-            ModrinthAnswers(CachedPackListing(ModrinthListing(client), ModrinthPackSource.ID, searches), ModrinthProjects(client))
+            val host = context.hostServices
+            val mrpack = host.get<MrpackInstaller>()
+            val archives = ArchivePackUpdater(
+                feed = ModrinthArchiveFeed(client),
+                installer = mrpack,
+                repository = host.get<IPackRepository>(),
+                snapshotService = host.get<PackSnapshotService>(),
+                journal = host.get<ApplyJournal>(),
+                dataDir = host.get<Path>(),
+                sweep = host.get<ModStraySweep>(),
+            )
+            ModrinthAnswers(
+                ModrinthPacks(CachedPackListing(ModrinthListing(client), ModrinthPackSource.ID, searches), ModrinthPackWork(client, mrpack, archives)),
+                ModrinthProjects(client),
+            )
         }
     }
 }
@@ -86,6 +116,8 @@ object ModrinthSourceKeys : KeyContribution {
 /**
  * Modrinth's modpacks as a pack source. Browse lists them through Modrinth's project
  * search, as the modpack project type, so its filters, sorts and tags apply to them.
+ * It installs, updates and reattaches its packs. It does not repair them, since it
+ * publishes no per-file list of a build to measure a pack against.
  */
 object ModrinthPackSource : PackSourceContribution {
     /** The id every Modrinth pack record carries. */

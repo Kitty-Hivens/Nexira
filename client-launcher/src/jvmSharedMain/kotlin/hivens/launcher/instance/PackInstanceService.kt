@@ -7,8 +7,13 @@ import hivens.core.data.PackReference
 import hivens.core.io.InstanceMutationLock
 import hivens.core.launch.InstanceWork
 import hivens.core.launch.InstanceWorkRegistry
-import hivens.launcher.catalogue.PackArt
 import hivens.launcher.launch.RunningPackSource
+import hivens.launcher.sources.PackArt
+import hivens.launcher.sources.SourceCannotException
+import hivens.launcher.sources.SourceMissingException
+import hivens.launcher.sources.SourceOperation
+import hivens.launcher.sources.SourceStatus
+import hivens.launcher.sources.SourceWorks
 import hivens.launcher.update.ApplyJournal
 import hivens.launcher.update.PackReattacher
 import hivens.launcher.update.PackSnapshotService
@@ -43,8 +48,8 @@ class PackInstanceService(
      * what its source has answered this run. A detach writes it into the record.
      */
     private val knownArt: (PackInstance) -> PackArt? = { null },
-    /** What can put a detached pack back on its source, by the source's origin. */
-    private val reattachers: Map<PackOrigin, PackReattacher> = emptyMap(),
+    /** The sources, whose reattachers put a detached pack back on its source, by the source's origin. */
+    private val sources: SourceWorks = SourceWorks(),
 ) {
     private val log = LoggerFactory.getLogger(PackInstanceService::class.java)
 
@@ -160,11 +165,17 @@ class PackInstanceService(
     }
 
     /**
-     * Whether a detach of [instance] could be undone: its source is one that can
-     * take a detached pack back. A pack synced from a game server cannot, so its
+     * Whether a detach of [instance] could be undone: its source can take a detached pack
+     * back, or its module is not loaded now, which is no reason to call the detach final
+     * since the reattach works once the module is back. A pack synced from a game server
+     * cannot, and neither can one from a source that brings no reattacher, so their
      * detach is for good, and says so.
      */
-    fun canReattachAfterDetach(instance: PackInstance): Boolean = instance.packRef.origin in reattachers
+    fun canReattachAfterDetach(instance: PackInstance): Boolean = when (val status = sources.status(instance.packRef.origin)) {
+        is SourceStatus.Loaded -> status.work.reattacher != null
+        is SourceStatus.Missing -> true
+        SourceStatus.None -> false
+    }
 
     /**
      * Whether [instance] was detached from a source that can take it back. A pack
@@ -174,8 +185,20 @@ class PackInstanceService(
     fun canReattach(instance: PackInstance): Boolean = reattacherFor(instance) != null
 
     /**
+     * The source [instance] was detached from, where it is known by its id and no module
+     * that is loaded brings it: the reattach is refused for that reason until it is.
+     * Null for a pack that was never detached or whose source is loaded.
+     */
+    fun reattachSourceMissing(instance: PackInstance): PackOrigin? = (reattachStatus(instance) as? SourceStatus.Missing)?.origin
+
+    /** Where the source [instance] was detached from stands, or null for a pack that was never detached. */
+    fun reattachStatus(instance: PackInstance): SourceStatus? = instance.forkedFrom?.let { sources.status(it.origin) }
+
+    /**
      * What reattaching [instance] would remove and bring back, against the source
-     * build it would land on. Throws when [canReattach] is false.
+     * build it would land on. Throws when [canReattach] is false: with
+     * [SourceMissingException] where the source is not loaded, and with
+     * [SourceCannotException] where it is loaded and brings no reattacher.
      */
     suspend fun previewReattach(instance: PackInstance): ReattachPreview {
         val (source, reattacher) = requireReattacher(instance)
@@ -200,6 +223,10 @@ class PackInstanceService(
      * removed or changed comes back. A pack bound to a server may not carry mods of
      * its player's choosing, and a player who wants their own mods publishes their
      * fork as a pack of its own.
+     *
+     * A source whose module is not loaded is refused with [SourceMissingException], and
+     * one that is loaded and brings no reattacher with [SourceCannotException], before
+     * anything is read, and no other source is asked.
      */
     suspend fun reattach(
         instance: PackInstance,
@@ -230,11 +257,20 @@ class PackInstanceService(
 
     private fun reattacherFor(instance: PackInstance): Pair<PackReference, PackReattacher>? {
         val source = instance.forkedFrom ?: return null
-        return reattachers[source.origin]?.let { source to it }
+        return sources.work(source.origin)?.reattacher?.let { source to it }
     }
 
-    private fun requireReattacher(instance: PackInstance): Pair<PackReference, PackReattacher> =
-        reattacherFor(instance) ?: throw IllegalStateException("pack ${instance.id} was not detached from a source that can take it back")
+    private fun requireReattacher(instance: PackInstance): Pair<PackReference, PackReattacher> {
+        val source = instance.forkedFrom ?: throw notReattachable(instance)
+        return when (val status = sources.status(source.origin)) {
+            is SourceStatus.Missing -> throw SourceMissingException(status.origin)
+            is SourceStatus.Loaded -> source to (status.work.reattacher ?: throw SourceCannotException(source.origin, SourceOperation.Reattach))
+            SourceStatus.None -> throw notReattachable(instance)
+        }
+    }
+
+    private fun notReattachable(instance: PackInstance) =
+        IllegalStateException("pack ${instance.id} was not detached from a source that can take it back")
 
     /**
      * Recursive delete, deepest-first so directories are empty before removal.

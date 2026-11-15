@@ -59,6 +59,7 @@ import hivens.launcher.PackOperationService
 import hivens.launcher.sources.EngineSources
 import hivens.ui.components.ChannelChip
 import hivens.ui.components.label
+import hivens.ui.components.text
 import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.nx.NxIconButton
@@ -462,6 +463,7 @@ private fun FooterStatus(operation: PackOperation?, notice: String?) {
             phase is PackOperationPhase.Failed -> FooterError(s.text("packVersionsFailed", phase.message))
             phase is PackOperationPhase.Refused -> FooterError(s.text("packOperationRefused", phase.work.label(s)))
             phase is PackOperationPhase.PreviewStale -> FooterError(s.text("packSettingsReattachStale"))
+            phase is PackOperationPhase.SourceRefused -> FooterError(phase.text(s))
             notice != null -> FooterError(notice)
         }
     }

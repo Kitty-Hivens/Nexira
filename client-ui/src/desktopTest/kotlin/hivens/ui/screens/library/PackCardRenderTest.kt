@@ -14,7 +14,6 @@ import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
-import hivens.core.api.HttpClientProvider
 import hivens.catalogue.api.CatalogueCard
 import hivens.catalogue.api.CatalogueKeys
 import hivens.catalogue.api.SourceView
@@ -22,38 +21,36 @@ import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
 import hivens.core.data.PackReference
-import hivens.core.net.TransferEngine
-import hivens.launcher.catalogue.PackArtResolver
-import hivens.launcher.modrinth.ModrinthClient
-import hivens.launcher.smrt.SmrtPackClient
+import hivens.core.launch.InstanceWorkRegistry
+import hivens.launcher.launch.RunningPackSource
 import hivens.launcher.sources.EngineSources
+import hivens.launcher.sources.PackArtResolver
+import hivens.launcher.sources.SourceWorks
 import hivens.packs.api.PackKeys
 import hivens.packs.api.PackUpdateView
 import hivens.packs.toPackView
 import hivens.themes.Themes
+import hivens.ui.feature.catalogue.browse.BrowsePackCard
 import hivens.ui.host.HostKoin
 import hivens.ui.i18n.ShippedLanguageProvider
 import hivens.ui.navigation.NavRequests
 import hivens.ui.notifications.IndicationCenter
-import hivens.ui.feature.catalogue.browse.BrowsePackCard
+import hivens.ui.settle
+import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxTheme
 import hivens.widget.api.LocalWidgetDataRegistry
 import hivens.widget.api.WidgetDataRegistry
 import hivens.widget.api.flowSource
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import org.jetbrains.skia.EncodedImageFormat
-import org.koin.core.KoinApplication
-import hivens.core.launch.InstanceWorkRegistry
-import hivens.launcher.launch.RunningPackSource
-import org.koin.dsl.koinApplication
-import org.koin.dsl.module
 import java.io.File
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertTrue
-import hivens.ui.settle
-import hivens.ui.theme.NxColor
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import org.jetbrains.skia.EncodedImageFormat
+import org.koin.core.KoinApplication
+import org.koin.dsl.koinApplication
+import org.koin.dsl.module
 
 /**
  * Every card that stacks metadata chips over cover art, in one sheet.
@@ -137,16 +134,13 @@ class PackCardRenderTest {
         )
     }
 
-    /** Selected only if something asks for the network, which is what must not happen here. */
-    private fun offlineHttp() = HttpClientProvider { error("a render sheet does not go to the network") }
-
     private fun graph(): KoinApplication {
-        val http = offlineHttp()
         return koinApplication {
             modules(
                 module {
                     single<IPackRepository> { FakeRepo(listOf(instance, forked, orphan)) }
-                    single { PackArtResolver(ModrinthClient(http, TransferEngine(http)), SmrtPackClient(http)) }
+                    // No source is loaded, so nothing asks the network for a cover.
+                    single { PackArtResolver(SourceWorks()) }
                     single { IndicationCenter() }
                     single { NavRequests() }
                     // The card asks whether the pack may be deleted right now.

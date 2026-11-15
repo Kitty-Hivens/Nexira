@@ -1,4 +1,4 @@
-package hivens.launcher.update
+package hivens.source.modrinth
 
 import hivens.core.api.HttpClientProvider
 import hivens.core.api.interfaces.IJavaManager
@@ -6,8 +6,9 @@ import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
 import hivens.core.data.PackReference
-import hivens.core.update.CompatChange
+import hivens.core.io.InstanceMutationLock
 import hivens.core.launch.InstanceWorkRegistry
+import hivens.core.update.CompatChange
 import hivens.core.update.UpdateOutcome
 import hivens.launcher.instance.InstanceSizeService
 import hivens.launcher.instance.PackInstanceService
@@ -15,12 +16,20 @@ import hivens.launcher.launch.RunningPackSource
 import hivens.launcher.modrinth.ModrinthClient
 import hivens.launcher.mrpack.MrpackInstaller
 import hivens.launcher.mrpack.MrpackSource
-import hivens.core.io.InstanceMutationLock
-import hivens.launcher.record.PackFileRecord
 import hivens.launcher.runtime.RuntimeProvisioner
 import hivens.launcher.runtime.loader.LoaderRegistry
 import hivens.launcher.smrt.SmrtSyncService
+import hivens.launcher.smrt.SyncStraySweep
 import hivens.launcher.sources.EngineSources
+import hivens.launcher.sources.SourcePackWork
+import hivens.launcher.sources.SourceWorks
+import hivens.launcher.update.ApplyJournal
+import hivens.launcher.update.ArchivePackUpdater
+import hivens.launcher.update.InstanceRemovedException
+import hivens.launcher.update.PackReattacher
+import hivens.launcher.update.PackSnapshotService
+import hivens.launcher.update.ReattachPreviewStaleException
+import hivens.launcher.update.reattachArchiveDir
 import hivens.test.testTransferEngine
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
@@ -29,19 +38,6 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import io.ktor.utils.io.ByteReadChannel
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.awaitCancellation
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.cancelAndJoin
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.withTimeout
-import kotlinx.serialization.json.Json
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
@@ -58,6 +54,19 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withTimeout
+import kotlinx.serialization.json.Json
 
 /**
  * The Modrinth update path end to end, over a mock Modrinth and a mock CDN.
@@ -204,7 +213,7 @@ class ModrinthPackUpdaterTest {
         val snapshots = PackSnapshotService(dataDir, json)
         val journal = ApplyJournal(dataDir, json)
         private val modrinth = ModrinthClient(provider, transfers, json)
-        val updater = ModrinthPackUpdater(modrinth, installer, repo, snapshots, journal, dataDir, SmrtSyncService(modrinth, transfers))
+        val updater = ArchivePackUpdater(ModrinthArchiveFeed(modrinth), installer, repo, snapshots, journal, dataDir, SyncStraySweep(SmrtSyncService(modrinth, transfers)))
 
         /** Detach and reattach as the launcher runs them, with Modrinth as the only source that takes a pack back. */
         val instances = PackInstanceService(
@@ -217,7 +226,7 @@ class ModrinthPackUpdaterTest {
             snapshots = snapshots,
             journal = journal,
             sizes = InstanceSizeService(dataDir, CoroutineScope(Dispatchers.Unconfined)),
-            reattachers = mapOf(EngineSources.Modrinth to updater),
+            sources = sourcesOf(mapOf(EngineSources.Modrinth to updater)),
         )
 
         suspend fun installV1(): PackInstance {
@@ -249,7 +258,7 @@ class ModrinthPackUpdaterTest {
         val h = Harness(breakV2 = true)
         val instance = h.installV1()
         val dir = h.clientDirOf(instance)
-        val recordBefore = dir.resolve(PackFileRecord.FILE_NAME).readText()
+        val recordBefore = dir.resolve(RECORD_FILE).readText()
 
         runCatching { h.updater.applyUpdate(instance, null, null) }
             .onSuccess { error("a build with a missing file must not apply") }
@@ -258,7 +267,7 @@ class ModrinthPackUpdaterTest {
         assertTrue(Files.exists(dir.resolve("mods/lib-1.0.jar")))
         assertFalse(Files.exists(dir.resolve("mods/lib-2.0.jar")))
         assertEquals("FOO", dir.resolve("config/foo.txt").readText())
-        assertEquals(recordBefore, dir.resolve(PackFileRecord.FILE_NAME).readText())
+        assertEquals(recordBefore, dir.resolve(RECORD_FILE).readText())
         assertEquals(V1, h.repo.get(instance.id)?.pinnedPackVersion)
         assertTrue(h.journal.listPending().isEmpty(), "rolled back in process, so nothing for the next start")
         assertTrue(h.updater.listSnapshots(instance).isEmpty(), "and the spent snapshot is gone")
@@ -275,7 +284,7 @@ class ModrinthPackUpdaterTest {
         val h = Harness()
         val instance = h.installV1()
         val dir = h.clientDirOf(instance)
-        val recordBefore = dir.resolve(PackFileRecord.FILE_NAME).readText()
+        val recordBefore = dir.resolve(RECORD_FILE).readText()
         h.updater.applyUpdate(instance, null, null)
 
         h.updater.rollback(instance, h.updater.listSnapshots(instance).single().id)
@@ -285,7 +294,7 @@ class ModrinthPackUpdaterTest {
         assertEquals("COOL-MOD", dir.resolve("mods/cool.jar").readText())
         assertTrue(Files.exists(dir.resolve("mods/lib-1.0.jar")))
         assertFalse(Files.exists(dir.resolve("mods/lib-2.0.jar")), "what only the new version shipped is removed")
-        assertEquals(recordBefore, dir.resolve(PackFileRecord.FILE_NAME).readText())
+        assertEquals(recordBefore, dir.resolve(RECORD_FILE).readText())
         assertEquals(V1, h.repo.get(instance.id)?.pinnedPackVersion)
     }
 
@@ -551,6 +560,27 @@ class ModrinthPackUpdaterTest {
         assertTrue(h.journal.listPending().isEmpty(), "rolled back in process")
     }
 
+    /**
+     * An instance from before the record of what a build placed: the update fetches the
+     * installed version's own archive to learn what to retire, so the renamed lib does not
+     * end up beside its successor, and writes a record for the next one.
+     */
+    @Test
+    fun `an update of an instance with no record retires what the old version shipped`() = runTest {
+        val h = Harness()
+        val instance = h.installV1()
+        val dir = h.clientDirOf(instance)
+        Files.delete(dir.resolve(RECORD_FILE))
+
+        assertTrue(h.updater.applyUpdate(instance, null, null) is UpdateOutcome.Applied)
+
+        assertTrue(Files.exists(dir.resolve("mods/lib-2.0.jar")))
+        assertFalse(Files.exists(dir.resolve("mods/lib-1.0.jar")), "two of each mod and the game will not start")
+        assertEquals("COOL-MOD-V2", dir.resolve("mods/cool.jar").readText())
+        assertFalse(Files.exists(dir.resolve("config/gone.txt")), "the override the new version dropped is retired too")
+        assertTrue(Files.exists(dir.resolve(RECORD_FILE)), "and the next update has a record to go by")
+    }
+
     /** As on the mirror: a version the player picked is a pin, and only the latest is followed. */
     @Test
     fun `a version picked by hand stops following the latest`() = runTest {
@@ -565,6 +595,8 @@ class ModrinthPackUpdaterTest {
     }
 
     private companion object {
+        /** The record of what the archive installer placed, as the engine names it beside the instance. */
+        const val RECORD_FILE = ".nexira-pack"
         const val PROJECT = "proj"
         const val V1 = "1.0.0"
         const val V2 = "2.0.0"
@@ -583,3 +615,7 @@ class ModrinthPackUpdaterTest {
         const val RES_BASE = "https://resources.test"
     }
 }
+
+/** The sources [reattachers] stand for, each able to take a detached pack back and nothing else. */
+private fun sourcesOf(reattachers: Map<PackOrigin, PackReattacher>): SourceWorks =
+    SourceWorks.of(*reattachers.map { (origin, taking) -> origin to object : SourcePackWork { override val reattacher: PackReattacher = taking } }.toTypedArray())

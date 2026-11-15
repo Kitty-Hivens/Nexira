@@ -4,6 +4,9 @@ import hivens.core.data.PackInstance
 import hivens.core.launch.InstanceWork
 import hivens.core.launch.InstanceWorkRegistry
 import hivens.launcher.instance.InstanceSizeService
+import hivens.launcher.sources.SourceCannotException
+import hivens.launcher.sources.SourceOperation
+import hivens.launcher.sources.SourceRefusedException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -63,6 +66,14 @@ sealed interface PackOperationPhase {
      * failure: nothing went wrong, and what to do next is compare again.
      */
     data object PreviewStale : PackOperationPhase
+
+    /**
+     * Not done, because the pack's source could not be asked, and nothing was touched:
+     * no module that is loaded brings the source [origin] where [operation] is null, or
+     * the source is loaded and cannot do [operation]. Its own outcome rather than a
+     * failure, so a surface can say which, in the player's language.
+     */
+    data class SourceRefused(val origin: String, val operation: SourceOperation? = null) : PackOperationPhase
 }
 
 /** Observable state of the one operation an instance may have in flight or just finished. */
@@ -109,7 +120,8 @@ class PackOperationService(
     /**
      * Run [block] as [kind] on [instance], or refuse (returning false) when that
      * instance already has an operation in flight. [block] gets a progress sink
-     * and returns the terminal phase; a throw becomes [PackOperationPhase.Failed].
+     * and returns the terminal phase; a throw becomes [PackOperationPhase.Failed], and a
+     * refusal of the pack's source [PackOperationPhase.SourceRefused].
      */
     fun start(
         instance: PackInstance,
@@ -140,6 +152,9 @@ class PackOperationService(
                 // leaving a Running phase nothing will ever finish.
                 _operations.update { it - id }
                 throw e
+            } catch (e: SourceRefusedException) {
+                log.info("pack operation {} refused for {}: {}", kind, id, e.message)
+                publish(id, kind, PackOperationPhase.SourceRefused(e.origin.id, (e as? SourceCannotException)?.operation))
             } catch (e: Exception) {
                 log.warn("pack operation {} failed for {}", kind, id, e)
                 publish(id, kind, PackOperationPhase.Failed(e.message ?: e::class.simpleName.orEmpty()))

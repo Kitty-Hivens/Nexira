@@ -28,41 +28,37 @@ import hivens.catalogue.api.CategoryTag
 import hivens.catalogue.api.FilterField
 import hivens.catalogue.api.GameVersionTag
 import hivens.catalogue.api.LoaderTag
-import hivens.catalogue.api.SourceOption
-import hivens.catalogue.api.SourceView
-import hivens.source.mirror.MirrorPackSource
-import hivens.source.mirror.MirrorSourceModule
-import hivens.source.modrinth.ModrinthPackSource
-import hivens.source.modrinth.ModrinthSourceModule
 import hivens.catalogue.api.ProjectHit
 import hivens.catalogue.api.ProjectKind
 import hivens.catalogue.api.SearchFilter
-import hivens.core.api.HttpClientProvider
+import hivens.catalogue.api.SourceOption
+import hivens.catalogue.api.SourceView
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
 import hivens.core.data.PackReference
-import hivens.core.net.TransferEngine
-import hivens.launcher.catalogue.PackArtResolver
-import hivens.launcher.modrinth.ModrinthClient
 import hivens.launcher.modrinth.acceptedLoaders
-import hivens.launcher.smrt.SmrtPackClient
+import hivens.launcher.sources.PackArtResolver
+import hivens.launcher.sources.SourceWorks
+import hivens.source.mirror.MirrorPackSource
+import hivens.source.mirror.MirrorSourceModule
+import hivens.source.modrinth.ModrinthPackSource
+import hivens.source.modrinth.ModrinthSourceModule
 import hivens.themes.Themes
 import hivens.ui.host.HostKoin
-import hivens.ui.widgets.KoinLevelServicesHost
-import hivens.widget.api.LocalWidgetDataRegistry
-import kotlinx.coroutines.Dispatchers
 import hivens.ui.settle
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxTheme
+import hivens.ui.widgets.KoinLevelServicesHost
 import hivens.ui.widgets.WidgetSurface
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.LocalScope
-import hivens.widget.api.LocalWidgetCommandRegistry
 import hivens.widget.api.LocalSurfaceFamilies
+import hivens.widget.api.LocalWidgetCommandRegistry
+import hivens.widget.api.LocalWidgetDataRegistry
 import hivens.widget.api.LocalWidgetRegistry
 import hivens.widget.api.LocalWidgetSurfaceRenderer
 import hivens.widget.api.SlotRenderer
@@ -78,12 +74,6 @@ import hivens.widget.model.FamilyId
 import hivens.widget.model.ScopeLevel
 import hivens.widget.model.SlotId
 import hivens.widget.model.SurfaceId
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import org.jetbrains.skia.EncodedImageFormat
-import org.koin.core.KoinApplication
-import org.koin.dsl.koinApplication
-import org.koin.dsl.module
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Instant
@@ -91,6 +81,13 @@ import java.time.temporal.ChronoUnit
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertTrue
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import org.jetbrains.skia.EncodedImageFormat
+import org.koin.core.KoinApplication
+import org.koin.dsl.koinApplication
+import org.koin.dsl.module
 
 /**
  * Browse drawn off-screen: a project card in each state its install can be in, and
@@ -263,16 +260,14 @@ class BrowseRenderTest {
     private var window: WidgetScope? = null
 
     private fun graph() {
-        val http = HttpClientProvider { error("a render sheet does not go to the network") }
         val data: Path = Files.createTempDirectory("nexira-browse-render")
-        val modrinth = ModrinthClient(http, TransferEngine(http))
         koin.close()
         koin = koinApplication {
             modules(
                 module {
                     single<IPackRepository> { FakeRepo(listOf(local)) }
                     single { data }
-                    single { PackArtResolver(modrinth, SmrtPackClient(http)) }
+                    single { PackArtResolver(SourceWorks()) }
                     single { WidgetScope.app(sources, KoinLevelServicesHost.app(this), Dispatchers.Unconfined, commands) }
                 },
             )

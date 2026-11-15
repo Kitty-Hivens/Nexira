@@ -17,6 +17,7 @@ import hivens.launcher.PackInstallService
 import hivens.launcher.instance.InstanceContentUpdater
 import hivens.launcher.network.ServerProtocolConfig
 import hivens.launcher.platform.PlatformPaths
+import hivens.launcher.sources.SourceWorks
 import hivens.ui.activity.ActivityCommands
 import hivens.ui.activity.ActivityDriver
 import hivens.ui.activity.SelectionRegistry
@@ -35,6 +36,7 @@ import hivens.ui.feature.catalogue.project.sampleProjectPage
 import hivens.packs.PacksHost
 import hivens.ui.accounts.ClientAccountsHost
 import hivens.ui.host.LauncherHostAccess
+import hivens.ui.host.sourceWorksOf
 import hivens.ui.navigation.NavState
 import hivens.ui.packs.ClientPacksHost
 import hivens.ui.packs.withdrawNoticesOfInstalledPacks
@@ -420,6 +422,9 @@ fun uiCoreModule(
     //
     // A jar module read again while the launcher runs answers its keys with its new
     // code, and what its old code made is dropped here as it does.
+    //
+    // The engine installs, updates and reattaches through the sources the catalogue
+    // opened under this level, so it is handed them here, before anything is drawn.
     single {
         val appScope: CoroutineScope = get()
         val keys: HostKeys = get()
@@ -431,7 +436,10 @@ fun uiCoreModule(
             // The host view under each level is the launcher's alone, see LauncherHostAccess.
             access   = LauncherHostAccess,
             failures = reportedTo(get(), keys),
-        ).also { app -> followModuleReloads(get<WidgetModules>().state, keys, app, appScope) }
+        ).also { app ->
+            followModuleReloads(get<WidgetModules>().state, keys, app, appScope)
+            get<SourceWorks>().attach(sourceWorksOf(app))
+        }
     }
 
     // Widget layout graph persistence. Default graph lives at

@@ -36,8 +36,29 @@ data class SourceFilter(
 )
 
 /**
+ * What the launcher can do with a source's packs beyond listing them. Decided by the work
+ * the launcher holds for the source, never declared: only a module compiled into the
+ * launcher brings work, on what its source opens, and a jar's source only lists. The pack
+ * screens offer a pack only what its source can do, and the launcher refuses anything else
+ * asked of it, saying the source cannot do it, or that it is not loaded.
+ */
+enum class SourceAbility {
+    /** Installs one of its builds as a new pack. */
+    Install,
+
+    /** Moves a pack it installed to another of its builds, and back to a snapshot. */
+    Update,
+
+    /** Puts a pack detached from it back on one of its builds. */
+    Reattach,
+
+    /** Checks a pack it installed against the build it is on and puts right what does not match. */
+    Repair,
+}
+
+/**
  * A pack source as the catalogue lists it to a widget: what to call it and how to draw
- * it, the filters it offers, and how its packs are searched.
+ * it, the filters it offers, how its packs are searched, and what it can do with them.
  */
 data class SourceView(
     /** The source's id, the one every pack record from it carries. */
@@ -54,6 +75,8 @@ data class SourceView(
      * them itself.
      */
     val packType: String? = null,
+    /** What the launcher can do with the source's packs beyond listing them, from the work it holds for the source. */
+    val abilities: Set<SourceAbility> = emptySet(),
 )
 
 /** One option of one filter of one source: what a switch in Browse turns. */

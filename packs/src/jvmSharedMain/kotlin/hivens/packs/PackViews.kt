@@ -105,6 +105,10 @@ fun PackOperation.toView(): PackOperationView = PackOperationView(
         is PackOperationPhase.Failed -> OperationStatus.Failed("failed", p.message)
         is PackOperationPhase.Refused -> OperationStatus.Failed("busy", p.work.name.kebab())
         PackOperationPhase.PreviewStale -> OperationStatus.Failed("preview-stale")
+        is PackOperationPhase.SourceRefused -> when (val operation = p.operation) {
+            null -> OperationStatus.Failed("source-missing", p.origin)
+            else -> OperationStatus.Failed("source-cannot", "${p.origin}:${operation.name.kebab()}")
+        }
     },
 )
 

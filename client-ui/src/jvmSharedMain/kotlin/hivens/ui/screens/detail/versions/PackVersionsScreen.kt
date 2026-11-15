@@ -76,6 +76,7 @@ import hivens.ui.components.ReleaseNotes
 import hivens.ui.components.formatBuildTime
 import hivens.ui.components.formatBuildTimestamp
 import hivens.ui.components.label
+import hivens.ui.components.text
 import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.nx.CenteredProgress
@@ -955,6 +956,13 @@ private fun StatusRow(operation: PackOperation?) {
             )
             PackOperationPhase.PreviewStale -> Text(
                 text     = s.text("packSettingsReattachStale"),
+                style    = MaterialTheme.typography.labelSmall,
+                color    = NxColor.status(Status.Error),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            is PackOperationPhase.SourceRefused -> Text(
+                text     = phase.text(s),
                 style    = MaterialTheme.typography.labelSmall,
                 color    = NxColor.status(Status.Error),
                 maxLines = 1,

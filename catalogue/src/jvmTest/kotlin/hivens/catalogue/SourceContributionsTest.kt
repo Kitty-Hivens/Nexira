@@ -277,7 +277,17 @@ class SourceContributionsTest {
         assertEquals(SHELF, await("the source back", browse) { it.sources.isNotEmpty() }.origin)
         assertNotNull(window.findCommand(CatalogueKeys.RetryResults)).run(Unit)
         await("listed again", results) { it.status == SearchStatus.Loaded && it.question?.origin == SHELF }
-        assertEquals(2, opened.get(), "the module's new instance of the source is opened, not the old one reused")
+        // The remembered list answers before the new instance is opened, so what proves the
+        // new one was opened is the count itself, waited for rather than read at once.
+        awaitCount("the module's new instance of the source is opened, not the old one reused", opened, 2)
+    }
+
+    private fun awaitCount(what: String, count: AtomicInteger, expected: Int) = runBlocking {
+        try {
+            withTimeout(5.seconds) { while (count.get() != expected) delay(10) }
+        } catch (e: Exception) {
+            throw AssertionError("$what: expected $expected, was ${count.get()}", e)
+        }
     }
 
     @Test

@@ -18,8 +18,8 @@ import hivens.core.launch.InstanceWorkRegistry
 import hivens.launcher.instance.InstanceBusyException
 import hivens.launcher.instance.InstanceSizeService
 import hivens.launcher.instance.PackInstanceService
-import hivens.launcher.sources.EngineSources
-import hivens.launcher.update.PackUpdateService
+import hivens.launcher.sources.PackRepairer
+import hivens.launcher.sources.SourceWorks
 import hivens.ui.i18n.nexiraStrings
 import hivens.ui.utils.humanSize
 import hivens.ui.components.DestructiveConfirmDialog
@@ -70,7 +70,7 @@ internal fun PackDataSection(
 ) {
     val s = nexiraStrings()
     val service: PackInstanceService = koinInject()
-    val updates: PackUpdateService = koinInject()
+    val sources: SourceWorks = koinInject()
     val operations: PackOperationService = koinInject()
     // Through the packs module's command, the same reattach any widget fires.
     val reattach = rememberScopedCommand(PackKeys.ReattachPack)
@@ -102,9 +102,26 @@ internal fun PackDataSection(
     LaunchedEffect(pack.id) { sizes.measure(pack) }
     val sizeText = measured[pack.id]?.let { humanSize(it.bytes, s) }
 
-    fun runRepair() {
+    // What the pack's sources let this section offer, read once per pack and source and
+    // off the event thread, since the first question may open the source. A repair
+    // measures the instance against the build its source publishes, so it is offered
+    // where the pack's source can repair: a local or imported pack has no build to
+    // measure against, and one whose source is not loaded has none to read it from.
+    val offer by produceState(SourceOffer(), pack.id, pack.packRef, pack.forkedFrom) {
+        value = withContext(Dispatchers.IO) {
+            SourceOffer(
+                repairer = sources.work(pack.packRef.origin)?.repairer,
+                canReattach = service.canReattach(pack),
+                missingSource = service.reattachSourceMissing(pack),
+                detachUndoable = service.canReattachAfterDetach(pack),
+            )
+        }
+    }
+    val repairer = offer.repairer
+
+    fun runRepair(repairer: PackRepairer) {
         operations.start(pack, PackOperationKind.Repair) { progress ->
-            val report = updates.verifyAndRepair(pack) { current, total, path ->
+            val report = repairer.repair(pack) { current, total, path ->
                 progress(current, total, path.substringAfterLast('/'))
             }
             PackOperationPhase.Repaired(report.checked, report.repaired.size, report.failed.keys.toList())
@@ -118,12 +135,15 @@ internal fun PackDataSection(
     // Reattaching is promised only where a reattach can happen. In practice the one
     // origin without a source that takes a pack back is an old record from the
     // former SmartyCraft server sync: packs for a game server now come from the mirror.
-    val detachDesc = if (service.canReattachAfterDetach(pack)) s.text("packSettingsDetachDesc") else s.text("packSettingsDetachDescFinal")
+    val detachDesc = if (offer.detachUndoable) s.text("packSettingsDetachDesc") else s.text("packSettingsDetachDescFinal")
 
     // Reattaching drops what the player changed in the pack's mods, so it asks with
     // the list of what goes and what comes back. It rewrites files like an update
     // does, so it runs as an operation and must not surprise a live session.
-    val reattachSource = pack.forkedFrom?.takeIf { service.canReattach(pack) }
+    val reattachSource = pack.forkedFrom?.takeIf { offer.canReattach }
+    // A pack detached from a source that is not loaded says so where its reattach would
+    // be, and cannot be reattached until the source's module is.
+    val missingSource = offer.missingSource
     var confirmReattach by remember(pack.id) { mutableStateOf(false) }
     // The source as its source names it. A Modrinth project id reads as a code, so
     // the pack's own name stands in until the source answers, if it ever does.
@@ -141,14 +161,12 @@ internal fun PackDataSection(
                 compact = true,
             )
         }
-        // Mirror-only: a repair measures the instance against a published manifest,
-        // and a local or imported pack has none to measure against.
-        if (pack.packRef.origin == EngineSources.Mirror) {
+        if (repairer != null) {
             NxSettingRow(s.text("packSettingsRepair"), detail = s.text("packSettingsRepairDesc")) {
-                PuppetClick("packSettings.data.repair") { runningGuard.run(::runRepair) }
+                PuppetClick("packSettings.data.repair") { runningGuard.run { runRepair(repairer) } }
                 NxButton(
                     s.text("packSettingsRepairAction"),
-                    onClick = { runningGuard.run(::runRepair) },
+                    onClick = { runningGuard.run { runRepair(repairer) } },
                     style = NxButtonStyle.Secondary,
                     enabled = !busy,
                     compact = true,
@@ -163,6 +181,17 @@ internal fun PackDataSection(
                     onClick = { runningGuard.run { confirmReattach = true } },
                     style = NxButtonStyle.Secondary,
                     enabled = !held,
+                    compact = true,
+                )
+            }
+        }
+        missingSource?.let { origin ->
+            NxSettingRow(s.text("packSettingsReattach", s.text("packSourceMissing", origin.id)), detail = s.text("packSettingsReattachDesc")) {
+                NxButton(
+                    s.text("packSettingsReattachAction"),
+                    onClick = {},
+                    style = NxButtonStyle.Secondary,
+                    enabled = false,
                     compact = true,
                 )
             }
@@ -244,3 +273,15 @@ internal fun PackDataSection(
         )
     }
 }
+
+/**
+ * What the pack's sources let the data section offer: a repair, a reattach, a reattach
+ * that waits for a source to be loaded, and whether a detach could be undone. Until it is
+ * read, nothing is offered and a detach reads as undoable, as it is for nearly every pack.
+ */
+private data class SourceOffer(
+    val repairer: PackRepairer? = null,
+    val canReattach: Boolean = false,
+    val missingSource: PackOrigin? = null,
+    val detachUndoable: Boolean = true,
+)

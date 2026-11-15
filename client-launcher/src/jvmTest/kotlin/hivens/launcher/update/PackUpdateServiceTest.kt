@@ -1,22 +1,21 @@
 package hivens.launcher.update
 
-import hivens.test.testTransferEngine
 import hivens.core.api.HttpClientProvider
 import hivens.core.api.dto.smrt.toBaselineManifest
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.CachedManifestSnapshot
-import hivens.core.data.PackAuthRequirement
 import hivens.core.data.OptionalContentRules
+import hivens.core.data.PackAuthRequirement
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
 import hivens.core.data.PackReference
 import hivens.core.data.flatten
+import hivens.core.launch.InstanceWorkRegistry
 import hivens.core.update.CompatChange
 import hivens.core.update.UpdateCheck
 import hivens.core.update.UpdateDirection
 import hivens.core.update.UpdateOutcome
 import hivens.core.update.VersionChannel
-import hivens.core.launch.InstanceWorkRegistry
 import hivens.launcher.instance.InstanceSizeService
 import hivens.launcher.instance.PackInstanceService
 import hivens.launcher.launch.RunningPackSource
@@ -24,6 +23,9 @@ import hivens.launcher.modrinth.ModrinthClient
 import hivens.launcher.smrt.SmrtPackClient
 import hivens.launcher.smrt.SmrtSyncService
 import hivens.launcher.sources.EngineSources
+import hivens.launcher.sources.SourcePackWork
+import hivens.launcher.sources.SourceWorks
+import hivens.test.testTransferEngine
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -31,14 +33,6 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import io.ktor.utils.io.ByteReadChannel
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.Json
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.nio.file.Files
@@ -55,6 +49,14 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
 
 class PackUpdateServiceTest {
 
@@ -194,7 +196,7 @@ class PackUpdateServiceTest {
             snapshots = snapshots,
             journal = journal,
             sizes = InstanceSizeService(dataDir, CoroutineScope(Dispatchers.Unconfined)),
-            reattachers = mapOf(EngineSources.Mirror to service),
+            sources = sourcesOf(mapOf(EngineSources.Mirror to service)),
         )
 
         fun serveV2() { manifestBody = v2Body }
@@ -1185,3 +1187,7 @@ class PackUpdateServiceTest {
         val jsonHeaders = headersOf(HttpHeaders.ContentType, "application/json")
     }
 }
+
+/** The sources [reattachers] stand for, each able to take a detached pack back and nothing else. */
+private fun sourcesOf(reattachers: Map<PackOrigin, PackReattacher>): SourceWorks =
+    SourceWorks.of(*reattachers.map { (origin, taking) -> origin to object : SourcePackWork { override val reattacher: PackReattacher = taking } }.toTypedArray())

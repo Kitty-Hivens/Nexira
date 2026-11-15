@@ -7,8 +7,8 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackInstance
-import hivens.launcher.catalogue.PackArt
-import hivens.launcher.catalogue.PackArtResolver
+import hivens.launcher.sources.PackArt
+import hivens.launcher.sources.PackArtResolver
 import hivens.packs.api.PackView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext

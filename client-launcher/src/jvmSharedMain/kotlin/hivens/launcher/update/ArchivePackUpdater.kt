@@ -1,6 +1,5 @@
 package hivens.launcher.update
 
-import hivens.core.api.dto.modrinth.ModrinthVersion
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackInstance
 import hivens.core.data.PackReference
@@ -14,11 +13,19 @@ import hivens.core.update.UpdateCheck
 import hivens.core.update.UpdateDirection
 import hivens.core.update.UpdateOutcome
 import hivens.core.update.classifyCompat
-import hivens.launcher.modrinth.ModrinthClient
 import hivens.launcher.mrpack.MrpackInstaller
 import hivens.launcher.mrpack.MrpackSource
-import hivens.launcher.smrt.SmrtSyncService
+import hivens.launcher.record.PackFileRecord
+import hivens.launcher.record.withBuildOf
+import hivens.launcher.smrt.ModStraySweep
 import hivens.launcher.util.sha1Of
+import java.io.IOException
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.StandardCopyOption
+import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
+import java.util.stream.Collectors
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
@@ -27,34 +34,73 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
-import java.io.IOException
-import java.nio.file.Files
-import java.nio.file.Path
-import java.nio.file.StandardCopyOption
-import java.util.UUID
-import java.util.concurrent.ConcurrentHashMap
-import java.util.stream.Collectors
-import hivens.launcher.record.PackFileRecord
-import hivens.launcher.record.withBuildOf
 
 /**
- * Moves a Modrinth-installed instance between versions of its pack.
+ * One build of a pack a source publishes as a `.mrpack` archive, as [ArchivePackUpdater]
+ * reads it from the source's [ArchiveFeed].
+ */
+data class ArchiveBuild(
+    /** What identifies the build where its label does not: a source may publish two under one number. */
+    val id: String,
+    /** The pack the build belongs to, by the source's id for it. */
+    val packId: String,
+    val versionNumber: String,
+    /** The channel as the source spells it. */
+    val versionType: String,
+    /** ISO-8601, which orders builds newest first. */
+    val datePublished: String,
+    val gameVersions: List<String>,
+    val loaders: List<String>,
+    val changelog: String?,
+    /** The archive and its published sha1, null where the build lists no file at all. */
+    val archive: ArchiveFile?,
+) {
+    /** The archive, which a build that lists no file cannot be read without. */
+    fun archiveFile(): ArchiveFile = archive ?: throw NoSuchElementException("build $id of $packId lists no archive")
+}
+
+/** Where a build's archive is fetched from, and the digest it is held to. */
+data class ArchiveFile(val url: String, val sha1: String)
+
+/**
+ * What a source that publishes its builds as archives answers [ArchivePackUpdater] with:
+ * the builds of a pack, the archive bytes, and the pack's name.
+ */
+interface ArchiveFeed {
+    /** The source as a failure names it. */
+    val sourceName: String
+
+    /** Every build of [packId] the source lists, in any order. */
+    suspend fun builds(packId: String): List<ArchiveBuild>
+
+    /** Fetches [url] to [target], held to [sha1]. Nothing is fetched where [target] is already there. */
+    suspend fun download(url: String, target: Path, sha1: String)
+
+    /** What the source calls the pack [packId], or null where it cannot say. */
+    suspend fun title(packId: String): String?
+}
+
+/**
+ * Moves an instance a source installed from an archive between the builds of its pack.
  *
- * The sibling of [PackUpdateService], and deliberately much thinner. The mirror
- * publishes every file of every build with a hash, so it can say what an update
- * would do before doing it. Modrinth publishes a version object and an archive,
- * so this can say WHICH build and WHAT it runs on, and nothing about files until
- * the archive is in hand. Everything downstream is built to accept that: the
- * plan on a check is nullable precisely so this does not have to invent one.
+ * The sibling of the mirror's manifest updater, and deliberately much thinner. The
+ * mirror publishes every file of every build with a hash, so it can say what an update
+ * would do before doing it. A source that publishes a build object and an archive lets
+ * this say WHICH build and WHAT it runs on, and nothing about files until the archive is
+ * in hand. Everything downstream is built to accept that: the plan on a check is nullable
+ * precisely so this does not have to invent one.
  *
  * Applying goes through [MrpackInstaller.update], which reconciles against the
  * record written at install: the pack's own files move, and whatever the player
  * added stays where they put it. It runs inside the same [ApplyGuard] as the
  * mirror path, so a failed or interrupted update is rolled back rather than left
  * half-converted.
+ *
+ * Nothing in it is any one source's: the source answers through its [feed], and the
+ * archive format, the guard, the snapshots and the sweep are the engine's.
  */
-class ModrinthPackUpdater(
-    private val client: ModrinthClient,
+class ArchivePackUpdater(
+    private val feed: ArchiveFeed,
     private val installer: MrpackInstaller,
     private val repository: IPackRepository,
     private val snapshotService: PackSnapshotService,
@@ -63,13 +109,13 @@ class ModrinthPackUpdater(
     /**
      * Whose rule says which files in `mods/` a build does not account for. Asked
      * only by a reattach, which hands `mods/` back to the build: the same rule the
-     * mirror's sync sweeps by, so a reattach means the same whichever source the
+     * sync engine sweeps by, so a reattach means the same whichever source the
      * pack came from.
      */
-    private val roster: SmrtSyncService,
+    private val sweep: ModStraySweep,
 ) : PackUpdater, PackReattacher {
 
-    private val log = LoggerFactory.getLogger(ModrinthPackUpdater::class.java)
+    private val log = LoggerFactory.getLogger(ArchivePackUpdater::class.java)
     private val guard = ApplyGuard(snapshotService, journal, repository)
 
     private fun clientDirOf(instance: PackInstance): Path =
@@ -86,14 +132,14 @@ class ModrinthPackUpdater(
      * arrives the other way round would silently make "the newest" the oldest.
      */
     override suspend fun availableBuilds(instance: PackInstance): List<PackBuild> = withContext(Dispatchers.IO) {
-        client.listVersions(instance.packRef.id)
+        feed.builds(instance.packRef.id)
             .sortedByDescending { it.datePublished }
             .map { it.toPackBuild() }
     }
 
     /**
      * One emission. The mirror's stream exists because its listing is cached and
-     * a stale read has to be replaced by a fresh one; there is no such cache here
+     * a stale read has to be replaced by a fresh one. There is no such cache here
      * yet, so pretending to be stale-then-fresh would be a lie in a Flow's shape.
      */
     override fun availableBuildsStream(instance: PackInstance): Flow<List<PackBuild>> =
@@ -132,9 +178,9 @@ class ModrinthPackUpdater(
         val ordered = versionsNewestFirst(instance)
         val target = if (targetVersion != null) {
             ordered.resolve(targetVersion)
-                ?: throw IOException("Modrinth has no version '$targetVersion' of pack ${instance.packRef.id}")
+                ?: throw IOException("${feed.sourceName} has no version '$targetVersion' of pack ${instance.packRef.id}")
         } else {
-            ordered.firstOrNull() ?: throw IOException("Modrinth lists no versions of pack ${instance.packRef.id}")
+            ordered.firstOrNull() ?: throw IOException("${feed.sourceName} lists no versions of pack ${instance.packRef.id}")
         }
         if (currentVersionOf(instance) == target.versionNumber) return UpdateOutcome.AlreadyCurrent
 
@@ -158,7 +204,7 @@ class ModrinthPackUpdater(
                     // shipped: every pack renames its jars per version, so the
                     // instance ends up carrying two of each mod and the game will
                     // not start. The old version's own archive is the baseline, and
-                    // fetching it happens once -- the update writes a record.
+                    // fetching it happens once, since the update writes a record.
                     val installedArchive = if (record.isEmpty()) {
                         val installed = currentVersionOf(current)
                         val previous = ordered.firstOrNull { it.versionNumber == installed }
@@ -167,13 +213,13 @@ class ModrinthPackUpdater(
                                     "installed, and version '$installed' is no longer listed to read one from. " +
                                     "Reinstall the pack to update it.",
                             )
-                        scratch.resolve("installed.mrpack").also { previous.primaryFile().let { f -> client.downloadTo(f.url, it, f.hashes.sha1) } }
+                        scratch.resolve("installed.mrpack").also { previous.archiveFile().let { f -> feed.download(f.url, it, f.sha1) } }
                     } else {
                         null
                     }
                     // Held to the published digest: the index inside is what pins
                     // every other file the update fetches.
-                    target.primaryFile().let { f -> client.downloadTo(f.url, archive, f.hashes.sha1) }
+                    target.archiveFile().let { f -> feed.download(f.url, archive, f.sha1) }
                     // Say what went wrong here rather than let a zero-byte file
                     // reach the zip reader, which reports only "zip file is empty"
                     // and names neither the pack nor where the bytes should have
@@ -182,7 +228,7 @@ class ModrinthPackUpdater(
                     if (bytes == 0L) {
                         throw IOException(
                             "downloaded nothing for ${instance.packRef.id} ${target.versionNumber} " +
-                                "from ${target.primaryFile().url}",
+                                "from ${target.archiveFile().url}",
                         )
                     }
                     // Everything the update can create, replace or retire, known before
@@ -213,7 +259,7 @@ class ModrinthPackUpdater(
                         Files.deleteIfExists(scratch)
                     }
                 }
-                log.info("modrinth update: {} -> {}", instance.instanceDirName, target.versionNumber)
+                log.info("{} update: {} -> {}", feed.sourceName, instance.instanceDirName, target.versionNumber)
                 UpdateOutcome.Applied(target.versionNumber, compat, plan = null)
             }
         }
@@ -226,7 +272,7 @@ class ModrinthPackUpdater(
     private val previewing: MutableSet<Path> = ConcurrentHashMap.newKeySet()
 
     /**
-     * See [PackReattacher.previewReattach]. Modrinth says what a build contains only
+     * See [PackReattacher.previewReattach]. The source says what a build contains only
      * inside its archive, so the archive is fetched to answer, into a folder of this
      * preview's own. It is kept there for the reattach that follows, which takes it
      * over, and goes when the preview is discarded, when a later preview of the same
@@ -281,7 +327,7 @@ class ModrinthPackUpdater(
         confirmed: ReattachConfirmation,
         progress: ((current: Int, total: Int, path: String) -> Unit)?,
     ): PackInstance {
-        val target = client.listVersions(source.id).resolve(confirmed.build) ?: throw ReattachPreviewStaleException(instance.id)
+        val target = feed.builds(source.id).resolve(confirmed.build) ?: throw ReattachPreviewStaleException(instance.id)
         val clientDir = clientDirOf(instance)
         val home = reattachArchiveDir(dataDir, instance.instanceDirName)
         val dir = home.resolve("$APPLY_PREFIX${UUID.randomUUID()}")
@@ -305,9 +351,9 @@ class ModrinthPackUpdater(
                             progress = progress ?: { _, _, _ -> },
                             strictMods = true,
                         )
-                        val drop = roster.dropStrays(clientDir, measured.strays)
+                        val drop = sweep.dropStrays(clientDir, measured.strays)
                         if (drop.blocked.isNotEmpty()) throw IOException("could not remove ${drop.blocked.joinToString()} from mods/")
-                        log.info("modrinth reattach: {} back on {} {}, {} stray(s) removed", instance.instanceDirName, source.id, target.versionNumber, drop.removed.size)
+                        log.info("{} reattach: {} back on {} {}, {} stray(s) removed", feed.sourceName, instance.instanceDirName, source.id, target.versionNumber, drop.removed.size)
                         repository.update(current.id) { it.backOn(source, target.versionNumber) }
                             ?: throw InstanceRemovedException(instance)
                     }
@@ -322,7 +368,7 @@ class ModrinthPackUpdater(
     }
 
     override suspend fun sourceName(source: PackReference): String? =
-        runCatching { client.resolveProject(source.id).title }
+        runCatching { feed.title(source.id) }
             .onFailure { if (it is CancellationException) throw it }
             .getOrNull()
             ?.takeIf { it.isNotBlank() }
@@ -330,11 +376,11 @@ class ModrinthPackUpdater(
     /** A preview, and the strays it measured, which the reattach removes as measured. */
     private class Measured(val preview: ReattachPreview, val strays: List<String>)
 
-    private fun measure(clientDir: Path, record: PackInstance, archive: Path, target: ModrinthVersion): Measured {
+    private fun measure(clientDir: Path, record: PackInstance, archive: Path, target: ArchiveBuild): Measured {
         val divergence = installer.divergence(archive, clientDir)
         // Held to every path the build places under `mods/`, its versioned folders
         // included: a jar the build itself puts in `mods/<mcversion>/` is its own.
-        val scan = roster.strays(clientDir, divergence.mods, divergence.modPaths)
+        val scan = sweep.strays(clientDir, divergence.mods, divergence.modPaths)
         val preview = ReattachPreview(
             build = target.id,
             toVersion = target.versionNumber,
@@ -353,14 +399,14 @@ class ModrinthPackUpdater(
 
     /**
      * The version a reattach would land on: the pinned build where the pack is
-     * pinned and Modrinth still lists it, and the newest where it is not.
+     * pinned and the source still lists it, and the newest where it is not.
      */
-    private suspend fun reattachTarget(instance: PackInstance, source: PackReference): ModrinthVersion {
-        val ordered = client.listVersions(source.id).sortedByDescending { it.datePublished }
+    private suspend fun reattachTarget(instance: PackInstance, source: PackReference): ArchiveBuild {
+        val ordered = feed.builds(source.id).sortedByDescending { it.datePublished }
         val pin = instance.reattachPin { pin -> ordered.resolve(pin) != null }
         return pin?.let { ordered.resolve(it) }
             ?: ordered.firstOrNull()
-            ?: throw IOException("Modrinth lists no versions of pack ${source.id}")
+            ?: throw IOException("${feed.sourceName} lists no versions of pack ${source.id}")
     }
 
     /**
@@ -369,9 +415,9 @@ class ModrinthPackUpdater(
      * preview cleanup that runs at the same moment either finds it gone or loses it
      * before the move, and then the reattach fetches its own.
      */
-    private suspend fun takeOver(home: Path, dir: Path, target: ModrinthVersion): Path? = withContext(Dispatchers.IO) {
+    private suspend fun takeOver(home: Path, dir: Path, target: ArchiveBuild): Path? = withContext(Dispatchers.IO) {
         val name = archiveName(target)
-        val sha1 = target.primaryFile().hashes.sha1
+        val sha1 = target.archiveFile().sha1
         Files.createDirectories(dir)
         for (folder in previewFolders(home).filter { it !in previewing }) {
             val kept = folder.resolve(name)
@@ -387,20 +433,20 @@ class ModrinthPackUpdater(
     }
 
     /** [target]'s archive fetched into [dir], held to its published digest. */
-    private suspend fun fetchArchive(dir: Path, target: ModrinthVersion): Path {
-        val file = target.primaryFile()
+    private suspend fun fetchArchive(dir: Path, target: ArchiveBuild): Path {
+        val file = target.archiveFile()
         val archive = dir.resolve(archiveName(target))
         withContext(Dispatchers.IO) { Files.createDirectories(dir) }
-        client.downloadTo(file.url, archive, file.hashes.sha1)
+        feed.download(file.url, archive, file.sha1)
         // Say what went wrong here rather than let a zero-byte file reach the zip
         // reader, which names neither the pack nor where the bytes came from.
         if (withContext(Dispatchers.IO) { runCatching { Files.size(archive) }.getOrDefault(0L) } == 0L) {
-            throw IOException("downloaded nothing for ${target.projectId} ${target.versionNumber} from ${file.url}")
+            throw IOException("downloaded nothing for ${target.packId} ${target.versionNumber} from ${file.url}")
         }
         return archive
     }
 
-    private fun archiveName(target: ModrinthVersion): String = "${target.id.replace(Regex("[^A-Za-z0-9._-]"), "_")}.mrpack"
+    private fun archiveName(target: ArchiveBuild): String = "${target.id.replace(Regex("[^A-Za-z0-9._-]"), "_")}.mrpack"
 
     private fun previewFolders(home: Path): List<Path> =
         if (!Files.isDirectory(home)) emptyList()
@@ -413,7 +459,7 @@ class ModrinthPackUpdater(
 
     private fun dropArchives(dir: Path) {
         runCatching { deleteTree(dir, clearReadOnly = false) }
-            .onFailure { log.warn("modrinth reattach: could not remove the archive kept in {}", dir, it) }
+            .onFailure { log.warn("{} reattach: could not remove the archive kept in {}", feed.sourceName, dir, it) }
     }
 
     override fun listSnapshots(instance: PackInstance): List<PackSnapshot> =
@@ -442,16 +488,16 @@ class ModrinthPackUpdater(
 
     /**
      * By id first, by version number second. The id is what the screen hands back
-     * after a click; the number is what a caller with only a label can offer, and
+     * after a click. The number is what a caller with only a label can offer, and
      * it picks the first match because that is all it can do.
      */
-    private fun List<ModrinthVersion>.resolve(target: String): ModrinthVersion? =
+    private fun List<ArchiveBuild>.resolve(target: String): ArchiveBuild? =
         firstOrNull { it.id == target } ?: firstOrNull { it.versionNumber == target }
 
-    private suspend fun versionsNewestFirst(instance: PackInstance): List<ModrinthVersion> =
-        client.listVersions(instance.packRef.id).sortedByDescending { it.datePublished }
+    private suspend fun versionsNewestFirst(instance: PackInstance): List<ArchiveBuild> =
+        feed.builds(instance.packRef.id).sortedByDescending { it.datePublished }
 
-    private fun available(instance: PackInstance, target: ModrinthVersion, direction: UpdateDirection) =
+    private fun available(instance: PackInstance, target: ArchiveBuild, direction: UpdateDirection) =
         UpdateCheck.Available(
             fromVersion = currentVersionOf(instance),
             toVersion = target.versionNumber,
@@ -471,10 +517,10 @@ class ModrinthPackUpdater(
      * passed through. That is not a fudge: it is the sole thing separating
      * [CompatChange.Same] from [CompatChange.LoaderBump], and both of those are
      * safe, so the verdict this produces is exact and only the finer label is
-     * unavailable. A changed Minecraft version or a swapped loader family --
-     * the two that actually strand a world -- are both visible from here.
+     * unavailable. A changed Minecraft version and a swapped loader family, the
+     * two that actually strand a world, are both visible from here.
      */
-    private fun compatOf(instance: PackInstance, target: ModrinthVersion): CompatChange {
+    private fun compatOf(instance: PackInstance, target: ArchiveBuild): CompatChange {
         val installed = instance.cachedManifest
         return classifyCompat(
             installed = installed,
@@ -484,14 +530,14 @@ class ModrinthPackUpdater(
         )
     }
 
-    private fun ModrinthVersion.toPackBuild() = PackBuild(
+    private fun ArchiveBuild.toPackBuild() = PackBuild(
         versionNumber = versionNumber,
         id = id,
         versionType = versionType,
         datePublished = datePublished,
-        // Mirror concepts. Modrinth publishes no content fingerprint, and no
-        // counts without the archive; null keeps "unknown" out of the UI rather
-        // than drawing it as zero.
+        // Mirror concepts. An archive source publishes no content fingerprint, and no
+        // counts without the archive. Null keeps "unknown" out of the UI rather than
+        // drawing it as zero.
         fingerprint = null,
         changelog = changelog,
         modsCount = null,

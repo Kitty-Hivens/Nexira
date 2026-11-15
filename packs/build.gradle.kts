@@ -56,6 +56,8 @@ kotlin {
             dependencies {
                 implementation(kotlin("test"))
                 implementation(libs.kotlinx.coroutines.test)
+                // The launch controller stands behind the pack actions and is not what a reattach test is about.
+                implementation(libs.mockk)
             }
         }
     }

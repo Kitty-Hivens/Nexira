@@ -10,27 +10,18 @@ import hivens.core.io.InstanceMutationLock
 import hivens.core.launch.InstanceWork
 import hivens.core.launch.InstanceWorkRegistry
 import hivens.core.update.CompatChange
-import hivens.launcher.catalogue.PackArt
 import hivens.launcher.instance.PackInstanceService.DeleteOutcome
 import hivens.launcher.launch.RunningPackSource
 import hivens.launcher.sources.EngineSources
+import hivens.launcher.sources.PackArt
+import hivens.launcher.sources.SourcePackWork
+import hivens.launcher.sources.SourceWorks
 import hivens.launcher.update.ApplyJournal
 import hivens.launcher.update.PackReattacher
 import hivens.launcher.update.PackSnapshotService
+import hivens.launcher.update.PendingApply
 import hivens.launcher.update.ReattachConfirmation
 import hivens.launcher.update.ReattachPreview
-import hivens.launcher.update.PendingApply
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.serialization.json.Json
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.test.advanceUntilIdle
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.test.runTest
 import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -38,6 +29,17 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class PackInstanceServiceTest {
@@ -75,7 +77,7 @@ class PackInstanceServiceTest {
         journal = ApplyJournal(data, json),
         sizes = InstanceSizeService(data, CoroutineScope(Dispatchers.Unconfined)),
         knownArt = knownArt,
-        reattachers = reattachers,
+        sources = sourcesOf(reattachers),
     )
 
     /** A source that records what it was asked and answers with the record put back on it. */
@@ -359,3 +361,7 @@ class PackInstanceServiceTest {
         assertEquals("forge", repo.get("1")?.cachedManifest?.loaderName, "and nothing else about the runtime moves")
     }
 }
+
+/** The sources [reattachers] stand for, each able to take a detached pack back and nothing else. */
+private fun sourcesOf(reattachers: Map<PackOrigin, PackReattacher>): SourceWorks =
+    SourceWorks.of(*reattachers.map { (origin, taking) -> origin to object : SourcePackWork { override val reattacher: PackReattacher = taking } }.toTypedArray())

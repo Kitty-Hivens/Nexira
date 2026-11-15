@@ -1,4 +1,4 @@
-package hivens.launcher.catalogue
+package hivens.source.modrinth
 
 import hivens.core.api.HttpClientProvider
 import hivens.core.data.InstanceRuntime
@@ -6,8 +6,10 @@ import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
 import hivens.core.data.PackReference
 import hivens.launcher.modrinth.ModrinthClient
-import hivens.launcher.smrt.SmrtPackClient
 import hivens.launcher.sources.EngineSources
+import hivens.launcher.sources.PackArt
+import hivens.launcher.sources.PackArtResolver
+import hivens.launcher.sources.SourceWorks
 import hivens.test.testTransferEngine
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
@@ -15,15 +17,16 @@ import io.ktor.client.engine.mock.respond
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import io.ktor.utils.io.ByteReadChannel
+import io.mockk.mockk
+import java.util.concurrent.atomic.AtomicInteger
+import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import java.util.concurrent.atomic.AtomicInteger
-import kotlin.test.Test
-import kotlin.test.assertEquals
 
 class PackArtResolverTest {
 
@@ -47,7 +50,9 @@ class PackArtResolverTest {
             respond(ByteReadChannel(projectJson.toByteArray()), HttpStatusCode.OK, headersOf("Content-Type", "application/json"))
         }
         val provider = HttpClientProvider { HttpClient(engine) }
-        return PackArtResolver(ModrinthClient(provider, testTransferEngine(provider)), SmrtPackClient(provider))
+        val modrinth = ModrinthClient(provider, testTransferEngine(provider))
+        // Modrinth's own work, archive installs and updates aside: the cover is all this asks of it.
+        return PackArtResolver(SourceWorks.of(EngineSources.Modrinth to ModrinthPackWork(modrinth, mockk(), mockk())))
     }
 
     @Test

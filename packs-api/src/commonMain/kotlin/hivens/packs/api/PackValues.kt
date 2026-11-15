@@ -187,9 +187,12 @@ sealed interface OperationStatus {
      * `busy` when other work held the pack, `game-running` when its game was running,
      * `preview-stale` when a reattach no longer matched its preview, `incomplete`
      * when a delete left files behind or a repair could not put every file right,
-     * `cancelled` when the launcher stopped it on the way out. [message] is the
-     * detail where there is one. Nothing was touched unless the code is `failed`,
-     * `incomplete` or `cancelled`.
+     * `cancelled` when the launcher stopped it on the way out, `source-missing` when
+     * no module that is loaded brings the pack's source, with the source's id as
+     * [message], and `source-cannot` when the source is loaded and cannot do this,
+     * with the source's id and the operation as [message], `Shelf:update` say.
+     * [message] is the detail where there is one. Nothing was touched unless the code
+     * is `failed`, `incomplete` or `cancelled`.
      */
     data class Failed(val code: String, val message: String? = null) : OperationStatus
 }

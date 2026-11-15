@@ -95,19 +95,21 @@ import hivens.launcher.news.CuratedNewsFeed
 import hivens.launcher.news.SmartyCraftNewsFeed
 import hivens.launcher.news.toNewsItem
 import hivens.launcher.news.SyndicationNewsFeed
-import hivens.launcher.catalogue.PackArtResolver
 import hivens.launcher.modrinth.ModrinthClient
 import hivens.launcher.smrt.SmrtAuthlibSwapper
 import hivens.launcher.smrt.SmrtPackClient
 import hivens.launcher.smrt.SmrtSyncService
-import hivens.launcher.sources.EngineSources
+import hivens.launcher.smrt.ModStraySweep
+import hivens.launcher.smrt.SyncStraySweep
+import hivens.launcher.sources.PackArtResolver
+import hivens.launcher.sources.RoutingPackUpdater
+import hivens.launcher.sources.SourceWorks
 import hivens.launcher.update.ApplyJournal
 import hivens.launcher.update.ApplyRecovery
 import hivens.launcher.update.PackAutoUpdateService
 import hivens.launcher.update.PackSnapshotService
 import hivens.launcher.update.PackUpdateService
-import hivens.launcher.update.RoutingPackUpdater
-import hivens.launcher.update.ModrinthPackUpdater
+import hivens.launcher.update.SnapshotRollback
 import io.ktor.client.*
 import io.ktor.client.engine.okhttp.*
 import io.ktor.client.plugins.*
@@ -489,14 +491,19 @@ val mirrorModule = module {
     // What a source lists, a pack's page and its builds are the source modules' own,
     // which the catalogue module takes as contributions. Nothing here lists them.
 
+    // What each source does to the packs it installs, by the id the records carry: the
+    // source modules bring it, and the host hands it in once they are taken. Until then
+    // every source is missing.
+    single { SourceWorks() }
+
     // Resolves an installed instance's native cover from its source when the
     // install didn't capture one (pre-field instances), so Library cards and the
     // PackDetail hero show real art instead of the pixel placeholder.
-    single { PackArtResolver(modrinth = get(), mirror = get()) }
+    single { PackArtResolver(sources = get()) }
 
-    // Install write side: dispatches a (pack, version) by origin onto the
-    // mirror sync installer or the Modrinth .mrpack installer.
-    single { PackInstallCoordinator(mirrorInstaller = get(), mrpackInstaller = get(), mirrorClient = get()) }
+    // Install write side: hands a (pack, version) to the installer of the source it
+    // came from.
+    single { PackInstallCoordinator(sources = get()) }
     // App-scoped owner of catalogue installs: runs the install on the shared
     // process scope (get<CoroutineScope>()) so navigating away from Browse does
     // not cancel a download mid-flight.
@@ -536,10 +543,7 @@ val mirrorModule = module {
             journal = get(),
             sizes = get(),
             knownArt = art::cached,
-            reattachers = mapOf(
-                EngineSources.Mirror to get<PackUpdateService>(),
-                EngineSources.Modrinth to get<ModrinthPackUpdater>(),
-            ),
+            sources = get(),
         )
     }
     // On-disk size of an instance, measured on the app scope and shared, so a
@@ -572,29 +576,13 @@ val mirrorModule = module {
             languages = { reading?.tags() ?: listOf(settings.getSettings().locale) },
         )
     }
-    single {
-        ModrinthPackUpdater(
-            client = get(),
-            installer = get(),
-            repository = get(),
-            snapshotService = get(),
-            journal = get(),
-            dataDir = get(),
-            roster = get(),
-        )
-    }
-    // One PackUpdater above, routing to the source each instance came from. The
-    // UI injects the interface and knows nothing of the split -- which is the
-    // point, since the alternative was every caller testing the origin itself.
-    // An origin absent from this map has no version feed and says so.
-    single<PackUpdater> {
-        RoutingPackUpdater(
-            mapOf(
-                EngineSources.Mirror to get<PackUpdateService>(),
-                EngineSources.Modrinth to get<ModrinthPackUpdater>(),
-            ),
-        )
-    }
+    // One PackUpdater above, routing to the updater of the source each instance came
+    // from. The UI injects the interface and knows nothing of the split, which is the
+    // point, since the alternative was every caller testing the origin itself. A pack
+    // whose source cannot be asked keeps its snapshots, rolled back with nothing from it.
+    single<PackUpdater> { RoutingPackUpdater(sources = get(), snapshots = SnapshotRollback(get(), get(), get())) }
+    // The strict `mods/` sweep a reattach holds a pack to, the same for every source.
+    single<ModStraySweep> { SyncStraySweep(get()) }
     // Background auto-updater over installed mirror instances. Reads the current
     // auto-update policy each pass via the settings service. Also bound as the
     // status hub so UI badges and manual flows share one state.

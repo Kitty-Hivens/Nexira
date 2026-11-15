@@ -11,11 +11,14 @@ plugins {
 // nothing from the mirror. Compiled into the application and handed to the host as a
 // CompiledModule.
 //
-// It reads the mirror through the engine's client (client-launcher), which installs,
-// updates and the content tab still share with it, and never knows the catalogue
-// module, client-ui or another source. Nothing compiles against it, so it has no API
-// artifact of its own: the catalogue finds it by its contribution, the packs module
-// installs from it through the same contract.
+// It also brings what the mirror does to the packs it installs, on what its pack source
+// opens: a build synced from its manifest, updates, reattach and repair against the
+// manifests it publishes per build, and the pack's cover. It reads the mirror through
+// the engine's client (client-launcher), which the launch, the content tab and the pack
+// screens still share with it, and never knows the catalogue module, client-ui or another
+// source. Nothing compiles against it, so it has no API artifact of its own: the catalogue
+// finds it by its contribution, and the engine installs, updates and reattaches through
+// the same contract.
 kotlin {
     // KMP modules don't apply the `java` plugin, so the root's toolchain pin skips
     // them. Set here, org.gradle.jvm.version matches the JDK 27 modules.
@@ -58,6 +61,8 @@ kotlin {
                 // The mirror's answers are served by a mock engine under the engine's HTTP client.
                 implementation(libs.ktor.client.core)
                 implementation(libs.ktor.client.mock)
+                // The engine's transfers over the mock engine, for an install and an update run end to end.
+                implementation(project(":client-core-testing"))
             }
         }
     }

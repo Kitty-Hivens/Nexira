@@ -3,26 +3,25 @@ package hivens.launcher
 import hivens.core.api.catalogue.CataloguePack
 import hivens.core.api.catalogue.CataloguePackVersion
 import hivens.core.data.PackInstance
-import hivens.launcher.mrpack.MrpackInstaller
-import hivens.launcher.mrpack.MrpackSource
-import hivens.launcher.smrt.SmrtPackClient
-import hivens.launcher.sources.EngineSources
-import java.io.IOException
+import hivens.launcher.sources.SourceCannotException
+import hivens.launcher.sources.SourceMissingException
+import hivens.launcher.sources.SourceOperation
+import hivens.launcher.sources.SourceStatus
+import hivens.launcher.sources.SourceWorks
 import java.nio.file.Path
 
 /**
- * Single entry point for installing a catalogue pack: dispatches by
- * [CataloguePack.origin] onto the source-specific installer. Mirror packs sync
- * from the manifest ([PackInstaller]); Modrinth packs download the version's
- * `.mrpack` and install it ([MrpackInstaller]), stamping the Modrinth origin so
- * the update flow can find newer versions later. The Browse UI calls this with
- * a source-neutral (pack, version) pair and never touches a concrete installer.
+ * Single entry point for installing a catalogue pack: hands the (pack, version) pair to
+ * the installer of the source [CataloguePack.origin] names, found through [sources]. Each
+ * source installs its builds its own way and stamps its own origin on the record, so the
+ * update flow can find newer builds later. The Browse UI calls this with a source-neutral
+ * pair and never touches a concrete installer.
+ *
+ * A source whose module is not loaded is refused with [SourceMissingException], one that
+ * is loaded and brings no installer with [SourceCannotException], and a pack of the core's
+ * own as not supported. None of them is handed to another source.
  */
-class PackInstallCoordinator(
-    private val mirrorInstaller: PackInstaller,
-    private val mrpackInstaller: MrpackInstaller,
-    private val mirrorClient: SmrtPackClient,
-) {
+class PackInstallCoordinator(private val sources: SourceWorks) {
     suspend fun install(
         pack: CataloguePack,
         version: CataloguePackVersion,
@@ -31,28 +30,10 @@ class PackInstallCoordinator(
         // partial dir it left behind (see [PackInstallService]).
         onReserveDir: (Path) -> Unit = {},
         progress: (current: Int, total: Int, filename: String) -> Unit = { _, _, _ -> },
-    ): PackInstance = when (pack.origin) {
-        EngineSources.Mirror -> {
-            val summary = mirrorClient.fetchSummary(pack.id)
-            val manifest = mirrorClient.fetchManifestVersion(pack.id, version.id)
-            mirrorInstaller.install(pack.id, summary, manifest, onReserveDir, progress)
-        }
-        EngineSources.Modrinth -> {
-            val url = version.downloadUrl
-                ?: throw IOException("Modrinth version ${version.id} carries no .mrpack download URL")
-            val sha1 = version.downloadSha1
-                ?: throw IOException("Modrinth version ${version.id} publishes no digest for its .mrpack")
-            mrpackInstaller.installFromUrl(
-                url = url,
-                sha1 = sha1,
-                size = version.downloadSize,
-                source = MrpackSource(EngineSources.Modrinth, pack.id, version.versionNumber, buildKey = version.id),
-                iconUrl = pack.iconUrl,
-                bannerUrl = pack.bannerUrl,
-                onReserveDir = onReserveDir,
-                progress = progress,
-            )
-        }
-        else -> throw IllegalArgumentException("install from origin ${pack.origin} is not supported")
+    ): PackInstance = when (val status = sources.status(pack.origin)) {
+        is SourceStatus.Loaded -> status.work.installer?.install(pack, version, onReserveDir, progress)
+            ?: throw SourceCannotException(pack.origin, SourceOperation.Install)
+        is SourceStatus.Missing -> throw SourceMissingException(status.origin)
+        SourceStatus.None -> throw IllegalArgumentException("install from origin ${pack.origin} is not supported")
     }
 }

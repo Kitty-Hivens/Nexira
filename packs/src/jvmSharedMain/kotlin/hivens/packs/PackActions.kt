@@ -21,6 +21,7 @@ import hivens.launcher.PackOperationService
 import hivens.launcher.instance.PackInstanceService
 import hivens.launcher.instance.PackInstanceService.DeleteOutcome
 import hivens.launcher.launch.LauncherController
+import hivens.launcher.sources.SourceStatus
 import hivens.launcher.update.ReattachConfirmation
 import hivens.launcher.update.ReattachPreviewStaleException
 import kotlinx.coroutines.CancellationException
@@ -71,8 +72,9 @@ interface PackActions {
     /**
      * Puts the detached [pack] back on its source's build as the preview [confirmed]
      * described, or does nothing when it was never detached or other work on it is
-     * under way. A pack that no longer measures as the preview said is refused and
-     * left as it was, and the refusal is the operation's outcome.
+     * under way. A pack that no longer measures as the preview said, or whose source is
+     * not loaded or cannot reattach, is refused and left as it was, and the refusal is the
+     * operation's outcome.
      */
     fun reattach(pack: PackInstance, confirmed: ReattachConfirmation)
 }
@@ -119,7 +121,11 @@ class LauncherPackActions(
     }
 
     override fun reattach(pack: PackInstance, confirmed: ReattachConfirmation) {
-        if (!instances.canReattach(pack)) {
+        // One detached from a source that cannot be asked, its module not loaded or no
+        // reattacher in its work, is refused by the reattach itself, and the operation's
+        // outcome says which.
+        val source = instances.reattachStatus(pack)
+        if (source == null || source == SourceStatus.None) {
             log.info("Pack {} was not detached from a source that can take it back", pack.id)
             return
         }

@@ -57,6 +57,9 @@ kotlin {
                 implementation(libs.kotlinx.serialization.json)
                 // An offline catalogue client is stood up over the engine's HTTP type.
                 implementation(libs.ktor.client.core)
+                // A source of the test's own installs and updates over a mock engine.
+                implementation(libs.ktor.client.mock)
+                implementation(project(":client-core-testing"))
             }
         }
     }
