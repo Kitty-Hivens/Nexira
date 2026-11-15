@@ -30,10 +30,15 @@ import javax.crypto.spec.SecretKeySpec
  */
 class SmartyCraftAuthProvider(
     private val protocol: IServerProtocol,
+    /** The site's sign-up page, which the launcher's server configuration knows. */
+    override val registerUrl: String? = null,
 ) : AbstractCachingAuthProvider() {
 
     override val id = "smartycraft"
     override val displayName = "SmartyCraft"
+
+    /** The world a sign-in that names none signs in for. */
+    override val defaultServerId: String = Protocol.DEFAULT_SERVER_ID
     // The second factor works; what did not was logging in again afterwards.
     // See completeTwoFactor: SmartyCraft mints a new uid per login and kills the
     // previous one, so the code has to unlock the session already in hand.

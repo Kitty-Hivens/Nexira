@@ -5,121 +5,75 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import hivens.auth.AuthProviderRegistry
-import hivens.auth.DeviceCodeAuthProvider
-import hivens.auth.DeviceCodeChallenge
-import hivens.core.data.SessionData
-import hivens.core.diag.ActionRing
-import hivens.auth.AccountStore
-import hivens.ui.i18n.LocalStrings
-import hivens.ui.platform.SystemActions
-import hivens.ui.puppet.PuppetClick
+import hivens.accounts.api.AccountKeys
+import hivens.accounts.api.DeviceCodeSignIn
+import hivens.accounts.api.ProviderView
+import hivens.accounts.api.SignInError
+import hivens.accounts.api.SignInFlow
 import hivens.ui.flexible.Flexible
 import hivens.ui.flexible.FlexibleKind
+import hivens.ui.i18n.AppStrings
+import hivens.ui.i18n.LocalStrings
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import org.koin.compose.koinInject
-import org.slf4j.LoggerFactory
-import hivens.ui.theme.NxInk
+import hivens.ui.platform.SystemActions
+import hivens.ui.puppet.PuppetClick
 import hivens.ui.theme.NxColor
+import hivens.ui.theme.NxInk
 import hivens.ui.theme.Status
-
-private val log = LoggerFactory.getLogger("MicrosoftSignInButton")
+import hivens.widget.api.rememberScopedCommand
+import hivens.widget.api.rememberScopedSource
+import hivens.widget.api.valueOrNull
 
 /**
- * Microsoft device-code sign-in as a self-contained control: the button plus the
- * poll loop and the [DeviceCodeDialog] it drives. Renders nothing unless a
- * Microsoft client id is configured (the provider registers and advertises
- * device-code capability only then) -- resolved by capability, never by id.
+ * Microsoft device-code sign-in as a self-contained control: the button, and the
+ * [DeviceCodeDialog] the sign-in drives. Renders nothing unless the accounts module
+ * lists a device-code provider, which it does only when a Microsoft client id is
+ * configured: resolved by what the provider does, never by its id.
  *
- * On success the account is saved (when [rememberAccount]) and [onSignedIn] fires
- * with the fresh [SessionData]. Shared by the login panel (first sign-in) and the
- * account roster (adding a Microsoft account while already signed in elsewhere).
+ * The sign-in itself is the accounts module's: the request, the wait, keeping the
+ * account when [rememberAccount] asks for it, and signing the launcher in once it
+ * works. This fires it and draws where it stands.
  *
  * The device-code request can fail before the dialog ever opens (a bad client id,
  * an Azure app that doesn't allow personal accounts, no network), so that error
- * surfaces inline under the button -- the dialog only carries errors from the
- * poll that follows.
+ * surfaces inline under the button, and the dialog only carries errors from the
+ * wait that follows.
  */
 @Composable
 fun MicrosoftSignInButton(
-    onSignedIn: (SessionData) -> Unit,
     modifier: Modifier = Modifier,
     rememberAccount: Boolean = true,
     label: String? = null,
     puppetId: String = "login.microsoft",
 ) {
-    val authRegistry: AuthProviderRegistry     = koinInject()
-    val credentialsManager: AccountStore = koinInject()
-    val s   = LocalStrings.current
-    val scope = rememberCoroutineScope()
+    val providers = rememberScopedSource(AccountKeys.Providers).valueOrNull() ?: return
+    if (providers.none { it.kind == ProviderView.DEVICE_CODE }) return
+    val flows = rememberScopedSource(AccountKeys.SignIns).valueOrNull() ?: return
+    val signIn = rememberScopedCommand(AccountKeys.SignInMicrosoft) ?: return
+    val cancel = rememberScopedCommand(AccountKeys.CancelSignIn) ?: return
+    val s = LocalStrings.current
+    val flow = flows[AccountKeys.MICROSOFT]
 
-    val provider = remember { authRegistry.all.firstOrNull { it.capabilities.supportsDeviceCode } }
-    val deviceCodeProvider = provider as? DeviceCodeAuthProvider ?: return
-    val providerId = provider.id
+    // A press while one is under way does nothing: the module holds one at a time.
+    fun start() = signIn(DeviceCodeSignIn(remember = rememberAccount))
 
-    var deviceCodePending by remember { mutableStateOf<DeviceCodeChallenge?>(null) }
-    var deviceCodeError   by remember { mutableStateOf<String?>(null) }
-    var requesting        by remember { mutableStateOf(false) }
-    var msaJob            by remember { mutableStateOf<Job?>(null) }
-
-    fun start() {
-        if (requesting || deviceCodePending != null) return
-        deviceCodeError = null
-        requesting = true
-        msaJob = scope.launch {
-            try {
-                val challenge = withContext(Dispatchers.IO) { deviceCodeProvider.requestDeviceCode() }
-                requesting = false
-                deviceCodePending = challenge
-                val session = withContext(Dispatchers.IO) { deviceCodeProvider.awaitToken(challenge) }
-                // Off the composition thread like the two calls above: it writes the
-                // keyring, and a Secret Service that asks for an unlock would hold
-                // the window frozen for as long as its prompt stays up.
-                if (rememberAccount) withContext(Dispatchers.IO) { credentialsManager.saveAccount(session, providerId) }
-                ActionRing.record("Microsoft sign-in OK")
-                deviceCodePending = null
-                onSignedIn(session)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                log.warn("Microsoft sign-in failed", e)
-                ActionRing.record("Microsoft sign-in failed: ${e.message?.take(120)}")
-                deviceCodeError = e.message ?: s.loginErrorGeneric
-            } finally {
-                requesting = false
-            }
-        }
-    }
-
-    deviceCodePending?.let { challenge ->
+    (flow as? SignInFlow.DeviceCode)?.let { shown ->
         DeviceCodeDialog(
-            userCode = challenge.userCode,
-            verificationUri = challenge.verificationUri,
-            onOpenBrowser = { SystemActions.openUrl(challenge.verificationUri) },
-            onCancel = { msaJob?.cancel(); deviceCodePending = null; deviceCodeError = null },
-            errorMessage = deviceCodeError,
+            userCode = shown.userCode,
+            verificationUri = shown.verificationUri,
+            onOpenBrowser = { SystemActions.openUrl(shown.verificationUri) },
+            onCancel = { cancel(AccountKeys.MICROSOFT) },
+            errorMessage = shown.error?.let { it.message ?: s.loginErrorGeneric },
         )
     }
 
@@ -133,8 +87,8 @@ fun MicrosoftSignInButton(
                 minHeight = 42.dp,
             )
         }
-        when {
-            requesting -> Row(verticalAlignment = Alignment.CenterVertically) {
+        when (flow) {
+            SignInFlow.Working -> Row(verticalAlignment = Alignment.CenterVertically) {
                 CircularProgressIndicator(
                     modifier = Modifier.size(14.dp),
                     strokeWidth = 2.dp,
@@ -143,14 +97,23 @@ fun MicrosoftSignInButton(
                 Spacer(Modifier.width(8.dp))
                 Text(s.msaWaiting, style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
             }
-            // Errors from the request itself (before any dialog) show here; the
-            // dialog owns errors from the poll once it is open.
-            deviceCodeError != null && deviceCodePending == null -> Text(
-                text = deviceCodeError ?: "",
+            // Errors from the request itself (before any dialog) show here. The
+            // dialog owns errors from the wait once it is open.
+            is SignInFlow.Failed -> Text(
+                text = flow.error.words(s),
                 style = MaterialTheme.typography.bodySmall,
                 color = NxColor.status(Status.Error),
             )
+            else -> Unit
         }
     }
     PuppetClick(puppetId) { start() }
+}
+
+/** What a failed sign-in step says, in the person's words where the provider gave none. */
+internal fun SignInError.words(s: AppStrings): String = when (code) {
+    SignInError.EMPTY -> s.loginErrorEmpty
+    SignInError.WRONG_CODE -> s.auth2faInvalid
+    SignInError.SECOND_FACTOR_EXPIRED -> s.auth2faExpired
+    else -> message ?: s.loginErrorGeneric
 }

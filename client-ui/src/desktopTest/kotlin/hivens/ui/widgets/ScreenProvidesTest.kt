@@ -88,10 +88,9 @@ class ScreenProvidesTest {
         doNotDisturb     = MutableStateFlow(false),
         sslBypass        = flowSource(MutableStateFlow(false)),
         background       = MutableStateFlow(BackgroundSettings()),
-        accountsRevision = MutableStateFlow(0),
     )
 
-    private val commands = uiCommandRegistry({}, {}, {}, {})
+    private val commands = uiCommandRegistry({}, {}, {})
 
     /** An app level whose Koin also holds [services], which is where a screen drawn below it injects from. */
     private fun app(services: Module): WidgetScope = koinApplication {

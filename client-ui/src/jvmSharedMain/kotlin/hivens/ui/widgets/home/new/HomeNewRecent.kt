@@ -52,7 +52,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
-import hivens.ui.AppState
+import hivens.accounts.api.AccountKeys
+import hivens.accounts.api.SessionState
 import hivens.ui.Screen
 import hivens.ui.effects.pixelArtBackground
 import hivens.ui.i18n.LocalStrings
@@ -63,7 +64,6 @@ import hivens.ui.screens.library.rememberPackArt
 import hivens.ui.theme.familyForText
 import hivens.ui.theme.decorativePair
 import hivens.ui.widgets.Commands
-import hivens.ui.widgets.Sources
 import hivens.widget.api.rememberProps
 import hivens.widget.api.rememberScopedCommand
 import hivens.widget.api.rememberScopedSource
@@ -108,12 +108,12 @@ data class RecentProps(
     surface = """{"fill":"panel"}""",
     minWidth = 240, minHeight = 120,
     maxWidth = 2400, maxHeight = 1600,
-    needs = ["app.state", "nav.open", "packs.library", "pack.launch"],
+    needs = ["nav.open", "packs.library", "pack.launch"],
 )
 @Composable
 fun HomeNewRecent(instance: WidgetInstance) {
     val p = instance.rememberProps<RecentProps>()
-    val appState = rememberScopedSource(Sources.Session).valueOrNull() ?: return
+    val appState = rememberScopedSource(AccountKeys.Session).valueOrNull()
     val navigate = rememberScopedCommand(Commands.Navigate) ?: return
     val s = LocalStrings.current
     val all = rememberScopedSource(PackKeys.Library).valueOrNull() ?: return
@@ -190,7 +190,7 @@ internal fun tileBudget(columns: Int, rows: Int, maxTiles: Int): Int {
 // launch that is under way keeps its control showing, so a tile does not hide
 // that its pack is starting the moment the pointer leaves.
 @Composable
-private fun PackTile(pack: PackView, appState: AppState, onClick: () -> Unit, modifier: Modifier) {
+private fun PackTile(pack: PackView, appState: SessionState?, onClick: () -> Unit, modifier: Modifier) {
     val (hueA, hueB) = decorativePair(pack.id)
     val art = rememberPackArt(pack)
     val interaction = remember { MutableInteractionSource() }

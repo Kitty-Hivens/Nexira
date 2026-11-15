@@ -95,11 +95,10 @@ class HostedWindowTest {
                             doNotDisturb     = MutableStateFlow(false),
                             sslBypass        = flowSource(MutableStateFlow(false)),
                             background       = MutableStateFlow(BackgroundSettings()),
-                            accountsRevision = MutableStateFlow(0),
                         ),
                         services = KoinLevelServicesHost.app(this),
                         context  = Dispatchers.Unconfined,
-                        commands = uiCommandRegistry({}, {}, {}, {}),
+                        commands = uiCommandRegistry({}, {}, {}),
                     )
                 }
                 single { MainWindowRequests() }

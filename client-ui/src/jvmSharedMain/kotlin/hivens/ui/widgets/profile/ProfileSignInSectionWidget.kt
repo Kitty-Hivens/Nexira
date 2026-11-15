@@ -16,24 +16,14 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import hivens.auth.AuthProviderRegistry
-import hivens.core.api.interfaces.ISettingsService
-import hivens.core.data.PackAuthRequirement
-import hivens.core.data.releasingFace
-import hivens.core.data.SessionData
-import hivens.auth.AccountStore
+import hivens.accounts.api.AccountKeys
+import hivens.accounts.api.AccountView
 import hivens.ui.components.MicrosoftSignInButton
-import hivens.ui.components.rememberSignOutRequest
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
@@ -45,22 +35,13 @@ import hivens.ui.flexible.FlexibleKind
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.theme.LocalMonoFamily
-import hivens.ui.utils.rememberReadOffMain
-import hivens.ui.widgets.Commands
-import hivens.ui.widgets.Sources
-import hivens.widget.api.rememberScopedAction
-import hivens.widget.api.rememberScopedCommand
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
 import hivens.widget.model.Widget
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import org.koin.compose.koinInject
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxColor
 
-private const val MS_KEY = PackAuthRequirement.Microsoft.PROVIDER_KEY
+private const val MS_KEY = AccountKeys.MICROSOFT
 
 // Microsoft profile section (slot "signin"). Signed into Microsoft it shows the
 // licensed identity -- Minecraft name, UUID, the live skin -- with a sign-out.
@@ -74,25 +55,17 @@ private const val MS_KEY = PackAuthRequirement.Microsoft.PROVIDER_KEY
     id = "profile.signin",
     displayName = "widget.profile.signin",
     removable = false,
-    needs = ["app.state", "accounts.revision", "accounts.changed", "auth.signIn", "auth.signOut"],
+    needs = ["accounts.list", "accounts.providers", "accounts.signIns", "auth.signIn.microsoft", "auth.signIn.cancel", "accounts.remove", "accounts.removals", "auth.signOut"],
 )
 @Composable
 fun ProfileSignInSectionWidget() {
-    val face = rememberSession()
-    val signIn = rememberScopedCommand(Commands.SignIn) ?: return
-    val changed = rememberScopedAction(Commands.AccountsChanged) ?: return
-    val credentials: AccountStore = koinInject()
-    val authRegistry: AuthProviderRegistry = koinInject()
-    val settingsService: ISettingsService = koinInject()
-    val scope = rememberCoroutineScope()
-
-    // The device-code provider is registered only when a client id is configured.
-    val msaConfigured = remember { authRegistry.hasDeviceCodeProvider() }
-    // Shared with the account section and the nav's face picker, see
-    // Sources.AccountsRevision.
-    val revision = rememberScopedSource(Sources.AccountsRevision).valueOrNull() ?: return
-    // Nothing until the store has answered, as in the SmartyCraft section.
-    val msSession = (rememberReadOffMain(revision, face) { credentials.accountFor(MS_KEY) } ?: return).value
+    // The device-code provider is listed only when a client id is configured.
+    val providers = rememberScopedSource(AccountKeys.Providers).valueOrNull() ?: return
+    val msaConfigured = providers.hasDeviceCodeProvider()
+    // Nothing until the store has answered, as in the SmartyCraft section. Shared with
+    // the account section and the nav's face picker.
+    val accounts = rememberScopedSource(AccountKeys.Accounts).valueOrNull() ?: return
+    val msSession = accounts.firstOrNull { it.providerKey == MS_KEY }
 
     // Microsoft / multi-account is deferred to a later release. With no Microsoft
     // client id configured the provider never registers, so there is nothing to
@@ -108,67 +81,26 @@ fun ProfileSignInSectionWidget() {
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             if (msSession != null) {
-                MicrosoftAccount(msSession, changed)
+                MicrosoftAccount(msSession, othersLeft = accounts.size > 1)
             } else {
-                MicrosoftSignInButton(
-                    onSignedIn = {
-                        scope.launch {
-                            withContext(Dispatchers.IO) { credentials.faceSession(settingsService) }
-                                ?.let(signIn)
-                            changed()
-                        }
-                    },
-                    puppetId = "account.signin.microsoft",
-                )
+                // A sign-in that works signs the launcher in, as the face the accounts give.
+                MicrosoftSignInButton(puppetId = "account.signin.microsoft")
             }
         }
     }
 }
 
 @Composable
-private fun MicrosoftAccount(session: SessionData, onChanged: () -> Unit) {
-    val signIn = rememberScopedCommand(Commands.SignIn) ?: return
-    // A full sign-out asks first, through the window's sign-out question, which
-    // stays open when this section leaves once its account is gone.
-    val signOutAll = rememberSignOutRequest() ?: return
-    val credentials: AccountStore = koinInject()
-    val settingsService: ISettingsService = koinInject()
+private fun MicrosoftAccount(session: AccountView, othersLeft: Boolean) {
+    // Signing out of Microsoft removes its account. If it was the only one, or no face
+    // is left after it, that is a full logout, which asks first through the window's
+    // sign-out question (see the SmartyCraft section for the same shape).
+    val signOut = rememberAccountSignOut(MS_KEY, othersLeft) ?: return
     val s = LocalStrings.current
-    val scope = rememberCoroutineScope()
-    var signingOut by remember { mutableStateOf(false) }
-
-    // Signing out of Microsoft removes its account; if it was the only one, that
-    // is a full logout -- route it through the confirm so a dismissed dialog
-    // leaves the account intact (see the SmartyCraft section for the same shape).
-    // One at a time, for the same reason as there.
-    fun signOut() {
-        if (signingOut) return
-        signingOut = true
-        scope.launch {
-            try {
-                val accounts = withContext(Dispatchers.IO) { credentials.listAccounts() }
-                if (accounts.size <= 1) {
-                    signOutAll()
-                    return@launch
-                }
-                val face = withContext(Dispatchers.IO) {
-                    accounts.firstOrNull { it.providerId == MS_KEY }
-                        ?.let { credentials.removeAccount(it.providerId, it.accountId) }
-                    // The face choice goes with the account it named -- see releasingFace.
-                    settingsService.updateSettings { it.releasingFace(MS_KEY) }
-                    credentials.faceSession(settingsService)
-                }
-                face?.let(signIn) ?: signOutAll()
-                onChanged()
-            } finally {
-                signingOut = false
-            }
-        }
-    }
 
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text(
-            text = session.playerName,
+            text = session.name,
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
             color = NxInk.main,

@@ -65,10 +65,9 @@ class PalettePreviewSamplesTest {
         doNotDisturb     = MutableStateFlow(false),
         sslBypass        = flowSource(MutableStateFlow(false)),
         background       = MutableStateFlow(BackgroundSettings()),
-        accountsRevision = MutableStateFlow(0),
     )
 
-    private val commands = uiCommandRegistry({}, {}, {}, {})
+    private val commands = uiCommandRegistry({}, {}, {})
 
     /**
      * What the composition's level reads the theme keys from, the way the launcher's

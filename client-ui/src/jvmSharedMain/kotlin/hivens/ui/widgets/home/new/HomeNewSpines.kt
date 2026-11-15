@@ -44,7 +44,8 @@ import coil3.compose.AsyncImage
 import hivens.packs.api.PackKeys
 import hivens.packs.api.PackUpdateView
 import hivens.packs.api.PackView
-import hivens.ui.AppState
+import hivens.accounts.api.AccountKeys
+import hivens.accounts.api.SessionState
 import hivens.ui.Screen
 import hivens.ui.components.rememberLaunchControl
 import hivens.ui.effects.pixelArtBackground
@@ -59,7 +60,6 @@ import hivens.ui.theme.NxColor
 import hivens.ui.theme.decorativePair
 import hivens.ui.theme.familyForText
 import hivens.ui.widgets.Commands
-import hivens.ui.widgets.Sources
 import hivens.widget.api.rememberScopedCommand
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
@@ -80,11 +80,11 @@ import hivens.widget.model.Widget
     displayName = "widget.home.new.spines",
     minWidth = 480, minHeight = 240,
     maxWidth = 2400, maxHeight = 1600,
-    needs = ["app.state", "nav.open", "packs.library", "pack.launch"],
+    needs = ["nav.open", "packs.library", "pack.launch"],
 )
 @Composable
 fun HomeNewSpines() {
-    val appState = rememberScopedSource(Sources.Session).valueOrNull() ?: return
+    val appState = rememberScopedSource(AccountKeys.Session).valueOrNull()
     val navigate = rememberScopedCommand(Commands.Navigate) ?: return
     val all = rememberScopedSource(PackKeys.Library).valueOrNull() ?: return
     val packs = remember(all) {
@@ -130,7 +130,7 @@ internal fun spinesThatFit(width: Dp, packs: Int): Int {
 private fun Spine(
     pack: PackView,
     open: Boolean,
-    appState: AppState,
+    appState: SessionState?,
     onOpenPage: () -> Unit,
     onChoose: () -> Unit,
     modifier: Modifier,

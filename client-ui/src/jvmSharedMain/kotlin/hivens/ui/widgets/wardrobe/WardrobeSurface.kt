@@ -43,10 +43,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import hivens.core.api.SkinRepository
-import hivens.core.data.PackAuthRequirement
-import hivens.core.data.SessionData
-import hivens.auth.AccountStore
+import hivens.accounts.api.AccountKeys
+import hivens.accounts.api.SessionView
+import hivens.accounts.api.SkinUpload
+import hivens.accounts.api.SkinUploadStatus
+import hivens.ui.accounts.outcomeOf
 import hivens.ui.components.DestructiveConfirmDialog
 import hivens.ui.flexible.Flexible
 import hivens.ui.flexible.FlexibleKind
@@ -80,8 +81,11 @@ import hivens.ui.skin3d.layered
 import hivens.ui.skin3d.rememberSkinViewState
 import hivens.ui.utils.pickFile
 import hivens.ui.utils.rememberFileDialogSettings
-import hivens.ui.utils.rememberReadOffMain
 import hivens.ui.widgets.profile.SkinHero
+import hivens.widget.api.LocalScope
+import hivens.widget.api.rememberScopedCommand
+import hivens.widget.api.rememberScopedSource
+import hivens.widget.api.valueOrNull
 import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.path
 import kotlinx.coroutines.CoroutineScope
@@ -92,11 +96,12 @@ import hivens.ui.image.decodeRaster
 import org.koin.compose.koinInject
 import java.io.File
 import java.nio.file.Files
+import java.util.UUID
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.Status
 
-private const val SC_KEY = PackAuthRequirement.SmartyCraft.PROVIDER_KEY
+private const val SC_KEY = AccountKeys.SMARTYCRAFT
 
 // Caption strip under every card. Fixed so a card with a delete button (an
 // IconButton is taller than a bare label) lines up with the "+" import tile and
@@ -108,7 +113,7 @@ private val CardCaptionHeight = 24.dp
 // import a PNG, pick one to preview, apply it to SmartyCraft, or delete it.
 // Mojang apply + default skins + capes build on this.
 @Composable
-fun WardrobeSurface(session: SessionData?, onBack: () -> Unit) {
+fun WardrobeSurface(session: SessionView?, onBack: () -> Unit) {
     val s = LocalStrings.current
     PuppetScreen("Wardrobe")
     // The window frame carries the visible back arrow, so the screen draws none.
@@ -173,18 +178,20 @@ private fun WardrobePose.label(s: AppStrings): String = when (this) {
 }
 
 @Composable
-private fun Wardrobe(session: SessionData) {
+private fun Wardrobe(session: SessionView) {
     val s = LocalStrings.current
     val library: SkinLibrary = koinInject()
-    val skinRepository: SkinRepository = koinInject()
     val skinManager: SkinManager = koinInject()
-    val credentials: AccountStore = koinInject()
     val defaultSkinProvider: DefaultSkinProvider = koinInject()
     val clanRoles: ClanRoleProvider = koinInject()
     val scope = rememberCoroutineScope()
-    // The apply is a POST that does not stop because the reader left the screen,
-    // the same as the profile's own upload.
+    // The apply does not stop because the reader left the screen, the same as the
+    // profile's own upload, and neither does the wait for how it ended.
     val applyScope: CoroutineScope = koinInject()
+    // The upload is the accounts module's, signed with the account's own session,
+    // which this never holds.
+    val uploadSkin = rememberScopedCommand(AccountKeys.UploadSkin)
+    val level = LocalScope.current
 
     var refreshKey by remember { mutableIntStateOf(0) }
     var selectedId by remember { mutableStateOf<String?>(null) }
@@ -264,18 +271,19 @@ private fun Wardrobe(session: SessionData) {
             onDismiss    = { pendingDelete = null },
         )
     }
-    val scSession = rememberReadOffMain(refreshKey, session) { credentials.accountFor(SC_KEY) }?.value
+    // The stored SmartyCraft account, as the accounts module lists it.
+    val scSession = rememberScopedSource(AccountKeys.Accounts).valueOrNull()?.firstOrNull { it.providerKey == SC_KEY }
 
     // Cape capability. Fast path: a fresh login already said "no clan", no
     // network needed. Otherwise the public player page decides -- it works
     // regardless of how stale the persisted session is (pre-field sessions
     // never resolve their clan flag).
     var capeRole by remember { mutableStateOf(ClanRole.Unknown) }
-    LaunchedEffect(scSession?.playerName, scSession?.clan, scSession?.clanResolved) {
+    LaunchedEffect(scSession?.name, scSession?.clan, scSession?.clanResolved) {
         capeRole = when {
             scSession == null -> ClanRole.Unknown
             scSession.clanResolved && scSession.clan == null -> ClanRole.NoClan
-            else -> clanRoles.eligibility(scSession.playerName)
+            else -> clanRoles.eligibility(scSession.name)
         }
     }
     val showCapes = capeSectionVisible(scSession != null, capeRole)
@@ -288,8 +296,8 @@ private fun Wardrobe(session: SessionData) {
     // The SmartyCraft account's look, not the face's. The skin host is SmartyCraft's and
     // is asked by nickname, so a Microsoft face whose name is also taken there imported a
     // stranger's skin into the library and marked it applied.
-    LaunchedEffect(scSession?.playerName) {
-        val scName = scSession?.playerName ?: return@LaunchedEffect
+    LaunchedEffect(scSession?.name) {
+        val scName = scSession?.name ?: return@LaunchedEffect
         val bytes = skinManager.getRawSkinBytes(scName) ?: return@LaunchedEffect
         val primed = withContext(Dispatchers.IO) {
             // No pixel hash -> no dedup, so skip rather than accumulate a copy per open.
@@ -326,23 +334,24 @@ private fun Wardrobe(session: SessionData) {
     // stamps the library history when the file is a library entry (null for defaults).
     fun applyToSc(file: File, isCloak: Boolean, markId: String?) {
         val sc = scSession ?: return
+        val upload = uploadSkin ?: return
+        val uploads = level?.find(AccountKeys.SkinUploads)?.state ?: return
         busy = true
         error = null
-        // Left mid-request on the composition, the request was cancelled whether or not
+        val ticket = UUID.randomUUID().toString()
+        upload(SkinUpload(SC_KEY, file.path, cape = isCloak, ticket = ticket))
+        // Left mid-request on the composition, the wait was cancelled whether or not
         // the server had taken it: an apply that landed was never marked or shown, and
         // the next visit's import marked the old skin applied again.
         applyScope.launch(Dispatchers.Main) {
-            val result = withContext(Dispatchers.IO) {
-                runCatching { skinRepository.uploadSkin(file, isCloak = isCloak, session = sc) }
-                    .getOrElse { it.message ?: "error" }
-            }
+            val outcome = uploads.outcomeOf(SC_KEY, ticket)
             busy = false
-            if (result == "OK") {
+            if (outcome == SkinUploadStatus.Done) {
                 withContext(Dispatchers.IO) { markId?.let { library.markApplied(it, System.currentTimeMillis()) } }
-                skinManager.invalidate(sc.playerName)
+                skinManager.invalidate(sc.name)
                 refreshKey++
             } else {
-                error = s.profileUploadError(result)
+                error = s.profileUploadError((outcome as? SkinUploadStatus.Failed)?.message ?: "error")
             }
         }
     }
@@ -371,7 +380,7 @@ private fun Wardrobe(session: SessionData) {
                     SkinView3D(bmp, Modifier.fillMaxSize(), interactive = true, autoSpin = false, cape = previewCape, state = previewState)
                 } else {
                     // The look an apply here would change, which is the SmartyCraft account's.
-                    SkinHero(scSession?.playerName ?: session.playerName, refreshKey, Modifier.fillMaxSize(), interactive = true, autoSpin = false, cape = previewCape, state = previewState)
+                    SkinHero(scSession?.name ?: session.name, refreshKey, Modifier.fillMaxSize(), interactive = true, autoSpin = false, cape = previewCape, state = previewState)
                 }
             }
             FlowRow(

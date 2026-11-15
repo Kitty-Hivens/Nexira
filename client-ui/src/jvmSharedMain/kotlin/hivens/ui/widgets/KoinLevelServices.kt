@@ -1,6 +1,6 @@
 package hivens.ui.widgets
 
-import hivens.widget.api.ContributedLevelServices
+import hivens.ui.host.LauncherHostAccess
 import hivens.widget.api.LevelServices
 import hivens.widget.api.LevelServicesHost
 import hivens.widget.api.WidgetScope
@@ -91,12 +91,15 @@ class KoinLevelServicesHost private constructor(scope: Scope) : LevelServicesHos
  * because its tree starts at [KoinLevelServicesHost.app], with the modules' services
  * laid over it or not, so a level that does not is a tree made somewhere else and is
  * refused.
+ *
+ * Under the modules' services it is reached through the launcher's [LauncherHostAccess]
+ * alone. A tree with nothing laid over its Koin scope, which only a test builds,
+ * shows it as its plain services.
  */
 val WidgetScope.koinScope: Scope
     get() {
-        val own = hostServices
-        val koin = own as? KoinLevelServices ?: (own as? ContributedLevelServices)?.inner as? KoinLevelServices
-        return koin?.scope ?: error("a $level level whose services are not Koin's cannot be drawn by the launcher")
+        val own = LauncherHostAccess.ownServicesOf(this) ?: services
+        return (own as? KoinLevelServices)?.scope ?: error("a $level level whose services are not Koin's cannot be drawn by the launcher")
     }
 
 /** The Koin scope qualifier every level of this kind creates its own scope under. */

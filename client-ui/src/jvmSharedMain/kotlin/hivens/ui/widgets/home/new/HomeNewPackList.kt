@@ -40,10 +40,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import hivens.accounts.api.AccountKeys
+import hivens.accounts.api.SessionState
 import hivens.core.launch.LaunchControlMode
 import hivens.packs.api.PackKeys
 import hivens.packs.api.PackView
-import hivens.ui.AppState
 import hivens.ui.Screen
 import hivens.ui.components.rememberLaunchControl
 import hivens.ui.effects.pixelArtBackground
@@ -59,7 +60,6 @@ import hivens.ui.theme.NxInk
 import hivens.ui.theme.decorativePair
 import hivens.ui.theme.familyForText
 import hivens.ui.widgets.Commands
-import hivens.ui.widgets.Sources
 import hivens.widget.api.rememberProps
 import hivens.widget.api.rememberScopedCommand
 import hivens.widget.api.rememberScopedSource
@@ -100,12 +100,12 @@ data class PackListProps(
     surface = """{"fill":"panel"}""",
     minWidth = 280, minHeight = 120,
     maxWidth = 2400, maxHeight = 1600,
-    needs = ["app.state", "nav.open", "packs.library", "pack.launch"],
+    needs = ["nav.open", "packs.library", "pack.launch"],
 )
 @Composable
 fun HomeNewPackList(instance: WidgetInstance) {
     val p = instance.rememberProps<PackListProps>()
-    val appState = rememberScopedSource(Sources.Session).valueOrNull() ?: return
+    val appState = rememberScopedSource(AccountKeys.Session).valueOrNull()
     val navigate = rememberScopedCommand(Commands.Navigate) ?: return
     val s = LocalStrings.current
     val all = rememberScopedSource(PackKeys.Library).valueOrNull() ?: return
@@ -197,7 +197,7 @@ internal data class PackListColumns(val runsOn: Boolean, val played: Boolean, va
 }
 
 @Composable
-private fun PackRow(pack: PackView, columns: PackListColumns, appState: AppState, navigate: (Screen) -> Unit) {
+private fun PackRow(pack: PackView, columns: PackListColumns, appState: SessionState?, navigate: (Screen) -> Unit) {
     val s = LocalStrings.current
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()

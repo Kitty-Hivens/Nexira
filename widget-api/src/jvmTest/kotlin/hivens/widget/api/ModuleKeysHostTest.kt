@@ -8,6 +8,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.isActive
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -213,7 +215,8 @@ class ModuleKeysHostTest {
         val services = ContributedServices().apply { expose(Shared::class) }
         assertIs<ModuleKeysResult.Registered>(registerModuleKeys("jar", reader, sources, WidgetCommandRegistry(), services, trusted = false))
         val host = services.host(hostWith({ Secret() }, { Shared() }), Dispatchers.Unconfined)
-        val app = WidgetScope.app(sources, host, Dispatchers.Unconfined)
+        val access = HostAccess()
+        val app = WidgetScope.app(sources, host, Dispatchers.Unconfined, access = access)
 
         assertEquals("read", app.current(greeting))
         assertNull(seen["secret"], "the host's own service reached a module it does not trust")
@@ -221,7 +224,48 @@ class ModuleKeysHostTest {
         assertNotNull(seen["shared"], "what the host exposed is there")
         assertNotNull(seen["counter"], "and what modules declared")
         assertNull(app.services.find<Secret>(), "a module widget reads the level as modules see it")
-        assertNotNull(app.hostServices.find<Secret>(), "the host still has its own")
+        assertNull(app.hostServices.find<Secret>(), "and a level it holds hands it no host view")
+        assertNotNull(access.servicesOf(app)?.find<Secret>(), "the host still has its own")
+    }
+
+    @Test
+    fun `a level answers its host view only to the access its tree was made with`() {
+        val access = HostAccess()
+        val app = WidgetScope.app(WidgetDataRegistry(), hostWith({ Secret() }), Dispatchers.Unconfined, access = access)
+        val page = app.child(ScopeLevel.Window).child(ScopeLevel.Composition).child(ScopeLevel.Page)
+        assertNotNull(access.servicesOf(page)?.find<Secret>(), "from any level of its tree")
+        assertNull(HostAccess().servicesOf(page), "another access is answered nothing")
+        val bare = WidgetScope.app(WidgetDataRegistry(), hostWith({ Secret() }), Dispatchers.Unconfined)
+        assertNull(access.servicesOf(bare), "nor is a tree made without one")
+        val held: LevelContext = page
+        assertNull(held as? HostLevelContext, "a level is no factory's context")
+    }
+
+    @Test
+    fun `two threads asking for a service at once make it once, and both get that one`() {
+        val made = AtomicInteger()
+        val inMaker = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val tree = Tree(Contribution { keys ->
+            keys.service(ScopeLevel.App) {
+                made.incrementAndGet()
+                inMaker.countDown()
+                release.await(5, TimeUnit.SECONDS)
+                Counter()
+            }
+        })
+        val got = CopyOnWriteArrayList<Counter>()
+        val first = Thread { got += tree.app.services.get<Counter>() }.apply { start() }
+        assertTrue(inMaker.await(5, TimeUnit.SECONDS), "the first maker never ran")
+        val second = Thread { got += tree.app.services.get<Counter>() }.apply { start() }
+        // Long enough for a second maker to have started, had the gate let it.
+        Thread.sleep(200)
+        release.countDown()
+        first.join(5_000)
+        second.join(5_000)
+        assertEquals(1, made.get(), "a second maker ran beside the first")
+        assertEquals(2, got.size)
+        assertSame(got[0], got[1])
     }
 
     @Test
@@ -234,6 +278,61 @@ class ModuleKeysHostTest {
         val app = WidgetScope.app(sources, services.host(hostWith({ Secret() }), Dispatchers.Unconfined), Dispatchers.Unconfined)
         assertNotNull(app.current(greeting))
         assertNotNull(secret)
+    }
+
+    /** What a trusted module keeps for the host, a session with its tokens say. */
+    private class Kept
+
+    @Test
+    fun `a service a trusted module keeps for the host reaches the host and the trusted, and no other module`() {
+        val sources = WidgetDataRegistry()
+        val services = ContributedServices()
+        val keeper = Contribution { keys -> keys.hostService(ScopeLevel.App) { Kept() } }
+        assertIs<ModuleKeysResult.Registered>(registerModuleKeys("keeper", keeper, sources, WidgetCommandRegistry(), services, trusted = true))
+
+        val seen = HashMap<String, Any?>()
+        val reader = Contribution { keys ->
+            keys.service(ScopeLevel.App) { context ->
+                seen["maker.host"] = context.hostServices.find<Kept>()
+                seen["maker"] = context.services.find<Kept>()
+                Counter()
+            }
+            keys.source(greeting) { app ->
+                seen["factory.host"] = app.hostServices.find<Kept>()
+                seen["factory"] = app.services.find<Kept>()
+                seen["counter"] = app.services.find<Counter>()
+                flowSource(MutableStateFlow("read"))
+            }
+        }
+        assertIs<ModuleKeysResult.Registered>(registerModuleKeys("jar", reader, sources, WidgetCommandRegistry(), services, trusted = false))
+        val trusting = SourceKey<Kept?>("test.trusted")
+        val friend = Contribution { keys -> keys.source(trusting) { app -> flowSource(MutableStateFlow(app.hostServices.find<Kept>())) } }
+        assertIs<ModuleKeysResult.Registered>(registerModuleKeys("friend", friend, sources, WidgetCommandRegistry(), services, trusted = true))
+
+        val access = HostAccess()
+        val app = WidgetScope.app(sources, services.host(MemoryLevelServices.app(), Dispatchers.Unconfined), Dispatchers.Unconfined, access = access)
+        val page = app.child(ScopeLevel.Window).child(ScopeLevel.Composition).child(ScopeLevel.Page)
+        assertEquals("read", page.current(greeting))
+        listOf("maker.host", "maker", "factory.host", "factory").forEach { assertNull(seen[it], "a module the host does not trust reached it as $it") }
+        assertNotNull(seen["counter"], "what modules declared for everyone is there")
+        assertNull(page.services.find<Kept>(), "a widget reads the level as modules see it")
+        assertNull(page.hostServices.find<Kept>(), "and a level it holds hands it no host view, whatever it opts in to")
+        assertNotNull(access.servicesOf(page)?.find<Kept>(), "the host reaches it from below its level")
+        assertNotNull(page.current(trusting), "and so does a module it trusts")
+    }
+
+    @Test
+    fun `a module the host does not trust cannot keep a service for the host, and brings nothing`() {
+        val sources = WidgetDataRegistry()
+        val services = ContributedServices()
+        val sneaky = Contribution { keys ->
+            keys.source(greeting) { flowSource(MutableStateFlow("x")) }
+            keys.hostService(ScopeLevel.App) { Kept() }
+        }
+        val refused = assertIs<ModuleKeysResult.Refused>(registerModuleKeys("jar", sneaky, sources, WidgetCommandRegistry(), services, trusted = false))
+        assertTrue("trusts" in refused.reason, refused.reason)
+        assertNull(sources.declarationOf(greeting.id), "its other keys did not go in either")
+        assertNull(services.ownerOf(Kept::class))
     }
 
     @Test

@@ -1,5 +1,6 @@
 package hivens.ui.widgets
 
+import hivens.accounts.api.AccountsApi
 import hivens.packs.api.PacksApi
 import hivens.ui.HostKeys
 import hivens.ui.background.BackgroundSettings
@@ -40,10 +41,9 @@ class KeyDeclarationDriftTest {
         doNotDisturb     = MutableStateFlow(false),
         sslBypass        = flowSource(MutableStateFlow(false)),
         background       = MutableStateFlow(BackgroundSettings()),
-        accountsRevision = MutableStateFlow(0),
     )
 
-    private val commands = uiCommandRegistry({}, {}, {}, {})
+    private val commands = uiCommandRegistry({}, {}, {})
 
     init {
         moduleKeys(
@@ -67,10 +67,11 @@ class KeyDeclarationDriftTest {
     }
 
     @Test
-    fun `the bundled document names the packs module, so a fresh install has its keys`() {
-        assertEquals(listOf(PacksApi.ID), DefaultLayout.modules())
+    fun `the bundled document names the packs and accounts modules, so a fresh install has their keys`() {
+        assertEquals(listOf(PacksApi.ID, AccountsApi.ID), DefaultLayout.modules())
         assertEquals(null, DefaultLayout.load().modules, "the bundled graph itself names none, so nothing written from it freezes the list")
-        assertTrue(CompiledModules.any { it.id == PacksApi.ID }, "and the build carries it")
+        assertTrue(CompiledModules.any { it.id == PacksApi.ID }, "and the build carries the packs module")
+        assertTrue(CompiledModules.any { it.id == AccountsApi.ID }, "and the accounts module")
     }
 
     @Test

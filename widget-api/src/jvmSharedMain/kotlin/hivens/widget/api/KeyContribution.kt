@@ -59,11 +59,34 @@ interface ModuleKeys {
      * read it through [LevelContext.services].
      */
     fun <T : Any> service(level: ScopeLevel, type: KClass<T>, make: (ServiceContext) -> T)
+
+    /**
+     * A service of [type] like [service] makes, which only the host and the modules it
+     * trusts reach: through the host view a level hands their factories
+     * ([HostLevelContext.hostServices]) and their service makers
+     * ([ServiceContext.hostServices]), and through the [HostAccess] the host keeps.
+     * Every other module and every widget is answered as if nothing declared it, since
+     * the API hands them no host view at all. For what carries secrets the rest must
+     * never hold, a signed-in session with its tokens say.
+     *
+     * That is the API's promise and no more: in-process code can always reach past it
+     * by reflection, and isolating modules is not this API's business.
+     *
+     * Only a module the host trusts may declare one. A module that is not trusted and
+     * declares one registers nothing at all.
+     */
+    @HostApi
+    fun <T : Any> hostService(level: ScopeLevel, type: KClass<T>, make: (ServiceContext) -> T)
 }
 
 /** Declares a service of type [T]. See [ModuleKeys.service]. */
 inline fun <reified T : Any> ModuleKeys.service(level: ScopeLevel, noinline make: (ServiceContext) -> T) =
     service(level, T::class, make)
+
+/** Declares a host service of type [T]. See [ModuleKeys.hostService]. */
+@HostApi
+inline fun <reified T : Any> ModuleKeys.hostService(level: ScopeLevel, noinline make: (ServiceContext) -> T) =
+    hostService(level, T::class, make)
 
 /** What a level hands a module's service while making it. */
 interface ServiceContext {

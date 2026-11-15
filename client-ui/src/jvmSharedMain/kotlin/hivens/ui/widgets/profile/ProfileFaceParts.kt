@@ -6,62 +6,36 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import hivens.auth.AccountStore
-import hivens.core.api.interfaces.ISettingsService
-import hivens.core.data.SessionData
-import hivens.ui.AppState
+import hivens.accounts.api.AccountKeys
+import hivens.accounts.api.FaceChoice
+import hivens.accounts.api.SessionState
+import hivens.accounts.api.SessionView
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetClick
-import hivens.ui.utils.rememberReadOffMain
-import hivens.ui.widgets.Commands
-import hivens.ui.widgets.Sources
 import hivens.widget.api.rememberScopedCommand
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import org.koin.compose.koinInject
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxColor
 
-/**
- * The face the shell should wear right now: the user's choice first, licence
- * priority behind it.
- *
- * Every site that recomputes the face after an account is added or removed goes
- * through here. Calling [AccountStore.primarySession] bare re-decides by
- * priority alone, which silently discards the choice the moment the user signs
- * anything in or out.
- */
-internal fun AccountStore.faceSession(settingsService: ISettingsService): SessionData? =
-    primarySession(settingsService.getSettings().preferredFaceProvider)
-
 /** The session the composition is signed in as, null when nobody is or nothing says. */
 @Composable
-internal fun rememberSession(): SessionData? =
-    (rememberScopedSource(Sources.Session).valueOrNull() as? AppState.Authenticated)?.session
+internal fun rememberSession(): SessionView? =
+    (rememberScopedSource(AccountKeys.Session).valueOrNull() as? SessionState.SignedIn)?.session
 
 /**
  * Which signed-in account fronts the shell, when more than one is signed in.
  *
- * The store has always resolved this properly -- a named provider wins, and a
- * provider with no account signed in falls back to licence priority -- but
- * nothing ever named one, so the setting stayed null and the fallback was the
- * whole behaviour. This is the act of choosing.
+ * The accounts module resolves this properly (a named provider wins, and a provider
+ * with no account signed in falls back to licence priority), and this is the act of
+ * choosing.
  *
  * Hidden below two accounts: with one account the choice has a single outcome,
  * and with none there is nothing to front the shell with.
@@ -72,46 +46,27 @@ internal fun rememberSession(): SessionData? =
  */
 @Composable
 internal fun FacePicker(modifier: Modifier = Modifier) {
-    val session = rememberSession()
-    val signIn = rememberScopedCommand(Commands.SignIn) ?: return
-    val credentials: AccountStore = koinInject()
-    val settingsService: ISettingsService = koinInject()
+    // The list the store holds now, which every sign-in and sign-out reads again: the
+    // picker's whole job is to name one of the accounts that exist, and offering one
+    // that had just been removed wrote the preference for it.
+    // Missing and not read yet alike leave nothing to choose from.
+    val accounts = rememberScopedSource(AccountKeys.Accounts).valueOrNull() ?: return
+    val face =rememberScopedSource(AccountKeys.Face).valueOrNull() ?: return
+    val setFace = rememberScopedCommand(AccountKeys.SetFace) ?: return
     val s = LocalStrings.current
-    val scope = rememberCoroutineScope()
-
-    // Keyed on the account revision as well as the session: the picker's whole job
-    // is to name one of the accounts that exist now, and signing out of one that
-    // was not fronting the shell leaves the session structurally identical. On that
-    // alone the picker went on offering a provider that had just been removed, and
-    // choosing it wrote the preference for it.
-    val revision = rememberScopedSource(Sources.AccountsRevision).valueOrNull() ?: 0
-    val accounts = rememberReadOffMain(revision, session) { credentials.listAccounts() }?.value ?: return
     if (accounts.size < 2) return
 
-    var preferred by remember(revision, session) {
-        mutableStateOf(settingsService.getSettings().preferredFaceProvider)
-    }
-
-    fun choose(providerKey: String?) {
-        preferred = providerKey
-        scope.launch {
-            // Re-resolve through the store rather than loading the named account
-            // directly: naming a provider whose account has since gone must land on
-            // the same fallback the shell uses at startup.
-            val face = withContext(Dispatchers.IO) {
-                settingsService.updateSettings { it.copy(preferredFaceProvider = providerKey) }
-                credentials.faceSession(settingsService)
-            }
-            face?.let(signIn)
-        }
-    }
+    // The module re-resolves through the store rather than loading the named account
+    // directly: naming a provider whose account has since gone must land on the same
+    // fallback the shell uses at startup.
+    fun choose(providerKey: String?) = setFace(FaceChoice(providerKey))
 
     // Auto first: it is the default and the state a user returns to, so it reads
     // as the top of the list rather than as one more provider.
     val options = buildList {
         add(null to s.accountFaceAuto)
         ProfileCategory.entries
-            .filter { category -> accounts.any { it.providerId == category.providerKey } }
+            .filter { category -> accounts.any { it.providerKey == category.providerKey } }
             .forEach { add(it.providerKey to it.label(s)) }
     }
 
@@ -123,7 +78,7 @@ internal fun FacePicker(modifier: Modifier = Modifier) {
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
         )
         options.forEach { (key, label) ->
-            FaceOption(label = label, selected = key == preferred) { choose(key) }
+            FaceOption(label = label, selected = key == face.providerKey) { choose(key) }
             PuppetClick("profile.face.${key ?: "auto"}") { choose(key) }
         }
     }

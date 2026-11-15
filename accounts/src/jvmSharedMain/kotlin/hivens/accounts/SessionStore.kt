@@ -1,16 +1,16 @@
-package hivens.ui.session
+@file:OptIn(HostApi::class)
 
+package hivens.accounts
+
+import hivens.accounts.api.SessionState
 import hivens.auth.AccountStore
 import hivens.auth.AuthProvider
+import hivens.auth.OfflineAuthProvider
 import hivens.auth.RefreshableAuthProvider
 import hivens.core.api.interfaces.ISettingsService
-import hivens.core.data.PackAuthRequirement
 import hivens.core.data.SessionData
 import hivens.core.diag.ActionRing
-import hivens.launcher.bootstrap.AutoLoginCoordinator
-import hivens.ui.AppState
-import hivens.ui.notifications.CoreProblem
-import hivens.ui.notifications.CoreProblems
+import hivens.widget.api.HostApi
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -22,7 +22,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
@@ -37,6 +36,10 @@ import kotlin.time.Duration.Companion.milliseconds
  * again, which for a stored SmartyCraft account is a login that invalidates the
  * first one's session, nor stays signed in after another signed out.
  *
+ * It holds the session with its tokens, so it is a host service: the host and the
+ * modules compiled into it reach it, a widget and a jar module read [state], which
+ * carries none of them.
+ *
  * The startup sign-in is [AutoLoginCoordinator]'s decision, applied here when the
  * store is made: a network failure retries on its backoff for as long as the store
  * lives, so a launcher left open signs itself in once the network is back, while a
@@ -48,7 +51,7 @@ import kotlin.time.Duration.Companion.milliseconds
  *
  * Nothing here fails quietly. A startup sign-in that throws leaves the launcher
  * signed out rather than loading for ever, and a sign-out that throws leaves it as
- * it was. Either is logged and told to [problems].
+ * it was. Either is logged and told to [host].
  *
  * Asking whether to sign out is not this store's business: the command signs out,
  * and whatever offers it asks first.
@@ -59,33 +62,50 @@ class SessionStore(
     private val auth: AuthProvider,
     private val refreshable: RefreshableAuthProvider?,
     certificateGrants: StateFlow<Any?>,
-    private val problems: CoreProblems,
+    private val host: AccountsHost,
     parent: CoroutineScope,
-) : AutoCloseable {
+    /** Told whenever the stored accounts may have changed, so a list of them reads the store again. */
+    private val accountsChanged: () -> Unit = {},
+) : LaunchSessions, AutoCloseable {
 
     private val scope = CoroutineScope(parent.coroutineContext + SupervisorJob(parent.coroutineContext[Job]))
 
-    private val _state = MutableStateFlow<AppState>(AppState.Loading)
+    /** The session in full, with the provider it came from. Null while nobody is signed in. */
+    private class Signed(val session: SessionData, val provider: String)
 
-    /** Who the launcher is signed in as, that nobody is, or that startup is still finding out. */
-    val state: StateFlow<AppState> = _state.asStateFlow()
+    private val lock = Any()
 
-    /** The signed-in session, or null when nobody is signed in or startup is still finding out. */
-    val session: SessionData? get() = (_state.value as? AppState.Authenticated)?.session
+    // Both written under [lock] in one step, so a reader of either never sees the other behind.
+    private var current: Signed? = null
+    private var resolving = true
+    private val _state = MutableStateFlow<SessionState>(SessionState.Resolving)
+
+    /** Who the launcher is signed in as, that nobody is, or that startup is still finding out. Nothing secret. */
+    val state: StateFlow<SessionState> = _state.asStateFlow()
+
+    /** The signed-in session with its tokens, or null when nobody is signed in or startup is still finding out. */
+    val session: SessionData? get() = synchronized(lock) { current?.session }
+
+    override val identity: LaunchIdentity
+        get() = synchronized(lock) {
+            when {
+                current != null -> LaunchIdentity.SignedIn(checkNotNull(current).session)
+                resolving -> LaunchIdentity.Resolving
+                else -> LaunchIdentity.Nobody
+            }
+        }
 
     init {
         scope.launch { certificateGrants.collectLatest { signInFromStore() } }
     }
 
-    /** Makes [session] the one the launcher is signed in as. Wins over anything the startup sign-in finds. */
-    fun signIn(session: SessionData) {
-        _state.value = AppState.Authenticated(session)
-        signedIn()
-    }
-
-    // A sign-in that failed earlier no longer stands once one has worked.
-    private fun signedIn() {
-        problems.withdraw(CoreProblem.SignInFailed::class)
+    /**
+     * Makes [session] the one the launcher is signed in as, as an account of
+     * [provider]. Wins over anything the startup sign-in finds.
+     */
+    fun signIn(session: SessionData, provider: String = providerGuess(session)) {
+        set(Signed(session, provider), resolved = true)
+        host.cleared(AccountTrouble.SignIn)
     }
 
     /**
@@ -117,68 +137,92 @@ class SessionStore(
                 throw e
             } catch (e: Exception) {
                 log.error("Signing out failed: the stored accounts could not be cleared", e)
-                problems.report(CoreProblem.SignOutFailed(e))
+                host.failed(AccountTrouble.SignOut, e)
+                // Some may have gone before the failure, so the list is read again.
+                accountsChanged()
                 return@launch
             }
-            problems.withdraw(CoreProblem.SignOutFailed::class)
+            host.cleared(AccountTrouble.SignOut)
             try {
                 withContext(Dispatchers.IO) {
                     settings.updateSettings { it.copy(preferredFaceProvider = null, offlinePlayerName = null) }
                 }
-                problems.withdraw(CoreProblem.SignedOutNameKept::class)
+                host.cleared(AccountTrouble.NameKept)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 log.error("Signed out, but the face choice and the offline name could not be cleared", e)
-                problems.report(CoreProblem.SignedOutNameKept(e))
+                host.failed(AccountTrouble.NameKept, e)
             }
-            _state.value = AppState.Unauthenticated
+            set(null, resolved = true)
+            // After the names, so the list is read with the face choice already gone.
+            accountsChanged()
         }
+
+    /**
+     * The provider [session] most likely came from, by its shape alone: an offline
+     * identity is offline's, a session that carries a refresh token is the refreshing
+     * provider's, and any other is the password provider's. For a caller that cannot
+     * ask the store, [providerOf] asks it.
+     */
+    fun providerGuess(session: SessionData): String = when {
+        session.offline -> OfflineAuthProvider.PROVIDER_KEY
+        session.refreshToken != null -> (refreshable as? AuthProvider)?.id ?: auth.id
+        else -> auth.id
+    }
+
+    /** The provider whose stored account [session] is, or [providerGuess] where none matches. Reads the store. */
+    fun providerOf(session: SessionData): String = providerOf(session, accounts, ::providerGuess)
 
     /** Stops the startup sign-in and a sign-out still under way. */
     override fun close() {
         scope.cancel()
     }
 
+    private fun set(signed: Signed?, resolved: Boolean) = synchronized(lock) {
+        current = signed
+        if (resolved) resolving = false
+        _state.value = viewOf(signed)
+    }
+
+    private fun viewOf(signed: Signed?): SessionState = when {
+        signed != null -> SessionState.SignedIn(signed.session.toView(signed.provider))
+        resolving -> SessionState.Resolving
+        else -> SessionState.SignedOut
+    }
+
     private suspend fun signInFromStore() {
         var attempt = 0
-        while (_state.value !is AppState.Authenticated) {
+        while (synchronized(lock) { current == null }) {
             val resolution = try {
                 resolve()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 log.error("The startup sign-in failed, the launcher stays signed out", e)
-                problems.report(CoreProblem.SignInFailed(e))
+                host.failed(AccountTrouble.SignIn, e)
                 settleSignedOut()
                 return
             }
             when (resolution) {
-                is AutoLoginCoordinator.Resolution.Success -> {
+                is Resolved.Success -> {
                     // The form stays usable while a pass is in flight, so the person may
                     // have signed in by hand while this one waited on the network.
-                    var taken = false
-                    _state.update { current ->
-                        taken = current !is AppState.Authenticated
-                        if (taken) AppState.Authenticated(resolution.session) else current
+                    val taken = synchronized(lock) {
+                        (current == null).also { if (it) set(Signed(resolution.session, resolution.provider), resolved = true) }
                     }
-                    if (taken) signedIn() else ActionRing.record("Auto-login answered after a manual sign-in; the manual one stays")
+                    if (taken) host.cleared(AccountTrouble.SignIn) else ActionRing.record("Auto-login answered after a manual sign-in; the manual one stays")
                     return
                 }
-                AutoLoginCoordinator.Resolution.NoCredentials,
-                AutoLoginCoordinator.Resolution.Rejected,
-                // The certificate decision belongs to the person. Dropping to the
-                // sign-in form routes them to the prompt that asks for it, which also
-                // grants the bypass and restores the silent sign-in from the next start.
-                AutoLoginCoordinator.Resolution.CertificateUntrusted -> {
+                Resolved.Stop -> {
                     settleSignedOut()
                     return
                 }
-                AutoLoginCoordinator.Resolution.NetworkDown -> {
-                    // Loading covers only the first attempt. After it the form is
+                Resolved.NetworkDown -> {
+                    // Resolving covers only the first attempt. After it the form is
                     // usable while the retries go on quietly, and a sign-in made by
                     // hand meanwhile stays.
-                    _state.update { if (it is AppState.Loading) AppState.Unauthenticated else it }
+                    synchronized(lock) { if (current == null && resolving) set(null, resolved = true) }
                     val delayMs = AutoLoginCoordinator.retryDelayMs(attempt)
                     attempt += 1
                     ActionRing.record("Auto-login: network down, retry #$attempt in ${delayMs / 1000}s")
@@ -190,16 +234,20 @@ class SessionStore(
 
     // Signed out, unless somebody signed in by hand meanwhile.
     private fun settleSignedOut() {
-        var kept = false
-        _state.update { current ->
-            kept = current is AppState.Authenticated
-            if (kept) current else AppState.Unauthenticated
+        val kept = synchronized(lock) {
+            (current != null).also { if (!it) set(null, resolved = true) }
         }
         if (kept) ActionRing.record("Auto-login found no session after a manual sign-in; the manual one stays")
     }
 
+    private sealed interface Resolved {
+        class Success(val session: SessionData, val provider: String) : Resolved
+        data object NetworkDown : Resolved
+        data object Stop : Resolved
+    }
+
     /** One pass: what the stored account and the settings say, with the store told what the pass changed. */
-    private suspend fun resolve(): AutoLoginCoordinator.Resolution {
+    private suspend fun resolve(): Resolved {
         val current = withContext(Dispatchers.IO) { settings.getSettings() }
         val saved = withContext(Dispatchers.IO) { accounts.primarySession(current.preferredFaceProvider) }
         val resolution = withContext(Dispatchers.IO) {
@@ -210,40 +258,58 @@ class SessionStore(
                 msaProvider = refreshable,
             )
         }
-        if (resolution is AutoLoginCoordinator.Resolution.Success) keep(resolution, saved)
-        return resolution
+        return when (resolution) {
+            is AutoLoginCoordinator.Resolution.Success -> {
+                keep(resolution, saved)
+                Resolved.Success(resolution.session, withContext(Dispatchers.IO) { providerOf(resolution.session) })
+            }
+            AutoLoginCoordinator.Resolution.NetworkDown -> Resolved.NetworkDown
+            // The certificate decision belongs to the person. Dropping to the sign-in
+            // form routes them to the prompt that asks for it, which also grants the
+            // bypass and restores the silent sign-in from the next start.
+            AutoLoginCoordinator.Resolution.NoCredentials,
+            AutoLoginCoordinator.Resolution.Rejected,
+            AutoLoginCoordinator.Resolution.CertificateUntrusted -> Resolved.Stop
+        }
     }
 
     /** Writes back to the account store what a successful startup sign-in changed in it. */
     private suspend fun keep(resolution: AutoLoginCoordinator.Resolution.Success, saved: SessionData?) {
         val session = resolution.session
+        // The account the pass signed in from, the same provider as what it stored.
+        val provider = withContext(Dispatchers.IO) { saved?.let { providerOf(it) } ?: providerOf(session) }
+        var changed = false
         // A silent Microsoft refresh rotates the refresh token, and the next start
         // has to use the fresh one. A rotation is not a choice of account, so it
         // never takes the active slot: it used to, and "active" came to mean
         // whichever account the boot happened to refresh.
         if (session.refreshToken != null && session.refreshToken != saved?.refreshToken) {
             withContext(Dispatchers.IO) {
-                accounts.saveAccount(session, PackAuthRequirement.Microsoft.PROVIDER_KEY, makeActive = false)
+                accounts.saveAccount(session, provider, makeActive = false)
             }
+            changed = true
         }
         // The sign-in retired the uid the store holds, and whatever is signed later
         // from the stored account, a skin upload among them, needs the one it minted.
         if (resolution.signedIn) {
             withContext(Dispatchers.IO) {
                 runCatching {
-                    accounts.refreshStored(PackAuthRequirement.SmartyCraft.PROVIDER_KEY, session)
+                    accounts.refreshStored(provider, session)
                 }.onFailure {
                     log.warn("Auto-login could not record the refreshed session", it)
                 }
             }
+            changed = true
         }
         // The sign-in that just ran met the second factor, and it is the only thing
         // that could have said so. Unrecorded, the next start would spend another
         // login, and each one invalidates the session the player has in hand.
         if (session.twoFactor && saved?.twoFactor != true) {
-            withContext(Dispatchers.IO) { accounts.markTwoFactor(PackAuthRequirement.SmartyCraft.PROVIDER_KEY) }
-            ActionRing.record("Auto-login met the second factor: the SmartyCraft account is marked")
+            withContext(Dispatchers.IO) { accounts.markTwoFactor(provider) }
+            ActionRing.record("Auto-login met the second factor: the account is marked")
+            changed = true
         }
+        if (changed) accountsChanged()
     }
 
     private companion object {

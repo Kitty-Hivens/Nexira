@@ -6,6 +6,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import hivens.accounts.api.SessionState
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.launch.InstanceWork
 import hivens.core.launch.InstanceWorkRegistry
@@ -20,7 +21,6 @@ import hivens.launcher.launch.LauncherController
 import hivens.launcher.platform.PlatformPaths
 import hivens.packs.api.PackKeys
 import hivens.packs.api.PackView
-import hivens.ui.AppState
 import hivens.ui.Screen
 import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
@@ -77,11 +77,16 @@ data class LaunchControl(
  * What [pack]'s launch control shows and does now, as [appState] has the launcher
  * signed in. Play and Stop fire the packs module's commands, so a control drawn where
  * that module is not brought in offers a press that does nothing.
+ *
+ * A null [appState] is a launcher with no accounts module, where nobody is ever
+ * signed in. Play then follows the packs module's rule for nobody: it runs as the
+ * offline name where one is kept, and is refused without one, with no sign-in to
+ * send the person to.
  */
 @Composable
 fun rememberLaunchControl(
     pack: PackView,
-    appState: AppState,
+    appState: SessionState?,
     playLabel: String? = null,
 ): LaunchControl = rememberLaunchControl(pack.id, pack.folder, appState, playLabel)
 
@@ -94,10 +99,10 @@ fun rememberLaunchControl(
 fun rememberLaunchControl(
     packId: String,
     folder: String,
-    appState: AppState,
+    appState: SessionState?,
     playLabel: String? = null,
 ): LaunchControl {
-    val session = (appState as? AppState.Authenticated)?.session
+    val session = (appState as? SessionState.SignedIn)?.session
     val s = LocalStrings.current
     val controller: LauncherController = koinInject()
     val indications: IndicationCenter = koinInject()
@@ -148,7 +153,7 @@ fun rememberLaunchControl(
             work = work,
             instancePresent = present,
             otherLaunchActive = !launcherIdle,
-            identityResolving = appState is AppState.Loading,
+            identityResolving = appState is SessionState.Resolving,
         )
     }
 
@@ -186,13 +191,14 @@ fun rememberLaunchControl(
             label = block.label(s),
             icon = block.icon(),
             tone = when (block) {
-                LaunchBlock.NoIdentity -> PlayTone.Ready
+                // Signing in is the way out, where there is a way to sign in.
+                LaunchBlock.NoIdentity -> if (appState == null) PlayTone.Unavailable else PlayTone.Ready
                 is LaunchBlock.Busy, LaunchBlock.ResolvingIdentity -> PlayTone.Waiting
                 LaunchBlock.Missing -> PlayTone.Problem
                 LaunchBlock.OtherGameRunning -> PlayTone.Unavailable
             },
             progress = if (block is LaunchBlock.Busy) workProgress else null,
-            onClick = if (block == LaunchBlock.NoIdentity) {
+            onClick = if (block == LaunchBlock.NoIdentity && appState != null) {
                 { navRequests.open(Screen.Profile) }
             } else {
                 {}

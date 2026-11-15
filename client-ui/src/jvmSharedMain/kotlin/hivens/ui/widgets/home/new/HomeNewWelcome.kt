@@ -11,9 +11,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import hivens.ui.AppState
+import hivens.accounts.api.AccountKeys
+import hivens.accounts.api.SessionState
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.widgets.Sources
 import hivens.widget.api.rememberProps
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
@@ -45,9 +45,9 @@ data class WelcomeProps(
 @Composable
 fun HomeNewWelcome(instance: WidgetInstance) {
     val p = instance.rememberProps<WelcomeProps>()
-    val appState = rememberScopedSource(Sources.Session).valueOrNull() ?: return
+    val appState = rememberScopedSource(AccountKeys.Session).valueOrNull() ?: return
     val s = LocalStrings.current
-    val playerName = (appState as? AppState.Authenticated)?.session?.playerName
+    val playerName = (appState as? SessionState.SignedIn)?.session?.name
 
     // No plane of its own. The widget's surface is declared in the layout and painted
     // by the kernel, so the editor's surface rows move THIS card rather than adding a

@@ -9,6 +9,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import hivens.accounts.api.SessionState
 import hivens.core.data.ThemeMode
 import hivens.ui.background.BackgroundSettings
 import hivens.ui.chrome.LocalWindowClass
@@ -75,7 +76,7 @@ import hivens.ui.theme.NxColor
 
 @Composable
 fun AppLayout(
-    appState: AppState,
+    appState: SessionState?,
     currentScreen: Screen,
     onScreenChange: (Screen) -> Unit,
     onSwitchTab: (Screen) -> Unit,
@@ -112,7 +113,7 @@ fun AppLayout(
     // back down here -- so this is derived rather than held. It used to be a var
     // the classic home wrote into on an SC re-auth, which meant a refresh survived
     // exactly until the next appState change discarded it.
-    val currentSession = (appState as? AppState.Authenticated)?.session
+    val currentSession = (appState as? SessionState.SignedIn)?.session
 
     // Go transparent only when the wallpaper can actually be drawn: a deleted image
     // left the row transparent over a blank white window. Everything inside is told
@@ -135,7 +136,7 @@ fun AppLayout(
                 Screen.Profile ->
                     ProfileSurface(
                         session       = currentSession,
-                        authResolving = appState is AppState.Loading,
+                        authResolving = appState is SessionState.Resolving,
                     )
 
                 Screen.Wardrobe ->

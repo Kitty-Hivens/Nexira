@@ -1,4 +1,4 @@
-package hivens.launcher.bootstrap
+package hivens.accounts
 
 import hivens.auth.AuthProvider
 import hivens.auth.microsoft.MsaAuthProvider
@@ -8,9 +8,10 @@ import hivens.core.data.AuthStatus
 import hivens.core.data.OfflineIdentity
 import hivens.core.data.SessionData
 import hivens.core.data.SettingsData
-import hivens.launcher.bootstrap.AutoLoginCoordinator.Resolution
+import hivens.accounts.AutoLoginCoordinator.Resolution
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -23,7 +24,9 @@ class AutoLoginCoordinatorTest {
 
     // The offline branch returns before touching the network deps, so a strict
     // mock here also asserts it is never called.
-    private val authService: AuthProvider = mockk()
+    private val authService: AuthProvider = mockk<AuthProvider>().also {
+        every { it.defaultServerId } returns "Industrial"
+    }
 
     private suspend fun resolve(settings: SettingsData, saved: SessionData?, msa: MsaAuthProvider? = null) =
         AutoLoginCoordinator.resolveSession(

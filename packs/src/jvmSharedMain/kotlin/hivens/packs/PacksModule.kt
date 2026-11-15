@@ -4,6 +4,8 @@
 
 package hivens.packs
 
+import hivens.accounts.LaunchIdentity
+import hivens.accounts.LaunchSessions
 import hivens.auth.OfflineAuthProvider
 import hivens.core.api.catalogue.CataloguePack
 import hivens.core.api.catalogue.CataloguePackDetails
@@ -28,8 +30,10 @@ import hivens.widget.api.ModuleContribution
 import hivens.widget.api.ModuleKeys
 import hivens.widget.api.ModuleStrings
 import hivens.widget.api.command
+import hivens.widget.api.find
 import hivens.widget.api.flowSource
 import hivens.widget.api.get
+import hivens.widget.api.hostServices
 import hivens.widget.api.service
 import hivens.widget.model.ApiVersion
 import hivens.widget.model.ScopeLevel
@@ -131,7 +135,9 @@ object PackKeysContribution : KeyContribution {
             mapped(app.hostServices.get<ReattachPreviews>().previews, app.coroutineScope) { all -> all.mapValues { (_, it) -> it.toView() } }
         }
 
-        // What is done to packs is the same whoever asks. A launch runs as the host's session.
+        // What is done to packs is the same whoever asks. A launch runs as the session
+        // the accounts module keeps for the modules the host trusts, read at the press,
+        // and as nobody where no accounts module is brought in.
         keys.command(PackKeys.LaunchPack) { app ->
             val services = app.hostServices
             val host = services.get<PacksHost>()
@@ -139,7 +145,10 @@ object PackKeysContribution : KeyContribution {
             val actions = services.get<PackActions>()
             val settings = services.get<ISettingsService>()
             val offline = services.get<OfflineAuthProvider>()
-            command { id -> launchPack(id, host.identity, packs, actions, settings, offline, host, app.coroutineScope) }
+            command { id ->
+                val identity = services.find<LaunchSessions>()?.identity ?: LaunchIdentity.Nobody
+                launchPack(id, identity, packs, actions, settings, offline, host, app.coroutineScope)
+            }
         }
         keys.command(PackKeys.StopPack) { app -> command(app.hostServices.get<PackActions>()::stop) }
         keys.command(PackKeys.InstallPack) { app ->

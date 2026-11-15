@@ -2,7 +2,6 @@ package hivens.ui.widgets
 
 import hivens.core.activity.Activity
 import hivens.core.data.ThemeMode
-import hivens.ui.AppState
 import hivens.ui.background.BackgroundSettings
 import hivens.ui.i18n.AppLocale
 import hivens.ui.navigation.NavState
@@ -29,6 +28,8 @@ import hivens.widget.model.SourceKey
  *
  * The packs and what is done to them are not here: they are the packs module's keys,
  * in `hivens.packs.api.PackKeys`, and exist only where the document names that module.
+ * Nor are the session and the accounts, which are the accounts module's, in
+ * `hivens.accounts.api.AccountKeys`.
  */
 object Sources {
     /**
@@ -63,13 +64,6 @@ object Sources {
      */
     val Navigation = SourceKey<NavState>("nav.state", ScopeLevel.Composition)
 
-    /**
-     * Who the launcher is signed in as, that nobody is, or that startup is still
-     * finding out. The app's, since the accounts are. Moved by [Commands.SignIn] and
-     * [Commands.SignOut].
-     */
-    val Session = SourceKey<AppState>("app.state")
-
     /** Whether the user let the launcher reach its own server past a certificate it does not trust. */
     val SslBypass = SourceKey<Boolean>("ssl.bypass")
 
@@ -78,14 +72,6 @@ object Sources {
 
     /** The machine's memory and processor, read once a run. */
     val SystemInfo = SourceKey<SystemFacts>("system.info")
-
-    /**
-     * Moves whenever an account is signed in or out. The account store has no
-     * reactive seam of its own, and removing an account that was not fronting the
-     * shell leaves the session as it was, so a reader keyed on the session alone
-     * went on offering an account that was gone. Moved by [Commands.AccountsChanged].
-     */
-    val AccountsRevision = SourceKey<Int>("accounts.revision")
 
     /** Every theme there is and the one in use, as the composition draws with them. Changed through [Commands.ApplyTheme]. */
     val ThemeLibrary = SourceKey<ThemeLibrary>("theme.library", ScopeLevel.Composition)

@@ -1,6 +1,5 @@
 package hivens.ui.widgets
 
-import hivens.core.data.SessionData
 import hivens.core.data.ThemeMode
 import hivens.ui.Screen
 import hivens.ui.background.BackgroundSettings
@@ -26,7 +25,8 @@ import hivens.widget.model.ScopeLevel
  * wherever such a level is, whoever draws it. The history's are provided by the
  * composition's owner, so a window moves its own history.
  *
- * The pack commands are the packs module's, in `hivens.packs.api.PackKeys`.
+ * The pack commands are the packs module's, in `hivens.packs.api.PackKeys`, and the
+ * sign-in and sign-out commands the accounts module's, in `hivens.accounts.api.AccountKeys`.
  */
 object Commands {
     val ClearNotifications = CommandKey<Unit>("notifications.clear")
@@ -60,20 +60,8 @@ object Commands {
     /** Steps back to a screen already in the trail. */
     val PopTo = CommandKey<Screen>("nav.popTo", ScopeLevel.Composition)
 
-    /** Makes a session the one the launcher is signed in as. */
-    val SignIn = CommandKey<SessionData>("auth.signIn")
-
-    /**
-     * Signs out of everything: every stored account, the face choice and the
-     * offline name. At once, so whatever offers it asks the person first.
-     */
-    val SignOut = CommandKey<Unit>("auth.signOut")
-
     /** Changes the wallpaper settings by one change applied to what they are when it lands. */
     val UpdateBackground = CommandKey<BackgroundSettings.() -> BackgroundSettings>("background.update")
-
-    /** Says an account was signed in or out. Paired with [Sources.AccountsRevision]. */
-    val AccountsChanged = CommandKey<Unit>("accounts.changed")
 
     /** Puts the theme of this id in use. */
     val ApplyTheme = CommandKey<String>("theme.apply", ScopeLevel.Composition)

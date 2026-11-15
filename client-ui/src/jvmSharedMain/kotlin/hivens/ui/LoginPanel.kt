@@ -15,21 +15,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.text.input.KeyboardActionHandler
+import hivens.accounts.api.AccountKeys
+import hivens.accounts.api.PasswordSignIn
+import hivens.accounts.api.SignInCode
+import hivens.accounts.api.SignInError
+import hivens.accounts.api.SignInFlow
 import hivens.ui.nx.rememberFieldState
 import androidx.compose.ui.unit.dp
-import hivens.config.Protocol
-import hivens.core.api.AuthException
-import hivens.core.api.TwoFactorRequiredException
-import hivens.core.api.interfaces.ISettingsService
-import hivens.core.data.AuthStatus
-import hivens.auth.AuthProvider
-import hivens.auth.OfflineAuthProvider
-import hivens.core.data.SessionData
-import hivens.auth.AccountStore
-import hivens.launcher.network.CertificateTrustGate
-import hivens.launcher.network.ServerProtocolConfig
 import hivens.ui.components.ConfirmCodeDialog
 import hivens.ui.components.MicrosoftSignInButton
+import hivens.ui.components.words
 import hivens.ui.flexible.Flexible
 import hivens.ui.flexible.FlexibleKind
 import hivens.ui.nx.NxButton
@@ -42,61 +37,59 @@ import hivens.ui.puppet.PuppetField
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.puppet.PuppetToggle
 import hivens.ui.platform.SystemActions
-import hivens.ui.utils.PreferenceWriter
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import org.koin.compose.koinInject
+import hivens.widget.api.rememberScopedCommand
+import hivens.widget.api.rememberScopedSource
+import hivens.widget.api.valueOrNull
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.Status
 
+/**
+ * The SmartyCraft sign-in form, with offline play and, where [showMicrosoft], the
+ * Microsoft button under it.
+ *
+ * Everything it does goes through the accounts module's keys: the sign-in, the second
+ * factor the provider may ask for, offline play and the remember choice. It keeps the
+ * fields and nothing else, and draws where the module says the sign-in stands. Once a
+ * sign-in works the module signs the launcher in, so the form has nothing to hand on.
+ * Where no accounts module is brought in it draws nothing.
+ */
 @Composable
 fun LoginPanel(
-    onLogin: (SessionData) -> Unit,
     showOffline: Boolean = true,
     showMicrosoft: Boolean = true,
 ) {
-    val authService: AuthProvider              = koinInject()
-    val credentialsManager: AccountStore       = koinInject()
-    val protocolConfig: ServerProtocolConfig   = koinInject()
-    val certificateGate: CertificateTrustGate  = koinInject()
-    val offlineProvider: OfflineAuthProvider   = koinInject()
-    val settingsService: ISettingsService      = koinInject()
-    val preferences: PreferenceWriter          = koinInject()
+    val flows = rememberScopedSource(AccountKeys.SignIns).valueOrNull() ?: return
+    val providers = rememberScopedSource(AccountKeys.Providers).valueOrNull() ?: return
+    val rememberMe = rememberScopedSource(AccountKeys.Remember).valueOrNull() ?: return
+    val signIn = rememberScopedCommand(AccountKeys.SignInSmartyCraft) ?: return
+    val signInOffline = rememberScopedCommand(AccountKeys.SignInOffline) ?: return
+    val answerCode = rememberScopedCommand(AccountKeys.SignInCode) ?: return
+    val cancel = rememberScopedCommand(AccountKeys.CancelSignIn) ?: return
+    val setRemember = rememberScopedCommand(AccountKeys.SetRemember) ?: return
     val s            = LocalStrings.current
-    val scope        = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
 
     var login        by remember { mutableStateOf("") }
     var password     by remember { mutableStateOf("") }
-    // Seeded from the persisted choice rather than always-on: the box gates every
-    // save path below, so a session-local default of true silently re-armed saving
-    // on the next start for a user who had turned it off.
-    var rememberMe   by remember { mutableStateOf(settingsService.getSettings().saveCredentials) }
-    var isLoading    by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
 
-    // The choice outlives the panel, so it is persisted on the flip rather than at
-    // login: a user who unticks and then closes the window without signing in has
-    // still expressed it. Does NOT touch credentials already stored -- turning the
-    // box off stops future saves and nothing else.
-    val setRememberMe: (Boolean) -> Unit = { value ->
-        rememberMe = value
-        preferences.write("remember me") { settingsService.updateSettings { it.copy(saveCredentials = value) } }
+    val provider = AccountKeys.SMARTYCRAFT
+    val flow = flows[provider]
+    val offlineFlow = flows[AccountKeys.OFFLINE]
+    val registerUrl = providers.firstOrNull { it.key == provider }?.registerUrl
+    val isLoading = flow == SignInFlow.Working
+    val twoFactorUnsupported = (flow as? SignInFlow.Failed)?.error?.code == SignInError.SECOND_FACTOR_UNSUPPORTED
+    // What went wrong, the sign-in's own failure first and then offline play's.
+    val errorMessage = listOfNotNull(flow, offlineFlow)
+        .filterIsInstance<SignInFlow.Failed>()
+        .firstOrNull { it.error.code != SignInError.SECOND_FACTOR_UNSUPPORTED }
+        ?.error?.words(s)
+
+    // Typing over a failure says it was read: the form stops showing it.
+    fun edited() {
+        if (flow is SignInFlow.Failed) cancel(provider)
+        if (offlineFlow is SignInFlow.Failed) cancel(AccountKeys.OFFLINE)
     }
-
-    // 2FA flow state. Which path a TWOAUTH demand takes is decided by the
-    // provider's AuthCapabilities.supports2FA: a capable provider opens the
-    // [twoFactorPending] / completeTwoFactor / ConfirmCodeDialog path, which is
-    // now what SmartyCraft takes. The [twoFactorUnsupported] banner remains for a
-    // provider that raises the demand without being able to answer it.
-    data class TwoFactorPending(val uid: String, val username: String, val password: String, val serverId: String)
-    var twoFactorPending      by remember { mutableStateOf<TwoFactorPending?>(null) }
-    var twoFactorError        by remember { mutableStateOf<String?>(null) }
-    var twoFactorBusy         by remember { mutableStateOf(false) }
-    var twoFactorUnsupported  by remember { mutableStateOf(false) }
 
     val fieldColors = OutlinedTextFieldDefaults.colors(
         focusedTextColor        = NxInk.main,
@@ -112,166 +105,31 @@ fun LoginPanel(
 
     fun doLogin() {
         // The button and the automation hook are both off while one is in flight, and
-        // Enter in the password field was not: a second sign-in started beside the
-        // first, and on SmartyCraft each login retires the uid the one before it got.
+        // Enter in the password field was not. The module holds one sign-in at a time
+        // as well, since on SmartyCraft each login retires the uid the one before it got.
         if (isLoading) return
-        if (login.isBlank() || password.isBlank()) { errorMessage = s.loginErrorEmpty; return }
-        focusManager.clearFocus()
-        isLoading             = true
-        errorMessage          = null
-        twoFactorUnsupported  = false
-        // No account name in any of these: the ring pre-fills a crash report and is
-        // copied into the diagnostic bundle, and what it is for is what happened.
-        hivens.core.diag.ActionRing.record("Login attempt")
-        scope.launch {
-            try {
-                val session = withContext(Dispatchers.IO) {
-                    val sess = authService.login(login, password, Protocol.DEFAULT_SERVER_ID)
-                    if (rememberMe) credentialsManager.saveAccount(sess, authService.id)
-                    sess
-                }
-                hivens.core.diag.ActionRing.record("Login OK")
-                // Cleared on success as well. Where the panel stays on screen after a
-                // sign-in, a profile section signing in a second provider, it went on
-                // showing the spinner over a form that was done.
-                isLoading = false
-                onLogin(session)
-            } catch (e: TwoFactorRequiredException) {
-                isLoading = false
-                if (authService.capabilities.supports2FA) {
-                    // Provider runs a real second factor: open the code dialog.
-                    hivens.core.diag.ActionRing.record("Login: 2FA required, prompting for code")
-                    twoFactorPending = TwoFactorPending(
-                        uid = e.uid.orEmpty(),
-                        username = login,
-                        password = password,
-                        serverId = Protocol.DEFAULT_SERVER_ID,
-                    )
-                } else {
-                    // The provider raised a second-factor demand it cannot
-                    // complete. Nothing to prompt for, so say so plainly.
-                    hivens.core.diag.ActionRing.record(
-                        "Login: 2FA detected, rejected (unsupported on this provider)"
-                    )
-                    twoFactorUnsupported = true
-                }
-            } catch (e: AuthException) {
-                isLoading = false
-                hivens.core.diag.ActionRing.record(
-                    "Login failed (auth): ssl=${e.isSslError} msg=${e.message?.take(80)}"
-                )
-                when {
-                    // The certificate question is the shell's to ask now, so the form
-                    // no longer draws its own copy of it: the same refusal reaches the
-                    // roster and the news, and one dialog for one decision beats a
-                    // banner that only the login path could raise. The retry rides
-                    // along -- accepting here means the user wanted to sign in. The
-                    // gate records the grant before it runs, so the same provider
-                    // now reaches the host over the bypassed channel.
-                    e.isSslError -> certificateGate.request(protocolConfig.sslBypassHost) {
-                        doLogin()
-                    }
-                    else         -> errorMessage = e.message
-                        ?.replace("java.lang.Exception: ", "")
-                        ?.substringAfter("API: ")
-                        ?: s.loginErrorGeneric
-                }
-            } catch (e: Exception) {
-                isLoading    = false
-                hivens.core.diag.ActionRing.record("Login failed (generic): msg=${e.message?.take(80)}")
-                errorMessage = e.message ?: s.loginErrorGeneric
-            }
-        }
+        if (login.isNotBlank() && password.isNotBlank()) focusManager.clearFocus()
+        signIn(PasswordSignIn(login, password, remember = rememberMe))
     }
 
     fun playOffline() {
-        val name = login.trim()
-        if (name.isEmpty()) { errorMessage = s.loginErrorEmpty; return }
-        focusManager.clearFocus()
-        errorMessage = null
-        scope.launch {
-            // Caught like the sign-in above. Unguarded, a settings file that could not
-            // be written threw out of the composition's scope and raised the crash
-            // dialog over a press of "play offline".
-            val session = try {
-                withContext(Dispatchers.IO) {
-                    val sess = offlineProvider.login(name, "", "")
-                    // Remember the offline name so a restart -- or the Settings offline
-                    // toggle -- restores this identity without re-typing.
-                    settingsService.updateSettings { it.copy(offlinePlayerName = name) }
-                    sess
-                }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                hivens.core.diag.ActionRing.record("Play offline failed: msg=${e.message?.take(80)}")
-                errorMessage = e.message ?: s.loginErrorGeneric
-                return@launch
-            }
-            hivens.core.diag.ActionRing.record("Play offline")
-            onLogin(session)
-        }
+        if (login.isNotBlank()) focusManager.clearFocus()
+        signInOffline(login)
     }
 
-    fun submitTwoFactor(code: String) {
-        val pending = twoFactorPending ?: return
-        twoFactorBusy = true
-        twoFactorError = null
-        scope.launch {
-            try {
-                val session = withContext(Dispatchers.IO) {
-                    val sess = authService.completeTwoFactor(
-                        username = pending.username, password = pending.password,
-                        serverId = pending.serverId, uid = pending.uid, code = code,
-                    )
-                    if (rememberMe) credentialsManager.saveAccount(sess, authService.id)
-                    sess
-                }
-                hivens.core.diag.ActionRing.record("Login OK after 2FA")
-                twoFactorBusy = false
-                twoFactorPending = null
-                onLogin(session)
-            } catch (e: AuthException) {
-                twoFactorBusy = false
-                hivens.core.diag.ActionRing.record(
-                    "2FA verify failed: status=${e.status}"
-                )
-                when (e.status) {
-                    AuthStatus.WRONG_CODE -> twoFactorError = s.auth2faInvalid
-                    AuthStatus.TWO_FACTOR_EXPIRED -> {
-                        // Session is gone server-side -- close the dialog and
-                        // surface in the main login form so the user retries
-                        // from scratch.
-                        twoFactorPending = null
-                        errorMessage = s.auth2faExpired
-                    }
-                    else -> twoFactorError = e.message ?: s.loginErrorGeneric
-                }
-            } catch (e: Exception) {
-                twoFactorBusy = false
-                twoFactorError = e.message ?: s.loginErrorGeneric
-            }
-        }
-    }
-
-    // 2FA prompt -- renders only while we're awaiting a code. Decoupled
-    // from the login form below so the form retains its state (username,
-    // password, rememberMe) for the resume path. Dismissal cancels the
-    // 2FA flow without clearing the form, letting the user retry.
-    twoFactorPending?.let {
+    // The 2FA prompt renders only while the provider waits for a code. Decoupled
+    // from the login form below so the form keeps its fields for the resume path.
+    // Dismissal gives the sign-in up without clearing the form, letting the user retry.
+    (flow as? SignInFlow.SecondFactor)?.let { asked ->
         // Puppet: this dialog overrides the screen marker while open so
         // /screen returns "Login_2FA" -- drivers can detect the modal and
         // pivot to the 2FA-specific element ids instead of the form ones.
         PuppetScreen("Login_2FA")
         ConfirmCodeDialog(
-            onDismiss = {
-                twoFactorPending = null
-                twoFactorError = null
-                twoFactorBusy = false
-            },
-            onSubmit = { code -> submitTwoFactor(code) },
-            errorMessage = twoFactorError,
-            isSubmitting = twoFactorBusy,
+            onDismiss = { cancel(provider) },
+            onSubmit = { code -> answerCode(SignInCode(provider, code)) },
+            errorMessage = asked.error?.words(s),
+            isSubmitting = asked.checking,
         )
     }
 
@@ -297,7 +155,7 @@ fun LoginPanel(
                 body  = s.auth2faUnsupportedBody,
             ) {
                 OutlinedButton(
-                    onClick  = { twoFactorUnsupported = false },
+                    onClick  = { cancel(provider) },
                     modifier = Modifier.align(Alignment.End),
                     shape    = MaterialTheme.shapes.small,
                 ) {
@@ -309,7 +167,7 @@ fun LoginPanel(
         // ── Regular error ─────────────────────────────────────────────────
         if (errorMessage != null) {
             Text(
-                text     = errorMessage ?: "",
+                text     = errorMessage,
                 style    = MaterialTheme.typography.bodySmall,
                 color    = NxColor.status(Status.Error),
                 modifier = Modifier
@@ -325,7 +183,7 @@ fun LoginPanel(
         // ── Fields ────────────────────────────────────────────────────────
         OutlinedTextField(
             value         = login,
-            onValueChange = { login = it; errorMessage = null; twoFactorUnsupported = false },
+            onValueChange = { login = it; edited() },
             label         = { Text(s.loginUsername) },
             modifier      = Modifier.fillMaxWidth(),
             singleLine    = true,
@@ -336,10 +194,10 @@ fun LoginPanel(
         )
         PuppetField("login.username", login) {
             login = it
-            errorMessage = null
+            edited()
         }
 
-        val passwordState = rememberFieldState(password) { password = it; errorMessage = null; twoFactorUnsupported = false }
+        val passwordState = rememberFieldState(password) { password = it; edited() }
         OutlinedSecureTextField(
             state            = passwordState,
             label            = { Text(s.loginPassword) },
@@ -354,13 +212,15 @@ fun LoginPanel(
         )
         PuppetField("login.password", password) {
             password = it
-            errorMessage = null
+            edited()
         }
 
+        // The choice outlives the panel, so it is kept on the flip rather than at a
+        // sign-in, and turning it off stops future saves and nothing else.
         Row(verticalAlignment = Alignment.CenterVertically) {
             Checkbox(
                 checked         = rememberMe,
-                onCheckedChange = setRememberMe,
+                onCheckedChange = setRemember,
                 colors          = CheckboxDefaults.colors(
                     checkedColor   = NxColor.lead(),
                     uncheckedColor = NxInk.quiet.copy(alpha = 0.4f)
@@ -372,7 +232,7 @@ fun LoginPanel(
                 color = NxInk.quiet
             )
         }
-        PuppetToggle("login.rememberMe", rememberMe, onValueChange = setRememberMe)
+        PuppetToggle("login.rememberMe", rememberMe, onValueChange = setRemember)
 
         // LOG IN -- chaos target (only when not loading, loading state stays reliable)
         if (isLoading) {
@@ -406,21 +266,23 @@ fun LoginPanel(
         PuppetClick("login.submit", enabled = !isLoading) { doLogin() }
 
         // REGISTER -- chaos target
-        Flexible("login_register_btn", FlexibleKind.Button) {
-            NxButton(
-                label     = s.loginRegister,
-                onClick   = { SystemActions.openUrl("${protocolConfig.baseUrl}/register") },
-                modifier  = Modifier.fillMaxWidth(),
-                style     = NxButtonStyle.Tertiary,
-                minHeight = 42.dp,
-            )
-        }
-        PuppetClick("login.register") {
-            SystemActions.openUrl("${protocolConfig.baseUrl}/register")
+        if (registerUrl != null) {
+            Flexible("login_register_btn", FlexibleKind.Button) {
+                NxButton(
+                    label     = s.loginRegister,
+                    onClick   = { SystemActions.openUrl(registerUrl) },
+                    modifier  = Modifier.fillMaxWidth(),
+                    style     = NxButtonStyle.Tertiary,
+                    minHeight = 42.dp,
+                )
+            }
+            PuppetClick("login.register") {
+                SystemActions.openUrl(registerUrl)
+            }
         }
 
         // PLAY OFFLINE -- offline identity, no network. Reuses the username field
-        // as the offline name and remembers it for next time.
+        // as the offline name, which the module keeps for next time.
         if (showOffline) {
             Flexible("login_offline_btn", FlexibleKind.Button) {
                 NxButton(
@@ -437,10 +299,7 @@ fun LoginPanel(
         // SIGN IN WITH MICROSOFT -- present only when a client id is configured
         // (the provider registers and advertises device-code capability then).
         if (showMicrosoft) {
-            MicrosoftSignInButton(onSignedIn = onLogin, rememberAccount = rememberMe)
+            MicrosoftSignInButton(rememberAccount = rememberMe)
         }
     }
 }
-
-// ─── Account Panel ────────────────────────────────────────────────────────────
-

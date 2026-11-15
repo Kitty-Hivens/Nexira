@@ -11,8 +11,9 @@ plugins {
 // into the application for now and handed to the host as a CompiledModule.
 //
 // It knows the engine (client-core, client-launcher, client-auth) and the kernel, and
-// never client-ui: what it needs from the application around it, the session and the
-// launch notices, comes in through PacksHost, which the host implements.
+// never client-ui: what it needs from the application around it, the launch notices,
+// comes in through PacksHost, which the host implements. Who a launch runs as is the
+// accounts module's, read through the service it keeps for the modules the host trusts.
 kotlin {
     // KMP modules don't apply the `java` plugin, so the root's toolchain pin skips
     // them. Set here, org.gradle.jvm.version matches the JDK 27 modules.
@@ -39,6 +40,7 @@ kotlin {
             dependencies {
                 api(project(":packs-api"))
                 api(project(":widget-api"))
+                implementation(project(":accounts"))
                 implementation(project(":client-core"))
                 implementation(project(":client-launcher"))
                 implementation(project(":client-auth"))

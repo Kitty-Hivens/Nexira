@@ -77,9 +77,9 @@ echo "[puppet] filling password"
 echo "[puppet] click login.submit"
 "$(dirname "$0")/click.sh" login.submit >/dev/null
 
-# Success detection: account.logout appears in the registry once
-# AppState transitions to Authenticated (the right-panel AccountPanel
-# renders). We do NOT rely on /screen — Nexira preserves the previously-
+# Success detection: account.logout appears in the registry once the
+# SmartyCraft account is stored and the profile's account section draws it
+# (the accounts module's accounts.list lists it). We do NOT rely on /screen: Nexira preserves the previously-
 # selected Screen across logout, so after login we may land back on
 # Settings instead of Dashboard, and the screen marker can lag because
 # PuppetScreen uses last-writer-wins (see PR #201 known limitations).

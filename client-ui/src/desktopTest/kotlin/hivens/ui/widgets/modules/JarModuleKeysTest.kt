@@ -1,8 +1,16 @@
 package hivens.ui.widgets.modules
 
+import hivens.accounts.AccountsModule
+import hivens.accounts.SessionStore
+import hivens.ui.host.LauncherHostAccess
+import hivens.widget.api.hostServices
+import hivens.accounts.api.AccountKeys
+import hivens.accounts.api.AccountsApi
+import hivens.accounts.api.SessionState
 import hivens.packs.PacksModule
 import hivens.ui.HostKeys
 import hivens.ui.JarKeys
+import hivens.ui.accounts.accountsEngineStandIns
 import hivens.ui.background.BackgroundSettings
 import hivens.ui.followModuleReloads
 import hivens.ui.jarKeysOf
@@ -16,7 +24,9 @@ import hivens.widget.api.ModuleKeys
 import hivens.widget.api.WidgetScope
 import hivens.widget.api.current
 import hivens.widget.api.flowSource
+import hivens.widget.api.service
 import hivens.widget.generated.GeneratedWidgetRegistry
+import hivens.widget.model.ScopeLevel
 import hivens.widget.model.SourceKey
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -89,9 +99,8 @@ class JarModuleKeysTest {
             doNotDisturb     = MutableStateFlow(false),
             sslBypass        = flowSource(MutableStateFlow(false)),
             background       = MutableStateFlow(BackgroundSettings()),
-            accountsRevision = MutableStateFlow(0),
         )
-        return HostKeys(data, uiCommandRegistry({}, {}, {}, {}), ContributedServices()).also {
+        return HostKeys(data, uiCommandRegistry({}, {}, {}), ContributedServices()).also {
             moduleKeys(it, named, compiled = listOf(PacksModule), jars = jarKeysOf(modules), onCrash = modules::switchOffAfterCrash)
         }
     }
@@ -156,13 +165,104 @@ class JarModuleKeysTest {
             doNotDisturb     = MutableStateFlow(false),
             sslBypass        = flowSource(MutableStateFlow(false)),
             background       = MutableStateFlow(BackgroundSettings()),
-            accountsRevision = MutableStateFlow(0),
         )
-        val keys = HostKeys(data, uiCommandRegistry({}, {}, {}, {}), ContributedServices())
+        val keys = HostKeys(data, uiCommandRegistry({}, {}, {}), ContributedServices())
         moduleKeys(keys, emptySet(), compiled = emptyList(), jars = listOf(JarKeys("broken", "Broken", "broken.keys") { broken })) { id, cause ->
             crashed += id to cause
         }
         assertEquals("broken", crashed.single().first)
         assertIs<NotImplementedError>(crashed.single().second)
+    }
+
+    /**
+     * Everything that holds a token or the cached password, by name, the way a jar
+     * that cannot compile against them would look them up. The accounts module's own
+     * services are among them: each stands on the credential store.
+     */
+    private val secrets = listOf(
+        "hivens.accounts.SessionStore",
+        "hivens.accounts.LaunchSessions",
+        "hivens.accounts.AccountDirectory",
+        "hivens.accounts.SignIns",
+        "hivens.accounts.LaunchSecondFactor",
+        "hivens.accounts.SkinUploads",
+        "hivens.accounts.TwoFactorLaunchGate",
+        "hivens.auth.AccountStore",
+        "hivens.core.api.interfaces.ICredentialStore",
+    ).map { Class.forName(it).kotlin }
+
+    /** The service a prying jar declares, so its maker runs. */
+    private class Pry
+
+    /** This level and every one above it. */
+    private fun WidgetScope.parentsAndSelf(): List<WidgetScope> = generateSequence(this) { it.parent }.toList()
+
+    @Test
+    fun `a jar module reaches neither the session with its tokens nor anything that holds one, and reads only the session view`() {
+        val reached = CopyOnWriteArrayList<String>()
+        val view = SourceKey<SessionState?>("prying.view")
+        val prying = object : KeyContribution {
+            override val id = "prying.keys"
+            override val label = "Prying"
+            override fun declare(keys: ModuleKeys) {
+                keys.service(ScopeLevel.App) { context ->
+                    secrets.forEach { type ->
+                        if (context.services.find(type) != null) reached += "maker: ${type.simpleName}"
+                        if (context.hostServices.find(type) != null) reached += "maker host view: ${type.simpleName}"
+                    }
+                    Pry()
+                }
+                keys.source(view) { app ->
+                    // Made here, so its maker looks too.
+                    assertNotNull(app.services.find(Pry::class))
+                    secrets.forEach { type ->
+                        if (app.services.find(type) != null) reached += "factory: ${type.simpleName}"
+                        if (app.hostServices.find(type) != null) reached += "factory host view: ${type.simpleName}"
+                    }
+                    flowSource(MutableStateFlow(app.find(AccountKeys.Session)?.state?.value))
+                }
+            }
+        }
+        val data = uiDataRegistry(
+            activity         = MutableStateFlow(emptyList()),
+            notifications    = MutableStateFlow(emptyList()),
+            doNotDisturb     = MutableStateFlow(false),
+            sslBypass        = flowSource(MutableStateFlow(false)),
+            background       = MutableStateFlow(BackgroundSettings()),
+        )
+        val keys = HostKeys(data, uiCommandRegistry({}, {}, {}), ContributedServices())
+        moduleKeys(
+            keys     = keys,
+            named    = setOf(AccountsApi.ID),
+            compiled = listOf(AccountsModule),
+            jars     = listOf(JarKeys("prying", "Prying", "prying.keys") { prying }),
+        )
+        val app: WidgetScope = koinApplication {
+            modules(
+                accountsEngineStandIns(),
+                module {
+                    single {
+                        WidgetScope.app(
+                            keys.sources, keys.appServices(KoinLevelServicesHost.app(this), Dispatchers.Unconfined), Dispatchers.Unconfined,
+                            keys.commands, access = LauncherHostAccess,
+                        )
+                    }
+                },
+            )
+        }.koin.get()
+        try {
+            val page = app.child(ScopeLevel.Window).child(ScopeLevel.Composition).child(ScopeLevel.Page)
+            assertNotNull(page.current(view), "the jar reads the session as a view")
+            assertEquals(emptyList(), reached.toList(), "a jar reached what holds a secret")
+            // What a widget holds is a level, and every way the API offers from a level:
+            // its services, and the host view a widget may opt in to and is handed none of.
+            val widgetReached = (page.parentsAndSelf()).flatMap { level ->
+                secrets.filter { level.services.find(it) != null || level.hostServices.find(it) != null }.map { "${level.level}: ${it.simpleName}" }
+            }
+            assertEquals(emptyList(), widgetReached, "a widget reached what holds a secret")
+            assertNotNull(LauncherHostAccess.servicesOf(app)?.find(SessionStore::class), "the host still reaches the session it trusts the accounts module with")
+        } finally {
+            keys.close()
+        }
     }
 }

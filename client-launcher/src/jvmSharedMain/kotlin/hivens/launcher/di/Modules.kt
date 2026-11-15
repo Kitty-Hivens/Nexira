@@ -419,7 +419,9 @@ val authModule = module {
     // bypassed channel kept its own copy of both: a code completed through one was
     // unknown to the other, which the launch asked next. The channel is the
     // protocol's choice per request, so the bypass never needed a provider.
-    single<AuthProvider> { SmartyCraftAuthProvider(get<IServerProtocol>()) }
+    single<AuthProvider> {
+        SmartyCraftAuthProvider(get<IServerProtocol>(), registerUrl = "${get<ServerProtocolConfig>().baseUrl}/register")
+    }
 
     // Offline-play provider + the Microsoft provider + the registry the content
     // router and launch gate consult. Microsoft is always constructible but only

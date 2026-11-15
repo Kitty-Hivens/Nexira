@@ -1,4 +1,4 @@
-package hivens.ui.components
+package hivens.accounts
 
 import hivens.core.data.SessionData
 import kotlin.test.Test

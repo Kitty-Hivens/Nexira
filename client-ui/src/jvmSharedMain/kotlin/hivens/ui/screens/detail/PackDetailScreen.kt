@@ -61,7 +61,7 @@ import hivens.core.data.PackOrigin
 import hivens.core.update.PackUpdateStatus
 import hivens.core.update.PackUpdateStatusHub
 import hivens.core.update.UpdateDirection
-import hivens.ui.AppState
+import hivens.accounts.api.SessionState
 import hivens.ui.components.BannerVideo
 import hivens.ui.components.FullscreenVideo
 import hivens.ui.components.LaunchControl
@@ -136,7 +136,7 @@ import hivens.ui.theme.originColor
 @Composable
 fun PackDetailScreen(
     instanceId: String,
-    appState: AppState,
+    appState: SessionState?,
     onBack: () -> Unit,
     initialShowSettings: Boolean = false,
     initialSettingsSection: PackSettingsCategory? = null,

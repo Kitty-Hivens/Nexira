@@ -1,6 +1,5 @@
-package hivens.launcher.bootstrap
+package hivens.accounts
 
-import hivens.config.Protocol
 import hivens.core.api.AuthException
 import hivens.core.api.TwoFactorRequiredException
 import hivens.auth.AuthProvider
@@ -147,7 +146,7 @@ object AutoLoginCoordinator {
         }
 
         val cachedPass = saved.cachedPassword ?: return Resolution.NoCredentials
-        val server = Protocol.DEFAULT_SERVER_ID
+        val server = authService.defaultServerId
 
         return try {
             Resolution.Success(authService.login(saved.playerName, cachedPass, server), signedIn = true)

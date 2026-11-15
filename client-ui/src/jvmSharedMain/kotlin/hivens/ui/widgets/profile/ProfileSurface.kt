@@ -17,7 +17,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import hivens.core.data.SessionData
+import hivens.accounts.api.SessionView
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import hivens.ui.i18n.LocalStrings
@@ -68,7 +68,7 @@ private val STACK_BELOW = 560.dp
 // recover.
 @Composable
 fun ProfileSurface(
-    session: SessionData?,
+    session: SessionView?,
     authResolving: Boolean,
 ) {
     val s = LocalStrings.current
@@ -81,7 +81,7 @@ fun ProfileSurface(
     // them regardless of the active tab. Skin refresh / top-up are signed-in
     // only, so they no-op without a session.
     PuppetScreen("Profile")
-    PuppetClick("profile.refreshSkin") { session?.let { skinManager.invalidate(it.playerName) } }
+    PuppetClick("profile.refreshSkin") { session?.let { skinManager.invalidate(it.name) } }
     PuppetClick("profile.topUp")       { SystemActions.openUrl("https://smartycraft.ru/cabinet") }
 
     Column(Modifier.fillMaxSize().padding(16.dp)) {

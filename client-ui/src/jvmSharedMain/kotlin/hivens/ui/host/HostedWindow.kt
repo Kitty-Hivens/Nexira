@@ -78,7 +78,7 @@ fun HostedWindow(
     val app = LocalScope.current
     val level = app?.let { rememberChildScope(it, ScopeLevel.Window) }
     if (level != null) remember(level, backend) { level.provideWindow(backend) }
-    val families = remember(level) { level?.hostServices?.find<SurfaceFamilies>() ?: SurfaceFamilies() }
+    val families = remember(level) { level?.launcherServices?.find<SurfaceFamilies>() ?: SurfaceFamilies() }
     CompositionLocalProvider(
         // A refused window is in no registry, so nothing may be held against it.
         LocalHostWindow provides host.takeUnless { registered.refused },

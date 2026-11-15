@@ -91,7 +91,7 @@ fun registerModuleKeys(
         log.error("Module '{}' could not declare its keys", moduleId, e)
         return ModuleKeysResult.Refused("its keys could not be declared: ${e.message ?: e.javaClass.simpleName}", e)
     }
-    first.fault(moduleId, sources, commands, services)?.let { return ModuleKeysResult.Refused(it) }
+    first.fault(moduleId, sources, commands, services, trusted)?.let { return ModuleKeysResult.Refused(it) }
     val live = Live(moduleId, current, contribution, first)
     first.commit(moduleId, live, sources, commands, services, trusted)
     return ModuleKeysResult.Registered(
@@ -141,7 +141,7 @@ private class Declaration : ModuleKeys {
 
     class Source(val key: SourceKey<*>, val sample: (() -> Any?)?, val factory: SourceFactory<*>)
     class Command(val key: CommandKey<*>, val factory: CommandFactory<*>)
-    class Service(val level: ScopeLevel, val make: (ServiceContext) -> Any)
+    class Service(val level: ScopeLevel, val hostOnly: Boolean, val make: (ServiceContext) -> Any)
 
     val sources = LinkedHashMap<String, Source>()
     val commands = LinkedHashMap<String, Command>()
@@ -183,12 +183,30 @@ private class Declaration : ModuleKeys {
 
     override fun <T : Any> service(level: ScopeLevel, type: KClass<T>, make: (ServiceContext) -> T) {
         if (type in services) return flaw("it declares the service ${type.qualifiedName} twice")
-        services[type] = Service(level, make)
+        services[type] = Service(level, hostOnly = false, make)
     }
 
-    /** Why these cannot all be registered beside what [sources], [commands] and [services] hold, or null when they can. */
-    fun fault(moduleId: String, sources: WidgetDataRegistry, commands: WidgetCommandRegistry, services: ContributedServices): String? {
+    override fun <T : Any> hostService(level: ScopeLevel, type: KClass<T>, make: (ServiceContext) -> T) {
+        if (type in services) return flaw("it declares the service ${type.qualifiedName} twice")
+        services[type] = Service(level, hostOnly = true, make)
+    }
+
+    /**
+     * Why these cannot all be registered beside what [sources], [commands] and
+     * [services] hold, for a module [trusted] or not, or null when they can.
+     */
+    fun fault(
+        moduleId: String,
+        sources: WidgetDataRegistry,
+        commands: WidgetCommandRegistry,
+        services: ContributedServices,
+        trusted: Boolean,
+    ): String? {
         flaw?.let { return it }
+        if (!trusted) {
+            this.services.entries.firstOrNull { it.value.hostOnly }
+                ?.let { return "only a module the host trusts may keep the service ${it.key.qualifiedName} for the host" }
+        }
         (this.sources.keys + ownedSources.keys).firstOrNull { sources.declarationOf(it) != null }
             ?.let { return "the source '$it' is already answered elsewhere" }
         (this.commands.keys + ownedCommands.keys).firstOrNull { commands.declarationOf(it) != null }
@@ -251,8 +269,8 @@ private class Declaration : ModuleKeys {
         ownedCommands.values.forEach { commands.declare(it) }
         this.services.forEach { (type, declared) ->
             val name = type.simpleName ?: "a service"
-            services.declare(declared.level, type as KClass<Any>, moduleId, trusted) { context ->
-                val now = live.declaration(name).services[type]?.takeIf { it.level == declared.level }
+            services.declare(declared.level, type as KClass<Any>, moduleId, trusted, declared.hostOnly) { context ->
+                val now = live.declaration(name).services[type]?.takeIf { it.level == declared.level && it.hostOnly == declared.hostOnly }
                     ?: error("module '$moduleId' no longer declares the service $name at ${declared.level}")
                 contained(moduleId, name) { now.make(context) }
             }
@@ -265,12 +283,13 @@ private class Declaration : ModuleKeys {
     }
 }
 
-/** [this] as a module that is not [trusted] may see it: its host services are only what every module sees. */
+/**
+ * [this] as a module that is not [trusted] may see it: the level without its host
+ * view, so `hostServices` answers only what every module sees.
+ */
 private fun LevelContext.seenBy(trusted: Boolean): LevelContext = if (trusted) this else Untrusted(this)
 
-private class Untrusted(private val inner: LevelContext) : LevelContext by inner {
-    override val hostServices: LevelServices get() = inner.services
-}
+private class Untrusted(inner: LevelContext) : LevelContext by inner
 
 /**
  * The services modules declared, by type, the levels they are made for, and the host
@@ -278,26 +297,43 @@ private class Untrusted(private val inner: LevelContext) : LevelContext by inner
  *
  * The host lays these over its own services with [host], which gives every level two
  * views. Its `services`, which modules and their widgets read, answers the services
- * modules declared and the host types [expose]d and nothing else, so the host's own
- * graph (a session store with its tokens, say) stays out of a module's reach. Its
- * `hostServices` answers the host's own services first and then the declared ones,
- * for the host and for the modules it trusts. A module's service is made lazily,
- * once per level of its kind, and closed with that level's services.
+ * modules declared for everyone and the host types [expose]d and nothing else, so the
+ * host's own graph (a session store with its tokens, say) stays out of a module's
+ * reach. Its `hostServices` answers the host's own services first and then every
+ * declared one, those kept for the host among them, for the host and for the modules
+ * it trusts. A module's service is made lazily, once per level of its kind, and
+ * closed with that level's services.
  */
 @HostApi
 class ContributedServices {
 
-    private class Declared(val level: ScopeLevel, val owner: String, val trusted: Boolean, val make: (ServiceContext) -> Any)
+    private class Declared(
+        val level: ScopeLevel,
+        val owner: String,
+        val trusted: Boolean,
+        val hostOnly: Boolean,
+        val make: (ServiceContext) -> Any,
+    )
 
     private val declared = HashMap<KClass<*>, Declared>()
 
     private val exposed = HashSet<KClass<*>>()
 
-    /** Declares [type] as made by [make] once per level of kind [level], on behalf of module [owner]. */
-    fun <T : Any> declare(level: ScopeLevel, type: KClass<T>, owner: String, trusted: Boolean = false, make: (ServiceContext) -> T) {
+    /**
+     * Declares [type] as made by [make] once per level of kind [level], on behalf of
+     * module [owner]. With [hostOnly] it is answered only through a level's host view.
+     */
+    fun <T : Any> declare(
+        level: ScopeLevel,
+        type: KClass<T>,
+        owner: String,
+        trusted: Boolean = false,
+        hostOnly: Boolean = false,
+        make: (ServiceContext) -> T,
+    ) {
         synchronized(declared) {
             require(type !in declared) { "the service ${type.qualifiedName} is already declared by '${declared.getValue(type).owner}'" }
-            declared[type] = Declared(level, owner, trusted, make)
+            declared[type] = Declared(level, owner, trusted, hostOnly, make)
         }
     }
 
@@ -340,10 +376,10 @@ class ContributedServices {
         private var closed = false
 
         override val hostServices: ContributedLevelServices =
-            ContributedLevelServices(inner.hostServices, this::contributed) { true }
+            ContributedLevelServices(inner.hostServices, { contributed(it, hostView = true) }) { true }
 
         override val services: ContributedLevelServices =
-            ContributedLevelServices(inner.hostServices, this::contributed, ::isExposed)
+            ContributedLevelServices(inner.hostServices, { contributed(it, hostView = false) }, ::isExposed)
 
         private fun contextFor(declaration: Declared) = object : ServiceContext {
             override val level: ScopeLevel get() = this@Shelf.level
@@ -353,22 +389,47 @@ class ContributedServices {
                 get() = if (declaration.trusted) this@Shelf.hostServices else this@Shelf.services
         }
 
+        // One gate per service type, held while its maker runs.
+        private val gates = HashMap<KClass<*>, Gate>()
+
         // What a module declared for this level's kind, made here, or else the nearest
-        // level above's. Made outside the lock, so a maker may ask for another service,
-        // and the first one stored wins.
-        fun contributed(type: KClass<*>): Any? {
+        // level above's. One kept for the host is only for [hostView].
+        //
+        // Exactly one maker runs per level and type: a service may start work as it is
+        // made, a sign-in say, and a second one made beside it would do it twice. The
+        // maker runs under the type's own gate and not the level's lock, so it may ask
+        // for a service of another type. One that asks for its own type fails.
+        fun contributed(type: KClass<*>, hostView: Boolean): Any? {
             val declaration = declaredFor(type) ?: return null
-            if (declaration.level != level) return parent?.contributed(type)
-            synchronized(lock) {
+            if (declaration.hostOnly && !hostView) return null
+            if (declaration.level != level) return parent?.contributed(type, hostView)
+            val gate = synchronized(lock) {
                 if (closed) return null
                 made[type]?.let { return it }
+                gates.getOrPut(type) { Gate() }
             }
-            val fresh = declaration.make(contextFor(declaration))
-            val kept = synchronized(lock) {
-                if (closed) null else made.getOrPut(type) { fresh }
+            synchronized(gate) {
+                synchronized(lock) {
+                    if (closed) return null
+                    made[type]?.let { return it }
+                }
+                check(!gate.making) { "the maker of ${type.simpleName} asks for its own service" }
+                gate.making = true
+                val fresh = try {
+                    declaration.make(contextFor(declaration))
+                } finally {
+                    gate.making = false
+                }
+                val kept = synchronized(lock) {
+                    if (closed) null else fresh.also { made[type] = it }
+                }
+                if (kept == null && fresh is AutoCloseable) fresh.closeLogged("a ${type.simpleName} made as its level closed")
+                return kept
             }
-            if (kept !== fresh && fresh is AutoCloseable) fresh.closeLogged("a duplicate ${type.simpleName}")
-            return kept
+        }
+
+        private inner class Gate {
+            var making = false
         }
 
         override fun child(level: ScopeLevel): LevelServicesHost {
@@ -397,8 +458,8 @@ class ContributedServices {
  */
 @HostApi
 class ContributedLevelServices internal constructor(
-    /** The host's own services for this level, for a host that has to reach its own kind of them. */
-    val inner: LevelServices,
+    /** The host's own services for this level. The host reaches them through [HostAccess.ownServicesOf]. */
+    internal val inner: LevelServices,
     private val contributed: (KClass<*>) -> Any?,
     private val reachable: (KClass<*>) -> Boolean,
 ) : LevelServices {

@@ -3,6 +3,7 @@ package hivens.ui.widgets.home.new
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import hivens.accounts.api.AccountKeys
 import hivens.packs.api.PackKeys
 import hivens.packs.api.PackView
 import hivens.ui.components.LaunchControl
@@ -11,7 +12,6 @@ import hivens.ui.feature.catalogue.project.loaderLabel
 import hivens.ui.nx.PlayButton
 import hivens.ui.nx.PlayGround
 import hivens.ui.nx.PlayLayout
-import hivens.ui.widgets.Sources
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
 
@@ -37,7 +37,8 @@ internal class QuickLaunchTarget(
  */
 @Composable
 internal fun rememberQuickLaunchTarget(playLabel: String? = null): QuickLaunchTarget? {
-    val appState = rememberScopedSource(Sources.Session).valueOrNull() ?: return null
+    // Optional: without an accounts module the packs still show, and Play runs as nobody.
+    val appState = rememberScopedSource(AccountKeys.Session).valueOrNull()
     val all = rememberScopedSource(PackKeys.Library).valueOrNull() ?: return null
 
     val target: PackView = remember(all) { all.minWithOrNull(RecentFirst) } ?: return null

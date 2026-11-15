@@ -59,18 +59,57 @@ interface LevelContext {
      */
     val services: LevelServices
 
-    /**
-     * The host's own services at this level as well, for the host's factories and for
-     * a module the host trusts with them. For anything else the same as [services].
-     */
-    @HostApi
-    val hostServices: LevelServices get() = services
-
     /** Another key's source as this level sees it, read at that key's own level. Null where it is missing. */
     fun <T> find(key: SourceKey<T>): WidgetDataSource<T>?
 
     /** A command as this level sees it, fired at that key's own level. Null where it is missing. */
     fun <P> findCommand(key: CommandKey<P>): WidgetCommand<P>?
+}
+
+/**
+ * What a level hands the factory of the host and of a module the host trusts: the
+ * level as [LevelContext] has it, with the host's own services besides.
+ *
+ * Only a factory is handed one, made by the level for that call. A level itself is a
+ * [LevelContext] and nothing more, so a widget holding a level has no host view to
+ * read, and a module the host does not trust is handed a context without one.
+ */
+@HostApi
+interface HostLevelContext : LevelContext {
+    /** The host's own services at this level, and every service a module declared, those kept for the host among them. */
+    val hostServices: LevelServices
+}
+
+/**
+ * The host's own services at this level, where this context is a [HostLevelContext],
+ * and the same as [LevelContext.services] anywhere else: in a factory of a module the
+ * host does not trust, and on a level a widget holds.
+ */
+@HostApi
+val LevelContext.hostServices: LevelServices
+    get() = (this as? HostLevelContext)?.hostServices ?: services
+
+/**
+ * The host's key to the host view of the levels of the trees it made with it, see
+ * [WidgetScope.app]. The host makes one and keeps it to itself: a level answers
+ * [servicesOf] only for the access its tree was made with, so code that does not hold
+ * it has no host view to ask for.
+ *
+ * In-process code can always reach past this by reflection, and isolating modules is
+ * not this API's business. What it removes is every way the API itself offers.
+ */
+@HostApi
+class HostAccess {
+    /** [level]'s host view, or null for a level of a tree made with another access or none. */
+    fun servicesOf(level: WidgetScope): LevelServices? = level.takeIf { it.root.access === this }?.hostView
+
+    /**
+     * The services the host itself laid under [level], with nothing modules declared
+     * over them, or null for a level of a tree made with another access or none. For
+     * a host that keeps its own kind of service store under the levels.
+     */
+    fun ownServicesOf(level: WidgetScope): LevelServices? =
+        servicesOf(level)?.let { (it as? ContributedLevelServices)?.inner ?: it }
 }
 
 /**
@@ -107,12 +146,25 @@ class WidgetScope private constructor(
     private val host: LevelServicesHost,
     context: CoroutineContext,
     private val failures: FactoryFailures,
+    /** The host's key to this tree's host view. Kept on the root only. */
+    internal val access: HostAccess?,
 ) : LevelContext {
 
     override val services: LevelServices = host.services
 
-    @HostApi
-    override val hostServices: LevelServices = host.hostServices
+    /** The host's view of this level, which only a factory's context and [HostAccess] hand on. */
+    internal val hostView: LevelServices = host.hostServices
+
+    /** The app level this one stands under, or itself. */
+    internal val root: WidgetScope get() = parent?.root ?: this
+
+    /**
+     * What this level hands a factory: the level, with its host view. Made for the
+     * factory alone, so nothing that holds the level itself gets the host view.
+     */
+    private val factoryContext: HostLevelContext = object : HostLevelContext, LevelContext by this {
+        override val hostServices: LevelServices get() = hostView
+    }
 
     private val job = SupervisorJob(context[Job])
 
@@ -168,7 +220,7 @@ class WidgetScope private constructor(
         synchronized(lock) {
             check(!closed) { "a ${this.level} level that was disposed cannot take a $level level" }
             val own = host.child(level)
-            return WidgetScope(level, this, registry, commands, own, coroutineScope.coroutineContext, failures).also { children += it }
+            return WidgetScope(level, this, registry, commands, own, coroutineScope.coroutineContext, failures, access = null).also { children += it }
         }
     }
 
@@ -249,7 +301,7 @@ class WidgetScope private constructor(
             return endRun(key.id, key.id, made, null, cause, "source") as WidgetDataSource<T>?
         }
         val fresh: WidgetDataSource<T> = try {
-            factory(this)
+            factory(factoryContext)
         } catch (e: Exception) {
             return endRun(key.id, key.id, made, null, e, "source") as WidgetDataSource<T>?
         } finally {
@@ -343,7 +395,7 @@ class WidgetScope private constructor(
             runs[marked] = (runs[marked] ?: 0) + 1
         }
         val fresh: WidgetCommand<P> = try {
-            factory(this)
+            factory(factoryContext)
         } catch (e: Exception) {
             return endRun(key.id, marked, madeCommands, null, e, "command") as WidgetCommand<P>?
         }
@@ -495,7 +547,9 @@ class WidgetScope private constructor(
          * which the levels keep to themselves and which stays the caller's to close.
          * [context] is the coroutine context every level's coroutines run under, so
          * cancelling its job stops them all. [failures] hears of every factory in the
-         * tree that could not make what it was asked for.
+         * tree that could not make what it was asked for. [access] is the host's key to
+         * the tree's host view outside its factories, see [HostAccess]: without one,
+         * only the factories ever see it.
          */
         @HostApi
         fun app(
@@ -503,8 +557,9 @@ class WidgetScope private constructor(
             services: LevelServicesHost,
             context: CoroutineContext = Dispatchers.Default,
             commands: WidgetCommandRegistry = WidgetCommandRegistry(),
+            access: HostAccess? = null,
             failures: FactoryFailures = FactoryFailures.None,
-        ): WidgetScope = WidgetScope(ScopeLevel.App, null, registry, commands, services, context, failures)
+        ): WidgetScope = WidgetScope(ScopeLevel.App, null, registry, commands, services, context, failures, access)
     }
 }
 

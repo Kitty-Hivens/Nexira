@@ -54,8 +54,9 @@ import androidx.compose.foundation.layout.union
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import hivens.accounts.api.AccountKeys
+import hivens.accounts.api.SessionState
 import hivens.ui.AppSidebar
-import hivens.ui.AppState
 import hivens.ui.RightPanel
 import hivens.ui.chrome.HOST_IS_MAC
 import hivens.ui.nx.NxIconButton
@@ -76,7 +77,6 @@ import hivens.ui.icons.Symbol
 import hivens.ui.layers.DismissOnBack
 import hivens.ui.surface.NxSurface
 import hivens.ui.widgets.Commands
-import hivens.ui.widgets.Sources
 import hivens.widget.api.LocalSlotPath
 import hivens.widget.api.SlotRenderer
 import hivens.widget.api.rememberProps
@@ -217,6 +217,9 @@ private fun CollapsedRegionStrip() {
 /**
  * Left region: the navigation rail plus the divider that separates it from the
  * center. removable=false -- losing the rail would navigation-lock the launcher.
+ *
+ * The session is not a need: a document with no accounts module still navigates, and
+ * the rail then has nobody to offer a sign-out for.
  */
 @Widget(
     id = "appshell.region.left",
@@ -225,7 +228,7 @@ private fun CollapsedRegionStrip() {
     removable = false,
     propsClass = ShellLeftRegionProps::class,
     drawsOwnSurface = true,
-    needs = ["app.state", "nav.switch", "auth.signOut"],
+    needs = ["nav.switch"],
 )
 @Composable
 fun ShellLeftRegion(instance: WidgetInstance) {
@@ -234,10 +237,10 @@ fun ShellLeftRegion(instance: WidgetInstance) {
         if (LocalEditMode.current is EditModeState.On) CollapsedRegionStrip()
         return
     }
-    val appState = rememberScopedSource(Sources.Session).valueOrNull() ?: return
+    val appState = rememberScopedSource(AccountKeys.Session).valueOrNull()
     val switchTab = rememberScopedCommand(Commands.SwitchTab) ?: return
     // Asks first, through the window's sign-out question.
-    val signOut = rememberSignOutRequest() ?: return
+    val signOut = rememberSignOutRequest()
     Row(Modifier.fillMaxHeight()) {
         // The width lands on the rail, not on the row that also holds the divider.
         // On the row, the surface took whatever the divider left, so a named width
@@ -259,9 +262,9 @@ fun ShellLeftRegion(instance: WidgetInstance) {
             opacity = props.opacityPct.regionOpacity(), blurDp = props.blurDp.toFloat(),
         ) {
             AppSidebar(
-                isAuthenticated = appState is AppState.Authenticated,
+                isAuthenticated = appState is SessionState.SignedIn && signOut != null,
                 onSwitchTab     = switchTab,
-                onLogout        = signOut,
+                onLogout        = signOut ?: {},
                 modifier        = Modifier.fillMaxSize().padding(start = edge.start, bottom = edge.bottom),
             )
         }

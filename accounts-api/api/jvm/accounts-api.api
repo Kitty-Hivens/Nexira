@@ -1,0 +1,429 @@
+public final class hivens/accounts/api/AccountKeys {
+	public static final field ACCOUNTS_ID Ljava/lang/String;
+	public static final field ANSWER_SECOND_FACTOR_ID Ljava/lang/String;
+	public static final field CANCEL_SIGN_IN_ID Ljava/lang/String;
+	public static final field DISMISS_SECOND_FACTOR_ID Ljava/lang/String;
+	public static final field FACE_ID Ljava/lang/String;
+	public static final field INSTANCE Lhivens/accounts/api/AccountKeys;
+	public static final field MICROSOFT Ljava/lang/String;
+	public static final field OFFLINE Ljava/lang/String;
+	public static final field PROVIDERS_ID Ljava/lang/String;
+	public static final field REMEMBER_ID Ljava/lang/String;
+	public static final field REMOVALS_ID Ljava/lang/String;
+	public static final field REMOVE_ACCOUNT_ID Ljava/lang/String;
+	public static final field SECOND_FACTOR_ID Ljava/lang/String;
+	public static final field SESSION_ID Ljava/lang/String;
+	public static final field SET_FACE_ID Ljava/lang/String;
+	public static final field SET_REMEMBER_ID Ljava/lang/String;
+	public static final field SIGN_INS_ID Ljava/lang/String;
+	public static final field SIGN_IN_CODE_ID Ljava/lang/String;
+	public static final field SIGN_IN_MICROSOFT_ID Ljava/lang/String;
+	public static final field SIGN_IN_OFFLINE_ID Ljava/lang/String;
+	public static final field SIGN_IN_SMARTYCRAFT_ID Ljava/lang/String;
+	public static final field SIGN_OUT_ID Ljava/lang/String;
+	public static final field SKIN_UPLOADS_ID Ljava/lang/String;
+	public static final field SMARTYCRAFT Ljava/lang/String;
+	public static final field UPLOAD_SKIN_ID Ljava/lang/String;
+	public final fun getAccounts ()Lhivens/widget/model/SourceKey;
+	public final fun getAnswerSecondFactor ()Lhivens/widget/model/CommandKey;
+	public final fun getCancelSignIn ()Lhivens/widget/model/CommandKey;
+	public final fun getDismissSecondFactor ()Lhivens/widget/model/CommandKey;
+	public final fun getFace ()Lhivens/widget/model/SourceKey;
+	public final fun getProviders ()Lhivens/widget/model/SourceKey;
+	public final fun getRemember ()Lhivens/widget/model/SourceKey;
+	public final fun getRemovals ()Lhivens/widget/model/SourceKey;
+	public final fun getRemoveAccount ()Lhivens/widget/model/CommandKey;
+	public final fun getSecondFactor ()Lhivens/widget/model/SourceKey;
+	public final fun getSession ()Lhivens/widget/model/SourceKey;
+	public final fun getSetFace ()Lhivens/widget/model/CommandKey;
+	public final fun getSetRemember ()Lhivens/widget/model/CommandKey;
+	public final fun getSignInCode ()Lhivens/widget/model/CommandKey;
+	public final fun getSignInMicrosoft ()Lhivens/widget/model/CommandKey;
+	public final fun getSignInOffline ()Lhivens/widget/model/CommandKey;
+	public final fun getSignInSmartyCraft ()Lhivens/widget/model/CommandKey;
+	public final fun getSignIns ()Lhivens/widget/model/SourceKey;
+	public final fun getSignOut ()Lhivens/widget/model/CommandKey;
+	public final fun getSkinUploads ()Lhivens/widget/model/SourceKey;
+	public final fun getUploadSkin ()Lhivens/widget/model/CommandKey;
+}
+
+public final class hivens/accounts/api/AccountRemoval {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;)Lhivens/accounts/api/AccountRemoval;
+	public static synthetic fun copy$default (Lhivens/accounts/api/AccountRemoval;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lhivens/accounts/api/AccountRemoval;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getProviderKey ()Ljava/lang/String;
+	public final fun getTicket ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/accounts/api/AccountView {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;ZZ)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;ZZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component5 ()I
+	public final fun component6 ()Ljava/lang/String;
+	public final fun component7 ()Z
+	public final fun component8 ()Z
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;ZZ)Lhivens/accounts/api/AccountView;
+	public static synthetic fun copy$default (Lhivens/accounts/api/AccountView;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;ZZILjava/lang/Object;)Lhivens/accounts/api/AccountView;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAccountId ()Ljava/lang/String;
+	public final fun getBalance ()I
+	public final fun getClan ()Ljava/lang/String;
+	public final fun getClanResolved ()Z
+	public final fun getName ()Ljava/lang/String;
+	public final fun getOnline ()Z
+	public final fun getProviderKey ()Ljava/lang/String;
+	public final fun getUuid ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/accounts/api/AccountsApi {
+	public static final field ID Ljava/lang/String;
+	public static final field INSTANCE Lhivens/accounts/api/AccountsApi;
+	public final fun getVERSION ()Lhivens/widget/model/ApiVersion;
+}
+
+public final class hivens/accounts/api/DeviceCodeSignIn {
+	public fun <init> ()V
+	public fun <init> (Z)V
+	public synthetic fun <init> (ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Z
+	public final fun copy (Z)Lhivens/accounts/api/DeviceCodeSignIn;
+	public static synthetic fun copy$default (Lhivens/accounts/api/DeviceCodeSignIn;ZILjava/lang/Object;)Lhivens/accounts/api/DeviceCodeSignIn;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getRemember ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/accounts/api/FaceChoice {
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lhivens/accounts/api/FaceChoice;
+	public static synthetic fun copy$default (Lhivens/accounts/api/FaceChoice;Ljava/lang/String;ILjava/lang/Object;)Lhivens/accounts/api/FaceChoice;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getProviderKey ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/accounts/api/PasswordSignIn {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Z)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Z
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Z)Lhivens/accounts/api/PasswordSignIn;
+	public static synthetic fun copy$default (Lhivens/accounts/api/PasswordSignIn;Ljava/lang/String;Ljava/lang/String;ZILjava/lang/Object;)Lhivens/accounts/api/PasswordSignIn;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getLogin ()Ljava/lang/String;
+	public final fun getPassword ()Ljava/lang/String;
+	public final fun getRemember ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/accounts/api/ProviderView {
+	public static final field Companion Lhivens/accounts/api/ProviderView$Companion;
+	public static final field DEVICE_CODE Ljava/lang/String;
+	public static final field OFFLINE Ljava/lang/String;
+	public static final field PASSWORD Ljava/lang/String;
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZLjava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZLjava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Z
+	public final fun component5 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZLjava/lang/String;)Lhivens/accounts/api/ProviderView;
+	public static synthetic fun copy$default (Lhivens/accounts/api/ProviderView;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZLjava/lang/String;ILjava/lang/Object;)Lhivens/accounts/api/ProviderView;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getKey ()Ljava/lang/String;
+	public final fun getKind ()Ljava/lang/String;
+	public final fun getName ()Ljava/lang/String;
+	public final fun getRegisterUrl ()Ljava/lang/String;
+	public final fun getSecondFactor ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/accounts/api/ProviderView$Companion {
+}
+
+public abstract interface class hivens/accounts/api/RemovalOutcome {
+}
+
+public final class hivens/accounts/api/RemovalOutcome$Failed : hivens/accounts/api/RemovalOutcome {
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lhivens/accounts/api/RemovalOutcome$Failed;
+	public static synthetic fun copy$default (Lhivens/accounts/api/RemovalOutcome$Failed;Ljava/lang/String;ILjava/lang/Object;)Lhivens/accounts/api/RemovalOutcome$Failed;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getMessage ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/accounts/api/RemovalOutcome$Moved : hivens/accounts/api/RemovalOutcome {
+	public static final field INSTANCE Lhivens/accounts/api/RemovalOutcome$Moved;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/accounts/api/RemovalOutcome$NoFaceLeft : hivens/accounts/api/RemovalOutcome {
+	public static final field INSTANCE Lhivens/accounts/api/RemovalOutcome$NoFaceLeft;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/accounts/api/RemovalOutcome$Removing : hivens/accounts/api/RemovalOutcome {
+	public static final field INSTANCE Lhivens/accounts/api/RemovalOutcome$Removing;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/accounts/api/RemovalView {
+	public fun <init> (Ljava/lang/String;Lhivens/accounts/api/RemovalOutcome;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Lhivens/accounts/api/RemovalOutcome;
+	public final fun copy (Ljava/lang/String;Lhivens/accounts/api/RemovalOutcome;)Lhivens/accounts/api/RemovalView;
+	public static synthetic fun copy$default (Lhivens/accounts/api/RemovalView;Ljava/lang/String;Lhivens/accounts/api/RemovalOutcome;ILjava/lang/Object;)Lhivens/accounts/api/RemovalView;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getOutcome ()Lhivens/accounts/api/RemovalOutcome;
+	public final fun getTicket ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/accounts/api/SecondFactorQuestion {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;ZLjava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;ZLjava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Z
+	public final fun component4 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;ZLjava/lang/String;)Lhivens/accounts/api/SecondFactorQuestion;
+	public static synthetic fun copy$default (Lhivens/accounts/api/SecondFactorQuestion;Ljava/lang/String;Ljava/lang/String;ZLjava/lang/String;ILjava/lang/Object;)Lhivens/accounts/api/SecondFactorQuestion;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getChecking ()Z
+	public final fun getError ()Ljava/lang/String;
+	public final fun getLabel ()Ljava/lang/String;
+	public final fun getProviderKey ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class hivens/accounts/api/SessionState {
+}
+
+public final class hivens/accounts/api/SessionState$Resolving : hivens/accounts/api/SessionState {
+	public static final field INSTANCE Lhivens/accounts/api/SessionState$Resolving;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/accounts/api/SessionState$SignedIn : hivens/accounts/api/SessionState {
+	public fun <init> (Lhivens/accounts/api/SessionView;)V
+	public final fun component1 ()Lhivens/accounts/api/SessionView;
+	public final fun copy (Lhivens/accounts/api/SessionView;)Lhivens/accounts/api/SessionState$SignedIn;
+	public static synthetic fun copy$default (Lhivens/accounts/api/SessionState$SignedIn;Lhivens/accounts/api/SessionView;ILjava/lang/Object;)Lhivens/accounts/api/SessionState$SignedIn;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getSession ()Lhivens/accounts/api/SessionView;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/accounts/api/SessionState$SignedOut : hivens/accounts/api/SessionState {
+	public static final field INSTANCE Lhivens/accounts/api/SessionState$SignedOut;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/accounts/api/SessionView {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Z)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Z
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Z)Lhivens/accounts/api/SessionView;
+	public static synthetic fun copy$default (Lhivens/accounts/api/SessionView;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZILjava/lang/Object;)Lhivens/accounts/api/SessionView;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getName ()Ljava/lang/String;
+	public final fun getOffline ()Z
+	public final fun getProviderKey ()Ljava/lang/String;
+	public final fun getUuid ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/accounts/api/SignInCode {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;)Lhivens/accounts/api/SignInCode;
+	public static synthetic fun copy$default (Lhivens/accounts/api/SignInCode;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lhivens/accounts/api/SignInCode;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCode ()Ljava/lang/String;
+	public final fun getProviderKey ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/accounts/api/SignInError {
+	public static final field Companion Lhivens/accounts/api/SignInError$Companion;
+	public static final field EMPTY Ljava/lang/String;
+	public static final field FAILED Ljava/lang/String;
+	public static final field REJECTED Ljava/lang/String;
+	public static final field SECOND_FACTOR_EXPIRED Ljava/lang/String;
+	public static final field SECOND_FACTOR_UNSUPPORTED Ljava/lang/String;
+	public static final field UNAVAILABLE Ljava/lang/String;
+	public static final field WRONG_CODE Ljava/lang/String;
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;)Lhivens/accounts/api/SignInError;
+	public static synthetic fun copy$default (Lhivens/accounts/api/SignInError;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lhivens/accounts/api/SignInError;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCode ()Ljava/lang/String;
+	public final fun getMessage ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/accounts/api/SignInError$Companion {
+}
+
+public abstract interface class hivens/accounts/api/SignInFlow {
+}
+
+public final class hivens/accounts/api/SignInFlow$DeviceCode : hivens/accounts/api/SignInFlow {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Lhivens/accounts/api/SignInError;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Lhivens/accounts/api/SignInError;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Lhivens/accounts/api/SignInError;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Lhivens/accounts/api/SignInError;)Lhivens/accounts/api/SignInFlow$DeviceCode;
+	public static synthetic fun copy$default (Lhivens/accounts/api/SignInFlow$DeviceCode;Ljava/lang/String;Ljava/lang/String;Lhivens/accounts/api/SignInError;ILjava/lang/Object;)Lhivens/accounts/api/SignInFlow$DeviceCode;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getError ()Lhivens/accounts/api/SignInError;
+	public final fun getUserCode ()Ljava/lang/String;
+	public final fun getVerificationUri ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/accounts/api/SignInFlow$Failed : hivens/accounts/api/SignInFlow {
+	public fun <init> (Lhivens/accounts/api/SignInError;)V
+	public final fun component1 ()Lhivens/accounts/api/SignInError;
+	public final fun copy (Lhivens/accounts/api/SignInError;)Lhivens/accounts/api/SignInFlow$Failed;
+	public static synthetic fun copy$default (Lhivens/accounts/api/SignInFlow$Failed;Lhivens/accounts/api/SignInError;ILjava/lang/Object;)Lhivens/accounts/api/SignInFlow$Failed;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getError ()Lhivens/accounts/api/SignInError;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/accounts/api/SignInFlow$SecondFactor : hivens/accounts/api/SignInFlow {
+	public fun <init> ()V
+	public fun <init> (ZLhivens/accounts/api/SignInError;)V
+	public synthetic fun <init> (ZLhivens/accounts/api/SignInError;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Z
+	public final fun component2 ()Lhivens/accounts/api/SignInError;
+	public final fun copy (ZLhivens/accounts/api/SignInError;)Lhivens/accounts/api/SignInFlow$SecondFactor;
+	public static synthetic fun copy$default (Lhivens/accounts/api/SignInFlow$SecondFactor;ZLhivens/accounts/api/SignInError;ILjava/lang/Object;)Lhivens/accounts/api/SignInFlow$SecondFactor;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getChecking ()Z
+	public final fun getError ()Lhivens/accounts/api/SignInError;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/accounts/api/SignInFlow$Working : hivens/accounts/api/SignInFlow {
+	public static final field INSTANCE Lhivens/accounts/api/SignInFlow$Working;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/accounts/api/SkinUpload {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;ZLjava/lang/String;Z)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;ZLjava/lang/String;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Z
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component5 ()Z
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;ZLjava/lang/String;Z)Lhivens/accounts/api/SkinUpload;
+	public static synthetic fun copy$default (Lhivens/accounts/api/SkinUpload;Ljava/lang/String;Ljava/lang/String;ZLjava/lang/String;ZILjava/lang/Object;)Lhivens/accounts/api/SkinUpload;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAsSignedIn ()Z
+	public final fun getCape ()Z
+	public final fun getPath ()Ljava/lang/String;
+	public final fun getProviderKey ()Ljava/lang/String;
+	public final fun getTicket ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class hivens/accounts/api/SkinUploadStatus {
+}
+
+public final class hivens/accounts/api/SkinUploadStatus$Done : hivens/accounts/api/SkinUploadStatus {
+	public static final field INSTANCE Lhivens/accounts/api/SkinUploadStatus$Done;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/accounts/api/SkinUploadStatus$Failed : hivens/accounts/api/SkinUploadStatus {
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lhivens/accounts/api/SkinUploadStatus$Failed;
+	public static synthetic fun copy$default (Lhivens/accounts/api/SkinUploadStatus$Failed;Ljava/lang/String;ILjava/lang/Object;)Lhivens/accounts/api/SkinUploadStatus$Failed;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getMessage ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/accounts/api/SkinUploadStatus$Uploading : hivens/accounts/api/SkinUploadStatus {
+	public static final field INSTANCE Lhivens/accounts/api/SkinUploadStatus$Uploading;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/accounts/api/SkinUploadView {
+	public fun <init> (Ljava/lang/String;Lhivens/accounts/api/SkinUploadStatus;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Lhivens/accounts/api/SkinUploadStatus;
+	public final fun copy (Ljava/lang/String;Lhivens/accounts/api/SkinUploadStatus;)Lhivens/accounts/api/SkinUploadView;
+	public static synthetic fun copy$default (Lhivens/accounts/api/SkinUploadView;Ljava/lang/String;Lhivens/accounts/api/SkinUploadStatus;ILjava/lang/Object;)Lhivens/accounts/api/SkinUploadView;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getStatus ()Lhivens/accounts/api/SkinUploadStatus;
+	public final fun getTicket ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+

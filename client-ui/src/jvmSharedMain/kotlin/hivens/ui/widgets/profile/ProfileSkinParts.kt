@@ -25,8 +25,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.unit.dp
-import hivens.core.api.SkinRepository
-import hivens.core.data.SessionData
+import hivens.accounts.api.AccountKeys
+import hivens.accounts.api.SkinUpload
+import hivens.accounts.api.SkinUploadStatus
+import hivens.ui.accounts.outcomeOf
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
@@ -40,10 +42,11 @@ import hivens.ui.utils.rememberFileDialogSettings
 import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.path
 import java.io.File
+import java.util.UUID
+import hivens.widget.api.LocalScope
+import hivens.widget.api.rememberScopedCommand
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxColor
@@ -121,15 +124,28 @@ class SkinUploader internal constructor(
     val refresh: () -> Unit,
 )
 
+/**
+ * The uploader for the account of [providerKey], whose player is [playerName]. The
+ * upload is the accounts module's, signed with the account's own session, or with the
+ * session the launcher is signed in as where [asSignedIn] says so, which this never
+ * holds either way.
+ */
 @Composable
-fun rememberSkinUploader(session: SessionData, onSkinChanged: () -> Unit): SkinUploader {
+fun rememberSkinUploader(
+    providerKey: String,
+    playerName: String,
+    asSignedIn: Boolean = false,
+    onSkinChanged: () -> Unit,
+): SkinUploader {
     val s = LocalStrings.current
     val skinManager: SkinManager = koinInject()
-    val skinRepository: SkinRepository = koinInject()
     val scope = rememberCoroutineScope()
-    // The picker is UI and belongs to the composition; the POST that follows it
-    // does not stop because the reader left the screen mid-upload.
+    // The picker is UI and belongs to the composition. The upload that follows it
+    // does not stop because the reader left the screen mid-upload, and neither does
+    // the wait for how it ended.
     val uploadScope: CoroutineScope = koinInject()
+    val upload = rememberScopedCommand(AccountKeys.UploadSkin)
+    val level = LocalScope.current
     var status by remember { mutableStateOf<UploadStatus>(UploadStatus.None) }
     val dialogSettings = rememberFileDialogSettings(s.profileUploadSkin)
 
@@ -144,37 +160,46 @@ fun rememberSkinUploader(session: SessionData, onSkinChanged: () -> Unit): SkinU
                 settings = dialogSettings,
             )
             val file = picked?.path?.let { File(it) }
-            if (file != null && status != UploadStatus.Loading) {
+            val uploads = level?.find(AccountKeys.SkinUploads)?.state
+            if (file != null && status != UploadStatus.Loading && upload != null && uploads != null) {
                 status = UploadStatus.Loading
+                val ticket = UUID.randomUUID().toString()
+                upload(SkinUpload(providerKey, file.path, cape = false, ticket = ticket, asSignedIn = asSignedIn))
                 uploadScope.launch {
-                    status = try {
-                        val result = withContext(Dispatchers.IO) { skinRepository.uploadSkin(file, false, session) }
-                        if (result == "OK") {
-                            skinManager.invalidate(session.playerName)
+                    status = when (val outcome = uploads.outcomeOf(providerKey, ticket)) {
+                        SkinUploadStatus.Done -> {
+                            skinManager.invalidate(playerName)
                             onSkinChanged()
                             UploadStatus.Success(s.profileUploadSuccess)
-                        } else {
-                            UploadStatus.Error(s.profileUploadError(result))
                         }
-                    } catch (e: Exception) {
-                        UploadStatus.Error(s.profileUploadError(e.message ?: s.loginErrorGeneric))
+                        is SkinUploadStatus.Failed -> UploadStatus.Error(s.profileUploadError(outcome.message ?: s.loginErrorGeneric))
+                        SkinUploadStatus.Uploading -> UploadStatus.Loading
                     }
                 }
             }
         }
     }
     val refresh: () -> Unit = {
-        skinManager.invalidate(session.playerName)
+        skinManager.invalidate(playerName)
         onSkinChanged()
     }
     return SkinUploader(status, pick, refresh)
 }
 
-/** A change-skin + refresh control block with the upload status above it. */
+/**
+ * A change-skin + refresh control block with the upload status above it, for the
+ * account of [providerKey], or the session the launcher is signed in as with [asSignedIn].
+ */
 @Composable
-fun SkinControls(session: SessionData, onSkinChanged: () -> Unit, modifier: Modifier = Modifier) {
+fun SkinControls(
+    providerKey: String,
+    playerName: String,
+    onSkinChanged: () -> Unit,
+    modifier: Modifier = Modifier,
+    asSignedIn: Boolean = false,
+) {
     val s = LocalStrings.current
-    val uploader = rememberSkinUploader(session, onSkinChanged)
+    val uploader = rememberSkinUploader(providerKey, playerName, asSignedIn, onSkinChanged)
     Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
         SkinUploadStatusLine(uploader.status)
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {

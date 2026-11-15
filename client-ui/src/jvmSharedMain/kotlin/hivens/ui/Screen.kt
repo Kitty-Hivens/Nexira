@@ -1,17 +1,8 @@
 package hivens.ui
 
 import hivens.core.data.PackOrigin
-import hivens.core.data.SessionData
 import hivens.ui.feature.catalogue.project.ModTarget
 import hivens.ui.screens.detail.settings.PackSettingsCategory
-
-// ─── State ───────────────────────────────────────────────────────────────────
-
-sealed class AppState {
-    object Loading : AppState()
-    object Unauthenticated : AppState()
-    data class Authenticated(val session: SessionData) : AppState()
-}
 
 // ─── Navigation ──────────────────────────────────────────────────────────────
 

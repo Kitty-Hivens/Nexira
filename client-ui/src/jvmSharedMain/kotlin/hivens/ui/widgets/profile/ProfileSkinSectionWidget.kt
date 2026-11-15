@@ -33,7 +33,7 @@ data class ProfileSkinProps(
     id = "profile.skin.section",
     displayName = "widget.profile.skin.section",
     propsClass = ProfileSkinProps::class,
-    needs = ["app.state"],
+    needs = ["app.state", "accounts.skin.upload"],
 )
 @Composable
 fun ProfileSkinSectionWidget(instance: WidgetInstance) {
@@ -43,7 +43,8 @@ fun ProfileSkinSectionWidget(instance: WidgetInstance) {
     var refreshKey by remember { mutableIntStateOf(0) }
 
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        SkinHero(session.playerName, refreshKey, Modifier.fillMaxWidth().height(p.previewHeight.dp))
-        SkinControls(session = session, onSkinChanged = { refreshKey++ })
+        SkinHero(session.name, refreshKey, Modifier.fillMaxWidth().height(p.previewHeight.dp))
+        // Signed with the session itself, as it always was: a sign-in not kept has no stored account.
+        SkinControls(providerKey = session.providerKey, playerName = session.name, onSkinChanged = { refreshKey++ }, asSignedIn = true)
     }
 }

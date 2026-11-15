@@ -23,14 +23,13 @@ public final class hivens/widget/api/ContributedLevelServices : hivens/widget/ap
 	public static final field $stable I
 	public fun find (Lkotlin/reflect/KClass;)Ljava/lang/Object;
 	public fun get (Lkotlin/reflect/KClass;)Ljava/lang/Object;
-	public final fun getInner ()Lhivens/widget/api/LevelServices;
 }
 
 public final class hivens/widget/api/ContributedServices {
 	public static final field $stable I
 	public fun <init> ()V
-	public final fun declare (Lhivens/widget/model/ScopeLevel;Lkotlin/reflect/KClass;Ljava/lang/String;ZLkotlin/jvm/functions/Function1;)V
-	public static synthetic fun declare$default (Lhivens/widget/api/ContributedServices;Lhivens/widget/model/ScopeLevel;Lkotlin/reflect/KClass;Ljava/lang/String;ZLkotlin/jvm/functions/Function1;ILjava/lang/Object;)V
+	public final fun declare (Lhivens/widget/model/ScopeLevel;Lkotlin/reflect/KClass;Ljava/lang/String;ZZLkotlin/jvm/functions/Function1;)V
+	public static synthetic fun declare$default (Lhivens/widget/api/ContributedServices;Lhivens/widget/model/ScopeLevel;Lkotlin/reflect/KClass;Ljava/lang/String;ZZLkotlin/jvm/functions/Function1;ILjava/lang/Object;)V
 	public final fun expose (Lkotlin/reflect/KClass;)V
 	public final fun host (Lhivens/widget/api/LevelServicesHost;Lkotlin/coroutines/CoroutineContext;)Lhivens/widget/api/LevelServicesHost;
 	public static synthetic fun host$default (Lhivens/widget/api/ContributedServices;Lhivens/widget/api/LevelServicesHost;Lkotlin/coroutines/CoroutineContext;ILjava/lang/Object;)Lhivens/widget/api/LevelServicesHost;
@@ -65,7 +64,18 @@ public final class hivens/widget/api/GridGeometry {
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class hivens/widget/api/HostAccess {
+	public static final field $stable I
+	public fun <init> ()V
+	public final fun ownServicesOf (Lhivens/widget/api/WidgetScope;)Lhivens/widget/api/LevelServices;
+	public final fun servicesOf (Lhivens/widget/api/WidgetScope;)Lhivens/widget/api/LevelServices;
+}
+
 public abstract interface annotation class hivens/widget/api/HostApi : java/lang/annotation/Annotation {
+}
+
+public abstract interface class hivens/widget/api/HostLevelContext : hivens/widget/api/LevelContext {
+	public abstract fun getHostServices ()Lhivens/widget/api/LevelServices;
 }
 
 public abstract interface class hivens/widget/api/KeyContribution : hivens/widget/api/ModuleContribution {
@@ -115,13 +125,8 @@ public abstract interface class hivens/widget/api/LevelContext {
 	public abstract fun find (Lhivens/widget/model/SourceKey;)Lhivens/widget/model/WidgetDataSource;
 	public abstract fun findCommand (Lhivens/widget/model/CommandKey;)Lhivens/widget/model/WidgetCommand;
 	public abstract fun getCoroutineScope ()Lkotlinx/coroutines/CoroutineScope;
-	public fun getHostServices ()Lhivens/widget/api/LevelServices;
 	public abstract fun getLevel ()Lhivens/widget/model/ScopeLevel;
 	public abstract fun getServices ()Lhivens/widget/api/LevelServices;
-}
-
-public final class hivens/widget/api/LevelContext$DefaultImpls {
-	public static fun getHostServices (Lhivens/widget/api/LevelContext;)Lhivens/widget/api/LevelServices;
 }
 
 public abstract interface class hivens/widget/api/LevelServices {
@@ -192,6 +197,7 @@ public final class hivens/widget/api/ModuleContribution$DefaultImpls {
 
 public abstract interface class hivens/widget/api/ModuleKeys {
 	public abstract fun command (Lhivens/widget/model/CommandKey;Lkotlin/jvm/functions/Function1;)V
+	public abstract fun hostService (Lhivens/widget/model/ScopeLevel;Lkotlin/reflect/KClass;Lkotlin/jvm/functions/Function1;)V
 	public abstract fun owned (Lhivens/widget/model/CommandKey;)V
 	public abstract fun owned (Lhivens/widget/model/SourceKey;Lkotlin/jvm/functions/Function0;)V
 	public static synthetic fun owned$default (Lhivens/widget/api/ModuleKeys;Lhivens/widget/model/SourceKey;Lkotlin/jvm/functions/Function0;ILjava/lang/Object;)V
@@ -714,7 +720,6 @@ public final class hivens/widget/api/WidgetScope : hivens/widget/api/LevelContex
 	public final fun forgetMade (Ljava/util/Set;)V
 	public final fun getClosed ()Z
 	public fun getCoroutineScope ()Lkotlinx/coroutines/CoroutineScope;
-	public fun getHostServices ()Lhivens/widget/api/LevelServices;
 	public fun getLevel ()Lhivens/widget/model/ScopeLevel;
 	public final fun getPages ()Lhivens/widget/api/PageLevels;
 	public final fun getParent ()Lhivens/widget/api/WidgetScope;
@@ -728,8 +733,8 @@ public final class hivens/widget/api/WidgetScope : hivens/widget/api/LevelContex
 }
 
 public final class hivens/widget/api/WidgetScope$Companion {
-	public final fun app (Lhivens/widget/api/WidgetDataRegistry;Lhivens/widget/api/LevelServicesHost;Lkotlin/coroutines/CoroutineContext;Lhivens/widget/api/WidgetCommandRegistry;Lhivens/widget/api/FactoryFailures;)Lhivens/widget/api/WidgetScope;
-	public static synthetic fun app$default (Lhivens/widget/api/WidgetScope$Companion;Lhivens/widget/api/WidgetDataRegistry;Lhivens/widget/api/LevelServicesHost;Lkotlin/coroutines/CoroutineContext;Lhivens/widget/api/WidgetCommandRegistry;Lhivens/widget/api/FactoryFailures;ILjava/lang/Object;)Lhivens/widget/api/WidgetScope;
+	public final fun app (Lhivens/widget/api/WidgetDataRegistry;Lhivens/widget/api/LevelServicesHost;Lkotlin/coroutines/CoroutineContext;Lhivens/widget/api/WidgetCommandRegistry;Lhivens/widget/api/HostAccess;Lhivens/widget/api/FactoryFailures;)Lhivens/widget/api/WidgetScope;
+	public static synthetic fun app$default (Lhivens/widget/api/WidgetScope$Companion;Lhivens/widget/api/WidgetDataRegistry;Lhivens/widget/api/LevelServicesHost;Lkotlin/coroutines/CoroutineContext;Lhivens/widget/api/WidgetCommandRegistry;Lhivens/widget/api/HostAccess;Lhivens/widget/api/FactoryFailures;ILjava/lang/Object;)Lhivens/widget/api/WidgetScope;
 }
 
 public final class hivens/widget/api/WidgetScopeHelpersKt {
@@ -744,6 +749,10 @@ public final class hivens/widget/api/WidgetScopeHelpersKt {
 	public static final fun rememberScopedCommand (Lhivens/widget/model/CommandKey;Landroidx/compose/runtime/Composer;I)Lkotlin/jvm/functions/Function1;
 	public static final fun rememberScopedSource (Lhivens/widget/model/SourceKey;Landroidx/compose/runtime/Composer;I)Lhivens/widget/api/ScopedSource;
 	public static final fun valueOrNull (Lhivens/widget/api/ScopedSource;)Ljava/lang/Object;
+}
+
+public final class hivens/widget/api/WidgetScopeKt {
+	public static final fun getHostServices (Lhivens/widget/api/LevelContext;)Lhivens/widget/api/LevelServices;
 }
 
 public final class hivens/widget/api/WidgetServiceHelpersKt {

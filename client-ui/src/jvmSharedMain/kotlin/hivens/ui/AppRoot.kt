@@ -21,6 +21,7 @@ import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.annotation.ExperimentalCoilApi
 import coil3.network.NetworkFetcher
 import coil3.network.cachecontrol.CacheControlCacheStrategy
+import hivens.accounts.api.AccountKeys
 import hivens.ui.appearance.AppearanceStore
 import hivens.ui.background.BackgroundManager
 import hivens.ui.background.BackgroundSettings
@@ -32,7 +33,6 @@ import hivens.ui.notifications.render.NotificationStack
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.WallpaperTone
 import hivens.ui.widgets.ChildLevel
-import hivens.ui.widgets.Sources
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
@@ -189,10 +189,11 @@ fun AppRoot(
     val widgetStrings = modules?.state?.collectAsState()?.value?.widgetStrings.orEmpty()
     val widgetLabels = remember(widgetStrings) { WidgetLabels { widgetStrings[it] } }
     // The composition's level, around everything it draws, the editor included. The
-    // session is read here through the same key a widget reads. Missing, it stays on
-    // Loading, and the failure that left it missing has been said out loud already.
+    // session is read here through the same key a widget reads. Missing, there is no
+    // session at all: the document brought no accounts module, or the one it brought
+    // could not start, which has been said out loud already.
     ChildLevel(ScopeLevel.Composition) {
-    val appState = rememberScopedSource(Sources.Session).valueOrNull() ?: AppState.Loading
+    val appState = rememberScopedSource(AccountKeys.Session).valueOrNull()
     CompositionLocalProvider(LocalWidgetLabels provides widgetLabels) {
     ScreenEffectHost(
         effects       = effects,

@@ -24,6 +24,15 @@ interface AuthProvider {
     val capabilities: AuthCapabilities
 
     /**
+     * The server a sign-in that names none signs in for: a sign-in by hand, and one
+     * made from a stored account at startup. Empty for a provider with no such notion.
+     */
+    val defaultServerId: String get() = ""
+
+    /** Where a person makes an account with this provider, or null where there is no such page. */
+    val registerUrl: String? get() = null
+
+    /**
      * Authenticates against the backend.
      *
      * @throws hivens.core.api.TwoFactorRequiredException when the account has

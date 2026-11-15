@@ -28,7 +28,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
-import hivens.ui.AppState
+import hivens.accounts.api.AccountKeys
+import hivens.accounts.api.SessionState
 import hivens.ui.Screen
 import hivens.ui.components.rememberSignOutRequest
 import hivens.ui.customization.LocalCustomization
@@ -71,11 +72,13 @@ data class NavEntryProps(
     val target: NavTarget = NavTarget.Home,
 )
 
+// The session is not a need of every entry: the sign-out entry draws nothing where no
+// accounts module is brought in, and the rest navigate all the same.
 @Widget(
     id = "nav.entry",
     displayName = "widget.nav.entry",
     propsClass = NavEntryProps::class,
-    needs = ["nav.state", "nav.switch", "app.state", "auth.signOut", "console.visible", "console.visible.set"],
+    needs = ["nav.state", "nav.switch", "console.visible", "console.visible.set"],
 )
 @Composable
 fun NavEntry(instance: WidgetInstance) {
@@ -153,8 +156,8 @@ fun NavEntry(instance: WidgetInstance) {
             // Self-gates on the session: render nothing when unauthenticated
             // so the slot lists the entry unconditionally and the graph stays
             // free of auth-state vocabulary.
-            val appState = rememberScopedSource(Sources.Session).valueOrNull()
-            if (appState !is AppState.Authenticated) return
+            val appState = rememberScopedSource(AccountKeys.Session).valueOrNull()
+            if (appState !is SessionState.SignedIn) return
             // Asks first, through the window's sign-out question.
             val signOut = rememberSignOutRequest() ?: return
             NavSlot(

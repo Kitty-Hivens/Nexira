@@ -12,19 +12,17 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
-import hivens.auth.AuthProviderRegistry
+import hivens.accounts.api.AccountKeys
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.nx.NxNavRowContent
 import hivens.ui.puppet.PuppetClick
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
 import hivens.widget.model.Widget
-import org.koin.compose.koinInject
 import hivens.ui.theme.NxColor
 
 // Vertical category nav for the profile surface. Writes the page's
@@ -37,20 +35,20 @@ import hivens.ui.theme.NxColor
     displayName = "widget.profile.nav",
     minWidth = 150, minHeight = 160,
     maxWidth = 360, maxHeight = 1200,
-    needs = ["profile.category", "app.state", "accounts.revision", "auth.signIn"],
+    needs = ["profile.category", "accounts.providers", "accounts.list", "accounts.face", "accounts.face.set"],
 )
 @Composable
 fun ProfileNavWidget() {
     val selection = rememberScopedSource(ProfileSelectionSource).valueOrNull() ?: return
+    val providers = rememberScopedSource(AccountKeys.Providers).valueOrNull() ?: return
     val s = LocalStrings.current
-    val authRegistry: AuthProviderRegistry = koinInject()
     val current = selection.category
 
     // Microsoft / multi-account is deferred: its category shows only when a client
     // id is configured (the device-code provider registers only then). Without one
     // the profile is a single SmartyCraft section -- no dangling Microsoft tab into
     // an empty pane.
-    val msaConfigured = remember { authRegistry.hasDeviceCodeProvider() }
+    val msaConfigured = providers.hasDeviceCodeProvider()
     val categories = ProfileCategory.entries.filter {
         it != ProfileCategory.Microsoft || msaConfigured
     }

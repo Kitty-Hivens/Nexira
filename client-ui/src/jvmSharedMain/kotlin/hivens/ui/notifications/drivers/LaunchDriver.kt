@@ -1,5 +1,6 @@
 package hivens.ui.notifications.drivers
 
+import hivens.accounts.TwoFactorLaunchGate
 import hivens.auth.OfflineAuthProvider
 import hivens.core.activity.ActivityAction
 import hivens.core.activity.ActivityKind
@@ -56,8 +57,8 @@ class LaunchDriver(
     private val offlineProvider: OfflineAuthProvider,
     private val settingsService: ISettingsService,
     private val credentialStore: ICredentialStore,
-    // Where "this launch needs a code" is parked for the shell to answer.
-    private val twoFactorGate: hivens.ui.notifications.TwoFactorLaunchGate,
+    // Where "this launch needs a code" is parked for the accounts module to answer.
+    private val twoFactorGate: TwoFactorLaunchGate,
     // Read on each push so a locale change in Settings is picked up
     // mid-launch without restarting the driver.
     private val stringsProvider: () -> AppStrings,
@@ -298,8 +299,8 @@ class LaunchDriver(
     private fun onError(target: LaunchTarget, reason: LaunchError) {
         val s = stringsProvider()
         if (reason == LaunchError.TwoFactorExpired) {
-            // Not a failure to report -- a step the launch is waiting on. The shell
-            // prompts, and the fresh session comes back here to start the same target
+            // Not a failure to report but a step the launch is waiting on. The accounts
+            // module asks, and the fresh session comes back here to start the same target
             // again, so the player clicks Play once and types a code once.
             indications.setLaunchIndication(target.id, null)
             activities.dismiss(launchKey(target))
@@ -307,7 +308,7 @@ class LaunchDriver(
             val serverId = (requirement as? PackAuthRequirement.SmartyCraft)?.serverId
                 ?: (requirement as? PackAuthRequirement.Both)?.serverId
                 ?: ""
-            twoFactorGate.request(target.displayName, serverId) { session ->
+            twoFactorGate.request(target.displayName, PackAuthRequirement.SmartyCraft.PROVIDER_KEY, serverId) { session ->
                 appScope.launch {
                     if (controller.launchPackInstance(session, target.instance, sessionMintedForLaunch = true)) observe(target)
                 }

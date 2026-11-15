@@ -1,13 +1,12 @@
 package hivens.ui
 
-import hivens.auth.AuthProviderRegistry
-import hivens.auth.RefreshableAuthProvider
+import hivens.accounts.AccountsHost
+import hivens.accounts.TwoFactorLaunchGate
 import hivens.config.Storage
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.activity.Activity
 import hivens.core.activity.ActivityRegistry
-import hivens.core.data.SessionData
 import hivens.core.data.ThemeMode
 import hivens.core.io.AtomicFiles
 import hivens.core.security.SslBypassStore
@@ -39,10 +38,11 @@ import hivens.ui.feature.catalogue.project.OpenProjectState
 import hivens.ui.feature.catalogue.project.ProjectPageSource
 import hivens.ui.feature.catalogue.project.sampleProjectPage
 import hivens.packs.PacksHost
+import hivens.ui.accounts.ClientAccountsHost
+import hivens.ui.host.LauncherHostAccess
 import hivens.ui.navigation.NavState
 import hivens.ui.packs.ClientPacksHost
 import hivens.ui.packs.withdrawNoticesOfInstalledPacks
-import hivens.ui.session.SessionStore
 import hivens.ui.theme.ThemeLibrary
 import hivens.ui.theme.ThemeManager
 import hivens.ui.i18n.AppLocale
@@ -87,7 +87,6 @@ import hivens.ui.widgets.levelServices
 import hivens.ui.widgets.modules.CompiledModules
 import hivens.ui.widgets.modules.WidgetModuleHost
 import hivens.ui.widgets.modules.WidgetModules
-import hivens.ui.widgets.profile.AccountChanges
 import hivens.ui.widgets.profile.ProfileSelection
 import hivens.ui.widgets.profile.ProfileSelectionSource
 import hivens.ui.widgets.state.WidgetStateFlushHook
@@ -110,6 +109,7 @@ import hivens.widget.api.WidgetServiceRegistry
 import hivens.widget.api.command
 import hivens.widget.api.flowSource
 import hivens.widget.api.get
+import hivens.widget.api.hostServices
 import hivens.widget.api.registerModuleKeys
 import hivens.widget.model.DefaultLayout
 import hivens.widget.model.LayoutGraph
@@ -160,32 +160,6 @@ val levelServicesModule: Module = module {
         // than by the widget that asked, which the answer itself can take away.
         scoped { SignOutRequests() }
     }
-}
-
-/**
- * Who the launcher is signed in as: one store for the app, since the accounts are
- * the app's, so no level below can make a second one that signs in again. Made the
- * first time something reads the session, which starts the startup sign-in, and
- * closed with Koin, which stops it.
- *
- * A function rather than one module value: Koin keeps a single's instance in the
- * module it was declared in, so two Koin applications loading one value would share
- * one store, signed in as whichever started first.
- */
-fun sessionModule(): Module = module {
-    single {
-        SessionStore(
-            accounts          = get(),
-            settings          = get(),
-            auth              = get(),
-            // Present only when a Microsoft client id is configured, so the startup
-            // sign-in refreshes a Microsoft account exactly then.
-            refreshable       = get<AuthProviderRegistry>().all.filterIsInstance<RefreshableAuthProvider>().firstOrNull(),
-            certificateGrants = get<SslBypassStore>().bypasses,
-            problems          = get(),
-            parent            = get(),
-        )
-    } withOptions { onClose { it?.close() } }
 }
 
 /**
@@ -252,7 +226,7 @@ fun uiCoreModule(
     single { BrowseSession() }
     single { ProjectBrowseSession() }
 
-    includes(levelServicesModule, sessionModule())
+    includes(levelServicesModule)
 
     // What the core could not do, said in the notification centre in the person's language.
     // A pack said to be missing is taken back once a pack of that id is installed.
@@ -305,9 +279,6 @@ fun uiCoreModule(
     // LocalWidgetServiceRegistry resolves before any @Widget renders.
     single { WidgetServiceRegistry() }
 
-    // Who signed in or out since the start, for every list of accounts to hear it.
-    single { AccountChanges() }
-
     // How the launcher looks and speaks, for every window and composition alike.
     // The module themes are read off the loaded modules as they change.
     single {
@@ -322,16 +293,27 @@ fun uiCoreModule(
         )
     }
 
-    // What the packs module needs from the application around it: who a launch runs
-    // as, the launch notices, and where a missing pack is said.
+    // What the packs module needs from the application around it: the launch notices,
+    // and where a missing pack is said.
     single<PacksHost> {
         val driver: LaunchDriver = get()
         ClientPacksHost(
-            session     = get(),
             onLaunched  = { pack -> driver.observe(LaunchTarget(pack)) },
             indications = get(),
             problems    = get(),
             scope       = get(),
+        )
+    }
+
+    // What the accounts module needs from the application around it: where a failed
+    // sign-in or sign-out is said, the writer for the person's choices, and the
+    // certificate question about the launcher's own server.
+    single<AccountsHost> {
+        ClientAccountsHost(
+            problems        = get(),
+            preferences     = get(),
+            certificates    = get(),
+            certificateHost = get<ServerProtocolConfig>().sslBypassHost,
         )
     }
 
@@ -341,7 +323,6 @@ fun uiCoreModule(
     // module has not reached yet.
     single {
         val appScope: CoroutineScope = get()
-        val accounts: AccountChanges = get()
         val archive: NotificationArchiveStore = get()
         val center: NotificationCenter = get()
         val backgrounds: BackgroundManager = get()
@@ -353,7 +334,6 @@ fun uiCoreModule(
                 doNotDisturb     = center.doNotDisturb,
                 sslBypass        = sslBypassSource(get(), get<ServerProtocolConfig>().sslBypassHost, appScope),
                 background       = backgrounds.settings,
-                accountsRevision = accounts.revision,
             ),
             // Reactive write side: commands widgets fire via rememberCommand /
             // rememberAction without injecting the backing service. What only some
@@ -362,7 +342,6 @@ fun uiCoreModule(
                 clearNotifications = { archive.clear() },
                 setDoNotDisturb    = { center.setDoNotDisturb(it) },
                 updateBackground   = { change -> backgrounds.update(change) },
-                accountsChanged    = { accounts.changed() },
             ).apply { koin.platformCommands(this) },
             services = ContributedServices(),
         )
@@ -400,6 +379,8 @@ fun uiCoreModule(
             services = keys.appServices(KoinLevelServicesHost.app(this), appScope.coroutineContext),
             context  = appScope.coroutineContext,
             commands = get(),
+            // The host view under each level is the launcher's alone, see LauncherHostAccess.
+            access   = LauncherHostAccess,
             failures = reportedTo(get(), keys) { AppLocale.fromTag(settings.getSettings().locale).tag },
         ).also { app -> followModuleReloads(get<WidgetModules>().state, keys, app, appScope) }
     }
@@ -509,8 +490,8 @@ fun uiCoreModule(
     single { SelectionRegistry() }
     single { ContentIconStore() }
     single { SessionRegistry(appScope = get()) }
-    // One-slot handoff: the launch driver parks "needs a code", the shell answers.
-    single { hivens.ui.notifications.TwoFactorLaunchGate() }
+    // One-slot handoff: the launch driver parks "needs a code", the accounts module answers.
+    single { TwoFactorLaunchGate() }
     single {
         val settingsService: ISettingsService = get()
         LaunchDriver(
@@ -595,7 +576,6 @@ internal fun reportedTo(problems: CoreProblems, keys: HostKeys? = null, localeTa
 internal fun corePartOf(id: String): CorePart = CORE_PARTS[id] ?: CorePart.Other
 
 private val CORE_PARTS: Map<String, CorePart> = buildMap {
-    listOf(Sources.Session.id, Commands.SignIn.id, Commands.SignOut.id).forEach { put(it, CorePart.Session) }
     listOf(
         Sources.ThemeLibrary.id, Sources.DarkTheme.id, Sources.ThemeMode.id, Sources.SystemSchemeAvailable.id, Sources.Locale.id,
         Commands.ApplyTheme.id, Commands.SetDarkTheme.id, Commands.SetThemeMode.id, Commands.SetLocale.id,
@@ -614,7 +594,6 @@ internal fun uiDataRegistry(
     doNotDisturb: StateFlow<Boolean>,
     sslBypass: WidgetDataSource<Boolean>,
     background: StateFlow<BackgroundSettings>,
-    accountsRevision: StateFlow<Int>,
 ): WidgetDataRegistry = WidgetDataRegistry().apply {
     register(Sources.Activity, flowSource(activity))
     register(Sources.Notifications, flowSource(notifications))
@@ -627,7 +606,6 @@ internal fun uiDataRegistry(
     declare(Sources.Window) { HostWindowState.Sample }
     register(Sources.SslBypass, sslBypass)
     register(Sources.Background, flowSource(background))
-    register(Sources.AccountsRevision, flowSource(accountsRevision))
     // Read the first time a card asks rather than at startup: asking the OS is slow,
     // and most runs never open the page that shows it. The card asks while the page
     // is laid out, so the files are read off that thread.
@@ -635,13 +613,10 @@ internal fun uiDataRegistry(
     // One per page, so a profile page kept in the history comes back on the section
     // it was left on.
     registerFactory(ProfileSelectionSource, sample = ::ProfileSelection) { flowSource(MutableStateFlow(ProfileSelection())) }
-    // The launcher's session, from the app's one store. Every key here carries the
-    // sample the palette and the editor show a widget on where no level of its kind
-    // is above: display data, never handed to a widget drawn for use.
-    registerFactory(Sources.Session, sample = { AppState.Authenticated(SessionData(playerName = "Steve")) }) { app ->
-        flowSource(app.hostServices.get<SessionStore>().state)
-    }
     // How the composition looks and speaks, read off the app's one appearance store.
+    // Every key here carries the sample the palette and the editor show a widget on
+    // where no level of its kind is above: display data, never handed to a widget
+    // drawn for use.
     registerFactory(Sources.ThemeLibrary, sample = ::ThemeLibrary) { composition ->
         flowSource(composition.hostServices.get<AppearanceStore>().library)
     }
@@ -678,18 +653,10 @@ internal fun uiCommandRegistry(
     clearNotifications: () -> Unit,
     setDoNotDisturb: (Boolean) -> Unit,
     updateBackground: (BackgroundSettings.() -> BackgroundSettings) -> Unit,
-    accountsChanged: () -> Unit,
 ): WidgetCommandRegistry = WidgetCommandRegistry().apply {
     register(Commands.ClearNotifications, command { clearNotifications() })
     register(Commands.SetDoNotDisturb, command(setDoNotDisturb))
     register(Commands.UpdateBackground, command(updateBackground))
-    register(Commands.AccountsChanged, command { accountsChanged() })
-    // The launcher's session, through the app's one store.
-    registerFactory(Commands.SignIn) { app -> command(app.hostServices.get<SessionStore>()::signIn) }
-    registerFactory(Commands.SignOut) { app ->
-        val store = app.hostServices.get<SessionStore>()
-        command { val _ = store.signOut() }
-    }
     // How the composition looks and speaks, through the app's appearance store.
     registerFactory(Commands.ApplyTheme) { composition -> command(composition.hostServices.get<AppearanceStore>()::select) }
     registerFactory(Commands.SetDarkTheme) { composition -> command(composition.hostServices.get<AppearanceStore>()::setDark) }

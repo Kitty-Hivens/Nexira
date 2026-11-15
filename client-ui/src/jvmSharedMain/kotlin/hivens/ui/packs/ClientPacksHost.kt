@@ -1,15 +1,12 @@
 package hivens.ui.packs
 
 import hivens.core.data.PackInstance
-import hivens.packs.LaunchIdentity
 import hivens.packs.PacksHost
 import hivens.packs.api.PackLaunch
-import hivens.ui.AppState
 import hivens.ui.notifications.CoreProblem
 import hivens.ui.notifications.CoreProblems
 import hivens.ui.notifications.IndicationCenter
 import hivens.ui.notifications.IndicationCenter.LaunchIndication
-import hivens.ui.session.SessionStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -19,25 +16,16 @@ import kotlinx.coroutines.launch
 
 /**
  * What the packs module asks of the launcher around it, over the launcher's own
- * parts: the session store says who a launch runs as, [onLaunched] hands a launch to
- * the launch driver, which follows it with its notices and keeps the per-pack launch
- * state in [indications], and the core problems say a missing pack out loud.
+ * parts: [onLaunched] hands a launch to the launch driver, which follows it with its
+ * notices and keeps the per-pack launch state in [indications], and the core problems
+ * say a missing pack out loud.
  */
 class ClientPacksHost(
-    private val session: SessionStore,
     private val onLaunched: (PackInstance) -> Unit,
     indications: IndicationCenter,
     private val problems: CoreProblems,
     scope: CoroutineScope,
 ) : PacksHost {
-
-    // Read at the moment of the launch, not through a copy that could lag a sign-in.
-    override val identity: LaunchIdentity
-        get() = when (val state = session.state.value) {
-            AppState.Loading -> LaunchIdentity.Resolving
-            AppState.Unauthenticated -> LaunchIdentity.Nobody
-            is AppState.Authenticated -> LaunchIdentity.SignedIn(state.session)
-        }
 
     override val launches: StateFlow<Map<String, PackLaunch>> =
         indications.launches

@@ -5,11 +5,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import hivens.ui.AppState
+import hivens.accounts.api.AccountKeys
+import hivens.accounts.api.SessionState
+import hivens.ui.host.launcherServices
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetClick
-import hivens.ui.widgets.Commands
-import hivens.ui.widgets.Sources
 import hivens.widget.api.LocalScope
 import hivens.widget.api.find
 import hivens.widget.api.rememberScopedAction
@@ -50,13 +50,13 @@ class SignOutRequests {
 @Composable
 private fun rememberSignOutRequests(): SignOutRequests? {
     val window = LocalScope.current?.nearest(ScopeLevel.Window)
-    return remember(window) { window?.hostServices?.find<SignOutRequests>() }
+    return remember(window) { window?.launcherServices?.find<SignOutRequests>() }
 }
 
 /**
  * Sign-out the way a widget offers it: the returned call asks the person first, and
- * [Commands.SignOut] runs only on a yes. Null where the command or the window's
- * question has no answer.
+ * [AccountKeys.SignOut] runs only on a yes. Null where the command or the window's
+ * question has no answer, which is everywhere a document brings no accounts module.
  *
  * The question belongs to the window, not to the caller, see [SignOutRequests], and
  * [SignOutPrompt] puts it on the window's layers.
@@ -64,7 +64,7 @@ private fun rememberSignOutRequests(): SignOutRequests? {
 @Composable
 fun rememberSignOutRequest(): (() -> Unit)? {
     val requests = rememberSignOutRequests() ?: return null
-    val _ = rememberScopedAction(Commands.SignOut) ?: return null
+    val _ = rememberScopedAction(AccountKeys.SignOut) ?: return null
     return remember(requests) { requests::ask }
 }
 
@@ -82,9 +82,9 @@ fun rememberSignOutRequest(): (() -> Unit)? {
 @Composable
 fun SignOutPrompt() {
     val requests = rememberSignOutRequests() ?: return
-    val signOut = rememberScopedAction(Commands.SignOut)
+    val signOut = rememberScopedAction(AccountKeys.SignOut)
     val asking by requests.asking.collectAsState()
-    val signedIn = rememberScopedSource(Sources.Session).valueOrNull() is AppState.Authenticated
+    val signedIn = rememberScopedSource(AccountKeys.Session).valueOrNull() is SessionState.SignedIn
     LaunchedEffect(signedIn) {
         if (!signedIn) requests.close()
     }

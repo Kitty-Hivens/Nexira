@@ -4,11 +4,15 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.unit.Density
+import hivens.accounts.AccountsModule
+import hivens.accounts.api.AccountKeys
+import hivens.accounts.api.AccountsApi
 import hivens.packs.PacksModule
 import hivens.packs.api.PackKeys
 import hivens.packs.api.PacksApi
 import hivens.ui.HostKeys
 import hivens.ui.background.BackgroundSettings
+import hivens.ui.host.LauncherHostAccess
 import hivens.ui.moduleKeys
 import hivens.ui.modulesNamedBy
 import hivens.ui.onEventThread
@@ -70,16 +74,20 @@ class ModuleKeysTest {
             doNotDisturb     = MutableStateFlow(false),
             sslBypass        = flowSource(MutableStateFlow(false)),
             background       = MutableStateFlow(BackgroundSettings()),
-            accountsRevision = MutableStateFlow(0),
         )
-        val commands = uiCommandRegistry({}, {}, {}, {})
+        val commands = uiCommandRegistry({}, {}, {})
         val keys = HostKeys(data, commands, ContributedServices()).also {
-            moduleKeys(it, named, compiled = listOf(PacksModule), jars = emptyList())
+            moduleKeys(it, named, compiled = listOf(PacksModule, AccountsModule), jars = emptyList())
         }
         val app: WidgetScope = koinApplication {
             modules(
                 module {
-                    single { WidgetScope.app(data, keys.appServices(KoinLevelServicesHost.app(this), Dispatchers.Unconfined), Dispatchers.Unconfined, commands) }
+                    single {
+                        WidgetScope.app(
+                            data, keys.appServices(KoinLevelServicesHost.app(this), Dispatchers.Unconfined), Dispatchers.Unconfined,
+                            commands, access = LauncherHostAccess,
+                        )
+                    }
                 },
             )
         }.koin.get()
@@ -128,9 +136,17 @@ class ModuleKeysTest {
     }
 
     @Test
-    fun `with the packs module named, the pack keys answer and only the history the page provides is wanting`() {
-        val missing = assertNotNull(placed(Host(named = setOf(PacksApi.ID))))
-        assertEquals(listOf(Commands.Navigate.id), missing, "the pack keys answer, and nothing put the history over the composition")
+    fun `with the packs module named and not the accounts module, the pack list needs no session`() {
+        val host = Host(named = setOf(PacksApi.ID))
+        assertNull(host.app.declarationOf(AccountKeys.SESSION_ID), "the session came in unnamed")
+        val missing = assertNotNull(placed(host))
+        assertEquals(listOf(Commands.Navigate.id), missing, "the packs show without anybody signed in, and only the history is wanting")
+    }
+
+    @Test
+    fun `with the packs and accounts modules named, only the history the page provides is wanting`() {
+        val missing = assertNotNull(placed(Host(named = setOf(PacksApi.ID, AccountsApi.ID))))
+        assertEquals(listOf(Commands.Navigate.id), missing, "the pack and session keys answer, and nothing put the history over the composition")
     }
 
     @Test

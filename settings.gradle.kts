@@ -156,6 +156,9 @@ include(":examples:widget-looks")
 // kernel only, kept in the build so the claim that a module needs nothing else to use
 // the packs keeps compiling.
 include(":examples:packs-consumer")
+// The same for the accounts module's API: reads the session and fires sign-out with
+// the kernel and that API alone.
+include(":examples:accounts-consumer")
 // Runtime discovery of widget modules: scans a directory for jars, checks the
 // ABI they declare, and hands back registries. Separate from :widget-api so a
 // module author compiles against the kernel without pulling in its loader.
@@ -166,5 +169,10 @@ include(":widget-loader")
 // that names it.
 include(":packs-api")
 include(":packs")
+// The accounts and sign-in module: the keys a widget reads and fires for who the
+// launcher is signed in as, the stored accounts and every way to sign in and out.
+// Its API carries no secret, and the module itself never depends on the interface.
+include(":accounts-api")
+include(":accounts")
 include(":profiler-agent")
 include(":authlib-agent")

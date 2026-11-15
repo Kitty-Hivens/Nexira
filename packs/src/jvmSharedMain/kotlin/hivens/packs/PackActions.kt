@@ -1,5 +1,6 @@
 package hivens.packs
 
+import hivens.accounts.LaunchIdentity
 import hivens.auth.AuthProvider
 import hivens.core.api.catalogue.CataloguePack
 import hivens.core.api.catalogue.CataloguePackVersion
@@ -165,7 +166,8 @@ fun PackOperationService.startReattach(pack: PackInstance, instances: PackInstan
 
 /**
  * Starts the game of the pack [packId] as [identity] says, or as the offline name the
- * person chose when nobody is signed in, the way Play on a pack always did. The
+ * person chose when nobody is signed in, the way Play on a pack always did. Where no
+ * accounts module is brought in, nobody is ever signed in. The
  * offline name is read at the press rather than taken from whatever was drawn, since
  * what the game runs as cannot lag behind the settings. With no identity at all
  * nothing starts, which the control offering Play already says. A pack that is not

@@ -35,9 +35,9 @@ import hivens.ui.theme.Status
 /**
  * Microsoft device-code prompt: shows the verification URL + the user code to
  * enter on another device (selectable, with an open-browser shortcut), and a
- * spinner while the launcher polls for confirmation. Pure presentation -- the poll loop
- * and the resulting [hivens.core.data.SessionData] live in the LoginPanel, which
- * cancels the poll when this dialog is dismissed.
+ * spinner while the launcher polls for confirmation. Pure presentation: the poll and
+ * the session it brings are the accounts module's, and [MicrosoftSignInButton] cancels
+ * the sign-in when this dialog is dismissed.
  *
  * The code + URL are mirrored to read-only puppet fields so an automation driver
  * can read them out of `/elements`.

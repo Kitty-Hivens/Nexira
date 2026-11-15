@@ -5,6 +5,14 @@ import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.unit.Density
+import hivens.accounts.AccountsHost
+import hivens.accounts.AccountsModule
+import hivens.accounts.SessionStore
+import hivens.accounts.api.AccountKeys
+import hivens.accounts.api.AccountsApi
+import hivens.accounts.api.SessionState
+import hivens.accounts.api.SignInError
+import hivens.accounts.api.SignInFlow
 import hivens.auth.AccountStore
 import hivens.auth.AuthCapabilities
 import hivens.auth.AuthProvider
@@ -36,6 +44,7 @@ import hivens.launcher.PackOperation
 import hivens.launcher.PackOperationKind
 import hivens.launcher.PackOperationPhase
 import hivens.launcher.catalogue.PackCatalogueRegistry
+import hivens.launcher.network.CertificateTrustGate
 import hivens.launcher.instance.PackInstanceService.DeleteOutcome
 import hivens.launcher.update.ReattachConfirmation
 import hivens.launcher.update.ReattachPreview
@@ -60,7 +69,9 @@ import hivens.packs.api.ReattachRequest
 import hivens.packs.toPackView
 import hivens.packs.toView
 import hivens.ui.HostKeys
-import hivens.ui.AppState
+import hivens.ui.accounts.ClientAccountsHost
+import hivens.ui.host.LauncherHostAccess
+import hivens.ui.host.launcherServices
 import hivens.ui.appearance.AppearanceStore
 import hivens.ui.background.BackgroundSettings
 import hivens.ui.i18n.AppLocale
@@ -79,8 +90,6 @@ import hivens.ui.onEventThread
 import hivens.ui.packs.ClientPacksHost
 import hivens.ui.packs.withdrawNoticesOfInstalledPacks
 import hivens.ui.reportedTo
-import hivens.ui.session.SessionStore
-import hivens.ui.sessionModule
 import hivens.ui.settle
 import hivens.ui.theme.ThemeManager
 import hivens.ui.theme.Themes
@@ -97,6 +106,7 @@ import hivens.widget.api.WidgetScope
 import hivens.widget.api.current
 import hivens.widget.api.find
 import hivens.widget.api.flowSource
+import hivens.widget.api.get
 import hivens.widget.api.rememberCommand
 import hivens.widget.api.rememberScopedCommand
 import hivens.widget.api.rememberScopedSource
@@ -161,10 +171,14 @@ class CoreKeysTest {
 
     private val koins = ArrayList<KoinApplication>()
 
+    private val hostKeys = ArrayList<HostKeys>()
+
     @OptIn(ExperimentalPathApi::class)
     @AfterTest
     fun tearDown() {
-        // A test may have closed its own already.
+        // A test may have closed its own already. The keys go first: the modules'
+        // services close with them, the startup sign-in's retries among them.
+        hostKeys.forEach { keys -> val _ = runCatching { keys.close() } }
         koins.forEach { koin -> val _ = runCatching { koin.close() } }
         runBlocking { consoles.forEach { it.close() } }
         scope.cancel()
@@ -337,17 +351,18 @@ class CoreKeysTest {
 
     /**
      * The launcher's Koin with stand-ins under the services the factories read, the
-     * launcher's own level and session modules, and nothing of any shell. The packs
-     * module brings its keys the way the launcher brings them, through its key
-     * contribution, for a document that names it, which [withPacks] false does not.
-     * With [withActions] false the pack actions are missing, the way a broken install
-     * would leave them.
+     * launcher's own level module, and nothing of any shell. The packs and accounts
+     * modules bring their keys the way the launcher brings them, through their key
+     * contributions, for a document that names them, which [withPacks] and
+     * [withAccounts] false do not. With [withActions] false the pack actions are
+     * missing, the way a broken install would leave them.
      */
     private inner class Launcher(
         settings: SettingsData = SettingsData(),
         saved: SessionData? = null,
         withActions: Boolean = true,
         withPacks: Boolean = true,
+        withAccounts: Boolean = true,
         notified: Boolean = false,
         /** What signs a stored account in at startup. */
         auth: AuthProvider = OfflineAuthProvider(),
@@ -379,17 +394,16 @@ class CoreKeysTest {
             doNotDisturb     = MutableStateFlow(false),
             sslBypass        = flowSource(MutableStateFlow(false)),
             background       = MutableStateFlow(BackgroundSettings()),
-            accountsRevision = MutableStateFlow(0),
         )
-        val commands = uiCommandRegistry({}, {}, {}, {})
+        val commands = uiCommandRegistry({}, {}, {})
         val keys = HostKeys(data, commands, ContributedServices()).also { keys ->
             moduleKeys(
                 keys     = keys,
-                named    = if (withPacks) setOf(PacksApi.ID) else emptySet(),
-                compiled = listOf(PacksModule),
+                named    = setOfNotNull(PacksApi.ID.takeIf { withPacks }, AccountsApi.ID.takeIf { withAccounts }),
+                compiled = listOf(PacksModule, AccountsModule),
                 jars     = emptyList(),
             )
-        }
+        }.also { hostKeys += it }
         val console = GameConsoleService(
             PlatformPaths(
                 osName = "linux",
@@ -412,7 +426,6 @@ class CoreKeysTest {
         val application: KoinApplication = koinApplication {
             modules(
                 levelServicesModule,
-                sessionModule(),
                 module {
                     single<CoroutineScope> { scope }
                     single<ISettingsService> { this@Launcher.settings }
@@ -429,12 +442,13 @@ class CoreKeysTest {
                     single<PackUpdateStatusHub> { hub }
                     single { PackCatalogueRegistry(listOf(Catalogue())) }
                     single { indications }
-                    single<PacksHost> { ClientPacksHost(get(), {}, indications, reporter, scope) }
+                    single<PacksHost> { ClientPacksHost({}, indications, reporter, scope) }
+                    single<AccountsHost> { ClientAccountsHost(reporter, preferences, CertificateTrustGate(Grants()), "smartycraft.example") }
                     single { console }
                     single { appearance }
                     single {
                         val services = keys.appServices(KoinLevelServicesHost.app(this), Dispatchers.Unconfined)
-                        WidgetScope.app(data, services, Dispatchers.Unconfined, commands, reportedTo(reporter, keys))
+                        WidgetScope.app(data, services, Dispatchers.Unconfined, commands, access = LauncherHostAccess, failures = reportedTo(reporter, keys))
                     }
                 },
             )
@@ -452,8 +466,8 @@ class CoreKeysTest {
         fun <P> fire(level: WidgetScope, key: CommandKey<P>, payload: P) =
             assertNotNull(level.findCommand(key), "${key.id} has no answer at ${level.level}").run(payload)
 
-        /** The app's session store, made the way the first read of the session makes it. */
-        val session: SessionStore get() = koin.get()
+        /** The app's session store, the accounts module's, made the way the first read of the session makes it. */
+        val session: SessionStore get() = app.launcherServices.get<SessionStore>()
 
         /**
          * Waits for the work the app level's commands launched so far. The app level
@@ -495,7 +509,10 @@ class CoreKeysTest {
         }
     }
 
-    private fun settled(launcher: Launcher): AppState = await(launcher.session.state, "the startup sign-in") { it !is AppState.Loading }
+    private fun settled(launcher: Launcher): SessionState = await(launcher.session.state, "the startup sign-in") { it !is SessionState.Resolving }
+
+    /** The name the launcher is signed in as, or null. */
+    private fun SessionState?.name(): String? = (this as? SessionState.SignedIn)?.session?.name
 
     // ── Resolution ────────────────────────────────────────────────────
 
@@ -503,21 +520,34 @@ class CoreKeysTest {
         Sources.ThemeLibrary, Sources.DarkTheme, Sources.ThemeMode, Sources.Locale,
     )
 
+    /** Every source the accounts module brings. */
+    private val accountSources: List<SourceKey<*>> = listOf(
+        AccountKeys.Session, AccountKeys.Accounts, AccountKeys.Providers, AccountKeys.Face, AccountKeys.Remember,
+        AccountKeys.SignIns, AccountKeys.SecondFactor, AccountKeys.SkinUploads,
+    )
+
+    /** Every command the accounts module brings. */
+    private val accountCommands: List<CommandKey<*>> = listOf(
+        AccountKeys.SignInSmartyCraft, AccountKeys.SignInMicrosoft, AccountKeys.SignInOffline, AccountKeys.SignInCode,
+        AccountKeys.CancelSignIn, AccountKeys.SignOut, AccountKeys.RemoveAccount, AccountKeys.SetFace, AccountKeys.SetRemember,
+        AccountKeys.AnswerSecondFactor, AccountKeys.DismissSecondFactor, AccountKeys.UploadSkin,
+    )
+
     private val appWide: List<SourceKey<*>> = listOf(
-        Sources.Session, Sources.SystemSchemeAvailable, PackKeys.Library, PackKeys.Launches,
+        Sources.SystemSchemeAvailable, PackKeys.Library, PackKeys.Launches,
         PackKeys.Launch, PackKeys.Installs, PackKeys.Updates, PackKeys.Operations, PackKeys.ReattachPreviews,
         Sources.ConsoleVisible,
-    )
+    ) + accountSources
 
     private val composedCommands: List<CommandKey<*>> = listOf(
         Commands.ApplyTheme, Commands.SetDarkTheme, Commands.SetThemeMode, Commands.SetLocale,
     )
 
     private val appCommands: List<CommandKey<*>> = listOf(
-        Commands.SignIn, Commands.SignOut, PackKeys.LaunchPack, PackKeys.StopPack, PackKeys.InstallPack,
+        PackKeys.LaunchPack, PackKeys.StopPack, PackKeys.InstallPack,
         PackKeys.DismissInstall, PackKeys.CancelInstall, PackKeys.UpdatePack, PackKeys.DeletePack, PackKeys.PreviewReattach,
         PackKeys.ReattachPack, Commands.SetConsoleVisible,
-    )
+    ) + accountCommands
 
     /** Every key the packs module brings, by id. */
     private val packIds: List<String> = listOf(
@@ -594,11 +624,11 @@ class CoreKeysTest {
         val sampled = second.child(ScopeLevel.Page)
         settled(launcher)
         listOf(first, second, sampled).forEach { level ->
-            assertSame(launcher.session, level.hostServices.find<SessionStore>(), "no level below the app makes a store of its own")
+            assertSame(launcher.session, level.launcherServices.find<SessionStore>(), "no level below the app makes a store of its own")
         }
-        assertEquals("Steve", (launcher.source(first, Sources.Session) as? AppState.Authenticated)?.session?.playerName)
-        launcher.fire(first, Commands.SignIn, SessionData(playerName = "Alex"))
-        assertEquals("Alex", (launcher.source(second, Sources.Session) as? AppState.Authenticated)?.session?.playerName)
+        assertEquals("Steve", launcher.source(first, AccountKeys.Session).name())
+        launcher.session.signIn(SessionData(playerName = "Alex"))
+        assertEquals("Alex", launcher.source(second, AccountKeys.Session).name())
         launcher.composition()
         assertEquals(1, launcher.accounts.reads.get(), "a new composition does not sign in again")
     }
@@ -606,8 +636,8 @@ class CoreKeysTest {
     @Test
     fun `startup signs in the chosen offline name, and with nothing to sign in with leaves the launcher signed out`() {
         val named = Launcher(SettingsData(offlinePlayerName = "Steve"))
-        assertEquals("Steve", (settled(named) as? AppState.Authenticated)?.session?.playerName)
-        assertIs<AppState.Unauthenticated>(settled(Launcher()))
+        assertEquals("Steve", settled(named).name())
+        assertIs<SessionState.SignedOut>(settled(Launcher()))
     }
 
     @Test
@@ -617,12 +647,12 @@ class CoreKeysTest {
         val launcher = Launcher(SettingsData(offlinePlayerName = "Steve")) { this.hold = hold }
         val store = launcher.session
         assertTrue(launcher.accounts.entered.await(5, TimeUnit.SECONDS), "the startup sign-in never reached the store")
-        launcher.fire(launcher.app, Commands.SignIn, SessionData(playerName = "Alex"))
+        launcher.session.signIn(SessionData(playerName = "Alex"))
         hold.countDown()
         awaitTrue("the startup sign-in standing down") {
             ActionRing.snapshot().any { it.text.contains("the manual one stays") }
         }
-        assertEquals("Alex", (store.state.value as? AppState.Authenticated)?.session?.playerName)
+        assertEquals("Alex", store.state.value.name())
     }
 
     @Test
@@ -632,19 +662,19 @@ class CoreKeysTest {
         val launcher = Launcher { this.hold = hold }
         val store = launcher.session
         assertTrue(launcher.accounts.entered.await(5, TimeUnit.SECONDS), "the startup sign-in never reached the store")
-        launcher.fire(launcher.app, Commands.SignIn, SessionData(playerName = "Alex"))
+        launcher.session.signIn(SessionData(playerName = "Alex"))
         hold.countDown()
         awaitTrue("the startup sign-in standing down") {
             ActionRing.snapshot().any { it.text.contains("found no session after a manual sign-in") }
         }
-        assertEquals("Alex", (store.state.value as? AppState.Authenticated)?.session?.playerName)
+        assertEquals("Alex", store.state.value.name())
     }
 
     @Test
     fun `a network that is down leaves the sign-in form usable and keeps trying`() {
         ActionRing.clear()
         val launcher = Launcher(saved = stored, auth = Unreachable())
-        assertIs<AppState.Unauthenticated>(settled(launcher), "loading covers the first attempt only")
+        assertIs<SessionState.SignedOut>(settled(launcher), "loading covers the first attempt only")
         awaitTrue("a retry planned") { ActionRing.snapshot().any { it.text.contains("network down, retry #1") } }
         assertTrue(launcher.problems.reported.isEmpty(), "a network that is down is not a failure of the launcher")
     }
@@ -656,16 +686,16 @@ class CoreKeysTest {
         val launcher = Launcher(saved = stored, auth = Unreachable()) { this.hold = hold }
         val store = launcher.session
         assertTrue(launcher.accounts.entered.await(5, TimeUnit.SECONDS), "the startup sign-in never reached the store")
-        launcher.fire(launcher.app, Commands.SignIn, SessionData(playerName = "Alex"))
+        launcher.session.signIn(SessionData(playerName = "Alex"))
         hold.countDown()
         awaitTrue("the network failure handled") { ActionRing.snapshot().any { it.text.contains("network down, retry #1") } }
-        assertEquals("Alex", (store.state.value as? AppState.Authenticated)?.session?.playerName)
+        assertEquals("Alex", store.state.value.name())
     }
 
     @Test
     fun `a startup sign-in that throws leaves the launcher signed out and says so`() {
         val launcher = Launcher(SettingsData(offlinePlayerName = "Steve")) { failRead = true }
-        assertIs<AppState.Unauthenticated>(settled(launcher))
+        assertIs<SessionState.SignedOut>(settled(launcher))
         assertIs<CoreProblem.SignInFailed>(launcher.problems.reported.single())
     }
 
@@ -674,7 +704,7 @@ class CoreKeysTest {
         val launcher = Launcher(notified = true) { failRead = true }
         settled(launcher)
         awaitTrue("the sign-in failure notice") { launcher.center.groups.value.any { it.sourceKey == "core:sign-in" } }
-        launcher.fire(launcher.app, Commands.SignIn, SessionData(playerName = "Alex"))
+        launcher.session.signIn(SessionData(playerName = "Alex"))
         awaitTrue("the notice taken back") { launcher.center.groups.value.none { it.sourceKey == "core:sign-in" } }
     }
 
@@ -682,10 +712,10 @@ class CoreKeysTest {
     fun `sign-out clears every account and the names at once`() {
         val launcher = Launcher(SettingsData(preferredFaceProvider = "microsoft"))
         settled(launcher)
-        launcher.fire(launcher.app, Commands.SignIn, SessionData(playerName = "Alex"))
+        launcher.session.signIn(SessionData(playerName = "Alex"))
         launcher.settings.current = launcher.settings.current.copy(offlinePlayerName = "Alex")
-        launcher.fire(launcher.app, Commands.SignOut, Unit)
-        await(launcher.session.state, "the sign-out") { it is AppState.Unauthenticated }
+        launcher.fire(launcher.app, AccountKeys.SignOut, Unit)
+        await(launcher.session.state, "the sign-out") { it is SessionState.SignedOut }
         assertTrue(launcher.accounts.cleared)
         assertNull(launcher.settings.current.preferredFaceProvider)
         assertNull(launcher.settings.current.offlinePlayerName)
@@ -696,22 +726,22 @@ class CoreKeysTest {
     fun `a sign-out that cannot clear the accounts stays signed in and says so`() {
         val launcher = Launcher { failClear = true }
         settled(launcher)
-        launcher.fire(launcher.app, Commands.SignIn, SessionData(playerName = "Alex"))
+        launcher.session.signIn(SessionData(playerName = "Alex"))
         // The whole sign-out, finished, before anything is looked at.
         runBlocking { withTimeout(5.seconds) { launcher.session.signOut().join() } }
         assertIs<CoreProblem.SignOutFailed>(launcher.problems.reported.single())
-        assertIs<AppState.Authenticated>(launcher.session.state.value, "the accounts are still there, so the session is")
+        assertIs<SessionState.SignedIn>(launcher.session.state.value, "the accounts are still there, so the session is")
     }
 
     @Test
     fun `a sign-out that cleared the accounts but not the offline name signs out and says the name was kept`() {
         val launcher = Launcher()
         settled(launcher)
-        launcher.fire(launcher.app, Commands.SignIn, SessionData(playerName = "Alex"))
+        launcher.session.signIn(SessionData(playerName = "Alex"))
         launcher.settings.current = launcher.settings.current.copy(offlinePlayerName = "Alex")
         launcher.settings.failWrites = true
         runBlocking { withTimeout(5.seconds) { launcher.session.signOut().join() } }
-        assertIs<AppState.Unauthenticated>(launcher.session.state.value)
+        assertIs<SessionState.SignedOut>(launcher.session.state.value)
         assertTrue(launcher.accounts.cleared)
         assertEquals("Alex", launcher.settings.current.offlinePlayerName, "the name really is still there")
         assertIs<CoreProblem.SignedOutNameKept>(launcher.problems.reported.single(), "it says what happened, not that sign-out failed")
@@ -723,21 +753,24 @@ class CoreKeysTest {
     fun `every failed sign-out is told, and one that works takes the notice back`() {
         val launcher = Launcher(notified = true) { failClear = true }
         settled(launcher)
-        launcher.fire(launcher.app, Commands.SignIn, SessionData(playerName = "Alex"))
+        launcher.session.signIn(SessionData(playerName = "Alex"))
         fun signOut() = runBlocking { withTimeout(5.seconds) { launcher.session.signOut().join() } }
         fun standing() = launcher.center.groups.value.any { it.sourceKey == "core:sign-out" }
 
+        // The notice is pushed from the reporter's own coroutine, which may land after
+        // the sign-out's job has ended, so each one is waited for, not read at once.
         signOut()
-        assertTrue(standing())
+        awaitTrue("the first failure told") { standing() }
         launcher.center.dismiss("core:sign-out")
         signOut()
-        assertTrue(standing(), "the second failure is told too")
-        assertEquals(2, launcher.archived.size)
+        awaitTrue("the second failure told too") { standing() }
+        awaitTrue("both in the history") { launcher.archived.size == 2 }
 
         launcher.accounts.failClear = false
         signOut()
-        assertFalse(standing(), "a sign-out that worked leaves no word that it could not")
-        assertIs<AppState.Unauthenticated>(launcher.session.state.value)
+        awaitTrue("a sign-out that worked leaves no word that it could not") { !standing() }
+        assertIs<SessionState.SignedOut>(launcher.session.state.value)
+        assertEquals(2, launcher.archived.size, "and adds nothing to the history")
     }
 
     @Test
@@ -745,7 +778,8 @@ class CoreKeysTest {
         val launcher = Launcher()
         val store = launcher.session
         settled(launcher)
-        launcher.application.close()
+        // The app's services close with the keys, the way the launcher's Koin closes them.
+        launcher.keys.close()
         val signOut = store.signOut()
         runBlocking { withTimeout(5.seconds) { signOut.join() } }
         assertTrue(signOut.isCancelled, "a closed store started the sign-out anyway")
@@ -767,7 +801,7 @@ class CoreKeysTest {
         assertTrue(offline.offline)
         assertEquals(pack, launchedPack)
 
-        launcher.fire(launcher.app, Commands.SignIn, SessionData(playerName = "Alex"))
+        launcher.session.signIn(SessionData(playerName = "Alex"))
         launcher.fire(launcher.app, PackKeys.LaunchPack, pack.id)
         assertEquals("Alex", launcher.actions.launched.last().first.playerName, "a signed-in launch runs as the session, at once")
     }
@@ -803,11 +837,11 @@ class CoreKeysTest {
         val launcher = Launcher(SettingsData(offlinePlayerName = "Steve"), saved = account) { this.hold = hold }
         val store = launcher.session
         assertTrue(launcher.accounts.entered.await(5, TimeUnit.SECONDS), "the startup sign-in never reached the store")
-        assertIs<AppState.Loading>(store.state.value)
+        assertIs<SessionState.Resolving>(store.state.value)
 
         launcher.fire(launcher.app, PackKeys.LaunchPack, pack.id)
         hold.countDown()
-        assertIs<AppState.Authenticated>(settled(launcher))
+        assertIs<SessionState.SignedIn>(settled(launcher))
         launcher.drain()
         assertTrue(launcher.actions.launched.isEmpty(), "nothing started, then or once the sign-in settled")
 
@@ -824,7 +858,7 @@ class CoreKeysTest {
         assertTrue(launcher.center.groups.value.any { it.sourceKey == "core:pack:later:not-installed" })
 
         runBlocking { launcher.packs.put(pack.copy(id = "later", instanceDirName = "later")) }
-        launcher.fire(launcher.app, Commands.SignIn, SessionData(playerName = "Alex"))
+        launcher.session.signIn(SessionData(playerName = "Alex"))
         launcher.fire(launcher.app, PackKeys.LaunchPack, "later")
         assertEquals("later", launcher.actions.launched.single().second.id)
         assertTrue(launcher.center.groups.value.none { it.sourceKey == "core:pack:later:not-installed" })
@@ -912,8 +946,53 @@ class CoreKeysTest {
         packIds.forEach { id -> assertNull(launcher.app.declarationOf(id), "$id is declared without the module") }
         assertNull(page.find(PackKeys.Library))
         assertNull(page.findCommand(PackKeys.LaunchPack))
-        assertNotNull(page.find(Sources.Session), "the host's own keys are there all the same")
+        assertNotNull(page.find(Sources.ConsoleVisible), "the host's own keys are there all the same")
+        assertNotNull(page.find(AccountKeys.Session), "and the accounts module's, which it names")
         assertTrue(launcher.center.groups.value.isEmpty(), "a module left out is not a part that failed: ${launcher.center.groups.value}")
+    }
+
+    @Test
+    fun `a document that does not name the accounts module has no session keys, nothing is said broken, and a launch runs as nobody`() {
+        val launcher = Launcher(SettingsData(offlinePlayerName = "Steve"), withAccounts = false, notified = true)
+        val page = launcher.composition().child(ScopeLevel.Page)
+        (accountSources.map { it.id } + accountCommands.map { it.id }).forEach { id ->
+            assertNull(launcher.app.declarationOf(id), "$id is declared without the module")
+        }
+        assertNull(page.find(AccountKeys.Session))
+        assertNull(page.findCommand(AccountKeys.SignOut))
+        assertNull(launcher.app.launcherServices.find(SessionStore::class), "and nothing keeps a session")
+
+        launcher.fire(launcher.app, PackKeys.LaunchPack, pack.id)
+        awaitTrue("the offline launch") { launcher.actions.launched.isNotEmpty() }
+        val (session, _) = launcher.actions.launched.single()
+        assertEquals("Steve", session.playerName, "nobody is signed in, so it runs as the offline name")
+        assertTrue(session.offline)
+        assertTrue(launcher.center.groups.value.isEmpty(), "a module left out is not a part that failed: ${launcher.center.groups.value}")
+    }
+
+    @Test
+    fun `offline play through its command signs in under the name and keeps it for the next start`() {
+        val launcher = Launcher()
+        settled(launcher)
+        launcher.fire(launcher.app, AccountKeys.SignInOffline, " Steve ")
+        await(launcher.session.state, "the offline sign-in") { it.name() == "Steve" }
+        val signed = assertIs<SessionState.SignedIn>(launcher.session.state.value).session
+        assertTrue(signed.offline)
+        assertEquals(AccountKeys.OFFLINE, signed.providerKey)
+        assertEquals("Steve", launcher.settings.current.offlinePlayerName)
+        assertEquals(null, launcher.source(launcher.app, AccountKeys.SignIns)[AccountKeys.OFFLINE], "nothing is left under way")
+    }
+
+    @Test
+    fun `offline play with no name fails as empty and signs nobody in`() {
+        val launcher = Launcher()
+        settled(launcher)
+        launcher.fire(launcher.app, AccountKeys.SignInOffline, "  ")
+        val flow = launcher.source(launcher.app, AccountKeys.SignIns)[AccountKeys.OFFLINE]
+        assertEquals(SignInFlow.Failed(SignInError(SignInError.EMPTY)), flow)
+        assertIs<SessionState.SignedOut>(launcher.session.state.value)
+        launcher.fire(launcher.app, AccountKeys.CancelSignIn, AccountKeys.OFFLINE)
+        assertTrue(launcher.source(launcher.app, AccountKeys.SignIns).isEmpty(), "the failure is forgotten once read")
     }
 
     /**
@@ -1067,7 +1146,7 @@ class CoreKeysTest {
     fun `a widget under a window and a composition reads and fires them with nothing else drawn`() {
         val launcher = Launcher(SettingsData(offlinePlayerName = "Steve"))
         var packs: List<PackView>? = null
-        var session: AppState? = null
+        var session: SessionState? = null
         var dark: Boolean? = null
         var launch: ((String) -> Unit)? = null
         var stop: ((String) -> Unit)? = null
@@ -1082,7 +1161,7 @@ class CoreKeysTest {
                     ChildLevel(ScopeLevel.Window) {
                         ChildLevel(ScopeLevel.Composition) {
                             packs = rememberScopedSource(PackKeys.Library).valueOrNull()
-                            session = rememberScopedSource(Sources.Session).valueOrNull()
+                            session = rememberScopedSource(AccountKeys.Session).valueOrNull()
                             dark = rememberScopedSource(Sources.DarkTheme).valueOrNull()
                             launch = rememberScopedCommand(PackKeys.LaunchPack)
                             // The plain app read, which a command a factory makes answers too.
@@ -1097,7 +1176,7 @@ class CoreKeysTest {
                 scene.settle(4)
                 // The startup sign-in runs off the event thread, and lands a few frames later.
                 var waited = 0
-                while (session !is AppState.Authenticated && waited < 250) {
+                while (session !is SessionState.SignedIn && waited < 250) {
                     Thread.sleep(20)
                     Snapshot.sendApplyNotifications()
                     scene.settle(1)
@@ -1108,7 +1187,7 @@ class CoreKeysTest {
             }
         }
         assertEquals(listOf(pack.toPackView()), packs)
-        assertEquals("Steve", (session as? AppState.Authenticated)?.session?.playerName)
+        assertEquals("Steve", session.name())
         assertEquals(true, dark)
         assertNotNull(launch).invoke(pack.id)
         assertEquals("Steve", launcher.actions.launched.single().first.playerName)

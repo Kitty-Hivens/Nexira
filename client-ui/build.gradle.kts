@@ -153,6 +153,10 @@ kotlin {
                 // module itself is compiled in and handed to the host as a CompiledModule.
                 implementation(project(":packs-api"))
                 implementation(project(":packs"))
+                // The accounts module, the same way: its API for the built-in widgets, the
+                // module compiled in.
+                implementation(project(":accounts-api"))
+                implementation(project(":accounts"))
                 implementation(project(":nx-ui"))
                 implementation(project(":ui-layers"))
                 implementation(project(":client-i18n"))
