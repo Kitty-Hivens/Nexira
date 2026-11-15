@@ -1000,13 +1000,21 @@ class PackUpdateServiceTest {
     /**
      * On a filesystem that ignores case the build's `JEI.jar` opens `jei.jar`, so the
      * scan found the build's bytes and wrote nothing, and the sweep then removed the
-     * file by its name. A hard link stands in for that here: two names, one file.
+     * file by its name. Where the filesystem ignores case the file is put under the
+     * other name for real. Elsewhere a hard link stands in for that: two names, one file.
      */
     @Test
     fun `a file the build's name opens is not a stray`() = runTest {
         val h = Harness()
         val detached = h.instances.detachToLocal(h.installV1())
-        Files.createLink(h.clientDir.resolve("mods/Req.jar"), h.clientDir.resolve("mods/req.jar"))
+        val mods = h.clientDir.resolve("mods")
+        if (Files.exists(mods.resolve("REQ.JAR"))) {
+            // Through a third name: a move between two names of one file is skipped as done.
+            val aside = Files.move(mods.resolve("req.jar"), mods.resolve("req.jar.aside"))
+            Files.move(aside, mods.resolve("Req.jar"))
+        } else {
+            Files.createLink(mods.resolve("Req.jar"), mods.resolve("req.jar"))
+        }
 
         val preview = h.instances.previewReattach(detached)
 
