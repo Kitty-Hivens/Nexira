@@ -71,23 +71,53 @@ The service entry the launcher discovers you by is generated for you into `META-
 
 ## Dependencies
 
-Depend on the kernel and on whatever you genuinely need. What you must not do is assume your own copy of the shared runtime will be used:
+Each module is loaded through a class loader of its own, and that loader does not see the whole launcher. It sees a fixed set of shared classes, and looks everything else up in your jar.
 
 ```kotlin
 dependencies {
     api(project(":widget-model"))
     api(project(":widget-api"))
+    // Only if you draw with the launcher's design system.
+    implementation(project(":nx-ui"))
     implementation(libs.compose.runtime)
     implementation(libs.compose.foundation)
     implementation(libs.compose.ui)
 }
 ```
 
-Each module is loaded through its own class loader over the launcher's, and delegation is parent-first. If your jar bundles Compose, the Kotlin standard library or the widget API, the launcher's copies are used and yours are ignored. That is what keeps a composable in your module talking to the same Compose runtime as everything else. Genuinely private dependencies, ones the launcher does not have, are loaded from your jar as normal.
+### What every module sees
+
+These always come from the launcher, and a copy in your jar is ignored. That is what keeps your composables talking to the same Compose runtime as everything else, so declare them as dependencies and do not bundle them:
+
+- the widget kernel, `widget-api` and `widget-model` (`hivens.widget.api`, `hivens.widget.model`);
+- the launcher's design system, `nx-ui`: `NxTheme`, the `Nx` components and the colour, spacing and motion tokens. Its colour helpers use `com.materialkolor`, which is shared with it;
+- Compose (`androidx.*`, `org.jetbrains.compose.*`) and Skia (`org.jetbrains.skia`, `org.jetbrains.skiko`);
+- the Kotlin standard library, kotlinx.coroutines, kotlinx.serialization and SLF4J;
+- the media engine, skinema (`dev.hivens.skinema`), whose native libraries a process can load only once.
+
+`nx-ui` is part of what your module builds against, the same way the widget kernel is. A launcher release that changes its public API can break modules built on the old one.
+
+### Other modules' APIs
+
+To use another module's API, for example the packs or the accounts module, name it in the manifest beside the other attributes:
+
+```kotlin
+"Nexira-Module-Requires" to "nexira.packs=1.0, nexira.accounts=1.0",
+```
+
+Each entry is an API id and the version you compiled against. The launcher refuses your jar, with the reason in the log, when it does not carry that API or carries a version that does not serve yours: another major version, or an older minor one. An API you name is visible to your module. One you do not name is not, even when the launcher carries it.
+
+### Everything else goes in your jar
+
+Any other library your module uses has to be inside your jar, as a fat jar or with the dependencies shaded in. That includes libraries the launcher also uses, an HTTP client or an image loader say: your module cannot see the launcher's copy and gets its own. The launcher's own code is not visible to modules at all, its services, its accounts and session, its interface and its dependency injection container among it. Use the keys the widget API offers instead.
+
+Module loading is no longer parent-first. Earlier launchers loaded a module over the whole application, so a library the launcher happened to carry was found without being bundled. A module that relied on that now fails with `NoClassDefFoundError` on the first such class, and has to bundle the library.
+
+While the launcher runs your module's code itself, its constructors, its key declarations, its factories and its services, the thread's context class loader is your module's own loader. A bundled library that finds its providers with `ServiceLoader` then finds yours. Inside a widget's composition, and in coroutines your module starts, that is not so, so there pass your own class loader explicitly, `ServiceLoader.load(Service::class.java, MyModule::class.java.classLoader)`.
 
 Modules cannot see each other's classes. Two modules can carry a class of the same name without interfering.
 
-You are not obliged to use the launcher's design system, and the example deliberately does not: it defines its own palette and draws its own controls. Both approaches are fine.
+You may draw with the launcher's design system or bring your own. The example deliberately does the second: it defines its own palette and draws its own controls.
 
 ## Installing while you work
 
@@ -104,7 +134,7 @@ Then `./gradlew installWidget` and restart the launcher. Modules are scanned onc
 
 ## What the launcher does not do
 
-There is no sandbox. Your module runs with the same access as the launcher: files, network, everything the JVM can reach. The launcher does not restrict it and does not ask the user to approve anything. What it does instead is name your module in the log and, in time, in a list the user can see and switch off.
+There is no sandbox. The class loader keeps the launcher's own classes out of your module's view, but your module still runs with the same access as the launcher: files, network, everything the JVM can reach. The launcher does not restrict it and does not ask the user to approve anything. What it does instead is name your module in the log and, in time, in a list the user can see and switch off.
 
 Nothing is signed or verified. A module is trusted because a person chose to put the file there.
 

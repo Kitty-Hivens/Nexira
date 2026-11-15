@@ -936,4 +936,18 @@ tasks.named<Test>("desktopTest") {
         "nexira.test.packsConsumerJar",
         rootProject.layout.projectDirectory.file("examples/packs-consumer/build/libs/packs-consumer.jar").asFile.absolutePath,
     )
+    // The other example modules, for the tests that open each the way the launcher does
+    // and check that every class it names is there for it. Off the test classpath too.
+    mapOf(
+        "accountsConsumer" to "accounts-consumer",
+        "pixelPlayer" to "widget-pixelplayer",
+        "screenFx" to "widget-screenfx",
+        "looks" to "widget-looks",
+    ).forEach { (property, module) ->
+        dependsOn(":examples:$module:jar")
+        systemProperty(
+            "nexira.test.${property}Jar",
+            rootProject.layout.projectDirectory.file("examples/$module/build/libs/$module.jar").asFile.absolutePath,
+        )
+    }
 }

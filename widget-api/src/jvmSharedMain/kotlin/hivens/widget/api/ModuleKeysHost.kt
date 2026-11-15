@@ -107,16 +107,31 @@ private fun Throwable.fatal(): Boolean = this is VirtualMachineError && this !is
  * Runs [block], module code, and turns whatever it throws that is not fatal and not an
  * ordinary exception into one, so the level that called it leaves the key missing
  * instead of crashing the frame on a `TODO()` or a linkage error.
+ *
+ * The thread's context class loader is [loader], the module's own, while it runs, so a
+ * library the module bundles that finds its providers through it finds the module's.
  */
-private inline fun <R> contained(moduleId: String, what: String, block: () -> R): R =
+private inline fun <R> contained(moduleId: String, what: String, loader: ClassLoader?, block: () -> R): R =
     try {
-        block()
+        inModule(loader, block)
     } catch (e: Exception) {
         throw e
     } catch (e: Throwable) {
         if (e.fatal()) throw e
         throw IllegalStateException("module '$moduleId' failed making '$what': ${e.message ?: e.javaClass.simpleName}", e)
     }
+
+/** Runs [block] with [loader] as the thread's context class loader, and puts the one before back. */
+private inline fun <R> inModule(loader: ClassLoader?, block: () -> R): R {
+    val thread = Thread.currentThread()
+    val before = thread.contextClassLoader
+    if (loader != null) thread.contextClassLoader = loader
+    try {
+        return block()
+    } finally {
+        if (loader != null) thread.contextClassLoader = before
+    }
+}
 
 /** The module's current declaration, declared again whenever [current] answers another instance. */
 private class Live(
@@ -126,7 +141,7 @@ private class Live(
     private var declaration: Declaration,
 ) {
     @Synchronized
-    fun declaration(what: String): Declaration = contained(moduleId, what) {
+    fun declaration(what: String): Declaration = contained(moduleId, what, instance.javaClass.classLoader) {
         val now = current() ?: error("module '$moduleId' is no longer loaded, so '$what' cannot be made")
         if (now !== instance) {
             declaration = Declaration.of(now)
@@ -136,8 +151,8 @@ private class Live(
     }
 }
 
-/** What one [KeyContribution.declare] said, by id. */
-private class Declaration : ModuleKeys {
+/** What one [KeyContribution.declare] said, by id, and [loader], the class loader of the module that said it. */
+private class Declaration(val loader: ClassLoader?) : ModuleKeys {
 
     class Source(val key: SourceKey<*>, val sample: (() -> Any?)?, val factory: SourceFactory<*>)
     class Command(val key: CommandKey<*>, val factory: CommandFactory<*>)
@@ -233,26 +248,29 @@ private class Declaration : ModuleKeys {
         this.sources.values.forEach { declared ->
             val key: SourceKey<Any?> = declared.key
             val factory: SourceFactory<Any?> = { context ->
-                val now = live.declaration(key.id).sources[key.id]?.takeIf { it.key.level == key.level }
+                val declaration = live.declaration(key.id)
+                val now = declaration.sources[key.id]?.takeIf { it.key.level == key.level }
                     ?: error("module '$moduleId' no longer declares the source '${key.id}' at ${key.level}")
-                contained(moduleId, key.id) { now.factory(context.seenBy(trusted)) }
+                contained(moduleId, key.id, declaration.loader) { now.factory(context.seenBy(trusted)) }
             }
             if (declared.sample == null) {
                 sources.registerFactory(key, factory)
             } else {
                 sources.registerFactory(key, {
-                    val now = live.declaration(key.id).sources[key.id]?.sample
+                    val declaration = live.declaration(key.id)
+                    val now = declaration.sources[key.id]?.sample
                         ?: error("module '$moduleId' no longer has a sample for '${key.id}'")
-                    contained(moduleId, key.id) { now() }
+                    contained(moduleId, key.id, declaration.loader) { now() }
                 }, factory)
             }
         }
         this.commands.values.forEach { declared ->
             val key = declared.key as CommandKey<Any?>
             commands.registerFactory(key) { context ->
-                val now = live.declaration(key.id).commands[key.id]?.takeIf { it.key.level == key.level }
+                val declaration = live.declaration(key.id)
+                val now = declaration.commands[key.id]?.takeIf { it.key.level == key.level }
                     ?: error("module '$moduleId' no longer declares the command '${key.id}' at ${key.level}")
-                contained(moduleId, key.id) { (now.factory as CommandFactory<Any?>)(context.seenBy(trusted)) }
+                contained(moduleId, key.id, declaration.loader) { (now.factory as CommandFactory<Any?>)(context.seenBy(trusted)) }
             }
         }
         ownedSources.values.forEach { (key, sample) ->
@@ -260,9 +278,10 @@ private class Declaration : ModuleKeys {
                 sources.declare(key)
             } else {
                 sources.declare(key) {
-                    val now = live.declaration(key.id).ownedSources[key.id]?.second
+                    val declaration = live.declaration(key.id)
+                    val now = declaration.ownedSources[key.id]?.second
                         ?: error("module '$moduleId' no longer has a sample for '${key.id}'")
-                    contained(moduleId, key.id) { now() }
+                    contained(moduleId, key.id, declaration.loader) { now() }
                 }
             }
         }
@@ -270,16 +289,23 @@ private class Declaration : ModuleKeys {
         this.services.forEach { (type, declared) ->
             val name = type.simpleName ?: "a service"
             services.declare(declared.level, type as KClass<Any>, moduleId, trusted, declared.hostOnly) { context ->
-                val now = live.declaration(name).services[type]?.takeIf { it.level == declared.level && it.hostOnly == declared.hostOnly }
+                val declaration = live.declaration(name)
+                val now = declaration.services[type]?.takeIf { it.level == declared.level && it.hostOnly == declared.hostOnly }
                     ?: error("module '$moduleId' no longer declares the service $name at ${declared.level}")
-                contained(moduleId, name) { now.make(context) }
+                contained(moduleId, name, declaration.loader) { now.make(context) }
             }
         }
     }
 
     companion object {
-        /** [contribution]'s declaration. Throws what the module's code threw. */
-        fun of(contribution: KeyContribution): Declaration = Declaration().also { contribution.declare(it) }
+        /**
+         * [contribution]'s declaration, run with the module's class loader as the thread's
+         * context class loader. Throws what the module's code threw.
+         */
+        fun of(contribution: KeyContribution): Declaration {
+            val loader = contribution.javaClass.classLoader
+            return Declaration(loader).also { inModule(loader) { contribution.declare(it) } }
+        }
     }
 }
 

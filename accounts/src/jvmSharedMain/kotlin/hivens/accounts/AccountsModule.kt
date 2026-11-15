@@ -52,6 +52,9 @@ object AccountsModule : CompiledModule {
         ),
     )
     override val provides: Map<String, ApiVersion> = mapOf(AccountsApi.ID to AccountsApi.VERSION)
+
+    // The API's own object lives in the API artifact's package, so the package is read off it.
+    override val apiPackages: Map<String, Set<String>> = mapOf(AccountsApi.ID to setOf(AccountsApi::class.java.name.substringBeforeLast('.')))
     override val contributions: List<ModuleContribution> = listOf(AccountKeysContribution)
 
     private const val NAME = "accounts.name"

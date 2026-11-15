@@ -14,3 +14,11 @@ val CompiledModules: List<CompiledModule> = listOf(PacksModule, AccountsModule)
 /** The module APIs [modules] publish, which a jar may have been compiled against. */
 fun offeredApis(modules: List<CompiledModule> = CompiledModules): Map<String, ApiVersion> =
     modules.fold(emptyMap()) { all, module -> all + module.provides }
+
+/**
+ * The packages each module API [modules] publish lives in, by API id: what a jar that
+ * names the API in its manifest is shown of the application, beside the widget kernel.
+ * Each module declares them beside the API itself (see [CompiledModule.apiPackages]).
+ */
+fun offeredApiPackages(modules: List<CompiledModule> = CompiledModules): Map<String, Set<String>> =
+    modules.fold(emptyMap()) { all, module -> all + module.apiPackages }

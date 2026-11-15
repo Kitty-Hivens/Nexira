@@ -751,7 +751,7 @@ val appModule = module {
 
     // Replays the persisted mimicVersionOverride into its global state
     // holder on Koin start. `createdAtStart = true` makes this run during
-    // `startKoin { modules(...) }` so the values are live before the
+    // the Koin application's start so the values are live before the
     // first protocol call.
     single(createdAtStart = true) { SettingsRestoreHook(get()) }
 

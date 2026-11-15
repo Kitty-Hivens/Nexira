@@ -48,6 +48,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 /**
@@ -67,6 +68,7 @@ class JarModuleKeysTest {
     private val consumerJar: Path = Path.of(requireNotNull(System.getProperty("nexira.test.packsConsumerJar")))
 
     private val greeting = SourceKey<String>("fixture.greeting")
+    private val contextLoaders = SourceKey<Map<String, String?>>("fixture.contextLoaders")
     private val shelf = "packs-consumer.shelf"
 
     @BeforeTest
@@ -88,7 +90,7 @@ class JarModuleKeysTest {
         json      = json,
         builtIn   = GeneratedWidgetRegistry,
         scope     = scope,
-        host      = DesktopWidgetModuleHost(folder, shadowDir = tmp.resolve("shadow"), offered = offeredApis()),
+        host      = DesktopWidgetModuleHost(folder, shadowDir = tmp.resolve("shadow"), offered = offeredApis(), apiPackages = offeredApiPackages()),
     )
 
     /** The host's keys with the modules [modules] has on, as the launcher builds them at a start. */
@@ -149,6 +151,18 @@ class JarModuleKeysTest {
 
         modules.setEnabled("fixture", enabled = false)
         awaitTrue("the key gone with the module") { app.current(greeting) == null }
+    }
+
+    @Test
+    fun `a jar's declaration and factories run with its own loader as the thread's context class loader`() {
+        fixtureJar.copyTo(folder.resolve("fixture.jar"))
+        val app = app(keys(modules()))
+        val before = Thread.currentThread().contextClassLoader
+
+        val seen = assertNotNull(app.find(contextLoaders)).state.value
+
+        assertEquals(mapOf("load" to "widget-module:fixture", "declare" to "widget-module:fixture", "factory" to "widget-module:fixture"), seen)
+        assertSame(before, Thread.currentThread().contextClassLoader, "the thread's own context class loader was not put back")
     }
 
     @Test

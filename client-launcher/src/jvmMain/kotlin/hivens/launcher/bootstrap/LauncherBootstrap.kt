@@ -9,8 +9,9 @@ import hivens.launcher.platform.DataDirMigration
 import hivens.launcher.platform.DataDirMover
 import hivens.launcher.platform.PlatformPaths
 import hivens.launcher.platform.SingleInstance
-import org.koin.core.context.startKoin
+import org.koin.core.KoinApplication
 import org.koin.core.module.Module
+import org.koin.dsl.koinApplication
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.util.UUID
@@ -41,6 +42,11 @@ import kotlin.system.exitProcess
  * `.show` watcher and data-dir-relative reads) and a possibly non-null
  * [DataDirMigration.Source] that gates whether the first composition
  * shows MigrationScreen or AppRoot.
+ *
+ * Koin is started as an isolated application and never registered in Koin's
+ * global context. The entrypoint holds it ([Result.koin]) and hands it to what
+ * needs it, the composition through host-provided locals. A module loaded from
+ * a jar therefore finds no launcher graph behind Koin's global entry points.
  *
  * This module is AWT-free by construction. Entry pipelines COMPOSE the
  * public pieces: [preBootHeadless] is the CLI's whole pipeline (a
@@ -73,11 +79,16 @@ object LauncherBootstrap {
      * post-Koin consumers grab their own instance via injection. The
      * shared mutable state between the two instances is zero, so the
      * parallel construction is functionally identical.
+     *
+     * [koin] is the launcher's graph. It is held here and by whoever the
+     * entrypoint hands it to, and nowhere global. Closing it is the
+     * entrypoint's, at process exit.
      */
     data class Result(
         val paths: PlatformPaths,
         val pendingMigration: DataDirMigration.Source?,
         val crashReporter: CrashReporter,
+        val koin: KoinApplication,
     )
 
     /** Pre-window prologue values [completeCore] resumes from. */
@@ -266,8 +277,21 @@ object LauncherBootstrap {
         // has a real instance to wire up; LauncherController and every fire-and-forget
         // launch/sync coroutine share it, so JVM shutdown cancels them together instead
         // of leaving a launched game process orphaned past the shutdown signal.
-        startKoin { modules(launcherModules() + desktopModules() + extraModules) }
+        //
+        // Isolated, not startKoin: the global context is reachable from any code in
+        // the process, a widget module's jar included, and the graph holds the
+        // account store and the session tokens.
+        //
+        // The eager singletons are made apart from the declaration, so a graph whose start
+        // throws half way is closed rather than left with what it already made running.
+        val koin = koinApplication(createEagerInstances = false) { modules(launcherModules() + desktopModules() + extraModules) }
+        try {
+            koin.createEagerInstances()
+        } catch (e: Throwable) {
+            val _ = runCatching { koin.close() }
+            throw e
+        }
 
-        return Result(paths, pendingMigration, crashReporter)
+        return Result(paths, pendingMigration, crashReporter, koin)
     }
 }

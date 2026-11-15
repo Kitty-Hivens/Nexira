@@ -1,5 +1,6 @@
 package hivens.widget.loader
 
+import androidx.compose.runtime.Composer
 import hivens.widget.api.ContributedServices
 import hivens.widget.api.HostApi
 import hivens.widget.api.KeyContribution
@@ -12,6 +13,9 @@ import hivens.widget.api.WidgetCommandRegistry
 import hivens.widget.api.WidgetDataRegistry
 import hivens.widget.api.registerModuleKeys
 import hivens.widget.model.ApiVersion
+import org.slf4j.Logger
+import java.io.ByteArrayInputStream
+import java.io.InputStream
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.jar.Attributes
@@ -25,6 +29,8 @@ import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 /**
@@ -66,9 +72,10 @@ class WidgetModuleLoaderTest {
         }
     }
 
-    /** Scans, remembering what it opened. */
+    /** Scans, remembering what it opened, with each API [offered] sharing a package of its own. */
     private fun scan(dir: Path = modules, offered: Map<String, ApiVersion> = emptyMap()): WidgetModuleScan =
-        WidgetModuleLoader(dir, offered = offered).scan().also { opened += it.loaded }
+        WidgetModuleLoader(dir, offered = offered, apiPackages = offered.mapValues { (id, _) -> setOf("fixture.api.$id") }).scan()
+            .also { opened += it.loaded }
 
     @Test
     fun `a well-formed module is loaded, named, and brings its widgets`() {
@@ -436,6 +443,84 @@ class WidgetModuleLoaderTest {
         assertEquals("sample", sources.sampleOf("fixture.greeting")?.invoke())
     }
 
+    // -- what a jar sees of the application -----------------------------------
+
+    @Test
+    fun `the kernel and the libraries shared with the launcher are the launcher's own classes`() {
+        install("good.jar")
+
+        val loader = scan().loaded.single().loader
+
+        listOf(WidgetApi::class.java, Unit::class.java, Composer::class.java, Logger::class.java).forEach { shared ->
+            assertSame(shared, loader.loadClass(shared.name), "${shared.name} is not the launcher's copy")
+        }
+    }
+
+    @Test
+    fun `the launcher's own classes outside the shared set are not found through a jar`() {
+        install("good.jar")
+
+        val loader = scan().loaded.single().loader
+
+        // On this test's class path, so the launcher has it: only the jar's view hides it.
+        assertSame(WidgetModuleLoader::class.java, javaClass.classLoader.loadClass(WidgetModuleLoader::class.java.name))
+        assertFailsWith<ClassNotFoundException> { loader.loadClass(WidgetModuleLoader::class.java.name) }
+        assertEquals(null, loader.getResource("hivens/widget/loader/WidgetModuleLoader.class"))
+    }
+
+    @Test
+    fun `a class an artifact lists is shared by name, and its package beside it is not`() {
+        install("good.jar")
+        // A host whose list names one class of a package that holds others as well, the
+        // way the design system shares its packages with the launcher's interface.
+        val listed = WidgetModuleLoader::class.java.name
+        val unlisted = LoadedWidgetModule::class.java.name
+        val host = ListingHost(javaClass.classLoader, mapOf(SharedClassList.pathOf("fixture-artifact") to listed))
+
+        val loader = WidgetModuleLoader(modules, parent = host, sharedArtifacts = listOf("fixture-artifact")).scan()
+            .also { opened += it.loaded }.loaded.single().loader
+
+        assertSame(WidgetModuleLoader::class.java, loader.loadClass(listed))
+        assertFailsWith<ClassNotFoundException> { loader.loadClass(unlisted) }
+    }
+
+    @Test
+    fun `an artifact the application carries no list for shares nothing`() {
+        install("good.jar")
+
+        val loader = WidgetModuleLoader(modules, sharedArtifacts = listOf("not-carried")).scan()
+            .also { opened += it.loaded }.loaded.single().loader
+
+        assertFailsWith<ClassNotFoundException> { loader.loadClass(WidgetModuleLoader::class.java.name) }
+    }
+
+    @Test
+    fun `a jar built against an API offered without its classes is refused, not loaded to fail later`() {
+        install("unshared-api.jar", requires = "nexira.packs=1.0")
+
+        val scan = WidgetModuleLoader(modules, offered = mapOf("nexira.packs" to ApiVersion(1, 0))).scan().also { opened += it.loaded }
+
+        assertEquals(emptyList(), scan.loaded)
+        assertTrue("without sharing its classes" in scan.rejected.single().reason, scan.rejected.single().reason)
+    }
+
+    @OptIn(HostApi::class)
+    @Test
+    fun `a jar's code runs with its own loader as the thread's context class loader`() {
+        install("good.jar")
+        val module = scan().loaded.single()
+        val keys = module.contributions.filterIsInstance<KeyContribution>().single()
+        val sources = WidgetDataRegistry()
+        val before = Thread.currentThread().contextClassLoader
+
+        registerModuleKeys("fixture", keys, sources, WidgetCommandRegistry(), ContributedServices())
+        val seen = sources.sampleOf("fixture.contextLoaders")?.invoke()
+
+        val own = module.loader.name
+        assertEquals(mapOf("load" to own, "declare" to own, "sample" to own), seen)
+        assertSame(before, Thread.currentThread().contextClassLoader, "the thread's own context class loader was not put back")
+    }
+
     // -- loading without a restart -------------------------------------------
 
     @Test
@@ -494,6 +579,12 @@ class WidgetModuleLoaderTest {
     }
 
     // -- fixture ------------------------------------------------------------
+
+    /** [parent] with [extra] resources on top, by path and text, the way an artifact's list would be there. */
+    private class ListingHost(parent: ClassLoader, private val extra: Map<String, String>) : ClassLoader(parent) {
+        override fun getResourceAsStream(name: String): InputStream? =
+            extra[name]?.let { ByteArrayInputStream(it.toByteArray(Charsets.UTF_8)) } ?: super.getResourceAsStream(name)
+    }
 
     /**
      * Copies the built fixture module into the scan directory, optionally with a

@@ -8,13 +8,14 @@ import hivens.core.api.interfaces.ILauncherService
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.update.PackUpdater
+import hivens.launcher.CrashReporter
 import hivens.launcher.PackInstallService
-import hivens.launcher.di.desktop.desktopModules
+import hivens.launcher.bootstrap.LauncherBootstrap
 import hivens.launcher.launch.LauncherController
 import hivens.launcher.platform.PlatformPaths
 import org.koin.core.Koin
-import org.koin.core.context.startKoin
-import org.koin.core.context.stopKoin
+import org.koin.core.KoinApplication
+import org.koin.core.context.GlobalContext
 import org.koin.dsl.module
 import java.nio.file.Files
 import java.nio.file.Path
@@ -22,10 +23,12 @@ import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertSame
 
 /**
- * The assembled graph, the way the entry points start it.
+ * The assembled graph, the way the entry points start it: through the bootstrap's own
+ * last step, which is also what keeps the graph out of Koin's global context.
  *
  * The per-module tests prove a module resolves with stand-ins for everything around
  * it. None of them proves that the modules, put together, leave nothing unbound, and
@@ -36,7 +39,8 @@ import kotlin.test.assertSame
 class LauncherGraphTest {
 
     private lateinit var dir: Path
-    private lateinit var koin: Koin
+    private lateinit var application: KoinApplication
+    private val koin: Koin get() = application.koin
 
     @BeforeTest
     fun start() {
@@ -47,22 +51,24 @@ class LauncherGraphTest {
             bootstrapDataDir = { null },
             env = { if (it == "NEXIRA_DATA_DIR") dir.toString() else null },
         )
-        koin = startKoin {
-            modules(
-                launcherModules() + desktopModules() + module {
+        val boot = LauncherBootstrap.finishBoot(
+            LauncherBootstrap.Core(paths, CrashReporter(paths)),
+            listOf(
+                module {
                     // The real registrations resolve the per-user paths of the machine
                     // the test runs on; these replace them.
                     single<PlatformPaths> { paths }
                     single<Path> { paths.dataDir }
                 },
-            )
-        }.koin
+            ),
+        )
+        application = boot.koin
     }
 
     @AfterTest
     fun stop() {
         val _ = runCatching { koin.get<IPackRepository>().let { (it as? AutoCloseable)?.close() } }
-        stopKoin()
+        application.close()
         dir.toFile().deleteRecursively()
     }
 
@@ -75,6 +81,14 @@ class LauncherGraphTest {
         assertNotNull(koin.get<PackUpdater>())
         assertNotNull(koin.get<PackInstallService>())
         assertNotNull(koin.get<AuthProviderRegistry>())
+    }
+
+    @Test
+    fun `the graph is the entry point's alone and not in Koin's global context`() {
+        // Anything in the process can ask the global context, a widget module's jar
+        // included, and this graph holds the account store and the session tokens.
+        assertNull(GlobalContext.getOrNull(), "the launcher's graph was registered globally")
+        assertNotNull(koin.get<AccountStore>())
     }
 
     @Test

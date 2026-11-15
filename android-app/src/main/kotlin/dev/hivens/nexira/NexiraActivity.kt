@@ -18,6 +18,7 @@ class NexiraActivity : ComponentActivity() {
         holdBackAtRoot(onBackPressedDispatcher)
         // The system file picker is opened through the activity.
         FileKit.init(this)
-        setContent { AndroidShell() }
+        val koin = (application as NexiraApp).koin
+        setContent { AndroidShell(koin) }
     }
 }

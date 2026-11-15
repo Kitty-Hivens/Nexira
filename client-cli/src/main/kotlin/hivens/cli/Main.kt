@@ -19,7 +19,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.koin.core.Koin
-import org.koin.core.context.GlobalContext
 import kotlin.system.exitProcess
 
 /**
@@ -56,8 +55,8 @@ private fun printVersion() {
 }
 
 /**
- * Boots the AWT-free launcher core once and returns the started Koin context, or
- * null when the launcher is running on the same data directory.
+ * Boots the AWT-free launcher core once and returns its Koin, or null when the
+ * launcher is running on the same data directory.
  *
  * The two cannot share it. Both databases lock their directory for one process, and
  * this one would either fail on them or hold them while the launcher needs them. So
@@ -74,8 +73,7 @@ private fun bootLauncher(): Koin? {
         )
         return null
     }
-    LauncherBootstrap.preBootHeadless(listOf(transientPackRegistryModule))
-    return GlobalContext.get()
+    return LauncherBootstrap.preBootHeadless(listOf(transientPackRegistryModule)).koin.koin
 }
 
 private fun runListPacks(): Int {

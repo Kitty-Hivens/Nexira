@@ -11,6 +11,7 @@ import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import hivens.ui.host.HostKoin
 import hivens.ui.i18n.AppLocale
 import hivens.ui.i18n.LocaleProvider
 import hivens.ui.notifications.SessionRegistry
@@ -21,8 +22,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import org.jetbrains.skia.EncodedImageFormat
-import org.koin.core.context.startKoin
-import org.koin.core.context.stopKoin
+import org.koin.core.KoinApplication
+import org.koin.dsl.koinApplication
 import org.koin.dsl.module
 import java.io.File
 import java.time.Instant
@@ -38,10 +39,11 @@ import kotlin.test.assertTrue
 class TopBarSessionsRenderTest {
 
     private val scope = CoroutineScope(SupervisorJob())
+    private var koin: KoinApplication? = null
 
     @AfterTest
     fun tearDown() {
-        stopKoin()
+        koin?.close()
         scope.cancel()
     }
 
@@ -53,18 +55,21 @@ class TopBarSessionsRenderTest {
         val registry = SessionRegistry(scope) { now }
         registry.register("a", "Industrial", null, {}, {})
         registry.register("b", "Create: Above and Beyond, with a long name", null, {}, {})
-        startKoin { modules(module { single { registry } }) }
+        val app = koinApplication { modules(module { single { registry } }) }
+        koin = app
 
         val d = 2f
         val scene = ImageComposeScene((720 * d).toInt(), (44 * d).toInt(), density = Density(d)) {
-            LocaleProvider(AppLocale.RUSSIAN) {
-                NxTheme(dark = true) {
-                    Box(
-                        Modifier.fillMaxSize().background(NxColor.page),
-                        contentAlignment = Alignment.CenterEnd,
-                    ) {
-                        Box(Modifier.fillMaxWidth().height(44.dp), contentAlignment = Alignment.CenterEnd) {
-                            TopBarSessionsWidget()
+            HostKoin(app) {
+                LocaleProvider(AppLocale.RUSSIAN) {
+                    NxTheme(dark = true) {
+                        Box(
+                            Modifier.fillMaxSize().background(NxColor.page),
+                            contentAlignment = Alignment.CenterEnd,
+                        ) {
+                            Box(Modifier.fillMaxWidth().height(44.dp), contentAlignment = Alignment.CenterEnd) {
+                                TopBarSessionsWidget()
+                            }
                         }
                     }
                 }

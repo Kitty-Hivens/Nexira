@@ -83,6 +83,35 @@ kotlin {
 // Own composeResources -- the icon + typography fonts live here. The generated
 // Res accessor uses a DIFFERENT package than client-ui's (hivens.ui.generated.resources)
 // so the two Res objects never collide on the classpath.
+// Every class this artifact holds, one binary name per line, for the widget module loader:
+// widget modules are shown the design system class by class from this list, because its
+// packages (hivens.ui.theme, hivens.ui.nx) also hold classes of the launcher's own
+// interface, which modules are not shown. The loader reads the list off the application at
+// run time, so it holds in the merged release jar as it does on a class path of separate
+// jars. See SharedClassList in :widget-loader for the format and the path.
+val sharedClassListDir = layout.buildDirectory.dir("generated/sharedClassList")
+val listSharedClasses = tasks.register("listSharedClasses") {
+    // The compile task's own output and not the compilation's classes, which the
+    // resources this list goes into are part of.
+    val classDirs = files(tasks.named<KotlinJvmCompile>("compileKotlinDesktop").flatMap { it.destinationDirectory })
+    val listFile = sharedClassListDir.map { it.file("META-INF/nexira/shared/nx-ui.classes") }
+    inputs.files(classDirs).withPropertyName("classes").withPathSensitivity(PathSensitivity.RELATIVE)
+    outputs.file(listFile).withPropertyName("list")
+    doLast {
+        val names = classDirs.files.filter { it.isDirectory }.flatMap { dir ->
+            dir.walkTopDown()
+                .filter { it.isFile && it.name.endsWith(".class") && it.name != "module-info.class" }
+                .map { it.relativeTo(dir).invariantSeparatorsPath.removeSuffix(".class").replace('/', '.') }
+                .toList()
+        }.sorted()
+        listFile.get().asFile.apply {
+            parentFile.mkdirs()
+            writeText(names.joinToString("\n", postfix = "\n"))
+        }
+    }
+}
+kotlin.sourceSets.getByName("desktopMain").resources.srcDir(files(sharedClassListDir).builtBy(listSharedClasses))
+
 compose.resources {
     publicResClass = true
     packageOfResClass = "hivens.nx.ui.generated.resources"

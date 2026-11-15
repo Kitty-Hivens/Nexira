@@ -31,8 +31,12 @@ class PackagingTest {
     @AfterTest
     fun tearDown() = dir.deleteRecursively()
 
+    // The packs API's classes are shown to the jar as the launcher shows them, from the
+    // package its own object lives in.
+    private val packsApiPackages = mapOf(PacksApi.ID to setOf(PacksApi::class.java.name.substringBeforeLast('.')))
+
     private fun scan(offered: Map<String, ApiVersion>) =
-        WidgetModuleLoader(dir, parent = WithoutThisModule(javaClass.classLoader), offered = offered).scan()
+        WidgetModuleLoader(dir, parent = WithoutThisModule(javaClass.classLoader), offered = offered, apiPackages = packsApiPackages).scan()
 
     @Test
     fun `it loads where the launcher carries the packs API it was built against or a newer minor`() {

@@ -9,9 +9,9 @@ import hivens.core.data.NewsChannelPolicy
 import hivens.core.data.NewsItem
 import hivens.core.data.NewsPage
 import hivens.launcher.network.ServerProtocolConfig
+import hivens.ui.host.HostKoin
 import hivens.ui.theme.NxTheme
-import org.koin.core.context.startKoin
-import org.koin.core.context.stopKoin
+import org.koin.dsl.koinApplication
 import org.koin.dsl.module
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.AfterTest
@@ -25,7 +25,9 @@ import kotlin.test.assertTrue
  */
 class CompactNewsFeedChannelTest {
 
-    @AfterTest fun tearDown() = stopKoin()
+    private val koin = koinApplication { modules(module { single { ServerProtocolConfig() } }) }
+
+    @AfterTest fun tearDown() = koin.close()
 
     private class CountingFeed(private val title: String) : INewsFeed {
         val firstPages = AtomicInteger()
@@ -39,14 +41,13 @@ class CompactNewsFeedChannelTest {
     @OptIn(ExperimentalComposeUiApi::class)
     @Test
     fun `a new channel loads its own first page`() {
-        startKoin { modules(module { single { ServerProtocolConfig() } }) }
         val upstream = CountingFeed("upstream")
         val curated = CountingFeed("curated")
         val feed = mutableStateOf<INewsFeed>(upstream)
         // Built and drawn on the event thread: the rail subscribes a snapshotFlow.
         val scene = onEventThread {
             ImageComposeScene(320, 300, density = Density(1f)) {
-                NxTheme(dark = true) { CompactNewsFeed(maxItems = 4, feed = feed.value) }
+                HostKoin(koin) { NxTheme(dark = true) { CompactNewsFeed(maxItems = 4, feed = feed.value) } }
             }
         }
         var t = 0L

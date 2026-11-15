@@ -44,6 +44,7 @@ import hivens.launcher.catalogue.PackCatalogueRegistry
 import hivens.launcher.content.ContentKind
 import hivens.launcher.modrinth.ModrinthClient
 import hivens.launcher.smrt.SmrtPackClient
+import hivens.ui.host.HostKoin
 import hivens.ui.i18n.AppLocale
 import hivens.ui.i18n.LocaleProvider
 import hivens.ui.settle
@@ -67,8 +68,8 @@ import hivens.widget.model.SurfaceId
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import org.jetbrains.skia.EncodedImageFormat
-import org.koin.core.context.startKoin
-import org.koin.core.context.stopKoin
+import org.koin.core.KoinApplication
+import org.koin.dsl.koinApplication
 import org.koin.dsl.module
 import java.nio.file.Files
 import java.nio.file.Path
@@ -90,7 +91,10 @@ import kotlin.test.assertTrue
  */
 class BrowseRenderTest {
 
-    @AfterTest fun tearDown() = stopKoin()
+    /** What the sheets inject from: nothing until a test builds its [graph]. */
+    private var koin: KoinApplication = koinApplication { }
+
+    @AfterTest fun tearDown() = koin.close()
 
     private val now = Instant.now()
 
@@ -230,7 +234,8 @@ class BrowseRenderTest {
         val http = HttpClientProvider { error("a render sheet does not go to the network") }
         val data: Path = Files.createTempDirectory("nexira-browse-render")
         val modrinth = ModrinthClient(http, TransferEngine(http))
-        startKoin {
+        koin.close()
+        koin = koinApplication {
             modules(
                 module {
                     single { controller }
@@ -327,13 +332,15 @@ class BrowseRenderTest {
     private fun sheet(name: String, width: Int, height: Int, padded: Boolean = true, body: @Composable () -> Unit) {
         val d = 2f
         val scene = ImageComposeScene((width * d).toInt(), (height * d).toInt(), density = Density(d)) {
-            LocaleProvider(AppLocale.RUSSIAN) {
-                NxTheme(dark = true) {
-                    Box(Modifier.fillMaxSize().background(NxColor.page).padding(20.dp)) {
-                        if (padded) {
-                            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) { body() }
-                        } else {
-                            Row { body() }
+            HostKoin(koin) {
+                LocaleProvider(AppLocale.RUSSIAN) {
+                    NxTheme(dark = true) {
+                        Box(Modifier.fillMaxSize().background(NxColor.page).padding(20.dp)) {
+                            if (padded) {
+                                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) { body() }
+                            } else {
+                                Row { body() }
+                            }
                         }
                     }
                 }

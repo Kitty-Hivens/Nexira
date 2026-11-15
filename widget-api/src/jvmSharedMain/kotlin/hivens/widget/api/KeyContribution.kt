@@ -130,6 +130,13 @@ interface CompiledModule {
     val provides: Map<String, ApiVersion> get() = emptyMap()
 
     /**
+     * The packages each API in [provides] lives in, by the same API id: what of the
+     * application a jar that names the API is shown. An API in [provides] with no
+     * packages here is one no jar could use, and the loader refuses a jar that names it.
+     */
+    val apiPackages: Map<String, Set<String>> get() = emptyMap()
+
+    /**
      * What it adds. The host reads its [KeyContribution]s, and of a compiled module
      * nothing else yet: effects, themes and particle fields come from jars only.
      */

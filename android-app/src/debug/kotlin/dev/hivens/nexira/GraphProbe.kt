@@ -1,5 +1,6 @@
 package dev.hivens.nexira
 
+import android.content.Context
 import android.util.Log
 import hivens.auth.AccountStore
 import hivens.auth.AuthProviderRegistry
@@ -13,7 +14,6 @@ import hivens.launcher.launch.LauncherController
 import hivens.launcher.launch.GameHost
 import hivens.launcher.platform.PlatformPaths
 import kotlinx.coroutines.runBlocking
-import org.koin.core.context.GlobalContext
 
 /**
  * Asks the running graph for the things the application is entered through, then
@@ -24,8 +24,8 @@ object GraphProbe {
 
     private const val TAG = "NexiraProbe"
 
-    fun run() = runBlocking {
-        val koin = GlobalContext.get()
+    fun run(context: Context) = runBlocking {
+        val koin = (context.applicationContext as NexiraApp).koin.koin
         fun <T : Any> probe(name: String, get: () -> T) {
             val outcome = runCatching { get() }
             Log.i(TAG, "graph $name: " + outcome.fold({ "ok" }, { "FAILED ${it.javaClass.simpleName}: ${it.message?.take(160)}" }))

@@ -19,13 +19,13 @@ import hivens.core.data.NewsOrder
 import hivens.core.data.NewsPage
 import hivens.launcher.network.ServerProtocolConfig
 import hivens.launcher.news.CuratedNewsFeed
+import hivens.ui.host.HostKoin
 import hivens.ui.i18n.AppLocale
 import hivens.ui.i18n.LocaleProvider
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.Spacing
 import org.jetbrains.skia.EncodedImageFormat
-import org.koin.core.context.startKoin
-import org.koin.core.context.stopKoin
+import org.koin.dsl.koinApplication
 import org.koin.dsl.module
 import java.io.File
 import kotlin.io.path.createTempDirectory
@@ -44,7 +44,9 @@ import hivens.ui.theme.NxColor
  */
 class NewsChannelRenderTest {
 
-    @AfterTest fun tearDown() = stopKoin()
+    private val koin = koinApplication { modules(module { single { ServerProtocolConfig() } }) }
+
+    @AfterTest fun tearDown() = koin.close()
 
     private val entries = listOf(
         NewsItem(id = 1, title = "Обновление сервера до 1.21.1", dateEpochSeconds = 1787227200L),
@@ -69,13 +71,15 @@ class NewsChannelRenderTest {
     private fun drawSheet(name: String, dark: Boolean, body: @Composable () -> Unit) {
         val d = 2f
         val scene = ImageComposeScene((320 * d).toInt(), (300 * d).toInt(), density = Density(d)) {
-            LocaleProvider(AppLocale.RUSSIAN) {
-                NxTheme(dark = dark) {
-                    Box(
-                        Modifier.fillMaxSize().background(NxColor.page).padding(Spacing.s8),
-                        contentAlignment = Alignment.TopStart,
-                    ) {
-                        Box(Modifier.width(300.dp)) { body() }
+            HostKoin(koin) {
+                LocaleProvider(AppLocale.RUSSIAN) {
+                    NxTheme(dark = dark) {
+                        Box(
+                            Modifier.fillMaxSize().background(NxColor.page).padding(Spacing.s8),
+                            contentAlignment = Alignment.TopStart,
+                        ) {
+                            Box(Modifier.width(300.dp)) { body() }
+                        }
                     }
                 }
             }
@@ -90,13 +94,8 @@ class NewsChannelRenderTest {
         }
     }
 
-    private fun koin() = startKoin {
-        modules(module { single { ServerProtocolConfig() } })
-    }
-
     @Test
     fun channels() {
-        koin()
         for (dark in listOf(true, false)) {
             val suffix = if (dark) "dark" else "light"
             // The launcher's own feed: dated rows that open at the site.

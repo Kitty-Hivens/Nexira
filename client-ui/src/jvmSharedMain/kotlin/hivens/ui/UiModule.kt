@@ -402,7 +402,7 @@ fun uiCoreModule(
     }
 
     // Flush pending debounced layout writes on JVM shutdown. createdAtStart so
-    // the hook registers during startKoin{}. Runs in parallel with the scope
+    // the hook registers while the Koin application starts. Runs in parallel with the scope
     // cancellation hook (JVM shutdown hooks run concurrently); flush() is
     // mutex-locked and cancellation-safe, so the race is fine.
     single(createdAtStart = true) { LayoutGraphFlushHook(get()) }

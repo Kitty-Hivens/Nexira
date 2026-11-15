@@ -14,7 +14,7 @@ import org.slf4j.LoggerFactory
  * access.
  *
  * Wired as `single(createdAtStart = true)` in [appModule] so Koin
- * instantiates this hook during `startKoin { modules(...) }` and the
+ * instantiates this hook while the Koin application starts and the
  * `init {}` side-effects land before the first network call. Replaces
  * the prior `KoinJavaComponent.get<ISettingsService>(...)` escape hatch
  * that ran after Koin start: the new shape makes the dependency

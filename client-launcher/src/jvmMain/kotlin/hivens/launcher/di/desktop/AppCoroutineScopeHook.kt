@@ -8,7 +8,7 @@ import org.slf4j.LoggerFactory
  * Installs a JVM shutdown hook that cancels the process-lifetime
  * [CoroutineScope] when the JVM is about to exit. Wired as
  * `single(createdAtStart = true)` in [appModule] so the hook is
- * registered during `startKoin { modules(...) }`.
+ * registered while the Koin application starts.
  *
  * Why: before unification, two scopes lived in the launcher, and only one of
  * them was registered for cancellation on shutdown. Both now resolve to the

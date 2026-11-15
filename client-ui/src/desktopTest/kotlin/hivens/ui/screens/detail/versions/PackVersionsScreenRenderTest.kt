@@ -37,6 +37,7 @@ import hivens.core.update.UpdatePlan
 import hivens.launcher.PackOperationService
 import hivens.launcher.instance.InstanceSizeService
 import hivens.launcher.launch.RunningPackSource
+import hivens.ui.host.HostKoin
 import hivens.ui.theme.NxTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -48,8 +49,8 @@ import kotlinx.coroutines.flow.flowOf
 import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.EncodedImageFormat
 import org.jetbrains.skia.Image
-import org.koin.core.context.startKoin
-import org.koin.core.context.stopKoin
+import org.koin.core.KoinApplication
+import org.koin.dsl.koinApplication
 import org.koin.dsl.module
 import java.nio.file.Files
 import java.nio.file.Path
@@ -66,7 +67,9 @@ import hivens.ui.settle
  */
 class PackVersionsScreenRenderTest {
 
-    @AfterTest fun tearDown() = stopKoin()
+    private var koin: KoinApplication? = null
+
+    @AfterTest fun tearDown() { koin?.close() }
 
     private val pack = PackInstance(
         id = "1",
@@ -178,7 +181,7 @@ class PackVersionsScreenRenderTest {
 
     private fun render(width: Int, height: Int, name: String) {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
-        startKoin {
+        val app = koinApplication {
             modules(module {
                 single<IPackRepository> { FakeRepo(pack) }
                 single<PackUpdater> { FakeUpdater }
@@ -192,12 +195,15 @@ class PackVersionsScreenRenderTest {
                 single { PackOperationService(scope = scope, sizes = get(), work = InstanceWorkRegistry()) }
             })
         }
+        koin = app
         val out = Path.of("build/render", name)
         Files.createDirectories(out.parent)
         val scene = ImageComposeScene(width, height, density = Density(1f)) {
-            NxTheme(dark = true) {
-                Box(Modifier.fillMaxSize().background(Color(BACKDROP))) {
-                    PackVersionsScreen(instanceId = "1", onBack = {})
+            HostKoin(app) {
+                NxTheme(dark = true) {
+                    Box(Modifier.fillMaxSize().background(Color(BACKDROP))) {
+                        PackVersionsScreen(instanceId = "1", onBack = {})
+                    }
                 }
             }
         }

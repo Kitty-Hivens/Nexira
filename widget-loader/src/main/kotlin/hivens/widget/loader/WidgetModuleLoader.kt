@@ -77,17 +77,62 @@ data class WidgetModuleScan(
  * or it is not, which is the model people already have for game mods and the one
  * thing about mod loading nobody needs explained.
  *
- * Each module gets its own [URLClassLoader] over the application's, which is
- * parent-first. That is deliberate and load-bearing: a widget is a composable,
- * and a composable compiled against a second copy of compose-runtime would hand
- * the wrong Composer type across every call. Delegating to the parent first
- * means a module that bundles its own Compose, kotlin-stdlib or widget-api
- * simply gets the launcher's, and only genuinely private dependencies come out
- * of the jar. One loader per module also keeps modules from seeing each other,
- * so a name collision between two of them is not a way to hijack a third.
+ * Each module gets its own [URLClassLoader], and its parent is a view of the
+ * application that answers only what a module is meant to compile against. Those
+ * names are parent-first, which is load-bearing: a widget is a composable, and a
+ * composable compiled against a second copy of compose-runtime would hand the wrong
+ * Composer type across every call. A module that bundles its own copy of something
+ * shared simply gets the launcher's. Everything else the launcher carries is not
+ * visible from the jar at all: a name outside the shared set is looked up in the jar
+ * and nowhere else, so a jar that bundles a library the launcher also uses gets its
+ * own copy, which knows nothing of the launcher's.
  *
- * Nothing is sandboxed. A jar has whatever access the JVM has, and pretending
- * otherwise with a half-policy would be worse than saying so.
+ * The shared set, which is all a jar sees of the application besides the JDK:
+ *
+ * - the widget kernel, `hivens.widget.api` and `hivens.widget.model`;
+ * - the API artifact of each module API the jar names in its manifest's
+ *   `Nexira-Module-Requires`, by the packages [apiPackages] gives for that API id
+ *   (`hivens.packs.api` for `nexira.packs`, `hivens.accounts.api` for
+ *   `nexira.accounts`). An API the jar does not name is not visible to it, so what
+ *   it compiles against is what the version check below has checked;
+ * - Compose: `androidx` (Compose and the Jetpack libraries it is built on),
+ *   `org.jetbrains.compose`, and Skiko, `org.jetbrains.skia` and `org.jetbrains.skiko`;
+ * - the Kotlin standard library, `kotlin`, kotlinx coroutines and serialization, and slf4j;
+ * - the media engine, `dev.hivens.skinema`, whose native libraries a process can
+ *   load once and which the pixel player example plays through;
+ * - the design system, nx-ui, by artifact and not by package: its classes are shared
+ *   one by one from the list its build writes ([SHARED_ARTIFACTS], [SharedClassList]),
+ *   because `hivens.ui.theme` and `hivens.ui.nx` also hold classes of the launcher's
+ *   own interface, which stay hidden. With it, `com.materialkolor`, which its public
+ *   API names. nx-ui is therefore part of what modules compile against, as the kernel
+ *   is: a change that breaks its public API breaks the modules built on it.
+ *
+ * Every other library stays hidden. A module that uses one, an HTTP client or an
+ * image loader the launcher also carries, bundles it in its jar and gets its own copy.
+ *
+ * Not visible: the launcher itself (`hivens.ui` outside the kernel and the design
+ * system, `hivens.auth`, `hivens.accounts` and `hivens.packs` outside their API
+ * packages, `hivens.launcher`, `hivens.core` and the rest), ui-layers, which no public
+ * API a module compiles against names, this loader, and Koin, so a jar can neither name
+ * the launcher's services nor reach its dependency graph. Resources follow the same
+ * rule by the package of their path. One loader per module also keeps modules from
+ * seeing each other, so a name collision between two of them is not a way to hijack a
+ * third.
+ *
+ * While this loader runs a module's code, its constructors and the reads of what it
+ * declares, the thread's context class loader is the module's own loader, so a
+ * library the jar bundles that finds its providers through it (a `ServiceLoader` call
+ * that names no loader) finds the jar's own. The widget kernel does the same around a
+ * module's key declaration, factories, samples and service makers. It cannot be done
+ * where module code runs inside the composition or on a coroutine the module started:
+ * a widget drawing, an effect applying, a flow a factory returned being collected.
+ * There the context class loader is whatever the thread has, so such a library is
+ * handed its loader explicitly or finds the launcher's providers.
+ *
+ * This closes the paths a module can take by naming things. It is not a sandbox: a
+ * jar runs with whatever access the JVM has, and code determined to reach past this
+ * with reflection or class loading machinery of its own is outside what a loader can
+ * hold back.
  *
  * [shadowDir], when given, is where each jar is copied before it is opened, under
  * a name made of its contents. The loader then holds the copy and never the file
@@ -105,6 +150,12 @@ data class WidgetModuleScan(
  * one it was built against: another major, or an older minor than the jar's. An API
  * a jar names is offered by a module compiled into the application, so a jar that
  * only another jar could serve is refused too.
+ *
+ * [apiPackages] is the packages each offered API's artifact lives in, by API id,
+ * which a jar that names the API is shown. A jar that names an offered API with no
+ * packages here is refused, since it would load and fail on the first class it names.
+ *
+ * [sharedArtifacts] is the artifacts shared class by class, read off [parent].
  */
 class WidgetModuleLoader(
     private val directory: Path,
@@ -113,9 +164,23 @@ class WidgetModuleLoader(
     private val disabled: Set<String> = emptySet(),
     private val contributionKinds: List<Class<out ModuleContribution>> = ModuleContribution.kinds,
     private val offered: Map<String, ApiVersion> = emptyMap(),
+    private val apiPackages: Map<String, Set<String>> = emptyMap(),
+    private val sharedArtifacts: List<String> = SHARED_ARTIFACTS,
 ) {
 
     private val log = LoggerFactory.getLogger(WidgetModuleLoader::class.java)
+
+    /**
+     * The classes of [sharedArtifacts], from the lists their builds wrote. An artifact
+     * the application carries no list for shares nothing, and says so once.
+     */
+    private val sharedClasses: Set<String> by lazy {
+        sharedArtifacts.flatMap { artifact ->
+            SharedClassList.read(parent, artifact) ?: emptySet<String>().also {
+                log.warn("No list of the classes of '{}' at {}: widget modules see none of them", artifact, SharedClassList.pathOf(artifact))
+            }
+        }.toSet()
+    }
 
     fun scan(): WidgetModuleScan {
         if (!Files.isDirectory(directory)) {
@@ -189,7 +254,9 @@ class WidgetModuleLoader(
 
         if (id in disabled) return DisabledWidgetModule(id, name, jar)
 
-        requirementFault(attributes.getValue(WidgetApi.MANIFEST_REQUIRES))?.let { return RejectedWidgetModule(jar, it) }
+        val requiresText = attributes.getValue(WidgetApi.MANIFEST_REQUIRES)
+        requirementFault(requiresText)?.let { return RejectedWidgetModule(jar, it) }
+        val requires = requiresText?.let { ApiVersion.parseAll(it) }.orEmpty()
 
         val opened = runCatching { shadowCopy(jar) }.getOrElse {
             return RejectedWidgetModule(jar, "could not be copied aside to load: ${it.message}")
@@ -203,74 +270,81 @@ class WidgetModuleLoader(
         // Named after the module, which is what lets a crash be traced back to it:
         // every frame of a stack trace carries the name of the loader its class came
         // from. See [moduleIdIn].
-        val loader = URLClassLoader(LOADER_PREFIX + id, arrayOf(opened.toUri().toURL()), parent)
-        val registries = runCatching {
-            ServiceLoader.load(WidgetRegistry::class.java, loader)
-                // ServiceLoader walks the whole delegation chain, so without this
-                // every module would also "find" the launcher's own built-in
-                // registry and contribute a second copy of it.
-                .filter { it.javaClass.classLoader === loader }
-        }.getOrElse {
-            loader.release()
-            return RejectedWidgetModule(jar, "could not instantiate its registry: ${it.message}")
-        }
-
-        val contributions = mutableListOf<ModuleContribution>()
-        val byKind = mutableListOf<List<ModuleContribution>>()
-        contributionKinds.forEach { kind ->
-            val found = runCatching {
-                ServiceLoader.load(kind, loader).filter { it.javaClass.classLoader === loader }
+        val view = ModuleClassView(VIEW_PREFIX + id, parent, visiblePackages(requires.keys), sharedClasses)
+        val loader = URLClassLoader(LOADER_PREFIX + id, arrayOf(opened.toUri().toURL()), view)
+        // Module code runs from here, its constructors and the reads of what it declares, so
+        // the thread's context class loader is the module's own: a library the jar bundles
+        // that looks its providers up through it finds the jar's, not the launcher's.
+        return withContextLoader(loader) {
+            val registries = runCatching {
+                ServiceLoader.load(WidgetRegistry::class.java, loader)
+                    // ServiceLoader walks the whole delegation chain, so without this
+                    // every module would also "find" the launcher's own built-in
+                    // registry and contribute a second copy of it.
+                    .filter { it.javaClass.classLoader === loader }
             }.getOrElse {
                 loader.release()
-                return RejectedWidgetModule(jar, "could not instantiate its ${kind.simpleName} services: ${it.message}")
+                return RejectedWidgetModule(jar, "could not instantiate its registry: ${it.message}")
             }
-            byKind += found
-            contributions += found
-        }
 
-        return when {
-            // A module may carry nothing but effects: it is a module all the same, with no widgets.
-            registries.isEmpty() && contributions.isEmpty() -> {
-                loader.release()
-                RejectedWidgetModule(jar, "declares the widget API but carries neither a registry nor a contribution service")
+            val contributions = mutableListOf<ModuleContribution>()
+            val byKind = mutableListOf<List<ModuleContribution>>()
+            contributionKinds.forEach { kind ->
+                val found = runCatching {
+                    ServiceLoader.load(kind, loader).filter { it.javaClass.classLoader === loader }
+                }.getOrElse {
+                    loader.release()
+                    return RejectedWidgetModule(jar, "could not instantiate its ${kind.simpleName} services: ${it.message}")
+                }
+                byKind += found
+                contributions += found
             }
-            registries.size > 1 -> {
-                // The processor emits exactly one per module. More than one means a
-                // hand-assembled or merged jar, where which registry wins is not
-                // something this can decide for the author.
-                loader.release()
-                RejectedWidgetModule(jar, "carries ${registries.size} registries; a module must carry one")
-            }
-            else -> {
-                // Listed once here, where a failure is this module's alone. Everything
-                // downstream reads the list outside any guard, building the registry
-                // the whole shell resolves from, so a registry that throws there took
-                // the shell down on every start instead of being refused by name.
-                val registry = registries.singleOrNull() ?: NoWidgets
-                val listed = runCatching { registry.all().values.toList() }.getOrElse {
+
+            when {
+                // A module may carry nothing but effects: it is a module all the same, with no widgets.
+                registries.isEmpty() && contributions.isEmpty() -> {
                     loader.release()
-                    return RejectedWidgetModule(jar, "its registry failed to list its widgets: ${it.message ?: it.javaClass.simpleName}")
+                    RejectedWidgetModule(jar, "declares the widget API but carries neither a registry nor a contribution service")
                 }
-                // The runtime half of the compile-time validator, for what a built
-                // descriptor still shows. A module is someone else's build, and
-                // nothing guarantees it went through the processor that checks these.
-                listed.firstNotNullOfOrNull { descriptorFault(it) }?.let { fault ->
+                registries.size > 1 -> {
+                    // The processor emits exactly one per module. More than one means a
+                    // hand-assembled or merged jar, where which registry wins is not
+                    // something this can decide for the author.
                     loader.release()
-                    return RejectedWidgetModule(jar, fault)
+                    RejectedWidgetModule(jar, "carries ${registries.size} registries; a module must carry one")
                 }
-                byKind.firstNotNullOfOrNull { ModuleContribution.faultIn(it) { read -> guarded(read) } }?.let { fault ->
-                    loader.release()
-                    return RejectedWidgetModule(jar, fault)
+                else -> {
+                    // Listed once here, where a failure is this module's alone. Everything
+                    // downstream reads the list outside any guard, building the registry
+                    // the whole shell resolves from, so a registry that throws there took
+                    // the shell down on every start instead of being refused by name.
+                    val registry = registries.singleOrNull() ?: NoWidgets
+                    val listed = runCatching { registry.all().values.toList() }.getOrElse {
+                        loader.release()
+                        return RejectedWidgetModule(jar, "its registry failed to list its widgets: ${it.message ?: it.javaClass.simpleName}")
+                    }
+                    // The runtime half of the compile-time validator, for what a built
+                    // descriptor still shows. A module is someone else's build, and
+                    // nothing guarantees it went through the processor that checks these.
+                    listed.firstNotNullOfOrNull { descriptorFault(it) }?.let { fault ->
+                        loader.release()
+                        return RejectedWidgetModule(jar, fault)
+                    }
+                    byKind.firstNotNullOfOrNull { ModuleContribution.faultIn(it) { read -> guarded(read) } }?.let { fault ->
+                        loader.release()
+                        return RejectedWidgetModule(jar, fault)
+                    }
+                    LoadedWidgetModule(id, name, jar, registry, loader, contributions, readStrings(opened, id))
                 }
-                LoadedWidgetModule(id, name, jar, registry, loader, contributions, readStrings(opened, id))
             }
         }
     }
 
     /**
      * The language files of a module: every `i18n/<tag>.properties` in its jar, read from the jar
-     * itself so the launcher's own resources, which a parent-first loader would answer with, never
-     * stand in for them. A file that cannot be read costs the module that language and nothing more.
+     * itself, so what a module says is only ever its own words and never a file of the same name
+     * elsewhere on the application's class path. A file that cannot be read costs the module that
+     * language and nothing more.
      */
     private fun readStrings(jar: Path, id: String): ModuleStrings {
         val tables = HashMap<String, Map<String, String>>()
@@ -302,9 +376,30 @@ class WidgetModuleLoader(
             if (!here.serves(builtAgainst)) {
                 return "built against the module API '$api' $builtAgainst, this launcher carries $here"
             }
+            // An API the version check lets through has to be one the jar can see, or it
+            // would load and then fail on the first class it names.
+            if (apiPackages[api].isNullOrEmpty()) {
+                return "built against the module API '$api', which this launcher carries without sharing its classes"
+            }
         }
         return null
     }
+
+    /** Runs [block] with [loader] as this thread's context class loader, and puts the one before back. */
+    private inline fun <T> withContextLoader(loader: ClassLoader, block: () -> T): T {
+        val thread = Thread.currentThread()
+        val before = thread.contextClassLoader
+        thread.contextClassLoader = loader
+        try {
+            return block()
+        } finally {
+            thread.contextClassLoader = before
+        }
+    }
+
+    /** The packages a jar that names the APIs [required] is shown, see the class KDoc. */
+    private fun visiblePackages(required: Set<String>): Set<String> =
+        SHARED_PACKAGES + required.flatMap { apiPackages[it].orEmpty() }
 
     /** What a module with no widgets contributes to the registry. */
     private object NoWidgets : WidgetRegistry {
@@ -385,6 +480,36 @@ class WidgetModuleLoader(
     companion object {
         /** What a module's class loader is named, ahead of the module's id. */
         const val LOADER_PREFIX = "widget-module:"
+
+        /** What the view of the application a module's loader sits on is named, ahead of the module's id. */
+        private const val VIEW_PREFIX = "widget-module-view:"
+
+        /**
+         * The packages of the application every jar is shown, with the packages below
+         * them, whatever it names. The API artifacts a jar names come on top, see the
+         * class KDoc for the whole set.
+         */
+        val SHARED_PACKAGES: Set<String> = setOf(
+            "hivens.widget.api",
+            "hivens.widget.model",
+            "androidx",
+            "org.jetbrains.compose",
+            "org.jetbrains.skia",
+            "org.jetbrains.skiko",
+            "kotlin",
+            "kotlinx.coroutines",
+            "kotlinx.serialization",
+            "org.slf4j",
+            "dev.hivens.skinema",
+            "com.materialkolor",
+        )
+
+        /**
+         * The artifacts of the application every jar is shown class by class, from the
+         * list each one's build writes (see [SharedClassList]): the design system, nx-ui,
+         * whose packages the launcher's own interface also uses.
+         */
+        val SHARED_ARTIFACTS: List<String> = listOf("nx-ui")
 
         private val STRINGS_FILE = Regex("""i18n/([A-Za-z][A-Za-z0-9_-]*)\.properties""")
 

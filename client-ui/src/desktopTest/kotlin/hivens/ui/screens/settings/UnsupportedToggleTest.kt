@@ -15,10 +15,10 @@ import androidx.compose.ui.unit.Density
 import hivens.core.data.SettingsData
 import hivens.ui.i18n.AppLocale
 import hivens.ui.i18n.LocaleProvider
+import hivens.ui.host.HostKoin
 import hivens.ui.puppet.PuppetRegistry
 import hivens.ui.theme.NxTheme
-import org.koin.core.context.startKoin
-import org.koin.core.context.stopKoin
+import org.koin.dsl.koinApplication
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -34,28 +34,31 @@ import kotlin.test.assertTrue
 @OptIn(ExperimentalComposeUiApi::class)
 class UnsupportedToggleTest {
 
-    @AfterTest fun tearDown() = stopKoin()
+    // A host that binds no actions supports neither the title bar nor hiding after launch.
+    private val koin = koinApplication { }
+
+    @AfterTest fun tearDown() = koin.close()
 
     @Test
     fun `an unsupported setting stored on shows a switch that is disabled and off`() {
-        // A host that binds no actions supports neither the title bar nor hiding after launch.
-        startKoin { }
         val form = SettingsFormState(SettingsData(useCustomChrome = true, closeAfterStart = true))
         assertTrue(form.useCustomChrome && form.closeAfterStart, "the premise: both are stored on")
         val scene = ImageComposeScene(900, 2000, density = Density(1f)) {
-            LocaleProvider(AppLocale.ENGLISH) {
-                NxTheme(dark = true) {
-                    Column(Modifier.verticalScroll(rememberScrollState())) {
-                        AppearanceSection(
-                            form = form,
-                            save = {},
-                            isDarkTheme = true,
-                            onToggleTheme = {},
-                            onOpenThemePicker = {},
-                            onOpenBackgroundSettings = {},
-                            currentLocale = AppLocale.ENGLISH,
-                            onLocaleChanged = {},
-                        )
+            HostKoin(koin) {
+                LocaleProvider(AppLocale.ENGLISH) {
+                    NxTheme(dark = true) {
+                        Column(Modifier.verticalScroll(rememberScrollState())) {
+                            AppearanceSection(
+                                form = form,
+                                save = {},
+                                isDarkTheme = true,
+                                onToggleTheme = {},
+                                onOpenThemePicker = {},
+                                onOpenBackgroundSettings = {},
+                                currentLocale = AppLocale.ENGLISH,
+                                onLocaleChanged = {},
+                            )
+                        }
                     }
                 }
             }

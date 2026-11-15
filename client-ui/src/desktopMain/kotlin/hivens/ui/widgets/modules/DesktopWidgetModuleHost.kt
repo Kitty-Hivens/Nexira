@@ -10,18 +10,28 @@ import java.nio.file.Files
 import java.nio.file.Path
 
 /**
- * Widget modules as jars in a folder, each opened in a class loader of its own.
- * [offered] is the module APIs this build carries, which a jar built against one of
- * them has to find in a version that serves it.
+ * Widget modules as jars in a folder, each opened in a class loader of its own that
+ * shows the jar the widget kernel and the libraries it shares with the launcher, and
+ * nothing of the launcher itself (see [WidgetModuleLoader]). [offered] is the module
+ * APIs this build carries, which a jar built against one of them has to find in a
+ * version that serves it, and [apiPackages] where each lives, which a jar that names
+ * it is shown.
  */
 class DesktopWidgetModuleHost(
     private val directory: Path,
     private val shadowDir: Path,
     private val offered: Map<String, ApiVersion> = emptyMap(),
+    private val apiPackages: Map<String, Set<String>> = emptyMap(),
 ) : WidgetModuleHost {
 
     override fun scan(disabled: Set<String>): ModuleScan {
-        val scan = WidgetModuleLoader(directory, shadowDir = shadowDir, disabled = disabled, offered = offered).scan()
+        val scan = WidgetModuleLoader(
+            directory   = directory,
+            shadowDir   = shadowDir,
+            disabled    = disabled,
+            offered     = offered,
+            apiPackages = apiPackages,
+        ).scan()
         return ModuleScan(
             loaded   = scan.loaded.map(::JarModule),
             disabled = scan.disabled.map { OffModule(it.id, it.name, it.file) },

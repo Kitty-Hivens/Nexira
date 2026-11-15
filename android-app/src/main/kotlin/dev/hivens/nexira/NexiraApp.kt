@@ -8,7 +8,8 @@ import dev.hivens.nexira.host.androidHostModule
 import hivens.launcher.di.launcherModules
 import hivens.ui.androidUiModule
 import hivens.ui.platform.AndroidAppContext
-import org.koin.core.context.startKoin
+import org.koin.core.KoinApplication
+import org.koin.dsl.koinApplication
 import hivens.ui.audio.AudioPlayer
 import hivens.ui.widgets.services.MusicPlayerService
 import hivens.ui.widgets.services.MusicPlayerServiceImpl
@@ -23,13 +24,20 @@ class NexiraApp : Application() {
     /** Built on first use: the process the game runs in has no player to build. */
     val playback: PlaybackHost by lazy { PlaybackHost(this) }
 
+    /**
+     * The launcher's graph, in the launcher's own process only. Held here and handed
+     * to the activity's composition, never registered in Koin's global context.
+     */
+    lateinit var koin: KoinApplication
+        private set
+
     override fun onCreate() {
         super.onCreate()
         // Every process of the application starts this class, and the game's has no use
         // for the launcher's graph: it would only pay for the databases it opens.
         if (Application.getProcessName() == packageName) {
             AndroidAppContext.install(this)
-            startKoin { modules(launcherModules() + androidHostModule(this@NexiraApp) + androidUiModule(playback.service)) }
+            koin = koinApplication { modules(launcherModules() + androidHostModule(this@NexiraApp) + androidUiModule(playback.service)) }
         }
     }
 }

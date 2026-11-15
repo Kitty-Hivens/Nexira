@@ -8,9 +8,10 @@ import hivens.launcher.protocol.LauncherHashCache
 import io.ktor.client.engine.okhttp.OkHttpEngine
 import okhttp3.Call
 import okhttp3.OkHttpClient
-import org.koin.core.context.startKoin
-import org.koin.core.context.stopKoin
+import org.koin.core.Koin
+import org.koin.core.KoinApplication
 import org.koin.core.qualifier.named
+import org.koin.dsl.koinApplication
 import org.koin.dsl.module
 import java.nio.file.Files
 import java.nio.file.Path
@@ -32,16 +33,18 @@ import kotlin.test.assertSame
 class NetworkModuleGraphTest {
 
     private lateinit var dataDir: Path
+    private lateinit var application: KoinApplication
+    private val koin: Koin get() = application.koin
 
     @BeforeTest
     fun setup() {
         dataDir = Files.createTempDirectory("nexira-network-graph-test-")
-        startKoin { modules(module { single { dataDir } }, networkModule) }
+        application = koinApplication { modules(module { single { dataDir } }, networkModule) }
     }
 
     @AfterTest
     fun teardown() {
-        stopKoin()
+        application.close()
         Files.walk(dataDir).use { walk ->
             walk.sorted(Comparator.reverseOrder()).forEach { entry -> Files.deleteIfExists(entry) }
         }
@@ -49,7 +52,6 @@ class NetworkModuleGraphTest {
 
     @Test
     fun `every network binding resolves`() {
-        val koin = org.koin.core.context.GlobalContext.get()
         koin.get<ServerProtocolConfig>()
         koin.get<OkHttpClient>(named("direct"))
         koin.get<OkHttpClient>(named("insecure"))
@@ -63,7 +65,6 @@ class NetworkModuleGraphTest {
 
     @Test
     fun `the insecure channel is a distinct client from the direct one`() {
-        val koin = org.koin.core.context.GlobalContext.get()
         // The bypass exists to drop certificate verification for one host. If
         // both qualifiers collapsed onto the same client, accepting a bypass
         // would either do nothing or widen to every host we talk to.
@@ -80,7 +81,6 @@ class NetworkModuleGraphTest {
      */
     @Test
     fun `the direct channel leaves redirects to the client that refuses a downgrade`() {
-        val koin = org.koin.core.context.GlobalContext.get()
         val engine = koin.get<HttpClientProvider>(named("direct")).current.engine as OkHttpEngine
         val okHttp = assertNotNull(engine.config.preconfigured)
         assertFalse(okHttp.followRedirects)
@@ -89,7 +89,6 @@ class NetworkModuleGraphTest {
 
     @Test
     fun `the default channel follows the bypass state per request`() {
-        val koin = org.koin.core.context.GlobalContext.get()
         val provider = koin.get<HttpClientProvider>()
         val host = koin.get<ServerProtocolConfig>().sslBypassHost
 

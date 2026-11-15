@@ -27,6 +27,7 @@ import hivens.launcher.smrt.SmrtPackClient
 import hivens.packs.api.PackKeys
 import hivens.packs.api.PackUpdateView
 import hivens.packs.toPackView
+import hivens.ui.host.HostKoin
 import hivens.ui.i18n.AppLocale
 import hivens.ui.i18n.LocaleProvider
 import hivens.ui.navigation.NavRequests
@@ -39,10 +40,10 @@ import hivens.widget.api.flowSource
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import org.jetbrains.skia.EncodedImageFormat
-import org.koin.core.context.startKoin
+import org.koin.core.KoinApplication
 import hivens.core.launch.InstanceWorkRegistry
 import hivens.launcher.launch.RunningPackSource
-import org.koin.core.context.stopKoin
+import org.koin.dsl.koinApplication
 import org.koin.dsl.module
 import java.io.File
 import kotlin.test.AfterTest
@@ -66,7 +67,9 @@ import hivens.ui.theme.NxColor
  */
 class PackCardRenderTest {
 
-    @AfterTest fun tearDown() = stopKoin()
+    private var koin: KoinApplication? = null
+
+    @AfterTest fun tearDown() { koin?.close() }
 
     // Art is carried on the record, so the resolver answers from it and the two
     // catalogue clients below are never reached. A blank url is enough: the image
@@ -119,9 +122,9 @@ class PackCardRenderTest {
     /** Selected only if something asks for the network, which is what must not happen here. */
     private fun offlineHttp() = HttpClientProvider { error("a render sheet does not go to the network") }
 
-    private fun graph() {
+    private fun graph(): KoinApplication {
         val http = offlineHttp()
-        startKoin {
+        return koinApplication {
             modules(
                 module {
                     single<IPackRepository> { FakeRepo(listOf(instance, forked)) }
@@ -137,21 +140,23 @@ class PackCardRenderTest {
                     single { InstanceWorkRegistry() }
                 },
             )
-        }
+        }.also { koin = it }
     }
 
     @OptIn(ExperimentalComposeUiApi::class)
-    private fun sheet(name: String, dark: Boolean, body: @Composable () -> Unit) {
+    private fun sheet(name: String, graph: KoinApplication, dark: Boolean, body: @Composable () -> Unit) {
         val d = 2f
         val scene = ImageComposeScene((520 * d).toInt(), (480 * d).toInt(), density = Density(d)) {
-            LocaleProvider(AppLocale.RUSSIAN) {
-                NxTheme(dark = dark) {
-                    CompositionLocalProvider(LocalWidgetDataRegistry provides keys) {
-                        Box(Modifier.fillMaxSize().background(NxColor.page).padding(16.dp)) {
-                            Column(
-                                modifier = Modifier.width(488.dp),
-                                verticalArrangement = Arrangement.spacedBy(12.dp),
-                            ) { body() }
+            HostKoin(graph) {
+                LocaleProvider(AppLocale.RUSSIAN) {
+                    NxTheme(dark = dark) {
+                        CompositionLocalProvider(LocalWidgetDataRegistry provides keys) {
+                            Box(Modifier.fillMaxSize().background(NxColor.page).padding(16.dp)) {
+                                Column(
+                                    modifier = Modifier.width(488.dp),
+                                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                                ) { body() }
+                            }
                         }
                     }
                 }
@@ -170,9 +175,9 @@ class PackCardRenderTest {
 
     @Test
     fun `pack cards hold their chips under both styles`() {
-        graph()
+        val graph = graph()
         listOf(true, false).forEach { dark ->
-            sheet("pack-cards-${if (dark) "dark" else "light"}", dark) {
+            sheet("pack-cards-${if (dark) "dark" else "light"}", graph, dark) {
                 // Library: a plain pack carrying the update badge in its corner, and
                 // a fork whose version string is long enough to crowd the row.
                 PackCard(instance.toPackView(), onOpenDetail = {}, onOpenFolder = {}, onDelete = {})

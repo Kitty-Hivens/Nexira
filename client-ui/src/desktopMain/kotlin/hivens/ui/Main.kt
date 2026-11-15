@@ -74,6 +74,7 @@ import hivens.ui.utils.LogRetention
 import hivens.ui.utils.PreferenceWriter
 import hivens.widget.model.DefaultLayout
 import java.nio.file.Path
+import java.util.concurrent.atomic.AtomicReference
 import javax.swing.SwingUtilities
 import org.slf4j.LoggerFactory
 import hivens.launcher.instance.InstanceContentUpdater
@@ -90,6 +91,7 @@ import hivens.widget.api.WidgetDataRegistry
 import hivens.ui.feature.catalogue.project.OpenProjectState
 import hivens.widget.api.SurfaceFamilies
 import hivens.ui.widgets.modules.DesktopWidgetModuleHost
+import hivens.ui.widgets.modules.offeredApiPackages
 import hivens.ui.widgets.modules.offeredApis
 import hivens.ui.widgets.modules.WidgetModules
 import hivens.widget.api.WidgetRegistry
@@ -106,11 +108,10 @@ import hivens.widget.generated.GeneratedWidgetRegistry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.jetbrains.compose.resources.ExperimentalResourceApi
-import org.koin.core.context.GlobalContext
-import org.koin.core.context.stopKoin
 import kotlin.concurrent.thread
 import kotlin.time.Duration.Companion.seconds
 import kotlin.system.exitProcess
+import org.koin.core.KoinApplication
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
 
@@ -127,7 +128,12 @@ val uiModule = module {
         uiCoreModule(
             builtIn = GeneratedWidgetRegistry,
             moduleHost = { directory, dataDir ->
-                DesktopWidgetModuleHost(directory, shadowDir = dataDir.resolve("cache").resolve("widget-modules"), offered = offeredApis())
+                DesktopWidgetModuleHost(
+                    directory   = directory,
+                    shadowDir   = dataDir.resolve("cache").resolve("widget-modules"),
+                    offered     = offeredApis(),
+                    apiPackages = offeredApiPackages(),
+                )
             },
             platformCommands = { registry ->
                 val updates: UpdateService = get()
@@ -277,6 +283,12 @@ fun main(args: Array<String>) {
     val recovery = RecoveryEntry.resolve(pre.core.initialPaths.dataDir, args)
     if (recovery) UiRecoverySignal.requestRecovery()
 
+    // What the boot thread hands the window. The launcher's Koin is kept apart in
+    // [graph] from the moment the boot built it, whether or not the boot then got as
+    // far as ready, and is handed down from here, never registered globally.
+    val bootOutcome = MutableStateFlow<BootOutcome?>(null)
+    val graph = AtomicReference<KoinApplication?>(null)
+
     // Process-lifetime teardown. Puppet + Koin come up on the boot thread but
     // are torn down once here at process exit -- NOT from a composition
     // DisposableEffect, which also fires when the shell is disposed on a crash
@@ -286,7 +298,7 @@ fun main(args: Array<String>) {
     Runtime.getRuntime().addShutdownHook(
         Thread {
             val _ = runCatching { PuppetServerLoader.instance.stop() }
-            val _ = runCatching { stopKoin() }
+            val _ = runCatching { graph.get()?.close() }
         },
     )
 
@@ -295,7 +307,6 @@ fun main(args: Array<String>) {
     // detect, Koin -- runs here behind the live boot
     // screen. Daemon thread so a user closing the window mid-boot is not
     // held hostage by a stuck phase.
-    val bootOutcome = MutableStateFlow<BootOutcome?>(null)
     val bootStage   = MutableStateFlow(BootStage.Files)
     // Dev knob: -Dnexira.boot.slowMs=800 stretches each phase so the
     // threshold can actually be looked at on a warm machine.
@@ -305,7 +316,7 @@ fun main(args: Array<String>) {
             GuiBootstrap.completeBoot(pre, listOf(uiModule)) { phase ->
                 bootStage.value = phase.toStage()
                 if (slowMs > 0) Thread.sleep(slowMs)
-            }
+            }.also { graph.set(it.koin) }
         }.mapCatching { result ->
             // Puppet mode: opt-in localhost HTTP control surface for automated
             // UI driving (see hivens.ui.puppet.PuppetServerLifecycle + Loader).
@@ -321,7 +332,7 @@ fun main(args: Array<String>) {
             // on this thread: the first screen to read it would otherwise open it on
             // the UI thread. Whatever goes wrong is the registry's to report, and it
             // is no reason to stop the boot.
-            val _ = runCatching { GlobalContext.get().get<IPackRepository>().observe() }
+            val _ = runCatching { result.koin.koin.get<IPackRepository>().observe() }
             result
         }.onSuccess { result ->
             bootStage.value   = BootStage.Done
@@ -455,7 +466,7 @@ private fun runShellWithRecovery(
         // if the module was not the whole story, safe mode is still the floor.
         if (!safe) {
             runCatching {
-                val modules = GlobalContext.getOrNull()?.getOrNull<WidgetModules>()
+                val modules = (bootOutcome.value as? BootOutcome.Ready)?.result?.koin?.koin?.getOrNull<WidgetModules>()
                 modules?.culpritOf(crash)?.let { modules.switchOffAfterCrash(it, crash) }
             }.onFailure { log.warn("Could not trace the crash to a widget module", it) }
         }

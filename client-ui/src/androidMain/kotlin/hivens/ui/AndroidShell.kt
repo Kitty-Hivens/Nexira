@@ -78,6 +78,7 @@ import hivens.ui.utils.GameConsoleService
 import hivens.ui.utils.PreferenceWriter
 import hivens.ui.chrome.LocalRightRailSheet
 import hivens.ui.chrome.LocalUseCustomChrome
+import hivens.ui.host.HostKoin
 import hivens.ui.host.HostedWindow
 import hivens.ui.host.MainWindowNavigation
 import hivens.ui.host.WindowId
@@ -114,6 +115,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import org.koin.compose.koinInject
+import org.koin.core.KoinApplication
 import org.slf4j.LoggerFactory
 import java.nio.file.Path
 
@@ -124,9 +126,18 @@ import java.nio.file.Path
  * What it leaves to the desktop: the tray and the system notifier, hiding the window while a
  * game runs, the custom window chrome, the wallpaper pipeline, the console as a window of its
  * own (it is an overlay here) and the quit question (the system owns the lifecycle).
+ *
+ * [koin] is the launcher's graph, which it is drawn inside (see [HostKoin]).
  */
 @Composable
-fun AndroidShell() {
+fun AndroidShell(koin: KoinApplication) {
+    // Inside the launcher's graph here rather than by the activity, so no host can draw
+    // the shell without the graph it injects from.
+    HostKoin(koin) { AndroidShellContent() }
+}
+
+@Composable
+private fun AndroidShellContent() {
     val settingsService: ISettingsService = koinInject()
     val controller: LauncherController = koinInject()
     val gameConsole: GameConsoleService = koinInject()

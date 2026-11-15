@@ -1,4 +1,5 @@
 public abstract interface class hivens/widget/api/CompiledModule {
+	public fun getApiPackages ()Ljava/util/Map;
 	public abstract fun getContributions ()Ljava/util/List;
 	public abstract fun getId ()Ljava/lang/String;
 	public abstract fun getName ()Ljava/lang/String;
@@ -7,6 +8,7 @@ public abstract interface class hivens/widget/api/CompiledModule {
 }
 
 public final class hivens/widget/api/CompiledModule$DefaultImpls {
+	public static fun getApiPackages (Lhivens/widget/api/CompiledModule;)Ljava/util/Map;
 	public static fun getProvides (Lhivens/widget/api/CompiledModule;)Ljava/util/Map;
 	public static fun getStrings (Lhivens/widget/api/CompiledModule;)Lhivens/widget/api/ModuleStrings;
 }

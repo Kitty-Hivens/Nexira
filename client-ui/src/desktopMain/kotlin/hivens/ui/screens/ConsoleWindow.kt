@@ -26,6 +26,7 @@ import hivens.ui.chrome.LocalWindowHost
 import hivens.ui.chrome.LocalWindowState
 import hivens.ui.customization.LocalCustomization
 import hivens.ui.host.DesktopWindowBackend
+import hivens.ui.host.HostKoin
 import hivens.ui.host.HostedWindow
 import hivens.ui.host.WindowCommand
 import hivens.ui.host.WindowId
@@ -44,6 +45,7 @@ import hivens.widget.api.WidgetScope
 import hivens.window.WindowHost
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.koin.compose.koinInject
+import org.koin.core.KoinApplication
 import java.awt.event.WindowAdapter
 import java.awt.event.WindowEvent
 
@@ -58,9 +60,18 @@ import java.awt.event.WindowEvent
  * own window level, its own layers and dismiss stack, and the window locals of its
  * own window. It draws in the look the main shell decided, read through [look].
  * Its frame is the system's, so nothing of the app's frame is offered in it.
+ *
+ * [koin] is the launcher's graph, which it is drawn inside (see [HostKoin]).
  */
 @Composable
-fun ConsoleWindow(look: ShellLook) {
+fun ConsoleWindow(look: ShellLook, koin: KoinApplication) {
+    // Inside the launcher's graph here rather than by the caller, so no caller can open
+    // the console without the graph it injects from.
+    HostKoin(koin) { ConsoleWindowContent(look) }
+}
+
+@Composable
+private fun ConsoleWindowContent(look: ShellLook) {
     val console: GameConsoleService = koinInject()
     if (!console.shouldShowConsole) return
     val appLevel: WidgetScope = koinInject()

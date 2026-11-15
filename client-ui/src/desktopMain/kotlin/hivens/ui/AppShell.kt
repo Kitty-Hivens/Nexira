@@ -122,6 +122,7 @@ import hivens.ui.widgets.PlayedWidgetEntrance
 import hivens.widget.api.WidgetSurfaceRenderer
 import androidx.compose.foundation.background
 import hivens.ui.host.DesktopWindowBackend
+import hivens.ui.host.HostKoin
 import hivens.ui.host.HostedWindow
 import hivens.ui.host.MainWindowNavigation
 import hivens.ui.host.WindowCommand
@@ -176,10 +177,28 @@ private const val NEXIRA_APP_ID = "dev.hivens.nexira"
  * late-bound through [chrome] instead. Receives the pre-Compose
  * [LauncherBootstrap.Result] from the boot thread; everything below this
  * is pure Compose.
+ *
+ * Drawn inside [HostKoin] with [boot]'s own Koin, here rather than by the caller, so
+ * no caller can draw the shell without the graph it injects from.
  */
-@OptIn(ExperimentalResourceApi::class)
 @Composable
 fun FrameWindowScope.AppShellContent(
+    boot: LauncherBootstrap.Result,
+    windowState: WindowState,
+    visibleState: MutableState<Boolean>,
+    chrome: WindowChromeHooks,
+    opening: OpeningFrame,
+    look: ShellLook,
+    exitApp: () -> Unit,
+) {
+    HostKoin(boot.koin) {
+        ShellContent(boot, windowState, visibleState, chrome, opening, look, exitApp)
+    }
+}
+
+@OptIn(ExperimentalResourceApi::class)
+@Composable
+private fun FrameWindowScope.ShellContent(
     boot: LauncherBootstrap.Result,
     windowState: WindowState,
     visibleState: MutableState<Boolean>,

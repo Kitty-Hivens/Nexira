@@ -7,10 +7,9 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.tls.HandshakeCertificates
 import okhttp3.tls.HeldCertificate
-import org.koin.core.context.GlobalContext
-import org.koin.core.context.startKoin
-import org.koin.core.context.stopKoin
+import org.koin.core.KoinApplication
 import org.koin.core.qualifier.named
+import org.koin.dsl.koinApplication
 import org.koin.dsl.module
 import java.net.InetSocketAddress
 import java.nio.file.Files
@@ -44,13 +43,14 @@ import kotlin.test.assertTrue
 class BypassScopedTlsTest {
 
     private lateinit var dataDir: Path
+    private lateinit var koin: KoinApplication
     private lateinit var server: HttpsServer
     private var port: Int = 0
 
     @BeforeTest
     fun setup() {
         dataDir = Files.createTempDirectory("nexira-bypass-tls-test-")
-        startKoin { modules(module { single { dataDir } }, networkModule) }
+        koin = koinApplication { modules(module { single { dataDir } }, networkModule) }
 
         // Issued to a name we never connect to, and signed by nobody: the
         // certificate fails both the chain check and the name check, which is
@@ -75,15 +75,15 @@ class BypassScopedTlsTest {
     @AfterTest
     fun teardown() {
         server.stop(0)
-        stopKoin()
+        koin.close()
         Files.walk(dataDir).use { walk ->
             walk.sorted(Comparator.reverseOrder()).forEach { entry -> Files.deleteIfExists(entry) }
         }
     }
 
-    private fun bypasses(): SslBypassStore = GlobalContext.get().get()
-    private fun bypassClient(): OkHttpClient = GlobalContext.get().get(named("insecure"))
-    private fun directClient(): OkHttpClient = GlobalContext.get().get(named("direct"))
+    private fun bypasses(): SslBypassStore = koin.koin.get()
+    private fun bypassClient(): OkHttpClient = koin.koin.get(named("insecure"))
+    private fun directClient(): OkHttpClient = koin.koin.get(named("direct"))
 
     /**
      * Addressed by literal rather than by `localhost`, which resolves to both

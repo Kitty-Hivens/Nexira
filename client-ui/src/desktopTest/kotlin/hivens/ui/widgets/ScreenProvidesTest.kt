@@ -25,6 +25,7 @@ import hivens.ui.feature.catalogue.browse.BrowseSession
 import hivens.ui.feature.catalogue.browse.BrowseTags
 import hivens.ui.feature.catalogue.browse.CataloguePackDetailScreen
 import hivens.ui.feature.catalogue.project.OpenProjectState
+import hivens.ui.host.HostKoin
 import hivens.ui.i18n.AppLocale
 import hivens.ui.i18n.LocaleProvider
 import hivens.ui.onEventThread
@@ -60,8 +61,7 @@ import hivens.widget.model.WidgetKind
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
-import org.koin.core.context.startKoin
-import org.koin.core.context.stopKoin
+import org.koin.core.KoinApplication
 import org.koin.core.module.Module
 import org.koin.dsl.koinApplication
 import org.koin.dsl.module
@@ -92,10 +92,10 @@ class ScreenProvidesTest {
 
     private val commands = uiCommandRegistry({}, {}, {})
 
-    /** An app level whose Koin also holds [services], which is where a screen drawn below it injects from. */
-    private fun app(services: Module): WidgetScope = koinApplication {
+    /** The Koin of an app level that also holds [services], which is where a screen drawn below it injects from. */
+    private fun graph(services: Module): KoinApplication = koinApplication {
         modules(module { single { WidgetScope.app(data, KoinLevelServicesHost.app(this), Dispatchers.Unconfined, commands) } }, services)
-    }.koin.get()
+    }
 
     private class Probe(override val needs: List<String>, val drew: MutableList<String>) : WidgetDescriptor {
         override val kind = WidgetKind("test.probe")
@@ -110,7 +110,8 @@ class ScreenProvidesTest {
 
     /** Draws [screen] for [surface] with a probe in every slot, and says what the probes drew and what they missed. */
     private fun probe(surface: String, services: Module = module { }, screen: @Composable () -> Unit): Pair<List<String>, Set<String>> {
-        val app = app(services)
+        val koin = graph(services)
+        val app: WidgetScope = koin.koin.get()
         val id = SurfaceId(surface)
         val provides = EditorSurfaces.spec(id)?.provides.orEmpty().toList()
         val drew = ArrayList<String>()
@@ -133,19 +134,21 @@ class ScreenProvidesTest {
         )
         onEventThread {
             val scene = ImageComposeScene(1200, 800, density = Density(1f)) {
-                LocaleProvider(AppLocale.ENGLISH) {
-                    NxTheme(dark = true) {
-                        CompositionLocalProvider(
-                            LocalWidgetDataRegistry provides data,
-                            LocalWidgetCommandRegistry provides commands,
-                            LocalScope provides app,
-                            LocalLayoutGraph provides graph,
-                            LocalWidgetRegistry provides registry,
-                            LocalSurfaceFamilies provides SurfaceFamilies(),
-                            LocalMisplacedWidget provides { _, _, missing -> missed += missing },
-                        ) {
-                            ChildLevel(ScopeLevel.Composition) {
-                                ChildLevel(ScopeLevel.Page) { Box(Modifier.fillMaxSize()) { screen() } }
+                HostKoin(koin) {
+                    LocaleProvider(AppLocale.ENGLISH) {
+                        NxTheme(dark = true) {
+                            CompositionLocalProvider(
+                                LocalWidgetDataRegistry provides data,
+                                LocalWidgetCommandRegistry provides commands,
+                                LocalScope provides app,
+                                LocalLayoutGraph provides graph,
+                                LocalWidgetRegistry provides registry,
+                                LocalSurfaceFamilies provides SurfaceFamilies(),
+                                LocalMisplacedWidget provides { _, _, missing -> missed += missing },
+                            ) {
+                                ChildLevel(ScopeLevel.Composition) {
+                                    ChildLevel(ScopeLevel.Page) { Box(Modifier.fillMaxSize()) { screen() } }
+                                }
                             }
                         }
                     }
@@ -155,6 +158,7 @@ class ScreenProvidesTest {
                 scene.settle(6)
             } finally {
                 scene.close()
+                koin.close()
             }
         }
         assertTrue(slots.isNotEmpty(), "$surface has no slots in the bundled layout, so nothing was probed")
@@ -172,16 +176,11 @@ class ScreenProvidesTest {
 
     @Test
     fun `the about page hands its widgets what its surface lists`() {
-        // The page asks the application's Koin for the host's actions, which an empty
-        // one answers with none: no update check runs.
-        startKoin { modules(module { }) }
-        try {
-            val (drew, missed) = probe("about") { AboutSurface(onBack = {}) }
-            assertEquals(emptySet(), missed)
-            assertTrue(drew.isNotEmpty())
-        } finally {
-            stopKoin()
-        }
+        // The page asks the application's Koin for the host's actions, which this
+        // probe's answers with none: no update check runs.
+        val (drew, missed) = probe("about") { AboutSurface(onBack = {}) }
+        assertEquals(emptySet(), missed)
+        assertTrue(drew.isNotEmpty())
     }
 
     private class Listing(override val origin: PackOrigin) : IPackCatalogueService {

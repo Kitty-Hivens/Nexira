@@ -70,7 +70,9 @@ class WindowChromeHooks(defaultClose: () -> Unit) {
  * a visible flash.
  *
  * Window-creation-time values that normally live behind Koin (undecorated
- * chrome, locale) come from the pre-Koin [GuiBootstrap.PreBoot.peek].
+ * chrome, locale) come from the pre-Koin [GuiBootstrap.PreBoot.peek]. Once the boot
+ * is ready, the shell and the console each draw themselves inside the boot's own
+ * Koin, which is never registered globally.
  *
  * The console is a window of the application in its own right, a sibling of the
  * main window here rather than a part of its content: hiding the main window to
@@ -202,5 +204,5 @@ fun ApplicationScope.ShellHost(
         }
     }
     // Koin is up once the boot is ready, and the console asks it for its service.
-    if (outcome is BootOutcome.Ready) ConsoleWindow(look)
+    (outcome as? BootOutcome.Ready)?.let { ready -> ConsoleWindow(look, ready.result.koin) }
 }

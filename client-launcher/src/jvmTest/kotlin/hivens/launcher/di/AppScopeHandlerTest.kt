@@ -6,8 +6,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import org.koin.core.context.startKoin
-import org.koin.core.context.stopKoin
+import org.koin.core.KoinApplication
+import org.koin.dsl.koinApplication
 import org.koin.dsl.module
 import java.nio.file.Files
 import java.nio.file.Path
@@ -37,16 +37,17 @@ import kotlin.test.assertTrue
 class AppScopeHandlerTest {
 
     private lateinit var dataDir: Path
+    private lateinit var koin: KoinApplication
 
     @BeforeTest
     fun setup() {
         dataDir = Files.createTempDirectory("nexira-app-scope-test-")
-        startKoin { modules(module { single { dataDir } }, networkModule, appModule) }
+        koin = koinApplication { modules(module { single { dataDir } }, networkModule, appModule) }
     }
 
     @AfterTest
     fun teardown() {
-        stopKoin()
+        koin.close()
         Files.walk(dataDir).use { walk ->
             walk.sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) }
         }
@@ -54,7 +55,7 @@ class AppScopeHandlerTest {
 
     @Test
     fun `the shared app scope carries an exception handler`() {
-        val scope: CoroutineScope = org.koin.java.KoinJavaComponent.get(CoroutineScope::class.java)
+        val scope: CoroutineScope = koin.koin.get()
         assertNotNull(
             scope.coroutineContext[CoroutineExceptionHandler],
             "without one, a failed background job opens the crash dialog on a healthy process",

@@ -14,6 +14,7 @@ import hivens.ui.i18n.AppLocale
 import hivens.ui.i18n.stringsFor
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.jetbrains.skia.EncodedImageFormat
+import org.koin.dsl.koinApplication
 import java.io.ByteArrayInputStream
 import java.nio.file.Files
 import java.nio.file.Path
@@ -39,7 +40,8 @@ class ThresholdOverlayRenderTest {
 
     private fun readyOutcome(tmp: Path): BootOutcome.Ready {
         val paths = PlatformPaths("Linux", tmp, { null }, { null })
-        return BootOutcome.Ready(LauncherBootstrap.Result(paths, null, CrashReporter(paths)))
+        // The overlay reads only whether the boot is ready, so an empty graph stands in for the launcher's.
+        return BootOutcome.Ready(LauncherBootstrap.Result(paths, null, CrashReporter(paths), koinApplication { }))
     }
 
     private data class Frames(val entry: java.awt.image.BufferedImage, val midWave: java.awt.image.BufferedImage, val end: java.awt.image.BufferedImage)

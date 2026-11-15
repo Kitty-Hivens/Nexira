@@ -12,6 +12,7 @@ import androidx.compose.ui.input.pointer.PointerButtons
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.unit.Density
 import hivens.launcher.platform.PlatformPaths
+import hivens.ui.host.HostKoin
 import hivens.ui.theme.NxTheme
 import hivens.ui.utils.ConsoleSettings
 import hivens.ui.utils.GameConsoleService
@@ -19,8 +20,7 @@ import hivens.ui.utils.LogEntry
 import hivens.ui.utils.LogType
 import hivens.ui.utils.releaseFocusOnPress
 import kotlinx.coroutines.runBlocking
-import org.koin.core.context.startKoin
-import org.koin.core.context.stopKoin
+import org.koin.dsl.koinApplication
 import org.koin.dsl.module
 import java.nio.file.Files
 import javax.swing.SwingUtilities
@@ -56,16 +56,18 @@ class ConsoleFocusTest {
             env = { name -> if (name == "NEXIRA_DATA_DIR") dir.toString() else null },
         )
         val console = GameConsoleService(paths)
-        startKoin { modules(module { single { console } }) }
+        val koin = koinApplication { modules(module { single { console } }) }
         try {
             SwingUtilities.invokeAndWait {
                 val probe = Probe()
                 val entries = (1..5).map { LogEntry("line $it", LogType.INFO, timestamp = "00:00:0$it") }
                 val scene = ImageComposeScene(800, 400, density = Density(1f)) {
-                    NxTheme(dark = true) {
-                        Box(Modifier.fillMaxSize().releaseFocusOnPress()) {
-                            Box(Modifier.fillMaxSize().onFocusChanged { probe.hasFocus = it.hasFocus }) {
-                                ConsoleContent(ConsoleSettings(), onSettingsChange = {}, source = ConsoleSource.FileBacked(entries))
+                    HostKoin(koin) {
+                        NxTheme(dark = true) {
+                            Box(Modifier.fillMaxSize().releaseFocusOnPress()) {
+                                Box(Modifier.fillMaxSize().onFocusChanged { probe.hasFocus = it.hasFocus }) {
+                                    ConsoleContent(ConsoleSettings(), onSettingsChange = {}, source = ConsoleSource.FileBacked(entries))
+                                }
                             }
                         }
                     }
@@ -87,7 +89,7 @@ class ConsoleFocusTest {
                 }
             }
         } finally {
-            stopKoin()
+            koin.close()
             runBlocking { console.close() }
             dir.toFile().deleteRecursively()
         }

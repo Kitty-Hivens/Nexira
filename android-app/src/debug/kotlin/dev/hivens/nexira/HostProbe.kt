@@ -11,7 +11,6 @@ import hivens.launcher.launch.RuntimeRequest
 import hivens.launcher.runtime.AndroidJdkCatalog
 import hivens.launcher.runtime.AndroidJdkInstaller
 import hivens.launcher.runtime.AndroidJdkRelease
-import org.koin.core.context.GlobalContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -53,7 +52,7 @@ object HostProbe {
     }
 
     fun run(context: Context, scenario: String, release: String?) = runBlocking {
-        val installer = GlobalContext.get().get<AndroidJdkInstaller>()
+        val installer = (context.applicationContext as NexiraApp).koin.koin.get<AndroidJdkInstaller>()
         val pinned = release?.split('|')?.let { (url, sha, version) -> AndroidJdkRelease(25, version, url, sha) }
         val manager = AndroidJavaManager(installer, AndroidJdkCatalog(listOfNotNull(pinned)))
         val jar = File(context.filesDir, "hello.jar")
