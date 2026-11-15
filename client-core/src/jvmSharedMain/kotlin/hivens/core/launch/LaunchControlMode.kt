@@ -4,8 +4,8 @@ package hivens.core.launch
  * What a launch control can do right now.
  *
  * Every surface that offers a launch reads the same [LaunchState] and used to
- * decide this for itself -- the dashboard panel, the pack hero, the home pill,
- * the launch tile, the CLI, each with its own `when`. They drifted, as parallel
+ * decide this for itself: the dashboard panel, the pack hero, the home pill,
+ * the launch tile, each with its own `when`. They drifted, as parallel
  * copies do: the tile never learned that a running game can be stopped, so it
  * simply went grey for as long as the game was up.
  *

@@ -15,8 +15,8 @@ import javax.swing.SwingUtilities
 
 /**
  * The GUI's pre-Compose pipeline, composed from [LauncherBootstrap]'s
- * AWT-free pieces plus the toolkit-touching steps that must not enter the
- * headless CLI's reachable graph: the Skiko cap, the X11 WM_CLASS override,
+ * AWT-free pieces plus the toolkit-touching steps that stay out of the
+ * engine module: the Skiko cap, the X11 WM_CLASS override,
  * the display diagnostics line, and a crash handler that surfaces the Swing
  * dialog.
  *

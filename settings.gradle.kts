@@ -91,12 +91,6 @@ include(":client-launcher")
 // per-platform applicators. Split from pack update, which shared the package name
 // and nothing else and stays in :client-launcher next to the mirror client.
 include(":client-update")
-// Headless native-image entrypoint: a Compose-free CLI over the launch
-// pipeline (auth -> resolve -> download -> JRE -> runtime -> launch),
-// buildable to a GraalVM / Liberica-NIK native binary for Linux. The GUI
-// (:client-ui) stays on the JVM -- Skiko/AWT block native-image of Compose.
-// See docs/src/content/docs/dev/native-image.md.
-include(":client-cli")
 // What decides how sound plays: the queue, the repeat modes and the state machine over an
 // engine. Shared by the desktop and Android builds; the engines are handed in.
 include(":client-playback")

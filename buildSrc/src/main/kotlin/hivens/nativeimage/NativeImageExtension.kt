@@ -16,11 +16,11 @@ import org.gradle.api.provider.Property
  * The toolchain (`native-image` binary) is located vendor-agnostically at task
  * time: [graalvmHome] -> `GRAALVM_HOME` -> `NATIVE_IMAGE_HOME` -> a scan of
  * `/usr/lib/jvm` -> `PATH`. Liberica NIK is the documented choice, but any
- * GraalVM 25 install works for the headless CLI.
+ * GraalVM install works, since the defaults use no vendor-specific flag.
  */
 abstract class NativeImageExtension {
 
-    /** Output binary file name (e.g. "nexira-cli"). */
+    /** Output binary file name. Defaults to "app". */
     abstract val imageName: Property<String>
 
     /**
@@ -38,8 +38,9 @@ abstract class NativeImageExtension {
     abstract val buildArgs: ListProperty<String>
 
     /**
-     * Arguments the tracing-agent run hands to the app's `main`. Overridable
-     * per-invocation via `-PnativeAgentArgs="launch foo --dry-run"`.
+     * Arguments the tracing-agent run hands to the app's `main`. Empty by
+     * default. Overridable per invocation via `-PnativeAgentArgs="<args>"`,
+     * split on spaces.
      */
     abstract val agentArgs: ListProperty<String>
 

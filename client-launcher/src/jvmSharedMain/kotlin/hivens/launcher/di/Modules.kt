@@ -804,26 +804,16 @@ val appModule = module {
     // Pack registry on Xodus (<dataDir>/db): installed PackInstances persisted one
     // entry per id so a mutation is an O(1) put, not a full-file rewrite. Migrates a
     // legacy packs.json on first open (renamed to *.migrated). Empty -> empty list.
-    single<IPackRepository> { packRegistry(get(), get(), holdOpen = true) }
+    single<IPackRepository> {
+        val dataDir: Path = get()
+        XodusPackRepository(
+            dbDir = dataDir.resolve("db"),
+            legacyPacksFile = dataDir.resolve(Storage.PACKS_FILE),
+            json = get(),
+        )
+    }
 
 }
-
-/**
- * The pack registry for a short-lived process: it opens the database for each
- * operation and closes it after, so its lock is held for milliseconds. Loaded after
- * the launcher's modules, it replaces their registry. See [XodusPackRepository].
- */
-val transientPackRegistryModule = module {
-    single<IPackRepository> { packRegistry(get(), get(), holdOpen = false) }
-}
-
-private fun packRegistry(dataDir: Path, json: Json, holdOpen: Boolean): IPackRepository =
-    XodusPackRepository(
-        dbDir = dataDir.resolve("db"),
-        legacyPacksFile = dataDir.resolve(Storage.PACKS_FILE),
-        json = json,
-        holdOpen = holdOpen,
-    )
 
 // ── Module factories ────────────────────────────────────────────────────────
 

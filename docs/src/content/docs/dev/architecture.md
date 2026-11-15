@@ -16,7 +16,6 @@ The launcher is made of Gradle modules. The dependency direction is one-way and 
 | `client-auth-microsoft`   | Microsoft (MSA) provider.                                                                                                                                                                                                      |
 | `client-launcher`         | The engine: DI wiring, mirror client and sync, runtime provisioning, loader resolution, the launch flow, pack update apply and rollback.                                                                                       |
 | `client-update`           | The launcher updating itself: release check, delta bundle, binary patch, and the per-platform applicators.                                                                                                                     |
-| `client-cli`              | Headless entry point over the same engine.                                                                                                                                                                                     |
 | `client-media`            | Video cache and yt-dlp resolution for the media surfaces.                                                                                                                                                                      |
 | `client-playback`         | How sound plays: the queue, the repeat modes and the state machine over an engine. Shared by the desktop and Android builds, the engines are handed in.                                                                        |
 | `client-tray`             | System tray behind one interface, backed by libtray (Panama bindings).                                                                                                                                                         |
@@ -46,7 +45,7 @@ Besides these, `client-core-testing` holds test doubles shared by the modules' t
 
 Two boundaries are worth stating outright, because nothing enforces them mechanically:
 
-- `client-launcher` and everything below it carry no `java.awt`, `javax.swing` or `javax.imageio` import. That is what keeps AWT out of the CLI's reachable graph and out of a native image. The only AWT-looking strings in the engine are JVM flags handed to the game process.
+- `client-launcher` and everything below it carry no `java.awt`, `javax.swing` or `javax.imageio` import. That keeps the toolkit in the UI layer, and the part of the engine the Android app shares could not use AWT anyway. The only AWT-looking strings in the engine are JVM flags handed to the game process.
 - `nx-ui` depends on Compose, coroutines, serialization and a colour library, and on no module of this project. A component belongs there only if it names no domain type and resolves no string of its own. That is why a source badge maps `PackOrigin` to a colour in `client-ui` and then calls a colour-taking primitive in `nx-ui`.
 
 ## Boot
@@ -60,7 +59,7 @@ The pipeline is split so a window is on screen before the slow work runs.
 
 Progress is reported as four phases (`Data`, `Network`, `Migration`, `Modules`) that drive the threshold's bar.
 
-The toolkit-touching edge lives in `hivens.ui.bootstrap.GuiBootstrap`: the X11 window-class override, the Skiko vsync property, a one-line display diagnostic, and a crash handler that surfaces a Swing dialog. The CLI composes the same core through `preBootHeadless` with a log-and-persist handler and no single-instance lock.
+The toolkit-touching edge lives in `hivens.ui.bootstrap.GuiBootstrap`: the X11 window-class override, the Skiko vsync property, a one-line display diagnostic, and a crash handler that surfaces a Swing dialog.
 
 ## Shell recovery
 

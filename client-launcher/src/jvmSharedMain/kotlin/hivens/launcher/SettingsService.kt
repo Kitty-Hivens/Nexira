@@ -20,7 +20,7 @@ import java.nio.file.Path
  *
  * The file has writers outside this object: the recovery surface switches modules
  * off and resets settings through the raw file while this process may still hold
- * its copy, and the command-line build is a second process. [updateSettings] reads
+ * its copy. [updateSettings] reads
  * the file again when it no longer holds what this object last read or wrote, so
  * a change made elsewhere is built on rather than written over. A module switched
  * off to get out of a crash loop came back on with the next track change.

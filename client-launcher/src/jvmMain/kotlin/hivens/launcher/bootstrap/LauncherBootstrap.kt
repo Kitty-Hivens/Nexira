@@ -12,7 +12,6 @@ import hivens.launcher.platform.SingleInstance
 import org.koin.core.KoinApplication
 import org.koin.core.module.Module
 import org.koin.dsl.koinApplication
-import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.util.UUID
 import kotlin.system.exitProcess
@@ -34,8 +33,7 @@ import kotlin.system.exitProcess
  *   - [completeCore] + [finishBoot] -- the potentially-slow remainder
  *     (data-dir move, migration detect, Koin). The
  *     GUI runs these on a background thread behind a live window and maps
- *     the [Phase] callbacks onto its progress bar; the CLI runs them
- *     inline.
+ *     the [Phase] callbacks onto its progress bar.
  *
  * Result is the small set of values the entrypoint needs to keep
  * threading through: the resolved [PlatformPaths] (for window-side
@@ -48,15 +46,12 @@ import kotlin.system.exitProcess
  * needs it, the composition through host-provided locals. A module loaded from
  * a jar therefore finds no launcher graph behind Koin's global entry points.
  *
- * This module is AWT-free by construction. Entry pipelines COMPOSE the
- * public pieces: [preBootHeadless] is the CLI's whole pipeline (a
- * log-and-persist crash handler, no single-instance lock);
- * the GUI pipeline lives with the UI layer (hivens.ui.bootstrap), which
- * runs [preWindow], layers its toolkit setup + Swing crash dialog on
- * top, then drives [completeCore] + [finishBoot] from its boot thread.
- * Keeping the GUI edge out of this module keeps AWT out of the CLI's
- * reachable graph and out of the native image -- which is the whole
- * point, since AWT/Skiko is what blocks native-image of the Compose GUI.
+ * This module is AWT-free by construction. An entry pipeline composes the
+ * public pieces: the GUI's lives with the UI layer (hivens.ui.bootstrap),
+ * which runs [preWindow], layers its toolkit setup and Swing crash dialog
+ * on top, then drives [completeCore] and [finishBoot] from its boot thread.
+ * The toolkit edge stays there so that this module, like the rest of the
+ * engine, carries no AWT.
  *
  * Anything that should run AFTER Koin but before the Compose entry
  * (puppet server startup, UI Koin module registration) is the caller's
@@ -101,22 +96,6 @@ object LauncherBootstrap {
         val paths: PlatformPaths,
         val crashReporter: CrashReporter,
     )
-
-    /**
-     * Headless variant for the CLI / native-image entrypoint: identical
-     * logging, paths, migration and Koin setup, but touches no AWT/Swing.
-     * It installs a log-and-persist crash handler (no Swing dialog) and
-     * skips the single-instance lock, which is the GUI's: a second process
-     * that met it would drop a raise signal and exit with nothing said. The
-     * CLI does not run beside a GUI on the same data directory; it checks for
-     * one itself and refuses with a message.
-     */
-    fun preBootHeadless(extraModules: List<Module> = emptyList()): Result {
-        val pre = preWindow(singleInstance = false)
-        val core = completeCore(pre, relockOnMove = false)
-        installHeadlessCrashHandler(core.crashReporter)
-        return finishBoot(core, extraModules)
-    }
 
     /**
      * The synchronous prologue: log-dir resolution, session tagging, and
@@ -228,23 +207,6 @@ object LauncherBootstrap {
         val crashReporter = CrashReporter(paths)
 
         return Core(paths, crashReporter)
-    }
-
-    /**
-     * Headless crash handler: logs and persists the report to disk, no
-     * Swing dialog. The GUI pipeline installs its own dialog-showing
-     * handler instead.
-     */
-    private fun installHeadlessCrashHandler(crashReporter: CrashReporter) {
-        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
-            val handlerLog = LoggerFactory.getLogger("CrashHandler")
-            handlerLog.error("Uncaught exception on thread '${thread.name}'", throwable)
-            val _ = runCatching {
-                val report     = crashReporter.generate(throwable, thread)
-                val reportFile = crashReporter.saveToDisk(report)
-                handlerLog.error("Crash report written to {}", reportFile.absolutePath)
-            }
-        }
     }
 
     /**

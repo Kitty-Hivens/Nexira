@@ -144,7 +144,7 @@ val uiModule = module {
     // stays free of java.desktop; the seam interface lives in core).
     single<IconProcessor> { ImageIoIconProcessor() }
     // System tray (client-tray seam): one libtray-backed impl. A plain single, so
-    // client-cli -- which never injects it -- never loads libtray's natives.
+    // libtray's natives load only when something injects the tray.
     single<TrayController> { LibTrayController() }
     // The leftover-clients chore. The gate is what the reminder's action opens;
     // the sweeper is registered here rather than beside the scanner because its

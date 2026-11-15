@@ -50,8 +50,8 @@ import java.nio.file.StandardCopyOption
  * takes an exclusive lock on the directory, and building it eagerly made a second
  * process on the same data dir fail inside the dependency graph, before anything
  * could say why. [holdOpen] false opens the environment for each operation and
- * closes it after, which is how a short-lived process (the command line) keeps the
- * lock for milliseconds rather than for as long as it runs.
+ * closes it after, which keeps the lock for milliseconds rather than for as long
+ * as the process runs.
  */
 class XodusPackRepository(
     private val dbDir: Path,
@@ -85,8 +85,8 @@ class XodusPackRepository(
     /**
      * Runs [block] against the environment, opening it first if it is not open. The
      * open waits [LOCK_WAIT_MS] for a lock another process holds briefly before
-     * giving up, so one command-line call does not fail the launcher starting
-     * beside it.
+     * giving up, so a process that holds it per operation does not fail the
+     * launcher starting beside it.
      */
     private fun <T> withEnv(block: (Environment) -> T): T = synchronized(envLock) {
         check(!closed) { "pack registry is closed" }

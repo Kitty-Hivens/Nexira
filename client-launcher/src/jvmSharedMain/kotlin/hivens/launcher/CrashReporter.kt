@@ -13,7 +13,7 @@ import java.time.format.DateTimeFormatter
 /**
  * Builds and persists crash reports -- headless diagnostics. The GUI's
  * post-crash Swing dialog lives with the UI layer (it is the one consumer
- * of a report that needs a toolkit); the CLI logs the report path instead.
+ * of a report that needs a toolkit).
  *
  * Constructor-injected [paths] (rather than a mutable static field
  * resolved from `PlatformPaths.system()`) so all the other Koin-wired

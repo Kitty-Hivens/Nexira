@@ -9,9 +9,9 @@ import hivens.core.data.PackInstance
  *
  * A class and not a sealed interface, because there is one thing the launcher
  * spawns. It was an interface while a SmartyCraft server could also be launched;
- * with that gone, the pack IS the unit of content, and every entry point --
- * a pack's page, quick launch, a relaunch from a notification, the CLI -- hands
- * over a [PackInstance]. Microsoft is a requirement ON a pack rather than a
+ * with that gone, the pack IS the unit of content, and every entry point (a
+ * pack's page, quick launch, a relaunch from a notification) hands over a
+ * [PackInstance]. Microsoft is a requirement ON a pack rather than a
  * second kind of target, so it changes nothing here.
  *
  * The interface that survived the removal was over a single case, and the driver

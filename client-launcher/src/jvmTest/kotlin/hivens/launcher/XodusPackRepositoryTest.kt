@@ -151,8 +151,8 @@ class XodusPackRepositoryTest {
     /**
      * Xodus locks the directory for one process, and the registry used to take that
      * lock when it was built and keep it. One that holds it per operation leaves the
-     * database free between them, which is what lets the launcher start while a
-     * command-line launch is running.
+     * database free between them, which is what lets another registry open it while
+     * the first is still alive.
      */
     @Test
     fun `a registry that holds the database per operation leaves it free between them`() = runTest {

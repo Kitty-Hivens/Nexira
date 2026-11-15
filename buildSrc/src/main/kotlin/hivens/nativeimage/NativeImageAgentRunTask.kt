@@ -75,8 +75,8 @@ abstract class NativeImageAgentRunTask : DefaultTask() {
         logger.lifecycle("native-image-agent: harvesting into ${meta.absolutePath}")
         execOperations.exec {
             commandLine(args)
-            // The app may exit non-zero (e.g. a dry-run that reaches a guard);
-            // the metadata is still written, so don't fail the harvest on it.
+            // The app may exit non-zero after the paths worth tracing have run.
+            // The metadata is still written, so the exit code does not fail the harvest.
             isIgnoreExitValue = true
         }
     }

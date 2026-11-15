@@ -10,14 +10,14 @@ import org.gradle.kotlin.dsl.register
 import java.io.File
 
 /**
- * Convention plugin for building the headless CLI to a GraalVM / Liberica-NIK
- * native binary. Apply via:
+ * Convention plugin that builds a JVM application module to a GraalVM /
+ * Liberica-NIK native binary. Apply via:
  *
  * ```kotlin
  * plugins { id("nexira.native-image") }
  *
  * nativeImage {
- *     imageName.set("nexira-cli")
+ *     imageName.set("nexira")
  *     // mainClass defaults from the `application` plugin
  *     buildArgs.add("--initialize-at-run-time=...")  // appends to defaults
  * }
@@ -38,11 +38,12 @@ class NativeImagePlugin : Plugin<Project> {
     override fun apply(project: Project) {
         val ext = project.extensions.create("nativeImage", NativeImageExtension::class.java)
 
-        // Defaults. native-access + headless are belt-and-suspenders for the
-        // Panama keyring and the AWT-free guarantee; --no-fallback makes a
-        // missing-metadata gap a hard build failure rather than a silent
-        // JVM-fallback image. No --gc=G1: that is Oracle-GraalVM-only and would
-        // break on Liberica NIK (CE-based, serial GC).
+        // Defaults. native-access lets Panama bindings such as the keyring's make
+        // their downcalls. headless keeps AWT from asking for a display, which
+        // suits an app that opens no window and has to be dropped for one that
+        // does. --no-fallback makes a missing-metadata gap a hard build failure
+        // rather than a silent JVM-fallback image. No --gc=G1: that is
+        // Oracle-GraalVM-only and would break on Liberica NIK (CE-based, serial GC).
         ext.imageName.convention("app")
         ext.buildArgs.convention(
             listOf(
@@ -52,7 +53,7 @@ class NativeImagePlugin : Plugin<Project> {
                 "-Djava.awt.headless=true",
             )
         )
-        ext.agentArgs.convention(listOf("list"))
+        ext.agentArgs.convention(emptyList())
         ext.outputDir.convention(project.layout.buildDirectory.dir("nativeImage"))
         ext.agentOutputDir.convention(project.layout.buildDirectory.dir("native/agent-output"))
         ext.committedMetadataDir.convention(
@@ -103,7 +104,7 @@ class NativeImagePlugin : Plugin<Project> {
         project.tasks.register<NativeImageAgentRunTask>("nativeImageAgentRun") {
             group = "native-image"
             description = "Runs the app under the native-image tracing agent to harvest reachability metadata. " +
-                "Override args with -PnativeAgentArgs=\"launch <id> --dry-run\"."
+                "Pass the app's arguments with -PnativeAgentArgs=\"<args>\"."
             classpath.from(jar.flatMap { it.archiveFile })
             classpath.from(runtimeClasspath)
             mainClass.convention(ext.mainClass)
@@ -160,7 +161,7 @@ internal fun resolveGraalvmHome(explicit: String?): File {
     error(
         "native-image not found. Install GraalVM or Liberica NIK 25 and set GRAALVM_HOME. " +
             "With SDKMAN:  sdk install nik  &&  export GRAALVM_HOME=\"\$HOME/.sdkman/candidates/nik/current\". " +
-            "Or set the nativeImage { graalvmHome } property. See docs/native-image.md."
+            "Or set the nativeImage { graalvmHome } property. See docs/src/content/docs/dev/native-image.md."
     )
 }
 
