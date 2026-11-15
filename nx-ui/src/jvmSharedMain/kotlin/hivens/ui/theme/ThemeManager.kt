@@ -45,7 +45,12 @@ data class ThemeLibrary(
 
     val all: List<Theme> get() = Themes.all + listOfNotNull(fromWallpaper) + contributed + own
 
-    val active: Theme get() = all.firstOrNull { it.id == selected } ?: Themes.default
+    val active: Theme get() = (RENAMED[selected] ?: selected).let { id -> all.firstOrNull { it.id == id } } ?: Themes.default
+
+    private companion object {
+        /** Themes that ship under another id now. Lotus Dark became the whole of Lotus. */
+        val RENAMED: Map<String, String> = mapOf("lotus-dark" to Themes.Lotus.id)
+    }
 }
 
 /**
@@ -144,17 +149,21 @@ class ThemeManager(
 
         private const val LEGACY_DEFAULT_NAME = "Celestia Dark"
 
-        /** The names the first version stored for the themes that ship. */
+        /**
+         * The names the first version stored for the themes it shipped. A theme that no
+         * longer ships lands on the default here, rather than coming back as somebody's
+         * own from the colours the file kept of it.
+         */
         private val LEGACY_NAMES: Map<String, String> = mapOf(
             "Celestia Dark" to Themes.Celestia.id,
-            "Cyberpunk" to Themes.Cyberpunk.id,
-            "Vaporwave" to Themes.Vaporwave.id,
-            "Matrix" to Themes.Matrix.id,
-            "Synthwave" to Themes.Synthwave.id,
-            "Neon Dreams" to Themes.NeonDreams.id,
+            "Cyberpunk" to Themes.default.id,
+            "Vaporwave" to Themes.default.id,
+            "Matrix" to Themes.default.id,
+            "Synthwave" to Themes.default.id,
+            "Neon Dreams" to Themes.default.id,
             "Abyssal" to Themes.Abyssal.id,
             "Blood Rain" to Themes.BloodRain.id,
-            "Lotus Dark" to Themes.LotusDark.id,
+            "Lotus Dark" to Themes.Lotus.id,
         )
     }
 }

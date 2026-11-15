@@ -34,11 +34,11 @@ class ThemeManagerTest {
         val published = mutableListOf<Pair<Path, String>>()
         val manager = ThemeManager(dir) { file, content -> published += file to content }
 
-        manager.save(ThemeLibrary(selected = Themes.NeonDreams.id))
+        manager.save(ThemeLibrary(selected = Themes.Abyssal.id))
 
         assertEquals(1, published.size, "the write must be delegated, not performed here")
         assertEquals(dir.resolve("themes.json"), published.single().first)
-        assertTrue(published.single().second.contains(Themes.NeonDreams.id))
+        assertTrue(published.single().second.contains(Themes.Abyssal.id))
         assertFalse(Files.exists(dir.resolve("themes.json")), "nothing may reach disk except through the publisher")
     }
 
@@ -57,6 +57,23 @@ class ThemeManagerTest {
         val dir = tempDir()
         Files.writeString(dir.resolve("themes.json"), """{"name":"Blood Rain","primary":"#A01818"}""")
         assertEquals(Themes.BloodRain, ThemeManager(dir) { _, _ -> }.load().active)
+    }
+
+    @Test
+    fun `a first-version file naming a theme that no longer ships lands on the default, not on a theme of its own`() {
+        val dir = tempDir()
+        Files.writeString(dir.resolve("themes.json"), """{"name":"Cyberpunk","primary":"#FF006E","background":"#0A0E27"}""")
+        val library = ThemeManager(dir) { _, _ -> }.load()
+        assertEquals(Themes.default, library.active)
+        assertTrue(library.own.isEmpty(), "a retired theme came back as somebody's own")
+    }
+
+    @Test
+    fun `Lotus Dark, by its first-version name or by its id, opens as Lotus`() {
+        val dir = tempDir()
+        Files.writeString(dir.resolve("themes.json"), """{"name":"Lotus Dark"}""")
+        assertEquals(Themes.Lotus, ThemeManager(dir) { _, _ -> }.load().active)
+        assertEquals(Themes.Lotus, ThemeLibrary(selected = "lotus-dark").active)
     }
 
     @Test
@@ -127,11 +144,11 @@ class ThemeManagerTest {
     @Test
     fun `a file from a newer build is read, and not written back over`() {
         val dir = tempDir()
-        Files.writeString(dir.resolve("themes.json"), """{"schema_version":99,"selected":"matrix"}""")
+        Files.writeString(dir.resolve("themes.json"), """{"schema_version":99,"selected":"abyssal"}""")
         val published = mutableListOf<String>()
         val manager = ThemeManager(dir) { _, c -> published += c }
 
-        assertEquals(Themes.Matrix, manager.load().active, "read it as far as this build can")
+        assertEquals(Themes.Abyssal, manager.load().active, "read it as far as this build can")
         assertTrue(manager.readOnly)
 
         manager.save(ThemeLibrary(selected = Themes.Celestia.id))

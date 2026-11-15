@@ -136,7 +136,7 @@ class ThemeIntentTest {
 
     @Test
     fun `a theme without a light scheme stays in its own`() {
-        assertEquals(Themes.Matrix.dark, Themes.Matrix.scheme(dark = false))
+        assertEquals(Themes.Abyssal.dark, Themes.Abyssal.scheme(dark = false))
         assertEquals(Themes.Celestia.light, Themes.Celestia.scheme(dark = false))
     }
 

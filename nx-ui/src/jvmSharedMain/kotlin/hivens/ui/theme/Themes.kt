@@ -6,10 +6,13 @@ import androidx.compose.ui.graphics.Color
  * The themes that ship.
  *
  * Celestia is the hand palette the interface was measured against, both modes, as it
- * was. The others are what their authors declared and nothing more: their own ground
- * and surface open the ladder, and every colour they named is one of their colours.
- * They have no light scheme yet, and no ink of their own, so they read with
- * Celestia's dark inks until they are drawn again.
+ * was. Lotus is the Lotus theme for JetBrains IDEs, both modes, with its colours taken
+ * from its MIT licensed VS Code port: every value below is one the original uses, and
+ * only which of them make the ladder was chosen here. The others are what their
+ * authors declared and nothing more: their own ground and surface open the ladder, and
+ * every colour they named is one of their colours. They have no light scheme yet, and
+ * no ink of their own, so they read with Celestia's dark inks until they are drawn
+ * again.
  */
 object Themes {
 
@@ -36,16 +39,34 @@ object Themes {
         ),
     )
 
-    val Cyberpunk = authored("cyberpunk", "Cyberpunk", 0xFF0A0E27, 0xFF1A1F3A, 0xFFFF006E, 0xFF00F5FF, 0xFFFFBE0B, 0xFF00F5A0)
-    val Vaporwave = authored("vaporwave", "Vaporwave", 0xFF05091B, 0xFF0E1428, 0xFFFF71CE, 0xFF01CDFE, 0xFFB967FF, 0xFF05FFA1, 0xFFFF006E)
-    val Matrix = authored("matrix", "Matrix", 0xFF0D0208, 0xFF1A1A1A, 0xFF00FF41, 0xFF008F11, 0xFFFF0000)
-    val Synthwave = authored("synthwave", "Synthwave", 0xFF0F0E17, 0xFF1C1B29, 0xFFF72585, 0xFF7209B7, 0xFF3A0CA3, 0xFF4CC9F0)
-    val NeonDreams = authored("neon-dreams", "Neon Dreams", 0xFF1A0033, 0xFF2D0052, 0xFFFF10F0, 0xFFFF6EC7, 0xFF39FF14, 0xFFFF073A)
     val Abyssal = authored("abyssal", "Abyssal", 0xFF050A14, 0xFF0A1628, 0xFF4FC3F7, 0xFF0D47A1, 0xFF00BCD4, 0xFF26C6DA, 0xFFEF5350)
     val BloodRain = authored("blood-rain", "Blood Rain", 0xFF0A0303, 0xFF1C0A0C, 0xFFA01818, 0xFF4A0810, 0xFF6B1525, 0xFF4A5A35, 0xFFE53935)
-    val LotusDark = authored("lotus-dark", "Lotus Dark", 0xFF141414, 0xFF1C1C1C, 0xFFFFB3D6, 0xFFAB9DF2, 0xFF78DCE8, 0xFFA9DC76, 0xFFFF6188)
 
-    val all: List<Theme> = listOf(Celestia, Cyberpunk, Vaporwave, Matrix, Synthwave, NeonDreams, Abyssal, BloodRain, LotusDark)
+    // The original's pink is its accent, its focus and its error at once, so it leads.
+    // Its dimmest grey text is the quiet ink in the dark, and in the light, where that
+    // grey does not read, its ruler grey is.
+    val Lotus = Theme(
+        id = "lotus",
+        name = "Lotus",
+        dark = Scheme(
+            steps = listOf(Color(0xFF121212), Color(0xFF161616), Color(0xFF1E1E1E), Color(0xFF222222)),
+            inks = listOf(Color(0xFFFCFCFA), Color(0xFF939293)),
+            colors = listOf(
+                Color(0xFFFF6188), Color(0xFFAB9DF2), Color(0xFFA9DC76),
+                Color(0xFFFFF48A), Color(0xFF55DBE4), Color(0xFFFC9867),
+            ),
+        ),
+        light = Scheme(
+            steps = listOf(Color(0xFFFFF0F6), Color(0xFFFFE3E9), Color(0xFFFFD6DF)),
+            inks = listOf(Color(0xFF121212), Color(0xFF5A5A5A)),
+            colors = listOf(
+                Color(0xFFFF6188), Color(0xFF836DF2), Color(0xFF5CAD0A),
+                Color(0xFFC4960C), Color(0xFF0FB7D9), Color(0xFFFC9867),
+            ),
+        ),
+    )
+
+    val all: List<Theme> = listOf(Celestia, Abyssal, BloodRain, Lotus)
 
     val default: Theme get() = Celestia
 
