@@ -21,7 +21,7 @@ import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertTrue
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.Themes
+import hivens.ui.theme.TestTheme
 
 /**
  * Static render sheet of the Play pill's moments (play, a wait, exit-the-game,
@@ -36,7 +36,7 @@ class PlayButtonRenderTest {
     @OptIn(ExperimentalComposeUiApi::class)
     private fun render(dark: Boolean, name: String) {
         val scene = ImageComposeScene(width = 1150, height = 360, density = Density(2f)) {
-            NxTheme(Themes.Celestia, dark = dark) {
+            NxTheme(TestTheme, dark = dark) {
                 Column(
                     modifier            = Modifier.fillMaxSize().background(Color(BACKDROP)).padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp),

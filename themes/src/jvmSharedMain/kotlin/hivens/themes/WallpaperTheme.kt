@@ -1,15 +1,16 @@
-package hivens.ui.theme
+package hivens.themes
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import com.materialkolor.hct.Hct
+import hivens.themes.api.ThemesApi
+import hivens.ui.theme.Scheme
+import hivens.ui.theme.Theme
 import kotlin.math.max
 
-/** The id of the theme made from the wallpaper. It is never stored as a theme, only selected. */
-const val WALLPAPER_THEME_ID = "wallpaper"
-
 /**
- * A theme authored from a wallpaper's [colours], best first, as [coloursFromImage]
- * ranks them.
+ * A theme authored from a wallpaper's [colours], best first, as
+ * [hivens.ui.theme.coloursFromImage] ranks them.
  *
  * It is a theme like any other, not a filter over the active one: the ladder and inks
  * are Celestia's, measured tone for tone, tinted toward the wallpaper's first colour,
@@ -27,7 +28,7 @@ fun themeFromWallpaper(colours: List<Int>, name: String): Theme? {
     val hue = (vivid.firstOrNull() ?: hcts.first()).hue
     val tint = if (vivid.isEmpty()) 0.0 else 1.0
     return Theme(
-        id = WALLPAPER_THEME_ID,
+        id = ThemesApi.WALLPAPER_THEME_ID,
         name = name,
         dark = wallpaperScheme(Themes.Celestia.dark, hue, tint * DARK_STEP_CHROMA, vivid, DARK_COLOUR_TONES),
         light = wallpaperScheme(Themes.Celestia.light!!, hue, tint * LIGHT_STEP_CHROMA, vivid, LIGHT_COLOUR_TONES),
@@ -47,6 +48,11 @@ private fun wallpaperScheme(
         Hct.from(it.hue, max(it.chroma, MIN_LEAD_CHROMA), it.tone.coerceIn(tones)).toColor()
     },
 )
+
+/** CIE L*, 0..100, which HCT's tone is. */
+private fun Color.lstar(): Double = Hct.fromInt(copy(alpha = 1f).toArgb()).tone
+
+private fun Hct.toColor(): Color = Color(toInt())
 
 /** Below this a wallpaper colour is a grey with a cast, not a colour to draw with. */
 private const val MIN_COLOUR_CHROMA = 12.0

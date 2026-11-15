@@ -34,7 +34,6 @@ import hivens.core.data.PackOrigin
 import hivens.core.data.PackReference
 import hivens.core.data.SessionData
 import hivens.core.data.SettingsData
-import hivens.core.data.ThemeMode
 import hivens.core.diag.ActionRing
 import hivens.core.launch.LaunchState
 import hivens.core.net.TransferEngine
@@ -84,7 +83,7 @@ import hivens.ui.HostKeys
 import hivens.ui.accounts.ClientAccountsHost
 import hivens.ui.host.LauncherHostAccess
 import hivens.ui.host.launcherServices
-import hivens.ui.appearance.AppearanceStore
+import hivens.ui.hostThemeManager
 import hivens.ui.background.BackgroundSettings
 import hivens.ui.i18n.NexiraStrings
 import hivens.ui.settings.SettingsDomainFiles
@@ -104,17 +103,29 @@ import hivens.ui.packs.ClientPacksHost
 import hivens.ui.packs.withdrawNoticesOfInstalledPacks
 import hivens.ui.reportedTo
 import hivens.ui.settle
-import hivens.ui.theme.ThemeManager
-import hivens.ui.theme.Themes
+import hivens.themes.ThemeLibraryFile
+import hivens.themes.ThemeManager
+import hivens.themes.Themes
+import hivens.themes.ThemesModule
+import hivens.themes.ThemesSettingsDomain
+import hivens.themes.api.SystemScheme
+import hivens.themes.api.ThemeInputs
+import hivens.themes.api.ThemeMode
+import hivens.themes.api.ThemesApi
+import hivens.themes.api.ThemesKeys
+import hivens.ui.theme.WallpaperTone
 import hivens.ui.uiCommandRegistry
 import hivens.ui.uiDataRegistry
 import hivens.ui.utils.GameConsoleService
 import hivens.ui.utils.PreferenceWriter
 import hivens.widget.api.ContributedServices
+import hivens.widget.api.KeyContribution
 import hivens.widget.api.KeyOrigin
 import hivens.widget.api.LocalScope
 import hivens.widget.api.LocalWidgetCommandRegistry
 import hivens.widget.api.LocalWidgetDataRegistry
+import hivens.widget.api.ModuleKeys
+import hivens.widget.api.ModuleKeysResult
 import hivens.widget.api.SettingsChange
 import hivens.widget.api.SettingsStores
 import hivens.widget.api.WidgetScope
@@ -122,6 +133,7 @@ import hivens.widget.api.current
 import hivens.widget.api.find
 import hivens.widget.api.flowSource
 import hivens.widget.api.get
+import hivens.widget.api.registerModuleKeys
 import hivens.widget.api.rememberCommand
 import hivens.widget.api.rememberScopedCommand
 import hivens.widget.api.rememberScopedSource
@@ -139,6 +151,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.job
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.serialization.json.Json
 import org.koin.core.Koin
 import org.koin.core.KoinApplication
 import org.koin.dsl.koinApplication
@@ -156,7 +169,6 @@ import kotlin.concurrent.thread
 import kotlin.io.path.ExperimentalPathApi
 import kotlin.reflect.KClass
 import kotlin.io.path.deleteRecursively
-import kotlin.io.path.exists
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -188,6 +200,8 @@ class CoreKeysTest {
 
     private val hostKeys = ArrayList<HostKeys>()
 
+    private val writers = ArrayList<PreferenceWriter>()
+
     @OptIn(ExperimentalPathApi::class)
     @AfterTest
     fun tearDown() {
@@ -197,6 +211,8 @@ class CoreKeysTest {
         koins.forEach { koin -> val _ = runCatching { koin.close() } }
         runBlocking { consoles.forEach { it.close() } }
         scope.cancel()
+        // The saves a test asked for land in the folder about to be deleted, so they land first.
+        writers.forEach { it.drain(5.seconds) }
         dir.deleteRecursively()
     }
 
@@ -369,8 +385,11 @@ class CoreKeysTest {
      * launcher's own level module, and nothing of any shell. The packs and accounts
      * modules bring their keys the way the launcher brings them, through their key
      * contributions, for a document that names them, which [withPacks],
-     * [withAccounts] and [withCatalogue] false do not. With [withActions] false the
-     * pack actions are missing, the way a broken install would leave them.
+     * [withAccounts], [withCatalogue] and [withThemes] false do not. With [withActions]
+     * false the pack actions are missing, the way a broken install would leave them.
+     *
+     * [settings] is also what the launcher's former settings file holds, which the
+     * modules' settings domains take their first values from.
      */
     private inner class Launcher(
         settings: SettingsData = SettingsData(),
@@ -380,6 +399,7 @@ class CoreKeysTest {
         withAccounts: Boolean = true,
         withCatalogue: Boolean = true,
         withI18n: Boolean = true,
+        withThemes: Boolean = true,
         notified: Boolean = false,
         /** What signs a stored account in at startup. */
         auth: AuthProvider = OfflineAuthProvider(),
@@ -402,7 +422,7 @@ class CoreKeysTest {
         val packs = Packs(listOf(pack))
         val measured = AtomicInteger()
         val previews = ReattachPreviews(measure = { measured.incrementAndGet(); shownPreview }, operations = operations, scope = scope)
-        val preferences = PreferenceWriter("core-keys-test")
+        val preferences = PreferenceWriter("core-keys-test").also { writers += it }
         val indications = IndicationCenter()
         val hub = Hub()
         val data = uiDataRegistry(
@@ -415,10 +435,12 @@ class CoreKeysTest {
         val commands = uiCommandRegistry({}, {}, {})
 
         /** The modules' settings, written where the launcher writes them, under the test's data folder. */
-        val domains = SettingsDomainFiles(dir.resolve(Storage.SETTINGS_DIR), dir.resolve(Storage.SETTINGS_FILE), preferences::write)
+        val domains = SettingsDomainFiles(dir.resolve(Storage.SETTINGS_DIR), dir.resolve(Storage.SETTINGS_FILE), preferences::write).also {
+            Files.writeString(dir.resolve(Storage.SETTINGS_FILE), legacyJson.encodeToString(SettingsData.serializer(), settings))
+        }
         val words: I18nEngine = NexiraStrings.engine(null, domains.of(I18nSettingsDomain).value.value.language).also { engine ->
             engine.follow(domains.of(I18nSettingsDomain), scope)
-            listOf(I18nModule, PacksModule, AccountsModule, CatalogueModule).forEach { engine.contribute(it.id, it.strings.wordsOf(it.id)) }
+            listOf(I18nModule, ThemesModule, PacksModule, AccountsModule, CatalogueModule).forEach { engine.contribute(it.id, it.strings.wordsOf(it.id)) }
         }
         val keys = HostKeys(data, commands, ContributedServices()).also { keys ->
             moduleKeys(
@@ -426,8 +448,9 @@ class CoreKeysTest {
                 named    = setOfNotNull(
                     PacksApi.ID.takeIf { withPacks }, AccountsApi.ID.takeIf { withAccounts },
                     CatalogueApi.ID.takeIf { withCatalogue }, I18nApi.ID.takeIf { withI18n },
+                    ThemesApi.ID.takeIf { withThemes },
                 ),
-                compiled = listOf(I18nModule, PacksModule, AccountsModule, CatalogueModule),
+                compiled = listOf(I18nModule, ThemesModule, PacksModule, AccountsModule, CatalogueModule),
                 jars     = emptyList(),
                 nameOf   = { moduleId, key -> words.strings(moduleId).text(key) },
             )
@@ -439,17 +462,9 @@ class CoreKeysTest {
             env = { name -> if (name == "NEXIRA_DATA_DIR") dir.toString() else null },
         )
         val console = GameConsoleService(paths).also { consoles += it }
-        val appearance = AppearanceStore(
-            settings    = this.settings,
-            preferences = preferences,
-            themes      = ThemeManager(dir) { file, content ->
-                Files.createDirectories(file.parent)
-                Files.writeString(file, content)
-            },
-            contributed = MutableStateFlow(emptyList()),
-            translations = words,
-            scope       = scope,
-        )
+
+        /** The themes module's manager, made the way the host makes it, over the domains above. */
+        val themes: ThemeManager = hostThemeManager(dir, domains, words, scope, preferences::write)
 
         val application: KoinApplication = koinApplication {
             modules(
@@ -479,7 +494,7 @@ class CoreKeysTest {
                     single<PacksHost> { ClientPacksHost({}, indications, reporter, scope) }
                     single<AccountsHost> { ClientAccountsHost(reporter, preferences, CertificateTrustGate(Grants()), "smartycraft.example") }
                     single { console }
-                    single { appearance }
+                    single { themes }
                     single<SettingsStores> { domains }
                     single { words }
                     single {
@@ -513,7 +528,18 @@ class CoreKeysTest {
         fun drain() = runBlocking {
             withTimeout(5.seconds) { app.coroutineScope.coroutineContext.job.children.toList().forEach { it.join() } }
         }
+
+        /** What only the host tells the themes module, reached the way the host reaches it. */
+        val inputs: ThemeInputs get() = assertNotNull(app.launcherServices.find(ThemeInputs::class), "the host cannot reach the theme inputs")
+
+        /** The launcher's former settings file as it is now, once every save asked for has landed. */
+        fun legacy(): SettingsData {
+            preferences.drain(5.seconds)
+            return legacyJson.decodeFromString(SettingsData.serializer(), Files.readString(dir.resolve(Storage.SETTINGS_FILE)))
+        }
     }
+
+    private val legacyJson = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
     /** A provider whose server is never reached, the way a network that is down answers a sign-in. */
     private class Unreachable : AuthProvider {
@@ -552,8 +578,14 @@ class CoreKeysTest {
 
     // ── Resolution ────────────────────────────────────────────────────
 
-    private val composed: List<SourceKey<*>> = listOf(
-        Sources.ThemeLibrary, Sources.DarkTheme, Sources.ThemeMode,
+    /** Every source the themes module brings. */
+    private val themeSources: List<SourceKey<*>> = listOf(
+        ThemesKeys.Settings, ThemesKeys.Active, ThemesKeys.Offered, ThemesKeys.Dark, ThemesKeys.Mode, ThemesKeys.SystemSchemeAvailable,
+    )
+
+    /** Every command the themes module brings. */
+    private val themeCommands: List<CommandKey<*>> = listOf(
+        ThemesKeys.UpdateSettings, ThemesKeys.Choose, ThemesKeys.SetDark, ThemesKeys.SetMode,
     )
 
     /** Every source the accounts module brings. */
@@ -570,20 +602,16 @@ class CoreKeysTest {
     )
 
     private val appWide: List<SourceKey<*>> = listOf(
-        Sources.SystemSchemeAvailable, PackKeys.Library, PackKeys.Launches,
+        PackKeys.Library, PackKeys.Launches,
         PackKeys.Launch, PackKeys.Installs, PackKeys.Updates, PackKeys.Operations, PackKeys.ReattachPreviews,
         Sources.ConsoleVisible, I18nKeys.Settings, I18nKeys.Language, I18nKeys.Languages,
-    ) + accountSources
-
-    private val composedCommands: List<CommandKey<*>> = listOf(
-        Commands.ApplyTheme, Commands.SetDarkTheme, Commands.SetThemeMode,
-    )
+    ) + accountSources + themeSources
 
     private val appCommands: List<CommandKey<*>> = listOf(
         PackKeys.LaunchPack, PackKeys.StopPack, PackKeys.InstallPack,
         PackKeys.DismissInstall, PackKeys.CancelInstall, PackKeys.UpdatePack, PackKeys.DeletePack, PackKeys.PreviewReattach,
         PackKeys.ReattachPack, Commands.SetConsoleVisible, I18nKeys.UpdateSettings,
-    ) + accountCommands
+    ) + accountCommands + themeCommands
 
     /** Every key the packs module brings, by id. */
     private val packIds: List<String> = listOf(
@@ -597,23 +625,22 @@ class CoreKeysTest {
     fun `every core key is made by a factory at its level and answers there with no shell drawn`() {
         val launcher = Launcher()
         val page = launcher.composition().child(ScopeLevel.Page)
-        (composed + appWide).forEach { key ->
+        appWide.forEach { key ->
             val declared = assertNotNull(launcher.app.declarationOf(key.id), "${key.id} is not declared")
             assertEquals(KeyOrigin.Factory, declared.origin, "${key.id} is not made by a factory")
             assertEquals(key.level, declared.level)
             assertNotNull(page.find(key), "${key.id} is not read from a page below its level")
             assertNotNull(launcher.app.sampleOf(key.id), "${key.id} has no sample to be shown on")
         }
-        composed.forEach { key -> assertNull(launcher.app.find(key), "${key.id} is the composition's and has no answer above it") }
         appWide.forEach { key -> assertNotNull(launcher.app.find(key), "${key.id} has no answer at the app") }
-        (composedCommands + appCommands).forEach { key ->
+        appCommands.forEach { key ->
             val declared = assertNotNull(launcher.app.declarationOf(key.id), "${key.id} is not declared")
             assertEquals(KeyOrigin.Factory, declared.origin, "${key.id} is not made by a factory")
             assertEquals(key.level, declared.level)
             assertNotNull(page.findCommand(key), "${key.id} is not fired from a page below its level")
         }
         assertEquals(listOf(pack.toPackView()), launcher.source(page, PackKeys.Library))
-        assertSame(launcher.appearance.library.value, launcher.source(page, Sources.ThemeLibrary))
+        assertSame(launcher.themes.active.value, launcher.source(page, ThemesKeys.Active))
         assertTrue(launcher.problems.reported.isEmpty(), "nothing failed: ${launcher.problems.reported}")
     }
 
@@ -1168,63 +1195,96 @@ class CoreKeysTest {
     // ── Appearance and console ────────────────────────────────────────
 
     @Test
-    fun `the appearance commands change the store every composition reads, and save it`() {
-        val launcher = Launcher(SettingsData(isDarkTheme = true, themeMode = ThemeMode.System, locale = "en"))
+    fun `the themes module's commands change the one choice every composition reads, and save it`() {
+        val launcher = Launcher(SettingsData(isDarkTheme = true, themeMode = ThemeMode.System.name, locale = "en"))
         val composition = launcher.composition()
         val other = launcher.composition()
         val theme = Themes.all.last().id
 
-        launcher.fire(composition, Commands.ApplyTheme, theme)
-        assertEquals(theme, launcher.source(other, Sources.ThemeLibrary).selected, "another composition reads the same store")
+        launcher.fire(composition, ThemesKeys.Choose, theme)
+        assertEquals(theme, launcher.source(other, ThemesKeys.Active).id, "another composition reads the same choice")
+        assertEquals(theme, launcher.source(other, ThemesKeys.Settings).theme)
 
-        launcher.fire(composition, Commands.SetDarkTheme, false)
-        assertFalse(launcher.source(other, Sources.DarkTheme))
-        assertEquals(ThemeMode.Manual, launcher.source(other, Sources.ThemeMode), "a choice made by hand takes the scheme back from the system")
+        launcher.fire(composition, ThemesKeys.SetDark, false)
+        assertFalse(launcher.source(other, ThemesKeys.Dark))
+        assertEquals(ThemeMode.Manual, launcher.source(other, ThemesKeys.Mode), "a choice made by hand takes the scheme back from the system")
 
-        launcher.fire(composition, Commands.SetThemeMode, ThemeMode.Wallpaper)
-        launcher.appearance.wallpaperLuminanceChanged(0.2f)
-        assertTrue(launcher.source(composition, Sources.DarkTheme), "a dark wallpaper turns the wallpaper mode dark")
-        assertEquals(ThemeMode.Wallpaper, launcher.source(composition, Sources.ThemeMode))
+        launcher.fire(composition, ThemesKeys.SetMode, ThemeMode.Wallpaper)
+        launcher.inputs.wallpaper(WallpaperTone(listOf(0xFF102030.toInt()), avgLuminance = 0.2f))
+        assertTrue(launcher.source(composition, ThemesKeys.Dark), "a dark wallpaper turns the wallpaper mode dark")
+        assertEquals(ThemeMode.Wallpaper, launcher.source(composition, ThemesKeys.Mode))
 
         launcher.fire(launcher.app, I18nKeys.UpdateSettings, SettingsChange { it.copy(language = "de") })
         assertEquals("de", launcher.source(other, I18nKeys.Settings).language, "every composition reads the one choice")
         awaitTrue("the words follow it") { launcher.source(other, I18nKeys.Language).tag == "de" }
 
-        launcher.appearance.setSystemSchemeAvailable(true)
-        assertTrue(launcher.source(launcher.app, Sources.SystemSchemeAvailable))
+        launcher.inputs.systemScheme(SystemScheme(readable = true, dark = false))
+        assertTrue(launcher.source(launcher.app, ThemesKeys.SystemSchemeAvailable))
 
-        launcher.preferences.drain(5.seconds)
-        val saved = launcher.settings.current
-        assertTrue(saved.isDarkTheme)
-        assertEquals(ThemeMode.Wallpaper, saved.themeMode)
+        val saved = launcher.legacy()
+        assertTrue(saved.isDarkTheme, "the old file holds the scheme for a build from before the move")
+        assertEquals(ThemeMode.Wallpaper.name, saved.themeMode)
         assertTrue(saved.themeFromWallpaper)
-        assertEquals("en", saved.locale, "the language is the language module's, and the old file keeps what it had")
-        assertEquals("de", SettingsDomainFiles(dir.resolve(Storage.SETTINGS_DIR), dir.resolve(Storage.SETTINGS_FILE)).peek(I18nSettingsDomain).language)
-        assertTrue(dir.resolve("themes.json").exists())
-        assertEquals(theme, ThemeManager(dir) { _, _ -> }.load().selected, "the choice is in the theme file")
+        assertEquals("de", saved.locale, "and the language, mirrored the same way")
+        val domains = SettingsDomainFiles(dir.resolve(Storage.SETTINGS_DIR), dir.resolve(Storage.SETTINGS_FILE))
+        assertEquals("de", domains.peek(I18nSettingsDomain).language)
+        assertEquals(theme, domains.peek(ThemesSettingsDomain).theme, "the choice is the themes module's own")
+        assertEquals(theme, ThemeLibraryFile(dir) { _, _ -> }.load().library.selected, "and copied to the theme file for an older build")
     }
 
     // The test above changes the mode after the dark choice, and the mode writes the
     // scheme over whatever the choice saved.
     @Test
     fun `a dark or light choice made by hand is saved for the next start`() {
-        val launcher = Launcher(SettingsData(isDarkTheme = true, themeMode = ThemeMode.System, themeFromWallpaper = false))
-        launcher.fire(launcher.composition(), Commands.SetDarkTheme, false)
-        launcher.preferences.drain(5.seconds)
-        val saved = launcher.settings.current
+        val launcher = Launcher(SettingsData(isDarkTheme = true, themeMode = ThemeMode.System.name, themeFromWallpaper = false))
+        launcher.fire(launcher.composition(), ThemesKeys.SetDark, false)
+        val saved = launcher.legacy()
         assertFalse(saved.isDarkTheme)
-        assertEquals(ThemeMode.Manual, saved.themeMode)
+        assertEquals(ThemeMode.Manual.name, saved.themeMode)
         assertFalse(saved.themeFromWallpaper)
     }
 
     @Test
     fun `turning the wallpaper mode on applies the brightness the wallpaper last reported`() {
-        val launcher = Launcher(SettingsData(isDarkTheme = false, themeMode = ThemeMode.Manual))
+        val launcher = Launcher(SettingsData(isDarkTheme = false, themeMode = ThemeMode.Manual.name))
         val composition = launcher.composition()
-        launcher.appearance.wallpaperLuminanceChanged(0.2f)
-        assertFalse(launcher.source(composition, Sources.DarkTheme), "the person's own choice ignores the wallpaper")
-        launcher.fire(composition, Commands.SetThemeMode, ThemeMode.Wallpaper)
-        assertTrue(launcher.source(composition, Sources.DarkTheme), "the dark wallpaper it already knew decides at once")
+        launcher.inputs.wallpaper(WallpaperTone(listOf(0xFF102030.toInt()), avgLuminance = 0.2f))
+        assertFalse(launcher.source(composition, ThemesKeys.Dark), "the person's own choice ignores the wallpaper")
+        launcher.fire(composition, ThemesKeys.SetMode, ThemeMode.Wallpaper)
+        assertTrue(launcher.source(composition, ThemesKeys.Dark), "the dark wallpaper it already knew decides at once")
+    }
+
+    @Test
+    fun `what the wallpaper and the system say is the host's to tell, and a jar cannot reach it`() {
+        val launcher = Launcher()
+        val reached = SourceKey<Boolean>("probe.themeInputs")
+        val jar = object : KeyContribution {
+            override val id = "probe.keys"
+            override val label = "probe"
+            override fun declare(keys: ModuleKeys) {
+                keys.source(reached) { app -> flowSource(MutableStateFlow(app.services.find(ThemeInputs::class) != null)) }
+            }
+        }
+        val result = registerModuleKeys("probe", jar, launcher.data, launcher.commands, launcher.keys.services, trusted = false)
+        assertIs<ModuleKeysResult.Registered>(result)
+
+        assertFalse(launcher.source(launcher.app, reached), "a jar's code found the theme inputs")
+        assertNull(launcher.app.services.find(ThemeInputs::class), "nor does a widget's view of the level")
+        assertNotNull(launcher.app.launcherServices.find(ThemeInputs::class), "the host reaches them")
+    }
+
+    @Test
+    fun `a document that does not name the themes module has none of its keys, and the theme is still drawn`() {
+        val launcher = Launcher(withThemes = false, notified = true)
+        val page = launcher.composition().child(ScopeLevel.Page)
+        (themeSources.map { it.id } + themeCommands.map { it.id }).forEach { id ->
+            assertNull(launcher.app.declarationOf(id), "$id is declared without the module")
+        }
+        assertNull(page.find(ThemesKeys.Active))
+        assertNull(page.findCommand(ThemesKeys.Choose))
+        assertNull(launcher.app.launcherServices.find(ThemeInputs::class), "nor the inputs the module keeps for the host")
+        assertEquals(Themes.default, launcher.themes.active.value, "the host draws with the manager all the same")
+        assertTrue(launcher.center.groups.value.isEmpty(), "a module left out is not a part that failed: ${launcher.center.groups.value}")
     }
 
     @Test
@@ -1260,7 +1320,7 @@ class CoreKeysTest {
                         ChildLevel(ScopeLevel.Composition) {
                             packs = rememberScopedSource(PackKeys.Library).valueOrNull()
                             session = rememberScopedSource(AccountKeys.Session).valueOrNull()
-                            dark = rememberScopedSource(Sources.DarkTheme).valueOrNull()
+                            dark = rememberScopedSource(ThemesKeys.Dark).valueOrNull()
                             launch = rememberScopedCommand(PackKeys.LaunchPack)
                             // The plain app read, which a command a factory makes answers too.
                             stop = rememberCommand(PackKeys.StopPack)

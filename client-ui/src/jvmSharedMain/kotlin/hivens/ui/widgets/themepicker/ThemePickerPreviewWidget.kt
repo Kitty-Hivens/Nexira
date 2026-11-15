@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import hivens.themes.api.ThemesKeys
 import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
@@ -27,7 +28,6 @@ import hivens.ui.surface.NxCard
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxTheme
-import hivens.ui.widgets.Sources
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
 import hivens.widget.model.Widget
@@ -47,11 +47,11 @@ import androidx.compose.ui.graphics.Color
     minWidth = 240, minHeight = 300,
     prefWidth = 320, prefHeight = 432,
     maxWidth = 720, maxHeight = 760,
-    needs = ["theme.dark", "theme.picker.selection"],
+    needs = [ThemesKeys.DARK_ID, "theme.picker.selection"],
 )
 @Composable
 fun ThemePickerPreviewWidget() {
-    val dark = rememberScopedSource(Sources.DarkTheme).valueOrNull() ?: return
+    val dark = rememberScopedSource(ThemesKeys.Dark).valueOrNull() ?: return
     val selection = rememberScopedSource(ThemeSelectionSource).valueOrNull() ?: return
     val s = nexiraStrings()
     val theme = selection.theme

@@ -14,6 +14,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import hivens.i18n.api.LocalTranslator
+import hivens.themes.Themes
 import hivens.ui.audio.PlaybackState
 import hivens.ui.audio.RepeatMode
 import hivens.ui.audio.TrackInfo
@@ -68,7 +69,7 @@ class PlaybackWidgetsRenderTest {
             height  = (height * scale).toInt(),
             density = Density(scale),
         ) {
-            NxTheme(dark = dark) {
+            NxTheme(Themes.default, dark = dark) {
                 CompositionLocalProvider(
                     LocalTranslator provides NexiraStrings.translator("en"),
                 ) {

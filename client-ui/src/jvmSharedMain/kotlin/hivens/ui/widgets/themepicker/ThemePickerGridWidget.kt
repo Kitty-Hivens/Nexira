@@ -31,6 +31,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import hivens.themes.api.ThemesKeys
 import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
@@ -44,7 +45,6 @@ import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.Theme
-import hivens.ui.widgets.Sources
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
 import hivens.widget.model.Widget
@@ -63,12 +63,12 @@ import hivens.widget.model.Widget
     drawsOwnSurface = true,
     minWidth = 260, minHeight = 220,
     maxWidth = 960, maxHeight = 1600,
-    needs = ["theme.library", "theme.dark", "theme.picker.selection"],
+    needs = [ThemesKeys.OFFERED_ID, ThemesKeys.DARK_ID, "theme.picker.selection"],
 )
 @Composable
 fun ThemePickerGridWidget() {
-    val library = rememberScopedSource(Sources.ThemeLibrary).valueOrNull() ?: return
-    val dark = rememberScopedSource(Sources.DarkTheme).valueOrNull() ?: return
+    val themes = rememberScopedSource(ThemesKeys.Offered).valueOrNull() ?: return
+    val dark = rememberScopedSource(ThemesKeys.Dark).valueOrNull() ?: return
     val selection = rememberScopedSource(ThemeSelectionSource).valueOrNull() ?: return
     val selected = selection.theme
 
@@ -79,7 +79,7 @@ fun ThemePickerGridWidget() {
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalArrangement   = Arrangement.spacedBy(16.dp),
         ) {
-            items(library.all, key = { it.id }) { theme ->
+            items(themes, key = { it.id }) { theme ->
                 ThemeCard(
                     theme      = theme,
                     dark       = dark,

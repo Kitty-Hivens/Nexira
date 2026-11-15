@@ -52,7 +52,15 @@ class WidgetModulesTest {
         json      = json,
         builtIn   = GeneratedWidgetRegistry,
         scope     = scope,
-        host      = DesktopWidgetModuleHost(folder, shadowDir = tmp.resolve("shadow")),
+        // As the launcher reads the folder: the module APIs it carries offered, and the kinds
+        // of contribution their modules take read beside the kernel's.
+        host      = DesktopWidgetModuleHost(
+            directory         = folder,
+            shadowDir         = tmp.resolve("shadow"),
+            offered           = offeredApis(),
+            apiPackages       = offeredApiPackages(),
+            contributionKinds = offeredContributionKinds(),
+        ),
     )
 
     private fun install() = fixtureJar.copyTo(folder.resolve("fixture.jar"), overwrite = true)

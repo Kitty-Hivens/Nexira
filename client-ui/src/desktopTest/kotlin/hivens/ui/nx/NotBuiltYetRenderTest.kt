@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import hivens.i18n.api.LocalTranslator
+import hivens.themes.Themes
 import hivens.ui.i18n.NexiraStrings
 import hivens.ui.i18n.nexiraStrings
 import hivens.ui.surface.NxSurface
@@ -40,7 +41,7 @@ class NotBuiltYetRenderTest {
         val out = Path.of("build/render", "not-built-yet.png")
         Files.createDirectories(out.parent)
         val scene = ImageComposeScene(760, 620, density = Density(1f)) {
-            NxTheme(dark = true) {
+            NxTheme(Themes.default, dark = true) {
                 CompositionLocalProvider(LocalTranslator provides NexiraStrings.translator("ru")) {
                     val s = nexiraStrings()
                     Box(Modifier.fillMaxSize().background(NxColor.page).padding(16.dp)) {

@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import hivens.i18n.api.LocalTranslator
+import hivens.themes.Themes
 import hivens.ui.i18n.NexiraStrings
 import hivens.ui.theme.NxTheme
 import org.jetbrains.skia.Bitmap
@@ -66,7 +67,7 @@ class ConfirmCodeCellsRenderTest {
         val scene = ImageComposeScene(width = width, height = height, density = Density(1f)) {
             // The real theme entry point rather than a hand-provided palette, so the
             // sheet shows what the app resolves, tonal ladder included.
-            NxTheme(dark = dark) {
+            NxTheme(Themes.default, dark = dark) {
                 CompositionLocalProvider(
                     LocalTranslator provides NexiraStrings.translator("en"),
                 ) {

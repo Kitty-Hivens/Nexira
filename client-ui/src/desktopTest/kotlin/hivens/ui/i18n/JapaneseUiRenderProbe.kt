@@ -20,6 +20,7 @@ import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Density
+import hivens.themes.Themes
 import hivens.ui.i18n.NexiraStrings
 import hivens.ui.i18n.ShippedLanguageProvider
 import hivens.ui.i18n.nexiraStrings
@@ -83,7 +84,7 @@ class JapaneseUiRenderProbe {
                 } else {
                     nexiraCjkFamily()
                 }
-                NxTheme(dark = true, uiFamily = family) {
+                NxTheme(Themes.default, dark = true, uiFamily = family) {
                     Box(
                         Modifier.fillMaxSize().background(NxColor.page).padding(Spacing.s16),
                         contentAlignment = Alignment.Center,

@@ -2,9 +2,10 @@ package hivens.ui.bootstrap
 
 import hivens.config.Storage
 import hivens.core.data.SettingsData
-import hivens.core.data.ThemeMode
-import hivens.core.data.resolveInitialThemeMode
+import hivens.themes.ThemesSettingsDomain
+import hivens.themes.api.ThemeMode
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonObject
 import java.nio.file.Files
 import java.nio.file.Path
@@ -38,6 +39,12 @@ class FirstRunDefaultsTest {
     private val json = Json { ignoreUnknownKeys = true }
     private fun readSettings() = json.decodeFromString<SettingsData>(Files.readString(settings()))
 
+    private val complete = Json { encodeDefaults = true }
+
+    /** The mode the themes module takes from what the settings file holds, as it does while it has no file of its own. */
+    private fun modeOf(settings: SettingsData): ThemeMode? =
+        ThemesSettingsDomain.imported(complete.encodeToJsonElement(settings).jsonObject, current = null)?.mode
+
     @Test
     fun `a translated system language wins, regardless of region`() {
         assertEquals("ru", FirstRunDefaults.supportedLocaleTag(Locale.forLanguageTag("ru-RU")))
@@ -61,7 +68,7 @@ class FirstRunDefaultsTest {
         assertTrue(seeded.isDarkTheme)
         // System mode is what hands the choice to the OS scheme; anything else
         // keeps the seeded value until the user picks a mode themselves.
-        assertNotEquals(ThemeMode.System, resolveInitialThemeMode(seeded))
+        assertNotEquals(ThemeMode.System, modeOf(seeded))
     }
 
     @Test
@@ -71,7 +78,7 @@ class FirstRunDefaultsTest {
         val settings = readSettings()
         assertEquals("ru", settings.locale)
         assertTrue(settings.isDarkTheme)
-        assertNotEquals(ThemeMode.System, resolveInitialThemeMode(settings))
+        assertNotEquals(ThemeMode.System, modeOf(settings))
     }
 
     @Test

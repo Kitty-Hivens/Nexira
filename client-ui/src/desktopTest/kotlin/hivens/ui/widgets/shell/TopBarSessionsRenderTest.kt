@@ -11,6 +11,7 @@ import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import hivens.themes.Themes
 import hivens.ui.host.HostKoin
 import hivens.ui.i18n.ShippedLanguageProvider
 import hivens.ui.notifications.SessionRegistry
@@ -61,7 +62,7 @@ class TopBarSessionsRenderTest {
         val scene = ImageComposeScene((720 * d).toInt(), (44 * d).toInt(), density = Density(d)) {
             HostKoin(app) {
                 ShippedLanguageProvider("ru") {
-                    NxTheme(dark = true) {
+                    NxTheme(Themes.default, dark = true) {
                         Box(
                             Modifier.fillMaxSize().background(NxColor.page),
                             contentAlignment = Alignment.CenterEnd,

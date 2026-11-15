@@ -102,12 +102,13 @@ These always come from the launcher, and a copy in your jar is ignored. That is 
 To use another module's API, for example the packs, the accounts, the catalogue or the language module, name it in the manifest beside the other attributes:
 
 ```kotlin
-"Nexira-Module-Requires" to "nexira.i18n=1.0, nexira.packs=1.0, nexira.accounts=1.0, nexira.catalogue=1.0",
+"Nexira-Module-Requires" to "nexira.i18n=1.0, nexira.themes=1.0, nexira.packs=1.0, nexira.accounts=1.0, nexira.catalogue=1.0",
 ```
 
 | API id             | Artifact         | Package                | What it is for                                              |
 |--------------------|------------------|------------------------|-------------------------------------------------------------|
 | `nexira.i18n`      | `:i18n-api`      | `hivens.i18n.api`      | Looking words up, the language in use, the language setting |
+| `nexira.themes`    | `:themes-api`    | `hivens.themes.api`    | The theme in use, the choice, and bringing a theme          |
 | `nexira.packs`     | `:packs-api`     | `hivens.packs.api`     | Listing, launching, installing and updating packs           |
 | `nexira.accounts`  | `:accounts-api`  | `hivens.accounts.api`  | Who is signed in, the stored accounts, signing in and out   |
 | `nexira.catalogue` | `:catalogue-api` | `hivens.catalogue.api` | Searching the catalogue and putting a project into a pack   |
@@ -194,7 +195,41 @@ class MyKeys : KeyContribution {
 
 A widget reads `rememberScopedSource(ClockKeys.Settings)` and changes it by firing `ClockKeys.Update` with `SettingsChange { it.copy(seconds = true) }`. A service of the module reads the same value through `context.services.get<SettingsStores>().of(ClockDomain)`.
 
-The launcher applies changes one at a time and writes the file whole. Where the file is absent or cannot be read, the module gets its defaults, or what `imported` takes from the launcher's former single settings file for a domain that was kept there before. Nothing is written for that, so it is asked again at every start until the first change is saved. A domain that was kept there can name, in `mirrored`, the fields an older build reads, and the launcher writes them there with every change, so going back to an older build keeps the choice, and a choice made there is taken back on the way up again. A file written by a newer build of the module, with a higher `schema` than the domain declares, is read as far as it can be and never written. A domain id is the module's for good, since the file is named by it, and a domain id another module already declared keeps your module's keys out entirely.
+The launcher applies changes one at a time and writes the file whole. Where the file is absent or cannot be read, the module gets its defaults, or what `imported` takes from the launcher's former single settings file for a domain that was kept there before. Nothing is written for that, so it is asked again at every start until the first change is saved. A domain that was kept there can name, in `mirrored`, the fields an older build reads, and the launcher writes them there with every change, so going back to an older build keeps the choice, and a choice made there is taken back on the way up again. Taking it back, `imported` is handed the value the domain holds as `current`, and lays the former file's fields over it, so a field that file never held is kept. A file written by a newer build of the module, with a higher `schema` than the domain declares, is read as far as it can be and never written. A domain id is the module's for good, since the file is named by it, and a domain id another module already declared keeps your module's keys out entirely.
+
+## Themes
+
+A theme is drawn by the design system, `nx-ui`, and kept and chosen by the themes module. To bring one, name `nexira.themes` in the manifest, compile against `:themes-api`, and implement `ThemeContribution`:
+
+```kotlin
+class Dusk : ThemeContribution {
+    override val id = "dusk"
+    override val label = "dusk"                 // a key into your words: dusk=Dusk
+    override val dark = ThemeScheme(
+        steps = listOf(Color(0xFF16121F), Color(0xFF201A2C), Color(0xFF2A2338)),
+        colors = listOf(Color(0xFFE88AA8), Color(0xFF8AC6E8)),
+    )
+}
+```
+
+and list it in `META-INF/services/hivens.themes.api.ThemeContribution`. The steps are the ladder from the page outward and the colours the theme's own in order of emphasis. Give `inks` to set the text yourself, a main and a quiet one, or leave them out to read in the launcher's. Without a `light` scheme the theme stays dark when the person asks for light. It joins the picker as your module's id, a slash, then its own id, so it cannot take the place of another theme. A person who chose it keeps that choice while your module is off or gone, and the launcher draws its default theme meanwhile.
+
+A jar that carries a theme without naming `nexira.themes` cannot see the interface it implements. The launcher refuses it before loading any of its classes, and the log says to name `nexira.themes` in `Nexira-Module-Requires`.
+
+To read the theme the launcher is drawn in, or to change it, use `ThemesKeys`: `Active` is the theme drawn now, `Offered` every theme on offer, `Dark` and `Mode` whether it is dark and what decides that, and `Choose`, `SetDark` and `SetMode` change them. What the wallpaper shows and what the system's scheme says are told to the themes module by the launcher alone, and a module cannot tell it either.
+
+```kotlin
+@Composable
+fun ThemeCount() {
+    val offered = rememberScopedSource(ThemesKeys.Offered).valueOrNull() ?: return
+    val choose = rememberScopedCommand(ThemesKeys.Choose) ?: return
+    Text("${offered.size} themes", Modifier.clickable { choose(offered.random().id) })
+}
+```
+
+:::note[Moving from earlier launchers]
+`ThemeContribution` and `ThemeScheme` were in the widget kernel, `hivens.widget.api`. They are the themes module's now, in `hivens.themes.api`, with the same members. Change the imports, rename the service file to `META-INF/services/hivens.themes.api.ThemeContribution`, and name `nexira.themes` in the manifest.
+:::
 
 ## Installing while you work
 

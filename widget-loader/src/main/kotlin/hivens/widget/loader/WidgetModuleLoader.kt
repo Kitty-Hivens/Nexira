@@ -156,6 +156,13 @@ data class WidgetModuleScan(
  * packages here is refused, since it would load and fail on the first class it names.
  *
  * [sharedArtifacts] is the artifacts shared class by class, read off [parent].
+ *
+ * [contributionKinds] is the kinds of contribution read out of each jar: the kernel's own
+ * ([ModuleContribution.kinds]) and the ones the APIs of the modules compiled into the
+ * launcher declare, a theme the themes module takes say. Such a kind lives in its API's
+ * package, so only a jar that names the API sees it, and a jar that carries one without
+ * naming the API is refused before any of its classes loads, with a reason that says to name
+ * the API.
  */
 class WidgetModuleLoader(
     private val directory: Path,
@@ -257,6 +264,7 @@ class WidgetModuleLoader(
         val requiresText = attributes.getValue(WidgetApi.MANIFEST_REQUIRES)
         requirementFault(requiresText)?.let { return RejectedWidgetModule(jar, it) }
         val requires = requiresText?.let { ApiVersion.parseAll(it) }.orEmpty()
+        unnamedApiFault(jar, requires.keys)?.let { return RejectedWidgetModule(jar, it) }
 
         val opened = runCatching { shadowCopy(jar) }.getOrElse {
             return RejectedWidgetModule(jar, "could not be copied aside to load: ${it.message}")
@@ -399,6 +407,31 @@ class WidgetModuleLoader(
         return null
     }
 
+    /**
+     * Why a jar that carries services of a kind of contribution a module API declares, without
+     * naming that API in [required], cannot work, or null when it names every such API. Read off
+     * the jar's service files before any of its classes is loaded, so the reason says what to
+     * change in the manifest rather than which class could not be linked. A jar that cannot be
+     * listed is left to the reads that follow, which refuse it with their own reason.
+     */
+    private fun unnamedApiFault(jar: Path, required: Set<String>): String? {
+        val owners = contributionKinds.mapNotNull { kind -> apiOwning(kind)?.let { kind to it } }
+        if (owners.isEmpty()) return null
+        val services = runCatching {
+            JarFile(jar.toFile()).use { file ->
+                file.entries().asSequence().map { it.name }.filter { it.startsWith(SERVICES_DIR) }.map { it.removePrefix(SERVICES_DIR) }.toSet()
+            }
+        }.getOrElse { return null }
+        val (kind, api) = owners.firstOrNull { (kind, api) -> kind.name in services && api !in required } ?: return null
+        return "carries ${kind.simpleName} services, which come from the module API '$api': name $api in ${WidgetApi.MANIFEST_REQUIRES}"
+    }
+
+    /** The module API whose packages hold [kind], or null for a kind of the kernel's own. */
+    private fun apiOwning(kind: Class<*>): String? {
+        val pkg = kind.packageName
+        return apiPackages.entries.firstOrNull { (_, packages) -> packages.any { pkg == it || pkg.startsWith("$it.") } }?.key
+    }
+
     /** Runs [block] with [loader] as this thread's context class loader, and puts the one before back. */
     private inline fun <T> withContextLoader(loader: ClassLoader, block: () -> T): T {
         val thread = Thread.currentThread()
@@ -524,6 +557,8 @@ class WidgetModuleLoader(
          * whose packages the launcher's own interface also uses.
          */
         val SHARED_ARTIFACTS: List<String> = listOf("nx-ui")
+
+        private const val SERVICES_DIR = "META-INF/services/"
 
         private val STRINGS_FILE = Regex("""i18n/([A-Za-z][A-Za-z0-9_-]*)\.properties""")
 

@@ -20,6 +20,7 @@ import hivens.core.activity.ActivityAction
 import hivens.core.activity.ActivityKind
 import hivens.core.activity.ActivityPhase
 import hivens.i18n.api.LocalTranslator
+import hivens.themes.Themes
 import hivens.ui.i18n.NexiraStrings
 import hivens.ui.theme.NxTheme
 import org.jetbrains.skia.Bitmap
@@ -104,7 +105,7 @@ class ActivityPillRenderTest {
         ) {
             // The real theme entry point rather than a hand-provided palette: what
             // the sheet shows is then what the app resolves, tonal ladder included.
-            NxTheme(dark = dark) {
+            NxTheme(Themes.default, dark = dark) {
                 CompositionLocalProvider(
                     LocalTranslator provides NexiraStrings.translator("en"),
                 ) {

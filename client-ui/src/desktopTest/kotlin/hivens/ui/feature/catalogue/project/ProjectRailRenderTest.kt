@@ -30,6 +30,7 @@ import hivens.catalogue.api.groupGameVersions
 import hivens.core.api.dto.modrinth.ModrinthDisclosures
 import hivens.core.api.dto.modrinth.ModrinthGameVersion
 import hivens.core.api.dto.modrinth.ModrinthProject
+import hivens.themes.Themes
 import hivens.ui.feature.catalogue.links
 import hivens.ui.feature.catalogue.toTags
 import hivens.ui.feature.catalogue.toView
@@ -191,7 +192,7 @@ class ProjectRailRenderTest {
         Files.createDirectories(out.parent)
         val projects = slugs.map(::open)
         val scene = ImageComposeScene(300 * slugs.size + 40 * (slugs.size + 1), 1200, density = Density(1f)) {
-            NxTheme(dark = dark) {
+            NxTheme(Themes.default, dark = dark) {
                 Box(Modifier.fillMaxSize().background(NxColor.page)) {
                     Row(
                         modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp),

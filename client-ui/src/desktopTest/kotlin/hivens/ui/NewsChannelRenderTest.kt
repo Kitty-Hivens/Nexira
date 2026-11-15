@@ -19,6 +19,7 @@ import hivens.core.data.NewsOrder
 import hivens.core.data.NewsPage
 import hivens.launcher.network.ServerProtocolConfig
 import hivens.launcher.news.CuratedNewsFeed
+import hivens.themes.Themes
 import hivens.ui.host.HostKoin
 import hivens.ui.i18n.ShippedLanguageProvider
 import hivens.ui.theme.NxTheme
@@ -72,7 +73,7 @@ class NewsChannelRenderTest {
         val scene = ImageComposeScene((320 * d).toInt(), (300 * d).toInt(), density = Density(d)) {
             HostKoin(koin) {
                 ShippedLanguageProvider("ru") {
-                    NxTheme(dark = dark) {
+                    NxTheme(Themes.default, dark = dark) {
                         Box(
                             Modifier.fillMaxSize().background(NxColor.page).padding(Spacing.s8),
                             contentAlignment = Alignment.TopStart,

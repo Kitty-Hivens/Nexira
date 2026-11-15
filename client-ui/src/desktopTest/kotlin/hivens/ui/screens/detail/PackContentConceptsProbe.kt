@@ -33,6 +33,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import hivens.themes.Themes
 import hivens.ui.effects.pixelArtBackground
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
@@ -345,7 +346,7 @@ class PackContentConceptsProbe {
         Files.createDirectories(out.parent)
         val wall = wallpaper()
         val scene = ImageComposeScene(width, height, density = Density(1f)) {
-            NxTheme(dark = true) { content(wall) }
+            NxTheme(Themes.default, dark = true) { content(wall) }
         }
         val png = try {
             val t = scene.settle(frames = 12)

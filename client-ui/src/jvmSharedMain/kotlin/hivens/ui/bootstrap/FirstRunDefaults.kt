@@ -2,9 +2,9 @@ package hivens.ui.bootstrap
 
 import hivens.config.Storage
 import hivens.core.data.SettingsData
-import hivens.core.data.ThemeMode
 import hivens.core.io.AtomicFiles
 import hivens.i18n.ShippedLanguages
+import hivens.themes.api.ThemeMode
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.encodeToJsonElement
@@ -74,7 +74,8 @@ object FirstRunDefaults {
     /**
      * What a first launch gets: the machine's own language where the launcher
      * speaks it, and dark. The language module takes the language from here for
-     * as long as it has no settings file of its own.
+     * as long as it has no settings file of its own, and the themes module the
+     * mode and the dark flag the same way.
      *
      * Dark as a mode of its own rather than [ThemeMode.System], which would hand
      * the decision to the desktop. A launcher is opened to start a game, most
@@ -86,7 +87,7 @@ object FirstRunDefaults {
     internal fun firstRunSettings(systemLocale: Locale): SettingsData = SettingsData(
         locale = supportedLocaleTag(systemLocale),
         isDarkTheme = true,
-        themeMode = ThemeMode.Manual,
+        themeMode = ThemeMode.Manual.name,
     )
 
     /**

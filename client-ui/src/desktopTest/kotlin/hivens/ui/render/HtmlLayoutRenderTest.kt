@@ -10,6 +10,7 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Density
+import hivens.themes.Themes
 import hivens.ui.FRAME_NANOS
 import hivens.ui.theme.NxTheme
 import org.jetbrains.skia.Bitmap
@@ -65,7 +66,7 @@ class HtmlLayoutRenderTest {
         val out = Path.of("build/render", name)
         Files.createDirectories(out.parent)
         val scene = ImageComposeScene(width, height, density = Density(1f)) {
-            NxTheme(dark = true) {
+            NxTheme(Themes.default, dark = true) {
                 Box(Modifier.fillMaxSize().background(NxColor.page).verticalScroll(rememberScrollState())) {
                     HtmlBody(html, Modifier.fillMaxWidth(), onLink = {})
                 }

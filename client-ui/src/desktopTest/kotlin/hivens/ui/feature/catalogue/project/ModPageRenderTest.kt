@@ -39,6 +39,7 @@ import hivens.core.api.dto.modrinth.ModrinthProject
 import hivens.core.api.dto.modrinth.ModrinthVersion
 import hivens.launcher.content.ContentKind
 import hivens.launcher.instance.loadersFor
+import hivens.themes.Themes
 import hivens.ui.components.ImageGallery
 import hivens.ui.components.galleryMedia
 import hivens.ui.feature.catalogue.links
@@ -277,7 +278,7 @@ class ModPageRenderTest {
         val out = Path.of("build/render", name)
         Files.createDirectories(out.parent)
         val png = renderOnEdt(1500, 1000) {
-            NxTheme(dark = true) { Screen(slug, local) }
+            NxTheme(Themes.default, dark = true) { Screen(slug, local) }
         }
         Files.write(out, png.bytes)
         assertTrue(png.bytes.size > 40_000, "$name drew almost nothing (${png.bytes.size} bytes)")
@@ -347,7 +348,7 @@ class ModPageRenderTest {
         )
 
         val png = renderOnEdt(width, 700) {
-            NxTheme(dark = true) {
+            NxTheme(Themes.default, dark = true) {
                 Box(Modifier.fillMaxSize().background(NxColor.page).padding(14.dp)) {
                     NxSurface(kind = SurfaceKind.Card, modifier = Modifier.fillMaxSize()) {
                         VersionsPane(pageState, onOpenVersion = {}, onReload = {}, modifier = Modifier.fillMaxSize())
@@ -375,7 +376,7 @@ class ModPageRenderTest {
         )
 
         val png = renderOnEdt(900, 760) {
-            NxTheme(dark = true) {
+            NxTheme(Themes.default, dark = true) {
                 Box(Modifier.fillMaxSize().background(NxColor.page).padding(14.dp)) {
                     NxSurface(kind = SurfaceKind.Card, modifier = Modifier.fillMaxSize()) {
                         ChangelogPane(pageState, onReload = {}, modifier = Modifier.fillMaxSize())
@@ -402,7 +403,7 @@ class ModPageRenderTest {
         assertTrue(media.isNotEmpty(), "the fixture carries no gallery to draw")
 
         val png = renderOnEdt(1000, 760) {
-            NxTheme(dark = true) {
+            NxTheme(Themes.default, dark = true) {
                 Box(Modifier.fillMaxSize().background(NxColor.page).padding(14.dp)) {
                     NxSurface(kind = SurfaceKind.Card, modifier = Modifier.fillMaxSize()) {
                         Box(Modifier.fillMaxSize().padding(16.dp)) {

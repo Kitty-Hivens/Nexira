@@ -40,6 +40,7 @@ import hivens.ui.layers.DismissOnBack
 import hivens.ui.layers.LayerHost
 import hivens.ui.layers.WindowLayers
 import hivens.ui.theme.NxTheme
+import hivens.ui.theme.TestTheme
 import org.jetbrains.skia.Bitmap
 import javax.swing.SwingUtilities
 import kotlin.math.abs
@@ -236,7 +237,7 @@ class NxLayersTest {
     fun `a dialog outside any layer host still covers the window and blocks what is under it`() = onEventThread {
         var behind = 0
         val scene = ImageComposeScene(width = 400, height = 400, density = Density(1f)) {
-            NxTheme(dark = true) {
+            NxTheme(TestTheme, dark = true) {
                 Box(Modifier.fillMaxSize().background(Color.Black)) {
                     Box(Modifier.size(80.dp).clickable { behind++ })
                     NxDialog(onDismissRequest = null) { Box(Modifier.size(100.dp).background(DIALOG_INK)) }
@@ -439,7 +440,7 @@ private fun onEventThread(body: () -> Unit) {
 private class LayersWindow(content: @Composable () -> Unit) : AutoCloseable {
     val layers = WindowLayers()
     private val scene = ImageComposeScene(width = 400, height = 400, density = Density(1f)) {
-        NxTheme(dark = true) {
+        NxTheme(TestTheme, dark = true) {
             LayerHost(layers, Modifier.fillMaxSize()) {
                 Box(Modifier.fillMaxSize().background(Color.Black)) { content() }
             }

@@ -4,6 +4,7 @@ import hivens.accounts.api.AccountsApi
 import hivens.catalogue.api.CatalogueApi
 import hivens.i18n.api.I18nApi
 import hivens.packs.api.PacksApi
+import hivens.themes.api.ThemesApi
 import hivens.ui.HostKeys
 import hivens.ui.background.BackgroundSettings
 import hivens.ui.editor.EditorSurfaces
@@ -69,13 +70,14 @@ class KeyDeclarationDriftTest {
     }
 
     @Test
-    fun `the bundled document names the language, packs, accounts and catalogue modules, so a fresh install has their keys`() {
-        assertEquals(listOf(I18nApi.ID, PacksApi.ID, AccountsApi.ID, CatalogueApi.ID), DefaultLayout.modules())
+    fun `the bundled document names the language, themes, packs, accounts and catalogue modules, so a fresh install has their keys`() {
+        assertEquals(listOf(I18nApi.ID, ThemesApi.ID, PacksApi.ID, AccountsApi.ID, CatalogueApi.ID), DefaultLayout.modules())
         assertEquals(null, DefaultLayout.load().modules, "the bundled graph itself names none, so nothing written from it freezes the list")
         assertTrue(CompiledModules.any { it.id == PacksApi.ID }, "and the build carries the packs module")
         assertTrue(CompiledModules.any { it.id == AccountsApi.ID }, "and the accounts module")
         assertTrue(CompiledModules.any { it.id == CatalogueApi.ID }, "and the catalogue module")
         assertTrue(CompiledModules.any { it.id == I18nApi.ID }, "and the language module")
+        assertTrue(CompiledModules.any { it.id == ThemesApi.ID }, "and the themes module")
     }
 
     @Test

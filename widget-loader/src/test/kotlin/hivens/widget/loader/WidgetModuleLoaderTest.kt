@@ -1,13 +1,15 @@
 package hivens.widget.loader
 
 import androidx.compose.runtime.Composer
+import hivens.themes.api.ThemeContribution
+import hivens.themes.api.ThemesApi
 import hivens.widget.api.ContributedServices
 import hivens.widget.api.HostApi
 import hivens.widget.api.KeyContribution
+import hivens.widget.api.ModuleContribution
 import hivens.widget.api.ModuleKeysResult
 import hivens.widget.api.ModuleValues
 import hivens.widget.api.ScreenEffect
-import hivens.widget.api.ThemeContribution
 import hivens.widget.api.WidgetApi
 import hivens.widget.api.WidgetCommandRegistry
 import hivens.widget.api.WidgetDataRegistry
@@ -71,6 +73,20 @@ class WidgetModuleLoaderTest {
             walk.sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) }
         }
     }
+
+    /**
+     * Scans as a launcher that carries the themes module does: its API offered and shown by its
+     * own package, and its kind of contribution read beside the kernel's [kinds].
+     */
+    private fun themesScan(
+        kinds: List<Class<out ModuleContribution>> = ModuleContribution.kinds + ThemeContribution::class.java,
+    ): WidgetModuleScan =
+        WidgetModuleLoader(
+            modules,
+            contributionKinds = kinds,
+            offered = mapOf(ThemesApi.ID to ThemesApi.VERSION),
+            apiPackages = mapOf(ThemesApi.ID to setOf(ThemesApi::class.java.name.substringBeforeLast('.'))),
+        ).scan().also { opened += it.loaded }
 
     /** Scans, remembering what it opened, with each API [offered] sharing a package of its own. */
     private fun scan(dir: Path = modules, offered: Map<String, ApiVersion> = emptyMap()): WidgetModuleScan =
@@ -289,17 +305,50 @@ class WidgetModuleLoaderTest {
         val module = scan().loaded.single()
 
         assertEquals(listOf("fixture.effect"), module.contributions.filterIsInstance<ScreenEffect>().map { it.id })
-        assertEquals(listOf("fixture.theme"), module.contributions.filterIsInstance<ThemeContribution>().map { it.id })
+        assertEquals(listOf("fixture.keys"), module.contributions.filterIsInstance<KeyContribution>().map { it.id })
     }
 
     @Test
     fun `a kind the host did not ask for is not read`() {
         install("good.jar")
 
-        val module = WidgetModuleLoader(modules, contributionKinds = listOf(ThemeContribution::class.java)).scan()
+        val module = WidgetModuleLoader(modules, contributionKinds = listOf(ScreenEffect::class.java)).scan()
             .also { opened += it.loaded }.loaded.single()
 
-        assertEquals(listOf("fixture.theme"), module.contributions.map { it.id })
+        assertEquals(listOf("fixture.effect"), module.contributions.map { it.id })
+    }
+
+    @Test
+    fun `a kind a module API declares is read from a jar that names the API, as the API's own interface`() {
+        install("themed.jar", requires = "${ThemesApi.ID}=${ThemesApi.VERSION}")
+
+        val scan = themesScan()
+
+        assertEquals(emptyList(), scan.rejected)
+        val theme = scan.loaded.single().contributions.filterIsInstance<ThemeContribution>().single()
+        assertEquals("fixture.theme", theme.id)
+        assertTrue(theme.javaClass.classLoader !== javaClass.classLoader, "the theme resolved through the parent loader")
+        assertSame(ThemeContribution::class.java, theme.javaClass.interfaces.single(), "the jar implements the launcher's interface, not a copy")
+    }
+
+    @Test
+    fun `a jar that brings a theme without naming the themes API cannot see it, and is refused where themes are read`() {
+        install("unthemed.jar")
+
+        val scan = themesScan()
+
+        assertEquals(emptyList(), scan.loaded)
+        val reason = scan.rejected.single().reason
+        assertTrue("ThemeContribution" in reason && "name ${ThemesApi.ID} in ${WidgetApi.MANIFEST_REQUIRES}" in reason, reason)
+    }
+
+    @Test
+    fun `the themes API is not shown to a jar that does not name it`() {
+        install("good.jar")
+
+        val loader = themesScan(kinds = ModuleContribution.kinds).loaded.single().loader
+
+        assertFailsWith<ClassNotFoundException> { loader.loadClass(ThemeContribution::class.java.name) }
     }
 
     @Test

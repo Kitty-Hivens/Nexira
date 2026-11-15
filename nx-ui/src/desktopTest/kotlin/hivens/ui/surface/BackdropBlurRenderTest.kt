@@ -27,7 +27,7 @@ import kotlin.math.sqrt
 import kotlin.test.Test
 import kotlin.test.assertTrue
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.Themes
+import hivens.ui.theme.TestTheme
 
 /**
  * The [Backdrop] layer has to blur what is actually beneath the surface.
@@ -113,7 +113,7 @@ class BackdropBlurRenderTest {
         blurEnabled: Boolean = true,
     ): Sample {
         val scene = ImageComposeScene(width = W, height = H, density = Density(1f)) {
-            NxTheme(Themes.Celestia, dark = true) {
+            NxTheme(TestTheme, dark = true) {
                 CompositionLocalProvider(LocalCustomization provides CustomizationSettings(surfaceBlur = blurEnabled)) {
                 Box(Modifier.fillMaxSize().drawBehind { stripes() }) {
                     if (plate != null) {

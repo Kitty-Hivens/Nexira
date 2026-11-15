@@ -1,9 +1,10 @@
 package hivens.module.looks
 
+import hivens.themes.api.ThemeContribution
+import hivens.themes.api.ThemesApi
 import hivens.widget.api.ModuleContribution
 import hivens.widget.api.ParticleContribution
 import hivens.widget.api.ParticlePalette
-import hivens.widget.api.ThemeContribution
 import hivens.widget.loader.WidgetModuleLoader
 import androidx.compose.ui.graphics.Color
 import java.nio.file.Files
@@ -24,7 +25,15 @@ class LooksTest {
         val jar = Path.of(requireNotNull(System.getProperty("nexira.test.moduleJar")))
         val dir = Files.createTempDirectory("looks-")
         Files.copy(jar, dir.resolve("looks.jar"))
-        val scan = WidgetModuleLoader(dir, parent = WithoutThisModule(javaClass.classLoader)).scan()
+        // As a launcher that carries the themes module loads it: the themes API offered and
+        // shown by its package, and its kind of contribution read beside the kernel's.
+        val scan = WidgetModuleLoader(
+            dir,
+            parent = WithoutThisModule(javaClass.classLoader),
+            contributionKinds = ModuleContribution.kinds + ThemeContribution::class.java,
+            offered = mapOf(ThemesApi.ID to ThemesApi.VERSION),
+            apiPackages = mapOf(ThemesApi.ID to setOf(ThemesApi::class.java.name.substringBeforeLast('.'))),
+        ).scan()
         try {
             assertEquals(emptyList(), scan.rejected)
             val module = scan.loaded.single()
@@ -32,6 +41,21 @@ class LooksTest {
             assertEquals(setOf("outrun", "paperback"), module.contributions.filterIsInstance<ThemeContribution>().map { it.id }.toSet())
             assertEquals(setOf("fireflies", "confetti"), module.contributions.filterIsInstance<ParticleContribution>().map { it.id }.toSet())
             assertEquals(setOf("en", "ru", "de", "ja"), module.strings.languages)
+        } finally {
+            scan.loaded.forEach { it.loader.close() }
+            Files.walk(dir).use { walk -> walk.sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) } }
+        }
+    }
+
+    @Test
+    fun `the jar names the themes API it brings its themes through, and is refused where the launcher carries none`() {
+        val jar = Path.of(requireNotNull(System.getProperty("nexira.test.moduleJar")))
+        val dir = Files.createTempDirectory("looks-")
+        Files.copy(jar, dir.resolve("looks.jar"))
+        val scan = WidgetModuleLoader(dir, parent = WithoutThisModule(javaClass.classLoader)).scan()
+        try {
+            assertEquals(emptyList(), scan.loaded)
+            assertTrue(ThemesApi.ID in scan.rejected.single().reason, scan.rejected.single().reason)
         } finally {
             scan.loaded.forEach { it.loader.close() }
             Files.walk(dir).use { walk -> walk.sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) } }

@@ -1,5 +1,6 @@
-package hivens.core.data
+package hivens.themes
 
+import hivens.themes.api.ThemeMode
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -7,7 +8,7 @@ import kotlin.test.assertNull
 /**
  * Three sources write one boolean: the manual toggle, the OS scheme, and the
  * wallpaper's brightness. Each used to decide for itself, in its own effect,
- * with the persist repeated beside it -- so what actually governed the theme
+ * with the persist repeated beside it, so what actually governed the theme
  * could only be reconstructed by reading all three.
  *
  * Null means "change nothing", and it carries weight: every caller persists

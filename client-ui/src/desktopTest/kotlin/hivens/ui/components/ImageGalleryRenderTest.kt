@@ -8,6 +8,7 @@ import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import hivens.themes.Themes
 import hivens.ui.theme.NxTheme
 import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.EncodedImageFormat
@@ -65,7 +66,7 @@ class ImageGalleryRenderTest {
         val out = Path.of("build/render", name)
         Files.createDirectories(out.parent)
         val scene = ImageComposeScene(width, 700, density = Density(1f)) {
-            NxTheme(dark = true) {
+            NxTheme(Themes.default, dark = true) {
                 Box(Modifier.fillMaxSize().background(NxColor.page).padding(pad.dp)) {
                     ImageGallery(media = items)
                 }

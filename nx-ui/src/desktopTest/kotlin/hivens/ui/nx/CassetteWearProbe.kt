@@ -48,6 +48,7 @@ import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.Spacing
+import hivens.ui.theme.TestTheme
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
 import kotlin.math.cos
@@ -261,7 +262,7 @@ class CassetteWearProbe {
     private fun one(name: String, wear: Float, chewed: Boolean) {
         val d = 2f
         val scene = ImageComposeScene((330 * d).toInt(), (214 * d).toInt(), density = Density(d)) {
-            NxTheme(dark = true) {
+            NxTheme(TestTheme, dark = true) {
                 Box(
                     Modifier.fillMaxSize().background(NxColor.page),
                     contentAlignment = Alignment.Center,
@@ -353,7 +354,7 @@ class CassetteWearProbe {
     private fun sprawledSheet() {
         val d = 2f
         val scene = ImageComposeScene((372 * d).toInt(), (282 * d).toInt(), density = Density(d)) {
-            NxTheme(dark = true) {
+            NxTheme(TestTheme, dark = true) {
                 Box(
                     Modifier.fillMaxSize().background(NxColor.page),
                     contentAlignment = Alignment.Center,

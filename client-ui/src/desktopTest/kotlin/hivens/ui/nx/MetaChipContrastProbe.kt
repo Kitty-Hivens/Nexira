@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import hivens.core.data.PackOrigin
 import hivens.i18n.api.LocalTranslator
+import hivens.themes.Themes
 import hivens.ui.components.SourceBadge
 import hivens.ui.i18n.NexiraStrings
 import hivens.ui.theme.NxTheme
@@ -63,7 +64,7 @@ class MetaChipContrastProbe {
             "night" to Color(0xFF14161C),
         )
         val scene = ImageComposeScene(980, 60 + banners.size * 2 * 96, density = Density(1f)) {
-            NxTheme(dark = true) {
+            NxTheme(Themes.default, dark = true) {
                 CompositionLocalProvider(LocalTranslator provides NexiraStrings.translator("ru")) {
                     Box(Modifier.fillMaxSize().background(NxColor.page).padding(16.dp)) {
                         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {

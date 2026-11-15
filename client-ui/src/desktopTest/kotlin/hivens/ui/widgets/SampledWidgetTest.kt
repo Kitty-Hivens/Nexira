@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import hivens.themes.Themes
 import hivens.ui.editor.EditModeController
 import hivens.ui.editor.EditModeState
 import hivens.ui.editor.LocalEditMode
@@ -113,7 +114,7 @@ class SampledWidgetTest {
         val bitmap = onEventThread {
             val scene = ImageComposeScene(300, 200, density = Density(1f)) {
                 ShippedLanguageProvider("en") {
-                    NxTheme(dark = true) {
+                    NxTheme(Themes.default, dark = true) {
                         CompositionLocalProvider(
                             LocalWidgetDataRegistry provides data,
                             LocalWidgetCommandRegistry provides WidgetCommandRegistry(),

@@ -12,10 +12,11 @@ import kotlin.math.max
  * never changed. Everything here is read from it or computed beside it.
  *
  * One instance per active scheme, held by [NxTheme], so the computed sets are worked
- * out once rather than on every recomposition that asks.
+ * out once rather than on every recomposition that asks. Made directly for a scheme
+ * that is not being drawn: a theme held to what it promises, before anyone chooses it.
  */
 @Stable
-class SchemeColours internal constructor(val scheme: Scheme) {
+class SchemeColours(val scheme: Scheme) {
 
     val isDark: Boolean = scheme.isDark
 

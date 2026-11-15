@@ -14,13 +14,13 @@ class I18nSettingsDomainTest {
 
     @Test
     fun `the old locale field is the language`() {
-        assertEquals(I18nSettings("de"), I18nSettingsDomain.imported(legacy("""{"locale":"de","isDarkTheme":true}""")))
+        assertEquals(I18nSettings("de"), I18nSettingsDomain.imported(legacy("""{"locale":"de","isDarkTheme":true}"""), current = null))
     }
 
     @Test
     fun `an old file with no locale, or a blank one, imports nothing`() {
-        assertNull(I18nSettingsDomain.imported(legacy("""{"isDarkTheme":true}""")))
-        assertNull(I18nSettingsDomain.imported(legacy("""{"locale":"  "}""")))
+        assertNull(I18nSettingsDomain.imported(legacy("""{"isDarkTheme":true}"""), current = I18nSettings("ja")))
+        assertNull(I18nSettingsDomain.imported(legacy("""{"locale":"  "}"""), current = null))
     }
 
     @Test

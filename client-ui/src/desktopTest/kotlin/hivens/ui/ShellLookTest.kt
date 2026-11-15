@@ -6,22 +6,18 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.unit.Density
-import hivens.core.api.interfaces.ISettingsService
-import hivens.core.data.SettingsData
+import hivens.config.Storage
 import hivens.i18n.api.FixedTranslations
-import hivens.ui.appearance.AppearanceStore
+import hivens.themes.Themes
 import hivens.ui.customization.CustomizationSettings
 import hivens.ui.i18n.NexiraStrings
 import hivens.ui.i18n.ShippedLanguageProvider
+import hivens.ui.settings.SettingsDomainFiles
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.ThemeManager
-import hivens.ui.theme.Themes
-import hivens.ui.utils.PreferenceWriter
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.MutableStateFlow
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.ExperimentalPathApi
@@ -49,46 +45,33 @@ class ShellLookTest {
         dir.deleteRecursively()
     }
 
-    private class Settings : ISettingsService {
-        @Volatile private var current = SettingsData(isDarkTheme = true)
-        override fun getSettings(): SettingsData = current
-        override fun saveSettings(settings: SettingsData) {
-            current = settings
-        }
-    }
-
     /** A composable boundary of its own, as the window and its layers are. */
     @Composable
     private fun Frame(content: @Composable () -> Unit) = content()
 
     @Test
     fun `a dark switch and a theme picked reach the console's look at once`() {
-        val appearance = AppearanceStore(
-            settings    = Settings(),
-            preferences = PreferenceWriter("shell-look-test"),
-            themes      = ThemeManager(dir) { file, content ->
-                Files.createDirectories(file.parent)
-                Files.writeString(file, content)
-            },
-            contributed = MutableStateFlow(emptyList()),
+        val themes = hostThemeManager(
+            dataDir      = dir,
+            settings     = SettingsDomainFiles(dir.resolve(Storage.SETTINGS_DIR), dir.resolve(Storage.SETTINGS_FILE)),
             translations = FixedTranslations(NexiraStrings.translator("en")),
-            scope       = scope,
+            scope        = scope,
         )
-        val look = ShellLook(dark = true, words = NexiraStrings.translator("en"))
+        val look = ShellLook(theme = Themes.default, dark = true, words = NexiraStrings.translator("en"))
         val picked = Themes.all.last()
         onEventThread {
             val scene = ImageComposeScene(100, 100, Density(1f)) {
-                val isDarkTheme by appearance.dark.collectAsState()
-                val library by appearance.library.collectAsState()
+                val isDarkTheme by themes.dark.collectAsState()
+                val active by themes.active.collectAsState()
                 ShippedLanguageProvider("en") {
-                    PublishShellLook(look, appearance, FixedTranslations(NexiraStrings.translator("en")), null, CustomizationSettings())
-                    Frame { Frame { NxTheme(theme = library.active, dark = isDarkTheme) {} } }
+                    PublishShellLook(look, themes, FixedTranslations(NexiraStrings.translator("en")), null, CustomizationSettings())
+                    Frame { Frame { NxTheme(theme = active, dark = isDarkTheme) {} } }
                 }
             }
             try {
                 scene.settle(4)
-                appearance.setDark(false)
-                appearance.select(picked.id)
+                themes.setDark(false)
+                themes.choose(picked.id)
                 scene.settle(8, sleepMs = 20)
             } finally {
                 scene.close()

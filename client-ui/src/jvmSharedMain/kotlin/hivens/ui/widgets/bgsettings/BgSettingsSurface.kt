@@ -11,7 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import hivens.core.data.ThemeMode
+import hivens.themes.api.ThemeMode
 import hivens.ui.background.BackgroundSettings
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
@@ -53,7 +53,7 @@ fun BgSettingsSurface(
     themeMode: ThemeMode,
     onThemeModeChanged: (ThemeMode) -> Unit,
     systemThemeAvailable: Boolean,
-    activeTheme: Theme,
+    activeTheme: Theme?,
     surfaceBlur: Boolean,
     onSurfaceBlurChanged: (Boolean) -> Unit,
     reduceMotion: Boolean,

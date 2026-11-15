@@ -9,7 +9,11 @@ import hivens.widget.api.SettingsDomain
 import hivens.launcher.SettingsService
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.int
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import java.nio.file.Files
@@ -46,6 +50,14 @@ class SettingsDomainFilesTest {
     /** The same domain at a later schema, which this build would not write over. */
     private object OtherDomain : SettingsDomain<Prefs>("test.other", Prefs.serializer()) {
         override fun defaults() = Prefs(volume = 1)
+    }
+
+    /** A domain the former file held one field of, `volume`, and not its name. */
+    private object MovedDomain : SettingsDomain<Prefs>("test.moved", Prefs.serializer()) {
+        override fun defaults() = Prefs()
+        override fun imported(legacy: JsonObject, current: Prefs?): Prefs? =
+            (legacy["volume"] as? JsonPrimitive)?.intOrNull?.let { volume -> (current ?: defaults()).copy(volume = volume) }
+        override fun mirrored(value: Prefs): Map<String, JsonElement> = mapOf("volume" to JsonPrimitive(value.volume))
     }
 
     private lateinit var data: Path
@@ -183,6 +195,16 @@ class SettingsDomainFilesTest {
         store.update { it.copy(language = "ru") }
         assertEquals(I18nSettings("ru"), files().peek(I18nSettingsDomain))
         assertEquals("ru", legacyJson().getValue("locale").jsonPrimitive.content)
+    }
+
+    @Test
+    fun `a change an older build made is laid over the domain's own value, so what the old file never held is kept`() {
+        legacy.writeText("""{"volume":5}""")
+        files().of(MovedDomain).update { Prefs(volume = 6, name = "mine") }
+        // A build from before the domain changes the one field it knows.
+        legacy.writeText("""{"volume":2}""")
+        assertEquals(Prefs(volume = 2, name = "mine"), files().of(MovedDomain).value.value)
+        assertEquals(Prefs(volume = 2, name = "mine"), files().peek(MovedDomain), "and is written so")
     }
 
     @Test

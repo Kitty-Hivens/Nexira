@@ -69,7 +69,8 @@ class WindowChromeHooks(defaultClose: () -> Unit) {
  * a visible flash.
  *
  * Window-creation-time values that normally live behind Koin (undecorated
- * chrome, locale) come from the pre-Koin [GuiBootstrap.PreBoot.peek]. Once the boot
+ * chrome, locale, the theme and whether it is dark) come from the pre-Koin
+ * [GuiBootstrap.PreBoot.peek]. Once the boot
  * is ready, the shell and the console each draw themselves inside the boot's own
  * Koin, which is never registered globally.
  *
@@ -132,7 +133,8 @@ fun ApplicationScope.ShellHost(
     // its own, which the pre-boot started making off this thread (see PreBoot.words).
     val bootWords = remember { pre.words.join() }
     val thresholdStrings = remember(bootWords) { bootWords.strings(NexiraStrings.NAMESPACE) }
-    val look = remember { ShellLook(dark = pre.peek.isDarkTheme, words = bootWords) }
+    // The theme and the scheme the themes module's manager will open on, read before it exists.
+    val look = remember { ShellLook(theme = pre.peek.theme, dark = pre.peek.isDarkTheme, words = bootWords) }
 
     // A recovery restart with boot already done skips the threshold entirely
     // (no black frame). The restart flag is EXPLICIT, not inferred from the

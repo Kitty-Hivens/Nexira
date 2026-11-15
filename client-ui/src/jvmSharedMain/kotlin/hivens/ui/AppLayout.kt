@@ -10,7 +10,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import hivens.accounts.api.SessionState
-import hivens.core.data.ThemeMode
+import hivens.themes.api.ThemeMode
+import hivens.themes.api.ThemesKeys
 import hivens.ui.background.BackgroundSettings
 import hivens.ui.chrome.LocalWindowClass
 import hivens.ui.chrome.rememberWindowClass
@@ -35,7 +36,6 @@ import hivens.ui.screens.detail.settings.PackSettingsCategory
 import hivens.ui.screens.detail.versions.PackVersionsScreen
 import hivens.ui.screens.library.LibraryScreen
 import hivens.ui.screens.settings.SettingsScreen
-import hivens.ui.theme.ThemeLibrary
 import hivens.ui.theme.Plane
 import hivens.ui.theme.Backdrop
 import hivens.ui.theme.LocalPlane
@@ -72,6 +72,7 @@ import hivens.widget.model.SlotId
 import hivens.widget.model.SurfaceId
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxColor
+import hivens.ui.theme.NxTheme
 
 // ─── Layout ──────────────────────────────────────────────────────────────────
 
@@ -100,17 +101,18 @@ fun AppLayout(
     val aimBrowse = rememberScopedCommand(CatalogueKeys.Aim)
 
     // How the composition looks and speaks, read and changed the way a widget does,
-    // for the screens that still take it as arguments.
-    val isDarkTheme = rememberScopedSource(Sources.DarkTheme).valueOrNull() ?: true
-    val themeMode = rememberScopedSource(Sources.ThemeMode).valueOrNull() ?: ThemeMode.Manual
-    val systemThemeAvailable = rememberScopedSource(Sources.SystemSchemeAvailable).valueOrNull() ?: false
-    val themeLibrary = rememberScopedSource(Sources.ThemeLibrary).valueOrNull() ?: ThemeLibrary()
+    // for the screens that still take it as arguments. The themes module's: where it is
+    // not brought in, the switches show the scheme the window is drawn in and change nothing.
+    val isDarkTheme = rememberScopedSource(ThemesKeys.Dark).valueOrNull() ?: NxTheme.isDark
+    val themeMode = rememberScopedSource(ThemesKeys.Mode).valueOrNull() ?: ThemeMode.Manual
+    val systemThemeAvailable = rememberScopedSource(ThemesKeys.SystemSchemeAvailable).valueOrNull() ?: false
+    val activeTheme = rememberScopedSource(ThemesKeys.Active).valueOrNull()
     // The language module's: where it is not brought in, the picker shows the one language in use.
     val currentLanguage = rememberScopedSource(I18nKeys.Language).valueOrNull() ?: LocalTranslator.current.language
     val languages = rememberScopedSource(I18nKeys.Languages).valueOrNull() ?: listOf(currentLanguage)
-    val setDark = rememberScopedCommand(Commands.SetDarkTheme)
+    val setDark = rememberScopedCommand(ThemesKeys.SetDark)
     val onToggleDarkTheme: () -> Unit = { setDark?.invoke(!isDarkTheme) }
-    val onThemeModeChanged = rememberScopedCommand(Commands.SetThemeMode) ?: {}
+    val onThemeModeChanged = rememberScopedCommand(ThemesKeys.SetMode) ?: {}
     val updateLanguage = rememberScopedCommand(I18nKeys.UpdateSettings)
     val onLanguageChanged: (String) -> Unit = { tag -> updateLanguage?.invoke(SettingsChange { it.copy(language = tag) }) }
 
@@ -174,7 +176,7 @@ fun AppLayout(
                         themeMode = themeMode,
                         onThemeModeChanged = onThemeModeChanged,
                         systemThemeAvailable = systemThemeAvailable,
-                        activeTheme       = themeLibrary.active,
+                        activeTheme       = activeTheme,
                         surfaceBlur       = customization.surfaceBlur,
                         onSurfaceBlurChanged = { onCustomizationChanged(customization.copy(surfaceBlur = it)) },
                         reduceMotion      = customization.reduceMotion,

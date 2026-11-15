@@ -90,6 +90,7 @@ import hivens.widget.api.SurfaceFamilies
 import hivens.ui.widgets.modules.DesktopWidgetModuleHost
 import hivens.ui.widgets.modules.offeredApiPackages
 import hivens.ui.widgets.modules.offeredApis
+import hivens.ui.widgets.modules.offeredContributionKinds
 import hivens.ui.widgets.modules.WidgetModules
 import hivens.widget.api.WidgetRegistry
 import hivens.widget.api.WidgetServiceRegistry
@@ -122,10 +123,11 @@ val uiModule = module {
             builtIn = GeneratedWidgetRegistry,
             moduleHost = { directory, dataDir ->
                 DesktopWidgetModuleHost(
-                    directory   = directory,
-                    shadowDir   = dataDir.resolve("cache").resolve("widget-modules"),
-                    offered     = offeredApis(),
-                    apiPackages = offeredApiPackages(),
+                    directory         = directory,
+                    shadowDir         = dataDir.resolve("cache").resolve("widget-modules"),
+                    offered           = offeredApis(),
+                    apiPackages       = offeredApiPackages(),
+                    contributionKinds = offeredContributionKinds(),
                 )
             },
             platformCommands = { registry ->

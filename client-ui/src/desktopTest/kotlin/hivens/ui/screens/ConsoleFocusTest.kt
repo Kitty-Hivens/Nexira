@@ -12,6 +12,7 @@ import androidx.compose.ui.input.pointer.PointerButtons
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.unit.Density
 import hivens.launcher.platform.PlatformPaths
+import hivens.themes.Themes
 import hivens.ui.host.HostKoin
 import hivens.ui.theme.NxTheme
 import hivens.ui.utils.ConsoleSettings
@@ -63,7 +64,7 @@ class ConsoleFocusTest {
                 val entries = (1..5).map { LogEntry("line $it", LogType.INFO, timestamp = "00:00:0$it") }
                 val scene = ImageComposeScene(800, 400, density = Density(1f)) {
                     HostKoin(koin) {
-                        NxTheme(dark = true) {
+                        NxTheme(Themes.default, dark = true) {
                             Box(Modifier.fillMaxSize().releaseFocusOnPress()) {
                                 Box(Modifier.fillMaxSize().onFocusChanged { probe.hasFocus = it.hasFocus }) {
                                     ConsoleContent(ConsoleSettings(), onSettingsChange = {}, source = ConsoleSource.FileBacked(entries))

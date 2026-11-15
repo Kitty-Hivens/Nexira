@@ -22,6 +22,7 @@ import hivens.core.api.dto.modrinth.ModrinthVersion
 import hivens.i18n.api.LocalTranslator
 import hivens.launcher.content.ContentKind
 import hivens.launcher.instance.loadersFor
+import hivens.themes.Themes
 import hivens.ui.feature.catalogue.toBuild
 import hivens.ui.feature.catalogue.toDetails
 import hivens.ui.feature.catalogue.toTags
@@ -148,7 +149,7 @@ class ModVersionPageRenderTest {
         var png: Data? = null
         SwingUtilities.invokeAndWait {
             val scene = ImageComposeScene(1160, 900, density = Density(1f)) {
-                NxTheme(dark = true) {
+                NxTheme(Themes.default, dark = true) {
                     CompositionLocalProvider(LocalTranslator provides NexiraStrings.translator("ru")) {
                         Box(Modifier.fillMaxSize().background(NxColor.page).padding(14.dp)) {
                             ModVersionBody(

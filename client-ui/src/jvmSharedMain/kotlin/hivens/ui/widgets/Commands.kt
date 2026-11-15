@@ -1,6 +1,5 @@
 package hivens.ui.widgets
 
-import hivens.core.data.ThemeMode
 import hivens.ui.Screen
 import hivens.ui.background.BackgroundSettings
 import hivens.widget.model.CommandKey
@@ -24,8 +23,10 @@ import hivens.widget.model.ScopeLevel
  * wherever such a level is, whoever draws it. The history's are provided by the
  * composition's owner, so a window moves its own history.
  *
- * The pack commands are the packs module's, in `hivens.packs.api.PackKeys`, and the
- * sign-in and sign-out commands the accounts module's, in `hivens.accounts.api.AccountKeys`.
+ * The pack commands are the packs module's, in `hivens.packs.api.PackKeys`, the
+ * sign-in and sign-out commands the accounts module's, in `hivens.accounts.api.AccountKeys`,
+ * and choosing a theme and what decides dark and light the themes module's, in
+ * `hivens.themes.api.ThemesKeys`.
  */
 object Commands {
     val ClearNotifications = CommandKey<Unit>("notifications.clear")
@@ -61,15 +62,6 @@ object Commands {
 
     /** Changes the wallpaper settings by one change applied to what they are when it lands. */
     val UpdateBackground = CommandKey<BackgroundSettings.() -> BackgroundSettings>("background.update")
-
-    /** Puts the theme of this id in use. */
-    val ApplyTheme = CommandKey<String>("theme.apply", ScopeLevel.Composition)
-
-    /** Draws dark or light, as the person's own choice, which overrides whatever [SetThemeMode] said. */
-    val SetDarkTheme = CommandKey<Boolean>("theme.dark.set", ScopeLevel.Composition)
-
-    /** Says what decides dark and light from now on. Paired with [Sources.ThemeMode]. */
-    val SetThemeMode = CommandKey<ThemeMode>("theme.mode.set", ScopeLevel.Composition)
 
     /** Puts the console on screen or takes it off. Paired with [Sources.ConsoleVisible]. */
     val SetConsoleVisible = CommandKey<Boolean>("console.visible.set")

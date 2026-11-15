@@ -1,6 +1,9 @@
 package hivens.ui.bootstrap
 
 import hivens.config.Storage
+import hivens.themes.Themes
+import hivens.themes.ThemesSettingsDomain
+import hivens.ui.settings.SettingsDomainFiles
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
@@ -113,6 +116,26 @@ class RecoveryIoTest {
         RecoveryIo.resetCustomization(dataDir)
 
         files.forEach { assertFalse(Files.exists(it), "${it.fileName} is appearance and should be cleared") }
+    }
+
+    @Test
+    fun `resetCustomization takes the theme choice too, so the look comes back on the default theme and keeps the scheme`() {
+        val domains = dataDir / Storage.SETTINGS_DIR
+        Files.createDirectories(domains)
+        Files.writeString(domains / "${ThemesSettingsDomain.id}.json", """{"schema":1,"value":{"theme":"lotus","mode":"Manual","dark":false}}""")
+        Files.writeString(dataDir / "themes.json", """{"selected":"lotus","schema_version":2}""")
+        Files.writeString(settings(), """{"isDarkTheme":false,"themeMode":"Manual"}""")
+        Files.writeString(domains / "i18n.json", """{"schema":1,"value":{"language":"ja"}}""")
+
+        RecoveryIo.resetCustomization(dataDir)
+
+        assertEquals(Storage.SETTINGS_DIR + "/" + ThemesSettingsDomain.id + ".json", RecoveryIo.THEME_CHOICE_FILE, "the file is the domain's")
+        assertFalse(Files.exists(domains / "${ThemesSettingsDomain.id}.json"))
+        assertTrue(Files.exists(domains / "i18n.json"), "the language is no appearance file")
+        val back = SettingsPeek.read(dataDir)
+        assertEquals(Themes.default, back.theme)
+        assertFalse(back.isDarkTheme, "the scheme comes back from the old settings file, as it stayed before the choice moved")
+        assertFalse(SettingsDomainFiles(domains, settings()).peek(ThemesSettingsDomain).dark)
     }
 
     @Test

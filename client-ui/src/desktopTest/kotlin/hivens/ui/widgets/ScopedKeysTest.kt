@@ -10,6 +10,7 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Density
+import hivens.themes.Themes
 import hivens.ui.Screen
 import hivens.ui.editor.EditModeController
 import hivens.ui.editor.EditModeState
@@ -316,7 +317,7 @@ class ScopedKeysTest {
         val inked = onEventThread {
             val scene = ImageComposeScene(240, 80, density = Density(1f)) {
                 ShippedLanguageProvider("en") {
-                    NxTheme(dark = true) {
+                    NxTheme(Themes.default, dark = true) {
                         CompositionLocalProvider(
                             LocalWidgetDataRegistry provides data,
                             LocalWidgetCommandRegistry provides commands,

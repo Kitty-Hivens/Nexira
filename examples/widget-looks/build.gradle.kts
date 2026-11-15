@@ -4,11 +4,12 @@ plugins {
 }
 
 // A worked example of a module that brings two themes and two particle fields and no widgets, and not part of the
-// launcher. It depends on the widget kernel and on Compose, and The jar this produces is discovered from the widgets directory at
-// boot, like any other module.
+// launcher. It depends on the widget kernel, on Compose, and on the themes module's API, which a theme is brought
+// through. The jar this produces is discovered from the widgets directory at boot, like any other module.
 dependencies {
     api(project(":widget-model"))
     api(project(":widget-api"))
+    implementation(project(":themes-api"))
     implementation(libs.compose.runtime)
     implementation(libs.compose.ui)
 
@@ -30,6 +31,9 @@ tasks.jar {
             "Nexira-Widget-Api" to providers.gradleProperty("nexira.widgetApi").get(),
             "Nexira-Module-Id" to "looks",
             "Nexira-Module-Name" to "Looks",
+            // The themes API its themes are brought through, which the loader checks the
+            // launcher's against and without which the jar cannot see it.
+            "Nexira-Module-Requires" to "nexira.themes=" + providers.gradleProperty("nexira.themesApi").get(),
         )
     }
 }

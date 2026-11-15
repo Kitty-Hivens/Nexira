@@ -15,7 +15,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import hivens.core.data.ThemeMode
+import hivens.themes.api.ThemeMode
 import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
@@ -40,7 +40,7 @@ internal fun AppearanceThemeIsland(
     themeMode: ThemeMode,
     onThemeModeChanged: (ThemeMode) -> Unit,
     systemThemeAvailable: Boolean,
-    activeTheme: Theme,
+    activeTheme: Theme?,
     surfaceBlur: Boolean,
     onSurfaceBlurChanged: (Boolean) -> Unit,
     reduceMotion: Boolean,
@@ -63,7 +63,7 @@ internal fun AppearanceThemeIsland(
             }
             // A theme without a light scheme stays dark in light mode rather than
             // having one invented for it, so the switch says why nothing changed.
-            if (!activeTheme.hasLight) {
+            if (activeTheme != null && !activeTheme.hasLight) {
                 Text(
                     text  = s.text("themePickerDarkOnly"),
                     style = MaterialTheme.typography.bodySmall,

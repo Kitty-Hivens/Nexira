@@ -48,6 +48,7 @@ import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.Spacing
+import hivens.ui.theme.TestTheme
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
 import kotlin.math.cos
@@ -284,7 +285,7 @@ class CassetteWidgetProbe {
     private fun sheet(name: String, body: @Composable () -> Unit) {
         val d = 2.4f
         val scene = ImageComposeScene((380 * d).toInt(), (320 * d).toInt(), density = Density(d)) {
-            NxTheme(dark = true) {
+            NxTheme(TestTheme, dark = true) {
                 Box(
                     Modifier.fillMaxSize().background(NxColor.page),
                     contentAlignment = Alignment.Center,

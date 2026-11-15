@@ -14,6 +14,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import hivens.ui.theme.NxTheme
+import hivens.ui.theme.TestTheme
 import org.jetbrains.skia.EncodedImageFormat
 import java.nio.file.Files
 import java.nio.file.Paths
@@ -33,7 +34,7 @@ class MenuHintProbe {
     @Test
     fun probe() {
         val scene = ImageComposeScene(width = 760, height = 260, density = Density(2f)) {
-            NxTheme {
+            NxTheme(TestTheme) {
                 Box(Modifier.fillMaxSize().background(Color(0xFF2B2F3A)), contentAlignment = Alignment.Center) {
                     Box(Modifier.padding(16.dp).width(IntrinsicSize.Max)) {
                         Column {

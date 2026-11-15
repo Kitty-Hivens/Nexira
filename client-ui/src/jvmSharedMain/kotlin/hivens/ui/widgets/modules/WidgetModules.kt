@@ -8,7 +8,6 @@ import hivens.widget.api.ModuleStrings
 import hivens.widget.api.ParticleContribution
 import hivens.widget.api.ModuleContribution
 import hivens.widget.api.ScreenEffect
-import hivens.widget.api.ThemeContribution
 import hivens.widget.api.WidgetDescriptor
 import hivens.widget.api.WidgetRegistry
 import hivens.widget.model.WidgetKind
@@ -101,7 +100,6 @@ class WidgetModules(
             contributions.mapNotNull { c -> (c.item as? T)?.let { Contributed(c.moduleId, c.moduleName, it) } }
 
         val effects: List<Contributed<ScreenEffect>> get() = of<ScreenEffect>()
-        val themes: List<Contributed<ThemeContribution>> get() = of<ThemeContribution>()
     }
 
     /**

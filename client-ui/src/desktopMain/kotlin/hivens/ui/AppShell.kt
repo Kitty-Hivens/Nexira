@@ -25,7 +25,6 @@ import hivens.core.api.interfaces.IUpdateApplicator
 import hivens.core.data.ModuleId
 import hivens.core.data.PackAuthRequirement
 import hivens.core.launch.LaunchLogEvent
-import hivens.core.data.ThemeMode
 import hivens.launcher.legacy.RetiredClientScanner
 import hivens.launcher.update.ApplyRecovery
 import hivens.launcher.update.PackAutoUpdateService
@@ -80,7 +79,10 @@ import hivens.ui.easter.LocalAprilFools
 import hivens.ui.editor.EditModeController
 import hivens.ui.editor.WidgetGraphReconciler
 import hivens.ui.generated.resources.Res
-import hivens.ui.appearance.AppearanceStore
+import hivens.themes.ThemeManager
+import hivens.themes.api.SystemScheme
+import hivens.themes.api.ThemeInputs
+import hivens.themes.api.ThemeMode
 import hivens.i18n.api.LocalTranslator
 import hivens.i18n.api.Translations
 import hivens.ui.layers.LayerHost
@@ -130,6 +132,7 @@ import hivens.ui.host.WindowCommand
 import hivens.ui.host.WindowId
 import hivens.ui.host.WindowOwner
 import hivens.ui.host.WindowRegistry
+import hivens.ui.host.launcherServices
 import hivens.ui.widgets.WidgetSurface
 import hivens.ui.widgets.modules.WidgetModules
 import hivens.ui.widgets.state.WidgetStateStore
@@ -358,29 +361,35 @@ private fun FrameWindowScope.ShellContent(
         }
     }
 
-    // How the launcher looks and speaks lives in the appearance store, which every
-    // composition reads through its sources. The shell draws with the same values
-    // and feeds the store what only a host can see: whether the system's scheme can
-    // be read, what it says, and how bright the wallpaper is. Made here, during the
-    // first composition, so a theme file from a newer build is on record before the
-    // read-only notice below looks.
-    val appearance: AppearanceStore = koinInject()
-    val isDarkTheme by appearance.dark.collectAsState()
-    val themeMode by appearance.mode.collectAsState()
+    // How the launcher looks is the themes module's. The shell draws with what its manager
+    // holds, which the host made, and tells the module what only a host can see, through the
+    // inputs the module keeps for the host: whether the system's scheme can be read, and what
+    // it says. The wallpaper is told by AppRoot. Injected here, during the first composition, so a theme
+    // file from a newer build is on record before the read-only notice below looks.
+    val themes: ThemeManager = koinInject()
+    val isDarkTheme by themes.dark.collectAsState()
+    val themeMode by themes.mode.collectAsState()
     // The words the shell is drawn in: the language module's engine, which the host made.
     val translations: Translations = koinInject()
     val words by translations.current.collectAsState()
+    // Missing where the document brings no themes module: then nothing follows the system.
+    val inputs = remember(appLevel) { appLevel.launcherServices.find(ThemeInputs::class) }
     // Whether the OS scheme is readable at all (no portal backend on Linux -> no).
-    // Probed once; drives the System chip's enabled state in the theme island.
+    // Probed once, and said with what it read. It drives the System chip's enabled
+    // state in the theme island.
+    var schemeReadable by remember { mutableStateOf<Boolean?>(null) }
     LaunchedEffect(Unit) {
-        appearance.setSystemSchemeAvailable(withContext(Dispatchers.IO) { SystemTheme.probe() } != null)
+        val probed = withContext(Dispatchers.IO) { SystemTheme.probe() }
+        schemeReadable = probed != null
+        inputs?.systemScheme(SystemScheme(readable = probed != null, dark = probed))
     }
     // System mode: follow the OS scheme while the mode is active -- the cold flow
     // (portal signal on Linux, polling fallback) runs only while collected, so the
     // other modes cost nothing.
-    LaunchedEffect(themeMode) {
+    LaunchedEffect(themeMode, schemeReadable) {
+        val readable = schemeReadable ?: return@LaunchedEffect
         if (themeMode != ThemeMode.System) return@LaunchedEffect
-        SystemTheme.observe().collect { dark -> appearance.systemSchemeChanged(dark) }
+        SystemTheme.observe().collect { dark -> inputs?.systemScheme(SystemScheme(readable = readable, dark = dark)) }
     }
 
     // The chaos engine is a plain singleton rather than a composable, so it is
@@ -692,8 +701,8 @@ private fun FrameWindowScope.ShellContent(
         }
         val packAutoUpdateService: PackAutoUpdateService = koinInject()
         val applyRecovery: ApplyRecovery = koinInject()
-        // The stored library with the themes the loaded modules bring, which are never stored.
-        val themeLibrary by appearance.library.collectAsState()
+        // The theme in use: the one chosen where it is on offer, the modules' among them.
+        val activeTheme by themes.active.collectAsState()
 
         // Customization extension: persisted choices for whether surfaces blur
         // and how the nav rail draws its selection. Provided via
@@ -817,7 +826,7 @@ private fun FrameWindowScope.ShellContent(
 
         // The console is a window of its own beside this one (see ShellHost) and
         // draws in what this shell decided, published for it here.
-        PublishShellLook(look, appearance, translations, uiFamily, customization)
+        PublishShellLook(look, themes, translations, uiFamily, customization)
 
         // ── Main window ────────────────────────────────────────────────
         // af.requestCloseDialog dispatches: chaos active -> pop the torturous
@@ -965,7 +974,7 @@ private fun FrameWindowScope.ShellContent(
             LayerHost(windowLayers, Modifier.fillMaxSize()) {
             val themeReveal = rememberThemeReveal()
             NxTheme(
-                theme    = themeLibrary.active,
+                theme    = activeTheme,
                 dark     = isDarkTheme,
                 uiFamily = uiFamily,
             ) {
@@ -1008,7 +1017,7 @@ private fun FrameWindowScope.ShellContent(
             // NotificationStack), its own NxTheme wrap so it draws in the active theme.
             // Inert unless a non-release build has the master toggle on.
             NxTheme(
-                theme    = themeLibrary.active,
+                theme    = activeTheme,
                 dark     = isDarkTheme,
                 uiFamily = uiFamily,
             ) {

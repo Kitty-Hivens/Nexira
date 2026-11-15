@@ -31,6 +31,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import hivens.core.update.VersionChannel
+import hivens.themes.Themes
 import hivens.ui.components.channelColor
 import hivens.ui.components.formatBuildTimestamp
 import hivens.ui.i18n.nexiraStrings
@@ -292,7 +293,7 @@ class VersionListConceptProbe {
         val out = Path.of("build/render", name)
         Files.createDirectories(out.parent)
         val scene = ImageComposeScene(900, 760, density = Density(1f)) {
-            NxTheme(dark = true) { Window(selected, installed) }
+            NxTheme(Themes.default, dark = true) { Window(selected, installed) }
         }
         val png = try {
             var t = 0L

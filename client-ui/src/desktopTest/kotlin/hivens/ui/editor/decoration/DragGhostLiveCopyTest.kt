@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import hivens.themes.Themes
 import hivens.ui.editor.EditModeController
 import hivens.ui.editor.dnd.DragController
 import hivens.ui.editor.dnd.DropTargetRegistry
@@ -80,7 +81,7 @@ class DragGhostLiveCopyTest {
         var sawDrag = false
 
         val scene = ImageComposeScene(width = 300, height = 300, density = Density(1f)) {
-            NxTheme(dark = true) {
+            NxTheme(Themes.default, dark = true) {
                 Box(Modifier.fillMaxSize()) {
                     Column {
                         EditableWidgetChrome(

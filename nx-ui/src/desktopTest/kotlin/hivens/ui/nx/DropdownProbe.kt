@@ -25,6 +25,7 @@ import hivens.ui.layers.LayerHost
 import hivens.ui.layers.rememberWindowLayers
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.Spacing
+import hivens.ui.theme.TestTheme
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
 import javax.swing.SwingUtilities
@@ -83,7 +84,7 @@ class DropdownProbe {
             // The window's layers at the root, where the shell mounts them: every
             // popup on these sheets is one of them.
             LayerHost(rememberWindowLayers(), Modifier.fillMaxSize()) {
-                NxTheme(dark = dark) {
+                NxTheme(TestTheme, dark = dark) {
                     Box(Modifier.fillMaxSize().background(NxColor.page).padding(Spacing.s16)) { body() }
                 }
             }

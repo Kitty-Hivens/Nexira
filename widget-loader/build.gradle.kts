@@ -17,6 +17,9 @@ dependencies {
     implementation(libs.compose.runtime)
 
     testImplementation(kotlin("test"))
+    // The themes module's API, for the tests of a kind of contribution a module compiled into
+    // the launcher declares rather than the kernel: the fixture brings a theme through it.
+    testImplementation(project(":themes-api"))
 }
 
 // A widget module built the way a third party would build one, kept OFF the test
@@ -25,6 +28,10 @@ dependencies {
 // opened. The tests rewrite its manifest to produce the malformed variants.
 val fixtureModule: SourceSet = sourceSets.create("fixtureModule") {
     compileClasspath += sourceSets["main"].output + configurations["compileClasspath"].incoming.files
+}
+dependencies {
+    // The fixture brings a theme, which a module does through the themes module's API.
+    "fixtureModuleImplementation"(project(":themes-api"))
 }
 
 val fixtureModuleJar = tasks.register<Jar>("fixtureModuleJar") {
@@ -36,6 +43,9 @@ val fixtureModuleJar = tasks.register<Jar>("fixtureModuleJar") {
             "Nexira-Widget-Api" to providers.gradleProperty("nexira.widgetApi").get(),
             "Nexira-Module-Id" to "fixture",
             "Nexira-Module-Name" to "Fixture Module",
+            // The themes API its theme is brought through. The loader's own tests write
+            // the manifest again for each case, so this is what the launcher's tests see.
+            "Nexira-Module-Requires" to "nexira.themes=" + providers.gradleProperty("nexira.themesApi").get(),
         )
     }
 }

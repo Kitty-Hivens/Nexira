@@ -34,9 +34,9 @@ class RetiredSettingsValueTest {
 
     @Test
     fun `a file naming a retired enum constant decodes to the field's default`() {
-        val stored = """{"themeMode":"Seasonal","isDarkTheme":false,"doNotDisturb":true}"""
+        val stored = """{"amberUpdatePolicy":"Gamble","isDarkTheme":false,"doNotDisturb":true}"""
         val decoded = json.decodeFromString<SettingsData>(stored)
-        assertEquals(SettingsData().themeMode, decoded.themeMode)
+        assertEquals(SettingsData().amberUpdatePolicy, decoded.amberUpdatePolicy)
     }
 
     @Test
@@ -51,7 +51,7 @@ class RetiredSettingsValueTest {
     fun `the rest of the file survives an unknown value`() {
         // The point of the coercion: one retired enum must not cost the user
         // every other setting in the file.
-        val stored = """{"themeMode":"Seasonal","isDarkTheme":false,"doNotDisturb":true}"""
+        val stored = """{"amberUpdatePolicy":"Gamble","isDarkTheme":false,"doNotDisturb":true}"""
         val decoded = json.decodeFromString<SettingsData>(stored)
         assertEquals(false, decoded.isDarkTheme)
         assertEquals(true, decoded.doNotDisturb)
@@ -59,9 +59,16 @@ class RetiredSettingsValueTest {
 
     @Test
     fun `the constants that remain still decode by name`() {
-        ThemeMode.entries.forEach { mode ->
-            val decoded = json.decodeFromString<SettingsData>("""{"themeMode":"${mode.name}"}""")
-            assertEquals(mode, decoded.themeMode)
+        AmberUpdatePolicy.entries.forEach { policy ->
+            val decoded = json.decodeFromString<SettingsData>("""{"amberUpdatePolicy":"${policy.name}"}""")
+            assertEquals(policy, decoded.amberUpdatePolicy)
         }
+    }
+
+    @Test
+    fun `the theme mode is kept as written, a newer build's included, for the themes module to read`() {
+        val decoded = json.decodeFromString<SettingsData>("""{"themeMode":"Seasonal","isDarkTheme":false}""")
+        assertEquals("Seasonal", decoded.themeMode)
+        assertEquals(false, decoded.isDarkTheme)
     }
 }

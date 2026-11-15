@@ -33,7 +33,7 @@ import hivens.ui.theme.NxInk
  * (the `#` and surrounding space optional); any other length, or a non-hex body,
  * is null. One format, no 16-bit guessing -- the rule [NxColorField] enforces.
  */
-internal fun parseHexOrNull(hex: String): Color? {
+fun parseHexOrNull(hex: String): Color? {
     val clean = hex.trim().removePrefix("#")
     if (clean.length != 6 && clean.length != 8) return null
     val full = if (clean.length == 6) "FF$clean" else clean

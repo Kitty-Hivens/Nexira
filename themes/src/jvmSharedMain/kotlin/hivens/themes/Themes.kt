@@ -1,6 +1,8 @@
-package hivens.ui.theme
+package hivens.themes
 
 import androidx.compose.ui.graphics.Color
+import hivens.ui.theme.Scheme
+import hivens.ui.theme.Theme
 
 /**
  * The themes that ship.

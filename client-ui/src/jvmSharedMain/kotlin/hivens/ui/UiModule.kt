@@ -8,7 +8,8 @@ import hivens.core.api.interfaces.ISettingsService
 import hivens.core.api.interfaces.ReadingLanguage
 import hivens.core.activity.Activity
 import hivens.core.activity.ActivityRegistry
-import hivens.core.data.ThemeMode
+import hivens.core.data.NewerBuildData
+import hivens.core.data.ReadOnlyStore
 import hivens.core.io.AtomicFiles
 import hivens.core.security.SslBypassStore
 import hivens.core.update.PackUpdateStatusHub
@@ -19,7 +20,6 @@ import hivens.launcher.platform.PlatformPaths
 import hivens.ui.activity.ActivityCommands
 import hivens.ui.activity.ActivityDriver
 import hivens.ui.activity.SelectionRegistry
-import hivens.ui.appearance.AppearanceStore
 import hivens.ui.background.BackgroundManager
 import hivens.ui.components.SignOutRequests
 import hivens.ui.background.BackgroundSettings
@@ -38,8 +38,9 @@ import hivens.ui.host.LauncherHostAccess
 import hivens.ui.navigation.NavState
 import hivens.ui.packs.ClientPacksHost
 import hivens.ui.packs.withdrawNoticesOfInstalledPacks
-import hivens.ui.theme.ThemeLibrary
-import hivens.ui.theme.ThemeManager
+import hivens.themes.ThemeLibraryFile
+import hivens.themes.ThemeManager
+import hivens.themes.ThemesSettingsDomain
 import hivens.i18n.I18nEngine
 import hivens.i18n.I18nSettingsDomain
 import hivens.i18n.api.Translations
@@ -86,6 +87,7 @@ import hivens.ui.widgets.levelServices
 import hivens.ui.widgets.modules.CompiledModules
 import hivens.ui.widgets.modules.WidgetModuleHost
 import hivens.ui.widgets.modules.WidgetModules
+import hivens.ui.widgets.modules.followModuleThemes
 import hivens.ui.widgets.modules.followModuleWords
 import hivens.ui.widgets.modules.take
 import hivens.ui.widgets.profile.ProfileSelection
@@ -307,19 +309,21 @@ fun uiCoreModule(
     // LocalWidgetServiceRegistry resolves before any @Widget renders.
     single { WidgetServiceRegistry() }
 
-    // How the launcher looks and speaks, for every window and composition alike.
-    // The module themes are read off the loaded modules as they change.
+    // The library of themes and the choice: the themes module's manager. Made by the host
+    // rather than by the module for the reason the language's engine is: the window the
+    // launcher boots in is already drawn in the person's theme, so the manager exists before
+    // any module does. The host draws its windows with it, the module answers its keys over
+    // it, and it takes the themes of every jar module as the module list changes.
     single {
         val appScope: CoroutineScope = get()
-        val modules: WidgetModules = get()
-        AppearanceStore(
-            settings    = get(),
-            preferences = get(),
-            themes      = ThemeManager(get<Path>(), AtomicFiles::writeString),
-            contributed = modules.state.map { it.themes }.stateIn(appScope, SharingStarted.Eagerly, modules.state.value.themes),
+        val preferences: PreferenceWriter = get()
+        hostThemeManager(
+            dataDir      = get(),
+            settings     = get<SettingsDomainFiles>(),
             translations = get(),
-            scope       = appScope,
-        )
+            scope        = appScope,
+            write        = preferences::write,
+        ).also { manager -> followModuleThemes(get<WidgetModules>().state, manager, appScope) }
     }
 
     // What the packs module needs from the application around it: the launch notices,
@@ -607,12 +611,28 @@ internal fun reportedTo(problems: CoreProblems, keys: HostKeys? = null): Factory
 internal fun corePartOf(id: String): CorePart = CORE_PARTS[id] ?: CorePart.Other
 
 private val CORE_PARTS: Map<String, CorePart> = buildMap {
-    listOf(
-        Sources.ThemeLibrary.id, Sources.DarkTheme.id, Sources.ThemeMode.id, Sources.SystemSchemeAvailable.id,
-        Commands.ApplyTheme.id, Commands.SetDarkTheme.id, Commands.SetThemeMode.id,
-    ).forEach { put(it, CorePart.Appearance) }
     listOf(Sources.ConsoleVisible.id, Commands.SetConsoleVisible.id).forEach { put(it, CorePart.Console) }
 }
+
+/**
+ * The themes module's manager as the host makes it, over the module's settings domain in
+ * [settings] and the theme file in [dataDir]: the one the shell draws with and the module's keys
+ * answer over. A theme file a newer build wrote is put on record here, before the shell's first
+ * frame, for the notice that says what this session changes in it is not kept.
+ */
+internal fun hostThemeManager(
+    dataDir: Path,
+    settings: SettingsDomainFiles,
+    translations: Translations,
+    scope: CoroutineScope,
+    write: (what: String, block: () -> Unit) -> Unit = { _, block -> block() },
+): ThemeManager = ThemeManager(
+    store        = settings.of(ThemesSettingsDomain),
+    file         = ThemeLibraryFile(dataDir, AtomicFiles::writeString),
+    translations = translations,
+    scope        = scope,
+    write        = write,
+).also { if (it.readOnly) NewerBuildData.record(ReadOnlyStore.Theme) }
 
 /**
  * The app's data registry as the launcher builds it, from the flows the services
@@ -640,22 +660,9 @@ internal fun uiDataRegistry(
     // One per page, so a profile page kept in the history comes back on the section
     // it was left on.
     registerFactory(ProfileSelectionSource, sample = ::ProfileSelection) { flowSource(MutableStateFlow(ProfileSelection())) }
-    // How the composition looks, read off the app's one appearance store.
     // Every key here carries the sample the palette and the editor show a widget on
     // where no level of its kind is above: display data, never handed to a widget
-    // drawn for use.
-    registerFactory(Sources.ThemeLibrary, sample = ::ThemeLibrary) { composition ->
-        flowSource(composition.hostServices.get<AppearanceStore>().library)
-    }
-    registerFactory(Sources.DarkTheme, sample = { true }) { composition ->
-        flowSource(composition.hostServices.get<AppearanceStore>().dark)
-    }
-    registerFactory(Sources.ThemeMode, sample = { ThemeMode.Manual }) { composition ->
-        flowSource(composition.hostServices.get<AppearanceStore>().mode)
-    }
-    registerFactory(Sources.SystemSchemeAvailable, sample = { false }) { app ->
-        flowSource(app.hostServices.get<AppearanceStore>().systemSchemeAvailable)
-    }
+    // drawn for use. How the launcher looks is the themes module's keys.
     registerFactory(Sources.ConsoleVisible, sample = { false }) { app ->
         flowSource(app.hostServices.get<GameConsoleService>().visible)
     }
@@ -681,10 +688,6 @@ internal fun uiCommandRegistry(
     register(Commands.ClearNotifications, command { clearNotifications() })
     register(Commands.SetDoNotDisturb, command(setDoNotDisturb))
     register(Commands.UpdateBackground, command(updateBackground))
-    // How the composition looks, through the app's appearance store.
-    registerFactory(Commands.ApplyTheme) { composition -> command(composition.hostServices.get<AppearanceStore>()::select) }
-    registerFactory(Commands.SetDarkTheme) { composition -> command(composition.hostServices.get<AppearanceStore>()::setDark) }
-    registerFactory(Commands.SetThemeMode) { composition -> command(composition.hostServices.get<AppearanceStore>()::setMode) }
     registerFactory(Commands.SetConsoleVisible) { app ->
         val console = app.hostServices.get<GameConsoleService>()
         command { visible -> if (visible) console.show() else console.hide() }

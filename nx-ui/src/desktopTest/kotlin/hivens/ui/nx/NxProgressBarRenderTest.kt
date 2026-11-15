@@ -16,7 +16,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.Themes
+import hivens.ui.theme.TestTheme
 import hivens.ui.theme.SchemeColours
 import hivens.ui.theme.Status
 
@@ -40,7 +40,7 @@ class NxProgressBarRenderTest {
     /** Accent run along one scanline, in pixels. */
     private fun accentRun(progress: Float?, row: Int): Int {
         val bmp = render(progress)
-        val accent = SchemeColours(Themes.Celestia.dark).status(Status.Info)
+        val accent = SchemeColours(TestTheme.dark).status(Status.Info)
         var run = 0
         for (x in 0 until width) {
             if (isAccent(bmp.getColor(x, row), accent)) run++
@@ -51,7 +51,7 @@ class NxProgressBarRenderTest {
     @OptIn(ExperimentalComposeUiApi::class)
     private fun render(progress: Float?): Bitmap {
         val scene = ImageComposeScene(width = width, height = barHeight, density = Density(density)) {
-            NxTheme(Themes.Celestia, dark = true) {
+            NxTheme(TestTheme, dark = true) {
                 Box(Modifier.fillMaxSize().background(Color(0xFF121212))) {
                     NxProgressBar(progress = progress, height = barHeight.dp)
                 }

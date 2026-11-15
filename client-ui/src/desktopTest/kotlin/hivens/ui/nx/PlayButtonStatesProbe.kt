@@ -3,6 +3,7 @@ package hivens.ui.nx
 import androidx.compose.foundation.background
 import hivens.i18n.api.LocalTranslator
 import hivens.i18n.api.Strings
+import hivens.themes.Themes
 import hivens.ui.i18n.NexiraStrings
 import hivens.ui.theme.Spacing
 import hivens.ui.icons.Symbol
@@ -113,7 +114,7 @@ class PlayButtonStatesProbe {
 
     @Composable
     private fun Sheet(dark: Boolean, onSurface: Boolean = false, stripH: Int = STRIP_H, button: @Composable (Cell, Strings) -> Unit) {
-        NxTheme(dark = dark) {
+        NxTheme(Themes.default, dark = dark) {
             Box(Modifier.fillMaxSize().background(NxColor.page).padding(16.dp)) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     cells.forEach { cell ->

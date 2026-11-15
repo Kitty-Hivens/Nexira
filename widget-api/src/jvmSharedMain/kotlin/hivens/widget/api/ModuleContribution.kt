@@ -1,15 +1,16 @@
 package hivens.widget.api
 
 /**
- * Something a module adds to the launcher besides widgets: a screen effect, a theme, a particle
- * field, the keys it answers. Every kind of contribution shares this much, which is what lets the loader, the module
- * list and the settings treat them alike without knowing any of them.
+ * Something a module adds to the launcher besides widgets: a screen effect, a particle field, the
+ * keys it answers, a theme. Every kind of contribution shares this much, which is what lets the
+ * loader, the module list and the settings treat them alike without knowing any of them.
  *
  * A module carries its contributions as services, one service file per kind in
  * `META-INF/services`, named after the kind's interface. A kind is an interface that extends this
- * one, and the launcher decides what each kind is for: effects wrap the interface, themes join the
- * theme list, particle fields become widgets. A new kind is one interface here and one consumer in
- * the launcher, and no module that does not use it has to change.
+ * one, and whoever takes it decides what it is for: effects wrap the interface and particle fields
+ * become widgets, which the launcher does, and themes join the theme list, which the themes module
+ * does. A kind is declared here, in [kinds], or by a module compiled into the launcher in its own
+ * API (see [CompiledModule.contributionKinds]), and no module that does not use it has to change.
  */
 interface ModuleContribution {
     /** Stable across versions of the module, since the person's choices are stored by it. */
@@ -22,10 +23,13 @@ interface ModuleContribution {
     val settings: List<ModuleSetting> get() = emptyList()
 
     companion object {
-        /** The kinds of contribution this build of the launcher knows. A kind a module declares that is not here is never read. */
+        /**
+         * The kinds of contribution the widget kernel itself declares. The ones the modules compiled
+         * into the launcher declare in their own APIs come on top. A kind a module carries that
+         * neither declares is never read.
+         */
         val kinds: List<Class<out ModuleContribution>> = listOf(
             ScreenEffect::class.java,
-            ThemeContribution::class.java,
             ParticleContribution::class.java,
             KeyContribution::class.java,
         )

@@ -5,10 +5,10 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import hivens.themes.Themes
+import hivens.themes.api.ThemesApi
 import hivens.ui.i18n.nexiraStrings
 import hivens.ui.theme.Theme
-import hivens.ui.theme.Themes
-import hivens.ui.theme.WALLPAPER_THEME_ID
 import hivens.widget.model.ScopeLevel
 import hivens.widget.model.SourceKey
 
@@ -33,4 +33,4 @@ internal fun sampleThemeSelection(): ThemeSelection = ThemeSelection(Themes.defa
 
 /** What the picker calls [this]: the theme's own name, or this launcher's word for the one made from the wallpaper. */
 @Composable
-internal fun Theme.label(): String = if (id == WALLPAPER_THEME_ID) nexiraStrings().text("themeFromWallpaper") else name
+internal fun Theme.label(): String = if (id == ThemesApi.WALLPAPER_THEME_ID) nexiraStrings().text("themeFromWallpaper") else name

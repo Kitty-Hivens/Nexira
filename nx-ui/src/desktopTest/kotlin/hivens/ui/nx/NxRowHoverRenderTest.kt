@@ -13,7 +13,7 @@ import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.Themes
+import hivens.ui.theme.TestTheme
 import org.jetbrains.skia.Bitmap
 import kotlin.test.Test
 import kotlin.test.assertNotEquals
@@ -28,7 +28,7 @@ class NxRowHoverRenderTest {
     @Test
     fun `hovering a clickable row lightens it`() {
         val scene = ImageComposeScene(width = 400, height = 120, density = Density(1f)) {
-            NxTheme(Themes.Celestia, dark = true) {
+            NxTheme(TestTheme, dark = true) {
                 Column(Modifier.fillMaxSize().background(Color.Black).padding(horizontal = 24.dp)) {
                     NxRow(title = "Row", onClick = {})
                 }

@@ -17,6 +17,7 @@ import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.unit.Density
+import hivens.themes.Themes
 import hivens.ui.icons.NxIcon
 import hivens.ui.layers.LayerHost
 import hivens.ui.layers.WindowLayers
@@ -41,7 +42,7 @@ class VersionPickerFocusReturnTest {
         var open by mutableStateOf(false)
         var focusManager: FocusManager? = null
         val scene = ImageComposeScene(900, 600, density = Density(1f)) {
-            NxTheme(dark = true) {
+            NxTheme(Themes.default, dark = true) {
                 LayerHost(layers, Modifier.fillMaxSize()) {
                     focusManager = LocalFocusManager.current
                     Row(Modifier.focusGroup()) {

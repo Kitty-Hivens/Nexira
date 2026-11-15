@@ -10,6 +10,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Density
 import hivens.catalogue.api.PackOrigins
 import hivens.catalogue.api.ProjectTarget
+import hivens.themes.Themes
+import hivens.themes.api.ThemesKeys
 import hivens.ui.background.BackgroundSettings
 import hivens.ui.editor.EditorSurfaces
 import hivens.ui.feature.catalogue.browse.CataloguePackDetailScreen
@@ -19,7 +21,6 @@ import hivens.ui.i18n.ShippedLanguageProvider
 import hivens.ui.onEventThread
 import hivens.ui.settle
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.ThemeLibrary
 import hivens.ui.uiCommandRegistry
 import hivens.ui.uiDataRegistry
 import hivens.ui.widgets.about.AboutSurface
@@ -31,7 +32,6 @@ import hivens.widget.api.LocalSurfaceFamilies
 import hivens.widget.api.LocalWidgetCommandRegistry
 import hivens.widget.api.LocalWidgetDataRegistry
 import hivens.widget.api.LocalWidgetRegistry
-import hivens.widget.api.ProvideScoped
 import hivens.widget.api.SurfaceFamilies
 import hivens.widget.api.WidgetDescriptor
 import hivens.widget.api.WidgetRegistry
@@ -123,7 +123,7 @@ class ScreenProvidesTest {
             val scene = ImageComposeScene(1200, 800, density = Density(1f)) {
                 HostKoin(koin) {
                     ShippedLanguageProvider("en") {
-                        NxTheme(dark = true) {
+                        NxTheme(Themes.default, dark = true) {
                             CompositionLocalProvider(
                                 LocalWidgetDataRegistry provides data,
                                 LocalWidgetCommandRegistry provides commands,
@@ -154,9 +154,11 @@ class ScreenProvidesTest {
 
     @Test
     fun `the theme picker hands its widgets what its surface lists`() {
-        // The library is put over the composition rather than read off an appearance
-        // store, which this probe's Koin does not hold.
-        val (drew, missed) = probe("theme.picker") { ProvideScoped(Sources.ThemeLibrary, ThemeLibrary()) { ThemePickerSurface() } }
+        // The themes on offer and the one in use are the app's values here rather than the
+        // themes module's answers, since this probe's Koin holds no manager to answer them.
+        data.register(ThemesKeys.Offered, flowSource(MutableStateFlow(Themes.all)))
+        data.register(ThemesKeys.Active, flowSource(MutableStateFlow(Themes.default)))
+        val (drew, missed) = probe("theme.picker") { ThemePickerSurface() }
         assertEquals(emptySet(), missed)
         assertTrue(drew.isNotEmpty())
     }

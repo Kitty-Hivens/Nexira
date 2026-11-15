@@ -1,12 +1,10 @@
 package hivens.ui.widgets
 
 import hivens.core.activity.Activity
-import hivens.core.data.ThemeMode
 import hivens.ui.background.BackgroundSettings
 import hivens.ui.navigation.NavState
 import hivens.ui.notifications.PersistedNotification
 import hivens.ui.host.HostWindowState
-import hivens.ui.theme.ThemeLibrary
 import hivens.ui.widgets.about.SystemFacts
 import hivens.widget.model.ScopeLevel
 import hivens.widget.model.SourceKey
@@ -28,7 +26,9 @@ import hivens.widget.model.SourceKey
  * in `hivens.packs.api.PackKeys`, and exist only where the document names that module.
  * Nor are the session and the accounts, which are the accounts module's, in
  * `hivens.accounts.api.AccountKeys`, nor the catalogue and the project the rail
- * describes, which are the catalogue module's, in `hivens.catalogue.api.CatalogueKeys`.
+ * describes, which are the catalogue module's, in `hivens.catalogue.api.CatalogueKeys`,
+ * nor the theme in use and what decides dark and light, which are the themes module's,
+ * in `hivens.themes.api.ThemesKeys`.
  */
 object Sources {
     /**
@@ -66,18 +66,6 @@ object Sources {
 
     /** The machine's memory and processor, read once a run. */
     val SystemInfo = SourceKey<SystemFacts>("system.info")
-
-    /** Every theme there is and the one in use, as the composition draws with them. Changed through [Commands.ApplyTheme]. */
-    val ThemeLibrary = SourceKey<ThemeLibrary>("theme.library", ScopeLevel.Composition)
-
-    /** Whether the composition is drawn in its dark scheme. Set by [Commands.SetDarkTheme]. */
-    val DarkTheme = SourceKey<Boolean>("theme.dark", ScopeLevel.Composition)
-
-    /** What decides [DarkTheme]: the person, the system's scheme or the wallpaper. Changed through [Commands.SetThemeMode]. */
-    val ThemeMode = SourceKey<ThemeMode>("theme.mode", ScopeLevel.Composition)
-
-    /** Whether the host can read the system's colour scheme, so following it can be offered. A fact of the host, so the app's. */
-    val SystemSchemeAvailable = SourceKey<Boolean>("theme.system.available")
 
     /** Whether the console is asked to be on screen. Changed through [Commands.SetConsoleVisible]. */
     val ConsoleVisible = SourceKey<Boolean>("console.visible")

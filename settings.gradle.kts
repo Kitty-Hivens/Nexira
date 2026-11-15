@@ -188,5 +188,12 @@ include(":catalogue")
 // before any module loads, since the window the launcher boots in already speaks.
 include(":i18n-api")
 include(":i18n")
+// The themes module: the themes that ship, the one made from the wallpaper, the ones modules
+// bring and the person's own, which is in use and what decides dark and light, and where the
+// choice is kept. Drawing stays in nx-ui, which is handed the theme to draw. Like the language
+// module, the host makes its manager before any module loads, since the boot window is drawn
+// in the person's theme.
+include(":themes-api")
+include(":themes")
 include(":profiler-agent")
 include(":authlib-agent")

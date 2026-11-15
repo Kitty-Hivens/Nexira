@@ -27,6 +27,9 @@ val LocalScheme = staticCompositionLocalOf<SchemeColours> { error("No theme prov
 /**
  * Provides [theme] in [dark] or light mode to everything inside.
  *
+ * Which theme that is, and where the choice is kept, is not decided here: the caller hands
+ * the theme it wants drawn, a window the one in use, a picker the one it shows.
+ *
  * The page is the first plane: content directly inside reads against step 0 until a
  * surface says otherwise. Material components still in use get a colour scheme built
  * from the same ladder and colours, so they agree with the library around them
@@ -37,7 +40,7 @@ val LocalScheme = staticCompositionLocalOf<SchemeColours> { error("No theme prov
  */
 @Composable
 fun NxTheme(
-    theme: Theme = Themes.default,
+    theme: Theme,
     dark: Boolean = true,
     // The face every text role is drawn with. Null keeps the bundled Latin face;
     // a locale whose own strings that face cannot cover passes the bundled CJK

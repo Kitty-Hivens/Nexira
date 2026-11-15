@@ -16,6 +16,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import hivens.themes.Themes
 import hivens.ui.audio.PlaybackState
 import hivens.ui.audio.RepeatMode
 import hivens.ui.audio.TrackInfo
@@ -61,7 +62,7 @@ class CoverPlayerRenderProbe {
         val d = 2f
         val scene = ImageComposeScene((500 * d).toInt(), (1240 * d).toInt(), density = Density(d)) {
             ShippedLanguageProvider("en") {
-                NxTheme(dark = true) {
+                NxTheme(Themes.default, dark = true) {
                     Box(
                         Modifier.fillMaxSize().background(NxColor.page).padding(Spacing.s16),
                         contentAlignment = Alignment.TopCenter,
@@ -103,7 +104,7 @@ class CoverPlayerRenderProbe {
         val d = 2f
         val scene = ImageComposeScene((460 * d).toInt(), (520 * d).toInt(), density = Density(d)) {
             ShippedLanguageProvider("en") {
-                NxTheme(dark = true) {
+                NxTheme(Themes.default, dark = true) {
                     Box(
                         Modifier.fillMaxSize().background(NxColor.page).padding(Spacing.s16),
                         contentAlignment = Alignment.Center,
@@ -153,7 +154,7 @@ class CoverPlayerRenderProbe {
             val d = 2f
             val scene = ImageComposeScene((460 * d).toInt(), (420 * d).toInt(), density = Density(d)) {
                 ShippedLanguageProvider("ru") {
-                    NxTheme(dark = dark) {
+                    NxTheme(Themes.default, dark = dark) {
                         Box(
                             Modifier.fillMaxSize().background(NxColor.page).padding(Spacing.s16),
                             contentAlignment = Alignment.TopStart,

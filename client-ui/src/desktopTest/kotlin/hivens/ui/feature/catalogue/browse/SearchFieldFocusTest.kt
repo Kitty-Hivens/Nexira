@@ -16,6 +16,7 @@ import androidx.compose.ui.input.pointer.PointerButtons
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import hivens.themes.Themes
 import hivens.ui.theme.NxTheme
 import javax.swing.SwingUtilities
 import kotlin.test.Test
@@ -50,7 +51,7 @@ class SearchFieldFocusTest {
     fun `clearing the search leaves the caret in the field`() = SwingUtilities.invokeAndWait {
         val probe = Probe()
         val scene = ImageComposeScene(WIDTH, 80, density = Density(1f)) {
-            NxTheme(dark = true) {
+            NxTheme(Themes.default, dark = true) {
                 var value by remember { mutableStateOf(probe.value) }
                 Box(Modifier.onFocusChanged { probe.hasFocus = it.hasFocus }) {
                     SearchField(

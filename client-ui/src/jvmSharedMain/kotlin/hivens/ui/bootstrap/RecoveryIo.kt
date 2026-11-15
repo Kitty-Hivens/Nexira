@@ -34,6 +34,13 @@ object RecoveryIo {
     private val CUSTOMIZATION_FILES =
         listOf("themes.json", "background.json", "console.json", "customization.json")
 
+    // The theme a person chose is kept apart from the theme file now, as the themes
+    // module's settings, so a reset of the look takes that file too. Without it the
+    // reset kept the choice of a theme it had just removed. The dark flag and the
+    // mode come back from what the old settings file holds of them, as they stayed
+    // before the choice moved.
+    internal val THEME_CHOICE_FILE = Storage.SETTINGS_DIR + "/themes.json"
+
     // Not one of the above, and not a reset the appearance button is allowed to
     // make: this file is what the user typed into their widgets, and nothing else
     // holds a copy of it.
@@ -86,6 +93,7 @@ object RecoveryIo {
     fun resetCustomization(dataDir: Path) {
         stateWasReset = true
         CUSTOMIZATION_FILES.forEach { deleteQuietly(dataDir.resolve(it)) }
+        deleteQuietly(dataDir.resolve(THEME_CHOICE_FILE))
     }
 
     /**

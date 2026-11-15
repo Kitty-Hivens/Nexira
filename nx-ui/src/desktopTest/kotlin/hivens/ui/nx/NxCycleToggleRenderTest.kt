@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.Density
 import hivens.ui.icons.NxIcon
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.Spacing
+import hivens.ui.theme.TestTheme
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
 import kotlin.test.Test
@@ -61,7 +62,7 @@ class NxCycleToggleRenderTest {
     private fun sheet(name: String, dark: Boolean) {
         val d = 3f
         val scene = ImageComposeScene((260 * d).toInt(), (86 * d).toInt(), density = Density(d)) {
-            NxTheme(dark = dark) {
+            NxTheme(TestTheme, dark = dark) {
                 Box(
                     Modifier.fillMaxSize().background(NxColor.page).padding(Spacing.s12),
                     contentAlignment = Alignment.CenterStart,

@@ -1,4 +1,4 @@
-package hivens.ui.theme
+package hivens.themes
 
 import androidx.compose.ui.graphics.Color
 import kotlin.math.abs

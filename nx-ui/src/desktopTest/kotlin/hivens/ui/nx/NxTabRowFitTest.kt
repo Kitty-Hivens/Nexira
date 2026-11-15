@@ -20,6 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import hivens.ui.theme.NxTheme
+import hivens.ui.theme.TestTheme
 import kotlin.test.Test
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -62,7 +63,7 @@ class NxTabRowFitTest {
     fun `tabs that fit take only their own width`() {
         var neighbourAt = -1f
         val scene = ImageComposeScene(1200, 120, density = Density(1f)) {
-            NxTheme(dark = true) {
+            NxTheme(TestTheme, dark = true) {
                 Row {
                     NxTabRow(tabs = labels.take(2), selected = 0, onSelect = {})
                     Box(Modifier.size(10.dp).onGloballyPositioned { neighbourAt = it.positionInRoot().x })
@@ -82,7 +83,7 @@ class NxTabRowFitTest {
     /** Draws the five tabs in a row narrower than they are together and runs [check] on it. */
     private fun rowOf(selected: Int, check: (ImageComposeScene) -> Unit) {
         val scene = ImageComposeScene(400, 120, density = Density(1f)) {
-            NxTheme(dark = true) {
+            NxTheme(TestTheme, dark = true) {
                 Box(Modifier.fillMaxSize()) {
                     NxTabRow(tabs = labels, selected = selected, onSelect = {}, modifier = Modifier.width(ROW_WIDTH.dp))
                 }
@@ -105,7 +106,7 @@ class NxTabRowFitTest {
     private fun naturalWidth(label: String): Int {
         var width = -1
         val scene = ImageComposeScene(1000, 120, density = Density(1f)) {
-            NxTheme(dark = true) {
+            NxTheme(TestTheme, dark = true) {
                 NxSteadyText(
                     text = label,
                     weight = FontWeight.Normal,

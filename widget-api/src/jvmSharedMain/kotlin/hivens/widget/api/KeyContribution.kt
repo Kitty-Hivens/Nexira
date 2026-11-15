@@ -147,6 +147,15 @@ interface CompiledModule {
     val apiPackages: Map<String, Set<String>> get() = emptyMap()
 
     /**
+     * The kinds of contribution this module takes from the jars, each an interface in one of
+     * its APIs, the themes module's theme say. The host has the loader read them beside the
+     * kinds the kernel declares ([ModuleContribution.kinds]) and hands what it finds to the
+     * module. A jar that brings one names the API in its manifest, without which it cannot
+     * see the interface.
+     */
+    val contributionKinds: List<Class<out ModuleContribution>> get() = emptyList()
+
+    /**
      * What it adds. The host reads its [KeyContribution]s, and of a compiled module
      * nothing else yet: effects, themes and particle fields come from jars only.
      */

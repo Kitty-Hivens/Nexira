@@ -28,6 +28,7 @@ import hivens.launcher.smrt.SmrtPackClient
 import hivens.packs.api.PackKeys
 import hivens.packs.api.PackUpdateView
 import hivens.packs.toPackView
+import hivens.themes.Themes
 import hivens.ui.host.HostKoin
 import hivens.ui.i18n.ShippedLanguageProvider
 import hivens.ui.navigation.NavRequests
@@ -149,7 +150,7 @@ class PackCardRenderTest {
         val scene = ImageComposeScene((520 * d).toInt(), (480 * d).toInt(), density = Density(d)) {
             HostKoin(graph) {
                 ShippedLanguageProvider("ru") {
-                    NxTheme(dark = dark) {
+                    NxTheme(Themes.default, dark = dark) {
                         CompositionLocalProvider(LocalWidgetDataRegistry provides keys) {
                             Box(Modifier.fillMaxSize().background(NxColor.page).padding(16.dp)) {
                                 Column(

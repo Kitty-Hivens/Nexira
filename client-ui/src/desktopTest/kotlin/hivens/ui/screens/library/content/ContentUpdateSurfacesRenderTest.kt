@@ -24,6 +24,7 @@ import hivens.launcher.instance.ContentRef
 import hivens.launcher.instance.InstalledContent
 import hivens.launcher.instance.InstanceContentUpdater
 import hivens.launcher.instance.ModUpdate
+import hivens.themes.Themes
 import hivens.ui.theme.NxTheme
 import org.jetbrains.skia.EncodedImageFormat
 import java.awt.image.BufferedImage
@@ -281,7 +282,7 @@ class ContentUpdateSurfacesRenderTest {
         val out = Path.of("build/render", name)
         Files.createDirectories(out.parent)
         val scene = ImageComposeScene(width, height, density = density) {
-            NxTheme(dark = true) { content() }
+            NxTheme(Themes.default, dark = true) { content() }
         }
         val png = try {
             var frameNanos = 0L

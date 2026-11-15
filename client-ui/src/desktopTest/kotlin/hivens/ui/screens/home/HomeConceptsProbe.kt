@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import hivens.themes.Themes
 import hivens.ui.effects.pixelArtBackground
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
@@ -397,7 +398,7 @@ class HomeConceptsProbe {
         val out = Path.of("build/render/home", name)
         Files.createDirectories(out.parent)
         val scene = ImageComposeScene(1545, 935, density = Density(1f)) {
-            NxTheme(dark = true) {
+            NxTheme(Themes.default, dark = true) {
                 Box(Modifier.fillMaxSize().background(NxColor.page)) { content() }
             }
         }

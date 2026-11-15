@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import hivens.themes.Themes
 import hivens.ui.theme.NxTheme
 import hivens.ui.widgets.AdaptiveWidget
 import hivens.widget.model.SurfaceCorners
@@ -180,7 +181,7 @@ class WidgetSurfaceRenderTest {
     @OptIn(ExperimentalComposeUiApi::class)
     private fun pixel(spec: SurfaceSpec, px: Int, py: Int): Px {
         val scene = ImageComposeScene(width = SW, height = SH, density = Density(1f)) {
-            NxTheme(dark = true) {
+            NxTheme(Themes.default, dark = true) {
                 Box(Modifier.fillMaxSize().background(PAGE)) {
                     Box(Modifier.offset(X.dp, Y.dp).size(W.dp, H.dp)) {
                         WidgetSurface(spec) { Box(Modifier.fillMaxSize()) }
@@ -205,7 +206,7 @@ class WidgetSurfaceRenderTest {
     @OptIn(ExperimentalComposeUiApi::class)
     private fun adaptive(spec: SurfaceSpec, w: Int, h: Int, px: Int, py: Int): Px {
         val scene = ImageComposeScene(width = w + 2 * M, height = h + 2 * M, density = Density(1f)) {
-            NxTheme(dark = true) {
+            NxTheme(Themes.default, dark = true) {
                 Box(Modifier.fillMaxSize().background(PAGE)) {
                     Box(Modifier.offset(M.dp, M.dp).size(w.dp, h.dp)) {
                         WidgetSurface(spec) {
@@ -232,7 +233,7 @@ class WidgetSurfaceRenderTest {
     @OptIn(ExperimentalComposeUiApi::class)
     private fun cornerCut(spec: SurfaceSpec): Int {
         val scene = ImageComposeScene(width = SW, height = SH, density = Density(1f)) {
-            NxTheme(dark = true) {
+            NxTheme(Themes.default, dark = true) {
                 Box(Modifier.fillMaxSize().background(PAGE)) {
                     Box(Modifier.offset(X.dp, Y.dp).size(W.dp, H.dp)) {
                         WidgetSurface(spec) { Box(Modifier.fillMaxSize()) }

@@ -18,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import hivens.themes.api.ThemesKeys
 import hivens.ui.flexible.Flexible
 import hivens.ui.flexible.FlexibleKind
 import hivens.ui.i18n.nexiraStrings
@@ -29,7 +30,6 @@ import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.NxInk
 import hivens.ui.widgets.Commands
-import hivens.ui.widgets.Sources
 import hivens.widget.api.ProvideScoped
 import hivens.widget.api.SlotRenderer
 import hivens.widget.api.rememberScopedAction
@@ -45,16 +45,17 @@ private const val SURFACE = "theme.picker"
 // pending choice over its page for the child widgets and lays out two slots side by
 // side (grid and preview). The title and Apply are surface chrome rather than
 // widgets: without them the screen loses its whole purpose. Apply puts the choice in
-// use and leaves the picker.
+// use and leaves the picker. The themes on offer and the choice are the themes
+// module's, and with no themes module brought in there is nothing to pick.
 @Composable
 fun ThemePickerSurface() {
-    val library = rememberScopedSource(Sources.ThemeLibrary).valueOrNull() ?: return
+    val themes = rememberScopedSource(ThemesKeys.Offered).valueOrNull() ?: return
+    val active = rememberScopedSource(ThemesKeys.Active).valueOrNull() ?: return
     val s = nexiraStrings()
-    val themes = library.all
     // Keyless remember: the pending selection survives an outside change of the
     // active theme. Only Apply commits it.
-    val selected = remember { ThemeSelection(library.active) }
-    val apply = rememberScopedCommand(Commands.ApplyTheme)
+    val selected = remember { ThemeSelection(active) }
+    val apply = rememberScopedCommand(ThemesKeys.Choose)
     val back = rememberScopedAction(Commands.Back)
     // Leaves only once the choice is in use: with nothing to apply it, Apply does
     // nothing at all rather than walk away from a choice that did not land.

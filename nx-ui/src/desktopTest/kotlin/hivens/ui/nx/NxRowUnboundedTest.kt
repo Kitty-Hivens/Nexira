@@ -8,7 +8,7 @@ import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Density
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.Themes
+import hivens.ui.theme.TestTheme
 import kotlin.test.Test
 
 /** A clickable row measured with no width limit, as a horizontal scroller measures it. */
@@ -18,7 +18,7 @@ class NxRowUnboundedTest {
     @Test
     fun `a clickable row lays out in a horizontal scroller`() {
         val scene = ImageComposeScene(width = 400, height = 80, density = Density(1f)) {
-            NxTheme(Themes.Celestia, dark = true) {
+            NxTheme(TestTheme, dark = true) {
                 Row(Modifier.horizontalScroll(rememberScrollState())) {
                     NxRow(title = "Row", onClick = {})
                 }

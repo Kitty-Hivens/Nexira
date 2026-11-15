@@ -4,14 +4,23 @@ import hivens.accounts.AccountsModule
 import hivens.catalogue.CatalogueModule
 import hivens.i18n.I18nModule
 import hivens.packs.PacksModule
+import hivens.themes.ThemesModule
 import hivens.widget.api.CompiledModule
+import hivens.widget.api.ModuleContribution
 import hivens.widget.model.ApiVersion
 
 /**
  * The modules compiled into this build. Carrying one is not using it: the host brings
  * in a module's keys only where the document names it, the same as a jar's.
  */
-val CompiledModules: List<CompiledModule> = listOf(I18nModule, PacksModule, AccountsModule, CatalogueModule)
+val CompiledModules: List<CompiledModule> = listOf(I18nModule, ThemesModule, PacksModule, AccountsModule, CatalogueModule)
+
+/**
+ * The kinds of contribution read out of every jar: the ones the widget kernel declares and
+ * the ones the APIs of [modules] add (see [CompiledModule.contributionKinds]).
+ */
+fun offeredContributionKinds(modules: List<CompiledModule> = CompiledModules): List<Class<out ModuleContribution>> =
+    (ModuleContribution.kinds + modules.flatMap { it.contributionKinds }).distinct()
 
 /** The module APIs [modules] publish, which a jar may have been compiled against. */
 fun offeredApis(modules: List<CompiledModule> = CompiledModules): Map<String, ApiVersion> =

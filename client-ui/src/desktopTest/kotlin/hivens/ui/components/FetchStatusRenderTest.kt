@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import hivens.i18n.api.LocalTranslator
 import hivens.media.MediaFetch
+import hivens.themes.Themes
 import hivens.ui.i18n.NexiraStrings
 import hivens.ui.theme.NxTheme
 import org.jetbrains.skia.Bitmap
@@ -61,7 +62,7 @@ class FetchStatusRenderTest {
             height  = (height * scale).toInt(),
             density = Density(scale),
         ) {
-            NxTheme(dark = true) {
+            NxTheme(Themes.default, dark = true) {
                 CompositionLocalProvider(
                     LocalTranslator provides NexiraStrings.translator("en"),
                 ) {

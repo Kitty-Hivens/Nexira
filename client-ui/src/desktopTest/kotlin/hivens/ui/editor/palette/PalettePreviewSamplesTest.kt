@@ -6,24 +6,26 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
-import hivens.core.api.interfaces.ISettingsService
-import hivens.core.data.SettingsData
+import hivens.config.Storage
 import hivens.i18n.api.FixedTranslations
-import hivens.ui.appearance.AppearanceStore
+import hivens.themes.Themes
+import hivens.themes.ThemesKeysContribution
+import hivens.themes.api.ThemesApi
+import hivens.themes.api.ThemesKeys
 import hivens.ui.background.BackgroundSettings
+import hivens.ui.hostThemeManager
 import hivens.ui.i18n.NexiraStrings
 import hivens.ui.i18n.ShippedLanguageProvider
 import hivens.ui.onEventThread
+import hivens.ui.settings.SettingsDomainFiles
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.ThemeManager
 import hivens.ui.uiCommandRegistry
-import hivens.ui.utils.PreferenceWriter
 import hivens.ui.uiDataRegistry
 import hivens.ui.widgets.ChildLevel
 import hivens.ui.widgets.KoinLevelServicesHost
-import hivens.ui.widgets.Sources
 import hivens.ui.widgets.WidgetSurface
 import hivens.ui.widgets.themepicker.ThemeSelectionSource
+import hivens.widget.api.ContributedServices
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.LocalScope
 import hivens.widget.api.LocalWidgetCommandRegistry
@@ -34,6 +36,7 @@ import hivens.widget.api.WidgetCommandRegistry
 import hivens.widget.api.WidgetDataRegistry
 import hivens.widget.api.WidgetScope
 import hivens.widget.api.flowSource
+import hivens.widget.api.registerModuleKeys
 import hivens.widget.generated.GeneratedWidgetRegistry
 import hivens.widget.model.DefaultLayout
 import hivens.widget.model.ScopeLevel
@@ -70,38 +73,33 @@ class PalettePreviewSamplesTest {
 
     private val commands = uiCommandRegistry({}, {}, {})
 
-    /**
-     * What the composition's level reads the theme keys from, the way the launcher's
-     * does: they are the composition's own and answered wherever it is, so only the
-     * page's keys are left for the samples to stand in for.
-     */
-    private val themes: Path = Files.createTempDirectory("palette-preview-samples")
+    init {
+        // The themes module's keys, as the launcher brings them in: they are the app's and
+        // answered wherever a widget stands, so only the page's keys are left for the
+        // samples to stand in for.
+        registerModuleKeys(ThemesApi.ID, ThemesKeysContribution, sampled, commands, ContributedServices(), trusted = true)
+    }
+
+    /** Where the themes module's manager, which those keys are answered over, keeps its files. */
+    private val dataDir: Path = Files.createTempDirectory("palette-preview-samples")
 
     @OptIn(ExperimentalPathApi::class)
     @AfterTest
     fun tearDown() {
-        themes.deleteRecursively()
+        dataDir.deleteRecursively()
     }
 
-    private val appearance = AppearanceStore(
-        settings    = object : ISettingsService {
-            private var current = SettingsData()
-            override fun getSettings(): SettingsData = current
-            override fun saveSettings(settings: SettingsData) {
-                current = settings
-            }
-        },
-        preferences = PreferenceWriter("palette-preview-samples-test"),
-        themes      = ThemeManager(themes) { _, _ -> },
-        contributed = MutableStateFlow(emptyList()),
+    private val themes = hostThemeManager(
+        dataDir      = dataDir,
+        settings     = SettingsDomainFiles(dataDir.resolve(Storage.SETTINGS_DIR), dataDir.resolve(Storage.SETTINGS_FILE)),
         translations = FixedTranslations(NexiraStrings.translator("en")),
-        scope       = CoroutineScope(Dispatchers.Unconfined),
+        scope        = CoroutineScope(Dispatchers.Unconfined),
     )
 
-    /** The theme picker's keys as declared before they had samples. */
+    /** The theme picker's keys as declared before they had samples: the app's answered, the page's choice with nothing to stand in for it. */
     private val bare = WidgetDataRegistry().apply {
-        declare(Sources.ThemeLibrary)
-        declare(Sources.DarkTheme)
+        register(ThemesKeys.Offered, flowSource(MutableStateFlow(Themes.all)))
+        register(ThemesKeys.Dark, flowSource(MutableStateFlow(true)))
         declare(ThemeSelectionSource)
     }
 
@@ -110,7 +108,7 @@ class PalettePreviewSamplesTest {
         val app: WidgetScope = koinApplication {
             modules(
                 module {
-                    single { appearance }
+                    single { themes }
                     single { WidgetScope.app(data, KoinLevelServicesHost.app(this), Dispatchers.Unconfined, commands) }
                 },
             )
@@ -120,7 +118,7 @@ class PalettePreviewSamplesTest {
             var host: OffscreenPreviewHost? = null
             val scene = ImageComposeScene(400, 400, density = Density(1f)) {
                 ShippedLanguageProvider("en") {
-                    NxTheme(dark = true) {
+                    NxTheme(Themes.default, dark = true) {
                         CompositionLocalProvider(
                             LocalWidgetDataRegistry provides data,
                             LocalWidgetCommandRegistry provides commands,

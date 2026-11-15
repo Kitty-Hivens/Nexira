@@ -32,6 +32,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import hivens.themes.Themes
 import hivens.ui.effects.pixelArtBackground
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
@@ -438,7 +439,7 @@ class PackSettingsConceptsProbe {
         val out = Path.of("build/render/pack-settings", "$name-${width}x$height.png")
         Files.createDirectories(out.parent)
         val scene = ImageComposeScene(width, height, density = Density(1f)) {
-            NxTheme(dark = true) { content() }
+            NxTheme(Themes.default, dark = true) { content() }
         }
         val png = try {
             val t = scene.settle(frames = 12)

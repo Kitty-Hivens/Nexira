@@ -13,6 +13,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import hivens.i18n.api.LocalTranslator
+import hivens.themes.Themes
 import hivens.ui.i18n.NexiraStrings
 import hivens.core.activity.Activity
 import hivens.core.activity.ActivityKind
@@ -70,7 +71,7 @@ class PillWidthTest {
         val strings = if (russian) NexiraStrings.shipped("ru") else NexiraStrings.shipped("en")
         val ambient = if (russian) probeAmbient else null
         val scene = ImageComposeScene(width = frame, height = 140, density = Density(1f)) {
-            NxTheme(dark = true) {
+            NxTheme(Themes.default, dark = true) {
                 CompositionLocalProvider(
                     LocalTranslator provides NexiraStrings.translator(strings.language),
                 ) {

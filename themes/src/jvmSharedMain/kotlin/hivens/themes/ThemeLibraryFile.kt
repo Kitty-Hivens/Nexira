@@ -1,8 +1,10 @@
-package hivens.ui.theme
+package hivens.themes
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import hivens.ui.nx.parseHexOrNull
+import hivens.ui.theme.Scheme
+import hivens.ui.theme.Theme
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -12,74 +14,50 @@ import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.slf4j.LoggerFactory
-import hivens.ui.util.readUtf8
+import java.nio.ByteBuffer
 import java.nio.file.Files
 import java.nio.file.Path
 
 /**
- * The themes a person can choose from and the one they chose: everything that ships,
- * the one made from their wallpaper, and the ones that are their own.
- *
- * Their own are themes they brought in through a file or that an older build stored
- * in a shape this one has replaced. A selection naming a theme that no longer exists
- * lands on the default rather than on nothing, and so does the wallpaper theme while
- * there is no wallpaper to make it from.
- *
- * [wallpaper] is the last wallpaper's colours, best first. Kept with the selection so
- * a launcher that opens on the wallpaper theme opens in it, rather than in the default
- * until the picture has decoded.
+ * What `themes.json` held when it was read: the library, and whether its selection is one the
+ * file really holds. [selectionRead] is false where there is no file, where it cannot be read,
+ * and where a newer build wrote it, and then the selection is the default and says nothing of
+ * what anyone chose.
  */
-data class ThemeLibrary(
-    val selected: String = Themes.default.id,
-    val own: List<Theme> = emptyList(),
-    val wallpaper: List<Int> = emptyList(),
-    /**
-     * The themes modules brought, which the shell fills in from whatever is loaded. Never stored: a
-     * module that is off or gone takes its themes with it, and a selection that named one lands on
-     * the default until the module is back.
-     */
-    val contributed: List<Theme> = emptyList(),
-) {
-    /** The theme made from [wallpaper], null without one. Named in English: a screen shows its own word for it. */
-    val fromWallpaper: Theme? by lazy { themeFromWallpaper(wallpaper, "Wallpaper") }
-
-    val all: List<Theme> get() = Themes.all + listOfNotNull(fromWallpaper) + contributed + own
-
-    val active: Theme get() = (RENAMED[selected] ?: selected).let { id -> all.firstOrNull { it.id == id } } ?: Themes.default
-
-    private companion object {
-        /** Themes that ship under another id now. Lotus Dark became the whole of Lotus. */
-        val RENAMED: Map<String, String> = mapOf("lotus-dark" to Themes.Lotus.id)
-    }
-}
+data class StoredThemes(
+    val library: ThemeLibrary,
+    val selectionRead: Boolean = false,
+)
 
 /**
- * Reads and writes `themes.json`.
+ * Reads and writes `themes.json`: the person's own themes, the last wallpaper's colours, and
+ * a copy of the chosen theme for a build from before the choice moved into the themes settings.
  *
- * [publish] is supplied rather than performed here because this module has no
- * project dependencies and cannot reach the launcher's atomic-write helper. The app
- * root passes that helper in. Contract: [publish] writes the whole content or leaves
- * the previous file untouched, and creates missing parent directories.
+ * [publish] is supplied rather than performed here: the application has one atomic-write
+ * helper, and a second copy of that sequence would be a durability primitive kept in two
+ * places. Contract: [publish] writes the whole content or leaves the previous file untouched,
+ * and creates missing parent directories.
  */
-class ThemeManager(
+class ThemeLibraryFile(
     configPath: Path,
     private val publish: (file: Path, content: String) -> Unit,
 ) {
-    private val logger = LoggerFactory.getLogger(ThemeManager::class.java)
-    private val themesFile = configPath.resolve("themes.json")
+    private val logger = LoggerFactory.getLogger(ThemeLibraryFile::class.java)
+    private val themesFile = configPath.resolve(FILE_NAME)
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true; prettyPrint = true }
 
     /**
      * True when the file was stamped by a build newer than this one. This build cannot
-     * represent what it did not understand, so writing would discard it. The app root
-     * records the fact, the same way [publish] is handed in rather than performed here.
+     * represent what it did not understand, so writing would discard it. The host records
+     * the fact for the notice it shows, the same way [publish] is handed in rather than
+     * performed here.
      */
     @Volatile
     var readOnly: Boolean = false
         private set
 
-    fun load(): ThemeLibrary {
-        if (!Files.exists(themesFile)) return ThemeLibrary()
+    fun load(): StoredThemes {
+        if (!Files.exists(themesFile)) return StoredThemes(ThemeLibrary())
         return try {
             val root = json.parseToJsonElement(readUtf8(themesFile)).jsonObject
             // A file written before stamping began has none, and absent means the
@@ -92,29 +70,32 @@ class ThemeManager(
                         "Theme at {} is {} {} > supported {}: written by a newer build. Loading read-only.",
                         themesFile, SCHEMA_KEY, stamp, SCHEMA_VERSION,
                     )
-                    json.decodeFromJsonElement(ThemeFile.serializer(), root).toLibrary()
+                    StoredThemes(json.decodeFromJsonElement(ThemeFile.serializer(), root).toLibrary())
                 }
-                stamp == 1 -> fromFirstVersion(root)
-                else -> json.decodeFromJsonElement(ThemeFile.serializer(), root).toLibrary()
+                stamp == 1 -> StoredThemes(fromFirstVersion(root), selectionRead = true)
+                else -> StoredThemes(json.decodeFromJsonElement(ThemeFile.serializer(), root).toLibrary(), selectionRead = true)
             }
         } catch (e: Exception) {
-            logger.warn("Theme at {} could not be read ({}); falling back to the default theme", themesFile, e.toString())
-            ThemeLibrary()
+            logger.warn("Theme at {} could not be read ({}), so the default theme is used", themesFile, e.toString())
+            StoredThemes(ThemeLibrary())
         }
     }
 
-    fun save(library: ThemeLibrary) {
+    /** Writes [library], its selection as the copy of the choice an older build reads. Whether the file now holds it. */
+    fun save(library: ThemeLibrary): Boolean {
         if (readOnly) {
             logger.warn("Not writing {}: it belongs to a newer build and this session is read-only", themesFile)
-            return
+            return false
         }
-        try {
+        return try {
             val body = json.encodeToJsonElement(ThemeFile.serializer(), ThemeFile.of(library)).jsonObject
             val stamped = JsonObject(body + (SCHEMA_KEY to JsonPrimitive(SCHEMA_VERSION)))
             publish(themesFile, json.encodeToString(JsonObject.serializer(), stamped))
             logger.info("Theme saved: {}", library.selected)
+            true
         } catch (e: Exception) {
             logger.error("Failed to save theme", e)
+            false
         }
     }
 
@@ -143,6 +124,9 @@ class ThemeManager(
     }
 
     companion object {
+        /** The file's name in the data directory. */
+        const val FILE_NAME = "themes.json"
+
         /** Bumped when a change to the file cannot be read by an older build. */
         const val SCHEMA_VERSION = 2
         internal const val SCHEMA_KEY = "schema_version"
@@ -227,3 +211,7 @@ private fun hex(color: Color): String {
     val argb = color.toArgb()
     return if (argb ushr 24 == 0xFF) "#%06X".format(argb and 0xFFFFFF) else "#%08X".format(argb)
 }
+
+/** Whole-file UTF-8 read that rejects malformed input, as `Files.readString` does and Android's `java.nio.file.Files` does not offer. */
+private fun readUtf8(file: Path): String =
+    Charsets.UTF_8.newDecoder().decode(ByteBuffer.wrap(Files.readAllBytes(file))).toString()

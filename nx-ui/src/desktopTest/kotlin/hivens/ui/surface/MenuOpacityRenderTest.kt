@@ -16,7 +16,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.Themes
+import hivens.ui.theme.TestTheme
 import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
@@ -46,7 +46,7 @@ class MenuOpacityRenderTest {
         val wPx = 600
         val hPx = 600
         val scene = ImageComposeScene(width = wPx, height = hPx, density = Density(2f)) {
-            NxTheme(Themes.Celestia, dark = true) {
+            NxTheme(TestTheme, dark = true) {
                 Box(Modifier.fillMaxSize().background(Color(0xFFFF00FF))) { // bright magenta ground
                     Column(Modifier.padding(20.dp)) {
                         // The magenta stands in for a wallpaper here.
@@ -85,9 +85,9 @@ class MenuOpacityRenderTest {
         val (gr, gg, gb) = rgb(glass)
         println("MenuOpacityRenderTest: glass=RGB($gr,$gg,$gb)  popup=${"%08X".format(popup)}")
 
-        val top = Themes.Celestia.dark.steps.last()
+        val top = TestTheme.dark.steps.last()
         assertEquals(top.toArgb(), popup, "the popup is not the top step")
-        assertEquals(Themes.Celestia.dark.steps[1].toArgb(), chromeLeftAlone, "chrome left to itself is not solid in the step above the page")
+        assertEquals(TestTheme.dark.steps[1].toArgb(), chromeLeftAlone, "chrome left to itself is not solid in the step above the page")
         assertTrue(gb - gg >= 40 && abs(gr - gb) <= 30, "glass hid the ground it should show: ($gr,$gg,$gb)")
     }
 }

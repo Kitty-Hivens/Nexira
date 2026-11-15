@@ -15,22 +15,24 @@ import java.nio.file.Path
  * nothing of the launcher itself (see [WidgetModuleLoader]). [offered] is the module
  * APIs this build carries, which a jar built against one of them has to find in a
  * version that serves it, and [apiPackages] where each lives, which a jar that names
- * it is shown.
+ * it is shown. [contributionKinds] is what is read out of each jar besides its widgets.
  */
 class DesktopWidgetModuleHost(
     private val directory: Path,
     private val shadowDir: Path,
     private val offered: Map<String, ApiVersion> = emptyMap(),
     private val apiPackages: Map<String, Set<String>> = emptyMap(),
+    private val contributionKinds: List<Class<out ModuleContribution>> = ModuleContribution.kinds,
 ) : WidgetModuleHost {
 
     override fun scan(disabled: Set<String>): ModuleScan {
         val scan = WidgetModuleLoader(
-            directory   = directory,
-            shadowDir   = shadowDir,
-            disabled    = disabled,
-            offered     = offered,
-            apiPackages = apiPackages,
+            directory         = directory,
+            shadowDir         = shadowDir,
+            disabled          = disabled,
+            contributionKinds = contributionKinds,
+            offered           = offered,
+            apiPackages       = apiPackages,
         ).scan()
         return ModuleScan(
             loaded   = scan.loaded.map(::JarModule),

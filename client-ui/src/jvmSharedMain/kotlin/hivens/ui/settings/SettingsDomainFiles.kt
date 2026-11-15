@@ -39,7 +39,8 @@ private val log = LoggerFactory.getLogger("SettingsDomains")
  *
  * Every change also writes the fields the domain mirrors into the former file, for a build from
  * before the domain existed, and records what it wrote. A start that finds the former file holding
- * something else in those fields knows an older build changed them since, and takes that.
+ * something else in those fields knows an older build changed them since, and takes that, laid over
+ * what the domain's own file holds, so what the former file never held is kept.
  *
  * A file stamped with a schema newer than the domain's is read as far as it can be and never
  * written, for that domain alone, and the former file is left alone for it too.
@@ -100,7 +101,7 @@ class SettingsDomainFiles(
     private fun <T : Any> read(domain: SettingsDomain<T>): Loaded<T> {
         val file = fileOf(domain)
         val former by lazy { legacy.read() }
-        val fallback = { former?.let { imported(domain, it) } ?: domain.defaults() }
+        val fallback = { former?.let { imported(domain, it, current = null) } ?: domain.defaults() }
         if (!Files.exists(file)) return Loaded(fallback(), readOnly = false)
         val root = try {
             json.parseToJsonElement(readUtf8(file)).jsonObject
@@ -117,7 +118,8 @@ class SettingsDomainFiles(
             return Loaded(fallback(), readOnly = newer)
         }
         if (!newer && changedSince(root[MIRRORED] as? JsonObject, former)) {
-            val taken = former?.let { imported(domain, it) }
+            // Laid over the domain's own value, so what the former file never held is kept.
+            val taken = former?.let { imported(domain, it, current = value) }
             if (taken != null) {
                 log.info("Settings of '{}' were changed in the former settings file by an older build since they were last written, and are taken from there", domain.id)
                 return Loaded(taken, readOnly = false, retaken = true)
@@ -147,8 +149,8 @@ class SettingsDomainFiles(
         (json.parseToJsonElement(readUtf8(file)).jsonObject[SCHEMA] as? JsonPrimitive)?.intOrNull ?: 1
     }.getOrNull()
 
-    private fun <T : Any> imported(domain: SettingsDomain<T>, former: JsonObject): T? = try {
-        domain.imported(former)
+    private fun <T : Any> imported(domain: SettingsDomain<T>, former: JsonObject, current: T?): T? = try {
+        domain.imported(former, current)
     } catch (e: Exception) {
         log.warn("Could not take the settings of '{}' from the former settings file: {}", domain.id, e.toString())
         null

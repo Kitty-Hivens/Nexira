@@ -5,7 +5,7 @@ description: Modules, boot pipeline, dependency graph and the seams Nexira is bu
 
 ## Module map
 
-Twenty four Gradle modules make up the launcher. The dependency direction is one-way and load-bearing: the engine never sees the UI, and the design system never sees the domain.
+The launcher is made of Gradle modules. The dependency direction is one-way and load-bearing: the engine never sees the UI, and the design system never sees the domain.
 
 | Module                    | Role                                                                                                                                                                                                                           |
 |---------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -25,9 +25,11 @@ Twenty four Gradle modules make up the launcher. The dependency direction is one
 | `client-i18n`             | The launcher's own words: the `nexira` tables for every shipped language, the composable that reads them, and the build check that warns about missing translations.                                                           |
 | `i18n-api`                | The language module's API: looking words up by namespace and key, the composition local the host provides them through, and the language keys and settings.                                                                    |
 | `i18n`                    | The language module: the engine that answers every namespace in every language, a person's own translation files among them, with the message syntax and the plural rules.                                                     |
+| `themes-api`              | The themes module's API: the keys for the theme in use, the themes on offer, the choice and what decides dark and light, and the theme a module brings.                                                                        |
+| `themes`                  | The themes module: the themes that ship, the one made from the wallpaper, the user's own, which is in use and where that choice is kept.                                                                                       |
 | `client-render3d`         | Software 3D: the rasteriser and scene graph, and the Minecraft skin rig built on them.                                                                                                                                         |
 | `client-easter`           | The April Fools engine, behind an SPI that resolves to a no-op unless a provider is registered.                                                                                                                                |
-| `nx-ui`                   | The design system: theme, tokens, surfaces, primitives.                                                                                                                                                                        |
+| `nx-ui`                   | The design system: tokens, surfaces, primitives, and the drawing of whatever theme it is handed.                                                                                                                               |
 | `widget-model`            | Layout graph, slot and widget identity, service and command keys. Compose-free.                                                                                                                                                |
 | `widget-api`              | Widget runtime: the slot renderer, the registries, the composition locals.                                                                                                                                                     |
 | `widget-processor`        | KSP processor that generates the widget registry from `@Widget`.                                                                                                                                                               |
@@ -160,7 +162,9 @@ A widget whose kind is absent from the registry keeps its stored props and child
 
 A theme says what the interface may be drawn with, and nothing about where. It is a ladder of steps (the page first, then the planes outward from it), the inks text is set in (a main one and a quiet one, each readable on every step), and the theme's colours in order of emphasis. Which step a card sits on and which colour a status takes is decided in `nx-ui`, not in the theme, so a theme cannot paint one place without the rest.
 
-A theme has a dark scheme, and a light one when its author drew one. A light scheme is never derived: a theme without one stays in its own mode, and the day and night switch says so. Nine ship, `Celestia` with both modes and eight dark ones. The wallpaper can make one more from its colours, widget modules can bring their own, and the user's own are stored beside the selection. A theme a module brought is never saved, so it leaves with the module.
+A theme has a dark scheme, and a light one when its author drew one. A light scheme is never derived: a theme without one stays in its own mode, and the day and night switch says so. Five ship: `Celestia`, `Lotus` and `Signal` with both modes, `Abyssal` and `Blood Rain` dark only. The wallpaper can make one more from its colours, widget modules can bring their own, and the user's own are kept in the theme file. A theme a module brought is never saved, so it leaves with the module, and a choice of it draws the default theme until the module is back.
+
+Drawing a theme and choosing one are two modules. `nx-ui` draws the theme it is handed and never knows where a choice is kept. The themes module holds the library and the choice: which theme is in use, whether it is dark, and whether the user, the system's scheme or the wallpaper's brightness decides that. The choice is its settings domain, mirrored into the old settings file for a build from before the move. The host makes its manager before any module loads, so the boot window opens on the theme the shell will draw, and feeds it the system's scheme and the wallpaper through the module's own keys.
 
 The form is one. Radii, borders and motion are not a choice, and there is no second style to switch to. Beside the theme sit a few switches of the user's: whether surfaces blur, whether motion is reduced, and how the navigation rail marks its selection.
 

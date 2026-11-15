@@ -1,0 +1,131 @@
+public final class hivens/themes/api/SystemScheme {
+	public static final field $stable I
+	public fun <init> (ZLjava/lang/Boolean;)V
+	public synthetic fun <init> (ZLjava/lang/Boolean;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Z
+	public final fun component2 ()Ljava/lang/Boolean;
+	public final fun copy (ZLjava/lang/Boolean;)Lhivens/themes/api/SystemScheme;
+	public static synthetic fun copy$default (Lhivens/themes/api/SystemScheme;ZLjava/lang/Boolean;ILjava/lang/Object;)Lhivens/themes/api/SystemScheme;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDark ()Ljava/lang/Boolean;
+	public final fun getReadable ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class hivens/themes/api/ThemeContribution : hivens/widget/api/ModuleContribution {
+	public abstract fun getDark ()Lhivens/themes/api/ThemeScheme;
+	public fun getLight ()Lhivens/themes/api/ThemeScheme;
+}
+
+public final class hivens/themes/api/ThemeContribution$DefaultImpls {
+	public static fun getLight (Lhivens/themes/api/ThemeContribution;)Lhivens/themes/api/ThemeScheme;
+	public static fun getSettings (Lhivens/themes/api/ThemeContribution;)Ljava/util/List;
+}
+
+public abstract interface class hivens/themes/api/ThemeInputs {
+	public abstract fun systemScheme (Lhivens/themes/api/SystemScheme;)V
+	public abstract fun wallpaper (Lhivens/ui/theme/WallpaperTone;)V
+}
+
+public final class hivens/themes/api/ThemeMode : java/lang/Enum {
+	public static final field Companion Lhivens/themes/api/ThemeMode$Companion;
+	public static final field Manual Lhivens/themes/api/ThemeMode;
+	public static final field System Lhivens/themes/api/ThemeMode;
+	public static final field Wallpaper Lhivens/themes/api/ThemeMode;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lhivens/themes/api/ThemeMode;
+	public static fun values ()[Lhivens/themes/api/ThemeMode;
+}
+
+public final class hivens/themes/api/ThemeMode$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class hivens/themes/api/ThemeScheme {
+	public static final field $stable I
+	public fun <init> (Ljava/util/List;Ljava/util/List;Ljava/util/List;)V
+	public synthetic fun <init> (Ljava/util/List;Ljava/util/List;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun component2 ()Ljava/util/List;
+	public final fun component3 ()Ljava/util/List;
+	public final fun copy (Ljava/util/List;Ljava/util/List;Ljava/util/List;)Lhivens/themes/api/ThemeScheme;
+	public static synthetic fun copy$default (Lhivens/themes/api/ThemeScheme;Ljava/util/List;Ljava/util/List;Ljava/util/List;ILjava/lang/Object;)Lhivens/themes/api/ThemeScheme;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getColors ()Ljava/util/List;
+	public final fun getInks ()Ljava/util/List;
+	public final fun getSteps ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/themes/api/ThemeSettings {
+	public static final field $stable I
+	public static final field Companion Lhivens/themes/api/ThemeSettings$Companion;
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/String;Lhivens/themes/api/ThemeMode;ZLjava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Lhivens/themes/api/ThemeMode;ZLjava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Lhivens/themes/api/ThemeMode;
+	public final fun component3 ()Z
+	public final fun component4 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Lhivens/themes/api/ThemeMode;ZLjava/lang/String;)Lhivens/themes/api/ThemeSettings;
+	public static synthetic fun copy$default (Lhivens/themes/api/ThemeSettings;Ljava/lang/String;Lhivens/themes/api/ThemeMode;ZLjava/lang/String;ILjava/lang/Object;)Lhivens/themes/api/ThemeSettings;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCopied ()Ljava/lang/String;
+	public final fun getDark ()Z
+	public final fun getMode ()Lhivens/themes/api/ThemeMode;
+	public final fun getTheme ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class hivens/themes/api/ThemeSettings$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field $stable I
+	public static final field INSTANCE Lhivens/themes/api/ThemeSettings$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lhivens/themes/api/ThemeSettings;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lhivens/themes/api/ThemeSettings;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class hivens/themes/api/ThemeSettings$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class hivens/themes/api/ThemesApi {
+	public static final field $stable I
+	public static final field ID Ljava/lang/String;
+	public static final field INSTANCE Lhivens/themes/api/ThemesApi;
+	public static final field WALLPAPER_THEME_ID Ljava/lang/String;
+	public final fun getVERSION ()Lhivens/widget/model/ApiVersion;
+}
+
+public final class hivens/themes/api/ThemesKeys {
+	public static final field $stable I
+	public static final field ACTIVE_ID Ljava/lang/String;
+	public static final field CHOOSE_ID Ljava/lang/String;
+	public static final field DARK_ID Ljava/lang/String;
+	public static final field INSTANCE Lhivens/themes/api/ThemesKeys;
+	public static final field MODE_ID Ljava/lang/String;
+	public static final field OFFERED_ID Ljava/lang/String;
+	public static final field SETTINGS_ID Ljava/lang/String;
+	public static final field SET_DARK_ID Ljava/lang/String;
+	public static final field SET_MODE_ID Ljava/lang/String;
+	public static final field SYSTEM_SCHEME_AVAILABLE_ID Ljava/lang/String;
+	public static final field UPDATE_SETTINGS_ID Ljava/lang/String;
+	public final fun getActive ()Lhivens/widget/model/SourceKey;
+	public final fun getChoose ()Lhivens/widget/model/CommandKey;
+	public final fun getDark ()Lhivens/widget/model/SourceKey;
+	public final fun getMode ()Lhivens/widget/model/SourceKey;
+	public final fun getOffered ()Lhivens/widget/model/SourceKey;
+	public final fun getSetDark ()Lhivens/widget/model/CommandKey;
+	public final fun getSetMode ()Lhivens/widget/model/CommandKey;
+	public final fun getSettings ()Lhivens/widget/model/SourceKey;
+	public final fun getSystemSchemeAvailable ()Lhivens/widget/model/SourceKey;
+	public final fun getUpdateSettings ()Lhivens/widget/model/CommandKey;
+}
+

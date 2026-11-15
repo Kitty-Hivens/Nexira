@@ -1,37 +1,38 @@
 package hivens.ui.widgets.themepicker
 
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.unit.Density
+import hivens.themes.Themes
+import hivens.themes.api.ThemesKeys
 import hivens.ui.i18n.ShippedLanguageProvider
 import hivens.ui.onEventThread
 import hivens.ui.puppet.PuppetRegistry
 import hivens.ui.settle
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.ThemeLibrary
 import hivens.ui.widgets.ChildLevel
 import hivens.ui.widgets.Commands
 import hivens.ui.widgets.KoinLevelServicesHost
-import hivens.ui.widgets.Sources
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.LocalScope
 import hivens.widget.api.LocalSurfaceFamilies
 import hivens.widget.api.LocalWidgetCommandRegistry
 import hivens.widget.api.LocalWidgetDataRegistry
 import hivens.widget.api.LocalWidgetRegistry
-import hivens.widget.api.ProvideScoped
 import hivens.widget.api.ProvideScopedCommand
 import hivens.widget.api.SurfaceFamilies
 import hivens.widget.api.WidgetCommandRegistry
 import hivens.widget.api.WidgetDataRegistry
 import hivens.widget.api.WidgetScope
+import hivens.widget.api.command
+import hivens.widget.api.flowSource
 import hivens.widget.api.rememberLatestCommand
 import hivens.widget.generated.GeneratedWidgetRegistry
 import hivens.widget.model.LayoutGraph
 import hivens.widget.model.ScopeLevel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
 import org.koin.dsl.koinApplication
 import org.koin.dsl.module
 import kotlin.test.Test
@@ -45,27 +46,27 @@ import kotlin.test.assertEquals
 @OptIn(ExperimentalComposeUiApi::class)
 class ThemePickerApplyTest {
 
-    private val data = WidgetDataRegistry().apply {
-        declare(Sources.ThemeLibrary)
-        declare(ThemeSelectionSource)
-    }
-
-    private val commands = WidgetCommandRegistry().apply {
-        declare(Commands.ApplyTheme)
-        declare(Commands.Back)
-    }
-
-    private val app: WidgetScope = koinApplication {
-        modules(module { single { WidgetScope.app(data, KoinLevelServicesHost.app(this), Dispatchers.Unconfined, commands) } })
-    }.koin.get()
-
     /** Draws the picker in a page, with Apply answered only when [answerApply], presses Apply, and says what it fired. */
     private fun pressApply(answerApply: Boolean): List<String> {
         val fired = ArrayList<String>()
+        // The themes on offer, the one in use and the choice are the themes module's app
+        // keys, answered here as the app's own values and command.
+        val data = WidgetDataRegistry().apply {
+            register(ThemesKeys.Offered, flowSource(MutableStateFlow(Themes.all)))
+            register(ThemesKeys.Active, flowSource(MutableStateFlow(Themes.default)))
+            declare(ThemeSelectionSource)
+        }
+        val commands = WidgetCommandRegistry().apply {
+            if (answerApply) register(ThemesKeys.Choose, command { id: String -> fired += "apply $id" })
+            declare(Commands.Back)
+        }
+        val app: WidgetScope = koinApplication {
+            modules(module { single { WidgetScope.app(data, KoinLevelServicesHost.app(this), Dispatchers.Unconfined, commands) } })
+        }.koin.get()
         onEventThread {
             val scene = ImageComposeScene(900, 700, density = Density(1f)) {
                 ShippedLanguageProvider("en") {
-                    NxTheme(dark = true) {
+                    NxTheme(Themes.default, dark = true) {
                         CompositionLocalProvider(
                             LocalWidgetDataRegistry provides data,
                             LocalWidgetCommandRegistry provides commands,
@@ -75,13 +76,9 @@ class ThemePickerApplyTest {
                             LocalSurfaceFamilies provides SurfaceFamilies(),
                         ) {
                             ChildLevel(ScopeLevel.Composition) {
-                                val apply = rememberLatestCommand<String> { fired += "apply $it" }
                                 val back = rememberLatestCommand<Unit> { fired += "back" }
-                                val picker: @Composable () -> Unit = { ChildLevel(ScopeLevel.Page) { ThemePickerSurface() } }
-                                ProvideScoped(Sources.ThemeLibrary, ThemeLibrary()) {
-                                    ProvideScopedCommand(Commands.Back, back) {
-                                        if (answerApply) ProvideScopedCommand(Commands.ApplyTheme, apply, picker) else picker()
-                                    }
+                                ProvideScopedCommand(Commands.Back, back) {
+                                    ChildLevel(ScopeLevel.Page) { ThemePickerSurface() }
                                 }
                             }
                         }
@@ -100,7 +97,7 @@ class ThemePickerApplyTest {
 
     @Test
     fun `apply puts the choice in use and then leaves`() {
-        assertEquals(listOf("apply ${ThemeLibrary().active.id}", "back"), pressApply(answerApply = true))
+        assertEquals(listOf("apply ${Themes.default.id}", "back"), pressApply(answerApply = true))
     }
 
     @Test

@@ -3,19 +3,6 @@ package hivens.core.data
 import kotlinx.serialization.Serializable
 
 /**
- * Which source drives the dark/light choice. Exactly one is active:
- *
- * - [Manual] -- the user's own day/night toggle; [SettingsData.isDarkTheme] as set.
- * - [System] -- follow the OS colour scheme (XDG portal / registry / defaults).
- * - [Wallpaper] -- follow the wallpaper's average brightness.
- *
- * Flipping the day/night toggle while in [System]/[Wallpaper] drops back to
- * [Manual] -- an explicit choice always wins over an automatic source.
- */
-@Serializable
-enum class ThemeMode { Manual, System, Wallpaper }
-
-/**
  * What the auto-updater does when a pending pack update is graded amber (a
  * Minecraft or loader change that could invalidate worlds/configs). Green
  * updates always apply automatically; this governs only the risky ones.
@@ -26,16 +13,6 @@ enum class ThemeMode { Manual, System, Wallpaper }
  */
 @Serializable
 enum class AmberUpdatePolicy { Ask, SnapshotThenApply, Hold }
-
-/**
- * The theme mode a fresh session starts in. Migrates the pre-mode opt-in: a
- * settings file that enabled [SettingsData.themeFromWallpaper] before
- * [SettingsData.themeMode] existed decodes with the field's default ([ThemeMode.System]),
- * so the legacy flag promotes exactly that default to [ThemeMode.Wallpaper] -- a
- * non-default stored mode is an explicit choice and wins over the flag.
- */
-fun resolveInitialThemeMode(s: SettingsData): ThemeMode =
-    if (s.themeMode == ThemeMode.System && s.themeFromWallpaper) ThemeMode.Wallpaper else s.themeMode
 
 /**
  * Folds the retired experimental master into the knobs it used to suppress.
@@ -63,64 +40,29 @@ fun foldLegacyExperimentalGate(s: SettingsData): SettingsData =
         adaptiveMemoryEnabled       = false,
     )
 
-/**
- * Wallpapers below this luminance drive the dark theme.
- *
- * The comparison is strict, so exactly mid-grey resolves to the light theme.
- * Nothing rides on which side takes the tie -- it is stated only because a
- * threshold nobody wrote down is a threshold somebody later flips by accident.
- */
-const val WALLPAPER_DARK_THRESHOLD = 0.5f
-
-/**
- * The dark flag an automatic theme source wants, or null when nothing should
- * change.
- *
- * Three sources write one boolean -- the manual toggle, the OS scheme, and the
- * wallpaper's brightness -- and each had its own effect deciding when to fire,
- * with the persist repeated alongside. Stated once here: the mode picks which
- * source is listened to at all, a source with nothing to say (no wallpaper
- * decoded yet, no readable OS scheme) says nothing, and a source that agrees
- * with the current value asks for no write.
- *
- * Returning null rather than the unchanged value is the point: every caller
- * both sets state and persists, and a settings file rewritten on every
- * wallpaper tick is a write per frame during a crossfade.
- */
-fun darkThemeFor(
-    mode: ThemeMode,
-    current: Boolean,
-    wallpaperLuminance: Float? = null,
-    systemDark: Boolean? = null,
-): Boolean? {
-    val wanted = when (mode) {
-        // The user said so; nothing automatic overrides that until they
-        // choose another mode.
-        ThemeMode.Manual -> null
-        ThemeMode.System -> systemDark
-        ThemeMode.Wallpaper -> wallpaperLuminance?.let { it < WALLPAPER_DARK_THRESHOLD }
-    }
-    return wanted?.takeIf { it != current }
-}
-
 @Serializable
 data class SettingsData(
     val javaPath: String? = null,
+    /**
+     * Whether the launcher is drawn dark. The themes module's now: it keeps the choice in a
+     * settings file of its own, reads this field while it has none, and writes it here with
+     * every change for a build from before the move, as it does [themeMode] and
+     * [themeFromWallpaper]. Kept as a field so a save of this file carries what it wrote.
+     */
     val isDarkTheme: Boolean = true,
     /**
      * Legacy mirror of `themeMode == Wallpaper`, kept so a downgrade to a build
-     * that predates [themeMode] still honours the wallpaper opt-in. New code
-     * reads [themeMode] and only writes this field in step with it.
+     * that predates [themeMode] still honours the wallpaper opt-in. Written by the
+     * themes module in step with [themeMode].
      */
     val themeFromWallpaper: Boolean = false,
     /**
-     * Which source drives dark/light -- see [ThemeMode]. [isDarkTheme] stays the
-     * resolved value the automatic sources write through, so everything downstream
-     * (and older builds) keeps reading one boolean. Defaults to following the OS:
-     * where the scheme is unreadable the automatic source just never fires, so a
-     * fresh install falls back to [isDarkTheme]'s own default.
+     * Which source drives dark and light, by the name of the themes module's mode:
+     * `Manual`, `System` or `Wallpaper`. Text rather than that module's type, which this one
+     * cannot see, and a name this build does not know, a newer build's, is kept as written
+     * and read by the module as its default. Defaults to following the OS.
      */
-    val themeMode: ThemeMode = ThemeMode.System,
+    val themeMode: String = "System",
     /**
      * Replace the OS title bar with the in-app top bar (undecorated window +
      * custom caption buttons / drag / resize). On by default. Escape hatch: if a

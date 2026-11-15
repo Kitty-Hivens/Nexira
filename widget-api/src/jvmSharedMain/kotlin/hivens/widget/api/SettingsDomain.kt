@@ -34,16 +34,17 @@ abstract class SettingsDomain<T : Any>(
     open val schema: Int get() = 1
 
     /**
-     * The value as the launcher's former single settings file held it, [legacy] being that file, or null
-     * where it holds nothing of this domain.
+     * The value with what the launcher's former single settings file holds of it laid over [current],
+     * [legacy] being that file, or null where it holds nothing of this domain.
      *
      * Asked at every start while the domain has no file of its own, and while its file cannot be read,
-     * so a person's choice made before the move is kept until a change of the domain is saved. Asked
-     * again whenever the fields [mirrored] wrote to that file were changed there since, which is a build
-     * from before the move changing the choice, so going back to an older build and returning loses
-     * nothing either.
+     * with [current] null, so a person's choice made before the move is kept until a change of the
+     * domain is saved. Asked again whenever the fields [mirrored] wrote to that file were changed there
+     * since, which is a build from before the move changing the choice, with [current] the value the
+     * domain's own file holds: a field the former file never held is the domain's alone, and is kept
+     * from [current], so going back to an older build and returning loses nothing either.
      */
-    open fun imported(legacy: JsonObject): T? = null
+    open fun imported(legacy: JsonObject, current: T?): T? = null
 
     /**
      * The fields of the former settings file that hold [value] for a build from before the move, by

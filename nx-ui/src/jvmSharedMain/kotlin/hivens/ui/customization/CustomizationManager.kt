@@ -7,9 +7,8 @@ import java.nio.file.Files
 import java.nio.file.Path
 
 /**
- * [publish] is supplied by the app root for the reason spelled out on
- * [hivens.ui.theme.ThemeManager]: this module has no project dependencies, and a
- * second copy of the atomic-write sequence would be a durability primitive
+ * [publish] is supplied by the app root: this module has no project dependencies, and
+ * a second copy of the atomic-write sequence would be a durability primitive
  * maintained in two places.
  */
 class CustomizationManager(

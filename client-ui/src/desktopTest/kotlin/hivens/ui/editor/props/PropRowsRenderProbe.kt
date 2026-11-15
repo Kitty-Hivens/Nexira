@@ -17,6 +17,7 @@ import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import hivens.themes.Themes
 import hivens.ui.surface.NxSurface
 import hivens.ui.theme.NxTheme
 import hivens.widget.model.PropColor
@@ -88,7 +89,7 @@ class PropRowsRenderProbe {
     @OptIn(ExperimentalComposeUiApi::class)
     private fun planes(dark: Boolean) {
         val scene = ImageComposeScene(width = 560, height = 320, density = Density(2f)) {
-            NxTheme(dark = dark) {
+            NxTheme(Themes.default, dark = dark) {
                 Box(Modifier.fillMaxSize().background(NxColor.page)) {
                     Row(
                         modifier = Modifier.padding(20.dp),
@@ -131,7 +132,7 @@ class PropRowsRenderProbe {
         val values: JsonObject = defaults()
 
         val scene = ImageComposeScene(width = WIDTH, height = HEIGHT, density = Density(DENSITY)) {
-            NxTheme(dark = dark) {
+            NxTheme(Themes.default, dark = dark) {
                 // The page behind the panel, so the plane's own edge is visible rather
                 // than being the same colour as everything around it.
                 Box(Modifier.fillMaxSize().background(NxColor.page)) {

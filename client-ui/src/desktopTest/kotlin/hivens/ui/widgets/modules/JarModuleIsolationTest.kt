@@ -16,6 +16,9 @@ import hivens.core.api.interfaces.ICredentialStore
 import hivens.launcher.modrinth.ModrinthClient
 import hivens.packs.api.PackKeys
 import hivens.packs.api.PacksApi
+import hivens.themes.ThemeManager
+import hivens.themes.api.ThemeContribution
+import hivens.themes.api.ThemesApi
 import hivens.ui.theme.NxInk
 import hivens.widget.api.WidgetScope
 import hivens.widget.loader.LoadedWidgetModule
@@ -83,15 +86,16 @@ class JarModuleIsolationTest {
         Files.walk(tmp).use { walk -> walk.sorted(Comparator.reverseOrder()).forEach { val _ = runCatching { Files.deleteIfExists(it) } } }
     }
 
-    /** [jar] loaded alone, by the launcher's loader with the APIs this build offers. */
+    /** [jar] loaded alone, by the launcher's loader with the APIs this build offers and the kinds of contribution it reads. */
     private fun load(jar: Path): LoadedWidgetModule {
         val dir = tmp.resolve("${opened.size}-${jar.fileName}").createDirectories()
         jar.copyTo(dir.resolve(jar.fileName))
         val scan = WidgetModuleLoader(
-            directory   = dir,
-            parent      = javaClass.classLoader,
-            offered     = offeredApis(),
-            apiPackages = offeredApiPackages(),
+            directory         = dir,
+            parent            = javaClass.classLoader,
+            contributionKinds = offeredContributionKinds(),
+            offered           = offeredApis(),
+            apiPackages       = offeredApiPackages(),
         ).scan()
         assertEquals(emptyList(), scan.rejected, "${jar.fileName} was refused")
         return scan.loaded.single().also { opened += it }
@@ -201,6 +205,18 @@ class JarModuleIsolationTest {
         assertEquals(setOf(PackKeys::class.java.name.substringBeforeLast('.')), offeredApiPackages().getValue(PacksApi.ID))
         assertEquals(setOf(AccountKeys::class.java.name.substringBeforeLast('.')), offeredApiPackages().getValue(AccountsApi.ID))
         assertEquals(setOf(CatalogueKeys::class.java.name.substringBeforeLast('.')), offeredApiPackages().getValue(CatalogueApi.ID))
+        assertEquals(setOf(ThemeContribution::class.java.name.substringBeforeLast('.')), offeredApiPackages().getValue(ThemesApi.ID))
+    }
+
+    @Test
+    fun `a jar that names the themes API brings its themes through it, read as the launcher reads them`() {
+        val looks = load(jar("nexira.test.looksJar"))
+        assertEquals(setOf("outrun", "paperback"), looks.contributions.filterIsInstance<ThemeContribution>().map { it.id }.toSet())
+        assertSame(ThemeContribution::class.java, looks.loader.loadClass(ThemeContribution::class.java.name))
+        assertFailsWith<ClassNotFoundException>("the themes module itself was found through the jar") {
+            looks.loader.loadClass(ThemeManager::class.java.name)
+        }
+        assertTrue(ThemeContribution::class.java in offeredContributionKinds(), "the launcher reads the kind the themes module declares")
     }
 
     @Test

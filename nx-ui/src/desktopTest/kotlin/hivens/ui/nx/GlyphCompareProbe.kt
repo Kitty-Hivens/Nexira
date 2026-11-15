@@ -25,6 +25,7 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.Spacing
+import hivens.ui.theme.TestTheme
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
 import kotlin.test.Test
@@ -80,7 +81,7 @@ class GlyphCompareProbe {
     fun probe() {
         val d = 6f
         val scene = ImageComposeScene((230 * d).toInt(), (86 * d).toInt(), density = Density(d)) {
-            NxTheme(dark = true) {
+            NxTheme(TestTheme, dark = true) {
                 Column(
                     Modifier.fillMaxSize().background(NxColor.page).padding(Spacing.s12),
                     verticalArrangement = Arrangement.spacedBy(Spacing.s10),

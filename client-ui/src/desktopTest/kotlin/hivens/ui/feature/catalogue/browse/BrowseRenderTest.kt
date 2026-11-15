@@ -42,6 +42,7 @@ import hivens.launcher.catalogue.PackArtResolver
 import hivens.launcher.modrinth.ModrinthClient
 import hivens.launcher.modrinth.acceptedLoaders
 import hivens.launcher.smrt.SmrtPackClient
+import hivens.themes.Themes
 import hivens.ui.host.HostKoin
 import hivens.ui.i18n.ShippedLanguageProvider
 import hivens.ui.widgets.KoinLevelServicesHost
@@ -369,7 +370,7 @@ class BrowseRenderTest {
         val scene = ImageComposeScene((width * d).toInt(), (height * d).toInt(), density = Density(d)) {
             HostKoin(koin) {
                 ShippedLanguageProvider("ru") {
-                    NxTheme(dark = true) {
+                    NxTheme(Themes.default, dark = true) {
                         Box(Modifier.fillMaxSize().background(NxColor.page).padding(20.dp)) {
                             if (padded) {
                                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) { body() }

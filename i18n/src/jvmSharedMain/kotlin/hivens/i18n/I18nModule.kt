@@ -70,8 +70,10 @@ object I18nSettingsDomain : SettingsDomain<I18nSettings>("i18n", I18nSettings.se
 
     override fun defaults(): I18nSettings = I18nSettings()
 
-    override fun imported(legacy: JsonObject): I18nSettings? =
-        (legacy[LEGACY_FIELD] as? JsonPrimitive)?.contentOrNull?.trim()?.takeIf { it.isNotEmpty() }?.let(::I18nSettings)
+    override fun imported(legacy: JsonObject, current: I18nSettings?): I18nSettings? =
+        (legacy[LEGACY_FIELD] as? JsonPrimitive)?.contentOrNull?.trim()?.takeIf { it.isNotEmpty() }?.let { language ->
+            current?.copy(language = language) ?: I18nSettings(language)
+        }
 
     override fun mirrored(value: I18nSettings): Map<String, JsonElement> = mapOf(LEGACY_FIELD to JsonPrimitive(value.language))
 }

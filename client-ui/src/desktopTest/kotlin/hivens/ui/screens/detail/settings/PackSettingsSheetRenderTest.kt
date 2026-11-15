@@ -19,6 +19,7 @@ import hivens.core.data.PackReference
 import hivens.core.update.PackUpdater
 import hivens.launcher.PackOperationService
 import hivens.launcher.instance.InstanceSizeService
+import hivens.themes.Themes
 import hivens.ui.host.HostKoin
 import hivens.ui.theme.NxTheme
 import kotlinx.coroutines.CoroutineScope
@@ -119,7 +120,7 @@ class PackSettingsSheetRenderTest {
         Files.createDirectories(out.parent)
         val scene = ImageComposeScene(width, height, density = Density(1f)) {
             HostKoin(app) {
-                NxTheme(dark = true) {
+                NxTheme(Themes.default, dark = true) {
                     // A vivid backdrop so any bleed-through of the sheet shows up as a
                     // pink tint -- proves the sheet is opaque and the page beside it is not.
                     Box(Modifier.fillMaxSize().background(Color(BACKDROP))) {

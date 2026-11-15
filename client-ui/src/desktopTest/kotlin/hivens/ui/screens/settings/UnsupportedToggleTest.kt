@@ -14,6 +14,7 @@ import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.unit.Density
 import hivens.core.data.SettingsData
 import hivens.i18n.ShippedLanguages
+import hivens.themes.Themes
 import hivens.ui.host.HostKoin
 import hivens.ui.i18n.NexiraStrings
 import hivens.ui.i18n.ShippedLanguageProvider
@@ -47,7 +48,7 @@ class UnsupportedToggleTest {
         val scene = ImageComposeScene(900, 2000, density = Density(1f)) {
             HostKoin(koin) {
                 ShippedLanguageProvider("en") {
-                    NxTheme(dark = true) {
+                    NxTheme(Themes.default, dark = true) {
                         Column(Modifier.verticalScroll(rememberScrollState())) {
                             AppearanceSection(
                                 form = form,

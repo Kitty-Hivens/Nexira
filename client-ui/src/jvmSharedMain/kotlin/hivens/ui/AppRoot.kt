@@ -22,7 +22,7 @@ import coil3.annotation.ExperimentalCoilApi
 import coil3.network.NetworkFetcher
 import coil3.network.cachecontrol.CacheControlCacheStrategy
 import hivens.accounts.api.AccountKeys
-import hivens.ui.appearance.AppearanceStore
+import hivens.themes.api.ThemeInputs
 import hivens.ui.background.BackgroundManager
 import hivens.ui.background.BackgroundSettings
 import hivens.ui.components.SignOutPrompt
@@ -33,7 +33,9 @@ import hivens.ui.notifications.render.NotificationStack
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.WallpaperTone
 import hivens.ui.widgets.ChildLevel
+import hivens.ui.host.launcherServices
 import hivens.widget.api.LocalLayoutGraph
+import hivens.widget.api.LocalScope
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
 import hivens.widget.model.ScopeLevel
@@ -80,8 +82,9 @@ internal expect fun ComponentRegistry.Builder.addPlatformDecoders()
  *
  * The composition's level is made here, around everything it draws. Who the
  * launcher is signed in as and how it looks are read through the sources like any
- * widget reads them, and what the wallpaper shows is handed to the appearance store,
- * which decides the dark scheme and the wallpaper theme from it.
+ * widget reads them, and what the wallpaper shows is told to the themes module
+ * through the inputs it keeps for the host, which decides the dark scheme and the
+ * wallpaper theme from it.
  */
 @Composable
 fun AppRoot(
@@ -90,7 +93,6 @@ fun AppRoot(
     customization: CustomizationSettings,
     onCustomizationChanged: (CustomizationSettings) -> Unit,
 ) {
-    val appearance: AppearanceStore            = koinInject()
     val dataDirectory: Path                    = koinInject()
     val json: Json                             = koinInject()
     // Smartycraft-routed Call.Factory for Coil's image fetcher. The
@@ -173,12 +175,11 @@ fun AppRoot(
     val mousePos    = remember { mutableStateOf(Offset(0.5f, 0.5f)) }
     val mousePxPos  = remember { mutableStateOf(Offset.Zero) }
     var windowSize by remember { mutableStateOf(IntSize.Zero) }
-    // What the wallpaper tells the shell: its overall brightness, for the mode that
-    // follows the wallpaper between dark and light, and its colours, which the
-    // wallpaper theme is made of.
-    var tone by remember { mutableStateOf(WallpaperTone.NONE) }
-
-    LaunchedEffect(tone.avgLuminance) { appearance.wallpaperLuminanceChanged(tone.avgLuminance) }
+    // What the wallpaper tells the themes module: its overall brightness, for the mode
+    // that follows the wallpaper between dark and light, and its colours, which the
+    // wallpaper theme is made of. Missing where the document brings no themes module.
+    val level = LocalScope.current
+    val inputs = remember(level) { level?.launcherServices?.find(ThemeInputs::class) }
 
     // What the person switched on to look through, if a module brought it. Read where the shell does,
     // so an effect switched on or a module switched off takes hold on the next frame.
@@ -232,9 +233,9 @@ fun AppRoot(
           WallpaperLayer(
               settings         = backgroundSettings,
               mousePosProvider = { mousePos.value },
-              // Colours are passed on as reported and not from the initial state, which
-              // would clear the stored ones on every start before the picture decoded.
-              onTone           = { tone = it; appearance.setWallpaperColours(it.colours) },
+              // Passed on as reported and not from an initial state, which would clear the
+              // stored colours on every start before the picture decoded.
+              onTone           = { tone: WallpaperTone -> inputs?.wallpaper(tone) },
               // The one setting a player widget can move while the wallpaper is what
               // its transport is pointed at. Through the same state the appearance
               // panel writes, so the two sliders are one value and the debounce above

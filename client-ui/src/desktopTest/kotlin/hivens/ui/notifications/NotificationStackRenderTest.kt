@@ -7,6 +7,7 @@ import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Density
+import hivens.themes.Themes
 import hivens.ui.notifications.render.NotificationStack
 import hivens.ui.theme.NxTheme
 import org.jetbrains.skia.Bitmap
@@ -61,7 +62,7 @@ class NotificationStackRenderTest {
         push(center, "b", "second")
 
         val scene = ImageComposeScene(width = 900, height = 700, density = Density(1f)) {
-            NxTheme(dark = true) {
+            NxTheme(Themes.default, dark = true) {
                 Box(Modifier.fillMaxSize().background(Color.Black)) {
                     NotificationStack(center = center)
                 }
@@ -97,7 +98,7 @@ class NotificationStackRenderTest {
     fun `an empty backlog paints nothing and still composes`() {
         val center = NotificationCenter()
         val scene = ImageComposeScene(width = 900, height = 700, density = Density(1f)) {
-            NxTheme(dark = true) {
+            NxTheme(Themes.default, dark = true) {
                 Box(Modifier.fillMaxSize().background(Color.Black)) {
                     NotificationStack(center = center)
                 }

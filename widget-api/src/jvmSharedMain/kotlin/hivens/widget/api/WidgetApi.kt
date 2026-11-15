@@ -18,7 +18,12 @@ package hivens.widget.api
  *
  * 2: source and command keys gained a level, so their constructors changed.
  * 3: a module declares settings domains through its keys, and [ModuleStrings] carries a
- *    module's words for the language module instead of looking them up.
+ *    module's words for the language module instead of looking them up. A theme a module
+ *    brings is the themes module's contribution, `hivens.themes.api.ThemeContribution`, and
+ *    no longer the kernel's, and a module compiled in declares the kinds of contribution its
+ *    API adds ([CompiledModule.contributionKinds]). [SettingsDomain.imported] is handed the
+ *    value a domain holds, so taking a choice back from the former settings file keeps what
+ *    that file never held.
  */
 object WidgetApi {
     const val VERSION: Int = 3

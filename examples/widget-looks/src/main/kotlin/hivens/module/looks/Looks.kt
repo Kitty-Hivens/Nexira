@@ -1,11 +1,11 @@
 package hivens.module.looks
 
 import androidx.compose.ui.graphics.Color
+import hivens.themes.api.ThemeContribution
+import hivens.themes.api.ThemeScheme
 import hivens.widget.api.ParticleContribution
 import hivens.widget.api.ParticleMote
 import hivens.widget.api.ParticlePalette
-import hivens.widget.api.ThemeContribution
-import hivens.widget.api.ThemeScheme
 import kotlin.math.PI
 import kotlin.math.floor
 import kotlin.math.sin

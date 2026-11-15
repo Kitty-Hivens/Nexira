@@ -19,7 +19,7 @@ import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertTrue
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.Themes
+import hivens.ui.theme.TestTheme
 
 /**
  * A rounded surface has to round what is INSIDE it too.
@@ -58,7 +58,7 @@ class SurfaceContentClipRenderTest {
     @OptIn(ExperimentalComposeUiApi::class)
     private fun pixel(px: Int, py: Int): Px {
         val scene = ImageComposeScene(width = W + 2 * M, height = H + 2 * M, density = Density(1f)) {
-            NxTheme(Themes.Celestia, dark = true) {
+            NxTheme(TestTheme, dark = true) {
                 Box(Modifier.fillMaxSize().background(PAGE)) {
                     NxSurface(
                         kind = SurfaceKind.Panel,

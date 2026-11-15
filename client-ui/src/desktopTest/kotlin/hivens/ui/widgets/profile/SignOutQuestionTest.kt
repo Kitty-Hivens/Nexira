@@ -29,6 +29,7 @@ import hivens.accounts.api.RemovalView
 import hivens.auth.AccountStore
 import hivens.auth.StoredAccount
 import hivens.core.data.SessionData
+import hivens.themes.Themes
 import hivens.ui.HostKeys
 import hivens.ui.accounts.accountsEngineStandIns
 import hivens.ui.background.BackgroundSettings
@@ -151,7 +152,7 @@ class SignOutQuestionTest {
         onEventThread {
             val scene = ImageComposeScene(900, 900, density = Density(1f)) {
                 ShippedLanguageProvider("en") {
-                    NxTheme(dark = true) {
+                    NxTheme(Themes.default, dark = true) {
                         LayerHost(rememberWindowLayers(), Modifier.fillMaxSize()) {
                             CompositionLocalProvider(
                                 LocalWidgetDataRegistry provides data,

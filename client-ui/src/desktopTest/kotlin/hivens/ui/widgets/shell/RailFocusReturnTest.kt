@@ -22,6 +22,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import hivens.themes.Themes
 import hivens.ui.icons.NxIcon
 import hivens.ui.layers.Layer
 import hivens.ui.layers.LayerHost
@@ -45,7 +46,7 @@ class RailFocusReturnTest {
         var open by mutableStateOf(false)
         var focusManager: FocusManager? = null
         val scene = ImageComposeScene(300, 300, density = Density(1f)) {
-            NxTheme(dark = true) {
+            NxTheme(Themes.default, dark = true) {
                 LayerHost(layers, Modifier.fillMaxSize()) {
                     focusManager = LocalFocusManager.current
                     Column(Modifier.width(64.dp).focusGroup()) {

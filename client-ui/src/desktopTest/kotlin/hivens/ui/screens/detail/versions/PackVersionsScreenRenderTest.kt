@@ -37,6 +37,7 @@ import hivens.core.update.UpdatePlan
 import hivens.launcher.PackOperationService
 import hivens.launcher.instance.InstanceSizeService
 import hivens.launcher.launch.RunningPackSource
+import hivens.themes.Themes
 import hivens.ui.host.HostKoin
 import hivens.ui.theme.NxTheme
 import kotlinx.coroutines.CoroutineScope
@@ -200,7 +201,7 @@ class PackVersionsScreenRenderTest {
         Files.createDirectories(out.parent)
         val scene = ImageComposeScene(width, height, density = Density(1f)) {
             HostKoin(app) {
-                NxTheme(dark = true) {
+                NxTheme(Themes.default, dark = true) {
                     Box(Modifier.fillMaxSize().background(Color(BACKDROP))) {
                         PackVersionsScreen(instanceId = "1", onBack = {})
                     }

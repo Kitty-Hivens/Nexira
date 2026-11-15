@@ -1,4 +1,4 @@
-package hivens.ui.nx
+package hivens.themes
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -17,6 +17,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import hivens.ui.icons.NxIcon
+import hivens.ui.nx.NxButton
+import hivens.ui.nx.NxButtonStyle
+import hivens.ui.nx.NxField
+import hivens.ui.nx.NxIconButton
+import hivens.ui.nx.NxProgressBar
+import hivens.ui.nx.NxSwitch
 import hivens.ui.surface.NxSurface
 import hivens.ui.theme.NxTheme
 import org.jetbrains.skia.EncodedImageFormat
@@ -26,17 +32,17 @@ import kotlin.test.Test
 import hivens.ui.theme.NxInk
 import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.Theme
-import hivens.ui.theme.Themes
 import hivens.ui.theme.NxColor
 
 /**
- * Off-screen visual capture of the library's primitives in every theme and mode,
- * the headless stand-in for "look at it". Buttons in each style and state, the
- * switch, the two progress shapes, the surface vocabulary side by side and one
- * nesting, saved as PNGs. @Ignore: run on demand.
- *   ./gradlew :nx-ui:desktopTest --tests "hivens.ui.nx.PrimitiveShots"
+ * Off-screen visual capture of the design system's primitives in every theme that
+ * ships and every mode, the headless stand-in for "look at it". Buttons in each style
+ * and state, the switch, the two progress shapes, the surface vocabulary side by side
+ * and one nesting, saved as PNGs. Here rather than beside the primitives because the
+ * themes that ship are this module's. @Ignore: run on demand.
+ *   ./gradlew :themes:jvmTest --tests "hivens.themes.PrimitiveShots"
  *
- * No assertions on purpose: what this catches is what only an eye catches -- a
+ * No assertions on purpose. What this catches is what only an eye catches: a
  * control that vanishes in one theme, two depths that read as one tone. The
  * measurable parts of that live in ThemeIntentTest and NxSurfaceTest.
  */

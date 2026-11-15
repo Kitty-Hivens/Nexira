@@ -9,6 +9,7 @@ import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import hivens.themes.Themes
 import hivens.ui.i18n.ShippedLanguageProvider
 import hivens.ui.widgets.WidgetSurface
 import hivens.ui.theme.NxTheme
@@ -113,7 +114,7 @@ class WidgetPreviewCensusTest {
         return runCatching {
             scene.setContent {
                 ShippedLanguageProvider("en") {
-                    NxTheme(dark = true) {
+                    NxTheme(Themes.default, dark = true) {
                         Environment {
                             Box(Modifier.size(SIDE.dp)) { descriptor.Render(instance) }
                         }

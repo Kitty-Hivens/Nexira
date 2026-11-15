@@ -56,7 +56,9 @@ import hivens.ui.debug.IdentityWidgetDecorator
 import hivens.ui.easter.AprilFoolsLoader
 import hivens.ui.easter.LocalAprilFools
 import hivens.ui.editor.WidgetGraphReconciler
-import hivens.ui.appearance.AppearanceStore
+import hivens.themes.ThemeManager
+import hivens.themes.api.SystemScheme
+import hivens.themes.api.ThemeInputs
 import hivens.i18n.api.LocalTranslator
 import hivens.i18n.api.Translations
 import hivens.ui.i18n.nexiraStrings
@@ -84,6 +86,7 @@ import hivens.ui.host.HostedWindow
 import hivens.ui.host.MainWindowNavigation
 import hivens.ui.host.WindowId
 import hivens.ui.host.WindowOwner
+import hivens.ui.host.launcherServices
 import hivens.ui.host.rememberActivityWindow
 import hivens.ui.widgets.NxMapControls
 import hivens.ui.widgets.NxViewportScrollbar
@@ -176,21 +179,22 @@ private fun AndroidShellContent() {
         )
     }
 
-    // How the launcher looks and speaks lives in the appearance store, which every
-    // composition reads through its sources. The shell draws with the same values and
-    // feeds the store the system's scheme, which a phone can always read.
-    val appearance: AppearanceStore = koinInject()
-    remember { appearance.setSystemSchemeAvailable(true) }
-    val isDarkTheme by appearance.dark.collectAsState()
-    val themeMode by appearance.mode.collectAsState()
+    // How the launcher looks is the themes module's. The shell draws with what its manager
+    // holds, which the host made, and tells the module the system's scheme through the inputs
+    // the module keeps for the host: a phone can always read it.
+    val themes: ThemeManager = koinInject()
+    val isDarkTheme by themes.dark.collectAsState()
+    val themeMode by themes.mode.collectAsState()
     // The words the shell is drawn in: the language module's engine, which the host made.
     val translations: Translations = koinInject()
     val words by translations.current.collectAsState()
 
-    // The store listens to the source the mode names, so the scheme is handed over
-    // whenever it or the mode changes. AppRoot hands it what the wallpaper shows.
+    // The manager listens to the source the mode names, so the scheme is handed over
+    // whenever it or the mode changes. AppRoot hands it what the wallpaper shows. Missing
+    // where the document brings no themes module: then nothing follows the system.
+    val inputs = remember(appLevel) { appLevel.launcherServices.find(ThemeInputs::class) }
     val systemDark = isSystemInDarkTheme()
-    LaunchedEffect(themeMode, systemDark) { appearance.systemSchemeChanged(systemDark) }
+    LaunchedEffect(themeMode, systemDark) { inputs?.systemScheme(SystemScheme(readable = true, dark = systemDark)) }
 
     LaunchedEffect(Unit) {
         val before = layoutGraphRepo.value()
@@ -241,7 +245,7 @@ private fun AndroidShellContent() {
             val s = nexiraStrings()
             val uiFamily = if (needsCjkFace(s.text("settingsTitle") + s.text("navLibrary") + s.text("aboutTitle"))) nexiraCjkFamily() else null
 
-            val themeLibrary by appearance.library.collectAsState()
+            val activeTheme by themes.active.collectAsState()
             val customizationJson = remember { Json { ignoreUnknownKeys = true; encodeDefaults = true; coerceInputValues = true } }
             val customizationManager = remember { CustomizationManager(dataDirectory, customizationJson, AtomicFiles::writeString) }
             var customization by remember { mutableStateOf(customizationManager.load()) }
@@ -318,7 +322,7 @@ private fun AndroidShellContent() {
                 ) {
                 LayerHost(layers, Modifier.fillMaxSize()) {
                 val themeReveal = rememberThemeReveal()
-                NxTheme(theme = themeLibrary.active, dark = isDarkTheme, uiFamily = uiFamily) {
+                NxTheme(theme = activeTheme, dark = isDarkTheme, uiFamily = uiFamily) {
                     ThemeRevealHost(themeReveal) {
                         // The system bars and the caption of a freeform window are the system's, so the
                         // layout yields room to them instead of drawing under.

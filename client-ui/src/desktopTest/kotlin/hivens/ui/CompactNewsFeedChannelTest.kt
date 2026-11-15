@@ -9,6 +9,7 @@ import hivens.core.data.NewsChannelPolicy
 import hivens.core.data.NewsItem
 import hivens.core.data.NewsPage
 import hivens.launcher.network.ServerProtocolConfig
+import hivens.themes.Themes
 import hivens.ui.host.HostKoin
 import hivens.ui.theme.NxTheme
 import org.koin.dsl.koinApplication
@@ -47,7 +48,7 @@ class CompactNewsFeedChannelTest {
         // Built and drawn on the event thread: the rail subscribes a snapshotFlow.
         val scene = onEventThread {
             ImageComposeScene(320, 300, density = Density(1f)) {
-                HostKoin(koin) { NxTheme(dark = true) { CompactNewsFeed(maxItems = 4, feed = feed.value) } }
+                HostKoin(koin) { NxTheme(Themes.default, dark = true) { CompactNewsFeed(maxItems = 4, feed = feed.value) } }
             }
         }
         var t = 0L

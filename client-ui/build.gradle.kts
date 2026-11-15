@@ -164,6 +164,10 @@ kotlin {
                 // before any module loads: the window the launcher boots in already speaks.
                 implementation(project(":i18n-api"))
                 implementation(project(":i18n"))
+                // The themes module, the same way as the language module: the boot window is
+                // drawn in the person's theme, so the host makes its manager first.
+                implementation(project(":themes-api"))
+                implementation(project(":themes"))
                 implementation(project(":nx-ui"))
                 implementation(project(":ui-layers"))
                 implementation(project(":client-i18n"))
