@@ -94,6 +94,10 @@ jobs:
       # The rest are pure JVM -- no display, no native tray, no network, no spawned
       # yt-dlp -- so they cost seconds and cover the design system, the widget
       # kernel, all three auth providers and both java agents.
+      #
+      # The modules the launcher is made of and their API artifacts run beside the
+      # consumers that compile against each API from outside, for the reason the
+      # worked example above is here.
       - name: Run unit tests
         run: >-
           ./gradlew
@@ -103,8 +107,11 @@ jobs:
           :client-ui:desktopTest :client-i18n:desktopTest :client-render3d:desktopTest
           :client-easter:desktopTest :nx-ui:desktopTest :ui-layers:test
           :widget-api:test :widget-model:test :widget-processor:test :widget-loader:test
+          :packs-api:test :packs:test :accounts-api:test :accounts:test
+          :catalogue-api:test :catalogue:test :i18n-api:test :i18n:test
           :authlib-agent:test :profiler-agent:test
           :experimental:client-boot:test :examples:widget-pixelplayer:test :examples:widget-screenfx:test :examples:widget-looks:test
+          :examples:packs-consumer:test :examples:accounts-consumer:test :examples:catalogue-consumer:test
           --continue
 
       # The build logic in buildSrc: what the packaging tasks decide, such as which
