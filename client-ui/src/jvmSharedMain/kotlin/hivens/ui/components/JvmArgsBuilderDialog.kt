@@ -1,4 +1,5 @@
 package hivens.ui.components
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxDialog
 import hivens.ui.nx.NxSectionHeader
@@ -18,7 +19,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.core.jvm.*
-import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.surface.NxSurface
@@ -52,24 +52,24 @@ fun JvmArgsBuilderDialog(
     onDismiss: () -> Unit,
     onApply: (String) -> Unit,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     var config by remember { mutableStateOf(initial) }
     var selectedPresetId by remember { mutableStateOf<String?>(null) }
     var selectedTabIdx by remember { mutableStateOf(0) }
 
     val tabs = remember(s) {
         listOf(
-            s.jvmTabGc to NxIcon.Memory,
-            s.jvmTabTuning to NxIcon.Tune,
-            s.jvmTabCds to NxIcon.Bolt,
-            s.jvmTabJit to NxIcon.Speed,
-            s.jvmTabPerf to NxIcon.Whatshot,
-            s.jvmTabJfr to NxIcon.Insights,
-            s.jvmTabCustom to NxIcon.Code,
+            s.text("jvmTabGc") to NxIcon.Memory,
+            s.text("jvmTabTuning") to NxIcon.Tune,
+            s.text("jvmTabCds") to NxIcon.Bolt,
+            s.text("jvmTabJit") to NxIcon.Speed,
+            s.text("jvmTabPerf") to NxIcon.Whatshot,
+            s.text("jvmTabJfr") to NxIcon.Insights,
+            s.text("jvmTabCustom") to NxIcon.Code,
         )
     }
 
-    NxDialog(onDismissRequest = onDismiss, defaultWidth = false, paneTitle = s.jvmTitle) {
+    NxDialog(onDismissRequest = onDismiss, defaultWidth = false, paneTitle = s.text("jvmTitle")) {
         NxSurface(
             kind = SurfaceKind.Dialog,
             modifier = Modifier.width(820.dp).heightIn(min = 540.dp, max = 720.dp),
@@ -91,13 +91,13 @@ fun JvmArgsBuilderDialog(
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text(
-                            s.jvmTitle,
+                            s.text("jvmTitle"),
                             color = NxInk.main,
                             fontWeight = FontWeight.Bold,
                             style = MaterialTheme.typography.titleMedium,
                         )
                         Text(
-                            s.jvmSubtitle,
+                            s.text("jvmSubtitle"),
                             color = NxInk.quiet,
                             style = MaterialTheme.typography.bodySmall,
                         )
@@ -169,11 +169,11 @@ fun JvmArgsBuilderDialog(
                     horizontalArrangement = Arrangement.End,
                 ) {
                     TextButton(onClick = onDismiss) {
-                        Text(s.jvmCancel, color = NxInk.quiet)
+                        Text(s.text("jvmCancel"), color = NxInk.quiet)
                     }
                     Spacer(Modifier.width(8.dp))
                     NxButton(
-                        label   = s.jvmApply,
+                        label   = s.text("jvmApply"),
                         onClick = { onApply(config.toArgString(javaMajor)) },
                         icon    = NxIcon.Check,
                     )
@@ -190,14 +190,14 @@ private fun PresetPickerRow(
     selectedId: String?,
     onSelected: (JvmPreset) -> Unit,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     Column(
         Modifier
             .fillMaxWidth()
             .padding(horizontal = 24.dp, vertical = 12.dp)
     ) {
         Text(
-            s.jvmPresetsHeader,
+            s.text("jvmPresetsHeader"),
             color = NxInk.quiet,
             style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.Bold,
@@ -234,27 +234,27 @@ private fun PresetPickerRow(
 
 @Composable
 private fun GcTabContent(config: JvmConfig, onChange: (JvmConfig) -> Unit) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        NxSectionHeader(s.jvmGcHeader)
+        NxSectionHeader(s.text("jvmGcHeader"))
 
-        GcOption("G1GC", s.jvmGcG1Hint,
+        GcOption("G1GC", s.text("jvmGcG1Hint"),
             selected = config.gc == GcChoice.G1) {
             onChange(config.copy(gc = GcChoice.G1))
         }
-        GcOption("ZGC", s.jvmGcZHint,
+        GcOption("ZGC", s.text("jvmGcZHint"),
             selected = config.gc == GcChoice.Z) {
             onChange(config.copy(gc = GcChoice.Z))
         }
-        GcOption("Shenandoah", s.jvmGcShenandoahHint,
+        GcOption("Shenandoah", s.text("jvmGcShenandoahHint"),
             selected = config.gc == GcChoice.Shenandoah) {
             onChange(config.copy(gc = GcChoice.Shenandoah))
         }
-        GcOption("ParallelGC", s.jvmGcParallelHint,
+        GcOption("ParallelGC", s.text("jvmGcParallelHint"),
             selected = config.gc == GcChoice.Parallel) {
             onChange(config.copy(gc = GcChoice.Parallel))
         }
-        GcOption("SerialGC", s.jvmGcSerialHint,
+        GcOption("SerialGC", s.text("jvmGcSerialHint"),
             selected = config.gc == GcChoice.Serial) {
             onChange(config.copy(gc = GcChoice.Serial))
         }
@@ -297,13 +297,13 @@ private fun GcOption(label: String, hint: String, selected: Boolean, onClick: ()
 
 @Composable
 private fun GcTuningTabContent(config: JvmConfig, onChange: (JvmConfig) -> Unit) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     when (config.gc) {
         GcChoice.G1 -> G1TuningPanel(config.g1) { onChange(config.copy(g1 = it)) }
         GcChoice.Z -> ZgcTuningPanel(config.zgc) { onChange(config.copy(zgc = it)) }
         GcChoice.Shenandoah -> ShenandoahTuningPanel(config.shenandoah) { onChange(config.copy(shenandoah = it)) }
         GcChoice.Parallel, GcChoice.Serial -> Text(
-            s.jvmTuningNotApplicable("${config.gc.name}GC"),
+            s.text("jvmTuningNotApplicable", "${config.gc.name}GC"),
             color = NxInk.quiet,
             style = MaterialTheme.typography.bodyMedium,
         )
@@ -312,43 +312,43 @@ private fun GcTuningTabContent(config: JvmConfig, onChange: (JvmConfig) -> Unit)
 
 @Composable
 private fun G1TuningPanel(g1: G1Tuning, onChange: (G1Tuning) -> Unit) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        NxSectionHeader(s.jvmG1Header)
+        NxSectionHeader(s.text("jvmG1Header"))
         SliderField(
-            label = "MaxGCPauseMillis", hint = s.jvmG1MaxPauseMillisHint,
+            label = "MaxGCPauseMillis", hint = s.text("jvmG1MaxPauseMillisHint"),
             value = g1.maxPauseMs.toFloat(), valueRange = 50f..500f, steps = 8,
             display = "${g1.maxPauseMs} ms",
         ) { onChange(g1.copy(maxPauseMs = it.toInt())) }
         SliderField(
-            label = "G1HeapRegionSize", hint = s.jvmG1RegionSizeHint,
+            label = "G1HeapRegionSize", hint = s.text("jvmG1RegionSizeHint"),
             value = g1.regionSizeMb.toFloat(), valueRange = 1f..32f, steps = 4,
             display = "${g1.regionSizeMb} MB",
         ) { onChange(g1.copy(regionSizeMb = it.toInt())) }
         SliderField(
-            label = "G1NewSizePercent", hint = s.jvmG1NewSizePercentHint,
+            label = "G1NewSizePercent", hint = s.text("jvmG1NewSizePercentHint"),
             value = g1.newSizePercent.toFloat(), valueRange = 5f..80f, steps = 14,
             display = "${g1.newSizePercent}%",
         ) { onChange(g1.copy(newSizePercent = it.toInt())) }
         SliderField(
-            label = "G1MaxNewSizePercent", hint = s.jvmG1MaxNewSizePercentHint,
+            label = "G1MaxNewSizePercent", hint = s.text("jvmG1MaxNewSizePercentHint"),
             value = g1.maxNewSizePercent.toFloat(), valueRange = 5f..90f, steps = 16,
             display = "${g1.maxNewSizePercent}%",
         ) { onChange(g1.copy(maxNewSizePercent = it.toInt())) }
         SliderField(
             label = "InitiatingHeapOccupancyPercent",
-            hint = s.jvmG1IhopHint,
+            hint = s.text("jvmG1IhopHint"),
             value = g1.initiatingHeapOccupancyPercent.toFloat(), valueRange = 5f..90f, steps = 16,
             display = "${g1.initiatingHeapOccupancyPercent}%",
         ) { onChange(g1.copy(initiatingHeapOccupancyPercent = it.toInt())) }
         ToggleField(
             label = "ParallelRefProcEnabled",
-            hint = s.jvmG1ParallelRefProcHint,
+            hint = s.text("jvmG1ParallelRefProcHint"),
             checked = g1.parallelRefProcEnabled,
         ) { onChange(g1.copy(parallelRefProcEnabled = it)) }
         ToggleField(
             label = "PerfDisableSharedMem",
-            hint = s.jvmG1PerfDisableSharedMemHint,
+            hint = s.text("jvmG1PerfDisableSharedMemHint"),
             checked = g1.perfDisableSharedMem,
         ) { onChange(g1.copy(perfDisableSharedMem = it)) }
     }
@@ -356,12 +356,12 @@ private fun G1TuningPanel(g1: G1Tuning, onChange: (G1Tuning) -> Unit) {
 
 @Composable
 private fun ZgcTuningPanel(z: ZgcTuning, onChange: (ZgcTuning) -> Unit) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        NxSectionHeader(s.jvmZHeader)
+        NxSectionHeader(s.text("jvmZHeader"))
         ToggleField(
             label = "Generational ZGC",
-            hint = s.jvmZGenerationalHint,
+            hint = s.text("jvmZGenerationalHint"),
             checked = z.generational,
         ) { onChange(z.copy(generational = it)) }
     }
@@ -369,15 +369,15 @@ private fun ZgcTuningPanel(z: ZgcTuning, onChange: (ZgcTuning) -> Unit) {
 
 @Composable
 private fun ShenandoahTuningPanel(tuning: ShenandoahTuning, onChange: (ShenandoahTuning) -> Unit) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        NxSectionHeader(s.jvmShenandoahHeader)
+        NxSectionHeader(s.text("jvmShenandoahHeader"))
         ShenandoahTuning.Heuristic.entries.forEach { heuristic ->
             val hint = when (heuristic) {
-                ShenandoahTuning.Heuristic.Adaptive -> s.jvmShenandoahAdaptiveHint
-                ShenandoahTuning.Heuristic.Static -> s.jvmShenandoahStaticHint
-                ShenandoahTuning.Heuristic.Compact -> s.jvmShenandoahCompactHint
-                ShenandoahTuning.Heuristic.Aggressive -> s.jvmShenandoahAggressiveHint
+                ShenandoahTuning.Heuristic.Adaptive -> s.text("jvmShenandoahAdaptiveHint")
+                ShenandoahTuning.Heuristic.Static -> s.text("jvmShenandoahStaticHint")
+                ShenandoahTuning.Heuristic.Compact -> s.text("jvmShenandoahCompactHint")
+                ShenandoahTuning.Heuristic.Aggressive -> s.text("jvmShenandoahAggressiveHint")
             }
             GcOption(heuristic.name, hint,
                 selected = tuning.mode == heuristic) { onChange(tuning.copy(mode = heuristic)) }
@@ -389,11 +389,11 @@ private fun ShenandoahTuningPanel(tuning: ShenandoahTuning, onChange: (Shenandoa
 
 @Composable
 private fun CdsTabContent(config: JvmConfig, onChange: (JvmConfig) -> Unit) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        NxSectionHeader(s.jvmCdsHeader)
+        NxSectionHeader(s.text("jvmCdsHeader"))
         Text(
-            s.jvmCdsIntro,
+            s.text("jvmCdsIntro"),
             color = NxInk.quiet,
             style = MaterialTheme.typography.bodySmall,
         )
@@ -401,10 +401,10 @@ private fun CdsTabContent(config: JvmConfig, onChange: (JvmConfig) -> Unit) {
 
         CdsConfig.Mode.entries.forEach { mode ->
             val (label, hint) = when (mode) {
-                CdsConfig.Mode.Disabled -> s.jvmCdsModeDisabledLabel to s.jvmCdsModeDisabledHint
-                CdsConfig.Mode.AutoArchive -> s.jvmCdsModeAutoLabel to s.jvmCdsModeAutoHint
-                CdsConfig.Mode.ArchiveAtExit -> s.jvmCdsModeArchiveLabel to s.jvmCdsModeArchiveHint
-                CdsConfig.Mode.UseArchive -> s.jvmCdsModeUseLabel to s.jvmCdsModeUseHint
+                CdsConfig.Mode.Disabled -> s.text("jvmCdsModeDisabledLabel") to s.text("jvmCdsModeDisabledHint")
+                CdsConfig.Mode.AutoArchive -> s.text("jvmCdsModeAutoLabel") to s.text("jvmCdsModeAutoHint")
+                CdsConfig.Mode.ArchiveAtExit -> s.text("jvmCdsModeArchiveLabel") to s.text("jvmCdsModeArchiveHint")
+                CdsConfig.Mode.UseArchive -> s.text("jvmCdsModeUseLabel") to s.text("jvmCdsModeUseHint")
             }
             GcOption(label, hint, selected = config.cds.mode == mode) {
                 onChange(config.copy(cds = config.cds.copy(mode = mode)))
@@ -416,7 +416,7 @@ private fun CdsTabContent(config: JvmConfig, onChange: (JvmConfig) -> Unit) {
             OutlinedTextField(
                 value = config.cds.archivePath ?: "",
                 onValueChange = { onChange(config.copy(cds = config.cds.copy(archivePath = it.ifBlank { null }))) },
-                label = { Text(s.jvmCdsArchivePathLabel) },
+                label = { Text(s.text("jvmCdsArchivePathLabel")) },
                 placeholder = { Text("/path/to/aura.jsa") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
@@ -429,12 +429,12 @@ private fun CdsTabContent(config: JvmConfig, onChange: (JvmConfig) -> Unit) {
 
 @Composable
 private fun JitTabContent(config: JvmConfig, onChange: (JvmConfig) -> Unit) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        NxSectionHeader(s.jvmJitHeader)
+        NxSectionHeader(s.text("jvmJitHeader"))
         ToggleField(
             label = "Tiered compilation",
-            hint = s.jvmJitTieredHint,
+            hint = s.text("jvmJitTieredHint"),
             checked = config.jit.tieredCompilation,
         ) { onChange(config.copy(jit = config.jit.copy(tieredCompilation = it))) }
 
@@ -442,7 +442,7 @@ private fun JitTabContent(config: JvmConfig, onChange: (JvmConfig) -> Unit) {
 
         IntInput(
             label = "ReservedCodeCacheSize (MB)",
-            hint = s.jvmJitCodeCacheHint,
+            hint = s.text("jvmJitCodeCacheHint"),
             value = config.jit.codeCacheMb,
             placeholder = "240",
         ) { onChange(config.copy(jit = config.jit.copy(codeCacheMb = it))) }
@@ -453,42 +453,42 @@ private fun JitTabContent(config: JvmConfig, onChange: (JvmConfig) -> Unit) {
 
 @Composable
 private fun PerfTabContent(config: JvmConfig, onChange: (JvmConfig) -> Unit) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        NxSectionHeader(s.jvmPerfHeader)
+        NxSectionHeader(s.text("jvmPerfHeader"))
         ToggleField(
             label = "AlwaysPreTouch",
-            hint = s.jvmPerfAlwaysPreTouchHint,
+            hint = s.text("jvmPerfAlwaysPreTouchHint"),
             checked = config.perf.alwaysPreTouch,
         ) { onChange(config.copy(perf = config.perf.copy(alwaysPreTouch = it))) }
         ToggleField(
             label = "DisableExplicitGC",
-            hint = s.jvmPerfDisableExplicitGcHint,
+            hint = s.text("jvmPerfDisableExplicitGcHint"),
             checked = config.perf.disableExplicitGc,
         ) { onChange(config.copy(perf = config.perf.copy(disableExplicitGc = it))) }
         ToggleField(
             label = "UseLargePages (Linux)",
-            hint = s.jvmPerfUseLargePagesHint,
+            hint = s.text("jvmPerfUseLargePagesHint"),
             checked = config.perf.useLargePages,
         ) { onChange(config.copy(perf = config.perf.copy(useLargePages = it))) }
         ToggleField(
             label = "UseTransparentHugePages (Linux)",
-            hint = s.jvmPerfTransparentHugePagesHint,
+            hint = s.text("jvmPerfTransparentHugePagesHint"),
             checked = config.perf.useTransparentHugePages,
         ) { it -> onChange(config.perf.copy(useTransparentHugePages = it).let { config.copy(perf = it) }) }
         ToggleField(
             label = "UseNUMA",
-            hint = s.jvmPerfNumaHint,
+            hint = s.text("jvmPerfNumaHint"),
             checked = config.perf.numa,
         ) { onChange(config.copy(perf = config.perf.copy(numa = it))) }
         ToggleField(
             label = "HeapDumpOnOutOfMemoryError",
-            hint = s.jvmPerfHeapDumpHint,
+            hint = s.text("jvmPerfHeapDumpHint"),
             checked = config.perf.heapDumpOnOom,
         ) { onChange(config.copy(perf = config.perf.copy(heapDumpOnOom = it))) }
         ToggleField(
             label = "ExitOnOutOfMemoryError",
-            hint = s.jvmPerfExitOnOomHint,
+            hint = s.text("jvmPerfExitOnOomHint"),
             checked = config.perf.exitOnOom,
         ) { onChange(config.copy(perf = config.perf.copy(exitOnOom = it))) }
     }
@@ -498,35 +498,35 @@ private fun PerfTabContent(config: JvmConfig, onChange: (JvmConfig) -> Unit) {
 
 @Composable
 private fun JfrTabContent(config: JvmConfig, onChange: (JvmConfig) -> Unit) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        NxSectionHeader(s.jvmJfrHeader)
+        NxSectionHeader(s.text("jvmJfrHeader"))
         Text(
-            s.jvmJfrIntro,
+            s.text("jvmJfrIntro"),
             color = NxInk.quiet,
             style = MaterialTheme.typography.bodySmall,
         )
         Spacer(Modifier.height(4.dp))
         ToggleField(
-            label = s.jvmJfrEnableLabel,
-            hint = s.jvmJfrEnableHint,
+            label = s.text("jvmJfrEnableLabel"),
+            hint = s.text("jvmJfrEnableHint"),
             checked = config.jfr.enabled,
         ) { onChange(config.copy(jfr = config.jfr.copy(enabled = it))) }
 
         if (config.jfr.enabled) {
             IntInput(
-                label = s.jvmJfrDurationLabel,
+                label = s.text("jvmJfrDurationLabel"),
                 hint = "",
                 value = config.jfr.durationMinutes,
                 placeholder = "60",
             ) {
                 onChange(config.copy(jfr = config.jfr.copy(durationMinutes = it ?: 60)))
             }
-            NxSectionHeader(s.jvmJfrSettingsHeader)
+            NxSectionHeader(s.text("jvmJfrSettingsHeader"))
             JfrConfig.SettingsPreset.entries.forEach { preset ->
                 val hint = when (preset) {
-                    JfrConfig.SettingsPreset.Default -> s.jvmJfrSettingsDefaultHint
-                    JfrConfig.SettingsPreset.Profile -> s.jvmJfrSettingsProfileHint
+                    JfrConfig.SettingsPreset.Default -> s.text("jvmJfrSettingsDefaultHint")
+                    JfrConfig.SettingsPreset.Profile -> s.text("jvmJfrSettingsProfileHint")
                 }
                 GcOption(preset.name, hint, selected = config.jfr.settings == preset) {
                     onChange(config.copy(jfr = config.jfr.copy(settings = preset)))
@@ -535,7 +535,7 @@ private fun JfrTabContent(config: JvmConfig, onChange: (JvmConfig) -> Unit) {
             OutlinedTextField(
                 value = config.jfr.outputPath ?: "",
                 onValueChange = { onChange(config.copy(jfr = config.jfr.copy(outputPath = it.ifBlank { null }))) },
-                label = { Text(s.jvmJfrOutputPathLabel) },
+                label = { Text(s.text("jvmJfrOutputPathLabel")) },
                 placeholder = { Text("/path/to/recording.jfr") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
@@ -548,12 +548,12 @@ private fun JfrTabContent(config: JvmConfig, onChange: (JvmConfig) -> Unit) {
 
 @Composable
 private fun CustomTabContent(config: JvmConfig, onChange: (JvmConfig) -> Unit) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     var text by remember(config.custom) { mutableStateOf(config.custom.joinToString(" ")) }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        NxSectionHeader(s.jvmCustomHeader)
+        NxSectionHeader(s.text("jvmCustomHeader"))
         Text(
-            s.jvmCustomIntro,
+            s.text("jvmCustomIntro"),
             color = NxInk.quiet,
             style = MaterialTheme.typography.bodySmall,
         )
@@ -563,7 +563,7 @@ private fun CustomTabContent(config: JvmConfig, onChange: (JvmConfig) -> Unit) {
                 text = it
                 onChange(config.copy(custom = it.trim().split(Regex("\\s+")).filter { tok -> tok.isNotBlank() }))
             },
-            label = { Text(s.jvmCustomLabel) },
+            label = { Text(s.text("jvmCustomLabel")) },
             placeholder = { Text("-Daura.weird.flag=42 -XX:+SomeNewThing") },
             modifier = Modifier.fillMaxWidth().heightIn(min = 80.dp),
         )
@@ -574,7 +574,7 @@ private fun CustomTabContent(config: JvmConfig, onChange: (JvmConfig) -> Unit) {
 
 @Composable
 private fun ArgsPreviewBox(config: JvmConfig, javaMajor: Int?) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val args = remember(config, javaMajor) { config.toArgs(javaMajor) }
     Column(
         Modifier
@@ -585,7 +585,7 @@ private fun ArgsPreviewBox(config: JvmConfig, javaMajor: Int?) {
             Symbol(NxIcon.Code, null, tint = NxColor.lead(),
                 modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(6.dp))
-            Text(s.jvmPreviewFlagsCount(args.size),
+            Text(s.text("jvmPreviewFlagsCount", args.size),
                 color = NxInk.quiet,
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.Bold)

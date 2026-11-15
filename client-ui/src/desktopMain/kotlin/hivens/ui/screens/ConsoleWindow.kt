@@ -31,8 +31,8 @@ import hivens.ui.host.HostedWindow
 import hivens.ui.host.WindowCommand
 import hivens.ui.host.WindowId
 import hivens.ui.host.WindowOwner
-import hivens.ui.i18n.LocalStrings
-import hivens.ui.i18n.LocaleProvider
+import hivens.i18n.api.LocalTranslator
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.layers.LayerHost
 import hivens.ui.layers.rememberWindowLayers
 import hivens.ui.surface.NxSurface
@@ -83,11 +83,11 @@ private fun ConsoleWindowContent(look: ShellLook) {
     val layers = rememberWindowLayers()
     val close = remember(console) { { console.hide() } }
 
-    LocaleProvider(locale = look.locale) {
+    CompositionLocalProvider(LocalTranslator provides look.words) {
         Window(
             onCloseRequest    = close,
             state             = windowState,
-            title             = LocalStrings.current.consoleTitle,
+            title             = nexiraStrings().text("consoleTitle"),
             alwaysOnTop       = false,
             undecorated       = false,
             // The window's own dismiss stack hears every key first and last, as the

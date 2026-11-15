@@ -18,7 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.theme.LocalMonoFamily
@@ -39,7 +39,7 @@ fun UnsupportedWidgetPlaceholder(
     instance: WidgetInstance,
     onRemove: () -> Unit,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -56,7 +56,7 @@ fun UnsupportedWidgetPlaceholder(
         )
         Column(Modifier.weight(1f)) {
             Text(
-                s.editorUnsupportedWidget,
+                s.text("editorUnsupportedWidget"),
                 color = NxColor.status(Status.Error),
                 style = MaterialTheme.typography.bodySmall,
                 fontWeight = FontWeight.Medium,
@@ -70,7 +70,7 @@ fun UnsupportedWidgetPlaceholder(
         }
         IconButton(onClick = onRemove, modifier = Modifier.size(24.dp)) {
             Symbol(NxIcon.Close,
-                contentDescription = s.editorDelete,
+                contentDescription = s.text("editorDelete"),
                 tint = NxInk.quiet,
                 modifier = Modifier.size(16.dp),
             )

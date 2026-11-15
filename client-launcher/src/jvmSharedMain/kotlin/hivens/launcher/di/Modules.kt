@@ -496,7 +496,8 @@ val mirrorModule = module {
     // origin so the Browse UI stays source-agnostic.
     single {
         val settings = get<ISettingsService>()
-        MirrorPackCatalogue(get(), language = { settings.getSettings().locale })
+        val reading = getOrNull<ReadingLanguage>()
+        MirrorPackCatalogue(get(), languages = { reading?.tags() ?: listOf(settings.getSettings().locale) })
     }
     single { ModrinthPackCatalogue(get()) }
     single {
@@ -580,6 +581,7 @@ val mirrorModule = module {
     single { ApplyRecovery(snapshotService = get(), repository = get(), journal = get(), dataDir = get(), work = get()) }
     single {
         val settings = get<ISettingsService>()
+        val reading = getOrNull<ReadingLanguage>()
         PackUpdateService(
             client = get<SmrtPackClient>(),
             syncService = get(),
@@ -587,7 +589,7 @@ val mirrorModule = module {
             snapshotService = get(),
             journal = get(),
             dataDir = get(),
-            language = { settings.getSettings().locale },
+            languages = { reading?.tags() ?: listOf(settings.getSettings().locale) },
         )
     }
     single {

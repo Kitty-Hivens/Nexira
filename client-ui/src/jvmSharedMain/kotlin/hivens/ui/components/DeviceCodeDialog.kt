@@ -19,7 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxDialog
 import hivens.ui.puppet.PuppetClick
@@ -50,10 +50,10 @@ fun DeviceCodeDialog(
     onCancel: () -> Unit,
     errorMessage: String? = null,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     PuppetScreen("Login_DeviceCode")
 
-    NxDialog(onDismissRequest = onCancel, defaultWidth = false, paneTitle = s.msaTitle) {
+    NxDialog(onDismissRequest = onCancel, defaultWidth = false, paneTitle = s.text("msaTitle")) {
         NxSurface(
             kind = SurfaceKind.Dialog,
             modifier = Modifier.width(420.dp),
@@ -64,12 +64,12 @@ fun DeviceCodeDialog(
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
                 Text(
-                    s.msaTitle,
+                    s.text("msaTitle"),
                     style = MaterialTheme.typography.titleMedium,
                     color = NxInk.main,
                 )
                 Text(
-                    s.msaInstruction,
+                    s.text("msaInstruction"),
                     style = MaterialTheme.typography.bodyMedium,
                     color = NxInk.quiet,
                 )
@@ -110,7 +110,7 @@ fun DeviceCodeDialog(
                         )
                         Spacer(Modifier.width(10.dp))
                         Text(
-                            s.msaWaiting,
+                            s.text("msaWaiting"),
                             style = MaterialTheme.typography.bodySmall,
                             color = NxInk.quiet,
                         )
@@ -125,11 +125,11 @@ fun DeviceCodeDialog(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     TextButton(onClick = onCancel) {
-                        Text(s.auth2faCancel, color = NxInk.quiet)
+                        Text(s.text("auth2faCancel"), color = NxInk.quiet)
                     }
                     PuppetClick("login.msa.cancel") { onCancel() }
                     Spacer(Modifier.width(8.dp))
-                    NxButton(label = s.msaOpenBrowser, onClick = onOpenBrowser)
+                    NxButton(label = s.text("msaOpenBrowser"), onClick = onOpenBrowser)
                     PuppetClick("login.msa.openBrowser") { onOpenBrowser() }
                 }
             }

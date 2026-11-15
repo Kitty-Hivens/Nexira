@@ -39,7 +39,7 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
@@ -81,12 +81,12 @@ import hivens.ui.theme.Status
  */
 @Composable
 fun FileBrowserPane(rootDir: Path, modifier: Modifier = Modifier) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
 
     if (!rootDir.isDirectory()) {
         Box(modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
             Text(
-                text  = s.fileBrowserNoRoot,
+                text  = s.text("fileBrowserNoRoot"),
                 style = MaterialTheme.typography.bodyMedium,
                 color = NxInk.quiet,
             )
@@ -177,7 +177,7 @@ fun FileBrowserPane(rootDir: Path, modifier: Modifier = Modifier) {
                 if (picked == null) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text(
-                            text  = s.fileBrowserPickAFile,
+                            text  = s.text("fileBrowserPickAFile"),
                             style = MaterialTheme.typography.bodyMedium,
                             color = NxInk.quiet,
                         )
@@ -243,7 +243,7 @@ private fun FileTreeRow(
     val rowBg = if (isSelected) NxColor.wash(NxColor.lead(), 0.25f)
                 else Color.Transparent
 
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val clickHandler: () -> Unit = when {
         node.isEmpty -> ({})              // empty-folder placeholder is read-only
         node.isDir   -> onToggleExpand
@@ -286,7 +286,7 @@ private fun FileTreeRow(
             Spacer(Modifier.width(8.dp))
             if (node.isEmpty) {
                 Text(
-                    text       = s.fileBrowserEmptyFolder,
+                    text       = s.text("fileBrowserEmptyFolder"),
                     style      = MaterialTheme.typography.bodySmall,
                     color      = NxInk.quiet,
                     fontStyle  = FontStyle.Italic,
@@ -327,7 +327,7 @@ private fun FilePreview(file: Path) {
 
 @Composable
 private fun TextPreview(file: Path) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val state = produceState<TextLoadResult?>(initialValue = null, key1 = file) {
         // Same reason the loading state exists: without this the preview shows the
         // previously opened file's text under the newly selected file's name.
@@ -373,7 +373,7 @@ private fun TextPreview(file: Path) {
         Spacer(Modifier.height(8.dp))
         if (state.truncated) {
             Text(
-                text  = s.fileBrowserTextTruncated(TEXT_PREVIEW_MAX_BYTES / 1024),
+                text  = s.text("fileBrowserTextTruncated", TEXT_PREVIEW_MAX_BYTES / 1024),
                 style = MaterialTheme.typography.labelSmall,
                 color = NxColor.status(Status.Error),
             )
@@ -411,7 +411,7 @@ private fun ImagePreview(file: Path) {
 
 @Composable
 private fun BinaryPreview(file: Path) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     Column(
         modifier            = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -421,14 +421,14 @@ private fun BinaryPreview(file: Path) {
         NxSurface(SurfaceKind.Panel, modifier = Modifier.fillMaxWidth().height(140.dp)) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(
-                    text  = s.fileBrowserBinaryHint,
+                    text  = s.text("fileBrowserBinaryHint"),
                     style = MaterialTheme.typography.bodySmall,
                     color = NxInk.quiet,
                 )
             }
         }
         NxButton(
-            label   = s.fileBrowserOpenExternally,
+            label   = s.text("fileBrowserOpenExternally"),
             onClick = { SystemActions.openFile(file.toFile()) },
             icon    = NxIcon.OpenInNew,
         )

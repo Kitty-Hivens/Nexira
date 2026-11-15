@@ -57,10 +57,10 @@ import hivens.catalogue.api.InstallSubject
 import hivens.catalogue.api.NewPackRequest
 import hivens.catalogue.api.NewPackState
 import hivens.catalogue.api.ProjectBuild
+import hivens.i18n.api.Strings
 import hivens.packs.api.PackKeys
 import hivens.ui.Screen
-import hivens.ui.i18n.AppStrings
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.nx.InitialsAvatar
@@ -105,7 +105,7 @@ import hivens.ui.theme.decorativePair
  */
 @Composable
 internal fun InstallDialog(subject: InstallSubject, onDismiss: () -> Unit) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val model = rememberInstallDialogModel(subject)
     var tab by remember { mutableStateOf(InstallTab.Existing) }
     val tabs = if (model.newPackLoaders.isNotEmpty()) InstallTab.entries else listOf(InstallTab.Existing)
@@ -119,7 +119,7 @@ internal fun InstallDialog(subject: InstallSubject, onDismiss: () -> Unit) {
         defaultWidth     = false,
         scrim            = NxColor.page.copy(alpha = 0.72f),
         enter            = Motion.emphasis.enter,
-        paneTitle        = s.installDialogTitle,
+        paneTitle        = s.text("installDialogTitle"),
     ) {
         NxSurface(
             kind = SurfaceKind.Dialog,
@@ -132,13 +132,13 @@ internal fun InstallDialog(subject: InstallSubject, onDismiss: () -> Unit) {
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        s.installDialogTitle,
+                        s.text("installDialogTitle"),
                         style = MaterialTheme.typography.titleLarge,
                         color = NxInk.main,
                         fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.weight(1f),
                     )
-                    NxIconButton(icon = NxIcon.Close, contentDescription = s.installDialogClose, onClick = onDismiss)
+                    NxIconButton(icon = NxIcon.Close, contentDescription = s.text("installDialogClose"), onClick = onDismiss)
                 }
                 SubjectBlock(subject)
                 if (tabs.size > 1) {
@@ -172,12 +172,12 @@ internal fun InstallDialog(subject: InstallSubject, onDismiss: () -> Unit) {
                     Symbol(NxIcon.Inventory2, contentDescription = null, tint = NxInk.quiet, size = 18.dp)
                     Spacer(Modifier.width(8.dp))
                     Text(
-                        model.candidates?.let { list -> s.installDialogFitCount(list.count { it.verdict == CandidateVerdict.Fits }) }.orEmpty(),
+                        model.candidates?.let { list -> s.text("installDialogFitCount", list.count { it.verdict == CandidateVerdict.Fits }) }.orEmpty(),
                         style = MaterialTheme.typography.bodyMedium,
                         color = NxInk.quiet,
                         modifier = Modifier.weight(1f),
                     )
-                    NxButton(label = s.installDialogClose, onClick = onDismiss, style = NxButtonStyle.Secondary, icon = NxIcon.Close, compact = true)
+                    NxButton(label = s.text("installDialogClose"), onClick = onDismiss, style = NxButtonStyle.Secondary, icon = NxIcon.Close, compact = true)
                 }
             }
         }
@@ -186,9 +186,9 @@ internal fun InstallDialog(subject: InstallSubject, onDismiss: () -> Unit) {
 
 private enum class InstallTab { Existing, New }
 
-private fun InstallTab.label(s: AppStrings): String = when (this) {
-    InstallTab.Existing -> s.installDialogExisting
-    InstallTab.New -> s.installDialogNew
+private fun InstallTab.label(s: Strings): String = when (this) {
+    InstallTab.Existing -> s.text("installDialogExisting")
+    InstallTab.New -> s.text("installDialogNew")
 }
 
 private val DIALOG_WIDTH = 560.dp
@@ -196,7 +196,7 @@ private val BODY_HEIGHT = 400.dp
 
 @Composable
 private fun SubjectBlock(subject: InstallSubject) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     Row(
         Modifier.padding(horizontal = 24.dp).padding(top = 12.dp).fillMaxWidth()
             .clip(RoundedCornerShape(20.dp))
@@ -216,7 +216,7 @@ private fun SubjectBlock(subject: InstallSubject) {
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(subject.title, style = MaterialTheme.typography.titleMedium, color = NxInk.main, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (subject.author.isNotBlank()) {
-                Text(s.browseByAuthor(subject.author), style = MaterialTheme.typography.bodySmall, color = NxInk.quiet, maxLines = 1)
+                Text(s.text("browseByAuthor", subject.author), style = MaterialTheme.typography.bodySmall, color = NxInk.quiet, maxLines = 1)
             }
         }
     }
@@ -315,7 +315,7 @@ private fun compareVersions(a: String, b: String): Int {
 
 @Composable
 private fun ExistingPacks(model: InstallDialogModel) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     var query by remember { mutableStateOf("") }
     var hideUnfit by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxSize().padding(top = 14.dp)) {
@@ -324,11 +324,11 @@ private fun ExistingPacks(model: InstallDialogModel) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            NxField(value = query, onValueChange = { query = it }, placeholder = s.installDialogSearch, modifier = Modifier.weight(1f))
-            NxTooltip(text = if (hideUnfit) s.installDialogShowUnfit else s.installDialogHideUnfit) {
+            NxField(value = query, onValueChange = { query = it }, placeholder = s.text("installDialogSearch"), modifier = Modifier.weight(1f))
+            NxTooltip(text = if (hideUnfit) s.text("installDialogShowUnfit") else s.text("installDialogHideUnfit")) {
                 NxIconButton(
                     icon = if (hideUnfit) NxIcon.VisibilityOff else NxIcon.Visibility,
-                    contentDescription = if (hideUnfit) s.installDialogShowUnfit else s.installDialogHideUnfit,
+                    contentDescription = if (hideUnfit) s.text("installDialogShowUnfit") else s.text("installDialogHideUnfit"),
                     onClick = { hideUnfit = !hideUnfit },
                 )
             }
@@ -340,13 +340,13 @@ private fun ExistingPacks(model: InstallDialogModel) {
             list == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = NxColor.lead(), strokeWidth = 2.dp, modifier = Modifier.size(24.dp))
             }
-            model.failed -> Note(s.installPickerFailed, retry = model.retry)
+            model.failed -> Note(s.text("installPickerFailed"), retry = model.retry)
             else -> {
                 val shown = list
                     .filter { query.isBlank() || it.name.contains(query.trim(), ignoreCase = true) }
                     .filter { !hideUnfit || it.verdict == CandidateVerdict.Fits || model.rows[it.packId] != null }
                 if (shown.isEmpty()) {
-                    Note(if (list.isEmpty()) s.installPickerNoPacks else s.contentEmpty)
+                    Note(if (list.isEmpty()) s.text("installPickerNoPacks") else s.text("contentEmpty"))
                 } else {
                     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 8.dp)) {
                         items(shown, key = { it.packId }) { candidate ->
@@ -375,7 +375,7 @@ private fun CandidateRow(
     onOpen: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val verdict = candidate.verdict
     val fits = verdict == CandidateVerdict.Fits
     val present = verdict == CandidateVerdict.Present || state is CandidateState.Done
@@ -409,7 +409,7 @@ private fun CandidateRow(
                 )
                 val missing = (state as? CandidateState.Done)?.missing?.takeIf { it > 0 }
                 val note = (state as? CandidateState.Failed)?.problem?.label(s)
-                    ?: missing?.let { s.modPageInstallMissing(it) }
+                    ?: missing?.let { s.text("modPageInstallMissing", it) }
                     ?: unfitReason(verdict, s)
                 Text(
                     note ?: runtimeLabel(candidate.mcVersion, candidate.loader),
@@ -440,23 +440,23 @@ private fun CandidateRow(
     }
 }
 
-private fun unfitReason(verdict: CandidateVerdict, s: AppStrings): String? = when (verdict) {
-    CandidateVerdict.NoBuild -> s.installTargetNoBuild
-    CandidateVerdict.NotTaken -> s.installTargetNotTaken
-    CandidateVerdict.Unknown -> s.installTargetUnknown
+private fun unfitReason(verdict: CandidateVerdict, s: Strings): String? = when (verdict) {
+    CandidateVerdict.NoBuild -> s.text("installTargetNoBuild")
+    CandidateVerdict.NotTaken -> s.text("installTargetNotTaken")
+    CandidateVerdict.Unknown -> s.text("installTargetUnknown")
     CandidateVerdict.Fits, CandidateVerdict.Present -> null
 }
 
 @Composable
 private fun Note(text: String, retry: (() -> Unit)? = null) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     Column(
         Modifier.fillMaxSize().padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
     ) {
         Text(text, style = MaterialTheme.typography.bodyMedium, color = NxInk.quiet)
-        retry?.let { NxButton(label = s.browseRetry, onClick = it, style = NxButtonStyle.Secondary, icon = NxIcon.Refresh, compact = true) }
+        retry?.let { NxButton(label = s.text("browseRetry"), onClick = it, style = NxButtonStyle.Secondary, icon = NxIcon.Refresh, compact = true) }
     }
 }
 
@@ -464,7 +464,7 @@ private fun Note(text: String, retry: (() -> Unit)? = null) {
 
 @Composable
 private fun NewPack(model: InstallDialogModel) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val loaders = model.newPackLoaders
     var loader by remember(loaders) { mutableStateOf(loaders.firstOrNull { it != null } ?: loaders.firstOrNull()) }
     var showAll by remember { mutableStateOf(false) }
@@ -482,13 +482,13 @@ private fun NewPack(model: InstallDialogModel) {
     ) {
         when (val state = model.newPack) {
             NewPackState.Idle, is NewPackState.Failed -> {
-                Label(s.createPackName)
+                Label(s.text("createPackName"))
                 NxField(value = name, onValueChange = { name = it }, placeholder = defaultName, modifier = Modifier.fillMaxWidth())
-                Label(s.createPackLoader)
+                Label(s.text("createPackLoader"))
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     loaders.forEach { l -> NxChoiceChip(label = l?.let(::loaderLabel) ?: "Vanilla", selected = l == loader) { loader = l } }
                 }
-                Label(s.createPackMc)
+                Label(s.text("createPackMc"))
                 NxSelect(
                     options     = versions,
                     selected    = mc.takeIf { it.isNotBlank() },
@@ -499,7 +499,7 @@ private fun NewPack(model: InstallDialogModel) {
                     modifier    = Modifier.fillMaxWidth(),
                     footer      = {
                         NxChoiceFooterItem(
-                            label = if (showAll) s.createPackHideSnapshots else s.createPackShowSnapshots,
+                            label = if (showAll) s.text("createPackHideSnapshots") else s.text("createPackShowSnapshots"),
                             icon  = if (showAll) NxIcon.VisibilityOff else NxIcon.Visibility,
                         ) { showAll = !showAll }
                     },
@@ -507,7 +507,7 @@ private fun NewPack(model: InstallDialogModel) {
                 Spacer(Modifier.weight(1f))
                 if (state is NewPackState.Failed) {
                     Text(
-                        state.message.ifBlank { s.contentInstallFailed },
+                        state.message.ifBlank { s.text("contentInstallFailed") },
                         style = MaterialTheme.typography.labelMedium,
                         color = NxColor.status(Status.Error),
                         maxLines = 2,
@@ -515,7 +515,7 @@ private fun NewPack(model: InstallDialogModel) {
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     NxButton(
-                        label = s.installDialogCreate,
+                        label = s.text("installDialogCreate"),
                         onClick = { model.createAndInstall(name.trim().ifBlank { defaultName }, mc, loader) },
                         icon = NxIcon.Download,
                         enabled = mc.isNotBlank(),
@@ -533,11 +533,11 @@ private fun NewPack(model: InstallDialogModel) {
                 verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
             ) {
                 Symbol(NxIcon.CheckCircle, contentDescription = null, tint = NxColor.lead(), size = 40.dp)
-                Text(s.installDialogDone(state.packName), style = MaterialTheme.typography.titleMedium, color = NxInk.main, fontWeight = FontWeight.SemiBold)
+                Text(s.text("installDialogDone", state.packName), style = MaterialTheme.typography.titleMedium, color = NxInk.main, fontWeight = FontWeight.SemiBold)
                 if (state.missing > 0) {
-                    Text(s.modPageInstallMissing(state.missing), style = MaterialTheme.typography.labelMedium, color = NxColor.status(Status.Error))
+                    Text(s.text("modPageInstallMissing", state.missing), style = MaterialTheme.typography.labelMedium, color = NxColor.status(Status.Error))
                 }
-                NxButton(label = s.installDialogOpenPack, onClick = { model.openPack(state.packId) }, style = NxButtonStyle.Secondary, compact = true)
+                NxButton(label = s.text("installDialogOpenPack"), onClick = { model.openPack(state.packId) }, style = NxButtonStyle.Secondary, compact = true)
             }
         }
     }
@@ -545,7 +545,7 @@ private fun NewPack(model: InstallDialogModel) {
 
 @Composable
 private fun CreatingNote(state: NewPackState) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val creating = state as? NewPackState.Creating
     Column(
         Modifier.fillMaxSize(),
@@ -554,7 +554,7 @@ private fun CreatingNote(state: NewPackState) {
     ) {
         CircularProgressIndicator(color = NxColor.lead(), strokeWidth = 2.dp, modifier = Modifier.size(28.dp))
         Text(
-            if (state is NewPackState.Creating) s.installDialogCreating else s.modPageInstalling,
+            if (state is NewPackState.Creating) s.text("installDialogCreating") else s.text("modPageInstalling"),
             style = MaterialTheme.typography.titleSmall,
             color = NxInk.main,
         )
@@ -596,9 +596,9 @@ internal fun PackMark(packId: String, name: String, size: Dp, dimmed: Boolean = 
  */
 @Composable
 internal fun InstallChooser(subject: InstallSubject) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     var open by remember { mutableStateOf(false) }
-    NxButton(label = s.modPageInstallChoose, onClick = { open = true }, icon = NxIcon.Download)
+    NxButton(label = s.text("modPageInstallChoose"), onClick = { open = true }, icon = NxIcon.Download)
     PuppetClick("modPage.installChoose") { open = true }
     if (open) InstallDialog(subject) { open = false }
 }

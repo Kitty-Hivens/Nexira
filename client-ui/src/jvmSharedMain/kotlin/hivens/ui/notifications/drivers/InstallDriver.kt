@@ -1,9 +1,9 @@
 package hivens.ui.notifications.drivers
 
+import hivens.i18n.api.Strings
 import hivens.launcher.InstallPhase
 import hivens.launcher.InstallSnapshot
 import hivens.launcher.PackInstallService
-import hivens.ui.i18n.AppStrings
 import hivens.ui.notifications.Kind
 import hivens.ui.notifications.NotifAction
 import hivens.ui.notifications.NotificationCenter
@@ -28,7 +28,7 @@ class InstallDriver(
     private val service: PackInstallService,
     private val notifications: NotificationCenter,
     private val appScope: CoroutineScope,
-    private val stringsProvider: () -> AppStrings,
+    private val stringsProvider: () -> Strings,
 ) {
     private val lastPhase = HashMap<String, InstallPhase>()
 
@@ -63,7 +63,7 @@ class InstallDriver(
                 iconUrl   = snapshot.iconUrl,
                 severity  = Severity.Success,
                 kind      = Kind.OneShot,
-                title     = s.notifInstallDone(snapshot.title),
+                title     = s.text("notifInstallDone", snapshot.title),
             )
             is InstallPhase.Failed -> notifications.push(
                 sourceKey = sourceKey,
@@ -71,7 +71,7 @@ class InstallDriver(
                 iconUrl   = snapshot.iconUrl,
                 severity  = Severity.Critical,
                 kind      = Kind.Sticky,
-                title     = s.notifInstallFailed(snapshot.title),
+                title     = s.text("notifInstallFailed", snapshot.title),
                 body      = phase.message.ifBlank { null },
             )
             InstallPhase.Cancelled -> notifications.push(
@@ -80,7 +80,7 @@ class InstallDriver(
                 iconUrl   = snapshot.iconUrl,
                 severity  = Severity.Info,
                 kind      = Kind.OneShot,
-                title     = s.notifInstallCancelled(snapshot.title),
+                title     = s.text("notifInstallCancelled", snapshot.title),
             )
         }
     }

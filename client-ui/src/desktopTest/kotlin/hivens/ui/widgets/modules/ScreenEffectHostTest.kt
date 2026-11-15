@@ -10,7 +10,6 @@ import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.unit.Density
 import hivens.ui.widgets.modules.WidgetModules.Contributed
 import hivens.widget.api.ModuleSetting
-import hivens.widget.api.ModuleStrings
 import hivens.widget.api.ScreenEffect
 import hivens.widget.api.ScreenEffectState
 import javax.swing.SwingUtilities
@@ -37,7 +36,7 @@ class ScreenEffectHostTest {
     }
 
     private fun entry(effect: ScreenEffect, module: String = "m"): Contributed<ScreenEffect> =
-        Contributed(module, module, effect, ModuleStrings.EMPTY)
+        Contributed(module, module, effect)
 
     private fun on(vararg scopes: String): Map<String, Map<String, String>> =
         scopes.associateWith { mapOf(WidgetModules.EFFECT_ENABLED to "true") }

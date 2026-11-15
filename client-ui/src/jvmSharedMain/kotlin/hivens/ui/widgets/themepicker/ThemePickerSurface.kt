@@ -20,7 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.ui.flexible.Flexible
 import hivens.ui.flexible.FlexibleKind
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.puppet.PuppetClick
@@ -49,7 +49,7 @@ private const val SURFACE = "theme.picker"
 @Composable
 fun ThemePickerSurface() {
     val library = rememberScopedSource(Sources.ThemeLibrary).valueOrNull() ?: return
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val themes = library.all
     // Keyless remember: the pending selection survives an outside change of the
     // active theme. Only Apply commits it.
@@ -87,14 +87,14 @@ fun ThemePickerSurface() {
                     // No back arrow of its own. The window frame already carries one,
                     // enabled by the same history this screen would pop.
                     Text(
-                        text       = s.themePickerTitle,
+                        text       = s.text("themePickerTitle"),
                         style      = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Black,
                         color      = NxInk.main,
                     )
                     Flexible("theme_picker_apply_btn", FlexibleKind.Button) {
                         NxButton(
-                            label = s.themePickerApply,
+                            label = s.text("themePickerApply"),
                             onClick = applyAndLeave,
                             style = NxButtonStyle.Primary,
                         )

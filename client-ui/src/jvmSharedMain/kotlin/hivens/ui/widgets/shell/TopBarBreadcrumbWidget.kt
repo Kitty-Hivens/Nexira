@@ -18,7 +18,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import hivens.ui.chrome.rememberCrumbLabel
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.widgets.Commands
@@ -47,13 +47,13 @@ fun TopBarBreadcrumbWidget() {
     val back = rememberScopedAction(Commands.Back) ?: return
     val forward = rememberScopedAction(Commands.Forward) ?: return
     val popTo = rememberScopedCommand(Commands.PopTo) ?: return
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     Row(verticalAlignment = Alignment.CenterVertically) {
         // Back / forward are always present so the breadcrumb never shifts; each
         // greys out and stops responding when there is nowhere to go that way.
-        NavArrow(enabled = nav.canGoBack, mirrored = false, contentDescription = s.navBack, onClick = back)
+        NavArrow(enabled = nav.canGoBack, mirrored = false, contentDescription = s.text("navBack"), onClick = back)
         // Forward: the back arrow mirrored, so the pair matches exactly.
-        NavArrow(enabled = nav.canGoForward, mirrored = true, contentDescription = s.navForward, onClick = forward)
+        NavArrow(enabled = nav.canGoForward, mirrored = true, contentDescription = s.text("navForward"), onClick = forward)
         val trail = nav.trail
         trail.forEachIndexed { i, screen ->
             val isLast = i == trail.lastIndex

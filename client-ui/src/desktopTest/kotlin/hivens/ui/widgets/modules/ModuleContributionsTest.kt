@@ -4,6 +4,7 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Density
+import hivens.i18n.I18nEngine
 import hivens.ui.theme.NxTheme
 import hivens.ui.widgets.modules.WidgetModules.Contributed
 import hivens.widget.api.ModuleStrings
@@ -26,6 +27,9 @@ class ModuleContributionsTest {
 
     private val strings = ModuleStrings(mapOf("en" to mapOf("night" to "Night"), "ru" to mapOf("night" to "Ночь")))
 
+    /** The module's words in the language [tag], as the language module answers them. */
+    private fun words(tag: String) = I18nEngine(null, tag).apply { contribute("looks", strings.wordsOf("looks")) }.current.value
+
     private class Theme1(override val dark: ThemeScheme, override val light: ThemeScheme? = null) : ThemeContribution {
         override val id = "night"
         override val label = "night"
@@ -34,28 +38,28 @@ class ModuleContributionsTest {
     private val good = ThemeScheme(listOf(Color(0xFF101010), Color(0xFF202020)), listOf(Color.Red))
 
     private fun theme(dark: ThemeScheme = good, light: ThemeScheme? = null) =
-        Contributed("looks", "Looks", Theme1(dark, light) as ThemeContribution, strings)
+        Contributed("looks", "Looks", Theme1(dark, light) as ThemeContribution)
 
     @Test
     fun `a module's theme takes its module's id and is named in the person's language`() {
-        val themes = listOf(theme()).toThemes("ru")
+        val themes = listOf(theme()).toThemes(words("ru"))
 
         assertEquals("looks/night", themes.single().id)
         assertEquals("Ночь", themes.single().name)
-        assertEquals("Night", listOf(theme()).toThemes("ja").single().name)
+        assertEquals("Night", listOf(theme()).toThemes(words("ja")).single().name)
     }
 
     @Test
     fun `a theme with no inks of its own reads in the launcher's`() {
-        val scheme = listOf(theme()).toThemes("en").single().dark
+        val scheme = listOf(theme()).toThemes(words("en")).single().dark
 
         assertEquals(hivens.ui.theme.Themes.Celestia.dark.inks, scheme.inks)
     }
 
     @Test
     fun `a theme without a light scheme stays dark`() {
-        assertEquals(false, listOf(theme()).toThemes("en").single().hasLight)
-        val withLight = listOf(theme(light = good)).toThemes("en").single()
+        assertEquals(false, listOf(theme()).toThemes(words("en")).single().hasLight)
+        val withLight = listOf(theme(light = good)).toThemes(words("en")).single()
 
         assertTrue(withLight.hasLight)
     }
@@ -64,7 +68,7 @@ class ModuleContributionsTest {
     fun `a theme that cannot make a scheme costs only itself`() {
         val broken = theme(dark = ThemeScheme(listOf(Color.Black), listOf(Color.Red)))
 
-        val themes = listOf(broken, theme()).toThemes("en")
+        val themes = listOf(broken, theme()).toThemes(words("en"))
 
         assertEquals(1, themes.size)
     }
@@ -76,7 +80,7 @@ class ModuleContributionsTest {
         override fun moteAt(i: Int, t: Float, w: Float, h: Float) = ParticleMote(i * 3f % w, t % h, 2f, 0.5f, i)
     }
 
-    private fun fields() = ModuleParticleWidgets(listOf(Contributed("looks", "Looks", Field() as ParticleContribution, strings)))
+    private fun fields() = ModuleParticleWidgets(listOf(Contributed("looks", "Looks", Field() as ParticleContribution)))
 
     @Test
     fun `a particle field is a widget of its module with a density prop`() {

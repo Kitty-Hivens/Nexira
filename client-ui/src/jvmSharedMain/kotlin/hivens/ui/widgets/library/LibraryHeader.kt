@@ -11,7 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.widget.api.rememberProps
 import hivens.widget.model.PropLabel
 import hivens.widget.model.Widget
@@ -33,17 +33,17 @@ data class LibraryHeaderProps(
 fun LibraryHeader(instance: WidgetInstance) {
     val p = instance.rememberProps<LibraryHeaderProps>()
     if (!p.show) return
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     Column(Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
         Text(
-            text       = p.title.ifBlank { s.libraryHeaderTitle },
+            text       = p.title.ifBlank { s.text("libraryHeaderTitle") },
             style      = MaterialTheme.typography.headlineSmall,
             color      = NxInk.main,
             fontWeight = FontWeight.Bold,
         )
         Spacer(Modifier.height(4.dp))
         Text(
-            text  = p.subtitle.ifBlank { s.libraryHeaderSubtitle },
+            text  = p.subtitle.ifBlank { s.text("libraryHeaderSubtitle") },
             style = MaterialTheme.typography.bodyMedium,
             color = NxInk.quiet,
         )

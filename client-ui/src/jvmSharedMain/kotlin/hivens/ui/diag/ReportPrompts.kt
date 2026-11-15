@@ -1,12 +1,12 @@
 package hivens.ui.diag
 
+import hivens.i18n.api.Strings
 import hivens.launcher.diag.ReportPrompts
-import hivens.ui.i18n.AppStrings
 
 /**
  * The report prompts in the language the user picked.
  *
- * `client-launcher` composes the issue body and cannot see [AppStrings] -- it is
+ * `client-launcher` composes the issue body and cannot see [Strings], since it is
  * below the UI in the module order, and deliberately so. This is the seam: the
  * text comes down from here, the assembly stays there.
  *
@@ -14,11 +14,11 @@ import hivens.ui.i18n.AppStrings
  * because the crash dialog offering it is itself English and a crash can happen
  * before a locale has been resolved at all.
  */
-fun AppStrings.reportPrompts(): ReportPrompts = ReportPrompts(
-    describeHeading = reportDescribeHeading,
-    crashHint       = reportCrashHint,
-    bundleHint      = reportBundleHint,
-    languageNudge   = reportLanguageNudge,
-    bundleCreated   = reportBundleCreated,
-    bundleAttach    = reportBundleAttach,
+fun Strings.reportPrompts(): ReportPrompts = ReportPrompts(
+    describeHeading = text("reportDescribeHeading"),
+    crashHint       = text("reportCrashHint"),
+    bundleHint      = text("reportBundleHint"),
+    languageNudge   = text("reportLanguageNudge"),
+    bundleCreated   = text("reportBundleCreated"),
+    bundleAttach    = text("reportBundleAttach"),
 )

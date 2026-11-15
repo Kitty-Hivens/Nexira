@@ -21,9 +21,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import hivens.core.data.PackOrigin
+import hivens.i18n.api.LocalTranslator
 import hivens.ui.components.SourceBadge
-import hivens.ui.i18n.LocalStrings
-import hivens.ui.i18n.RussianStrings
+import hivens.ui.i18n.NexiraStrings
 import hivens.ui.theme.NxTheme
 import org.jetbrains.skia.EncodedImageFormat
 import java.nio.file.Files
@@ -64,7 +64,7 @@ class MetaChipContrastProbe {
         )
         val scene = ImageComposeScene(980, 60 + banners.size * 2 * 96, density = Density(1f)) {
             NxTheme(dark = true) {
-                CompositionLocalProvider(LocalStrings provides RussianStrings) {
+                CompositionLocalProvider(LocalTranslator provides NexiraStrings.translator("ru")) {
                     Box(Modifier.fillMaxSize().background(NxColor.page).padding(16.dp)) {
                         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             banners.forEach { (name, fill) ->

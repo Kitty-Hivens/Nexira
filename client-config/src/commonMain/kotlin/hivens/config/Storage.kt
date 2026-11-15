@@ -3,6 +3,12 @@ package hivens.config
 /** Leaf file names inside the platform data directory (directory resolved by [hivens.launcher.platform.PlatformPaths]). */
 object Storage {
     const val SETTINGS_FILE         = "settings.json"
+
+    /** The modules' settings, one file per settings domain. Beside [SETTINGS_FILE], which they were split out of. */
+    const val SETTINGS_DIR          = "settings"
+
+    /** A person's own translations: `<tag>/<namespace>.properties` and `<tag>/language.properties`. */
+    const val TRANSLATIONS_DIR      = "translations"
     const val HASH_CACHE_FILE       = "smarty_hash.cache"
     const val PACKS_FILE            = "packs.json"
     const val LAYOUT_GRAPH_FILE     = "layout-graph.json"

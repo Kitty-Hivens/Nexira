@@ -37,8 +37,8 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import hivens.ui.i18n.AppStrings
-import hivens.ui.i18n.LocalStrings
+import hivens.i18n.api.Strings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.layers.layerTrigger
@@ -183,7 +183,7 @@ internal fun SlotSelectionOverlay(
 /** The small corner handle that opens the selected slot's layout menu. */
 @Composable
 private fun SlotSelectionHandle(onClick: () -> Unit) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     NxSurface(
         kind = SurfaceKind.Popup,
         shape = MaterialTheme.shapes.small,
@@ -192,7 +192,7 @@ private fun SlotSelectionHandle(onClick: () -> Unit) {
             modifier         = Modifier.size(SLOT_HANDLE_SIZE).layerTrigger().clickable(onClick = onClick),
             contentAlignment = Alignment.Center,
         ) {
-            Symbol(NxIcon.ViewQuilt, contentDescription = s.editorSlotLayoutHandle, tint = NxColor.lead(), size = 16.dp)
+            Symbol(NxIcon.ViewQuilt, contentDescription = s.text("editorSlotLayoutHandle"), tint = NxColor.lead(), size = 16.dp)
         }
     }
 }
@@ -210,12 +210,12 @@ internal fun SlotLayoutMenuContent(
     controller: EditModeController,
     onClose: () -> Unit,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val live = LocalLayoutGraph.current.traverse(path) ?: SlotContent()
     val flow = live.flow
 
     Text(
-        text     = s.editorSlotLayoutMenuTitle,
+        text     = s.text("editorSlotLayoutMenuTitle"),
         style    = MaterialTheme.typography.labelSmall,
         color    = NxInk.quiet,
         modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 4.dp, bottom = 2.dp),
@@ -224,18 +224,18 @@ internal fun SlotLayoutMenuContent(
     // and a line length, and one placement mode with a unit, but a person
     // arranging a screen thinks in the four shapes those make, so the menu keeps
     // offering them by name.
-    NxMenuItem(s.editorSlotStack, selected = flow != null && !flow.horizontal && flow.wrap == 0) {
+    NxMenuItem(s.text("editorSlotStack"), selected = flow != null && !flow.horizontal && flow.wrap == 0) {
         controller.setFlow(path, FlowSpec.Column); onClose()
     }
-    NxMenuItem(s.editorSlotRow, selected = flow != null && flow.horizontal && flow.wrap == 0) {
+    NxMenuItem(s.text("editorSlotRow"), selected = flow != null && flow.horizontal && flow.wrap == 0) {
         controller.setFlow(path, FlowSpec.Row); onClose()
     }
-    NxMenuItem(s.editorSlotGrid, selected = flow != null && flow.wrap > 0) {
+    NxMenuItem(s.text("editorSlotGrid"), selected = flow != null && flow.wrap > 0) {
         controller.setFlow(path, FlowSpec.grid(DEFAULT_WRAP)); onClose()
     }
     // Canvas is always adaptive now: it scales its arrangement to fit rather than
     // clipping, so there is no per-slot mode to offer here.
-    NxMenuItem(s.editorSlotCanvas, selected = flow == null) {
+    NxMenuItem(s.text("editorSlotCanvas"), selected = flow == null) {
         controller.setFlow(path, null); onClose()
     }
 
@@ -246,10 +246,10 @@ internal fun SlotLayoutMenuContent(
     // behind you: stepping a grid down to a row used to take the control away
     // with it, and the only way back was the menu item, which reset the number.
     if (flow != null) {
-        SlotNumberRow(s.editorSlotGridColumns, flow.wrap, s, { controller.nudgeWrap(path, -1) }, { controller.nudgeWrap(path, 1) })
+        SlotNumberRow(s.text("editorSlotGridColumns"), flow.wrap, s, { controller.nudgeWrap(path, -1) }, { controller.nudgeWrap(path, 1) })
     } else if (live.viewportMode != ViewportMode.Map) {
         // Not on a map, which has no width for a lattice to divide.
-        SlotNumberRow(s.editorSlotGridColumns, live.grid, s, { controller.nudgeGrid(path, -1) }, { controller.nudgeGrid(path, 1) })
+        SlotNumberRow(s.text("editorSlotGridColumns"), live.grid, s, { controller.nudgeGrid(path, -1) }, { controller.nudgeGrid(path, 1) })
     }
 
     // How the slot shows what does not fit, which is a separate question from how
@@ -261,19 +261,19 @@ internal fun SlotLayoutMenuContent(
     // Keeps the page-by-page setting across a change of axis: it is a property of
     // how the slot scrolls, not of which way.
     val scrollKind = if (paged) ViewportSpec.PAGES else ViewportSpec.SCROLL
-    MenuSectionTitle(s.editorSlotViewportTitle)
-    NxMenuItem(s.editorViewportStatic, selected = mode == ViewportMode.Static) {
+    MenuSectionTitle(s.text("editorSlotViewportTitle"))
+    NxMenuItem(s.text("editorViewportStatic"), selected = mode == ViewportMode.Static) {
         controller.setViewport(path, null); onClose()
     }
-    NxMenuItem(s.editorViewportDown, selected = mode is ViewportMode.Scroll && !mode.horizontal) {
+    NxMenuItem(s.text("editorViewportDown"), selected = mode is ViewportMode.Scroll && !mode.horizontal) {
         controller.setViewport(path, ViewportSpec(scrollKind, ViewportSpec.VERTICAL, bar)); onClose()
     }
-    NxMenuItem(s.editorViewportRight, selected = mode is ViewportMode.Scroll && mode.horizontal) {
+    NxMenuItem(s.text("editorViewportRight"), selected = mode is ViewportMode.Scroll && mode.horizontal) {
         controller.setViewport(path, ViewportSpec(scrollKind, ViewportSpec.HORIZONTAL, bar)); onClose()
     }
     // A plane with no edges. It holds placed widgets, so a flow put on one becomes
     // a canvas in the same step.
-    NxMenuItem(s.editorViewportMap, selected = mode == ViewportMode.Map) {
+    NxMenuItem(s.text("editorViewportMap"), selected = mode == ViewportMode.Map) {
         controller.setViewport(path, ViewportSpec.Map); onClose()
     }
     // Stays open: it is a setting of the scroll just picked, and a reader flipping
@@ -281,10 +281,10 @@ internal fun SlotLayoutMenuContent(
     val current = live.viewport
     if (mode is ViewportMode.Scroll && current != null) {
         // A whole screen at a time: the wheel turns a page, a scroll settles on one.
-        NxMenuItem(s.editorViewportPaged, selected = paged) {
+        NxMenuItem(s.text("editorViewportPaged"), selected = paged) {
             controller.setViewport(path, current.copy(kind = if (paged) ViewportSpec.SCROLL else ViewportSpec.PAGES))
         }
-        NxMenuItem(s.editorViewportScrollbar, selected = bar) {
+        NxMenuItem(s.text("editorViewportScrollbar"), selected = bar) {
             controller.setViewport(path, current.copy(scrollbar = !bar))
         }
     }
@@ -307,7 +307,7 @@ private const val DEFAULT_WRAP = 2
 private fun SlotNumberRow(
     label: String,
     value: Int,
-    s: AppStrings,
+    s: Strings,
     onDecrease: () -> Unit,
     onIncrease: () -> Unit,
 ) {
@@ -321,14 +321,14 @@ private fun SlotNumberRow(
             color    = NxInk.main,
             modifier = Modifier.weight(1f),
         )
-        NxIconButton(NxIcon.ChevronLeft, s.editorSlotGridColumnsDecrease, onClick = onDecrease, iconSize = 16.dp)
+        NxIconButton(NxIcon.ChevronLeft, s.text("editorSlotGridColumnsDecrease"), onClick = onDecrease, iconSize = 16.dp)
         Text(
             text     = "$value",
             style    = MaterialTheme.typography.bodyMedium,
             color    = NxInk.main,
             modifier = Modifier.padding(horizontal = 6.dp),
         )
-        NxIconButton(NxIcon.ChevronRight, s.editorSlotGridColumnsIncrease, onClick = onIncrease, iconSize = 16.dp)
+        NxIconButton(NxIcon.ChevronRight, s.text("editorSlotGridColumnsIncrease"), onClick = onIncrease, iconSize = 16.dp)
     }
 }
 

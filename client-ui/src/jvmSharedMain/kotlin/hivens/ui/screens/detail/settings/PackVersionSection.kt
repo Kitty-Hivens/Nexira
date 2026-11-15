@@ -29,11 +29,11 @@ import hivens.core.update.VersionChannel
 import hivens.launcher.PackOperation
 import hivens.launcher.PackOperationPhase
 import hivens.packs.api.PackKeys
+import hivens.ui.i18n.nexiraStrings
 import hivens.widget.api.rememberScopedCommand
 import hivens.ui.components.ChannelChip
 import hivens.ui.components.formatBuildTimestamp
 import hivens.ui.components.rememberRunningPackGuard
-import hivens.ui.i18n.LocalStrings
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxCalloutBanner
@@ -72,7 +72,7 @@ internal fun PackVersionSection(
         PackLoaderSection(pack, save)
         return
     }
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val updater: PackUpdater = koinInject()
     val mirror: IMirrorPackClient = koinInject()
     val hub: PackUpdateStatusHub = koinInject()
@@ -107,7 +107,7 @@ internal fun PackVersionSection(
         value = bestEffort {
             val summary = mirror.fetchSummary(pack.packRef.id)
             val built = formatBuildTimestamp(summary.latestBuiltAt)
-            if (built != null) s.packVersionLatestBuilt(summary.latestPackVersion, built) else null
+            if (built != null) s.text("packVersionLatestBuilt", summary.latestPackVersion, built) else null
         }
     }
 
@@ -126,7 +126,7 @@ internal fun PackVersionSection(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                onNotice(s.packVersionsFailed(e.message ?: s.packVersionCheckFailed))
+                onNotice(s.text("packVersionsFailed", e.message ?: s.text("packVersionCheckFailed")))
                 null
             }
             // Feed the shared hub so the ambient badges (card, hero) reflect what
@@ -158,9 +158,9 @@ internal fun PackVersionSection(
         updatePack?.invoke(pack.id)
     }
 
-    NxSettingGroup(s.packVersionSection) {
+    NxSettingGroup(s.text("packVersionSection")) {
         NxSettingRow(
-            title  = s.packVersionInstalled,
+            title  = s.text("packVersionInstalled"),
             detail = latestLine,
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -169,13 +169,13 @@ internal fun PackVersionSection(
             }
         }
         NxSettingRow(
-            title  = s.packVersionCheckTitle,
-            detail = if (check == UpdateCheck.UpToDate) s.packVersionUpToDate else null,
+            title  = s.text("packVersionCheckTitle"),
+            detail = if (check == UpdateCheck.UpToDate) s.text("packVersionUpToDate") else null,
         ) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 PuppetClick("packSettings.version.check") { runCheck() }
                 NxButton(
-                    label   = s.packVersionCheck,
+                    label   = s.text("packVersionCheck"),
                     onClick = { runCheck() },
                     style   = NxButtonStyle.Secondary,
                     enabled = !busy,
@@ -183,14 +183,14 @@ internal fun PackVersionSection(
                 )
                 PuppetClick("packSettings.version.all") { onOpenVersions() }
                 NxButton(
-                    label   = s.packVersionsAllVersions,
+                    label   = s.text("packVersionsAllVersions"),
                     onClick = onOpenVersions,
                     style   = NxButtonStyle.Tertiary,
                     compact = true,
                 )
             }
         }
-        NxSettingRow(s.packVersionFollowLatest, detail = s.packVersionFollowLatestDesc) {
+        NxSettingRow(s.text("packVersionFollowLatest"), detail = s.text("packVersionFollowLatestDesc")) {
             NxSwitch(pack.followLatest, { enabled -> save { it.copy(followLatest = enabled) } })
         }
     }
@@ -210,8 +210,8 @@ internal fun PackVersionSection(
                 // A mirror-side rollback of latest arrives through the same check as
                 // a release; calling it "available build" would be true but reads as
                 // an update, and the target is older than what is installed.
-                title = if (isRollback) s.packVersionRolledBack(c.toVersion) else s.packVersionAvailable(c.toVersion),
-                body = if (c.compat.isSafe) s.packVersionSafe else s.packVersionNeedsCare,
+                title = if (isRollback) s.text("packVersionRolledBack", c.toVersion) else s.text("packVersionAvailable", c.toVersion),
+                body = if (c.compat.isSafe) s.text("packVersionSafe") else s.text("packVersionNeedsCare"),
                 tone = if (c.compat.isSafe && !isRollback) NxCalloutTone.Info else NxCalloutTone.Warning,
             ) {
                 // No line at all when the plan is absent: the source could not say
@@ -219,7 +219,7 @@ internal fun PackVersionSection(
                 // count of zero would read as "nothing changes".
                 c.plan?.takeIf { !it.isEmpty }?.let { plan ->
                     Text(
-                        s.packVersionsPlanCounts(plan.toAdd.size, plan.toUpdate.size, plan.toDelete.size),
+                        s.text("packVersionsPlanCounts", plan.toAdd.size, plan.toUpdate.size, plan.toDelete.size),
                         style = MaterialTheme.typography.labelSmall,
                         color = NxInk.quiet,
                     )
@@ -228,13 +228,13 @@ internal fun PackVersionSection(
                     if (c.compat.isSafe) {
                         PuppetClick("packSettings.version.updateNow") { runningGuard.run(::applyLatest) }
                         NxButton(
-                            label   = if (isRollback) s.packVersionSwitchNow else s.packVersionUpdateNow,
+                            label   = if (isRollback) s.text("packVersionSwitchNow") else s.text("packVersionUpdateNow"),
                             onClick = { runningGuard.run(::applyLatest) },
                             enabled = !busy,
                             compact = true,
                         )
                     } else {
-                        NxButton(s.packVersionsAllVersions, onClick = onOpenVersions, compact = true)
+                        NxButton(s.text("packVersionsAllVersions"), onClick = onOpenVersions, compact = true)
                     }
                 }
             }

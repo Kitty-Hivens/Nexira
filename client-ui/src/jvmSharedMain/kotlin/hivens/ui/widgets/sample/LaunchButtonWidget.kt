@@ -21,13 +21,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.workProgress
 import hivens.ui.nx.PlayTone
 import hivens.ui.icons.NxIcon
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import hivens.ui.components.LaunchControl
-import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.Symbol
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
@@ -57,8 +57,8 @@ data class LaunchButtonProps(
 @Composable
 fun LaunchButtonWidget(instance: WidgetInstance) {
     val p = instance.rememberProps<LaunchButtonProps>()
-    val s = LocalStrings.current
-    val quickLaunch = rememberQuickLaunchTarget(p.label.ifBlank { s.launchTileReady }) ?: return
+    val s = nexiraStrings()
+    val quickLaunch = rememberQuickLaunchTarget(p.label.ifBlank { s.text("launchTileReady") }) ?: return
     LaunchTile(quickLaunch.control, quickLaunch.target.name)
 }
 

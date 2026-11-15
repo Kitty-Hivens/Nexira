@@ -17,7 +17,7 @@ import hivens.accounts.api.AccountKeys
 import hivens.accounts.api.FaceChoice
 import hivens.accounts.api.SessionState
 import hivens.accounts.api.SessionView
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.puppet.PuppetClick
 import hivens.widget.api.rememberScopedCommand
 import hivens.widget.api.rememberScopedSource
@@ -53,7 +53,7 @@ internal fun FacePicker(modifier: Modifier = Modifier) {
     val accounts = rememberScopedSource(AccountKeys.Accounts).valueOrNull() ?: return
     val face =rememberScopedSource(AccountKeys.Face).valueOrNull() ?: return
     val setFace = rememberScopedCommand(AccountKeys.SetFace) ?: return
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     if (accounts.size < 2) return
 
     // The module re-resolves through the store rather than loading the named account
@@ -64,7 +64,7 @@ internal fun FacePicker(modifier: Modifier = Modifier) {
     // Auto first: it is the default and the state a user returns to, so it reads
     // as the top of the list rather than as one more provider.
     val options = buildList {
-        add(null to s.accountFaceAuto)
+        add(null to s.text("accountFaceAuto"))
         ProfileCategory.entries
             .filter { category -> accounts.any { it.providerKey == category.providerKey } }
             .forEach { add(it.providerKey to it.label(s)) }
@@ -72,7 +72,7 @@ internal fun FacePicker(modifier: Modifier = Modifier) {
 
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text(
-            text     = s.accountFaceLabel,
+            text     = s.text("accountFaceLabel"),
             style    = MaterialTheme.typography.labelSmall,
             color    = NxInk.quiet,
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),

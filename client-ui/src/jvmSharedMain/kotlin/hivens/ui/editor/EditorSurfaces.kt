@@ -1,7 +1,7 @@
 package hivens.ui.editor
 
+import hivens.i18n.api.Strings
 import hivens.ui.Screen
-import hivens.ui.i18n.AppStrings
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.feature.catalogue.browse.CataloguePackPageSource
@@ -32,8 +32,8 @@ import kotlinx.serialization.json.jsonPrimitive
 internal class EditorSurfaceSpec(
     val id: SurfaceId,
     val icon: IconKey,
-    val name: (AppStrings) -> String,
-    val shortName: (AppStrings) -> String,
+    val name: (Strings) -> String,
+    val shortName: (Strings) -> String,
     /** True when the surface exposes its own settings panel beside the widget props. */
     val hasSettings: Boolean = false,
     /**
@@ -77,24 +77,24 @@ internal object EditorSurfaces {
         EditorSurfaceSpec(
             id        = SurfaceId("home.new"),
             icon      = NxIcon.Home,
-            name      = { it.editorSurfHomeNew },
-            shortName = { it.editorSurfShortHome },
+            name      = { it.text("editorSurfHomeNew") },
+            shortName = { it.text("editorSurfShortHome") },
             mountedOn = { screen -> screen == Screen.Home },
             ownerRegion = "appshell.region.center",
         ),
         EditorSurfaceSpec(
             id        = SurfaceId("library"),
             icon      = NxIcon.Home,
-            name      = { it.editorSurfLibrary },
-            shortName = { it.editorSurfShortLibrary },
+            name      = { it.text("editorSurfLibrary") },
+            shortName = { it.text("editorSurfShortLibrary") },
             mountedOn = { screen -> screen == Screen.Library },
             ownerRegion = "appshell.region.center",
         ),
         EditorSurfaceSpec(
             id        = SurfaceId("browse"),
             icon      = NxIcon.Search,
-            name      = { it.editorSurfBrowse },
-            shortName = { it.editorSurfShortBrowse },
+            name      = { it.text("editorSurfBrowse") },
+            shortName = { it.text("editorSurfShortBrowse") },
             mountedOn = { screen -> screen == Screen.Browse || screen is Screen.BrowseInto },
             ownerRegion = "appshell.region.center",
         ),
@@ -103,8 +103,8 @@ internal object EditorSurfaces {
         EditorSurfaceSpec(
             id        = SurfaceId("project"),
             icon      = NxIcon.Description,
-            name      = { it.editorSurfProject },
-            shortName = { it.editorSurfShortProject },
+            name      = { it.text("editorSurfProject") },
+            shortName = { it.text("editorSurfShortProject") },
             provides  = setOf(ProjectPageSource.id),
             mountedOn = { screen -> screen is Screen.ModDetail },
             ownerRegion = "appshell.region.center",
@@ -112,8 +112,8 @@ internal object EditorSurfaces {
         EditorSurfaceSpec(
             id        = SurfaceId("catalogue.pack"),
             icon      = NxIcon.Inventory2,
-            name      = { it.editorSurfCataloguePack },
-            shortName = { it.editorSurfShortCataloguePack },
+            name      = { it.text("editorSurfCataloguePack") },
+            shortName = { it.text("editorSurfShortCataloguePack") },
             provides  = setOf(CataloguePackPageSource.id),
             mountedOn = { screen -> screen is Screen.CataloguePackDetail },
             ownerRegion = "appshell.region.center",
@@ -121,8 +121,8 @@ internal object EditorSurfaces {
         EditorSurfaceSpec(
             id        = SurfaceId("about"),
             icon      = NxIcon.Home,
-            name      = { it.editorSurfAbout },
-            shortName = { it.editorSurfShortAbout },
+            name      = { it.text("editorSurfAbout") },
+            shortName = { it.text("editorSurfShortAbout") },
             provides  = setOf(AboutUpdateSource.id, OpenUpdateDialog.id),
             mountedOn = { screen -> screen == Screen.About },
             ownerRegion = "appshell.region.center",
@@ -130,24 +130,24 @@ internal object EditorSurfaces {
         EditorSurfaceSpec(
             id        = SurfaceId("bg.settings"),
             icon      = NxIcon.Home,
-            name      = { it.editorSurfBg },
-            shortName = { it.editorSurfShortBg },
+            name      = { it.text("editorSurfBg") },
+            shortName = { it.text("editorSurfShortBg") },
             mountedOn = { screen -> screen == Screen.BackgroundSettings },
             ownerRegion = "appshell.region.center",
         ),
         EditorSurfaceSpec(
             id        = SurfaceId("profile"),
             icon      = NxIcon.Home,
-            name      = { it.editorSurfProfile },
-            shortName = { it.editorSurfShortProfile },
+            name      = { it.text("editorSurfProfile") },
+            shortName = { it.text("editorSurfShortProfile") },
             mountedOn = { screen -> screen == Screen.Profile },
             ownerRegion = "appshell.region.center",
         ),
         EditorSurfaceSpec(
             id        = SurfaceId("theme.picker"),
             icon      = NxIcon.Home,
-            name      = { it.editorSurfTheme },
-            shortName = { it.editorSurfShortTheme },
+            name      = { it.text("editorSurfTheme") },
+            shortName = { it.text("editorSurfShortTheme") },
             provides  = setOf(ThemeSelectionSource.id),
             mountedOn = { screen -> screen == Screen.ThemePicker },
             ownerRegion = "appshell.region.center",
@@ -160,48 +160,48 @@ internal object EditorSurfaces {
         EditorSurfaceSpec(
             id        = SurfaceId("appshell.topbar"),
             icon      = NxIcon.Layers,
-            name      = { it.editorSurfTopBar },
-            shortName = { it.editorSurfShortTopBar },
+            name      = { it.text("editorSurfTopBar") },
+            shortName = { it.text("editorSurfShortTopBar") },
             ownerRegion = "appshell.region.top",
         ),
         EditorSurfaceSpec(
             id        = SurfaceId("appshell.overlay"),
             icon      = NxIcon.Layers,
-            name      = { it.editorSurfOverlay },
-            shortName = { it.editorSurfShortOverlay },
+            name      = { it.text("editorSurfOverlay") },
+            shortName = { it.text("editorSurfShortOverlay") },
         ),
         EditorSurfaceSpec(
             id        = SurfaceId("appshell.backdrop"),
             icon      = NxIcon.Wallpaper,
-            name      = { it.editorSurfBackdrop },
-            shortName = { it.editorSurfShortBackdrop },
+            name      = { it.text("editorSurfBackdrop") },
+            shortName = { it.text("editorSurfShortBackdrop") },
         ),
         EditorSurfaceSpec(
             id          = SurfaceId("appshell.leftrail"),
             icon        = NxIcon.ViewSidebar,
-            name        = { it.editorSurfLeftRail },
-            shortName   = { it.editorSurfShortLeftRail },
+            name        = { it.text("editorSurfLeftRail") },
+            shortName   = { it.text("editorSurfShortLeftRail") },
             hasSettings = true,
             ownerRegion = "appshell.region.left",
         ),
         EditorSurfaceSpec(
             id        = SurfaceId("appshell.rightrail"),
             icon      = NxIcon.ViewQuilt,
-            name      = { it.editorSurfRightRail },
-            shortName = { it.editorSurfShortRightRail },
+            name      = { it.text("editorSurfRightRail") },
+            shortName = { it.text("editorSurfShortRightRail") },
             ownerRegion = "appshell.region.right",
         ),
         EditorSurfaceSpec(
             id        = SurfaceId("appshell.body"),
             icon      = NxIcon.ViewQuilt,
-            name      = { it.editorSurfBody },
-            shortName = { it.editorSurfShortBody },
+            name      = { it.text("editorSurfBody") },
+            shortName = { it.text("editorSurfShortBody") },
         ),
         EditorSurfaceSpec(
             id        = SurfaceId("appshell.root"),
             icon      = NxIcon.Dashboard,
-            name      = { it.editorSurfShell },
-            shortName = { it.editorSurfShortShell },
+            name      = { it.text("editorSurfShell") },
+            shortName = { it.text("editorSurfShortShell") },
         ),
     )
 
@@ -234,8 +234,8 @@ internal object EditorSurfaces {
     private fun madeScreen(spec: ScreenSpec): EditorSurfaceSpec = EditorSurfaceSpec(
         id          = spec.surface,
         icon        = ScreenIcons.of(spec.icon),
-        name        = { s -> spec.title.ifBlank { s.screenUntitled } },
-        shortName   = { s -> spec.title.ifBlank { s.screenUntitled } },
+        name        = { s -> spec.title.ifBlank { s.text("screenUntitled") } },
+        shortName   = { s -> spec.title.ifBlank { s.text("screenUntitled") } },
         hasSettings = true,
         mountedOn   = { screen -> screen == Screen.Custom(spec.id) },
         ownerRegion = "appshell.region.center",

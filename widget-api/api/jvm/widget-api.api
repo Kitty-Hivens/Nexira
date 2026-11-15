@@ -30,12 +30,14 @@ public final class hivens/widget/api/ContributedLevelServices : hivens/widget/ap
 public final class hivens/widget/api/ContributedServices {
 	public static final field $stable I
 	public fun <init> ()V
+	public final fun claimDomain (Ljava/lang/String;Ljava/lang/String;)V
 	public final fun declare (Lhivens/widget/model/ScopeLevel;Lkotlin/reflect/KClass;Ljava/lang/String;ZZLkotlin/jvm/functions/Function1;)V
 	public static synthetic fun declare$default (Lhivens/widget/api/ContributedServices;Lhivens/widget/model/ScopeLevel;Lkotlin/reflect/KClass;Ljava/lang/String;ZZLkotlin/jvm/functions/Function1;ILjava/lang/Object;)V
 	public final fun expose (Lkotlin/reflect/KClass;)V
 	public final fun host (Lhivens/widget/api/LevelServicesHost;Lkotlin/coroutines/CoroutineContext;)Lhivens/widget/api/LevelServicesHost;
 	public static synthetic fun host$default (Lhivens/widget/api/ContributedServices;Lhivens/widget/api/LevelServicesHost;Lkotlin/coroutines/CoroutineContext;ILjava/lang/Object;)Lhivens/widget/api/LevelServicesHost;
 	public final fun ownerOf (Lkotlin/reflect/KClass;)Ljava/lang/String;
+	public final fun ownerOfDomain (Ljava/lang/String;)Ljava/lang/String;
 }
 
 public abstract interface class hivens/widget/api/FactoryFailures {
@@ -204,6 +206,7 @@ public abstract interface class hivens/widget/api/ModuleKeys {
 	public abstract fun owned (Lhivens/widget/model/SourceKey;Lkotlin/jvm/functions/Function0;)V
 	public static synthetic fun owned$default (Lhivens/widget/api/ModuleKeys;Lhivens/widget/model/SourceKey;Lkotlin/jvm/functions/Function0;ILjava/lang/Object;)V
 	public abstract fun service (Lhivens/widget/model/ScopeLevel;Lkotlin/reflect/KClass;Lkotlin/jvm/functions/Function1;)V
+	public abstract fun settings (Lhivens/widget/api/SettingsDomain;Lhivens/widget/model/SourceKey;Lhivens/widget/model/CommandKey;)V
 	public abstract fun source (Lhivens/widget/model/SourceKey;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;)V
 	public static synthetic fun source$default (Lhivens/widget/api/ModuleKeys;Lhivens/widget/model/SourceKey;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)V
 }
@@ -346,12 +349,16 @@ public final class hivens/widget/api/ModuleSetting$Toggle : hivens/widget/api/Mo
 public final class hivens/widget/api/ModuleStrings {
 	public static final field $stable I
 	public static final field Companion Lhivens/widget/api/ModuleStrings$Companion;
-	public static final field FALLBACK Ljava/lang/String;
 	public fun <init> ()V
 	public fun <init> (Ljava/util/Map;)V
-	public synthetic fun <init> (Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun get (Ljava/lang/String;Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;
+	public fun <init> (Ljava/util/Map;Ljava/util/Map;)V
+	public fun <init> (Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;)V
+	public synthetic fun <init> (Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getLanguageDeclarations ()Ljava/util/Map;
 	public final fun getLanguages ()Ljava/util/Set;
+	public final fun getNamespaces ()Ljava/util/Map;
+	public final fun getTables ()Ljava/util/Map;
+	public final fun isEmpty ()Z
 }
 
 public final class hivens/widget/api/ModuleStrings$Companion {
@@ -517,6 +524,36 @@ public abstract interface class hivens/widget/api/ServiceContext {
 
 public final class hivens/widget/api/ServiceContext$DefaultImpls {
 	public static fun getHostServices (Lhivens/widget/api/ServiceContext;)Lhivens/widget/api/LevelServices;
+}
+
+public abstract interface class hivens/widget/api/SettingsChange {
+	public abstract fun apply (Ljava/lang/Object;)Ljava/lang/Object;
+}
+
+public abstract class hivens/widget/api/SettingsDomain {
+	public static final field $stable I
+	public static final field Companion Lhivens/widget/api/SettingsDomain$Companion;
+	public fun <init> (Ljava/lang/String;Lkotlinx/serialization/KSerializer;)V
+	public abstract fun defaults ()Ljava/lang/Object;
+	public final fun getId ()Ljava/lang/String;
+	public fun getSchema ()I
+	public final fun getSerializer ()Lkotlinx/serialization/KSerializer;
+	public fun imported (Lkotlinx/serialization/json/JsonObject;)Ljava/lang/Object;
+	public fun mirrored (Ljava/lang/Object;)Ljava/util/Map;
+}
+
+public final class hivens/widget/api/SettingsDomain$Companion {
+	public final fun faultIn (Ljava/lang/String;)Ljava/lang/String;
+}
+
+public abstract interface class hivens/widget/api/SettingsStore {
+	public abstract fun getReadOnly ()Z
+	public abstract fun getValue ()Lkotlinx/coroutines/flow/StateFlow;
+	public abstract fun update (Lhivens/widget/api/SettingsChange;)V
+}
+
+public abstract interface class hivens/widget/api/SettingsStores {
+	public abstract fun of (Lhivens/widget/api/SettingsDomain;)Lhivens/widget/api/SettingsStore;
 }
 
 public final class hivens/widget/api/ShadowedKind {

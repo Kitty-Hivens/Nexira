@@ -48,7 +48,7 @@ import hivens.packs.api.PackView
 import hivens.ui.Screen
 import hivens.ui.components.rememberLaunchControl
 import hivens.ui.effects.pixelArtBackground
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.NxMetaChipTone
 import hivens.ui.nx.NxVerticalScrollbar
 import hivens.ui.nx.PlayGround
@@ -107,7 +107,7 @@ fun HomeNewPackList(instance: WidgetInstance) {
     val p = instance.rememberProps<PackListProps>()
     val appState = rememberScopedSource(AccountKeys.Session).valueOrNull()
     val navigate = rememberScopedCommand(Commands.Navigate) ?: return
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val all = rememberScopedSource(PackKeys.Library).valueOrNull() ?: return
     val continued = rememberQuickLaunchTarget()?.target
 
@@ -126,7 +126,7 @@ fun HomeNewPackList(instance: WidgetInstance) {
 
     Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp)) {
         Text(
-            text       = p.title.ifBlank { s.homeRecentTitle },
+            text       = p.title.ifBlank { s.text("homeRecentTitle") },
             style      = MaterialTheme.typography.titleSmall,
             color      = NxInk.main,
             fontWeight = FontWeight.SemiBold,
@@ -198,7 +198,7 @@ internal data class PackListColumns(val runsOn: Boolean, val played: Boolean, va
 
 @Composable
 private fun PackRow(pack: PackView, columns: PackListColumns, appState: SessionState?, navigate: (Screen) -> Unit) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
     val control = rememberLaunchControl(pack, appState)
@@ -249,7 +249,7 @@ private fun PackRow(pack: PackView, columns: PackListColumns, appState: SessionS
             }
             val hours = pack.playtimeSeconds / 3600
             Text(
-                text     = if (hours > 0) s.homeFactHours(hours) else "",
+                text     = if (hours > 0) s.text("homeFactHours", hours) else "",
                 style    = MaterialTheme.typography.bodyMedium,
                 color    = NxInk.quiet,
                 maxLines = 1,

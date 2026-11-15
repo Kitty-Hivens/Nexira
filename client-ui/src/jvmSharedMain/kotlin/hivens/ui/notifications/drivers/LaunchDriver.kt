@@ -14,8 +14,8 @@ import hivens.core.launch.AuthRefreshFailure
 import hivens.core.launch.LaunchError
 import hivens.core.launch.LaunchLogEvent
 import hivens.core.launch.LaunchState
+import hivens.i18n.api.Strings
 import hivens.launcher.launch.LauncherController
-import hivens.ui.i18n.AppStrings
 import hivens.ui.notifications.IndicationCenter
 import hivens.ui.notifications.IndicationCenter.LaunchIndication
 import hivens.ui.notifications.Kind
@@ -61,7 +61,7 @@ class LaunchDriver(
     private val twoFactorGate: TwoFactorLaunchGate,
     // Read on each push so a locale change in Settings is picked up
     // mid-launch without restarting the driver.
-    private val stringsProvider: () -> AppStrings,
+    private val stringsProvider: () -> Strings,
 ) {
     private val log = LoggerFactory.getLogger(LaunchDriver::class.java)
 
@@ -185,7 +185,7 @@ class LaunchDriver(
                 iconUrl   = target.iconUrl,
                 severity  = Severity.Warn,
                 kind      = Kind.Sticky,
-                title     = s.notifForeignContentRemovedTitle(event.paths.size),
+                title     = s.text("notifForeignContentRemovedTitle", event.paths.size),
                 body      = event.paths.joinToString(", "),
             )
             return
@@ -200,8 +200,8 @@ class LaunchDriver(
                 iconUrl   = target.iconUrl,
                 severity  = Severity.Critical,
                 kind      = Kind.Sticky,
-                title     = s.notifInstanceUnverifiedTitle,
-                body      = s.notifInstanceUnverifiedBody,
+                title     = s.text("notifInstanceUnverifiedTitle"),
+                body      = s.text("notifInstanceUnverifiedBody"),
             )
             return
         }
@@ -217,7 +217,7 @@ class LaunchDriver(
             // Sticky: it is read after the game window has taken focus, so an
             // auto-dismissing toast would expire behind it unseen.
             kind      = Kind.Sticky,
-            title     = s.notifSessionStaleTitle,
+            title     = s.text("notifSessionStaleTitle"),
             body      = body,
         )
     }
@@ -291,7 +291,7 @@ class LaunchDriver(
             iconUrl   = target.iconUrl,
             severity  = Severity.Success,
             kind      = Kind.OneShot,
-            title     = s.notifPackRunning(target.displayName),
+            title     = s.text("notifPackRunning", target.displayName),
             body      = null,
         )
     }
@@ -325,17 +325,17 @@ class LaunchDriver(
             iconUrl   = target.iconUrl,
             severity  = Severity.Critical,
             kind      = Kind.Sticky,
-            title     = s.notifPackFailed(target.displayName),
+            title     = s.text("notifPackFailed", target.displayName),
             body      = humanReason(reason, s),
             actions   = buildList {
-                add(NotifAction("show_console", s.notifActionShowConsole) { gameConsole.show() })
+                add(NotifAction("show_console", s.text("notifActionShowConsole")) { gameConsole.show() })
                 // Offer offline for a pack whose online auth failed: offline runs
                 // the modpack in singleplayer (an SC-bound pack still can't join
                 // its server offline). Only when an offline identity is resolvable.
                 if (reason.isAuthFailure()) {
                     val instance = target.instance
                     offlineName()?.let { name ->
-                        add(NotifAction("play_offline", s.notifActionPlayOffline) {
+                        add(NotifAction("play_offline", s.text("notifActionPlayOffline")) {
                             relaunchOffline(instance, name)
                         })
                     }
@@ -380,7 +380,7 @@ class LaunchDriver(
             iconUrl   = target.iconUrl,
             severity  = Severity.Success,
             kind      = Kind.OneShot,
-            title     = s.notifPackSessionEnded(target.displayName),
+            title     = s.text("notifPackSessionEnded", target.displayName),
             body      = null,
         )
     }
@@ -403,17 +403,17 @@ class LaunchDriver(
         )
     }
 
-    private fun humanReason(reason: LaunchError, s: AppStrings): String = when (reason) {
-        is LaunchError.ExitCode            -> s.notifReasonExitCode(reason.code)
+    private fun humanReason(reason: LaunchError, s: Strings): String = when (reason) {
+        is LaunchError.ExitCode            -> s.text("notifReasonExitCode", reason.code)
         is LaunchError.Internal            -> reason.message.ifBlank { null }
-                                                ?.let { s.notifReasonInternalDetail(it) }
-                                                ?: s.notifReasonInternal
-        is LaunchError.MissingAuthProvider -> s.notifReasonMissingAuthProvider(reason.providerKey)
-        is LaunchError.InstanceBusy        -> s.notifReasonInstanceBusy
-        is LaunchError.AuthlibUnavailable  -> s.stateAuthlibUnavailable(reason.mcVersion)
-        LaunchError.ContentChangedDuringLaunch -> s.stateContentChanged
-        LaunchError.OfflineNoClient        -> s.notifReasonOfflineNoClient
-        LaunchError.TwoFactorExpired       -> s.notifReasonTwoFactorExpired
+                                                ?.let { s.text("notifReasonInternalDetail", it) }
+                                                ?: s.text("notifReasonInternal")
+        is LaunchError.MissingAuthProvider -> s.text("notifReasonMissingAuthProvider", reason.providerKey)
+        is LaunchError.InstanceBusy        -> s.text("notifReasonInstanceBusy")
+        is LaunchError.AuthlibUnavailable  -> s.text("stateAuthlibUnavailable", reason.mcVersion)
+        LaunchError.ContentChangedDuringLaunch -> s.text("stateContentChanged")
+        LaunchError.OfflineNoClient        -> s.text("notifReasonOfflineNoClient")
+        LaunchError.TwoFactorExpired       -> s.text("notifReasonTwoFactorExpired")
     }
 }
 
@@ -430,14 +430,14 @@ class LaunchDriver(
  * driver's DI graph, which is the same reason the flow contract is tested apart
  * from the driver in `LaunchDriverTest`.
  */
-internal fun staleSessionWarning(event: LaunchLogEvent, s: AppStrings): Pair<Severity, String>? = when (event) {
+internal fun staleSessionWarning(event: LaunchLogEvent, s: Strings): Pair<Severity, String>? = when (event) {
     is LaunchLogEvent.AuthFailed -> when (event.cause) {
-        AuthRefreshFailure.Rejected    -> Severity.Critical to s.notifSessionStaleRejected
-        AuthRefreshFailure.Unreachable -> Severity.Warn to s.notifSessionStaleUnreachable
-        AuthRefreshFailure.Unknown     -> Severity.Warn to s.notifSessionStaleUnknown
+        AuthRefreshFailure.Rejected    -> Severity.Critical to s.text("notifSessionStaleRejected")
+        AuthRefreshFailure.Unreachable -> Severity.Warn to s.text("notifSessionStaleUnreachable")
+        AuthRefreshFailure.Unknown     -> Severity.Warn to s.text("notifSessionStaleUnknown")
     }
     // No saved password means no refresh ever happens, so this one is not a
     // transient miss -- it is the state the account is in.
-    is LaunchLogEvent.NoPassword -> Severity.Critical to s.notifSessionStaleNoPassword
+    is LaunchLogEvent.NoPassword -> Severity.Critical to s.text("notifSessionStaleNoPassword")
     else -> null
 }

@@ -10,9 +10,8 @@ import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.unit.Density
-import hivens.ui.i18n.AppLocale
-import hivens.ui.i18n.LocaleProvider
-import hivens.ui.i18n.stringsFor
+import hivens.ui.i18n.NexiraStrings
+import hivens.ui.i18n.ShippedLanguageProvider
 import hivens.ui.theme.NxTheme
 import kotlin.test.Test
 import kotlin.test.assertNotNull
@@ -26,7 +25,7 @@ import kotlin.test.assertTrue
 @OptIn(ExperimentalComposeUiApi::class)
 class StatusFooterRenderTest {
 
-    private val strings = stringsFor(AppLocale.RUSSIAN)
+    private val strings = NexiraStrings.shipped("ru")
 
     @Test
     fun `the follow chip shows its whole label on a phone`() = assertChipWhole(historyOffset = 0, searchActive = false)
@@ -37,7 +36,7 @@ class StatusFooterRenderTest {
 
     private fun assertChipWhole(historyOffset: Int, searchActive: Boolean) {
         val scene = ImageComposeScene(PHONE_WIDTH, 2400, density = Density(2.5f)) {
-            LocaleProvider(AppLocale.RUSSIAN) {
+            ShippedLanguageProvider("ru") {
                 NxTheme(dark = true) {
                     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.BottomCenter) {
                         StatusFooter(
@@ -60,7 +59,7 @@ class StatusFooterRenderTest {
         }
         try {
             repeat(3) { scene.render() }
-            val label = assertNotNull(scene.text(strings.consoleStatusFollow), "no follow chip")
+            val label = assertNotNull(scene.text(strings.text("consoleStatusFollow")), "no follow chip")
             // A ten sp label at density 2.5 is twenty-five pixels of type before any
             // line spacing. The phone showed it ten pixels high.
             assertTrue(label.size.height >= LABEL_MIN_PX, "the chip's label is laid out ${label.size.height} px high")

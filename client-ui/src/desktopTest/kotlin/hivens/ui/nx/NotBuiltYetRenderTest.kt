@@ -13,8 +13,9 @@ import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
-import hivens.ui.i18n.LocalStrings
-import hivens.ui.i18n.RussianStrings
+import hivens.i18n.api.LocalTranslator
+import hivens.ui.i18n.NexiraStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.surface.NxSurface
 import hivens.ui.theme.NxTheme
 import org.jetbrains.skia.EncodedImageFormat
@@ -40,8 +41,8 @@ class NotBuiltYetRenderTest {
         Files.createDirectories(out.parent)
         val scene = ImageComposeScene(760, 620, density = Density(1f)) {
             NxTheme(dark = true) {
-                CompositionLocalProvider(LocalStrings provides RussianStrings) {
-                    val s = LocalStrings.current
+                CompositionLocalProvider(LocalTranslator provides NexiraStrings.translator("ru")) {
+                    val s = nexiraStrings()
                     Box(Modifier.fillMaxSize().background(NxColor.page).padding(16.dp)) {
                         Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                             NxSurface(
@@ -49,8 +50,8 @@ class NotBuiltYetRenderTest {
                                 modifier = Modifier.fillMaxWidth().height(260.dp),
                             ) {
                                 NxNotBuiltYet(
-                                    title = s.notBuiltYetTitle,
-                                    message = s.notBuiltYetBody,
+                                    title = s.text("notBuiltYetTitle"),
+                                    message = s.text("notBuiltYetBody"),
                                     detail = "Страница отдельной сборки",
                                     modifier = Modifier.fillMaxSize(),
                                 )
@@ -60,9 +61,9 @@ class NotBuiltYetRenderTest {
                                 modifier = Modifier.fillMaxWidth().height(260.dp),
                             ) {
                                 RetryStateBlock(
-                                    title = s.modPageVersionsFailed,
-                                    message = s.modPageVersionsFailedBody,
-                                    retryLabel = s.contentTabRetry,
+                                    title = s.text("modPageVersionsFailed"),
+                                    message = s.text("modPageVersionsFailedBody"),
+                                    retryLabel = s.text("contentTabRetry"),
                                     onRetry = {},
                                     modifier = Modifier.fillMaxSize(),
                                 )

@@ -9,7 +9,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.core.data.PackInstance
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.NxField
 import hivens.ui.nx.NxSettingBlock
 import hivens.ui.nx.NxSettingGroup
@@ -23,39 +23,39 @@ import hivens.ui.theme.NxInk
  */
 @Composable
 internal fun PackGeneralSection(pack: PackInstance, save: (PackEdit) -> Unit) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
 
-    NxSettingGroup(s.packSettingsIdentity) {
+    NxSettingGroup(s.text("packSettingsIdentity")) {
         NxSettingBlock {
-            FieldLabel(s.packSettingsName)
+            FieldLabel(s.text("packSettingsName"))
             NxField(
                 value = pack.displayName,
                 onValueChange = { if (it != pack.displayName) save { p -> p.copy(displayName = it) } },
-                placeholder = s.packSettingsNamePlaceholder,
+                placeholder = s.text("packSettingsNamePlaceholder"),
                 modifier = Modifier.fillMaxWidth(),
             )
         }
         NxSettingBlock {
-            FieldLabel(s.packSettingsNotes)
+            FieldLabel(s.text("packSettingsNotes"))
             NxField(
                 value = pack.notes,
                 onValueChange = { if (it != pack.notes) save { p -> p.copy(notes = it) } },
-                placeholder = s.packSettingsNotesPlaceholder,
+                placeholder = s.text("packSettingsNotesPlaceholder"),
                 singleLine = false,
                 modifier = Modifier.fillMaxWidth().heightIn(min = 72.dp),
             )
         }
     }
 
-    NxSettingGroup(s.packSettingsSource) {
-        NxSettingRow(s.packSettingsSource) { Value(pack.packRef.origin.name) }
+    NxSettingGroup(s.text("packSettingsSource")) {
+        NxSettingRow(s.text("packSettingsSource")) { Value(pack.packRef.origin.name) }
         pack.cachedManifest?.let { manifest ->
-            NxSettingRow(s.packSettingsLoader) { Value(runtimeLine(manifest, s)) }
+            NxSettingRow(s.text("packSettingsLoader")) { Value(runtimeLine(manifest, s)) }
         }
         pack.forkedFrom?.let { origin ->
-            NxSettingRow(s.packSettingsForkedFrom(origin.id))
+            NxSettingRow(s.text("packSettingsForkedFrom", origin.id))
         }
-        NxSettingRow(s.packSettingsPackId) { Value(pack.packRef.id) }
+        NxSettingRow(s.text("packSettingsPackId")) { Value(pack.packRef.id) }
     }
 }
 

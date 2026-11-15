@@ -51,14 +51,14 @@ import hivens.catalogue.api.ProjectInstall
 import hivens.catalogue.api.ProjectPageView
 import hivens.catalogue.api.gameVersionChips
 import hivens.core.update.VersionChannel
+import hivens.i18n.api.Strings
+import hivens.ui.i18n.nexiraStrings
 import hivens.widget.api.rememberScopedAction
 import hivens.widget.api.rememberScopedCommand
 import hivens.ui.components.LoaderGlyph
 import hivens.ui.components.formatBuildTimestamp
 import hivens.ui.components.relativeAge
 import hivens.ui.components.hasLoaderGlyph
-import hivens.ui.i18n.AppStrings
-import hivens.ui.i18n.LocalStrings
 import hivens.ui.nx.CenteredProgress
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
@@ -103,7 +103,7 @@ internal fun VersionsPane(
     onReload: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val loadVersions = rememberScopedAction(CatalogueKeys.LoadVersions)
     val retryVersions = rememberScopedAction(CatalogueKeys.RetryVersions)
     // Keyed on the project too. The page resolves it asynchronously, and a tab
@@ -119,9 +119,9 @@ internal fun VersionsPane(
         // none, which is a verdict nobody obtained.
         view.failed -> {
             RetryStateBlock(
-                title = s.contentTabFetchErrorTitle,
-                message = s.contentTabFetchErrorGeneric,
-                retryLabel = s.contentTabRetry,
+                title = s.text("contentTabFetchErrorTitle"),
+                message = s.text("contentTabFetchErrorGeneric"),
+                retryLabel = s.text("contentTabRetry"),
                 onRetry = onReload,
                 modifier = modifier.padding(20.dp),
                 titleStyle = MaterialTheme.typography.titleMedium,
@@ -130,9 +130,9 @@ internal fun VersionsPane(
         }
         view.versionsFailed -> {
             RetryStateBlock(
-                title = s.modPageVersionsFailed,
-                message = s.modPageVersionsFailedBody,
-                retryLabel = s.contentTabRetry,
+                title = s.text("modPageVersionsFailed"),
+                message = s.text("modPageVersionsFailedBody"),
+                retryLabel = s.text("contentTabRetry"),
                 onRetry = { retryVersions?.invoke() },
                 modifier = modifier.padding(20.dp),
                 titleStyle = MaterialTheme.typography.titleMedium,
@@ -162,7 +162,7 @@ internal fun VersionsPane(
         !view.knownToCatalogue -> {
             Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(
-                    s.modPageVersionsNoEntry,
+                    s.text("modPageVersionsNoEntry"),
                     style = MaterialTheme.typography.bodySmall,
                     color = NxInk.quiet,
                 )
@@ -183,7 +183,7 @@ internal fun VersionsPane(
     if (rows.isEmpty()) {
         Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text(
-                s.contentVersionsUnknown,
+                s.text("contentVersionsUnknown"),
                 style = MaterialTheme.typography.bodySmall,
                 color = NxInk.quiet,
             )
@@ -220,14 +220,14 @@ internal fun VersionsPane(
  */
 @Composable
 private fun InstallBuildButton(view: ProjectPageView, b: ProjectBuild) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val install = rememberScopedCommand(CatalogueKeys.InstallProject)
     val fits = remember(b, view.packMcVersion, view.packLoaders) {
         runsOn(b, view.packMcVersion, view.packLoaders)
     }
     NxIconButton(
         icon = NxIcon.Download,
-        contentDescription = if (fits) s.modPageInstallShort else s.versionsIncompatibleHint,
+        contentDescription = if (fits) s.text("modPageInstallShort") else s.text("versionsIncompatibleHint"),
         onClick = { install?.invoke(ProjectInstall(b.id)) },
         enabled = !view.installing,
         tint = if (fits) NxColor.lead() else NxColor.status(Status.Warning),
@@ -251,7 +251,7 @@ internal fun BuildsTable(
     rowAction: (@Composable (ProjectBuild) -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     var filters by remember(builds) { mutableStateOf(VersionFilters()) }
     val facets = remember(builds, gameVersionTags) { facetsOf(builds, gameVersionTags) }
     val shown = remember(builds, filters) { builds.filter { filters.matches(it) } }
@@ -290,7 +290,7 @@ internal fun BuildsTable(
             // builds and must not read like one.
             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                 Text(
-                    s.versionsFilterNoMatch,
+                    s.text("versionsFilterNoMatch"),
                     style = MaterialTheme.typography.bodySmall,
                     color = NxInk.quiet,
                 )
@@ -355,7 +355,7 @@ private fun VersionFilterBar(
     totalCount: Int,
     modifier: Modifier = Modifier,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     FlowRow(
         modifier,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -364,7 +364,7 @@ private fun VersionFilterBar(
     ) {
         if (facets.channels.size > 1) {
             FilterDropdown(
-                label = s.versionsFilterChannel,
+                label = s.text("versionsFilterChannel"),
                 summary = filters.channels.takeIf { it.isNotEmpty() }
                     ?.joinToString(", ") { channelLabel(it, s) },
                 onClear = { onFilters(filters.clearChannels()) },
@@ -378,7 +378,7 @@ private fun VersionFilterBar(
         }
         if (facets.gameVersionGroups.size > 1) {
             FilterDropdown(
-                label = s.versionsFilterGameVersion,
+                label = s.text("versionsFilterGameVersion"),
                 summary = facets.gameVersionGroups
                     .filter { filters.gameVersions.containsAll(it.versions) }
                     .takeIf { it.isNotEmpty() }
@@ -394,7 +394,7 @@ private fun VersionFilterBar(
         }
         if (facets.loaders.size > 1) {
             FilterDropdown(
-                label = s.versionsFilterPlatform,
+                label = s.text("versionsFilterPlatform"),
                 summary = filters.loaders.takeIf { it.isNotEmpty() }
                     ?.joinToString(", ") { loaderLabel(it) },
                 onClear = { onFilters(filters.clearLoaders()) },
@@ -409,13 +409,13 @@ private fun VersionFilterBar(
         // The count and the way out, at the end of the same row. Both belong to the
         // whole bar rather than to any one axis.
         Text(
-            s.versionsFilterShown(shownCount, totalCount),
+            s.text("versionsFilterShown", shownCount, totalCount),
             style = MaterialTheme.typography.labelSmall,
             color = NxInk.quiet,
         )
         if (!filters.isEmpty) {
             NxButton(
-                label = s.versionsFilterReset,
+                label = s.text("versionsFilterReset"),
                 onClick = { onFilters(VersionFilters()) },
                 style = NxButtonStyle.Tertiary,
                 compact = true,
@@ -499,11 +499,11 @@ private fun FilterDropdown(
 }
 
 /** Not composable: it reads nothing from composition, only from the language it is handed. */
-private fun channelLabel(versionType: String, s: AppStrings): String =
+private fun channelLabel(versionType: String, s: Strings): String =
     when (VersionChannel.of(versionType, "")) {
-        VersionChannel.Release -> s.packVersionsChannelRelease
-        VersionChannel.Beta -> s.packVersionsChannelBeta
-        VersionChannel.Alpha -> s.packVersionsChannelAlpha
+        VersionChannel.Release -> s.text("packVersionsChannelRelease")
+        VersionChannel.Beta -> s.text("packVersionsChannelBeta")
+        VersionChannel.Alpha -> s.text("packVersionsChannelAlpha")
     }
 
 // The measures the reference sets, in the same order. The channel is a mark and
@@ -527,20 +527,20 @@ private const val MAX_PLATFORM_CHIPS = 3
 
 @Composable
 private fun HeaderRow(columns: ScrollState, nameWidth: Dp, count: CountColumn?) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     Row(
         Modifier.fillMaxWidth().horizontalScroll(columns).padding(horizontal = ROW_PADDING, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(COLUMN_GAP),
     ) {
         Box(Modifier.width(CHANNEL_COLUMN))
-        HeaderCell(s.versionsColumnVersion, nameWidth)
-        HeaderCell(s.versionsColumnGameVersion, CHIP_COLUMN)
-        HeaderCell(s.versionsColumnPlatform, CHIP_COLUMN)
-        HeaderCell(s.versionsColumnPublished, DATE_COLUMN)
+        HeaderCell(s.text("versionsColumnVersion"), nameWidth)
+        HeaderCell(s.text("versionsColumnGameVersion"), CHIP_COLUMN)
+        HeaderCell(s.text("versionsColumnPlatform"), CHIP_COLUMN)
+        HeaderCell(s.text("versionsColumnPublished"), DATE_COLUMN)
         when (count) {
-            CountColumn.Downloads -> HeaderCell(s.versionsColumnDownloads, COUNT_COLUMN)
-            CountColumn.Mods -> HeaderCell(s.contentFilterMods, COUNT_COLUMN)
+            CountColumn.Downloads -> HeaderCell(s.text("versionsColumnDownloads"), COUNT_COLUMN)
+            CountColumn.Mods -> HeaderCell(s.text("contentFilterMods"), COUNT_COLUMN)
             null -> Unit
         }
         Box(Modifier.weight(1f))
@@ -572,7 +572,7 @@ private fun VersionTableRow(
     onOpen: (() -> Unit)?,
     action: (@Composable (ProjectBuild) -> Unit)?,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val channel = remember(b) { VersionChannel.of(b.versionType, b.versionNumber) }
     Row(
         Modifier.fillMaxWidth()
@@ -637,7 +637,7 @@ private fun VersionTableRow(
             gameVersionChips(b.gameVersions, gameVersionTags)
         }
         ChipColumn(
-            title = s.versionsColumnGameVersion,
+            title = s.text("versionsColumnGameVersion"),
             groups = groups,
             cap = MAX_GAME_VERSION_CHIPS,
             selected = { filters.gameVersions.containsAll(it.versions) },
@@ -665,7 +665,7 @@ private fun VersionTableRow(
                 // which two is a number that answers nothing.
                 if (b.loaders.size > MAX_PLATFORM_CHIPS) {
                     OverflowChips(
-                        title = s.versionsColumnPlatform,
+                        title = s.text("versionsColumnPlatform"),
                         labels = b.loaders.drop(MAX_PLATFORM_CHIPS).map { loaderLabel(it) to it },
                         selected = { it in filters.loaders },
                         onToggle = { onFilters(filters.toggleLoader(it)) },
@@ -756,7 +756,7 @@ private fun ChipColumn(
  * what this row answers.
  */
 @Composable
-private fun FilesRow(v: ProjectBuild, s: AppStrings) {
+private fun FilesRow(v: ProjectBuild, s: Strings) {
     FlowRow(
         Modifier.fillMaxWidth().padding(start = 64.dp, end = 14.dp, bottom = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp),

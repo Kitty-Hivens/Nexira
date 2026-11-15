@@ -52,7 +52,7 @@ import hivens.catalogue.api.PackOrigins
 import hivens.catalogue.api.SearchFilter
 import hivens.ui.components.LoaderGlyph
 import hivens.ui.components.hasLoaderGlyph
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
@@ -132,7 +132,7 @@ fun BrowseInstalledFilterWidget(instance: WidgetInstance) {
     val browse = rememberScopedSource(CatalogueKeys.Browse).valueOrNull() ?: return
     // Flipped where the view is kept, since the view read here arrives a frame late.
     val toggleHide = rememberScopedAction(CatalogueKeys.ToggleHideInstalled)
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     if (browse.target?.takes(browse.kind) != true) return
     PuppetClick("browse.filter.installed") { toggleHide?.invoke() }
     Row(
@@ -140,7 +140,7 @@ fun BrowseInstalledFilterWidget(instance: WidgetInstance) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(s.browseHideInstalled, style = MaterialTheme.typography.bodyMedium, color = NxInk.main, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+        Text(s.text("browseHideInstalled"), style = MaterialTheme.typography.bodyMedium, color = NxInk.main, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
         NxSwitch(checked = browse.hideInstalled, onCheckedChange = { toggleHide?.invoke() })
     }
 }
@@ -156,14 +156,14 @@ fun BrowseBuiltByFilterWidget(instance: WidgetInstance) {
     // Flipped where the view is kept, since the view read here arrives a frame late.
     val toggleOwn = rememberScopedAction(CatalogueKeys.ToggleMirrorOwn)
     val toggleCommunity = rememberScopedAction(CatalogueKeys.ToggleMirrorCommunity)
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     if (browse.kind != null || browse.origin != PackOrigins.MIRROR) return
     PuppetClick("browse.filter.builtBy.own") { toggleOwn?.invoke() }
     PuppetClick("browse.filter.builtBy.community") { toggleCommunity?.invoke() }
     // Two tiles switched on and off rather than two switches: the same plane as the
     // kind tiles above, so the rail reads as one set of controls, with the mark
     // filling in for what is listed.
-    RailBlock(s.browseFilterBuiltBy) {
+    RailBlock(s.text("browseFilterBuiltBy")) {
         Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(TILE_GAP)) {
             Box(Modifier.weight(1f).fillMaxHeight()) {
                 KindTile(
@@ -177,7 +177,7 @@ fun BrowseBuiltByFilterWidget(instance: WidgetInstance) {
             }
             Box(Modifier.weight(1f).fillMaxHeight()) {
                 KindTile(
-                    label = s.browseFilterCommunity,
+                    label = s.text("browseFilterCommunity"),
                     icon = NxIcon.Groups,
                     selected = browse.mirrorCommunity,
                     dimmed = false,
@@ -212,7 +212,7 @@ private fun FilterBlock(group: FilterGroup, instance: WidgetInstance) {
     val unlock = rememberScopedCommand(CatalogueKeys.Unlock)
     val relock = rememberScopedCommand(CatalogueKeys.Relock)
     val act = rememberFilterActions()
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val type = browse.type ?: return
     var allVersions by rememberSaveable(instance.instanceId) { mutableStateOf(false) }
     val choices = remember(group, type, tags, s, allVersions) { choicesFor(group, type, tags, s, allVersions) }
@@ -272,7 +272,7 @@ private fun FilterBlock(group: FilterGroup, instance: WidgetInstance) {
                         else -> choices.forEach { choice -> ChoiceRow(act, type, group, choice, chosen) }
                     }
                     if (group.field in browse.unlocked && browse.target?.takes(browse.kind) == true) {
-                        TextAction(s.browseFilterRelock, NxIcon.Lock) { relock?.invoke(group.field) }
+                        TextAction(s.text("browseFilterRelock"), NxIcon.Lock) { relock?.invoke(group.field) }
                     }
                 }
             }
@@ -282,7 +282,7 @@ private fun FilterBlock(group: FilterGroup, instance: WidgetInstance) {
 
 @Composable
 private fun SummaryChip(filter: SearchFilter, locked: Boolean) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     Row(
         Modifier.clip(MaterialTheme.shapes.extraLarge).background(NxColor.wash(NxInk.quiet, 0.12f)).padding(horizontal = 8.dp, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -303,7 +303,7 @@ private fun SummaryChip(filter: SearchFilter, locked: Boolean) {
  */
 @Composable
 private fun LockedNotice(packName: String, values: String, onUnlock: () -> Unit) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     Column(
         Modifier.fillMaxWidth().padding(horizontal = 8.dp)
             .border(1.dp, NxInk.line, MaterialTheme.shapes.medium)
@@ -311,9 +311,9 @@ private fun LockedNotice(packName: String, values: String, onUnlock: () -> Unit)
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Text(values, style = MaterialTheme.typography.bodyMedium, color = NxInk.main, fontWeight = FontWeight.Bold)
-        Text(s.browseFilterLockedBy(packName), style = MaterialTheme.typography.labelMedium, color = NxInk.quiet)
-        Text(s.browseFilterUnlockHint, style = MaterialTheme.typography.labelMedium, color = NxInk.quiet)
-        NxButton(label = s.browseFilterUnlock, onClick = onUnlock, style = NxButtonStyle.Secondary, icon = NxIcon.LockOpen, compact = true)
+        Text(s.text("browseFilterLockedBy", packName), style = MaterialTheme.typography.labelMedium, color = NxInk.quiet)
+        Text(s.text("browseFilterUnlockHint"), style = MaterialTheme.typography.labelMedium, color = NxInk.quiet)
+        NxButton(label = s.text("browseFilterUnlock"), onClick = onUnlock, style = NxButtonStyle.Secondary, icon = NxIcon.LockOpen, compact = true)
     }
 }
 
@@ -327,9 +327,9 @@ private fun VersionChoices(
     allVersions: Boolean,
     onAllVersions: (Boolean) -> Unit,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     var query by remember { mutableStateOf("") }
-    NxField(value = query, onValueChange = { query = it }, placeholder = s.versionPickerSearch, modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp))
+    NxField(value = query, onValueChange = { query = it }, placeholder = s.text("versionPickerSearch"), modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp))
     val shown = choices.filter { query.isBlank() || it.label.contains(query.trim()) }
     Column(Modifier.fillMaxWidth().heightIn(max = VERSION_LIST_HEIGHT).verticalScroll(rememberScrollState())) {
         shown.forEach { choice -> ChoiceRow(c, type, FilterGroup.GameVersion, choice, chosen) }
@@ -339,7 +339,7 @@ private fun VersionChoices(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Text(s.browseFilterAllVersions, style = MaterialTheme.typography.labelLarge, color = NxInk.quiet, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+        Text(s.text("browseFilterAllVersions"), style = MaterialTheme.typography.labelLarge, color = NxInk.quiet, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
         NxSwitch(checked = allVersions, onCheckedChange = onAllVersions)
     }
     PuppetClick("browse.filter.allVersions") { onAllVersions(!allVersions) }
@@ -356,7 +356,7 @@ private fun FoldedChoices(
     choices: List<FilterChoice>,
     chosen: List<SearchFilter>,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val first = choices.filter { !it.secondary || chosen.any { f -> f.value == it.filter.value } }
     val rest = choices - first.toSet()
     var more by remember { mutableStateOf(false) }
@@ -366,7 +366,7 @@ private fun FoldedChoices(
     }
     if (rest.isNotEmpty()) {
         val turn by animateFloatAsState(if (more) 180f else 0f, animationSpec = Motion.reveal, label = "moreChevron")
-        TextAction(if (more) s.browseFilterShowLess else s.browseFilterShowMore, NxIcon.ExpandMore, iconRotation = turn) { more = !more }
+        TextAction(if (more) s.text("browseFilterShowLess") else s.text("browseFilterShowMore"), NxIcon.ExpandMore, iconRotation = turn) { more = !more }
         PuppetClick("browse.filter.${group.name}.more") { more = !more }
     }
 }
@@ -406,7 +406,7 @@ private fun ChoiceRow(
     choice: FilterChoice,
     chosen: List<SearchFilter>,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val current = chosen.firstOrNull { it.value == choice.filter.value }
     val included = current != null && !current.excluded
     val excluded = current?.excluded == true
@@ -465,7 +465,7 @@ private fun ChoiceRow(
             val excludeAlpha by animateFloatAsState(if (hovered && !excluded && !included) 1f else 0f, animationSpec = Motion.tap, label = "excludeButton")
             val excludeHover = remember { MutableInteractionSource() }
             val excludeHovered by excludeHover.collectIsHoveredAsState()
-            NxTooltip(text = s.browseFilterExclude, enabled = excludeAlpha > 0f) {
+            NxTooltip(text = s.text("browseFilterExclude"), enabled = excludeAlpha > 0f) {
                 Box(
                     Modifier.size(24.dp).alpha(excludeAlpha).clip(MaterialTheme.shapes.small)
                         .background(if (excludeHovered) NxColor.wash(error, 0.18f) else Color.Transparent)
@@ -473,7 +473,7 @@ private fun ChoiceRow(
                         .clickable(interactionSource = excludeHover, indication = null, enabled = excludeAlpha > 0f) { c.exclude(FilterPick(type, choice.filter)) },
                     contentAlignment = Alignment.Center,
                 ) {
-                    Symbol(NxIcon.Block, contentDescription = s.browseFilterExclude, tint = if (excludeHovered) NxColor.status(Status.Error) else NxInk.quiet, size = 16.dp)
+                    Symbol(NxIcon.Block, contentDescription = s.text("browseFilterExclude"), tint = if (excludeHovered) NxColor.status(Status.Error) else NxInk.quiet, size = 16.dp)
                 }
             }
             PuppetClick("browse.filter.${group.name}.${choice.filter.value}.exclude") { c.exclude(FilterPick(type, choice.filter)) }

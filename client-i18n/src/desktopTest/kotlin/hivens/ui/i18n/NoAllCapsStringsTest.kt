@@ -1,10 +1,8 @@
 package hivens.ui.i18n
 
-import java.lang.reflect.Method
-import java.time.Instant
+import hivens.i18n.Message
 import kotlin.test.Test
 import kotlin.test.assertTrue
-import kotlin.test.fail
 
 /**
  * No catalogue string is set entirely in capitals. A section header typed as
@@ -13,14 +11,11 @@ import kotlin.test.fail
  * Acronyms, units and brand spellings are written in capitals by convention, so
  * they are named in [allowedCapsTokens] and do not count.
  *
- * Every string getter of [AppStrings] is read, and every function is called with
- * neutral arguments: an empty string for text, so a placeholder adds no letters
- * and only the literal ones are judged, and a spread of counts for numbers, so
- * each plural form and count branch is reached.
+ * Every message of every shipped table is read in every form it can take, each
+ * plural and select branch on its own, with its arguments left empty, so a
+ * placeholder adds no letters and only the literal ones are judged.
  */
 class NoAllCapsStringsTest {
-
-    private val locales = AppLocale.entries.associate { it.name to stringsFor(it) }
 
     private val allowedCapsTokens = setOf(
         // Hardware, runtime and platform acronyms.
@@ -42,8 +37,6 @@ class NoAllCapsStringsTest {
     // Kana and kanji have no case and split tokens without being counted.
     private val token = Regex("""[\p{Lu}\p{Ll}\p{Lt}\p{Nd}]+""")
 
-    private val intSamples = listOf(0, 1, 2, 3, 5, 6, 8, 11, 21)
-
     private fun shouts(value: String): Boolean {
         val letters = token.findAll(value)
             .map { it.value }
@@ -54,43 +47,13 @@ class NoAllCapsStringsTest {
         return letters.size >= MIN_LETTERS && letters.none { it.isLowerCase() }
     }
 
-    private fun argumentSets(method: Method): List<Array<Any>> {
-        val types = method.parameterTypes
-        if (types.isEmpty()) return listOf(emptyArray())
-        return intSamples.map { n ->
-            Array<Any>(types.size) { i ->
-                when (types[i]) {
-                    String::class.java -> ""
-                    Int::class.javaPrimitiveType -> n
-                    Long::class.javaPrimitiveType -> n.toLong()
-                    Instant::class.java -> Instant.EPOCH
-                    else -> fail("${method.name}: no sample argument for ${types[i].name}, add one to argumentSets")
-                }
-            }
-        }.distinctBy { it.toList() }
-    }
-
-    private fun valuesOf(strings: AppStrings): List<Pair<String, String>> = buildList {
-        for (method in AppStrings::class.java.declaredMethods.filterNot { it.isSynthetic }) {
-            when (method.returnType) {
-                String::class.java -> for (args in argumentSets(method)) {
-                    add(method.name to method.invoke(strings, *args) as String)
-                }
-                else -> when (val result = if (method.parameterCount == 0) method.invoke(strings) else null) {
-                    is List<*> -> result.forEach { add(method.name to it.toString()) }
-                    is Map<*, *> -> result.forEach { (key, value) -> add("${method.name}[$key]" to value.toString()) }
-                    else -> Unit
-                }
-            }
-        }
-    }
-
     @Test
     fun `no catalogue string is set in capitals`() {
         val violations = buildList {
-            for ((name, strings) in locales) {
-                for ((key, value) in valuesOf(strings).distinct()) {
-                    if (shouts(value)) add("$name.$key: \"$value\"")
+            for ((tag, table) in NexiraStrings.tables()) {
+                for ((key, text) in table) {
+                    val forms = runCatching { Message.parse(text).variants() }.getOrDefault(listOf(text))
+                    forms.filter(::shouts).forEach { add("$tag.$key: \"$it\"") }
                 }
             }
         }

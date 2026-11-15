@@ -31,7 +31,8 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import hivens.ui.components.LoaderGlyph
 import hivens.ui.components.hasLoaderGlyph
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.modrinthCategory
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
@@ -96,7 +97,7 @@ import hivens.ui.theme.Status
  * page is still asking, the place holds an ellipsis instead.
  */
 @Composable
-private fun unknown(p: OpenProject) = if (p.pending) PENDING else LocalStrings.current.modRailUnknownValue
+private fun unknown(p: OpenProject) = if (p.pending) PENDING else nexiraStrings().text("modRailUnknownValue")
 
 /** What a fact reads while the page has not heard back. */
 private const val PENDING = "…"
@@ -120,11 +121,11 @@ private const val PENDING = "…"
 @Composable
 fun ProjectCompatibilityWidget(instance: WidgetInstance) {
     val p = rememberScopedSource(CatalogueKeys.OpenProject).valueOrNull() ?: return
-    val s = LocalStrings.current
+    val s = nexiraStrings()
 
-    RailBlock(s.modRailCompatibility) {
+    RailBlock(s.text("modRailCompatibility")) {
         RailGroup {
-        RailLabel(s.modRailGame)
+        RailLabel(s.text("modRailGame"))
         // A jar declares the loader it needs and usually the game version it was
         // built against, so those two survive the loss of the catalogue. What it
         // cannot tell us is the RANGE it also runs on, and a range guessed from
@@ -146,7 +147,7 @@ fun ProjectCompatibilityWidget(instance: WidgetInstance) {
         }
 
         RailGroup {
-        RailLabel(s.modRailPlatforms)
+        RailLabel(s.text("modRailPlatforms"))
         if (p.loaders.isEmpty()) {
             Chips(listOf(unknown(p)))
         } else {
@@ -182,7 +183,7 @@ fun ProjectCompatibilityWidget(instance: WidgetInstance) {
         val envs = environments(p.clientSide, p.serverSide)
         if (envs.isNotEmpty() || p.source == ProjectSource.Local) {
             RailGroup {
-            RailLabel(s.modRailEnvironment)
+            RailLabel(s.text("modRailEnvironment"))
             if (envs.isEmpty()) {
                 Chips(listOf(unknown(p)))
             } else {
@@ -247,10 +248,10 @@ private fun environmentIcon(environment: Environment): IconKey = when (environme
 @Composable
 fun ProjectTagsWidget(instance: WidgetInstance) {
     val p = rememberScopedSource(CatalogueKeys.OpenProject).valueOrNull() ?: return
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     if (p.categories.isEmpty()) return
 
-    RailBlock(s.modRailTags) {
+    RailBlock(s.text("modRailTags")) {
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(5.dp),
             verticalArrangement = Arrangement.spacedBy(5.dp),
@@ -283,11 +284,11 @@ fun ProjectTagsWidget(instance: WidgetInstance) {
 @Composable
 fun ProjectLinksWidget(instance: WidgetInstance) {
     val p = rememberScopedSource(CatalogueKeys.OpenProject).valueOrNull() ?: return
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val follow = rememberLinkFollower(p.packId)
     if (p.links.isEmpty()) return
 
-    RailBlock(s.modRailLinks) {
+    RailBlock(s.text("modRailLinks")) {
         val donations = p.links.count { it.kind == ProjectLinkKind.Donate }
         p.links.forEachIndexed { index, link ->
             // Where the author can be reached, then a rule, then where they can be
@@ -363,10 +364,10 @@ private fun linkIcon(kind: ProjectLinkKind): IconKey = when (kind) {
 @Composable
 fun ProjectCreatorsWidget(instance: WidgetInstance) {
     val p = rememberScopedSource(CatalogueKeys.OpenProject).valueOrNull() ?: return
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     if (p.creators.isEmpty()) return
 
-    RailBlock(s.modRailCreators) {
+    RailBlock(s.text("modRailCreators")) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             p.creators.forEach { creator ->
                 Row(
@@ -453,9 +454,9 @@ private fun CreatorAvatar(creator: ProjectCreator) {
 @Composable
 fun ProjectDetailsWidget(instance: WidgetInstance) {
     val p = rememberScopedSource(CatalogueKeys.OpenProject).valueOrNull() ?: return
-    val s = LocalStrings.current
+    val s = nexiraStrings()
 
-    RailBlock(s.modRailDetails) {
+    RailBlock(s.text("modRailDetails")) {
         // Declarations come FIRST and in plain text. Only the one that can
         // physically hurt someone gets a colour: the difference between informing
         // a reader and accusing an author.
@@ -494,14 +495,14 @@ fun ProjectDetailsWidget(instance: WidgetInstance) {
         if (p.answersPublished) {
             DatedFact(
                 NxIcon.NewReleases,
-                relativeAge(p.published, s).takeIf { it.isNotBlank() }?.let { s.modPublishedOn(it) } ?: if (p.pending) PENDING else s.modPublishedUnknown,
+                relativeAge(p.published, s).takeIf { it.isNotBlank() }?.let { s.text("modPublishedOn", it) } ?: if (p.pending) PENDING else s.text("modPublishedUnknown"),
                 formatBuildTimestamp(p.published),
             )
         }
         if (p.answersUpdated) {
             DatedFact(
                 NxIcon.Update,
-                relativeAge(p.updated, s).takeIf { it.isNotBlank() }?.let { s.modUpdatedOn(it) } ?: if (p.pending) PENDING else s.modUpdatedUnknown,
+                relativeAge(p.updated, s).takeIf { it.isNotBlank() }?.let { s.text("modUpdatedOn", it) } ?: if (p.pending) PENDING else s.text("modUpdatedUnknown"),
                 formatBuildTimestamp(p.updated),
             )
         }
@@ -512,21 +513,21 @@ fun ProjectDetailsWidget(instance: WidgetInstance) {
         // A provider names itself where the accounts module lists it. One this build does
         // not list goes by its key, the way the launch gate's own messages say it.
         val providers = rememberScopedSource(AccountKeys.Providers).valueOrNull().orEmpty()
-        p.signIn.forEach { key -> Fact(NxIcon.VpnKey, s.packRailSignIn(providers.firstOrNull { it.key == key }?.name ?: key)) }
+        p.signIn.forEach { key -> Fact(NxIcon.VpnKey, s.text("packRailSignIn", providers.firstOrNull { it.key == key }?.name ?: key)) }
         p.runtime?.let { Fact(NxIcon.Memory, it) }
-        p.modsCount?.let { Fact(NxIcon.Widgets, "${s.packRailMods}: $it") }
+        p.modsCount?.let { Fact(NxIcon.Widgets, "${s.text("packRailMods")}: $it") }
 
         // What only the file can answer. These three were the whole of the
         // read-only dialog the page replaces, so they follow it here rather than
         // being lost on the way: a reader who used to check a jar's dependencies
         // must not find that the richer surface tells them less.
-        p.sizeBytes?.let { Fact(NxIcon.InsertDriveFile, "${s.contentDetailSize}: ${humanSize(it, s)}") }
+        p.sizeBytes?.let { Fact(NxIcon.InsertDriveFile, "${s.text("contentDetailSize")}: ${humanSize(it, s)}") }
         if (p.authors.isNotEmpty()) {
-            Fact(NxIcon.Person, "${s.contentDetailAuthors}: ${p.authors.joinToString(", ")}")
+            Fact(NxIcon.Person, "${s.text("contentDetailAuthors")}: ${p.authors.joinToString(", ")}")
         }
         if (p.usedBy.isNotEmpty()) {
             Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Fact(NxIcon.Inventory2, s.packRailUsedBy)
+                Fact(NxIcon.Inventory2, s.text("packRailUsedBy"))
                 Text(
                     p.usedBy.joinToString(", "),
                     style = MaterialTheme.typography.labelSmall,
@@ -536,7 +537,7 @@ fun ProjectDetailsWidget(instance: WidgetInstance) {
         }
         if (p.dependencies.isNotEmpty()) {
             Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Fact(NxIcon.Lan, s.contentTabModDependencies(p.dependencies.size))
+                Fact(NxIcon.Lan, s.text("contentTabModDependencies", p.dependencies.size))
                 Text(
                     p.dependencies.joinToString(", "),
                     style = MaterialTheme.typography.labelSmall,

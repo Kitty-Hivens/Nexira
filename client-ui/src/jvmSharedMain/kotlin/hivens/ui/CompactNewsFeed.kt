@@ -11,6 +11,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.NxBasicTextField
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -31,7 +32,6 @@ import hivens.core.api.interfaces.INewsFeed
 import hivens.core.data.NewsItem
 import hivens.core.data.NewsOrder
 import hivens.launcher.network.ServerProtocolConfig
-import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.nx.NxVerticalScrollbar
@@ -90,7 +90,7 @@ private fun CompactNewsFeedOf(
     modifier: Modifier,
 ) {
     val protocolConfig: ServerProtocolConfig = koinInject()
-    val s       = LocalStrings.current
+    val s       = nexiraStrings()
     val policy  = feed.policy
 
     var news    by remember { mutableStateOf<List<NewsItem>>(emptyList()) }
@@ -233,7 +233,7 @@ private fun CompactNewsFeedOf(
         // Section header (optional -- a tight rail may prefer to drop it).
         if (showTitle) {
             Text(
-                text       = s.newsTitle,
+                text       = s.text("newsTitle"),
                 style      = MaterialTheme.typography.bodySmall,
                 fontWeight = FontWeight.Bold,
                 color      = NxInk.quiet,
@@ -264,7 +264,7 @@ private fun CompactNewsFeedOf(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         Text(
-                            text  = unavailable ?: s.newsEmpty,
+                            text  = unavailable ?: s.text("newsEmpty"),
                             style = MaterialTheme.typography.bodySmall,
                             color = NxInk.quiet,
                         )
@@ -274,7 +274,7 @@ private fun CompactNewsFeedOf(
                         // is not merely empty but unconfigured: nothing to retry.
                         if (unavailable == null) {
                             TextButton(onClick = { retryTick++ }) {
-                                Text(s.updateRetry, style = MaterialTheme.typography.bodySmall)
+                                Text(s.text("updateRetry"), style = MaterialTheme.typography.bodySmall)
                             }
                         }
                     }
@@ -285,7 +285,7 @@ private fun CompactNewsFeedOf(
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        text  = s.newsEmpty,
+                        text  = s.text("newsEmpty"),
                         style = MaterialTheme.typography.bodySmall,
                         color = NxInk.quiet,
                     )
@@ -367,13 +367,13 @@ private fun FeedTail() {
 /** The way back to the archive when the feed is sitting on the dashboard's three. */
 @Composable
 private fun FeedRetry(onRetry: () -> Unit) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     Box(
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
         contentAlignment = Alignment.Center,
     ) {
         TextButton(onClick = onRetry) {
-            Text(s.updateRetry, style = MaterialTheme.typography.bodySmall)
+            Text(s.text("updateRetry"), style = MaterialTheme.typography.bodySmall)
         }
     }
 }
@@ -382,7 +382,7 @@ private fun FeedRetry(onRetry: () -> Unit) {
 // stays scannable in the rail.
 @Composable
 private fun NewsFilterField(query: String, onQueryChange: (String) -> Unit) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     NxSurface(
         kind     = SurfaceKind.Field,
         modifier = Modifier
@@ -412,7 +412,7 @@ private fun NewsFilterField(query: String, onQueryChange: (String) -> Unit) {
                 )
                 if (query.isEmpty()) {
                     Text(
-                        text  = s.newsFilterPlaceholder,
+                        text  = s.text("newsFilterPlaceholder"),
                         style = MaterialTheme.typography.bodySmall,
                         color = NxInk.quiet,
                     )
@@ -421,7 +421,7 @@ private fun NewsFilterField(query: String, onQueryChange: (String) -> Unit) {
             if (query.isNotEmpty()) {
                 IconButton(onClick = { onQueryChange("") }, modifier = Modifier.size(20.dp)) {
                     Symbol(icon = NxIcon.Close,
-                        contentDescription = s.newsFilterClear,
+                        contentDescription = s.text("newsFilterClear"),
                         tint               = NxInk.quiet,
                         modifier           = Modifier.size(12.dp),
                     )

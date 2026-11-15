@@ -14,7 +14,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import hivens.core.data.PackInstance
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxSettingBlock
@@ -40,7 +40,7 @@ import hivens.ui.theme.NxInk
  */
 @Composable
 internal fun PackLoaderSection(pack: PackInstance, save: (PackEdit) -> Unit) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val manifest = pack.cachedManifest ?: return
     val storedId = manifest.loaderName.trim().lowercase().takeUnless { it.isEmpty() || it == "vanilla" }
     val storedVersion = manifest.loaderVersion
@@ -54,8 +54,8 @@ internal fun PackLoaderSection(pack: PackInstance, save: (PackEdit) -> Unit) {
         if (canApply) save { p -> withLoader(p, loaderId, version) }
     }
 
-    NxSettingGroup(s.packSettingsLoader) {
-        NxSettingRow(s.packLoaderInstalled, detail = s.packLoaderNextLaunch) { Value(runtimeLine(manifest, s)) }
+    NxSettingGroup(s.text("packSettingsLoader")) {
+        NxSettingRow(s.text("packLoaderInstalled"), detail = s.text("packLoaderNextLaunch")) { Value(runtimeLine(manifest, s)) }
         NxSettingBlock {
             LoaderPicker(
                 mcVersion       = manifest.minecraftVersion,
@@ -72,20 +72,20 @@ internal fun PackLoaderSection(pack: PackInstance, save: (PackEdit) -> Unit) {
         // it is, and a pack of Fabric mods put on Forge starts with none of them.
         if (loaderId != storedId) {
             NxSettingBlock {
-                Text(s.packLoaderModsStay, style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
+                Text(s.text("packLoaderModsStay"), style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
             }
         }
         NxSettingBlock {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
                 if (changed) {
                     NxButton(
-                        s.packLoaderRevert,
+                        s.text("packLoaderRevert"),
                         onClick = { loaderId = storedId; version = storedVersion },
                         style = NxButtonStyle.Tertiary,
                         compact = true,
                     )
                 }
-                NxButton(s.packLoaderApply, onClick = ::apply, enabled = canApply, compact = true)
+                NxButton(s.text("packLoaderApply"), onClick = ::apply, enabled = canApply, compact = true)
                 PuppetClick("packSettings.loader.apply", enabled = canApply) { apply() }
             }
         }

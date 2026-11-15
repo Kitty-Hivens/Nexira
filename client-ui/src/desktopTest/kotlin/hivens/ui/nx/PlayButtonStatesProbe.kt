@@ -1,6 +1,9 @@
 package hivens.ui.nx
 
 import androidx.compose.foundation.background
+import hivens.i18n.api.LocalTranslator
+import hivens.i18n.api.Strings
+import hivens.ui.i18n.NexiraStrings
 import hivens.ui.theme.Spacing
 import hivens.ui.icons.Symbol
 import androidx.compose.ui.text.font.FontWeight
@@ -34,10 +37,6 @@ import hivens.core.launch.LaunchControlMode
 import hivens.ui.components.LaunchControl
 import hivens.ui.widgets.sample.LaunchTile
 import hivens.ui.effects.pixelArtBackground
-import hivens.ui.i18n.AppStrings
-import hivens.ui.i18n.GermanStrings
-import hivens.ui.i18n.LocalStrings
-import hivens.ui.i18n.RussianStrings
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.settle
@@ -67,7 +66,7 @@ class PlayButtonStatesProbe {
     /** One state of the control, in the words and glyph the launch control model gives it. */
     private data class Cell(
         val name: String,
-        val label: (AppStrings) -> String,
+        val label: (Strings) -> String,
         val icon: IconKey,
         val enabled: Boolean = true,
         val busy: Boolean = false,
@@ -77,17 +76,17 @@ class PlayButtonStatesProbe {
     )
 
     private val cells = listOf(
-        Cell("play", { it.packDetailPlay }, NxIcon.PlayArrow),
-        Cell("sign in", { it.packDetailPlayLoginRequired }, NxIcon.Person),
-        Cell("signing in", { it.launchBlockSigningIn }, NxIcon.Person, busy = true, kind = Kind.Waiting),
-        Cell("preparing", { it.packPlayWait }, NxIcon.PlayArrow, busy = true, kind = Kind.Waiting),
-        Cell("running", { it.packPlayExit }, NxIcon.Stop),
-        Cell("updating 42%", { it.launchBlockUpdating }, NxIcon.Update, busy = true, kind = Kind.Waiting, progress = 0.42f),
-        Cell("repairing 80%", { it.launchBlockRepairing }, NxIcon.Build, busy = true, kind = Kind.Waiting, progress = 0.8f),
-        Cell("recovering", { it.launchBlockRecovering }, NxIcon.History, busy = true, kind = Kind.Waiting),
-        Cell("mods 3 of 10", { it.launchBlockUpdatingContent }, NxIcon.Sync, busy = true, kind = Kind.Waiting, progress = 0.3f),
-        Cell("missing", { it.launchBlockMissing }, NxIcon.Warning, enabled = false, kind = Kind.Problem),
-        Cell("other game", { it.launchBlockOtherRunning }, NxIcon.HourglassEmpty, enabled = false, kind = Kind.Unavailable),
+        Cell("play", { it.text("packDetailPlay") }, NxIcon.PlayArrow),
+        Cell("sign in", { it.text("packDetailPlayLoginRequired") }, NxIcon.Person),
+        Cell("signing in", { it.text("launchBlockSigningIn") }, NxIcon.Person, busy = true, kind = Kind.Waiting),
+        Cell("preparing", { it.text("packPlayWait") }, NxIcon.PlayArrow, busy = true, kind = Kind.Waiting),
+        Cell("running", { it.text("packPlayExit") }, NxIcon.Stop),
+        Cell("updating 42%", { it.text("launchBlockUpdating") }, NxIcon.Update, busy = true, kind = Kind.Waiting, progress = 0.42f),
+        Cell("repairing 80%", { it.text("launchBlockRepairing") }, NxIcon.Build, busy = true, kind = Kind.Waiting, progress = 0.8f),
+        Cell("recovering", { it.text("launchBlockRecovering") }, NxIcon.History, busy = true, kind = Kind.Waiting),
+        Cell("mods 3 of 10", { it.text("launchBlockUpdatingContent") }, NxIcon.Sync, busy = true, kind = Kind.Waiting, progress = 0.3f),
+        Cell("missing", { it.text("launchBlockMissing") }, NxIcon.Warning, enabled = false, kind = Kind.Problem),
+        Cell("other game", { it.text("launchBlockOtherRunning") }, NxIcon.HourglassEmpty, enabled = false, kind = Kind.Unavailable),
     )
 
     /** The hero's bottom strip: pixel art under the same 0.4 scrim, control at the end. */
@@ -113,15 +112,15 @@ class PlayButtonStatesProbe {
     }
 
     @Composable
-    private fun Sheet(dark: Boolean, onSurface: Boolean = false, stripH: Int = STRIP_H, button: @Composable (Cell, AppStrings) -> Unit) {
+    private fun Sheet(dark: Boolean, onSurface: Boolean = false, stripH: Int = STRIP_H, button: @Composable (Cell, Strings) -> Unit) {
         NxTheme(dark = dark) {
             Box(Modifier.fillMaxSize().background(NxColor.page).padding(16.dp)) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     cells.forEach { cell ->
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                             Text(cell.name, Modifier.width(110.dp), style = MaterialTheme.typography.labelMedium, color = NxInk.quiet)
-                            listOf(RussianStrings, GermanStrings).forEach { strings ->
-                                CompositionLocalProvider(LocalStrings provides strings) {
+                            listOf(NexiraStrings.shipped("ru"), NexiraStrings.shipped("de")).forEach { strings ->
+                                CompositionLocalProvider(LocalTranslator provides NexiraStrings.translator(strings.language)) {
                                     if (onSurface) SurfaceStrip(stripH) { button(cell, strings) }
                                     else HeroStrip("${cell.name}-${strings.hashCode()}") { button(cell, strings) }
                                 }
@@ -200,7 +199,7 @@ class PlayButtonStatesProbe {
      * at the end, the way a game launcher's Play turns into its own progress bar.
      */
     @Composable
-    private fun ProgressPlate(cell: Cell, s: AppStrings, onSurface: Boolean) {
+    private fun ProgressPlate(cell: Cell, s: Strings, onSurface: Boolean) {
         val k = inks(onSurface)
         val shape = MaterialTheme.shapes.medium
         val filled = cell.kind == Kind.Ready || cell.kind == Kind.Waiting
@@ -246,7 +245,7 @@ class PlayButtonStatesProbe {
      * verb, so nothing next to the control is pushed about as the state changes.
      */
     @Composable
-    private fun CaptionPlate(cell: Cell, s: AppStrings, onSurface: Boolean) {
+    private fun CaptionPlate(cell: Cell, s: Strings, onSurface: Boolean) {
         val k = inks(onSurface)
         val shape = MaterialTheme.shapes.medium
         val ready = cell.kind == Kind.Ready

@@ -19,13 +19,13 @@ import hivens.catalogue.api.VersionDependency
 import hivens.core.api.dto.modrinth.ModrinthGameVersion
 import hivens.core.api.dto.modrinth.ModrinthProject
 import hivens.core.api.dto.modrinth.ModrinthVersion
+import hivens.i18n.api.LocalTranslator
 import hivens.launcher.content.ContentKind
 import hivens.launcher.instance.loadersFor
 import hivens.ui.feature.catalogue.toBuild
 import hivens.ui.feature.catalogue.toDetails
 import hivens.ui.feature.catalogue.toTags
-import hivens.ui.i18n.LocalStrings
-import hivens.ui.i18n.RussianStrings
+import hivens.ui.i18n.NexiraStrings
 import hivens.ui.theme.NxTheme
 import kotlinx.serialization.json.Json
 import org.jetbrains.skia.Data
@@ -149,7 +149,7 @@ class ModVersionPageRenderTest {
         SwingUtilities.invokeAndWait {
             val scene = ImageComposeScene(1160, 900, density = Density(1f)) {
                 NxTheme(dark = true) {
-                    CompositionLocalProvider(LocalStrings provides RussianStrings) {
+                    CompositionLocalProvider(LocalTranslator provides NexiraStrings.translator("ru")) {
                         Box(Modifier.fillMaxSize().background(NxColor.page).padding(14.dp)) {
                             ModVersionBody(
                                 project = project,

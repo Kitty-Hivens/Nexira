@@ -17,8 +17,8 @@ import hivens.config.Protocol
 import hivens.core.data.AmberUpdatePolicy
 import hivens.core.diag.ActionRing
 import hivens.launcher.platform.PlatformPaths
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.platform.rememberHostActions
-import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.nx.NxAlertDialog
 import hivens.ui.nx.NxButton
@@ -75,14 +75,14 @@ internal fun AdvancedSection(
     form: SettingsFormState,
     save: () -> Unit,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val host = rememberHostActions()
 
     var pendingTarget by remember { mutableStateOf<Path?>(null) }
     var showError     by remember { mutableStateOf<String?>(null) }
     var desktopDone   by remember { mutableStateOf(false) }
     val moveScope     = rememberCoroutineScope()
-    val dialogSettings = rememberFileDialogSettings(s.settingsDataDirMove)
+    val dialogSettings = rememberFileDialogSettings(s.text("settingsDataDirMove"))
     // What each debounced field below last saved, so its effect saves a change and
     // nothing else. Compared with the settings as the screen opened, a field cleared
     // after a save matched them again and the clear was never written.
@@ -99,17 +99,17 @@ internal fun AdvancedSection(
         }
     }
 
-    NxSection(s.settingsSectionUpdates) {
-        NxToggle(s.settingsPreReleases, form.preReleasesEnabled, description = s.settingsPreReleasesDesc) {
+    NxSection(s.text("settingsSectionUpdates")) {
+        NxToggle(s.text("settingsPreReleases"), form.preReleasesEnabled, description = s.text("settingsPreReleasesDesc")) {
             form.preReleasesEnabled = it; save()
         }
 
-        NxToggle(s.settingsMandatoryUpdates, form.mandatoryUpdates, description = s.settingsMandatoryUpdatesDesc, icon = NxIcon.Update) {
+        NxToggle(s.text("settingsMandatoryUpdates"), form.mandatoryUpdates, description = s.text("settingsMandatoryUpdatesDesc"), icon = NxIcon.Update) {
             form.mandatoryUpdates = it; save()
         }
         PuppetToggle("settings.mandatoryUpdates", form.mandatoryUpdates) { form.mandatoryUpdates = it; save() }
 
-        NxToggle(s.settingsAutoUpdatePacks, form.autoUpdatePacks, description = s.settingsAutoUpdatePacksDesc, icon = NxIcon.CloudDownload) {
+        NxToggle(s.text("settingsAutoUpdatePacks"), form.autoUpdatePacks, description = s.text("settingsAutoUpdatePacksDesc"), icon = NxIcon.CloudDownload) {
             form.autoUpdatePacks = it; save()
         }
         PuppetToggle("settings.autoUpdatePacks", form.autoUpdatePacks) { form.autoUpdatePacks = it; save() }
@@ -118,14 +118,14 @@ internal fun AdvancedSection(
         // classifies a build, so the policy governs nothing. Sits flush with the rest
         // of the plane, like every other PickerBlock.
         if (form.autoUpdatePacks) {
-            PickerBlock(s.settingsAmberPolicy, s.settingsAmberPolicyDesc) {
-                NxChoiceChip(s.settingsAmberPolicyAsk, form.amberUpdatePolicy == AmberUpdatePolicy.Ask) {
+            PickerBlock(s.text("settingsAmberPolicy"), s.text("settingsAmberPolicyDesc")) {
+                NxChoiceChip(s.text("settingsAmberPolicyAsk"), form.amberUpdatePolicy == AmberUpdatePolicy.Ask) {
                     form.amberUpdatePolicy = AmberUpdatePolicy.Ask; save()
                 }
-                NxChoiceChip(s.settingsAmberPolicyApply, form.amberUpdatePolicy == AmberUpdatePolicy.SnapshotThenApply) {
+                NxChoiceChip(s.text("settingsAmberPolicyApply"), form.amberUpdatePolicy == AmberUpdatePolicy.SnapshotThenApply) {
                     form.amberUpdatePolicy = AmberUpdatePolicy.SnapshotThenApply; save()
                 }
-                NxChoiceChip(s.settingsAmberPolicyHold, form.amberUpdatePolicy == AmberUpdatePolicy.Hold) {
+                NxChoiceChip(s.text("settingsAmberPolicyHold"), form.amberUpdatePolicy == AmberUpdatePolicy.Hold) {
                     form.amberUpdatePolicy = AmberUpdatePolicy.Hold; save()
                 }
             }
@@ -139,7 +139,7 @@ internal fun AdvancedSection(
         // integration feature -- that redesign is a separate task.
         if (host.menuEntrySupported) {
             NxButton(
-                label   = if (desktopDone) s.updateManagerDesktopDone else s.updateManagerInstallDesktop,
+                label   = if (desktopDone) s.text("updateManagerDesktopDone") else s.text("updateManagerInstallDesktop"),
                 style   = NxButtonStyle.Secondary,
                 compact = true,
                 enabled = !desktopDone,
@@ -156,18 +156,18 @@ internal fun AdvancedSection(
 
     Spacer(Modifier.height(16.dp))
 
-    NxSection(s.settingsSectionLaunch) {
-        NxToggle(s.settingsAdaptiveMemory, form.adaptiveMemoryEnabled, description = s.settingsAdaptiveMemoryDesc, icon = NxIcon.Memory) {
+    NxSection(s.text("settingsSectionLaunch")) {
+        NxToggle(s.text("settingsAdaptiveMemory"), form.adaptiveMemoryEnabled, description = s.text("settingsAdaptiveMemoryDesc"), icon = NxIcon.Memory) {
             form.adaptiveMemoryEnabled = it; save()
         }
         PuppetToggle("settings.adaptiveMemory", form.adaptiveMemoryEnabled) { form.adaptiveMemoryEnabled = it; save() }
 
-        NxToggle(s.settingsJvmBuilder, form.jvmBuilderEnabled, description = s.settingsJvmBuilderDesc, icon = NxIcon.Tune) {
+        NxToggle(s.text("settingsJvmBuilder"), form.jvmBuilderEnabled, description = s.text("settingsJvmBuilderDesc"), icon = NxIcon.Tune) {
             form.jvmBuilderEnabled = it; save()
         }
         PuppetToggle("settings.jvmBuilder", form.jvmBuilderEnabled) { form.jvmBuilderEnabled = it; save() }
 
-        NxToggle(s.settingsMimicVersion, form.mimicOverrideEnabled, description = s.settingsMimicVersionDesc, icon = NxIcon.Tag) {
+        NxToggle(s.text("settingsMimicVersion"), form.mimicOverrideEnabled, description = s.text("settingsMimicVersionDesc"), icon = NxIcon.Tag) {
             form.mimicOverrideEnabled = it; save()
         }
         PuppetToggle("settings.mimicVersion", form.mimicOverrideEnabled) { form.mimicOverrideEnabled = it; save() }
@@ -188,7 +188,7 @@ internal fun AdvancedSection(
                         it in Protocol.MIMIC_VERSION_ALLOWED_CHARS
                     }
                 },
-                placeholder   = s.settingsMimicVersionPlaceholder(Protocol.DEFAULT_MIMIC_LAUNCHER_VERSION),
+                placeholder   = s.text("settingsMimicVersionPlaceholder", Protocol.DEFAULT_MIMIC_LAUNCHER_VERSION),
                 modifier      = Modifier.fillMaxWidth(),
             )
             PuppetField("settings.mimicVersion.text", form.mimicVersionText) { newValue ->
@@ -212,10 +212,10 @@ internal fun AdvancedSection(
     // field IS the switch: blank means the channel is not configured and nothing is
     // fetched for it. Debounced like the mimic field, so the file is not written
     // once per keystroke.
-    NxSection(s.settingsSectionNews) {
-        Text(s.settingsAltNewsFeed, color = NxInk.main, fontWeight = FontWeight.Medium)
+    NxSection(s.text("settingsSectionNews")) {
+        Text(s.text("settingsAltNewsFeed"), color = NxInk.main, fontWeight = FontWeight.Medium)
         Text(
-            text  = s.settingsAltNewsFeedDesc,
+            text  = s.text("settingsAltNewsFeedDesc"),
             style = MaterialTheme.typography.bodySmall,
             color = NxInk.quiet,
         )
@@ -236,8 +236,8 @@ internal fun AdvancedSection(
 
     Spacer(Modifier.height(16.dp))
 
-    if (host.dataDirMoveSupported) NxSection(s.settingsSectionDataDir) {
-        Text(s.settingsDataDirCurrent, style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
+    if (host.dataDirMoveSupported) NxSection(s.text("settingsSectionDataDir")) {
+        Text(s.text("settingsDataDirCurrent"), style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
         Text(
             text       = paths.dataDir.toAbsolutePath().toString(),
             color      = NxInk.main,
@@ -245,7 +245,7 @@ internal fun AdvancedSection(
             style      = MaterialTheme.typography.bodyMedium,
         )
         NxButton(
-            label   = s.settingsDataDirMove,
+            label   = s.text("settingsDataDirMove"),
             style   = NxButtonStyle.Secondary,
             compact = true,
             onClick = {
@@ -261,13 +261,13 @@ internal fun AdvancedSection(
                     val pickedFile = pickResult.getOrElse { ex ->
                         // Surface the failure so a "dead button" stops looking dead.
                         log.warn("openDirectoryPicker failed", ex)
-                        showError = s.settingsDataDirErrorPickerFailed(ex.message ?: ex.javaClass.simpleName)
+                        showError = s.text("settingsDataDirErrorPickerFailed", ex.message ?: ex.javaClass.simpleName)
                         return@launch
                     } ?: return@launch
 
                     val picked = Paths.get(pickedFile.path)
                     if (picked.toAbsolutePath().normalize() == paths.dataDir.toAbsolutePath().normalize()) {
-                        showError = s.settingsDataDirErrorSamePath
+                        showError = s.text("settingsDataDirErrorSamePath")
                         return@launch
                     }
                     val populated = withContext(Dispatchers.IO) {
@@ -276,7 +276,7 @@ internal fun AdvancedSection(
                         }.getOrDefault(false)
                     }
                     if (populated) {
-                        showError = s.settingsDataDirErrorNotEmpty
+                        showError = s.text("settingsDataDirErrorNotEmpty")
                         return@launch
                     }
                     pendingTarget = picked
@@ -294,16 +294,16 @@ internal fun AdvancedSection(
         OnFill(container) {
             NxAlertDialog(
                 onDismissRequest = { pendingTarget = null },
-                paneTitle        = s.settingsDataDirConfirmTitle,
-                title = { Text(s.settingsDataDirConfirmTitle) },
+                paneTitle        = s.text("settingsDataDirConfirmTitle"),
+                title = { Text(s.text("settingsDataDirConfirmTitle")) },
                 text  = {
-                    Text(s.settingsDataDirConfirmBody(
+                    Text(s.text("settingsDataDirConfirmBody", 
                         paths.dataDir.toAbsolutePath().toString(),
                         target.toAbsolutePath().toString(),
                     ))
                 },
                 confirmButton = {
-                    NxButton(label = s.settingsDataDirQuitNow, onClick = {
+                    NxButton(label = s.text("settingsDataDirQuitNow"), onClick = {
                         val ok = host.scheduleDataDirMove(paths.dataDir, target)
                         if (ok) {
                             ActionRing.record("Data-dir move scheduled: ${paths.dataDir} -> $target -- quitting for restart")
@@ -318,7 +318,7 @@ internal fun AdvancedSection(
                 },
                 dismissButton = {
                     OutlinedButton(onClick = { pendingTarget = null }, shape = MaterialTheme.shapes.small) {
-                        Text(s.sslWarningCancel)
+                        Text(s.text("sslWarningCancel"))
                     }
                 },
                 containerColor    = container,

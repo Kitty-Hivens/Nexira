@@ -15,9 +15,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.core.api.interfaces.IUpdateApplicator
 import hivens.core.data.LauncherUpdate
+import hivens.ui.i18n.nexiraStrings
 import hivens.update.UpdateService
 import hivens.ui.chrome.LocalWindowHide
-import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.nx.NxDialog
@@ -56,7 +56,7 @@ fun UpdateDialog(
     updateService: UpdateService,
     onDismiss: () -> Unit
 ) {
-    val s              = LocalStrings.current
+    val s              = nexiraStrings()
     val logger         = LoggerFactory.getLogger("UpdateDialog")
     val scope          = rememberCoroutineScope()
     val updateApplicator: IUpdateApplicator = koinInject()
@@ -103,7 +103,7 @@ fun UpdateDialog(
                 throw e
             } catch (e: Exception) {
                 logger.error("Download failed", e)
-                errorMessage  = e.message ?: s.updateErrorUnknown
+                errorMessage  = e.message ?: s.text("updateErrorUnknown")
                 downloadState = DownloadState.Failed
             }
         }
@@ -122,7 +122,7 @@ fun UpdateDialog(
                 throw e
             } catch (e: Exception) {
                 logger.error("Failed to schedule update", e)
-                errorMessage  = "${s.updateScheduleFailed}: ${e.message}"
+                errorMessage  = "${s.text("updateScheduleFailed")}: ${e.message}"
                 downloadState = DownloadState.Failed
                 return@launch
             }
@@ -177,9 +177,9 @@ fun UpdateDialog(
     }
 
     val title = when {
-        update.isMandatory -> s.updateTitleMandatory
-        update.isCritical  -> s.updateTitleCritical
-        else               -> s.updateTitle
+        update.isMandatory -> s.text("updateTitleMandatory")
+        update.isCritical  -> s.text("updateTitleCritical")
+        else               -> s.text("updateTitle")
     }
     NxDialog(onDismissRequest = { if (!isBlocking) onDismiss() }, paneTitle = title) {
         // Focus the primary action so Enter triggers it without a mouse hop, as the
@@ -245,10 +245,10 @@ fun UpdateDialog(
                                 val bannerText = when {
                                     update.isMandatory -> {
                                         val reason = update.mandatoryReason
-                                        if (!reason.isNullOrBlank()) s.updateMandatoryBannerWithReason(reason)
-                                        else s.updateMandatoryBanner
+                                        if (!reason.isNullOrBlank()) s.text("updateMandatoryBannerWithReason", reason)
+                                        else s.text("updateMandatoryBanner")
                                     }
-                                    else -> s.updateCriticalBanner
+                                    else -> s.text("updateCriticalBanner")
                                 }
                                 Text(
                                     bannerText,
@@ -274,10 +274,10 @@ fun UpdateDialog(
                     val hasHighlights = !update.highlights.isNullOrBlank()
                     val bodyContent = update.highlights?.takeIf { it.isNotBlank() }
                         ?: update.changelog.takeIf { it.isNotBlank() }
-                        ?: s.updateNoChangelog
+                        ?: s.text("updateNoChangelog")
 
                     Text(
-                        if (hasHighlights) s.updateHighlights else s.updateChangelog,
+                        if (hasHighlights) s.text("updateHighlights") else s.text("updateChangelog"),
                         style      = MaterialTheme.typography.titleSmall,
                         color      = NxInk.main,
                         fontWeight = FontWeight.Bold
@@ -325,7 +325,7 @@ fun UpdateDialog(
                             ) {
                                 Column {
                                     Text(
-                                        s.updateErrorTitle,
+                                        s.text("updateErrorTitle"),
                                         style      = MaterialTheme.typography.titleSmall,
                                         color      = NxColor.status(Status.Error),
                                         fontWeight = FontWeight.Bold
@@ -353,7 +353,7 @@ fun UpdateDialog(
                                     modifier           = Modifier.size(16.dp)
                                 )
                                 Spacer(Modifier.width(6.dp))
-                                Text(s.updateViewOnGitHub, color = NxInk.quiet)
+                                Text(s.text("updateViewOnGitHub"), color = NxInk.quiet)
                             }
                         }
 
@@ -361,7 +361,7 @@ fun UpdateDialog(
 
                         if (!isBlocking && !busy) {
                             TextButton(onClick = onDismiss) {
-                                Text(s.updateLater, color = NxInk.quiet)
+                                Text(s.text("updateLater"), color = NxInk.quiet)
                             }
                             Spacer(Modifier.width(8.dp))
                         }
@@ -372,7 +372,7 @@ fun UpdateDialog(
                         // user yanking themselves out of an installation in progress.
                         if (update.isMandatory && !busy) {
                             TextButton(onClick = { exitProcess(0) }) {
-                                Text(s.updateExit, color = NxInk.quiet)
+                                Text(s.text("updateExit"), color = NxInk.quiet)
                             }
                             Spacer(Modifier.width(8.dp))
                         }
@@ -387,7 +387,7 @@ fun UpdateDialog(
                                     shape  = MaterialTheme.shapes.small
                                 ) {
                                     Text(
-                                        if (isBlocking) s.updateDownloadNow else s.updateDownload,
+                                        if (isBlocking) s.text("updateDownloadNow") else s.text("updateDownload"),
                                         color      = NxColor.on(fill),
                                         fontWeight = FontWeight.Bold
                                     )
@@ -408,7 +408,7 @@ fun UpdateDialog(
                                         strokeWidth = 2.dp
                                     )
                                     Spacer(Modifier.width(8.dp))
-                                    Text(s.updateDownloading, color = NxColor.on(fill))
+                                    Text(s.text("updateDownloading"), color = NxColor.on(fill))
                                 }
                             }
 
@@ -421,7 +421,7 @@ fun UpdateDialog(
                                     colors = ButtonDefaults.buttonColors(containerColor = fill),
                                     shape  = MaterialTheme.shapes.small
                                 ) {
-                                    Text(s.updateInstall, color = NxColor.on(fill), fontWeight = FontWeight.Bold)
+                                    Text(s.text("updateInstall"), color = NxColor.on(fill), fontWeight = FontWeight.Bold)
                                 }
                             }
 
@@ -433,7 +433,7 @@ fun UpdateDialog(
                                     colors   = ButtonDefaults.buttonColors(disabledContainerColor = fill),
                                     shape    = MaterialTheme.shapes.small
                                 ) {
-                                    Text(s.updateInstall, color = NxColor.on(fill))
+                                    Text(s.text("updateInstall"), color = NxColor.on(fill))
                                 }
                             }
 
@@ -445,7 +445,7 @@ fun UpdateDialog(
                                     colors  = ButtonDefaults.buttonColors(containerColor = fill),
                                     shape   = MaterialTheme.shapes.small
                                 ) {
-                                    Text(s.updateRetry, color = NxColor.on(fill))
+                                    Text(s.text("updateRetry"), color = NxColor.on(fill))
                                 }
                             }
                         }

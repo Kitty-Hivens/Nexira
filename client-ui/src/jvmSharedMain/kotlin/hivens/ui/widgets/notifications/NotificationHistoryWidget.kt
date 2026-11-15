@@ -45,7 +45,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
@@ -180,7 +180,7 @@ private fun HistoryHeader(
     onClear: () -> Unit,
     onToggleDnd: () -> Unit,
 ) {
-    val strings = LocalStrings.current
+    val strings = nexiraStrings()
     // The chevron points toward where the list will go: down for a downward
     // drawer (and up to close it), inverted for an upward one.
     val pointsUp = if (expandUp) !expanded else expanded
@@ -195,7 +195,7 @@ private fun HistoryHeader(
         ) {
             PillButton(
                 icon               = if (pointsUp) NxIcon.KeyboardArrowUp else NxIcon.KeyboardArrowDown,
-                contentDescription = if (expanded) strings.notificationCollapseHistory else strings.notificationExpandHistory,
+                contentDescription = if (expanded) strings.text("notificationCollapseHistory") else strings.text("notificationExpandHistory"),
                 outline            = outline,
                 onClick            = onToggle,
             )
@@ -203,7 +203,7 @@ private fun HistoryHeader(
                 if (showTrash) {
                     PillButton(
                         icon               = NxIcon.Delete,
-                        contentDescription = strings.notifHistoryClear,
+                        contentDescription = strings.text("notifHistoryClear"),
                         outline            = outline,
                         onClick            = onClear,
                     )
@@ -214,7 +214,7 @@ private fun HistoryHeader(
             } else {
                 PillButton(
                     icon               = NxIcon.NotificationsOff,
-                    contentDescription = strings.notifDoNotDisturb,
+                    contentDescription = strings.text("notifDoNotDisturb"),
                     outline            = outline,
                     active             = dndActive,
                     onClick            = onToggleDnd,
@@ -222,7 +222,7 @@ private fun HistoryHeader(
             }
         }
         CountPill(
-            text     = strings.notifCountTitle(messageCount),
+            text     = strings.text("notifCountTitle", messageCount),
             outline  = outline,
             modifier = Modifier.align(Alignment.Center),
         )
@@ -293,7 +293,7 @@ private fun NotificationDrawer(
     verticalTime: Boolean,
     fromTop: Boolean,
 ) {
-    val strings = LocalStrings.current
+    val strings = nexiraStrings()
     val edge = if (fromTop) Alignment.Top else Alignment.Bottom
     AnimatedVisibility(
         visible = expanded,
@@ -306,7 +306,7 @@ private fun NotificationDrawer(
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    text  = strings.notifHistoryEmpty,
+                    text  = strings.text("notifHistoryEmpty"),
                     style = MaterialTheme.typography.bodySmall,
                     color = NxInk.quiet,
                 )
@@ -424,7 +424,7 @@ private fun groupHistory(log: List<PersistedNotification>): List<HistoryGroup> {
 
 @Composable
 private fun HistoryRow(entry: PersistedNotification, count: Int, ampm: Boolean, verticalTime: Boolean) {
-    val strings = LocalStrings.current
+    val strings = nexiraStrings()
     Row(
         modifier          = Modifier.fillMaxWidth().padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -445,7 +445,7 @@ private fun HistoryRow(entry: PersistedNotification, count: Int, ampm: Boolean, 
                 if (count > 1) {
                     Spacer(Modifier.width(6.dp))
                     Text(
-                        text       = strings.notifGroupCount(count),
+                        text       = strings.text("notifGroupCount", count),
                         style      = MaterialTheme.typography.labelSmall,
                         color      = NxColor.lead(),
                         fontWeight = FontWeight.Bold,
@@ -484,7 +484,7 @@ private fun TimeStamp(epoch: Long, ampm: Boolean, vertical: Boolean, color: Colo
     val ss = "%02d".format(ldt.second)
     // The marker in the launcher's language, as the clock widget writes it, rather
     // than an English am/pm in a Russian or Japanese interface.
-    val locale = LocalStrings.current.locale
+    val locale = nexiraStrings().locale
     val meridiemFormat = remember(locale) { DateTimeFormatter.ofPattern("a", locale) }
     val meridiem = meridiemFormat.format(ldt)
     val style = MaterialTheme.typography.labelSmall

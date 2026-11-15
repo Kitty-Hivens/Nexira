@@ -1,6 +1,7 @@
 package hivens.ui.feature.catalogue.project
 
 import androidx.compose.foundation.background
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.theme.decorativeColor
 import hivens.ui.nx.InitialsAvatar
 import coil3.compose.AsyncImage
@@ -53,7 +54,6 @@ import hivens.ui.components.ReleaseNotes
 import hivens.ui.components.formatBuildTimestamp
 import hivens.ui.components.hasLoaderGlyph
 import hivens.ui.components.relativeAge
-import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.nx.CenteredProgress
@@ -133,19 +133,19 @@ internal fun ModVersionBody(
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     NxSurface(SurfaceKind.Panel, modifier = modifier) {
         when (buildPageView(project, build)) {
             BuildPageState.Failed -> RetryStateBlock(
-                title = s.modVersionFailed,
-                message = s.modPageVersionsFailedBody,
-                retryLabel = s.contentTabRetry,
+                title = s.text("modVersionFailed"),
+                message = s.text("modPageVersionsFailedBody"),
+                retryLabel = s.text("contentTabRetry"),
                 onRetry = onRetry,
                 modifier = Modifier.fillMaxSize().padding(20.dp),
                 titleStyle = MaterialTheme.typography.titleMedium,
             )
             BuildPageState.NoEntry -> Box(Modifier.fillMaxSize().padding(20.dp), contentAlignment = Alignment.Center) {
-                Text(s.modPageVersionsNoEntry, style = MaterialTheme.typography.bodyMedium, color = NxInk.quiet)
+                Text(s.text("modPageVersionsNoEntry"), style = MaterialTheme.typography.bodyMedium, color = NxInk.quiet)
             }
             BuildPageState.Loading -> CenteredProgress(Modifier.fillMaxSize())
             BuildPageState.Ready -> build?.build?.let { v ->
@@ -189,7 +189,7 @@ internal fun buildPageView(project: ProjectPageView, build: BuildPageView?): Bui
  */
 @Composable
 private fun BuildHeader(v: ProjectBuild, project: ProjectPageView) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val install = rememberScopedCommand(CatalogueKeys.InstallProject)
     val channel = remember(v) { VersionChannel.of(v.versionType, v.versionNumber) }
     Row(
@@ -244,22 +244,22 @@ private fun BuildHeader(v: ProjectBuild, project: ProjectPageView) {
             is InstallOffer.Install -> Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 NxButton(
                     label = when {
-                        project.installing -> s.modPageInstalling
-                        project.installFailed -> s.modPageInstallRetry
-                        else -> s.modPageInstallInto(action.packName)
+                        project.installing -> s.text("modPageInstalling")
+                        project.installFailed -> s.text("modPageInstallRetry")
+                        else -> s.text("modPageInstallInto", action.packName)
                     },
                     onClick = { install?.invoke(ProjectInstall(v.id)) },
                     icon = if (project.installFailed) NxIcon.Refresh else NxIcon.Download,
                     enabled = !project.installing,
                 )
                 if (!fits) {
-                    Text(s.versionsIncompatibleHint, style = MaterialTheme.typography.labelSmall, color = NxColor.status(Status.Warning))
+                    Text(s.text("versionsIncompatibleHint"), style = MaterialTheme.typography.labelSmall, color = NxColor.status(Status.Warning))
                 }
                 InstallNotes(project)
             }
             is InstallOffer.Present -> Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 NxButton(
-                    label = s.modPageInstalledIn(action.packName),
+                    label = s.text("modPageInstalledIn", action.packName),
                     onClick = {},
                     icon = NxIcon.Check,
                     enabled = false,
@@ -274,10 +274,10 @@ private fun BuildHeader(v: ProjectBuild, project: ProjectPageView) {
 
 @Composable
 private fun Compatibility(v: ProjectBuild, project: ProjectPageView) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val type = project.project?.projectType
-    Section(s.modRailCompatibility) {
-        Group(s.modRailGame) {
+    Section(s.text("modRailCompatibility")) {
+        Group(s.text("modRailGame")) {
             // Folded against the catalogue's release order, the same as the rail's
             // own block: a build listing eleven minors says `1.21.x` there and must
             // not spell all eleven out here.
@@ -290,7 +290,7 @@ private fun Compatibility(v: ProjectBuild, project: ProjectPageView) {
                 }
             }
         }
-        Group(s.modRailPlatforms) {
+        Group(s.text("modRailPlatforms")) {
             Chips {
                 v.loaders.forEach { loader ->
                     NxMetaChip(
@@ -319,11 +319,11 @@ private fun Compatibility(v: ProjectBuild, project: ProjectPageView) {
  */
 @Composable
 private fun Dependencies(dependencies: List<VersionDependency>, packId: String?) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val groups = listOf(
-        DependencyKind.Required to s.modVersionRequires,
-        DependencyKind.Optional to s.modVersionOptional,
-        DependencyKind.Incompatible to s.modVersionIncompatible,
+        DependencyKind.Required to s.text("modVersionRequires"),
+        DependencyKind.Optional to s.text("modVersionOptional"),
+        DependencyKind.Incompatible to s.text("modVersionIncompatible"),
     )
     val follow = rememberLinkFollower(packId)
     groups.forEach { (kind, title) ->
@@ -348,7 +348,7 @@ private fun Dependencies(dependencies: List<VersionDependency>, packId: String?)
                     ) {
                         DependencyMark(dep, kind)
                         Text(
-                            dep.title.ifBlank { s.modRailUnknownValue },
+                            dep.title.ifBlank { s.text("modRailUnknownValue") },
                             style = MaterialTheme.typography.bodyMedium,
                             fontSize = ROW_TEXT,
                             color = NxInk.main,
@@ -356,7 +356,7 @@ private fun Dependencies(dependencies: List<VersionDependency>, packId: String?)
                             overflow = TextOverflow.Ellipsis,
                         )
                         dep.versionNumber?.let {
-                            NxTooltip(text = s.modVersionPinnedBuild) {
+                            NxTooltip(text = s.text("modVersionPinnedBuild")) {
                                 NxMetaChip(it, tone = NxMetaChipTone.Surface)
                             }
                         }
@@ -391,12 +391,12 @@ private fun DependencyMark(dep: VersionDependency, kind: DependencyKind) {
 
 @Composable
 private fun Changes(v: ProjectBuild) {
-    val s = LocalStrings.current
-    Section(s.modPageTabChangelog) {
+    val s = nexiraStrings()
+    Section(s.text("modPageTabChangelog")) {
         val notes = v.changelog?.takeIf { it.isNotBlank() }
         if (notes == null) {
             Text(
-                s.versionPickerNoChangelog,
+                s.text("versionPickerNoChangelog"),
                 style = MaterialTheme.typography.bodySmall,
                 fontSize = ROW_SUBTLE,
                 color = NxInk.quiet,
@@ -416,8 +416,8 @@ private fun Changes(v: ProjectBuild) {
  */
 @Composable
 private fun Files(v: ProjectBuild) {
-    val s = LocalStrings.current
-    Section(s.modVersionFiles) {
+    val s = nexiraStrings()
+    Section(s.text("modVersionFiles")) {
         Column(verticalArrangement = Arrangement.spacedBy(GROUP_GAP)) {
             v.files.forEach { file ->
                 Row(
@@ -425,7 +425,7 @@ private fun Files(v: ProjectBuild) {
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     if (file.primary) {
-                        NxTooltip(text = s.modVersionPrimaryFile) {
+                        NxTooltip(text = s.text("modVersionPrimaryFile")) {
                             Symbol(NxIcon.Star, contentDescription = null, tint = NxColor.status(Status.Warning), size = 16.dp)
                         }
                     } else {

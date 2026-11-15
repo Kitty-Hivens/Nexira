@@ -27,7 +27,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import hivens.ui.editor.EditModeController
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.nx.NxAlertDialog
@@ -63,11 +63,11 @@ internal fun ScreenPropertiesPanel(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     var confirmDelete by remember(spec?.id) { mutableStateOf(false) }
     EditorSidePanel(
         visible   = visible && spec != null,
-        title     = s.screenSettingsTitle,
+        title     = s.text("screenSettingsTitle"),
         icon      = ScreenIcons.of(spec?.icon.orEmpty()),
         onDismiss = onDismiss,
         modifier  = modifier,
@@ -79,17 +79,17 @@ internal fun ScreenPropertiesPanel(
         var draft by remember(current.id) { mutableStateOf(current.title) }
         val rename: (String) -> Unit = { draft = it; controller.updateScreen(current.id, title = it) }
 
-        SectionLabel(s.screenTitleLabel)
+        SectionLabel(s.text("screenTitleLabel"))
         NxField(
             value         = draft,
             onValueChange = rename,
-            placeholder   = s.screenUntitled,
+            placeholder   = s.text("screenUntitled"),
             modifier      = Modifier.fillMaxWidth(),
         )
         PuppetField("screen.title", draft, onValueChange = rename)
 
         Spacer(Modifier.height(4.dp))
-        SectionLabel(s.screenIconLabel)
+        SectionLabel(s.text("screenIconLabel"))
         val chosen = ScreenIcons.of(current.icon)
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -123,7 +123,7 @@ internal fun ScreenPropertiesPanel(
 
         Spacer(Modifier.height(12.dp))
         NxButton(
-            label    = s.screenDelete,
+            label    = s.text("screenDelete"),
             onClick  = { confirmDelete = true },
             style    = NxButtonStyle.Destructive,
             icon     = NxIcon.Delete,
@@ -144,22 +144,22 @@ internal fun ScreenPropertiesPanel(
         OnFill(container) {
             NxAlertDialog(
                 onDismissRequest  = { confirmDelete = false },
-                paneTitle         = s.screenDelete,
+                paneTitle         = s.text("screenDelete"),
                 containerColor    = container,
                 titleContentColor = NxInk.main,
                 textContentColor  = NxInk.quiet,
-                title             = { Text(s.screenDelete) },
+                title             = { Text(s.text("screenDelete")) },
                 text              = {
                     Text(
-                        text  = s.screenDeleteBody(doomed.title.ifBlank { s.screenUntitled }),
+                        text  = s.text("screenDeleteBody", doomed.title.ifBlank { s.text("screenUntitled") }),
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 },
                 confirmButton = {
-                    TextButton(onClick = delete) { Text(s.editorDelete, color = NxColor.status(Status.Error)) }
+                    TextButton(onClick = delete) { Text(s.text("editorDelete"), color = NxColor.status(Status.Error)) }
                 },
                 dismissButton = {
-                    TextButton(onClick = { confirmDelete = false }) { Text(s.editorCancel) }
+                    TextButton(onClick = { confirmDelete = false }) { Text(s.text("editorCancel")) }
                 },
             )
         }

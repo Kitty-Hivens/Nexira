@@ -16,7 +16,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import hivens.ui.editor.EditModeState
 import hivens.ui.editor.LocalEditMode
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.surface.NxSurface
@@ -85,7 +85,7 @@ private fun SampleMark(modifier: Modifier) {
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Symbol(NxIcon.VisibilityOff, contentDescription = null, tint = NxInk.quiet, size = 12.dp)
-            Text(LocalStrings.current.editorNotAvailableHere, style = MaterialTheme.typography.labelSmall, color = NxInk.quiet)
+            Text(nexiraStrings().text("editorNotAvailableHere"), style = MaterialTheme.typography.labelSmall, color = NxInk.quiet)
         }
     }
 }

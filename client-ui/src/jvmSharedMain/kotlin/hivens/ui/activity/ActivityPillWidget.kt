@@ -59,8 +59,8 @@ import hivens.core.activity.ActivityAction
 import hivens.core.activity.ActivityPhase
 import hivens.core.activity.isTerminal
 import hivens.core.activity.ActivityRegistry
-import hivens.ui.i18n.AppStrings
-import hivens.ui.i18n.LocalStrings
+import hivens.i18n.api.Strings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.nx.NxButton
@@ -134,7 +134,7 @@ fun ActivityPillWidget(instance: WidgetInstance) {
     val selections: SelectionRegistry = koinInject()
     val selection by selections.selection.collectAsState()
     val activities by registry.activities.collectAsState()
-    val s = LocalStrings.current
+    val s = nexiraStrings()
 
     // One line, so one subject. A failure outranks live work -- it is the only
     // record the user gets -- and otherwise the newest job narrates.
@@ -217,7 +217,7 @@ internal fun Pill(
     onPick: (Activity) -> Unit = {},
     props: PillProps,
     commands: ActivityCommands?,
-    s: AppStrings,
+    s: Strings,
     maxWidth: Dp,
     open: Boolean = true,
 ) {
@@ -473,7 +473,7 @@ private fun Activity.fraction(): Float? {
  * "34 of 97" and "14:32" sharing a slot is what makes a download and a running
  * game read as one object rather than two designs.
  */
-private fun Activity.measure(s: AppStrings): String? {
+private fun Activity.measure(s: Strings): String? {
     val failed = phase as? ActivityPhase.Failed
     if (failed != null) return failed.reason
     val running = phase as? ActivityPhase.Running ?: return null
@@ -481,7 +481,7 @@ private fun Activity.measure(s: AppStrings): String? {
     // it is in, or the file it is on. Leaving the zone empty is what made the
     // first seconds of an install read as a bare name and nothing else.
     if (running.total <= 0) return running.detail
-    return s.activityPillMeasure(running.done, running.total)
+    return s.text("activityPillMeasure", running.done, running.total)
 }
 
 private fun ActivityAction.icon(): IconKey = when (this) {
@@ -490,10 +490,10 @@ private fun ActivityAction.icon(): IconKey = when (this) {
     ActivityAction.Dismiss -> NxIcon.Close
 }
 
-private fun ActivityAction.label(s: AppStrings): String = when (this) {
-    ActivityAction.Cancel -> s.activityPillCancel
-    ActivityAction.Pause -> s.activityPillPause
-    ActivityAction.Dismiss -> s.activityPillDismiss
+private fun ActivityAction.label(s: Strings): String = when (this) {
+    ActivityAction.Cancel -> s.text("activityPillCancel")
+    ActivityAction.Pause -> s.text("activityPillPause")
+    ActivityAction.Dismiss -> s.text("activityPillDismiss")
 }
 
 /** Weight of the perimeter measure. Reads at any density; see [EdgeMeasure]. */

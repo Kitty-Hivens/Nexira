@@ -27,6 +27,7 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.NxBasicTextField
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -53,8 +54,7 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.editor.EditModeController
 import hivens.ui.editor.dnd.DragController
 import hivens.ui.editor.dnd.DropTargetRegistry
-import hivens.ui.i18n.LocalAppLocale
-import hivens.ui.i18n.LocalStrings
+import hivens.i18n.api.LocalTranslator
 import hivens.ui.widgets.modules.LocalWidgetLabels
 import hivens.widget.api.WidgetDescriptor
 import hivens.ui.icons.NxIcon
@@ -83,7 +83,7 @@ fun WidgetPalettePanel(
     surface: SurfaceId?,
     modifier: Modifier = Modifier,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     // Read here rather than handed down. The drag state changes on every pointer
     // move, so reading it in the host meant the host's whole body re-ran sixty
     // times a second for a boolean only this panel uses.
@@ -101,11 +101,11 @@ fun WidgetPalettePanel(
     // the palette also exposed them, the user could drop duplicates
     // into arbitrary slots and never be able to remove them.
     val labels = LocalWidgetLabels.current
-    val locale = LocalAppLocale.current
-    val nameOf = { d: WidgetDescriptor -> labels.of(d.kind, d.displayName, s, locale) }
+    val words = LocalTranslator.current
+    val nameOf = { d: WidgetDescriptor -> labels.of(d.kind, d.displayName, words) }
     // And only what the surface being arranged can hold: a widget reading what that
     // surface does not have would only draw the placeholder for a misplaced one.
-    val descriptors = remember(registry0, s, labels, locale, surface) {
+    val descriptors = remember(registry0, labels, words, surface) {
         registry0.all().values
             .filter { it.removable }
             .filter { surface == null || editController.admits(it.kind, surface) }
@@ -115,7 +115,7 @@ fun WidgetPalettePanel(
     // takes the host out of the composition and every preview is lost to a typo.
     val previews = rememberWidgetPreviewHost()
     var query by remember { mutableStateOf("") }
-    val filtered = remember(descriptors, query, s, labels, locale) {
+    val filtered = remember(descriptors, query, labels, words) {
         if (query.isBlank()) descriptors
         else descriptors.filter {
             nameOf(it).contains(query, ignoreCase = true) || it.kind.value.contains(query, ignoreCase = true)
@@ -204,7 +204,7 @@ fun WidgetPalettePanel(
                     )
                     Spacer(Modifier.width(8.dp))
                     Text(
-                        text       = s.editorWidgets,
+                        text       = s.text("editorWidgets"),
                         style      = MaterialTheme.typography.titleSmall,
                         color      = NxInk.main,
                         fontWeight = FontWeight.SemiBold,
@@ -218,14 +218,14 @@ fun WidgetPalettePanel(
                 }
                 IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
                     Symbol(icon = NxIcon.Close,
-                        contentDescription = s.editorPaletteHide,
+                        contentDescription = s.text("editorPaletteHide"),
                         tint               = NxInk.quiet,
                         modifier           = Modifier.size(16.dp),
                     )
                 }
             }
             Text(
-                text     = s.editorPaletteHint,
+                text     = s.text("editorPaletteHint"),
                 style    = MaterialTheme.typography.labelSmall,
                 color    = NxInk.quiet,
                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 0.dp),
@@ -238,7 +238,7 @@ fun WidgetPalettePanel(
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        text  = s.editorPaletteEmpty,
+                        text  = s.text("editorPaletteEmpty"),
                         style = MaterialTheme.typography.bodySmall,
                         color = NxInk.quiet,
                     )
@@ -252,7 +252,7 @@ fun WidgetPalettePanel(
                         contentAlignment = Alignment.Center,
                     ) {
                         Text(
-                            text  = s.editorPaletteNoMatch,
+                            text  = s.text("editorPaletteNoMatch"),
                             style = MaterialTheme.typography.bodySmall,
                             color = NxInk.quiet,
                         )
@@ -334,7 +334,7 @@ internal val TILE_MIN = 104.dp
 // now-large widget set stays navigable.
 @Composable
 private fun PaletteSearchField(query: String, onQueryChange: (String) -> Unit) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     NxSurface(
         kind     = SurfaceKind.Field,
         shape    = RoundedCornerShape(10.dp),
@@ -365,7 +365,7 @@ private fun PaletteSearchField(query: String, onQueryChange: (String) -> Unit) {
                 )
                 if (query.isEmpty()) {
                     Text(
-                        text  = s.editorPaletteSearch,
+                        text  = s.text("editorPaletteSearch"),
                         style = MaterialTheme.typography.bodySmall,
                         color = NxInk.quiet,
                     )

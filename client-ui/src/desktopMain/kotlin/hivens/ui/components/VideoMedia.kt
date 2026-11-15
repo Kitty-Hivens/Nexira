@@ -27,12 +27,12 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import dev.hivens.skinema.compose.VideoScale
+import hivens.i18n.api.Strings
 import hivens.media.MediaFetch
 import hivens.media.MediaResolver
 import hivens.media.VideoCacheService
 import hivens.media.YtDlpService
-import hivens.ui.i18n.AppStrings
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.NxProgressBar
 import hivens.ui.render.openInBrowser
 import hivens.ui.utils.humanSize
@@ -137,7 +137,7 @@ fun VideoMedia(
     onExitFullscreen: (() -> Unit)? = null,
     onCancelled: (() -> Unit)? = null,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val resolution = rememberVideoResolution(url)
     when (val load = resolution.load) {
         is VideoLoad.Ready -> VideoPlayer(
@@ -164,8 +164,8 @@ fun VideoMedia(
             PlaceholderBox(modifier, thumbUrl) {
                 if (showControls) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(s.videoCancelled, color = Color.White.copy(alpha = 0.85f), style = MaterialTheme.typography.bodySmall)
-                        LinkText(s.videoRetry, resolution.retry)
+                        Text(s.text("videoCancelled"), color = Color.White.copy(alpha = 0.85f), style = MaterialTheme.typography.bodySmall)
+                        LinkText(s.text("videoRetry"), resolution.retry)
                     }
                 }
             }
@@ -173,9 +173,9 @@ fun VideoMedia(
         VideoLoad.Failed -> PlaceholderBox(modifier, thumbUrl) {
             if (showControls) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(s.videoError, color = Color.White.copy(alpha = 0.85f), style = MaterialTheme.typography.bodySmall)
-                    LinkText(s.videoRetry, resolution.retry)
-                    LinkText(s.videoOpenInBrowser) { openInBrowser(url) }
+                    Text(s.text("videoError"), color = Color.White.copy(alpha = 0.85f), style = MaterialTheme.typography.bodySmall)
+                    LinkText(s.text("videoRetry"), resolution.retry)
+                    LinkText(s.text("videoOpenInBrowser")) { openInBrowser(url) }
                 }
             }
         }
@@ -189,7 +189,7 @@ fun VideoMedia(
  */
 @Composable
 internal fun FetchStatus(fetch: MediaFetch, onCancel: () -> Unit) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -207,7 +207,7 @@ internal fun FetchStatus(fetch: MediaFetch, onCancel: () -> Unit) {
                 style = MaterialTheme.typography.labelSmall,
             )
         }
-        LinkText(s.videoCancelDownload, onCancel)
+        LinkText(s.text("videoCancelDownload"), onCancel)
     }
 }
 
@@ -221,17 +221,17 @@ private fun LinkText(label: String, onClick: () -> Unit) {
     )
 }
 
-private fun fetchLabel(fetch: MediaFetch, s: AppStrings): String = when (fetch) {
+private fun fetchLabel(fetch: MediaFetch, s: Strings): String = when (fetch) {
     // Idle here means the resolve has not reached the service yet; from the
     // outside that is still the generic wait.
-    MediaFetch.Idle              -> s.videoLoading
-    is MediaFetch.InstallingTool -> s.videoFetchingTool
-    MediaFetch.Resolving         -> s.videoResolvingPage
-    is MediaFetch.Downloading    -> s.videoDownloading
+    MediaFetch.Idle              -> s.text("videoLoading")
+    is MediaFetch.InstallingTool -> s.text("videoFetchingTool")
+    MediaFetch.Resolving         -> s.text("videoResolvingPage")
+    is MediaFetch.Downloading    -> s.text("videoDownloading")
 }
 
 /** "12.4 MB / 45.6 MB", or just what has arrived while the size is unknown. */
-private fun byteLabel(fetch: MediaFetch, s: AppStrings): String? {
+private fun byteLabel(fetch: MediaFetch, s: Strings): String? {
     val (done, total) = when (fetch) {
         is MediaFetch.Downloading    -> fetch.doneBytes to fetch.totalBytes
         is MediaFetch.InstallingTool -> fetch.doneBytes to fetch.totalBytes

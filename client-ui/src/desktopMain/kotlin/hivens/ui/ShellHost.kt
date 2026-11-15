@@ -27,8 +27,7 @@ import hivens.ui.bootstrap.RecoveryEntry
 import hivens.ui.chrome.OPENING_FLOOR
 import hivens.ui.generated.resources.Res
 import hivens.ui.generated.resources.icon
-import hivens.ui.i18n.AppLocale
-import hivens.ui.i18n.stringsFor
+import hivens.ui.i18n.NexiraStrings
 import hivens.ui.screens.ConsoleWindow
 import hivens.ui.threshold.BootOutcome
 import hivens.ui.threshold.BootStage
@@ -129,8 +128,11 @@ fun ApplicationScope.ShellHost(
     val visibleState = remember { mutableStateOf(true) }
     val chrome = remember { WindowChromeHooks(defaultClose = { exitApplication() }) }
     val windowIcon = painterResource(Res.drawable.icon)
-    val thresholdStrings = remember { stringsFor(AppLocale.fromTag(pre.peek.locale)) }
-    val look = remember { ShellLook(dark = pre.peek.isDarkTheme, locale = AppLocale.fromTag(pre.peek.locale)) }
+    // The window speaks before any module loads, so it reads the words through an engine of
+    // its own, which the pre-boot started making off this thread (see PreBoot.words).
+    val bootWords = remember { pre.words.join() }
+    val thresholdStrings = remember(bootWords) { bootWords.strings(NexiraStrings.NAMESPACE) }
+    val look = remember { ShellLook(dark = pre.peek.isDarkTheme, words = bootWords) }
 
     // A recovery restart with boot already done skips the threshold entirely
     // (no black frame). The restart flag is EXPLICIT, not inferred from the

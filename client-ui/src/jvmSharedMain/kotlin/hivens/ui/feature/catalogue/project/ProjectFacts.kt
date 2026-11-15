@@ -4,7 +4,7 @@ import androidx.compose.ui.graphics.Color
 import hivens.catalogue.api.Disclosure
 import hivens.catalogue.api.ProjectLink
 import hivens.catalogue.api.ProjectLinkKind
-import hivens.ui.i18n.AppStrings
+import hivens.i18n.api.Strings
 
 /**
  * The rules that turn what a catalogue stores into what a reader reads.
@@ -13,7 +13,7 @@ import hivens.ui.i18n.AppStrings
  * against real payloads in the mock-up and every one is a judgement that can be
  * wrong in a way a screenshot shows and a type does not: fifty-eight game
  * versions folded into four chips, a loader's own capitalisation, two
- * independent side flags read as one phrase. Pure functions over [AppStrings], so
+ * independent side flags read as one phrase. Pure functions over [Strings], so
  * the judgement is testable without a composition and says the same thing in
  * four languages.
  */
@@ -94,10 +94,10 @@ fun environments(client: String?, server: String?): List<Environment> {
     return out
 }
 
-fun environmentLabel(environment: Environment, s: AppStrings): String = when (environment) {
-    Environment.Client -> s.modEnvClientOnly
-    Environment.Server -> s.modEnvServerOnly
-    Environment.Both -> s.modEnvBoth
+fun environmentLabel(environment: Environment, s: Strings): String = when (environment) {
+    Environment.Client -> s.text("modEnvClientOnly")
+    Environment.Server -> s.text("modEnvServerOnly")
+    Environment.Both -> s.text("modEnvBoth")
 }
 
 private const val REQUIRED = "required"
@@ -106,10 +106,10 @@ private const val UNSUPPORTED = "unsupported"
 private const val UNKNOWN = "unknown"
 
 /** Short, human, and never the raw LicenseRef machinery. */
-fun licenseLabel(id: String?, name: String?, s: AppStrings): String {
-    val chosen = id?.takeIf { it.isNotBlank() } ?: return name?.takeIf { it.isNotBlank() } ?: s.modLicenseUnknown
+fun licenseLabel(id: String?, name: String?, s: Strings): String {
+    val chosen = id?.takeIf { it.isNotBlank() } ?: return name?.takeIf { it.isNotBlank() } ?: s.text("modLicenseUnknown")
     return when {
-        chosen == "LicenseRef-All-Rights-Reserved" -> s.modLicenseAllRights
+        chosen == "LicenseRef-All-Rights-Reserved" -> s.text("modLicenseAllRights")
         chosen.startsWith("LicenseRef-") -> chosen.removePrefix("LicenseRef-").replace('-', ' ')
         else -> chosen
     }
@@ -121,9 +121,9 @@ fun licenseLabel(id: String?, name: String?, s: AppStrings): String {
  * The decimal is formatted here and the unit comes from the locale, because
  * "1.2 M" and "1,2 Mio." differ in both halves and only one of them is a number.
  */
-fun compactCount(n: Long, s: AppStrings): String = when {
-    n >= 1_000_000 -> s.compactMillions("%.1f".format(n / 1_000_000.0))
-    n >= 1_000 -> s.compactThousands("%.1f".format(n / 1_000.0))
+fun compactCount(n: Long, s: Strings): String = when {
+    n >= 1_000_000 -> s.text("compactMillions", "%.1f".format(n / 1_000_000.0))
+    n >= 1_000 -> s.text("compactThousands", "%.1f".format(n / 1_000.0))
     else -> n.toString()
 }
 
@@ -136,19 +136,19 @@ fun compactCount(n: Long, s: AppStrings): String = when {
  * hiding the newest thing an author can disclose is the one failure this block
  * exists to prevent.
  */
-fun disclosureLine(d: Disclosure, s: AppStrings): Pair<String, List<String>> = when (d.type) {
+fun disclosureLine(d: Disclosure, s: Strings): Pair<String, List<String>> = when (d.type) {
     Disclosure.TELEMETRY -> when (d.consent) {
-        "opt_in" -> s.modDisclosureTelemetryOptIn
-        "opt_out" -> s.modDisclosureTelemetryOptOut
-        "always_active" -> s.modDisclosureTelemetryAlways
-        else -> s.modDisclosureTelemetry
+        "opt_in" -> s.text("modDisclosureTelemetryOptIn")
+        "opt_out" -> s.text("modDisclosureTelemetryOptOut")
+        "always_active" -> s.text("modDisclosureTelemetryAlways")
+        else -> s.text("modDisclosureTelemetry")
     } to d.dataCollected
-    Disclosure.ADVERTISEMENTS -> s.modDisclosureAds to listOfNotNull(d.note)
-    Disclosure.PAID_FEATURES -> s.modDisclosurePaid to d.features
-    Disclosure.AI_CONTENT -> s.modDisclosureAiContent to listOfNotNull(d.note)
-    Disclosure.AI_FUNCTIONALITY -> s.modDisclosureAiFunctionality to listOfNotNull(d.note)
-    Disclosure.SYSTEM_INTERACTIONS -> s.modDisclosureSystem to listOfNotNull(d.note)
-    Disclosure.EPILEPSY_TRIGGERS -> s.modDisclosureEpilepsy to listOfNotNull(d.note)
+    Disclosure.ADVERTISEMENTS -> s.text("modDisclosureAds") to listOfNotNull(d.note)
+    Disclosure.PAID_FEATURES -> s.text("modDisclosurePaid") to d.features
+    Disclosure.AI_CONTENT -> s.text("modDisclosureAiContent") to listOfNotNull(d.note)
+    Disclosure.AI_FUNCTIONALITY -> s.text("modDisclosureAiFunctionality") to listOfNotNull(d.note)
+    Disclosure.SYSTEM_INTERACTIONS -> s.text("modDisclosureSystem") to listOfNotNull(d.note)
+    Disclosure.EPILEPSY_TRIGGERS -> s.text("modDisclosureEpilepsy") to listOfNotNull(d.note)
     Disclosure.DERIVATIVE_WORK ->
         d.type to (listOfNotNull(d.note) + d.sources.map { it.label }.filter { it.isNotBlank() })
     else -> d.type to listOfNotNull(d.note)
@@ -190,14 +190,14 @@ private val DISCLOSURE_ORDER = listOf(
  * The destination's own name wins where it has one, which is how a row of
  * donation links stops being five identical lines.
  */
-fun linkLabel(link: ProjectLink, s: AppStrings): String =
+fun linkLabel(link: ProjectLink, s: Strings): String =
     link.label ?: linkLabel(link.kind, s)
 
-private fun linkLabel(kind: ProjectLinkKind, s: AppStrings): String = when (kind) {
-    ProjectLinkKind.Issues -> s.modLinkIssues
-    ProjectLinkKind.Source -> s.modLinkSource
-    ProjectLinkKind.Wiki -> s.modLinkWiki
-    ProjectLinkKind.Discord -> s.modLinkDiscord
-    ProjectLinkKind.Donate -> s.modLinkDonate
-    ProjectLinkKind.Page -> s.modLinkPage
+private fun linkLabel(kind: ProjectLinkKind, s: Strings): String = when (kind) {
+    ProjectLinkKind.Issues -> s.text("modLinkIssues")
+    ProjectLinkKind.Source -> s.text("modLinkSource")
+    ProjectLinkKind.Wiki -> s.text("modLinkWiki")
+    ProjectLinkKind.Discord -> s.text("modLinkDiscord")
+    ProjectLinkKind.Donate -> s.text("modLinkDonate")
+    ProjectLinkKind.Page -> s.text("modLinkPage")
 }

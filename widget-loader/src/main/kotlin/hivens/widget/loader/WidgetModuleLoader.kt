@@ -341,26 +341,40 @@ class WidgetModuleLoader(
     }
 
     /**
-     * The language files of a module: every `i18n/<tag>.properties` in its jar, read from the jar
-     * itself, so what a module says is only ever its own words and never a file of the same name
-     * elsewhere on the application's class path. A file that cannot be read costs the module that
-     * language and nothing more.
+     * The language files of a module, read from the jar itself, so what a module says is only ever
+     * its own words and never a file of the same name elsewhere on the application's class path:
+     * every `i18n/<tag>.properties` for its own words, every `i18n/<namespace>/<tag>.properties`
+     * for words it carries for another namespace, a translation of the launcher's own say, and every
+     * `i18n/<tag>/language.properties` for a language it adds. A file that cannot be read costs the
+     * module that file and nothing more.
      */
     private fun readStrings(jar: Path, id: String): ModuleStrings {
         val tables = HashMap<String, Map<String, String>>()
+        val namespaces = HashMap<String, MutableMap<String, Map<String, String>>>()
+        val languages = HashMap<String, Map<String, String>>()
         runCatching {
             JarFile(jar.toFile()).use { file ->
                 file.entries().asSequence().forEach { entry ->
-                    val tag = STRINGS_FILE.matchEntire(entry.name)?.groupValues?.get(1) ?: return@forEach
+                    val own = STRINGS_FILE.matchEntire(entry.name)
+                    val language = LANGUAGE_FILE.matchEntire(entry.name)
+                    val other = if (language == null) NAMESPACED_STRINGS_FILE.matchEntire(entry.name) else null
+                    if (own == null && other == null && language == null) return@forEach
                     runCatching {
                         val properties = Properties()
                         InputStreamReader(file.getInputStream(entry), Charsets.UTF_8).use { properties.load(it) }
-                        tables[tag] = properties.stringPropertyNames().associateWith { properties.getProperty(it) }
+                        val words = properties.stringPropertyNames().associateWith { properties.getProperty(it) }
+                        if (own != null) {
+                            tables[own.groupValues[1]] = words
+                        } else if (language != null) {
+                            languages[language.groupValues[1]] = words
+                        } else if (other != null) {
+                            namespaces.getOrPut(other.groupValues[1]) { HashMap() }[other.groupValues[2]] = words
+                        }
                     }.onFailure { log.warn("Widget module '{}' has an unreadable language file {}: {}", id, entry.name, it.message) }
                 }
             }
         }.onFailure { log.warn("Widget module '{}' language files could not be read: {}", id, it.message) }
-        return if (tables.isEmpty()) ModuleStrings.EMPTY else ModuleStrings(tables)
+        return if (tables.isEmpty() && namespaces.isEmpty() && languages.isEmpty()) ModuleStrings.EMPTY else ModuleStrings(tables, namespaces, languages)
     }
 
     /**
@@ -512,6 +526,10 @@ class WidgetModuleLoader(
         val SHARED_ARTIFACTS: List<String> = listOf("nx-ui")
 
         private val STRINGS_FILE = Regex("""i18n/([A-Za-z][A-Za-z0-9_-]*)\.properties""")
+
+        private val LANGUAGE_FILE = Regex("""i18n/([A-Za-z][A-Za-z0-9_-]*)/language\.properties""")
+
+        private val NAMESPACED_STRINGS_FILE = Regex("""i18n/([A-Za-z0-9][A-Za-z0-9._-]*)/([A-Za-z][A-Za-z0-9_-]*)\.properties""")
 
         /**
          * The module whose code is on [error]'s stack, or null when none is.

@@ -127,8 +127,8 @@ include(":nx-ui")
 // Layer ordering and the dismiss stack of a window, with no visuals. Below both
 // nx-ui and the widget kernel, and depends on neither.
 include(":ui-layers")
-// Localisation layer: the AppStrings interface, the three locale
-// implementations and the LocalStrings CompositionLocal. Carved out of
+// The launcher's own words: the tables of the `nexira` namespace the language module
+// answers, and the composable that reads them. Carved out of
 // client-ui, where it was the single largest package and imported by 150
 // files while importing nothing back. A string edit no longer recompiles
 // the UI.
@@ -182,5 +182,11 @@ include(":accounts")
 // Like the others, brought in only by a document that names it.
 include(":catalogue-api")
 include(":catalogue")
+// The language module: the words of the launcher and of every module, by namespace and
+// key, in the languages that ship and in any a person adds as files. Its API is what a
+// module looks its words up through. Unlike the others its engine is made by the host
+// before any module loads, since the window the launcher boots in already speaks.
+include(":i18n-api")
+include(":i18n")
 include(":profiler-agent")
 include(":authlib-agent")

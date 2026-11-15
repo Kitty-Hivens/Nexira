@@ -8,7 +8,7 @@ import androidx.compose.runtime.produceState
 import androidx.compose.ui.unit.dp
 import hivens.ui.background.BackgroundMediaKind
 import hivens.ui.background.backgroundMediaKind
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.nx.NxSlider
 import hivens.ui.nx.NxToggle
@@ -31,7 +31,7 @@ import hivens.ui.theme.NxColor
 @Composable
 fun BgAudioWidget() {
     val bg = rememberBgSettings() ?: return
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val settings = bg.value
 
     // Asked of the decoders rather than of the file name, off the UI thread,
@@ -46,9 +46,9 @@ fun BgAudioWidget() {
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         NxToggle(
-            label           = s.backgroundAudio,
+            label           = s.text("backgroundAudio"),
             checked         = settings.audio && available,
-            description     = if (moves == false) s.backgroundAudioStill else s.backgroundAudioDesc,
+            description     = if (moves == false) s.text("backgroundAudioStill") else s.text("backgroundAudioDesc"),
             icon            = if (settings.audio && available) NxIcon.VolumeUp else NxIcon.VolumeOff,
             enabled         = available,
             accent          = NxColor.lead(),
@@ -58,7 +58,7 @@ fun BgAudioWidget() {
         if (settings.audio && available) {
             val level = settings.audioVolume
             NxSlider(
-                label         = s.backgroundAudioVolume,
+                label         = s.text("backgroundAudioVolume"),
                 value         = level,
                 range         = 0f..1f,
                 valueText     = "%.0f%%".format(level * 100),
@@ -69,9 +69,9 @@ fun BgAudioWidget() {
             // layout choice: a wall the transport drives but nobody hears is a
             // scrubber over a decoration.
             NxToggle(
-                label           = s.backgroundLink,
+                label           = s.text("backgroundLink"),
                 checked         = settings.linkToPlayers,
-                description     = s.backgroundLinkDesc,
+                description     = s.text("backgroundLinkDesc"),
                 icon            = NxIcon.MusicNote,
                 accent          = NxColor.lead(),
                 onCheckedChange = { bg.update { copy(linkToPlayers = it) } },

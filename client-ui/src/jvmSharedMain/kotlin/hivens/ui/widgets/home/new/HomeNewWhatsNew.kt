@@ -18,7 +18,7 @@ import hivens.packs.api.PackUpdateView
 import hivens.packs.api.PackView
 import hivens.ui.Screen
 import hivens.ui.components.LauncherUpdateState
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.nx.NxRow
@@ -54,7 +54,7 @@ import org.koin.compose.koinInject
 fun HomeNewWhatsNew(instance: WidgetInstance) {
     val navigate = rememberScopedCommand(Commands.Navigate) ?: return
     val packs = rememberScopedSource(PackKeys.Library).valueOrNull() ?: return
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val updateState: LauncherUpdateState = koinInject()
     val launcher by updateState.available.collectAsState()
     val statuses = rememberScopedSource(PackKeys.Updates).valueOrNull() ?: return
@@ -64,7 +64,7 @@ fun HomeNewWhatsNew(instance: WidgetInstance) {
 
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
         Text(
-            text       = s.homeWhatsNewTitle,
+            text       = s.text("homeWhatsNewTitle"),
             style      = MaterialTheme.typography.titleSmall,
             color      = NxInk.main,
             fontWeight = FontWeight.SemiBold,
@@ -72,8 +72,8 @@ fun HomeNewWhatsNew(instance: WidgetInstance) {
         )
         launcher?.let { update ->
             NxRow(
-                title    = s.homeWhatsNewLauncher(Branding.TITLE, update.version),
-                subtitle = s.homeWhatsNewLauncherHint,
+                title    = s.text("homeWhatsNewLauncher", Branding.TITLE, update.version),
+                subtitle = s.text("homeWhatsNewLauncherHint"),
                 icon     = NxIcon.NewReleases,
                 iconTint = NxColor.lead(),
                 onClick  = { updateState.requestDetails() },
@@ -85,9 +85,9 @@ fun HomeNewWhatsNew(instance: WidgetInstance) {
                 title    = pack.name,
                 subtitle = when (status) {
                     is PackUpdateView.Pending ->
-                        if (status.direction == PackUpdateView.Pending.OLDER) s.homeWhatsNewPackRollback(status.toVersion)
-                        else s.homeWhatsNewPackReady(status.toVersion)
-                    is PackUpdateView.Updated -> s.homeWhatsNewPackUpdated(status.toVersion)
+                        if (status.direction == PackUpdateView.Pending.OLDER) s.text("homeWhatsNewPackRollback", status.toVersion)
+                        else s.text("homeWhatsNewPackReady", status.toVersion)
+                    is PackUpdateView.Updated -> s.text("homeWhatsNewPackUpdated", status.toVersion)
                     else -> null
                 },
                 icon     = when (status) {

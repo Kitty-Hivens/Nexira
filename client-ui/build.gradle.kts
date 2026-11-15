@@ -160,6 +160,10 @@ kotlin {
                 // The catalogue module, the same way.
                 implementation(project(":catalogue-api"))
                 implementation(project(":catalogue"))
+                // The language module, the same way, except that the host makes its engine
+                // before any module loads: the window the launcher boots in already speaks.
+                implementation(project(":i18n-api"))
+                implementation(project(":i18n"))
                 implementation(project(":nx-ui"))
                 implementation(project(":ui-layers"))
                 implementation(project(":client-i18n"))

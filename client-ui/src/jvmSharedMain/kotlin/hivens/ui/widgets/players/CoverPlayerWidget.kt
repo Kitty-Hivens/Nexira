@@ -36,7 +36,7 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.audio.PlaybackState
 import hivens.ui.audio.RepeatMode
 import hivens.ui.audio.TrackInfo
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
@@ -142,7 +142,7 @@ internal fun CoverPlayerCard(
     onSeek: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val loaded = state !is PlaybackState.Idle && state !is PlaybackState.Error
     val duration = durationMsOf(state)
     var menuOpen by remember { mutableStateOf(false) }
@@ -161,7 +161,7 @@ internal fun CoverPlayerCard(
       BoxWithConstraints(
           Modifier
               .fillMaxWidth()
-              .openWhenEmpty(state is PlaybackState.Idle, s.audioPickTrack, onPick),
+              .openWhenEmpty(state is PlaybackState.Idle, s.text("audioPickTrack"), onPick),
       ) {
         // The ladder, with the skips IN it rather than beside it. Adding two more
         // controls to the row without moving these numbers is what clipped the
@@ -237,7 +237,7 @@ internal fun CoverPlayerCard(
                         // is permanently inert teaches the reader to stop trusting
                         // the row it sits in.
                         if (skips) {
-                            SkipKey(NxIcon.SkipPrevious, s.audioSkipPrevious, loaded, onSkipPrev)
+                            SkipKey(NxIcon.SkipPrevious, s.text("audioSkipPrevious"), loaded, onSkipPrev)
                             Spacer(Modifier.width(2.dp))
                         }
                         TransportKey(
@@ -247,7 +247,7 @@ internal fun CoverPlayerCard(
                         )
                         if (skips) {
                             Spacer(Modifier.width(2.dp))
-                            SkipKey(NxIcon.SkipNext, s.audioSkipNext, loaded, onSkipNext)
+                            SkipKey(NxIcon.SkipNext, s.text("audioSkipNext"), loaded, onSkipNext)
                         }
                         // The label decides as well as the ladder: Timecode draws
                         // nothing for an empty string, so gating on the width alone
@@ -277,7 +277,7 @@ internal fun CoverPlayerCard(
         Box(Modifier.align(Alignment.TopEnd).padding(6.dp)) {
                 NxIconButton(
                     icon               = NxIcon.MoreVert,
-                    contentDescription = s.packCardMore,
+                    contentDescription = s.text("packCardMore"),
                     onClick            = { menuOpen = true },
                 )
                 // A panel and not a menu. What lives behind this button is a set of
@@ -288,17 +288,17 @@ internal fun CoverPlayerCard(
                 NxPopoverPanel(
                     expanded         = menuOpen,
                     onDismissRequest = { menuOpen = false },
-                    title            = s.audioPlaybackOptions,
+                    title            = s.text("audioPlaybackOptions"),
                     footer           = {
                         NxButton(
-                            label   = s.audioOpenFile,
+                            label   = s.text("audioOpenFile"),
                             onClick = { menuOpen = false; onPick() },
                             style   = NxButtonStyle.Tertiary,
                             icon    = NxIcon.FolderOpen,
                             compact = true,
                         )
                         NxButton(
-                            label   = s.audioStop,
+                            label   = s.text("audioStop"),
                             onClick = { menuOpen = false; onStop() },
                             style   = NxButtonStyle.Tertiary,
                             icon    = NxIcon.Stop,
@@ -308,14 +308,14 @@ internal fun CoverPlayerCard(
                     },
                 ) {
                     NxSlider(
-                        label         = s.audioVolume,
+                        label         = s.text("audioVolume"),
                         value         = volume,
                         range         = 0f..1f,
                         valueText     = "${(volume * 100).toInt()}%",
                         onValueChange = onVolume,
                         compact       = true,
                     )
-                    NxPanelGroup(label = s.audioRepeat) {
+                    NxPanelGroup(label = s.text("audioRepeat")) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             NxCycleToggle(
                                 states  = repeatStates(s),
@@ -363,7 +363,7 @@ private fun Timecode(text: String) {
  */
 @Composable
 private fun CoverArt(track: TrackInfo?, onPick: () -> Unit, side: Dp) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val well = NxColor.wash(NxColor.lead(), 0.16f)
     OnFill(well) {
         Box(
@@ -389,7 +389,7 @@ private fun CoverArt(track: TrackInfo?, onPick: () -> Unit, side: Dp) {
             } else {
                 Symbol(
                     icon               = NxIcon.MusicNote,
-                    contentDescription = s.audioPickTrack,
+                    contentDescription = s.text("audioPickTrack"),
                     tint               = NxColor.lead(),
                     modifier           = Modifier.size(side * 0.33f),
                 )
@@ -426,7 +426,7 @@ private fun SkipKey(icon: IconKey, name: String, enabled: Boolean, onClick: () -
 /** The one filled control on the card, so the eye has a single anchor. */
 @Composable
 private fun TransportKey(playing: Boolean, enabled: Boolean, onClick: () -> Unit) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val lead = NxColor.lead()
     val fill = if (enabled) lead else NxColor.wash(NxInk.quiet, 0.12f)
     OnFill(fill) {
@@ -440,7 +440,7 @@ private fun TransportKey(playing: Boolean, enabled: Boolean, onClick: () -> Unit
         ) {
             Symbol(
                 icon               = if (playing) NxIcon.Pause else NxIcon.PlayArrow,
-                contentDescription = if (playing) s.audioPause else s.audioPlay,
+                contentDescription = if (playing) s.text("audioPause") else s.text("audioPlay"),
                 // The scheme's own answer for what reads on the lead colour, not white.
                 // The dark theme's lead is a light purple, and white on it measures
                 // 2.65 to 1, under even the large-graphic floor. A dark lead still

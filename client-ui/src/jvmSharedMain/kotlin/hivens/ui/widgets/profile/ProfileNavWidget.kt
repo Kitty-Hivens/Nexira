@@ -17,7 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import hivens.accounts.api.AccountKeys
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.NxNavRowContent
 import hivens.ui.puppet.PuppetClick
 import hivens.widget.api.rememberScopedSource
@@ -41,7 +41,7 @@ import hivens.ui.theme.NxColor
 fun ProfileNavWidget() {
     val selection = rememberScopedSource(ProfileSelectionSource).valueOrNull() ?: return
     val providers = rememberScopedSource(AccountKeys.Providers).valueOrNull() ?: return
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val current = selection.category
 
     // Microsoft / multi-account is deferred: its category shows only when a client

@@ -3,7 +3,6 @@ package hivens.ui.widgets
 import hivens.core.data.ThemeMode
 import hivens.ui.Screen
 import hivens.ui.background.BackgroundSettings
-import hivens.ui.i18n.AppLocale
 import hivens.widget.model.CommandKey
 import hivens.widget.model.ScopeLevel
 
@@ -71,9 +70,6 @@ object Commands {
 
     /** Says what decides dark and light from now on. Paired with [Sources.ThemeMode]. */
     val SetThemeMode = CommandKey<ThemeMode>("theme.mode.set", ScopeLevel.Composition)
-
-    /** Speaks this language from now on. Paired with [Sources.Locale]. */
-    val SetLocale = CommandKey<AppLocale>("locale.set", ScopeLevel.Composition)
 
     /** Puts the console on screen or takes it off. Paired with [Sources.ConsoleVisible]. */
     val SetConsoleVisible = CommandKey<Boolean>("console.visible.set")

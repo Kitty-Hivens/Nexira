@@ -38,9 +38,9 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import hivens.i18n.api.Strings
 import hivens.ui.generated.resources.Res
 import hivens.ui.generated.resources.press_start_2p
-import hivens.ui.i18n.AppStrings
 import hivens.ui.theme.Motion
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
@@ -109,7 +109,7 @@ private const val VEIL_LIFT_MS = 220
 fun ThresholdOverlay(
     stageFlow: StateFlow<BootStage>,
     outcome: BootOutcome?,
-    strings: AppStrings,
+    strings: Strings,
     logsDir: Path,
     dark: Boolean,
     onQuit: () -> Unit,
@@ -291,7 +291,7 @@ fun ThresholdOverlay(
                 verticalArrangement = Arrangement.Bottom,
             ) {
                 Text(
-                    text       = strings.thresholdErrorTitle.lowercase(),
+                    text       = strings.text("thresholdErrorTitle").lowercase(),
                     fontFamily = pixelFont,
                     fontSize   = 18.sp,
                     color      = pal.frame,
@@ -310,18 +310,18 @@ fun ThresholdOverlay(
                 // not, so quitting and starting again met the same failure for ever.
                 var recoveryArmed by remember { mutableStateOf(false) }
                 Row(horizontalArrangement = Arrangement.spacedBy(UNIT * 2)) {
-                    ThresholdButton(strings.thresholdRecovery.lowercase(), pixelFont, pal) {
+                    ThresholdButton(strings.text("thresholdRecovery").lowercase(), pixelFont, pal) {
                         if (!onRecovery()) recoveryArmed = true
                     }
-                    ThresholdButton(strings.thresholdOpenLogs.lowercase(), pixelFont, pal) {
+                    ThresholdButton(strings.text("thresholdOpenLogs").lowercase(), pixelFont, pal) {
                         thread(isDaemon = true) {
                             val _ = runCatching { Desktop.getDesktop().open(logsDir.toFile()) }
                         }
                     }
-                    ThresholdButton(strings.thresholdQuit.lowercase(), pixelFont, pal, onClick = onQuit)
+                    ThresholdButton(strings.text("thresholdQuit").lowercase(), pixelFont, pal, onClick = onQuit)
                 }
                 Text(
-                    text       = if (recoveryArmed) strings.thresholdRecoveryArmed else strings.thresholdRecoveryHint,
+                    text       = if (recoveryArmed) strings.text("thresholdRecoveryArmed") else strings.text("thresholdRecoveryHint"),
                     fontFamily = FontFamily.Monospace,
                     fontSize   = 11.sp,
                     color      = pal.dim,
@@ -373,10 +373,10 @@ private fun DrawScope.drawPixelSegment(r: Rect, step: Float, color: Color) {
     drawRect(color, Offset(r.right - step, r.top + step), Size(step, (r.height - 2 * step).coerceAtLeast(0f)))
 }
 
-private fun stageLabel(s: AppStrings, stage: BootStage): String = when (stage) {
-    BootStage.Files     -> s.thresholdStageFiles
-    BootStage.Network   -> s.thresholdStageNetwork
-    BootStage.Migration -> s.thresholdStageMigration
-    BootStage.Modules   -> s.thresholdStageModules
-    BootStage.Done      -> s.thresholdStageModules
+private fun stageLabel(s: Strings, stage: BootStage): String = when (stage) {
+    BootStage.Files     -> s.text("thresholdStageFiles")
+    BootStage.Network   -> s.text("thresholdStageNetwork")
+    BootStage.Migration -> s.text("thresholdStageMigration")
+    BootStage.Modules   -> s.text("thresholdStageModules")
+    BootStage.Done      -> s.text("thresholdStageModules")
 }

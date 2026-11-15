@@ -5,7 +5,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import hivens.core.launch.InstanceWorkRegistry
 import hivens.launcher.launch.RunningPackSource
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import org.koin.compose.koinInject
 
 /**
@@ -20,13 +20,13 @@ import org.koin.compose.koinInject
  */
 @Composable
 internal fun rememberPackDeleteBlock(packId: String): String? {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val running: RunningPackSource = koinInject()
     val registry: InstanceWorkRegistry = koinInject()
     val runningId by running.runningPackInstanceId.collectAsState()
     val works by registry.current.collectAsState()
     return when {
-        runningId == packId -> s.packDeleteBlockedRunning
+        runningId == packId -> s.text("packDeleteBlockedRunning")
         else -> works[packId]?.label(s)
     }
 }

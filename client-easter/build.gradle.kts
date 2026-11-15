@@ -4,8 +4,8 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
 // The April Fools engine and its companions: a self-contained seasonal surface
 // that decorates the shell on one day of the year and is inert on every other.
 //
-// Its whole contract with the rest of the tree is three symbols -- NxTheme and
-// NxSwitch from nx-ui, LocalStrings from client-i18n -- so it sits here rather
+// Its whole contract with the rest of the tree is three symbols (NxTheme and
+// NxSwitch from nx-ui, the launcher's words from client-i18n), so it sits here rather
 // than inside client-ui, where a seasonal prank shared a module with the launch
 // path. Nothing in the tree may depend on it except the shell that mounts it.
 plugins {

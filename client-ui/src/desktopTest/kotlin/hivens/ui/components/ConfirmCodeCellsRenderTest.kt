@@ -10,8 +10,8 @@ import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
-import hivens.ui.i18n.EnglishStrings
-import hivens.ui.i18n.LocalStrings
+import hivens.i18n.api.LocalTranslator
+import hivens.ui.i18n.NexiraStrings
 import hivens.ui.theme.NxTheme
 import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.EncodedImageFormat
@@ -68,7 +68,7 @@ class ConfirmCodeCellsRenderTest {
             // sheet shows what the app resolves, tonal ladder included.
             NxTheme(dark = dark) {
                 CompositionLocalProvider(
-                    LocalStrings provides EnglishStrings,
+                    LocalTranslator provides NexiraStrings.translator("en"),
                 ) {
                     Column(
                         modifier = Modifier.fillMaxSize().background(NxColor.page).padding(16.dp),

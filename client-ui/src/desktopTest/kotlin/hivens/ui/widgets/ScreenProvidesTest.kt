@@ -15,8 +15,7 @@ import hivens.ui.editor.EditorSurfaces
 import hivens.ui.feature.catalogue.browse.CataloguePackDetailScreen
 import hivens.ui.feature.catalogue.project.ModDetailScreen
 import hivens.ui.host.HostKoin
-import hivens.ui.i18n.AppLocale
-import hivens.ui.i18n.LocaleProvider
+import hivens.ui.i18n.ShippedLanguageProvider
 import hivens.ui.onEventThread
 import hivens.ui.settle
 import hivens.ui.theme.NxTheme
@@ -123,7 +122,7 @@ class ScreenProvidesTest {
         onEventThread {
             val scene = ImageComposeScene(1200, 800, density = Density(1f)) {
                 HostKoin(koin) {
-                    LocaleProvider(AppLocale.ENGLISH) {
+                    ShippedLanguageProvider("en") {
                         NxTheme(dark = true) {
                             CompositionLocalProvider(
                                 LocalWidgetDataRegistry provides data,

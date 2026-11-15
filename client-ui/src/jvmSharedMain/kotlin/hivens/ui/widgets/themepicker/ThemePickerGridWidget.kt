@@ -31,7 +31,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.nx.NxButton
@@ -98,7 +98,7 @@ private fun ThemeCard(
     isSelected: Boolean,
     onClick: () -> Unit,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val scale by animateFloatAsState(
         targetValue   = if (isSelected) 1.03f else 1f,
         animationSpec = spring(dampingRatio = 0.7f, stiffness = 300f),
@@ -133,11 +133,11 @@ private fun ThemeCard(
                             overflow   = TextOverflow.Ellipsis,
                         )
                         if (darkOnly) {
-                            Text(s.themePickerDarkOnly, style = MaterialTheme.typography.labelSmall, color = NxInk.quiet)
+                            Text(s.text("themePickerDarkOnly"), style = MaterialTheme.typography.labelSmall, color = NxInk.quiet)
                         }
                     }
                     if (isSelected) {
-                        Symbol(NxIcon.Check, contentDescription = s.themePickerSelected, tint = NxColor.lead(), modifier = Modifier.size(18.dp))
+                        Symbol(NxIcon.Check, contentDescription = s.text("themePickerSelected"), tint = NxColor.lead(), modifier = Modifier.size(18.dp))
                     }
                 }
                 NxSurface(SurfaceKind.Panel, Modifier.fillMaxWidth()) {
@@ -149,7 +149,7 @@ private fun ThemeCard(
                         }
                         Spacer(Modifier.height(10.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            NxButton(label = s.themePickerBtnSample, onClick = {}, style = NxButtonStyle.Primary, compact = true)
+                            NxButton(label = s.text("themePickerBtnSample"), onClick = {}, style = NxButtonStyle.Primary, compact = true)
                             NxSwitch(checked = true, onCheckedChange = null)
                         }
                     }

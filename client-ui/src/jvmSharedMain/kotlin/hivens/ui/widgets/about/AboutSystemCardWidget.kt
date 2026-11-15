@@ -9,7 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.widgets.Sources
 import hivens.widget.api.rememberProps
@@ -47,10 +47,10 @@ fun AboutSystemCardWidget(instance: WidgetInstance) {
     val facts = rememberScopedSource(Sources.SystemInfo).valueOrNull() ?: return
     val displayInfo = rememberDisplayInfo()
     val renderer = rememberRendererInfo()
-    val s = LocalStrings.current
+    val s = nexiraStrings()
 
     Column(Modifier.fillMaxWidth().padding(20.dp)) {
-        SectionLabel(p.title.ifBlank { s.aboutSectionSystem })
+        SectionLabel(p.title.ifBlank { s.text("aboutSectionSystem") })
         Spacer(Modifier.height(12.dp))
 
         val host = HostSystem.info
@@ -73,11 +73,11 @@ fun AboutSystemCardWidget(instance: WidgetInstance) {
             facts.swapMb?.takeIf { it > 0 }?.let { append(" · swap $it MB") }
         }
 
-        InfoRow(NxIcon.Computer, s.aboutOs, host.os)
+        InfoRow(NxIcon.Computer, s.text("aboutOs"), host.os)
         InfoRow(NxIcon.Memory,   "CPU",     cpuValue)
         InfoRow(NxIcon.Storage,  "RAM",     ramValue)
         InfoRow(NxIcon.Code,     "Java",    "${host.javaVersion} (${host.javaVendor})")
         InfoRow(NxIcon.Tv,       "Display", displayInfo)
-        InfoRow(NxIcon.Layers,   s.aboutRenderer, renderer)
+        InfoRow(NxIcon.Layers,   s.text("aboutRenderer"), renderer)
     }
 }

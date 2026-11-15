@@ -68,6 +68,10 @@ fun registerModuleKeys(
  * trusted sees there what every module sees in `services`: the services modules
  * declared and the host types the host exposed (see [ContributedServices.expose]).
  * The host trusts the modules compiled into it and no jar.
+ *
+ * Whoever the module is, the [SettingsStores] its factories and service makers find
+ * answer only the settings domains it declared itself (see [ContributedServices.claimDomain]),
+ * so no module reads or replaces another's.
  */
 @HostApi
 fun registerModuleKeys(
@@ -92,7 +96,7 @@ fun registerModuleKeys(
         return ModuleKeysResult.Refused("its keys could not be declared: ${e.message ?: e.javaClass.simpleName}", e)
     }
     first.fault(moduleId, sources, commands, services, trusted)?.let { return ModuleKeysResult.Refused(it) }
-    val live = Live(moduleId, current, contribution, first)
+    val live = Live(moduleId, current, contribution, first, services)
     first.commit(moduleId, live, sources, commands, services, trusted)
     return ModuleKeysResult.Registered(
         sources = first.sources.keys + first.ownedSources.keys,
@@ -133,18 +137,29 @@ private inline fun <R> inModule(loader: ClassLoader?, block: () -> R): R {
     }
 }
 
-/** The module's current declaration, declared again whenever [current] answers another instance. */
+/**
+ * The module's current declaration, declared again whenever [current] answers another
+ * instance. A declaration of the module loaded again that names a settings domain another
+ * module holds is refused, so the keys it would answer are missing rather than reaching
+ * the other module's file.
+ */
 private class Live(
     private val moduleId: String,
     private val current: () -> KeyContribution?,
     private var instance: KeyContribution,
     private var declaration: Declaration,
+    private val services: ContributedServices,
 ) {
     @Synchronized
     fun declaration(what: String): Declaration = contained(moduleId, what, instance.javaClass.classLoader) {
         val now = current() ?: error("module '$moduleId' is no longer loaded, so '$what' cannot be made")
         if (now !== instance) {
-            declaration = Declaration.of(now)
+            val fresh = Declaration.of(now)
+            fresh.domains.keys.forEach { id ->
+                val owner = services.ownerOfDomain(id)
+                check(owner == null || owner == moduleId) { "module '$moduleId' loaded again declares the settings domain '$id', which is '$owner's" }
+            }
+            declaration = fresh
             instance = now
         }
         declaration
@@ -163,6 +178,7 @@ private class Declaration(val loader: ClassLoader?) : ModuleKeys {
     val ownedSources = LinkedHashMap<String, Pair<SourceKey<*>, (() -> Any?)?>>()
     val ownedCommands = LinkedHashMap<String, CommandKey<*>>()
     val services = LinkedHashMap<KClass<*>, Service>()
+    val domains = LinkedHashMap<String, SettingsDomain<*>>()
 
     /** The first thing the declaration said that cannot stand on its own. */
     private var flaw: String? = null
@@ -201,6 +217,22 @@ private class Declaration(val loader: ClassLoader?) : ModuleKeys {
         services[type] = Service(level, hostOnly = false, make)
     }
 
+    // The value is read and changed through the store the host keeps, held to this module's
+    // own domains and looked up when the key is made, so a module loaded again reads through
+    // the domain its new code declared.
+    override fun <T : Any> settings(domain: SettingsDomain<T>, source: SourceKey<T>, update: CommandKey<SettingsChange<T>>) {
+        SettingsDomain.faultIn(domain.id)?.let { return flaw(it) }
+        if (domain.id in domains) return flaw("it declares the settings domain '${domain.id}' twice")
+        if (source.level != ScopeLevel.App) return flaw("settings source '${source.id}' is not an app key")
+        if (update.level != ScopeLevel.App) return flaw("settings command '${update.id}' is not an app key")
+        domains[domain.id] = domain
+        source(source, sample = { domain.defaults() }) { app -> flowSource(app.services.get<SettingsStores>().of(domain).value) }
+        command(update) { app ->
+            val store = app.services.get<SettingsStores>().of(domain)
+            command { change -> store.update(change) }
+        }
+    }
+
     override fun <T : Any> hostService(level: ScopeLevel, type: KClass<T>, make: (ServiceContext) -> T) {
         if (type in services) return flaw("it declares the service ${type.qualifiedName} twice")
         services[type] = Service(level, hostOnly = true, make)
@@ -228,6 +260,8 @@ private class Declaration(val loader: ClassLoader?) : ModuleKeys {
             ?.let { return "the command '$it' is already answered elsewhere" }
         this.services.keys.firstNotNullOfOrNull { type -> services.ownerOf(type)?.let { type to it } }
             ?.let { (type, owner) -> return "the service ${type.qualifiedName} is already declared by '$owner'" }
+        domains.keys.firstNotNullOfOrNull { id -> services.ownerOfDomain(id)?.let { id to it } }
+            ?.let { (id, owner) -> return "the settings domain '$id' is already declared by '$owner'" }
         if (moduleId.isBlank()) return "it has no id"
         return null
     }
@@ -251,7 +285,7 @@ private class Declaration(val loader: ClassLoader?) : ModuleKeys {
                 val declaration = live.declaration(key.id)
                 val now = declaration.sources[key.id]?.takeIf { it.key.level == key.level }
                     ?: error("module '$moduleId' no longer declares the source '${key.id}' at ${key.level}")
-                contained(moduleId, key.id, declaration.loader) { now.factory(context.seenBy(trusted)) }
+                contained(moduleId, key.id, declaration.loader) { now.factory(context.forModule(moduleId, trusted, services)) }
             }
             if (declared.sample == null) {
                 sources.registerFactory(key, factory)
@@ -270,7 +304,7 @@ private class Declaration(val loader: ClassLoader?) : ModuleKeys {
                 val declaration = live.declaration(key.id)
                 val now = declaration.commands[key.id]?.takeIf { it.key.level == key.level }
                     ?: error("module '$moduleId' no longer declares the command '${key.id}' at ${key.level}")
-                contained(moduleId, key.id, declaration.loader) { (now.factory as CommandFactory<Any?>)(context.seenBy(trusted)) }
+                contained(moduleId, key.id, declaration.loader) { (now.factory as CommandFactory<Any?>)(context.forModule(moduleId, trusted, services)) }
             }
         }
         ownedSources.values.forEach { (key, sample) ->
@@ -286,6 +320,7 @@ private class Declaration(val loader: ClassLoader?) : ModuleKeys {
             }
         }
         ownedCommands.values.forEach { commands.declare(it) }
+        domains.keys.forEach { services.claimDomain(it, moduleId) }
         this.services.forEach { (type, declared) ->
             val name = type.simpleName ?: "a service"
             services.declare(declared.level, type as KClass<Any>, moduleId, trusted, declared.hostOnly) { context ->
@@ -310,12 +345,59 @@ private class Declaration(val loader: ClassLoader?) : ModuleKeys {
 }
 
 /**
- * [this] as a module that is not [trusted] may see it: the level without its host
- * view, so `hostServices` answers only what every module sees.
+ * [this] as the module [moduleId] may see it. One that is not [trusted] sees the level
+ * without its host view, so `hostServices` answers only what every module sees. Every
+ * module finds, in place of the host's [SettingsStores], one that answers only the
+ * domains it declared.
  */
-private fun LevelContext.seenBy(trusted: Boolean): LevelContext = if (trusted) this else Untrusted(this)
+private fun LevelContext.forModule(moduleId: String, trusted: Boolean, services: ContributedServices): LevelContext {
+    val stores = OwnedStores.of(this as? HostLevelContext, moduleId, services)
+    return if (trusted && this is HostLevelContext) TrustedModuleContext(this, stores) else ModuleContext(this, stores)
+}
 
-private class Untrusted(inner: LevelContext) : LevelContext by inner
+private class ModuleContext(private val inner: LevelContext, stores: SettingsStores?) : LevelContext by inner {
+    override val services: LevelServices = WithStores(inner.services, stores)
+}
+
+private class TrustedModuleContext(private val inner: HostLevelContext, stores: SettingsStores?) : HostLevelContext by inner {
+    override val services: LevelServices = WithStores(inner.services, stores)
+    override val hostServices: LevelServices = WithStores(inner.hostServices, stores)
+}
+
+/** [inner] answering [stores] for [SettingsStores], or nothing where the host keeps no stores. */
+private class WithStores(private val inner: LevelServices, private val stores: SettingsStores?) : LevelServices {
+    @Suppress("UNCHECKED_CAST")
+    override fun <T : Any> find(type: KClass<T>): T? = if (type == SettingsStores::class) stores as T? else inner.find(type)
+
+    override fun <T : Any> get(type: KClass<T>): T =
+        find(type) ?: if (type == SettingsStores::class) throw NoSuchElementException("the host keeps no settings") else inner.get(type)
+}
+
+/** The host's [stores] as the module [owner] may use them: the domains it declared, and no other. */
+private class OwnedStores(
+    private val stores: SettingsStores,
+    private val owner: String,
+    private val services: ContributedServices,
+) : SettingsStores {
+    override fun <T : Any> of(domain: SettingsDomain<T>): SettingsStore<T> {
+        val holder = services.ownerOfDomain(domain.id)
+        check(holder == owner) {
+            if (holder == null) "module '$owner' did not declare the settings domain '${domain.id}'"
+            else "the settings domain '${domain.id}' is '$holder's, not '$owner's"
+        }
+        return stores.of(domain)
+    }
+
+    companion object {
+        /** The stores the host keeps at [level], held to [owner]'s domains, or null where it keeps none. */
+        fun of(level: HostLevelContext?, owner: String, services: ContributedServices): SettingsStores? =
+            level?.hostServices?.find(SettingsStores::class)?.let { OwnedStores(it, owner, services) }
+
+        /** The same over a level's [host] view. */
+        fun of(host: LevelServices, owner: String, services: ContributedServices): SettingsStores? =
+            host.find(SettingsStores::class)?.let { OwnedStores(it, owner, services) }
+    }
+}
 
 /**
  * The services modules declared, by type, the levels they are made for, and the host
@@ -377,6 +459,21 @@ class ContributedServices {
     /** The module that declared [type], or null when none did. */
     fun ownerOf(type: KClass<*>): String? = synchronized(declared) { declared[type]?.owner }
 
+    // Settings domain ids to the module that declared each. Kept beside the services
+    // because a domain is one of the things a module declares that no other may.
+    private val domains = HashMap<String, String>()
+
+    /** The module that declared the settings domain [id], or null when none did. */
+    fun ownerOfDomain(id: String): String? = synchronized(declared) { domains[id] }
+
+    /** Records that [owner] declared the settings domain [id]. */
+    fun claimDomain(id: String, owner: String) {
+        synchronized(declared) {
+            require(id !in domains) { "the settings domain '$id' is already declared by '${domains.getValue(id)}'" }
+            domains[id] = owner
+        }
+    }
+
     private fun declaredFor(type: KClass<*>): Declared? = synchronized(declared) { declared[type] }
 
     /**
@@ -408,11 +505,12 @@ class ContributedServices {
             ContributedLevelServices(inner.hostServices, { contributed(it, hostView = false) }, ::isExposed)
 
         private fun contextFor(declaration: Declared) = object : ServiceContext {
+            private val stores = OwnedStores.of(this@Shelf.hostServices, declaration.owner, this@ContributedServices)
             override val level: ScopeLevel get() = this@Shelf.level
             override val coroutineScope: CoroutineScope get() = scope
-            override val services: LevelServices get() = this@Shelf.services
-            override val hostServices: LevelServices
-                get() = if (declaration.trusted) this@Shelf.hostServices else this@Shelf.services
+            override val services: LevelServices = WithStores(this@Shelf.services, stores)
+            override val hostServices: LevelServices =
+                if (declaration.trusted) WithStores(this@Shelf.hostServices, stores) else services
         }
 
         // One gate per service type, held while its maker runs.

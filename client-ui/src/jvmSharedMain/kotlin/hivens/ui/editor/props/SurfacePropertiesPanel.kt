@@ -50,10 +50,10 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import hivens.i18n.api.Strings
 import hivens.ui.customization.CustomizationSettings
 import hivens.ui.customization.NavSelectionStyle
-import hivens.ui.i18n.AppStrings
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
@@ -114,7 +114,7 @@ internal fun EditorSidePanel(
         exit     = fadeOut(spring()) + slideOutHorizontally(spring(stiffness = Spring.StiffnessMediumLow)) { it },
         modifier = modifier,
     ) {
-        val s = LocalStrings.current
+        val s = nexiraStrings()
         // Draggable dock: the header drags this offset (session-scoped), like the
         // widget palette, so the panel can be pulled off the right edge.
         val offset = rememberDockOffset()
@@ -172,7 +172,7 @@ internal fun EditorSidePanel(
                 }
                 IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
                     Symbol(icon = NxIcon.Close,
-                        contentDescription = s.editorClose,
+                        contentDescription = s.text("editorClose"),
                         tint               = NxInk.quiet,
                         modifier           = Modifier.size(16.dp),
                     )
@@ -204,7 +204,7 @@ private fun NavSelectionControl(
     customization: CustomizationSettings,
     onChange: (CustomizationSettings) -> Unit,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
 
     // A group of choices set into the panel, so a field: one step back from it.
     NxSurface(SurfaceKind.Field, Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium) {
@@ -215,9 +215,9 @@ private fun NavSelectionControl(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Column {
-            Text(s.navSelectionTitle, color = NxInk.main, fontWeight = FontWeight.Bold)
+            Text(s.text("navSelectionTitle"), color = NxInk.main, fontWeight = FontWeight.Bold)
             Text(
-                s.navSelectionSub,
+                s.text("navSelectionSub"),
                 style = MaterialTheme.typography.bodySmall,
                 color = NxInk.quiet,
             )
@@ -258,7 +258,7 @@ private fun NavSelectionControl(
         }
 
         CompactSwitchRow(
-            title           = s.navSelectionOutlineIcons,
+            title           = s.text("navSelectionOutlineIcons"),
             checked         = customization.navSelectionOutlineIcons,
             onCheckedChange = { onChange(customization.copy(navSelectionOutlineIcons = it)) },
         )
@@ -267,7 +267,7 @@ private fun NavSelectionControl(
         }
 
         CompactSwitchRow(
-            title           = s.navHoverHighlight,
+            title           = s.text("navHoverHighlight"),
             checked         = customization.navHoverHighlight,
             onCheckedChange = { onChange(customization.copy(navHoverHighlight = it)) },
         )
@@ -280,7 +280,7 @@ private fun NavSelectionControl(
         // squeezed the field). The clear collapses to a compact icon.
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(
-                text  = s.navSelectionAccent,
+                text  = s.text("navSelectionAccent"),
                 style = MaterialTheme.typography.bodySmall,
                 color = NxInk.quiet,
             )
@@ -291,7 +291,7 @@ private fun NavSelectionControl(
             ) {
                 HexField(
                     initialHex   = customization.navSelectionAccent ?: "",
-                    invalidLabel = s.customizationHexInvalid,
+                    invalidLabel = s.text("customizationHexInvalid"),
                     onValidHex   = { onChange(customization.copy(navSelectionAccent = it)) },
                     modifier     = Modifier.weight(1f),
                     rgbOnly      = true,
@@ -303,7 +303,7 @@ private fun NavSelectionControl(
                         contentPadding = PaddingValues(8.dp),
                     ) {
                         Symbol(icon = NxIcon.Close,
-                            contentDescription = s.customizationAccentClear,
+                            contentDescription = s.text("customizationAccentClear"),
                             modifier           = Modifier.size(14.dp),
                         )
                     }
@@ -314,14 +314,14 @@ private fun NavSelectionControl(
     }
 }
 
-private fun navSelectionStyleLabel(variant: NavSelectionStyle, s: AppStrings): String =
+private fun navSelectionStyleLabel(variant: NavSelectionStyle, s: Strings): String =
     when (variant) {
-        NavSelectionStyle.Pill    -> s.navStylePill
-        NavSelectionStyle.Square  -> s.navStyleSquare
-        NavSelectionStyle.Circle  -> s.navStyleCircle
-        NavSelectionStyle.LeftBar -> s.navStyleBar
-        NavSelectionStyle.Dot     -> s.navStyleDot
-        NavSelectionStyle.None    -> s.navStyleNone
+        NavSelectionStyle.Pill    -> s.text("navStylePill")
+        NavSelectionStyle.Square  -> s.text("navStyleSquare")
+        NavSelectionStyle.Circle  -> s.text("navStyleCircle")
+        NavSelectionStyle.LeftBar -> s.text("navStyleBar")
+        NavSelectionStyle.Dot     -> s.text("navStyleDot")
+        NavSelectionStyle.None    -> s.text("navStyleNone")
     }
 
 // The library's row in its panel form: smaller than a settings-screen row, because

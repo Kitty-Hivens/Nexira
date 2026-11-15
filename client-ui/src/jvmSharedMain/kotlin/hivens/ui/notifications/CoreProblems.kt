@@ -1,7 +1,7 @@
 package hivens.ui.notifications
 
 import hivens.config.Branding
-import hivens.ui.i18n.AppStrings
+import hivens.i18n.api.Strings
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -117,7 +117,7 @@ class NotifiedCoreProblems(
     private val notifications: NotificationCenter,
     private val scope: CoroutineScope,
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
-    private val strings: () -> AppStrings,
+    private val strings: () -> Strings,
 ) : CoreProblems {
 
     // The keys told and not withdrawn, with the kind each was told for.
@@ -157,29 +157,29 @@ class NotifiedCoreProblems(
         if (told.remove(problem.key) != null) notifications.dismiss(problem.key)
     }
 
-    private fun title(problem: CoreProblem, s: AppStrings): String = when (problem) {
-        is CoreProblem.SignInFailed -> s.notifSignInFailedTitle
-        is CoreProblem.SignOutFailed -> s.notifSignOutFailedTitle
-        is CoreProblem.SignedOutNameKept -> s.notifSignOutNameKeptTitle
-        is CoreProblem.PackNotInstalled -> s.notifLaunchNotInstalledTitle
+    private fun title(problem: CoreProblem, s: Strings): String = when (problem) {
+        is CoreProblem.SignInFailed -> s.text("notifSignInFailedTitle")
+        is CoreProblem.SignOutFailed -> s.text("notifSignOutFailedTitle")
+        is CoreProblem.SignedOutNameKept -> s.text("notifSignOutNameKeptTitle")
+        is CoreProblem.PackNotInstalled -> s.text("notifLaunchNotInstalledTitle")
         is CoreProblem.PartMissing -> when (problem.part) {
-            CorePart.Session -> s.notifCoreSessionMissingTitle
-            CorePart.Appearance -> s.notifCoreAppearanceMissingTitle
-            CorePart.Console -> s.notifCoreConsoleMissingTitle
-            CorePart.Other -> s.notifCorePartMissingTitle
+            CorePart.Session -> s.text("notifCoreSessionMissingTitle")
+            CorePart.Appearance -> s.text("notifCoreAppearanceMissingTitle")
+            CorePart.Console -> s.text("notifCoreConsoleMissingTitle")
+            CorePart.Other -> s.text("notifCorePartMissingTitle")
         }
-        is CoreProblem.ModuleMissing -> s.notifCoreModuleMissingTitle(problem.name)
+        is CoreProblem.ModuleMissing -> s.text("notifCoreModuleMissingTitle", problem.name)
     }
 
-    private fun body(problem: CoreProblem, s: AppStrings): String = when (problem) {
+    private fun body(problem: CoreProblem, s: Strings): String = when (problem) {
         is CoreProblem.SignInFailed -> detail(problem.cause, s)
         is CoreProblem.SignOutFailed -> detail(problem.cause, s)
-        is CoreProblem.SignedOutNameKept -> s.notifSignOutNameKeptBody
-        is CoreProblem.PackNotInstalled -> s.notifReasonNotInstalled
-        is CoreProblem.PartMissing -> s.notifCorePartMissingBody
-        is CoreProblem.ModuleMissing -> s.notifCorePartMissingBody
+        is CoreProblem.SignedOutNameKept -> s.text("notifSignOutNameKeptBody")
+        is CoreProblem.PackNotInstalled -> s.text("notifReasonNotInstalled")
+        is CoreProblem.PartMissing -> s.text("notifCorePartMissingBody")
+        is CoreProblem.ModuleMissing -> s.text("notifCorePartMissingBody")
     }
 
-    private fun detail(cause: Throwable, s: AppStrings): String =
-        cause.message?.takeIf { it.isNotBlank() }?.let(s::notifReasonInternalDetail) ?: s.notifReasonInternal
+    private fun detail(cause: Throwable, s: Strings): String =
+        cause.message?.takeIf { it.isNotBlank() }?.let { s.text("notifReasonInternalDetail", it) } ?: s.text("notifReasonInternal")
 }

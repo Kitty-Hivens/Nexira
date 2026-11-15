@@ -65,11 +65,12 @@ import hivens.catalogue.api.ScrollMark
 import hivens.catalogue.api.SearchResults
 import hivens.catalogue.api.SearchStatus
 import hivens.catalogue.api.SkipReason
+import hivens.i18n.api.Strings
 import hivens.ui.components.LoaderGlyph
 import hivens.ui.components.hasLoaderGlyph
 import hivens.ui.components.relativeAge
-import hivens.ui.i18n.AppStrings
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.modrinthCategory
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
@@ -97,28 +98,28 @@ internal fun runtimeLabel(mcVersion: String, loader: String): String =
         .filterNotNull()
         .joinToString(" ")
 
-internal fun InstallProblem.label(s: AppStrings): String = when (this) {
-    InstallProblem.NoBuild -> s.installTargetNoBuild
+internal fun InstallProblem.label(s: Strings): String = when (this) {
+    InstallProblem.NoBuild -> s.text("installTargetNoBuild")
     is InstallProblem.Refused -> when (reason) {
-        InstallRefusal.GameRunning -> s.installRefusedGameRunning
-        InstallRefusal.Busy -> s.installRefusedBusy
+        InstallRefusal.GameRunning -> s.text("installRefusedGameRunning")
+        InstallRefusal.Busy -> s.text("installRefusedBusy")
     }
-    InstallProblem.NotLanded -> s.contentInstallFailed
+    InstallProblem.NotLanded -> s.text("contentInstallFailed")
     is InstallProblem.LeftOut -> reason.reason(s)
 }
 
 /** Why an install left a project out, in the reader's words. */
-internal fun SkipReason.reason(s: AppStrings): String = when (this) {
-    SkipReason.NoBuild -> s.installTargetNoBuild
-    SkipReason.LookupFailed -> s.installSkipLookupFailed
-    SkipReason.NotPlaceable -> s.installSkipNotPlaceable
-    SkipReason.NotAllowed -> s.installTargetNotTaken
-    SkipReason.NameTaken -> s.installSkipNameTaken
-    SkipReason.Failed -> s.contentInstallFailed
-    SkipReason.NotAttempted -> s.installSkipNotAttempted
-    SkipReason.TooDeep -> s.installSkipTooDeep
-    SkipReason.PackOwned -> s.installSkipPackOwned
-    SkipReason.SwitchedOff -> s.installSkipSwitchedOff
+internal fun SkipReason.reason(s: Strings): String = when (this) {
+    SkipReason.NoBuild -> s.text("installTargetNoBuild")
+    SkipReason.LookupFailed -> s.text("installSkipLookupFailed")
+    SkipReason.NotPlaceable -> s.text("installSkipNotPlaceable")
+    SkipReason.NotAllowed -> s.text("installTargetNotTaken")
+    SkipReason.NameTaken -> s.text("installSkipNameTaken")
+    SkipReason.Failed -> s.text("contentInstallFailed")
+    SkipReason.NotAttempted -> s.text("installSkipNotAttempted")
+    SkipReason.TooDeep -> s.text("installSkipTooDeep")
+    SkipReason.PackOwned -> s.text("installSkipPackOwned")
+    SkipReason.SwitchedOff -> s.text("installSkipSwitchedOff")
     SkipReason.Present, SkipReason.AlreadyInstalled -> ""
 }
 
@@ -138,7 +139,7 @@ internal fun ProjectResults(
     onOpenPack: (CatalogueCard) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val retry = rememberScopedAction(CatalogueKeys.RetryResults)
     val more = rememberScopedAction(CatalogueKeys.MoreResults)
     val scroll = rememberScopedCommand(CatalogueKeys.ScrollResults)
@@ -154,14 +155,14 @@ internal fun ProjectResults(
     when (results.status) {
         SearchStatus.Loading -> BrowseLoading()
         is SearchStatus.Failed -> RetryStateBlock(
-            title      = s.modBrowserErrorTitle,
-            message    = s.modBrowserErrorMessage,
-            retryLabel = s.browseRetry,
+            title      = s.text("modBrowserErrorTitle"),
+            message    = s.text("modBrowserErrorMessage"),
+            retryLabel = s.text("browseRetry"),
             onRetry    = { retry?.invoke() },
             modifier   = modifier.fillMaxSize(),
         )
         SearchStatus.Empty -> Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text(s.contentEmpty, style = MaterialTheme.typography.bodyMedium, color = NxInk.quiet)
+            Text(s.text("contentEmpty"), style = MaterialTheme.typography.bodyMedium, color = NxInk.quiet)
         }
         SearchStatus.Loaded -> BoxWithConstraints(modifier.fillMaxSize()) {
             // The catalogue's own break: a narrow column takes the small icon so the
@@ -211,7 +212,7 @@ internal fun ProjectResults(
                             hit      = hit,
                             iconSize = icon,
                             stacked  = stacked,
-                            note     = problem?.label(s) ?: results.missing[id]?.let { s.modPageInstallMissing(it) },
+                            note     = problem?.label(s) ?: results.missing[id]?.let { s.text("modPageInstallMissing", it) },
                             onOpen   = open,
                             modifier = Modifier.animateItem(
                                 fadeInSpec    = Motion.fade,
@@ -266,7 +267,7 @@ internal enum class CardPhase { Offered, Working, Installed, Failed }
  */
 @Composable
 internal fun CardInstall(phase: CardPhase, onInstall: () -> Unit) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     // Resolved here: a role is read in composition, and the transition is built outside it.
     val tap = Motion.tap
     AnimatedContent(
@@ -279,16 +280,16 @@ internal fun CardInstall(phase: CardPhase, onInstall: () -> Unit) {
         label          = "cardInstall",
     ) { p ->
         when (p) {
-            CardPhase.Offered -> OutlinedAction(s.browseDetailInstallButton, NxColor.lead(), NxColor.lead(), onClick = onInstall) {
+            CardPhase.Offered -> OutlinedAction(s.text("browseDetailInstallButton"), NxColor.lead(), NxColor.lead(), onClick = onInstall) {
                 Symbol(NxIcon.Download, contentDescription = null, tint = NxColor.lead(), size = ACTION_ICON)
             }
-            CardPhase.Working -> OutlinedAction(s.modPageInstalling, NxInk.line, NxInk.quiet, onClick = null) {
+            CardPhase.Working -> OutlinedAction(s.text("modPageInstalling"), NxInk.line, NxInk.quiet, onClick = null) {
                 CircularProgressIndicator(color = NxColor.lead(), strokeWidth = 2.dp, modifier = Modifier.size(ACTION_ICON - 2.dp))
             }
-            CardPhase.Installed -> OutlinedAction(s.installInstalled, NxInk.line, NxInk.quiet, onClick = null) {
+            CardPhase.Installed -> OutlinedAction(s.text("installInstalled"), NxInk.line, NxInk.quiet, onClick = null) {
                 Symbol(NxIcon.Check, contentDescription = null, tint = NxColor.lead(), size = ACTION_ICON)
             }
-            CardPhase.Failed -> OutlinedAction(s.contentInstallRetry, NxColor.status(Status.Error), NxColor.status(Status.Error), onClick = onInstall) {
+            CardPhase.Failed -> OutlinedAction(s.text("contentInstallRetry"), NxColor.status(Status.Error), NxColor.status(Status.Error), onClick = onInstall) {
                 Symbol(NxIcon.Refresh, contentDescription = null, tint = NxColor.status(Status.Error), size = ACTION_ICON)
             }
         }
@@ -350,7 +351,7 @@ internal fun ProjectCard(
     onOpen: (() -> Unit)? = null,
     action: (@Composable () -> Unit)? = null,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val shape = MaterialTheme.shapes.medium
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
@@ -386,7 +387,7 @@ internal fun ProjectCard(
                     )
                     if (hit.author.isNotBlank()) {
                         Text(
-                            s.browseByAuthor(hit.author),
+                            s.text("browseByAuthor", hit.author),
                             style    = MaterialTheme.typography.bodyMedium,
                             color    = NxInk.quiet,
                             maxLines = 1,
@@ -412,8 +413,8 @@ internal fun ProjectCard(
         }
         val stats = @Composable {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Stat(NxIcon.Download, hit.downloads, s.modPageStatDownloads)
-                Stat(NxIcon.Favorite, hit.follows, s.modPageStatFollowers)
+                Stat(NxIcon.Download, hit.downloads, s.text("modPageStatDownloads"))
+                Stat(NxIcon.Favorite, hit.follows, s.text("modPageStatFollowers"))
             }
         }
         if (stacked) {
@@ -444,7 +445,7 @@ internal fun ProjectCard(
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                             Symbol(NxIcon.History, contentDescription = null, tint = NxInk.quiet, size = 16.dp)
                             Text(
-                                s.modUpdatedOn(relativeAge(hit.dateModified, s)),
+                                s.text("modUpdatedOn", relativeAge(hit.dateModified, s)),
                                 style    = MaterialTheme.typography.labelMedium,
                                 color    = NxInk.quiet,
                                 maxLines = 1,
@@ -460,7 +461,7 @@ internal fun ProjectCard(
 /** A count with its mark, compact on the card and whole in the tooltip. */
 @Composable
 private fun Stat(icon: IconKey, n: Long, unit: String) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     NxTooltip(text = "%,d %s".format(n, unit)) {
         Row(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
             Symbol(icon, contentDescription = null, tint = NxInk.quiet, size = STAT_ICON)
@@ -476,7 +477,7 @@ private fun Stat(icon: IconKey, n: Long, unit: String) {
 @Composable
 private fun ProjectTags(tags: List<String>, max: Int) {
     if (tags.isEmpty()) return
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     FlowRow(
         horizontalArrangement = Arrangement.spacedBy(5.dp),
         itemVerticalAlignment = Alignment.CenterVertically,

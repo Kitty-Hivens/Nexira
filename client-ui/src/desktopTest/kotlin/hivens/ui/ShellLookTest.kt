@@ -8,10 +8,11 @@ import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.unit.Density
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.data.SettingsData
+import hivens.i18n.api.FixedTranslations
 import hivens.ui.appearance.AppearanceStore
 import hivens.ui.customization.CustomizationSettings
-import hivens.ui.i18n.AppLocale
-import hivens.ui.i18n.LocaleProvider
+import hivens.ui.i18n.NexiraStrings
+import hivens.ui.i18n.ShippedLanguageProvider
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.ThemeManager
 import hivens.ui.theme.Themes
@@ -70,16 +71,17 @@ class ShellLookTest {
                 Files.writeString(file, content)
             },
             contributed = MutableStateFlow(emptyList()),
+            translations = FixedTranslations(NexiraStrings.translator("en")),
             scope       = scope,
         )
-        val look = ShellLook(dark = true, locale = AppLocale.ENGLISH)
+        val look = ShellLook(dark = true, words = NexiraStrings.translator("en"))
         val picked = Themes.all.last()
         onEventThread {
             val scene = ImageComposeScene(100, 100, Density(1f)) {
                 val isDarkTheme by appearance.dark.collectAsState()
                 val library by appearance.library.collectAsState()
-                LocaleProvider(locale = AppLocale.ENGLISH) {
-                    PublishShellLook(look, appearance, null, CustomizationSettings())
+                ShippedLanguageProvider("en") {
+                    PublishShellLook(look, appearance, FixedTranslations(NexiraStrings.translator("en")), null, CustomizationSettings())
                     Frame { Frame { NxTheme(theme = library.active, dark = isDarkTheme) {} } }
                 }
             }

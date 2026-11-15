@@ -8,7 +8,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.theme.NxInk
 import hivens.widget.api.LocalLayoutGraph
@@ -30,7 +30,7 @@ fun CustomScreen(id: String) {
     val spec = LocalLayoutGraph.current.screen(id)
     if (spec == null) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text(LocalStrings.current.screenMissing, style = MaterialTheme.typography.bodyLarge, color = NxInk.quiet)
+            Text(nexiraStrings().text("screenMissing"), style = MaterialTheme.typography.bodyLarge, color = NxInk.quiet)
         }
         return
     }

@@ -9,7 +9,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.unit.dp
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.NxAlertDialog
 import hivens.ui.theme.NxTheme
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -62,34 +62,34 @@ fun QuitWithGameHost(
 ) {
     val pending by gate.pending.collectAsState()
     if (!pending) return
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     // Material draws the dialog body, so the plane its words sit on is named by hand: the
     // dialog step of the ladder, which is what a modal is anywhere else in the app.
     val body = NxTheme.colours.step(NxTheme.colours.topStep)
     NxAlertDialog(
         onDismissRequest = gate::dismiss,
-        paneTitle        = s.quitGameTitle,
-        title = { OnFill(body) { Text(s.quitGameTitle, color = NxInk.main) } },
+        paneTitle        = s.text("quitGameTitle"),
+        title = { OnFill(body) { Text(s.text("quitGameTitle"), color = NxInk.main) } },
         text  = {
             OnFill(body) {
-                Text(s.quitGameBody(packName.orEmpty()), style = MaterialTheme.typography.bodyMedium, color = NxInk.quiet)
+                Text(s.text("quitGameBody", packName.orEmpty()), style = MaterialTheme.typography.bodyMedium, color = NxInk.quiet)
             }
         },
         confirmButton = {
             OnFill(body) {
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     TextButton(onClick = { gate.dismiss(); onLeaveRunning() }) {
-                        Text(s.quitLeaveGame, color = NxColor.lead())
+                        Text(s.text("quitLeaveGame"), color = NxColor.lead())
                     }
                     TextButton(onClick = { gate.dismiss(); onStopGame() }) {
-                        Text(s.quitStopGame, color = NxColor.status(Status.Error))
+                        Text(s.text("quitStopGame"), color = NxColor.status(Status.Error))
                     }
                 }
             }
         },
         dismissButton = {
             OnFill(body) {
-                TextButton(onClick = gate::dismiss) { Text(s.editorCancel, color = NxColor.lead()) }
+                TextButton(onClick = gate::dismiss) { Text(s.text("editorCancel"), color = NxColor.lead()) }
             }
         },
         containerColor = body,

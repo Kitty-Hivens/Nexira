@@ -26,7 +26,7 @@ import hivens.packs.api.PackKeys
 import hivens.packs.api.ReattachConfirmation
 import hivens.packs.api.ReattachPreview
 import hivens.packs.api.ReattachPreviewView
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.NxAlertDialog
 import hivens.ui.nx.NxCalloutBanner
 import hivens.ui.nx.NxCalloutTone
@@ -74,7 +74,7 @@ internal fun ReattachConfirmDialog(
     onConfirm: (ReattachConfirmation) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val previews = rememberScopedSource(PackKeys.ReattachPreviews).valueOrNull()
     val ask = rememberScopedCommand(PackKeys.PreviewReattach)
     val forget = rememberScopedCommand(PackKeys.ForgetReattachPreview)
@@ -84,7 +84,7 @@ internal fun ReattachConfirmDialog(
         onDispose { if (available) forget?.invoke(packId) }
     }
     val state = previews?.get(packId) ?: ReattachPreviewView.Comparing
-    val title = s.packSettingsReattach(sourceName)
+    val title = s.text("packSettingsReattach", sourceName)
     val container = NxTheme.colours.step(NxTheme.colours.topStep)
     OnFill(container) {
         NxAlertDialog(
@@ -98,7 +98,7 @@ internal fun ReattachConfirmDialog(
                 ) {
                     when {
                         !available -> Text(
-                            s.packSettingsReattachUnavailable,
+                            s.text("packSettingsReattachUnavailable"),
                             style = MaterialTheme.typography.bodyMedium,
                             color = NxColor.status(Status.Error),
                         )
@@ -107,10 +107,10 @@ internal fun ReattachConfirmDialog(
                             horizontalArrangement = Arrangement.spacedBy(10.dp),
                         ) {
                             CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = NxColor.lead())
-                            Text(s.packSettingsReattachComparing, style = MaterialTheme.typography.bodyMedium)
+                            Text(s.text("packSettingsReattachComparing"), style = MaterialTheme.typography.bodyMedium)
                         }
                         state is ReattachPreviewView.Failed -> Text(
-                            s.packSettingsReattachCompareFailed(state.message),
+                            s.text("packSettingsReattachCompareFailed", state.message),
                             style = MaterialTheme.typography.bodyMedium,
                             color = NxColor.status(Status.Error),
                         )
@@ -132,13 +132,13 @@ internal fun ReattachConfirmDialog(
                     enabled = ready != null,
                 ) {
                     Text(
-                        s.packSettingsReattachAction,
+                        s.text("packSettingsReattachAction"),
                         color = if (ready != null) NxColor.status(Status.Error) else NxInk.quiet,
                     )
                 }
             },
             dismissButton = {
-                TextButton(onClick = onDismiss) { Text(s.editorCancel) }
+                TextButton(onClick = onDismiss) { Text(s.text("editorCancel")) }
             },
             containerColor    = container,
             titleContentColor = NxInk.main,
@@ -149,27 +149,27 @@ internal fun ReattachConfirmDialog(
 
 @Composable
 private fun PreviewBody(preview: ReattachPreview) {
-    val s = LocalStrings.current
-    if (preview.movesRuntime) NxCalloutBanner(body = s.packVersionNeedsCare, tone = NxCalloutTone.Warning)
+    val s = nexiraStrings()
+    if (preview.movesRuntime) NxCalloutBanner(body = s.text("packVersionNeedsCare"), tone = NxCalloutTone.Warning)
     if (preview.unreadable.isNotEmpty()) {
-        NxCalloutBanner(body = s.packSettingsReattachUnreadable(shortNameList(preview.unreadable.map { it.substringAfterLast('/') })), tone = NxCalloutTone.Warning)
+        NxCalloutBanner(body = s.text("packSettingsReattachUnreadable", shortNameList(preview.unreadable.map { it.substringAfterLast('/') })), tone = NxCalloutTone.Warning)
     }
     when (preview.basis) {
-        "no-baseline" -> NxCalloutBanner(body = s.packSettingsReattachNoBaseline, tone = NxCalloutTone.Warning)
-        "names-only" -> Text(s.packSettingsReattachNamesOnly, style = MaterialTheme.typography.bodySmall)
+        "no-baseline" -> NxCalloutBanner(body = s.text("packSettingsReattachNoBaseline"), tone = NxCalloutTone.Warning)
+        "names-only" -> Text(s.text("packSettingsReattachNamesOnly"), style = MaterialTheme.typography.bodySmall)
         else -> Unit
     }
     if (preview.isEmpty) {
-        Text(s.packSettingsReattachNothing, style = MaterialTheme.typography.bodyMedium)
+        Text(s.text("packSettingsReattachNothing"), style = MaterialTheme.typography.bodyMedium)
         return
     }
-    Text(s.packSettingsReattachBody(preview.toVersion), style = MaterialTheme.typography.bodyMedium)
-    if (preview.removed.isNotEmpty()) PathList(s.packSettingsReattachRemoved(preview.removed.size), preview.removed)
+    Text(s.text("packSettingsReattachBody", preview.toVersion), style = MaterialTheme.typography.bodyMedium)
+    if (preview.removed.isNotEmpty()) PathList(s.text("packSettingsReattachRemoved", preview.removed.size), preview.removed)
     val returned = (preview.restored + preview.replaced).sorted()
-    if (returned.isNotEmpty()) PathList(s.packSettingsReattachReturned(returned.size), returned)
-    if (preview.turnedOn.isNotEmpty()) PathList(s.packSettingsReattachTurnedOn(preview.turnedOn.size), preview.turnedOn)
-    if (preview.turnedOff.isNotEmpty()) PathList(s.packSettingsReattachTurnedOff(preview.turnedOff.size), preview.turnedOff)
-    if (preview.kept.isNotEmpty()) PathList(s.packSettingsReattachKept(preview.kept.size), preview.kept)
+    if (returned.isNotEmpty()) PathList(s.text("packSettingsReattachReturned", returned.size), returned)
+    if (preview.turnedOn.isNotEmpty()) PathList(s.text("packSettingsReattachTurnedOn", preview.turnedOn.size), preview.turnedOn)
+    if (preview.turnedOff.isNotEmpty()) PathList(s.text("packSettingsReattachTurnedOff", preview.turnedOff.size), preview.turnedOff)
+    if (preview.kept.isNotEmpty()) PathList(s.text("packSettingsReattachKept", preview.kept.size), preview.kept)
 }
 
 /**
@@ -178,7 +178,7 @@ private fun PreviewBody(preview: ReattachPreview) {
  */
 @Composable
 private fun PathList(header: String, paths: List<String>) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     var unfolded by remember(paths) { mutableStateOf(false) }
     val shown = if (unfolded) paths else paths.take(FOLDED_ROWS)
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -189,7 +189,7 @@ private fun PathList(header: String, paths: List<String>) {
         if (paths.size > FOLDED_ROWS) {
             TextButton(onClick = { unfolded = !unfolded }) {
                 Text(
-                    if (unfolded) s.packSettingsReattachLess else s.packSettingsReattachMore(paths.size - FOLDED_ROWS),
+                    if (unfolded) s.text("packSettingsReattachLess") else s.text("packSettingsReattachMore", paths.size - FOLDED_ROWS),
                     style = MaterialTheme.typography.labelMedium,
                     color = NxColor.lead(),
                 )

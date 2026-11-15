@@ -5,6 +5,7 @@ import hivens.accounts.TwoFactorLaunchGate
 import hivens.config.Storage
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.api.interfaces.ISettingsService
+import hivens.core.api.interfaces.ReadingLanguage
 import hivens.core.activity.Activity
 import hivens.core.activity.ActivityRegistry
 import hivens.core.data.ThemeMode
@@ -39,8 +40,10 @@ import hivens.ui.packs.ClientPacksHost
 import hivens.ui.packs.withdrawNoticesOfInstalledPacks
 import hivens.ui.theme.ThemeLibrary
 import hivens.ui.theme.ThemeManager
-import hivens.ui.i18n.AppLocale
-import hivens.ui.i18n.stringsFor
+import hivens.i18n.I18nEngine
+import hivens.i18n.I18nSettingsDomain
+import hivens.i18n.api.Translations
+import hivens.ui.i18n.NexiraStrings
 import hivens.ui.identity.ClanRoleProvider
 import hivens.ui.identity.DefaultSkinProvider
 import hivens.ui.identity.SkinLibrary
@@ -66,6 +69,8 @@ import hivens.ui.notifications.drivers.InstallDriver
 import hivens.ui.notifications.drivers.LaunchDriver
 import hivens.ui.notifications.drivers.PackUpdateDriver
 import hivens.ui.screens.library.content.ContentIconStore
+import hivens.ui.settings.LegacySettingsThroughService
+import hivens.ui.settings.SettingsDomainFiles
 import hivens.ui.utils.ConsoleSettingsStore
 import hivens.ui.utils.GameConsoleService
 import hivens.ui.utils.LogRetention
@@ -81,6 +86,8 @@ import hivens.ui.widgets.levelServices
 import hivens.ui.widgets.modules.CompiledModules
 import hivens.ui.widgets.modules.WidgetModuleHost
 import hivens.ui.widgets.modules.WidgetModules
+import hivens.ui.widgets.modules.followModuleWords
+import hivens.ui.widgets.modules.take
 import hivens.ui.widgets.profile.ProfileSelection
 import hivens.ui.widgets.profile.ProfileSelectionSource
 import hivens.ui.widgets.state.WidgetStateFlushHook
@@ -94,6 +101,7 @@ import hivens.widget.api.FactoryFailures
 import hivens.widget.api.KeyContribution
 import hivens.widget.api.LevelServicesHost
 import hivens.widget.api.ModuleKeysResult
+import hivens.widget.api.SettingsStores
 import hivens.widget.api.SurfaceFamilies
 import hivens.widget.api.WidgetCommandRegistry
 import hivens.widget.api.WidgetDataRegistry
@@ -212,12 +220,51 @@ fun uiCoreModule(
 
     includes(levelServicesModule)
 
+    // The modules' settings, one file per settings domain, beside the settings file they were
+    // split out of, which a domain reads until it has a file and mirrors its old fields into for
+    // an older build. That file is written through the settings service, which holds a copy of
+    // it. Saved by the writer the interface's other choices go through, off the event thread and
+    // in order.
+    single {
+        val dataDir: Path = get()
+        val preferences: PreferenceWriter = get()
+        SettingsDomainFiles(
+            dir    = dataDir.resolve(Storage.SETTINGS_DIR),
+            legacy = LegacySettingsThroughService(dataDir.resolve(Storage.SETTINGS_FILE), get(), get()),
+            write  = preferences::write,
+        )
+    }
+    single<SettingsStores> { get<SettingsDomainFiles>() }
+
+    // The launcher's words, and every module's: the language module's engine. Made by the host
+    // rather than by the module because the window the launcher boots in already speaks, so the
+    // engine exists before any module does. It follows the language the person chooses in the
+    // module's settings domain, and takes the words of every module compiled in and of every
+    // jar module as the module list changes.
+    single {
+        val dataDir: Path = get()
+        val appScope: CoroutineScope = get()
+        val language = get<SettingsDomainFiles>().of(I18nSettingsDomain)
+        NexiraStrings.engine(dataDir.resolve(Storage.TRANSLATIONS_DIR), language.value.value.language).also { engine ->
+            engine.follow(language, appScope)
+            compiled.forEach { module -> engine.take(module.id, module.strings) }
+            followModuleWords(get<WidgetModules>().state, engine, appScope)
+        }
+    }
+    single<Translations> { get<I18nEngine>() }
+    // What the engine fetches in a language, the catalogue's texts and the release notes, is
+    // fetched in the language the words are in now.
+    single<ReadingLanguage> {
+        val engine: I18nEngine = get()
+        ReadingLanguage { engine.readingOrder }
+    }
+
     // What the core could not do, said in the notification centre in the person's language.
     // A pack said to be missing is taken back once a pack of that id is installed.
     single<CoreProblems> {
-        val settingsService: ISettingsService = get()
+        val translations: Translations = get()
         NotifiedCoreProblems(notifications = get(), scope = get()) {
-            stringsFor(AppLocale.fromTag(settingsService.getSettings().locale))
+            translations.strings(NexiraStrings.NAMESPACE)
         }.also { problems -> withdrawNoticesOfInstalledPacks(get<IPackRepository>().observe(), problems, get()) }
     }
 
@@ -270,6 +317,7 @@ fun uiCoreModule(
             preferences = get(),
             themes      = ThemeManager(get<Path>(), AtomicFiles::writeString),
             contributed = modules.state.map { it.themes }.stateIn(appScope, SharingStarted.Eagerly, modules.state.value.themes),
+            translations = get(),
             scope       = appScope,
         )
     }
@@ -327,12 +375,14 @@ fun uiCoreModule(
             services = ContributedServices(),
         )
         val modules: WidgetModules = get()
+        val translations: Translations = get()
         moduleKeys(
             keys     = keys,
             named    = modulesNamedBy(get<LayoutGraphRepository>().value()) { DefaultLayout.modules(get()) },
             compiled = compiled,
             jars     = jarKeysOf(modules),
             onCrash  = modules::switchOffAfterCrash,
+            nameOf   = { moduleId, key -> translations.strings(moduleId).text(key) },
         )
         keys
     } withOptions { onClose { it?.close() } }
@@ -354,7 +404,6 @@ fun uiCoreModule(
     single {
         val appScope: CoroutineScope = get()
         val keys: HostKeys = get()
-        val settings: ISettingsService = get()
         WidgetScope.app(
             registry = get(),
             services = keys.appServices(KoinLevelServicesHost.app(this), appScope.coroutineContext),
@@ -362,7 +411,7 @@ fun uiCoreModule(
             commands = get(),
             // The host view under each level is the launcher's alone, see LauncherHostAccess.
             access   = LauncherHostAccess,
-            failures = reportedTo(get(), keys) { AppLocale.fromTag(settings.getSettings().locale).tag },
+            failures = reportedTo(get(), keys),
         ).also { app -> followModuleReloads(get<WidgetModules>().state, keys, app, appScope) }
     }
 
@@ -475,6 +524,7 @@ fun uiCoreModule(
     single { TwoFactorLaunchGate() }
     single {
         val settingsService: ISettingsService = get()
+        val translations: Translations = get()
         LaunchDriver(
             controller      = get(),
             notifications   = get(),
@@ -487,19 +537,19 @@ fun uiCoreModule(
             settingsService = settingsService,
             credentialStore = get(),
             twoFactorGate   = get(),
-            stringsProvider = { stringsFor(AppLocale.fromTag(settingsService.getSettings().locale)) },
+            stringsProvider = { translations.strings(NexiraStrings.NAMESPACE) },
         )
     }
     // Surfaces app-scoped installs (PackInstallService) into the notification
     // center. createdAtStart so its collector is live before the first install
     // can fire; start() launches on the shared app scope.
     single(createdAtStart = true) {
-        val settingsService: ISettingsService = get()
+        val translations: Translations = get()
         InstallDriver(
             service         = get(),
             notifications   = get(),
             appScope        = get(),
-            stringsProvider = { stringsFor(AppLocale.fromTag(settingsService.getSettings().locale)) },
+            stringsProvider = { translations.strings(NexiraStrings.NAMESPACE) },
         ).also { it.start() }
     }
     // Feeds the self-identifying services (installs, updates, content) into the
@@ -522,28 +572,28 @@ fun uiCoreModule(
     // the status hub) into the notification center. Same lifecycle rationale as
     // InstallDriver.
     single(createdAtStart = true) {
-        val settingsService: ISettingsService = get()
+        val translations: Translations = get()
         PackUpdateDriver(
             hub             = get(),
             repository      = get(),
             notifications   = get(),
             nav             = get(),
             appScope        = get(),
-            stringsProvider = { stringsFor(AppLocale.fromTag(settingsService.getSettings().locale)) },
+            stringsProvider = { translations.strings(NexiraStrings.NAMESPACE) },
         ).also { it.start() }
     }
 }
 
 /**
  * Every factory of the scope tree that could not make its key, told to [problems]:
- * a key a module brought as that module, by its own name in the language [localeTag]
- * says, and one of the host's as the part of the host it belongs to.
+ * a key a module brought as that module, by its own name in the person's language,
+ * and one of the host's as the part of the host it belongs to.
  */
-internal fun reportedTo(problems: CoreProblems, keys: HostKeys? = null, localeTag: () -> String = { "en" }): FactoryFailures =
+internal fun reportedTo(problems: CoreProblems, keys: HostKeys? = null): FactoryFailures =
     FactoryFailures { id, _, cause ->
         val owner = keys?.ownerOf(id)
         val problem = if (owner != null) {
-            CoreProblem.ModuleMissing(owner.moduleId, owner.name(localeTag()), cause)
+            CoreProblem.ModuleMissing(owner.moduleId, owner.name(), cause)
         } else {
             CoreProblem.PartMissing(corePartOf(id), cause)
         }
@@ -558,8 +608,8 @@ internal fun corePartOf(id: String): CorePart = CORE_PARTS[id] ?: CorePart.Other
 
 private val CORE_PARTS: Map<String, CorePart> = buildMap {
     listOf(
-        Sources.ThemeLibrary.id, Sources.DarkTheme.id, Sources.ThemeMode.id, Sources.SystemSchemeAvailable.id, Sources.Locale.id,
-        Commands.ApplyTheme.id, Commands.SetDarkTheme.id, Commands.SetThemeMode.id, Commands.SetLocale.id,
+        Sources.ThemeLibrary.id, Sources.DarkTheme.id, Sources.ThemeMode.id, Sources.SystemSchemeAvailable.id,
+        Commands.ApplyTheme.id, Commands.SetDarkTheme.id, Commands.SetThemeMode.id,
     ).forEach { put(it, CorePart.Appearance) }
     listOf(Sources.ConsoleVisible.id, Commands.SetConsoleVisible.id).forEach { put(it, CorePart.Console) }
 }
@@ -590,7 +640,7 @@ internal fun uiDataRegistry(
     // One per page, so a profile page kept in the history comes back on the section
     // it was left on.
     registerFactory(ProfileSelectionSource, sample = ::ProfileSelection) { flowSource(MutableStateFlow(ProfileSelection())) }
-    // How the composition looks and speaks, read off the app's one appearance store.
+    // How the composition looks, read off the app's one appearance store.
     // Every key here carries the sample the palette and the editor show a widget on
     // where no level of its kind is above: display data, never handed to a widget
     // drawn for use.
@@ -605,9 +655,6 @@ internal fun uiDataRegistry(
     }
     registerFactory(Sources.SystemSchemeAvailable, sample = { false }) { app ->
         flowSource(app.hostServices.get<AppearanceStore>().systemSchemeAvailable)
-    }
-    registerFactory(Sources.Locale, sample = { AppLocale.ENGLISH }) { composition ->
-        flowSource(composition.hostServices.get<AppearanceStore>().locale)
     }
     registerFactory(Sources.ConsoleVisible, sample = { false }) { app ->
         flowSource(app.hostServices.get<GameConsoleService>().visible)
@@ -634,11 +681,10 @@ internal fun uiCommandRegistry(
     register(Commands.ClearNotifications, command { clearNotifications() })
     register(Commands.SetDoNotDisturb, command(setDoNotDisturb))
     register(Commands.UpdateBackground, command(updateBackground))
-    // How the composition looks and speaks, through the app's appearance store.
+    // How the composition looks, through the app's appearance store.
     registerFactory(Commands.ApplyTheme) { composition -> command(composition.hostServices.get<AppearanceStore>()::select) }
     registerFactory(Commands.SetDarkTheme) { composition -> command(composition.hostServices.get<AppearanceStore>()::setDark) }
     registerFactory(Commands.SetThemeMode) { composition -> command(composition.hostServices.get<AppearanceStore>()::setMode) }
-    registerFactory(Commands.SetLocale) { composition -> command(composition.hostServices.get<AppearanceStore>()::setLocale) }
     registerFactory(Commands.SetConsoleVisible) { app ->
         val console = app.hostServices.get<GameConsoleService>()
         command { visible -> if (visible) console.show() else console.hide() }
@@ -667,8 +713,8 @@ internal fun uiCommandRegistry(
 private fun sslBypassSource(store: SslBypassStore, host: String, scope: CoroutineScope): WidgetDataSource<Boolean> =
     flowSource(store.bypasses.map { store.isBypassed(host) }.stateIn(scope, SharingStarted.Eagerly, store.isBypassed(host)))
 
-/** A module that brought keys: its id, and its name in the language a tag says. */
-internal class ModuleOwner(val moduleId: String, val name: (localeTag: String) -> String)
+/** A module that brought keys: its id, and its name in the person's language as it is when asked. */
+internal class ModuleOwner(val moduleId: String, val name: () -> String)
 
 /**
  * The app's registries and the services modules declared, made together so a module's
@@ -752,6 +798,9 @@ internal fun modulesNamedBy(graph: LayoutGraph, standard: () -> List<String>): S
  * none and is logged by name. One whose own code threw while declaring them is handed
  * to [onCrash], the way a module that crashed the interface is, which switches it off.
  *
+ * [nameOf] answers a module's name, a key into its words, in the person's language,
+ * for what is said about the module when one of its keys cannot be made.
+ *
  * A jar's keys are registered at startup: one switched on later brings them at the
  * next start. One read again while the launcher runs answers them with its new code,
  * and one switched off leaves them missing, see [followModuleReloads].
@@ -761,12 +810,13 @@ internal fun moduleKeys(
     named: Set<String>,
     compiled: List<CompiledModule>,
     jars: List<JarKeys>,
+    nameOf: (moduleId: String, key: String) -> String = { _, key -> key },
     onCrash: (moduleId: String, failure: Throwable) -> Unit = { _, _ -> },
 ) {
     val carried = compiled.map { it.id }.toSet() + jars.map { it.moduleId }
     (named - carried).forEach { moduleKeysLog.warn("The interface names the module '{}', which this launcher does not carry", it) }
     compiled.filter { it.id in named }.forEach { module ->
-        val owner = ModuleOwner(module.id) { tag -> module.strings.get(module.name, tag) }
+        val owner = ModuleOwner(module.id) { nameOf(module.id, module.name) }
         module.contributions.filterIsInstance<KeyContribution>().forEach { contribution ->
             val result = registerModuleKeys(module.id, contribution, keys.sources, keys.commands, keys.services, trusted = true)
             settle(keys, module.id, owner, result) { /* a compiled module cannot be switched off */ }
@@ -774,7 +824,7 @@ internal fun moduleKeys(
     }
     jars.forEach { jar ->
         val result = registerModuleKeys(jar.moduleId, jar.current, keys.sources, keys.commands, keys.services, trusted = false)
-        settle(keys, jar.moduleId, ModuleOwner(jar.moduleId) { jar.name }, result) { cause -> onCrash(jar.moduleId, cause) }
+        settle(keys, jar.moduleId, ModuleOwner(jar.moduleId) { nameOf(jar.moduleId, jar.name) }, result) { cause -> onCrash(jar.moduleId, cause) }
         if (result is ModuleKeysResult.Registered) {
             synchronized(keys) { keys.jars[jar.moduleId + "/" + jar.contributionId] = result.ids to jar }
         }

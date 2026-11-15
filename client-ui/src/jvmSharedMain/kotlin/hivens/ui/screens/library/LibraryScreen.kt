@@ -36,7 +36,7 @@ import hivens.launcher.PackInstallService
 import hivens.launcher.imports.LocalPackCreator
 import hivens.launcher.runtime.RuntimeProvisioner
 import hivens.ui.Screen
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.layers.layerTrigger
@@ -88,7 +88,7 @@ fun LibraryScreen(
 ) {
     PuppetScreen("Library")
 
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val importService: PackImportService = koinInject()
     val installService: PackInstallService = koinInject()
     val creator: LocalPackCreator = koinInject()
@@ -143,7 +143,7 @@ fun LibraryScreen(
         }
     }
 
-    val importDialogSettings = rememberFileDialogSettings(s.browseImport)
+    val importDialogSettings = rememberFileDialogSettings(s.text("browseImport"))
 
     // The picker is UI and stays on the composition; the unpacking does not. It ran
     // on rememberCoroutineScope, which is the screen's own scope, so leaving the
@@ -229,12 +229,12 @@ fun LibraryScreen(
                 if (importing || creating) {
                     CircularProgressIndicator(color = onLead, strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
                 } else {
-                    Symbol(NxIcon.Add, contentDescription = s.libraryAddAction)
+                    Symbol(NxIcon.Add, contentDescription = s.text("libraryAddAction"))
                 }
             }
             NxContextMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                NxMenuItem(label = s.libraryNewLocalPack, icon = NxIcon.Add) { menuOpen = false; showCreate = true }
-                NxMenuItem(label = s.libraryImportPack, icon = NxIcon.Download) { menuOpen = false; startImport() }
+                NxMenuItem(label = s.text("libraryNewLocalPack"), icon = NxIcon.Add) { menuOpen = false; showCreate = true }
+                NxMenuItem(label = s.text("libraryImportPack"), icon = NxIcon.Download) { menuOpen = false; startImport() }
             }
             PuppetClick("library.newLocalPack") { menuOpen = false; showCreate = true }
             PuppetClick("library.importPack") { menuOpen = false; startImport() }
@@ -252,7 +252,7 @@ private fun NewLocalPackDialog(
     onDismiss: () -> Unit,
     onCreate: (name: String, mc: String, loader: String?, loaderVersion: String) -> Unit,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val provisioner: RuntimeProvisioner = koinInject()
 
     var name by remember { mutableStateOf("") }
@@ -293,7 +293,7 @@ private fun NewLocalPackDialog(
         defaultWidth     = false,
         scrim            = NxColor.page.copy(alpha = 0.72f),
         enter            = Motion.emphasis.enter,
-        paneTitle        = s.libraryNewLocalPack,
+        paneTitle        = s.text("libraryNewLocalPack"),
     ) {
         NxSurface(
             kind = SurfaceKind.Dialog,
@@ -304,14 +304,14 @@ private fun NewLocalPackDialog(
             Column(Modifier.verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Symbol(NxIcon.Inventory2, contentDescription = null, tint = NxColor.lead(), size = 22.dp)
-                    Text(s.libraryNewLocalPack, style = MaterialTheme.typography.titleMedium, color = NxInk.main, fontWeight = FontWeight.Bold)
+                    Text(s.text("libraryNewLocalPack"), style = MaterialTheme.typography.titleMedium, color = NxInk.main, fontWeight = FontWeight.Bold)
                 }
 
-                FieldLabel(s.createPackName)
-                NxField(value = name, onValueChange = { name = it }, placeholder = defaultName.ifBlank { s.createPackName }, modifier = Modifier.fillMaxWidth())
+                FieldLabel(s.text("createPackName"))
+                NxField(value = name, onValueChange = { name = it }, placeholder = defaultName.ifBlank { s.text("createPackName") }, modifier = Modifier.fillMaxWidth())
                 PuppetField("createPack.name", name) { name = it }
 
-                FieldLabel(s.createPackMc)
+                FieldLabel(s.text("createPackMc"))
                 Box {
                     NxField(
                         value = mc,
@@ -334,7 +334,7 @@ private fun NewLocalPackDialog(
                         yieldsToField    = true,
                         footer           = {
                             NxChoiceFooterItem(
-                                label = if (showSnapshots) s.createPackHideSnapshots else s.createPackShowSnapshots,
+                                label = if (showSnapshots) s.text("createPackHideSnapshots") else s.text("createPackShowSnapshots"),
                                 icon  = if (showSnapshots) NxIcon.VisibilityOff else NxIcon.Visibility,
                             ) { showSnapshots = !showSnapshots }
                         },
@@ -349,7 +349,7 @@ private fun NewLocalPackDialog(
                 }
                 PuppetField("createPack.mc", mc) { mc = it; mcMenuOpen = true }
 
-                FieldLabel(s.createPackLoader)
+                FieldLabel(s.text("createPackLoader"))
                 LoaderPicker(
                     mcVersion       = mc.trim(),
                     mcKnown         = mc.trim() in versions,
@@ -362,9 +362,9 @@ private fun NewLocalPackDialog(
                 )
 
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End)) {
-                    NxButton(label = s.createPackCancel, onClick = onDismiss, style = NxButtonStyle.Tertiary, compact = true)
+                    NxButton(label = s.text("createPackCancel"), onClick = onDismiss, style = NxButtonStyle.Tertiary, compact = true)
                     NxButton(
-                        label = s.createPackConfirm,
+                        label = s.text("createPackConfirm"),
                         onClick = { onCreate(effectiveName.trim(), mc.trim(), loaderId, loaderVersion.trim().takeIf { loaderId != null }.orEmpty()) },
                         style = NxButtonStyle.Primary,
                         icon = NxIcon.Add,

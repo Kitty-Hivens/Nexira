@@ -12,7 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import hivens.ui.background.BackgroundManager
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
@@ -45,23 +45,23 @@ import java.nio.file.Path
 @Composable
 fun BgImagePickerWidget() {
     val bg = rememberBgSettings() ?: return
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val settings = bg.value
     val scope = rememberCoroutineScope()
     val appScope = koinInject<CoroutineScope>()
     val backgrounds = koinInject<BackgroundManager>()
     val dataDir = koinInject<Path>()
-    val dialogSettings = rememberFileDialogSettings(s.backgroundPickFile)
+    val dialogSettings = rememberFileDialogSettings(s.text("backgroundPickFile"))
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        SectionTitle(s.backgroundSectionImage)
+        SectionTitle(s.text("backgroundSectionImage"))
         Row(
             modifier              = Modifier.fillMaxWidth(),
             verticalAlignment     = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             NxButton(
-                label    = s.backgroundPickButton,
+                label    = s.text("backgroundPickButton"),
                 icon     = NxIcon.Image,
                 style    = NxButtonStyle.Secondary,
                 modifier = Modifier.weight(1f),

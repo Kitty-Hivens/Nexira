@@ -1,5 +1,7 @@
 package hivens.ui.editor.palette
 
+import hivens.i18n.api.Strings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.widgets.modules.widgetLabel
 import androidx.compose.foundation.background
 import androidx.compose.foundation.Image
@@ -49,7 +51,6 @@ import hivens.ui.editor.dnd.DragPayload
 import hivens.ui.editor.dnd.DropTargetRegistry
 import hivens.ui.editor.dnd.dragSource
 import hivens.ui.editor.windowPointToSlotDp
-import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.surface.NxSurface
@@ -94,8 +95,8 @@ fun PaletteItem(
     // moved on: three widgets from one row into a canvas all seeded from the same
     // count and landed on top of each other.
     val graph by rememberUpdatedState(LocalLayoutGraph.current)
-    val s = LocalStrings.current
-    // Resolve the widget's label via key-indirection (see AppStrings.widgetLabel).
+    val s = nexiraStrings()
+    // Resolve the widget's label via key-indirection (see Strings.widgetLabel).
     val label = widgetLabel(descriptor.kind, descriptor.displayName)
     val density = LocalDensity.current.density
 

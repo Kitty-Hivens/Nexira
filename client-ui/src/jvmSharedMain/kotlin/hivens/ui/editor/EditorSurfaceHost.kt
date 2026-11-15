@@ -67,7 +67,9 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import hivens.i18n.api.Strings
 import hivens.ui.Screen
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.platform.SystemActions
 import hivens.ui.customization.CustomizationSettings
 import hivens.ui.editor.decoration.EditableWidgetChrome
@@ -87,8 +89,6 @@ import hivens.ui.editor.props.ScreenPropertiesPanel
 import hivens.ui.editor.props.WidgetModulesPanel
 import hivens.ui.editor.props.SurfacePropertiesPanel
 import hivens.ui.editor.props.WidgetPropPanel
-import hivens.ui.i18n.AppStrings
-import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
@@ -203,7 +203,7 @@ fun EditorSurfaceHost(
     val presetRepo: PresetRepository      = koinInject()
     val widgetModules: WidgetModules      = koinInject()
     val coroutineScope = rememberCoroutineScope()
-    val s = LocalStrings.current
+    val s = nexiraStrings()
 
     // An edit session belongs to the app, not to the screen it started on. Moving
     // to another screen while arranging keeps the editor on: a rail or the top bar
@@ -362,9 +362,9 @@ fun EditorSurfaceHost(
                 // Held until answered or closed: a one-shot notice is gone in five
                 // seconds, which is less time than it takes to read it and decide.
                 kind      = Kind.ActionRequired,
-                title     = s.screenDeletedTitle(doomed.title.ifBlank { s.screenUntitled }),
+                title     = s.text("screenDeletedTitle", doomed.title.ifBlank { s.text("screenUntitled") }),
                 actions   = listOf(
-                    NotifAction(id = "screen-restore-${doomed.id}", label = s.screenRestore) {
+                    NotifAction(id = "screen-restore-${doomed.id}", label = s.text("screenRestore")) {
                         controller.restoreScreen(gone)
                         pendingSettings = false
                         pendingScreen = gone.spec
@@ -712,7 +712,7 @@ fun EditorSurfaceHost(
                     onDismissRequest = { entryMenuAt = null },
                 ) {
                     NxMenuItem(
-                        label = LocalStrings.current.editorEnterLayout,
+                        label = nexiraStrings().text("editorEnterLayout"),
                         icon  = NxIcon.ViewQuilt,
                         hint  = "Ctrl+E",
                     ) {
@@ -735,11 +735,11 @@ fun EditorSurfaceHost(
                 if (editing && resetSurfaceConfirm && surfaceForReset != null) {
                     NxAlertDialog(
                         onDismissRequest = { resetSurfaceConfirm = false },
-                        paneTitle        = s.editorResetSurfaceTitle,
-                        title            = { Text(s.editorResetSurfaceTitle) },
+                        paneTitle        = s.text("editorResetSurfaceTitle"),
+                        title            = { Text(s.text("editorResetSurfaceTitle")) },
                         text             = {
                             Text(
-                                text = s.editorResetSurfaceBody(humanSurfaceName(surfaceForReset, s, graphForSurfaces)),
+                                text = s.text("editorResetSurfaceBody", humanSurfaceName(surfaceForReset, s, graphForSurfaces)),
                                 style = MaterialTheme.typography.bodyMedium,
                             )
                         },
@@ -747,7 +747,7 @@ fun EditorSurfaceHost(
                             TextButton(onClick = {
                                 controller.resetSurface(surfaceForReset)
                                 resetSurfaceConfirm = false
-                            }) { Text(s.editorReset, color = NxColor.status(Status.Error)) }
+                            }) { Text(s.text("editorReset"), color = NxColor.status(Status.Error)) }
                         },
                         // Resetting everything is offered from here and asked about on
                         // its own. It sat beside this surface's reset as a second red
@@ -758,8 +758,8 @@ fun EditorSurfaceHost(
                                 TextButton(modifier = Modifier.layerTrigger(), onClick = {
                                     resetSurfaceConfirm = false
                                     resetAllConfirm = true
-                                }) { Text(s.editorResetAll) }
-                                TextButton(onClick = { resetSurfaceConfirm = false }) { Text(s.editorCancel) }
+                                }) { Text(s.text("editorResetAll")) }
+                                TextButton(onClick = { resetSurfaceConfirm = false }) { Text(s.text("editorCancel")) }
                             }
                         },
                     )
@@ -767,17 +767,17 @@ fun EditorSurfaceHost(
                 if (editing && resetAllConfirm) {
                     NxAlertDialog(
                         onDismissRequest = { resetAllConfirm = false },
-                        paneTitle        = s.editorResetAllTitle,
-                        title            = { Text(s.editorResetAllTitle) },
-                        text             = { Text(s.editorResetAllBody, style = MaterialTheme.typography.bodyMedium) },
+                        paneTitle        = s.text("editorResetAllTitle"),
+                        title            = { Text(s.text("editorResetAllTitle")) },
+                        text             = { Text(s.text("editorResetAllBody"), style = MaterialTheme.typography.bodyMedium) },
                         confirmButton = {
                             TextButton(onClick = {
                                 controller.resetAll()
                                 resetAllConfirm = false
-                            }) { Text(s.editorResetAll, color = NxColor.status(Status.Error)) }
+                            }) { Text(s.text("editorResetAll"), color = NxColor.status(Status.Error)) }
                         },
                         dismissButton = {
-                            TextButton(onClick = { resetAllConfirm = false }) { Text(s.editorCancel) }
+                            TextButton(onClick = { resetAllConfirm = false }) { Text(s.text("editorCancel")) }
                         },
                     )
                 }
@@ -971,7 +971,7 @@ fun EditorSurfaceHost(
                     onOpenModules         = { modulesPanelOpen = !modulesPanelOpen },
                     onNewScreen           = {
                         pendingSettings = true
-                        pendingScreen = controller.createScreen(s.screenDefaultTitle(graphForSurfaces.screens.size + 1))
+                        pendingScreen = controller.createScreen(s.text("screenDefaultTitle", graphForSurfaces.screens.size + 1))
                     },
                     onRequestReset        = { if (selectedSurface != null) resetSurfaceConfirm = true },
                     hasRegionProps        = ownerRegion(selectedSurface) != null,
@@ -1064,7 +1064,7 @@ private fun EditModePill(
     onRedo: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val motionMs = Motion.panelSlide.durationMs
     AnimatedVisibility(
         visible  = active,
@@ -1138,7 +1138,7 @@ private fun EditModePill(
                     if (surfaceHasSettings) {
                         ToolChip(
                             icon     = NxIcon.Settings,
-                            label    = s.editorSurfaceSettings,
+                            label    = s.text("editorSurfaceSettings"),
                             selected = false,
                             onClick  = onOpenSurfaceSettings,
                             compact  = compact,
@@ -1156,7 +1156,7 @@ private fun EditModePill(
                     if (hasRegionProps) {
                         ToolChip(
                             icon     = NxIcon.ViewSidebar,
-                            label    = s.editorRegionProps,
+                            label    = s.text("editorRegionProps"),
                             selected = false,
                             onClick  = onOpenRegionProps,
                             compact  = compact,
@@ -1170,7 +1170,7 @@ private fun EditModePill(
                     // handles), which matches user intent.
                     ToolChip(
                         icon       = if (previewing) NxIcon.VisibilityOff else NxIcon.Visibility,
-                        label      = if (previewing) s.editorPreviewHidden else s.editorPreview,
+                        label      = if (previewing) s.text("editorPreviewHidden") else s.text("editorPreview"),
                         selected   = previewing,
                         onClick    = onTogglePreview,
                         compact    = compact,
@@ -1180,7 +1180,7 @@ private fun EditModePill(
                     // Palette toggle.
                     ToolChip(
                         icon     = NxIcon.Widgets,
-                        label    = if (paletteOpen) s.editorPaletteToggleHide else s.editorWidgets,
+                        label    = if (paletteOpen) s.text("editorPaletteToggleHide") else s.text("editorWidgets"),
                         selected = paletteOpen,
                         onClick  = onTogglePalette,
                         compact  = compact,
@@ -1193,7 +1193,7 @@ private fun EditModePill(
                     // there is anything to go back to.
                     ToolChip(
                         icon     = NxIcon.Undo,
-                        label    = s.editorUndo,
+                        label    = s.text("editorUndo"),
                         selected = false,
                         onClick  = onUndo,
                         enabled  = canUndo,
@@ -1202,7 +1202,7 @@ private fun EditModePill(
                     Spacer(Modifier.width(4.dp))
                     ToolChip(
                         icon     = NxIcon.Redo,
-                        label    = s.editorRedo,
+                        label    = s.text("editorRedo"),
                         selected = false,
                         onClick  = onRedo,
                         enabled  = canRedo,
@@ -1213,7 +1213,7 @@ private fun EditModePill(
                     // A new screen of one's own, opened and ready to be named.
                     ToolChip(
                         icon     = NxIcon.Add,
-                        label    = s.editorNewScreen,
+                        label    = s.text("editorNewScreen"),
                         selected = false,
                         onClick  = onNewScreen,
                         compact  = compact,
@@ -1223,7 +1223,7 @@ private fun EditModePill(
                     // The widget modules, switched on and off while the launcher runs.
                     ToolChip(
                         icon     = NxIcon.Folder,
-                        label    = s.modulesChip,
+                        label    = s.text("modulesChip"),
                         selected = false,
                         onClick  = onOpenModules,
                         compact  = compact,
@@ -1233,7 +1233,7 @@ private fun EditModePill(
                     // Presets dialog.
                     ToolChip(
                         icon     = NxIcon.Inventory2,
-                        label    = s.editorPresetsTitle,
+                        label    = s.text("editorPresetsTitle"),
                         selected = false,
                         onClick  = onOpenPresets,
                         compact  = compact,
@@ -1248,7 +1248,7 @@ private fun EditModePill(
                     // the chip cannot pretend to be live.
                     ToolChip(
                         icon        = NxIcon.RestartAlt,
-                        label       = s.editorReset,
+                        label       = s.text("editorReset"),
                         selected    = false,
                         onClick     = onRequestReset,
                         destructive = true,
@@ -1259,7 +1259,7 @@ private fun EditModePill(
                     if (!compact) {
                         Spacer(Modifier.width(10.dp))
                         Text(
-                            text  = s.editorEscHint,
+                            text  = s.text("editorEscHint"),
                             style = MaterialTheme.typography.labelSmall,
                             color = NxInk.quiet,
                             modifier = Modifier.padding(end = 8.dp),
@@ -1305,12 +1305,12 @@ private fun SurfaceChip(
     compact: Boolean,
     onClick: () -> Unit,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val graph = LocalLayoutGraph.current
     val bg = if (active) NxColor.wash(NxColor.lead(), 0.18f)
              else Color.Transparent
     val name = humanSurfaceShortName(surface, s, graph)
-    val label = if (folded) s.editorSurfaceFolded(name) else name
+    val label = if (folded) s.text("editorSurfaceFolded", name) else name
     OnFill(bg) {
         val base = if (active) NxColor.lead() else NxInk.quiet
         val fg = if (folded) NxColor.wash(base, 0.45f) else base
@@ -1425,10 +1425,10 @@ private fun surfaceIcon(surface: SurfaceId, graph: LayoutGraph): IconKey =
 // Falls back to the raw id for a surface with no spec: better a visible
 // `home.experiment` in the picker than a blank chip, and the registry test
 // catches the omission before a build ships it.
-private fun humanSurfaceShortName(surface: SurfaceId, s: AppStrings, graph: LayoutGraph): String =
+private fun humanSurfaceShortName(surface: SurfaceId, s: Strings, graph: LayoutGraph): String =
     EditorSurfaces.specIn(surface, graph)?.shortName?.invoke(s) ?: surface.value
 
-private fun humanSurfaceName(surface: SurfaceId, s: AppStrings, graph: LayoutGraph): String =
+private fun humanSurfaceName(surface: SurfaceId, s: Strings, graph: LayoutGraph): String =
     EditorSurfaces.specIn(surface, graph)?.name?.invoke(s) ?: surface.value
 
 // Surfaces that expose surface-level settings (a SurfacePropertiesPanel, or a made
@@ -1443,14 +1443,14 @@ private fun surfaceHasSettings(surface: SurfaceId?, graph: LayoutGraph): Boolean
  */
 @Composable
 private fun RefusedMountPlaceholder() {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     Box(
         modifier = Modifier
             .padding(8.dp)
             .border(1.dp, NxColor.status(Status.Warning), RoundedCornerShape(8.dp))
             .padding(horizontal = 12.dp, vertical = 8.dp),
     ) {
-        Text(s.editorMountRefused, style = MaterialTheme.typography.labelMedium, color = NxColor.status(Status.Warning))
+        Text(s.text("editorMountRefused"), style = MaterialTheme.typography.labelMedium, color = NxColor.status(Status.Warning))
     }
 }
 

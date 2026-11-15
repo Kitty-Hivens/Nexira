@@ -40,9 +40,9 @@ import hivens.ui.LoginPanel
 import hivens.ui.components.rememberSignOutRequest
 import hivens.ui.flexible.Flexible
 import hivens.ui.flexible.FlexibleKind
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
-import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.platform.SystemActions
@@ -107,7 +107,7 @@ private fun SmartyCraftAccount(account: AccountView, othersLeft: Boolean) {
     val signOut = rememberAccountSignOut(SC_KEY, othersLeft) ?: return
     // Automation's full logout asks the window's question directly.
     val signOutAll = rememberSignOutRequest() ?: return
-    val s = LocalStrings.current
+    val s = nexiraStrings()
 
     // Bumped by the skin uploader so the skin re-loads after upload/refresh.
     var skinKey by remember { mutableIntStateOf(0) }
@@ -136,13 +136,13 @@ private fun SmartyCraftAccount(account: AccountView, othersLeft: Boolean) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Flexible("profile_upload_skin_btn", FlexibleKind.Button) {
                     NxButton(
-                        label = s.profileUploadSkin,
+                        label = s.text("profileUploadSkin"),
                         onClick = uploader.pick,
                         style = NxButtonStyle.Primary,
                     )
                 }
                 IconButton(onClick = uploader.refresh) {
-                    Symbol(NxIcon.Refresh, s.profileRefresh, tint = NxInk.quiet)
+                    Symbol(NxIcon.Refresh, s.text("profileRefresh"), tint = NxInk.quiet)
                 }
             }
             SkinUploadStatusLine(uploader.status)
@@ -150,7 +150,7 @@ private fun SmartyCraftAccount(account: AccountView, othersLeft: Boolean) {
 
         Flexible("profile_sc_signout_btn", FlexibleKind.Button) {
             NxButton(
-                label = s.profileSignOutSmartycraft,
+                label = s.text("profileSignOutSmartycraft"),
                 onClick = signOut,
                 modifier = Modifier.widthIn(min = 200.dp),
                 style = NxButtonStyle.Secondary,
@@ -163,7 +163,7 @@ private fun SmartyCraftAccount(account: AccountView, othersLeft: Boolean) {
 
 @Composable
 private fun AccountPanel(account: AccountView) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         // Name with the status pill on its right.
@@ -186,7 +186,7 @@ private fun AccountPanel(account: AccountView) {
             val topUp: @Composable (Modifier) -> Unit = { modifier ->
                 Flexible("profile_topup_btn", FlexibleKind.Button) {
                     NxButton(
-                        label = s.profileTopUp,
+                        label = s.text("profileTopUp"),
                         onClick = { SystemActions.openUrl("https://smartycraft.ru/cabinet") },
                         modifier = modifier,
                         style = NxButtonStyle.Secondary,
@@ -214,7 +214,7 @@ private fun AccountPanel(account: AccountView) {
 
 @Composable
 private fun StatusPill(online: Boolean) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val accent = if (online) NxColor.status(Status.Success) else NxColor.status(Status.Error)
     Row(
         modifier = Modifier
@@ -226,7 +226,7 @@ private fun StatusPill(online: Boolean) {
         Box(Modifier.size(7.dp).clip(RoundedCornerShape(50)).background(accent))
         Spacer(Modifier.width(7.dp))
         Text(
-            text = if (online) s.profileStatusOnline else s.profileStatusOffline,
+            text = if (online) s.text("profileStatusOnline") else s.text("profileStatusOffline"),
             style = MaterialTheme.typography.bodySmall,
             color = accent,
         )
@@ -235,7 +235,7 @@ private fun StatusPill(online: Boolean) {
 
 @Composable
 private fun BalanceCard(balance: Int, modifier: Modifier = Modifier) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     Row(
         modifier = modifier
             .clip(MaterialTheme.shapes.medium)
@@ -245,9 +245,9 @@ private fun BalanceCard(balance: Int, modifier: Modifier = Modifier) {
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Row(Modifier.weight(1f, fill = false), verticalAlignment = Alignment.CenterVertically) {
-            Symbol(NxIcon.Star, s.profileBalance, tint = Color(0xFFFFD700), fill = 1f, modifier = Modifier.size(20.dp))
+            Symbol(NxIcon.Star, s.text("profileBalance"), tint = Color(0xFFFFD700), fill = 1f, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(10.dp))
-            Text(s.profileBalance, color = NxInk.quiet, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(s.text("profileBalance"), color = NxInk.quiet, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         Spacer(Modifier.width(8.dp))
         // One line, never wrapped: the figure and its coin broke apart when the card was narrow.

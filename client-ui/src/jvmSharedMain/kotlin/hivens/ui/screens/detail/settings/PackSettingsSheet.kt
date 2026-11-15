@@ -51,14 +51,14 @@ import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
 import hivens.core.update.PackUpdater
 import hivens.core.update.VersionChannel
+import hivens.i18n.api.Strings
 import hivens.launcher.PackOperation
 import hivens.launcher.PackOperationKind
 import hivens.launcher.PackOperationPhase
 import hivens.launcher.PackOperationService
 import hivens.ui.components.ChannelChip
 import hivens.ui.components.label
-import hivens.ui.i18n.AppStrings
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.nx.NxIconButton
 import hivens.ui.nx.NxMetaChip
@@ -137,7 +137,7 @@ fun PackSettingsSheet(
     /** Section to open on, or null for the default. Set when returning from the version screen. */
     initialCategory: PackSettingsCategory? = null,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val repo: IPackRepository = koinInject()
     val appScope: CoroutineScope = koinInject()
     PuppetScreen("PackSettings.${pack.id}")
@@ -306,7 +306,7 @@ private fun SheetHeader(
     onExpand: () -> Unit,
     onClose: () -> Unit,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val mirror: IMirrorPackClient = koinInject()
     val installed = pack.pinnedPackVersion ?: pack.packRef.version
 
@@ -326,7 +326,7 @@ private fun SheetHeader(
         HeaderAvatar(pack)
         Column(Modifier.weight(1f)) {
             Text(
-                s.packSettingsTitle,
+                s.text("packSettingsTitle"),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = NxInk.main,
@@ -346,12 +346,12 @@ private fun SheetHeader(
         }
         NxIconButton(
             icon = if (expanded) NxIcon.CloseFullscreen else NxIcon.OpenInFull,
-            contentDescription = if (expanded) s.packSettingsCollapse else s.packSettingsExpand,
+            contentDescription = if (expanded) s.text("packSettingsCollapse") else s.text("packSettingsExpand"),
             onClick = onExpand,
         )
         NxIconButton(
             icon = NxIcon.Close,
-            contentDescription = s.packSettingsClose,
+            contentDescription = s.text("packSettingsClose"),
             onClick = onClose,
         )
     }
@@ -362,14 +362,14 @@ private fun SheetHeader(
  * version. The loader version is the part nothing else on screen showed, and the
  * one a player needs to say which build of the loader a crash came from.
  */
-internal fun runtimeLine(m: CachedManifestSnapshot, s: AppStrings): String {
+internal fun runtimeLine(m: CachedManifestSnapshot, s: Strings): String {
     val loader = m.loaderName
         .takeIf { it.isNotBlank() && !it.equals("vanilla", ignoreCase = true) }
         ?.let(::loaderLabel)
     return when {
-        loader == null -> s.packSettingsRuntimeVanilla(m.minecraftVersion)
-        m.loaderVersion.isBlank() -> s.packSettingsRuntimeLine(loader, m.minecraftVersion)
-        else -> s.packSettingsRuntimeLine("$loader ${m.loaderVersion}", m.minecraftVersion)
+        loader == null -> s.text("packSettingsRuntimeVanilla", m.minecraftVersion)
+        m.loaderVersion.isBlank() -> s.text("packSettingsRuntimeLine", loader, m.minecraftVersion)
+        else -> s.text("packSettingsRuntimeLine", "$loader ${m.loaderVersion}", m.minecraftVersion)
     }
 }
 
@@ -403,7 +403,7 @@ private fun HeaderAvatar(pack: PackInstance) {
  */
 @Composable
 private fun FooterStatus(operation: PackOperation?, notice: String?) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     Box(
         modifier = Modifier.fillMaxWidth().height(34.dp).padding(horizontal = 24.dp, vertical = 6.dp),
         contentAlignment = Alignment.CenterStart,
@@ -419,9 +419,9 @@ private fun FooterStatus(operation: PackOperation?, notice: String?) {
                     )
                     Text(
                         text     = when (operation.kind) {
-                            PackOperationKind.Update -> s.packVersionsApplying(phase.current, phase.total, phase.path)
-                            PackOperationKind.Repair -> s.packSettingsRepairProgress(phase.current, phase.total, phase.path)
-                            PackOperationKind.Reattach -> s.packSettingsReattachProgress(phase.current, phase.total, phase.path)
+                            PackOperationKind.Update -> s.text("packVersionsApplying", phase.current, phase.total, phase.path)
+                            PackOperationKind.Repair -> s.text("packSettingsRepairProgress", phase.current, phase.total, phase.path)
+                            PackOperationKind.Reattach -> s.text("packSettingsReattachProgress", phase.current, phase.total, phase.path)
                         },
                         style    = MaterialTheme.typography.labelSmall,
                         color    = NxInk.quiet,
@@ -433,7 +433,7 @@ private fun FooterStatus(operation: PackOperation?, notice: String?) {
                 }
             }
             phase is PackOperationPhase.Updated -> Text(
-                text  = if (operation.kind == PackOperationKind.Reattach) s.packSettingsReattached(phase.version) else s.packVersionsApplied(phase.version),
+                text  = if (operation.kind == PackOperationKind.Reattach) s.text("packSettingsReattached", phase.version) else s.text("packVersionsApplied", phase.version),
                 style = MaterialTheme.typography.labelSmall,
                 color = NxColor.status(Status.Success),
             )
@@ -442,7 +442,7 @@ private fun FooterStatus(operation: PackOperation?, notice: String?) {
             // in the same green as "all intact" is what let a half-finished repair
             // read as a finished one.
             phase is PackOperationPhase.Repaired && phase.failed.isNotEmpty() -> Text(
-                text  = s.packSettingsRepairIncomplete(
+                text  = s.text("packSettingsRepairIncomplete", 
                     phase.checked,
                     phase.repaired,
                     phase.failed.size,
@@ -454,13 +454,13 @@ private fun FooterStatus(operation: PackOperation?, notice: String?) {
                 overflow = TextOverflow.Ellipsis,
             )
             phase is PackOperationPhase.Repaired -> Text(
-                text  = s.packSettingsRepairDone(phase.checked, phase.repaired),
+                text  = s.text("packSettingsRepairDone", phase.checked, phase.repaired),
                 style = MaterialTheme.typography.labelSmall,
                 color = NxColor.status(Status.Success),
             )
-            phase is PackOperationPhase.Failed -> FooterError(s.packVersionsFailed(phase.message))
-            phase is PackOperationPhase.Refused -> FooterError(s.packOperationRefused(phase.work.label(s)))
-            phase is PackOperationPhase.PreviewStale -> FooterError(s.packSettingsReattachStale)
+            phase is PackOperationPhase.Failed -> FooterError(s.text("packVersionsFailed", phase.message))
+            phase is PackOperationPhase.Refused -> FooterError(s.text("packOperationRefused", phase.work.label(s)))
+            phase is PackOperationPhase.PreviewStale -> FooterError(s.text("packSettingsReattachStale"))
             notice != null -> FooterError(notice)
         }
     }

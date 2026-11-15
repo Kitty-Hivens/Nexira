@@ -31,7 +31,7 @@ import androidx.compose.ui.unit.dp
 import hivens.core.api.dto.modrinth.ModrinthProject
 import hivens.launcher.instance.InstalledContent
 import hivens.ui.customization.LocalCustomization
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.nx.NxButton
@@ -76,7 +76,7 @@ internal fun PackLockCard(
     onOpenPackSettings: () -> Unit,
     dismiss: () -> Unit,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val follow = rememberLinkFollower()
     // The same resolution the menu makes: the declared homepage, else the catalogue
     // page found by the file's hash, and no button while neither is known.
@@ -107,7 +107,7 @@ internal fun PackLockCard(
         page?.let { url ->
             NxIconButton(
                 icon               = NxIcon.OpenInNew,
-                contentDescription = s.contentActionOpenPage,
+                contentDescription = s.text("contentActionOpenPage"),
                 onClick            = { dismiss(); follow(url) },
                 tint               = NxInk.quiet,
             )
@@ -120,13 +120,13 @@ internal fun PackLockCard(
         LockMark()
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(
-                text       = s.contentLockedTitle,
+                text       = s.text("contentLockedTitle"),
                 style      = MaterialTheme.typography.titleSmall,
                 color      = NxInk.main,
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
-                text  = if (lock == RowLock.PackOptional) s.contentLockedOptionalBody else s.contentLockedBody,
+                text  = if (lock == RowLock.PackOptional) s.text("contentLockedOptionalBody") else s.text("contentLockedBody"),
                 style = MaterialTheme.typography.bodySmall,
                 color = NxInk.quiet,
             )
@@ -135,13 +135,13 @@ internal fun PackLockCard(
 
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         NxButton(
-            label   = s.contentLockedOpenSettings,
+            label   = s.text("contentLockedOpenSettings"),
             onClick = { dismiss(); onOpenPackSettings() },
             icon    = NxIcon.Settings,
             compact = true,
         )
         NxButton(
-            label   = s.contentActionDetails,
+            label   = s.text("contentActionDetails"),
             onClick = { dismiss(); onDetails() },
             style   = NxButtonStyle.Secondary,
             icon    = NxIcon.Info,

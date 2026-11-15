@@ -39,11 +39,11 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import hivens.i18n.api.Strings
 import hivens.ui.audio.PlaybackState
 import hivens.ui.audio.RepeatMode
 import hivens.ui.audio.TrackInfo
-import hivens.ui.i18n.AppStrings
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
@@ -176,7 +176,7 @@ internal fun TokenPlayerCard(
     onSeek: (Long) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val idle = state is PlaybackState.Idle
     val loaded = !idle && state !is PlaybackState.Error
     var menuOpen by remember { mutableStateOf(false) }
@@ -210,7 +210,7 @@ internal fun TokenPlayerCard(
                     .seekByAngle(MIDDLE_SHARE) { at ->
                         if (loaded && duration > 0L) onSeek((at * duration).toLong())
                     }
-                    .openWhenEmpty(idle, s.audioPickTrack, onPick),
+                    .openWhenEmpty(idle, s.text("audioPickTrack"), onPick),
                 contentAlignment = Alignment.Center,
             ) {
                 val side = minOf(maxWidth, maxHeight)
@@ -266,24 +266,24 @@ internal fun TokenPlayerCard(
                     Box(Modifier.align(Alignment.TopEnd).padding(side * OVERFLOW_INSET).alpha(reveal)) {
                         NxIconButton(
                             icon               = NxIcon.MoreVert,
-                            contentDescription = s.packCardMore,
+                            contentDescription = s.text("packCardMore"),
                             onClick            = { menuOpen = true },
                             iconSize           = 16.dp,
                         )
                         NxPopoverPanel(
                             expanded         = menuOpen,
                             onDismissRequest = { menuOpen = false },
-                            title            = s.audioPlaybackOptions,
+                            title            = s.text("audioPlaybackOptions"),
                             footer           = {
                                 NxButton(
-                                    label   = s.audioOpenFile,
+                                    label   = s.text("audioOpenFile"),
                                     onClick = { menuOpen = false; onPick() },
                                     style   = NxButtonStyle.Tertiary,
                                     icon    = NxIcon.FolderOpen,
                                     compact = true,
                                 )
                                 NxButton(
-                                    label   = s.audioStop,
+                                    label   = s.text("audioStop"),
                                     onClick = { menuOpen = false; onStop() },
                                     style   = NxButtonStyle.Tertiary,
                                     icon    = NxIcon.Stop,
@@ -295,17 +295,17 @@ internal fun TokenPlayerCard(
                             // The face has no room for a skip, so the queue is
                             // reachable only from here.
                             if (queueSize > 1) {
-                                NxPanelGroup(label = s.audioQueue) {
+                                NxPanelGroup(label = s.text("audioQueue")) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         NxIconButton(
                                             icon               = NxIcon.SkipPrevious,
-                                            contentDescription = s.audioSkipPrevious,
+                                            contentDescription = s.text("audioSkipPrevious"),
                                             onClick            = onSkipPrev,
                                             enabled            = loaded,
                                         )
                                         NxIconButton(
                                             icon               = NxIcon.SkipNext,
-                                            contentDescription = s.audioSkipNext,
+                                            contentDescription = s.text("audioSkipNext"),
                                             onClick            = onSkipNext,
                                             enabled            = loaded,
                                         )
@@ -313,14 +313,14 @@ internal fun TokenPlayerCard(
                                 }
                             }
                             NxSlider(
-                                label         = s.audioVolume,
+                                label         = s.text("audioVolume"),
                                 value         = volume,
                                 range         = 0f..1f,
                                 valueText     = "${(volume * 100).toInt()}%",
                                 onValueChange = onVolume,
                                 compact       = true,
                             )
-                            NxPanelGroup(label = s.audioRepeat) {
+                            NxPanelGroup(label = s.text("audioRepeat")) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     NxCycleToggle(
                                         states  = repeatStates(s),
@@ -349,11 +349,11 @@ private fun Transport(
     loaded: Boolean,
     tint: Color,
     side: Dp,
-    s: AppStrings,
+    s: Strings,
     onPlayPause: () -> Unit,
 ) = NxIconButton(
     icon               = if (state is PlaybackState.Playing) NxIcon.Pause else NxIcon.PlayArrow,
-    contentDescription = if (state is PlaybackState.Playing) s.audioPause else s.audioPlay,
+    contentDescription = if (state is PlaybackState.Playing) s.text("audioPause") else s.text("audioPlay"),
     onClick            = onPlayPause,
     tint               = tint,
     enabled            = loaded,

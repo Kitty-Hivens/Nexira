@@ -1,6 +1,6 @@
 {
   "schema_version": 15,
-  "modules": ["nexira.packs", "nexira.accounts", "nexira.catalogue"],
+  "modules": ["nexira.i18n", "nexira.packs", "nexira.accounts", "nexira.catalogue"],
   "graph": {
     "surfaces": {
       "appshell.backdrop": {

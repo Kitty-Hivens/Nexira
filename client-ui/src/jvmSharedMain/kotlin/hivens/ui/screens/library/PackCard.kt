@@ -40,7 +40,7 @@ import hivens.ui.Screen
 import hivens.ui.components.SourceBadge
 import hivens.ui.components.rememberPackDeleteBlock
 import hivens.ui.effects.pixelArtBackground
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.navigation.NavRequests
 import hivens.ui.notifications.IndicationCenter
@@ -84,7 +84,7 @@ fun PackCard(
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val (hueA, hueB) = decorativePair(instance.id)
     val art = rememberPackArt(instance)
     PuppetClick("library.pack.${instance.id}") { onOpenDetail() }
@@ -181,14 +181,14 @@ fun PackCard(
                 // where launch + every setting live. Card keeps only the overflow
                 // (open folder / delete) as out-of-the-way quick actions.
                 val deleteBlock = rememberPackDeleteBlock(instance.id)
-                NxKebabButton(contentDescription = s.packCardMore, tint = Color.White) { dismiss ->
+                NxKebabButton(contentDescription = s.text("packCardMore"), tint = Color.White) { dismiss ->
                     NxMenuItem(
-                        label   = s.serverSettingsOpenFolder,
+                        label   = s.text("serverSettingsOpenFolder"),
                         icon    = NxIcon.FolderOpen,
                         onClick = { dismiss(); onOpenFolder() },
                     )
                     NxMenuItem(
-                        label       = s.editorDelete,
+                        label       = s.text("editorDelete"),
                         icon        = NxIcon.Delete,
                         destructive = true,
                         hint        = deleteBlock,
@@ -253,9 +253,9 @@ private fun UpdateBadgePill(
     modifier: Modifier = Modifier,
     tone: NxMetaChipTone = NxMetaChipTone.OnMedia,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     NxMetaChip(
-        text     = if (isRollback) s.packVersionRollbackBadge else s.packVersionUpdateBadge,
+        text     = if (isRollback) s.text("packVersionRollbackBadge") else s.text("packVersionUpdateBadge"),
         modifier = modifier,
         tone     = tone,
         dot      = if (isRollback) NxColor.status(Status.Warning) else NxColor.lead(),
@@ -266,14 +266,14 @@ private fun UpdateBadgePill(
 /** Compact launch-state pill overlaid on the card while a launch of this pack is in flight. */
 @Composable
 private fun LaunchStatusPill(indication: IndicationCenter.LaunchIndication, modifier: Modifier = Modifier) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val (dotColor, label) = when (indication) {
-        IndicationCenter.LaunchIndication.Preparing -> NxColor.status(Status.Info) to s.launchPreparing
+        IndicationCenter.LaunchIndication.Preparing -> NxColor.status(Status.Info) to s.text("launchPreparing")
         is IndicationCenter.LaunchIndication.Downloading ->
-            NxColor.status(Status.Info) to (indication.progress?.let { "${(it * 100).roundToInt()}%" } ?: s.launchDownloading.removeSuffix(":"))
-        IndicationCenter.LaunchIndication.Running -> NxColor.status(Status.Success) to s.launchRunning
-        IndicationCenter.LaunchIndication.Stopping -> NxColor.status(Status.Info) to s.launchStopping
-        IndicationCenter.LaunchIndication.Failed  -> NxColor.status(Status.Error) to s.launchFailed
+            NxColor.status(Status.Info) to (indication.progress?.let { "${(it * 100).roundToInt()}%" } ?: s.text("launchDownloading").removeSuffix(":"))
+        IndicationCenter.LaunchIndication.Running -> NxColor.status(Status.Success) to s.text("launchRunning")
+        IndicationCenter.LaunchIndication.Stopping -> NxColor.status(Status.Info) to s.text("launchStopping")
+        IndicationCenter.LaunchIndication.Failed  -> NxColor.status(Status.Error) to s.text("launchFailed")
     }
     NxMetaChip(text = label, modifier = modifier, tone = NxMetaChipTone.OnMedia, dot = dotColor)
 }
@@ -298,15 +298,15 @@ private fun LastPlayedChip(lastPlayedEpoch: Long) {
 /** When a pack was last played, in the words a card uses: "1 h ago", "never played". */
 @Composable
 internal fun lastPlayedLabel(lastPlayedEpoch: Long): String {
-    val s = LocalStrings.current
-    if (lastPlayedEpoch <= 0L) return s.packCardNeverPlayed
+    val s = nexiraStrings()
+    if (lastPlayedEpoch <= 0L) return s.text("packCardNeverPlayed")
     val dur = Duration.between(Instant.ofEpochSecond(lastPlayedEpoch), Instant.now())
     return when {
-        dur.toMinutes() < 1   -> s.packCardPlayedJustNow
-        dur.toHours()   < 1   -> s.packCardPlayedMinutesAgo(dur.toMinutes())
-        dur.toDays()    < 1   -> s.packCardPlayedHoursAgo(dur.toHours())
-        dur.toDays()    < 14  -> s.packCardPlayedDaysAgo(dur.toDays())
-        else                  -> s.packCardPlayedLongAgo
+        dur.toMinutes() < 1   -> s.text("packCardPlayedJustNow")
+        dur.toHours()   < 1   -> s.text("packCardPlayedMinutesAgo", dur.toMinutes())
+        dur.toDays()    < 1   -> s.text("packCardPlayedHoursAgo", dur.toHours())
+        dur.toDays()    < 14  -> s.text("packCardPlayedDaysAgo", dur.toDays())
+        else                  -> s.text("packCardPlayedLongAgo")
     }
 }
 

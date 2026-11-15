@@ -12,8 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import hivens.ui.host.HostKoin
-import hivens.ui.i18n.AppLocale
-import hivens.ui.i18n.LocaleProvider
+import hivens.ui.i18n.ShippedLanguageProvider
 import hivens.ui.notifications.SessionRegistry
 import hivens.ui.settle
 import hivens.ui.theme.NxColor
@@ -61,7 +60,7 @@ class TopBarSessionsRenderTest {
         val d = 2f
         val scene = ImageComposeScene((720 * d).toInt(), (44 * d).toInt(), density = Density(d)) {
             HostKoin(app) {
-                LocaleProvider(AppLocale.RUSSIAN) {
+                ShippedLanguageProvider("ru") {
                     NxTheme(dark = true) {
                         Box(
                             Modifier.fillMaxSize().background(NxColor.page),

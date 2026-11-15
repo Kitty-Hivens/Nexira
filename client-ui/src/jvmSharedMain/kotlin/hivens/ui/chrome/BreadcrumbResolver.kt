@@ -9,9 +9,9 @@ import hivens.catalogue.api.OpenProject
 import hivens.catalogue.api.ProjectTarget
 import hivens.catalogue.api.packTargetKey
 import hivens.core.api.interfaces.IPackRepository
+import hivens.i18n.api.Strings
 import hivens.ui.Screen
-import hivens.ui.i18n.AppStrings
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
@@ -24,18 +24,18 @@ import org.koin.compose.koinInject
  * screens whose label is a pack name resolved asynchronously (installed pack,
  * Modrinth project, mirror pack).
  */
-fun staticCrumbLabel(screen: Screen, s: AppStrings): String? = when (screen) {
-    Screen.Home                   -> s.crumbHome
-    Screen.Library                -> s.libraryHeaderTitle
-    Screen.Browse                 -> s.browseTitle
-    Screen.Profile                -> s.profileTitle
-    Screen.Wardrobe               -> s.wardrobeTitle
-    Screen.Settings               -> s.settingsTitle
-    Screen.ThemePicker            -> s.themePickerTitle
-    Screen.About                  -> s.aboutTitle
-    Screen.BackgroundSettings     -> s.backgroundTitle
-    is Screen.PackVersions        -> s.packVersionsTitle
-    is Screen.BrowseInto          -> s.contentFindProjects
+fun staticCrumbLabel(screen: Screen, s: Strings): String? = when (screen) {
+    Screen.Home                   -> s.text("crumbHome")
+    Screen.Library                -> s.text("libraryHeaderTitle")
+    Screen.Browse                 -> s.text("browseTitle")
+    Screen.Profile                -> s.text("profileTitle")
+    Screen.Wardrobe               -> s.text("wardrobeTitle")
+    Screen.Settings               -> s.text("settingsTitle")
+    Screen.ThemePicker            -> s.text("themePickerTitle")
+    Screen.About                  -> s.text("aboutTitle")
+    Screen.BackgroundSettings     -> s.text("backgroundTitle")
+    is Screen.PackVersions        -> s.text("packVersionsTitle")
+    is Screen.BrowseInto          -> s.text("contentFindProjects")
     // Resolved to a human name by the catalogue / repository / roster (see below).
     is Screen.PackDetail          -> null
     is Screen.CataloguePackDetail -> null
@@ -68,7 +68,7 @@ private fun modFallbackLabel(target: ProjectTarget): String = when (target) {
  */
 @Composable
 fun rememberCrumbLabel(screen: Screen): String {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     staticCrumbLabel(screen, s)?.let { return it }
     return when (screen) {
         is Screen.PackDetail -> {
@@ -88,7 +88,7 @@ fun rememberCrumbLabel(screen: Screen): String {
         // Read live, so a rename in the editor relabels the crumb at once. A screen
         // deleted while it was open says so rather than naming nothing.
         is Screen.Custom              ->
-            LocalLayoutGraph.current.screen(screen.id)?.title?.ifBlank { null } ?: s.screenMissing
+            LocalLayoutGraph.current.screen(screen.id)?.title?.ifBlank { null } ?: s.text("screenMissing")
         else -> staticCrumbLabel(screen, s).orEmpty() // unreachable: statics returned above
     }
 }

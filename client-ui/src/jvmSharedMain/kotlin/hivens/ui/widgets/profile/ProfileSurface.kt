@@ -18,9 +18,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import hivens.accounts.api.SessionView
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
-import hivens.ui.i18n.LocalStrings
 import hivens.ui.identity.SkinManager
 import hivens.ui.platform.SystemActions
 import hivens.ui.puppet.PuppetClick
@@ -71,7 +71,7 @@ fun ProfileSurface(
     session: SessionView?,
     authResolving: Boolean,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val skinManager: SkinManager = koinInject()
     // The page's own, shared with the nav that picks it. Drawn outside any page,
     // which only a test does, the surface keeps one of its own.

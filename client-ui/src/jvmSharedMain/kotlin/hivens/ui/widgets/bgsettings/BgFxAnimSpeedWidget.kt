@@ -1,15 +1,15 @@
 package hivens.ui.widgets.bgsettings
 
 import androidx.compose.runtime.Composable
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.widget.model.Widget
 
 @Widget(id = "bg.fx.animspeed", displayName = "widget.bg.fx.animspeed", needs = ["background.settings", "background.update"])
 @Composable
 fun BgFxAnimSpeedWidget() {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     BgSlider(
-        label  = s.backgroundAnimationSpeed,
+        label  = s.text("backgroundAnimationSpeed"),
         range  = 0.25f..4f,
         read   = { animationSpeedMultiplier },
         format = { "%.2fx".format(it) },

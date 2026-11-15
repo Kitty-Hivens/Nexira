@@ -36,11 +36,11 @@ import hivens.catalogue.api.CatalogueKeys
 import hivens.catalogue.api.ProjectBuild
 import hivens.catalogue.api.ProjectPageView
 import hivens.core.update.VersionChannel
+import hivens.ui.i18n.nexiraStrings
 import hivens.widget.api.rememberScopedAction
 import hivens.ui.components.ChannelChip
 import hivens.ui.components.ReleaseNotes
 import hivens.ui.components.formatBuildTimestamp
-import hivens.ui.i18n.LocalStrings
 import hivens.ui.nx.CenteredProgress
 import hivens.ui.nx.NxVerticalScrollbar
 import hivens.ui.nx.RetryStateBlock
@@ -65,7 +65,7 @@ internal fun ChangelogPane(
     onReload: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val loadVersions = rememberScopedAction(CatalogueKeys.LoadVersions)
     val retryVersions = rememberScopedAction(CatalogueKeys.RetryVersions)
     // Same key as the versions tab, for the same reason: the project arrives after
@@ -80,9 +80,9 @@ internal fun ChangelogPane(
     // cannot tell from work still in progress.
     if (state.failed) {
         RetryStateBlock(
-            title = s.contentTabFetchErrorTitle,
-            message = s.contentTabFetchErrorGeneric,
-            retryLabel = s.contentTabRetry,
+            title = s.text("contentTabFetchErrorTitle"),
+            message = s.text("contentTabFetchErrorGeneric"),
+            retryLabel = s.text("contentTabRetry"),
             onRetry = onReload,
             modifier = modifier.padding(20.dp),
             titleStyle = MaterialTheme.typography.titleMedium,
@@ -91,9 +91,9 @@ internal fun ChangelogPane(
     }
     if (state.versionsFailed) {
         RetryStateBlock(
-            title = s.modPageVersionsFailed,
-            message = s.modPageVersionsFailedBody,
-            retryLabel = s.contentTabRetry,
+            title = s.text("modPageVersionsFailed"),
+            message = s.text("modPageVersionsFailedBody"),
+            retryLabel = s.text("contentTabRetry"),
             onRetry = { retryVersions?.invoke() },
             modifier = modifier.padding(20.dp),
             titleStyle = MaterialTheme.typography.titleMedium,
@@ -114,7 +114,7 @@ internal fun ChangelogPane(
     if (!state.knownToCatalogue) {
         Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text(
-                s.modPageVersionsNoEntry,
+                s.text("modPageVersionsNoEntry"),
                 style = MaterialTheme.typography.bodySmall,
                 color = NxInk.quiet,
             )
@@ -134,12 +134,12 @@ internal fun ChangelogPane(
  */
 @Composable
 internal fun ChangelogList(builds: List<ProjectBuild>, modifier: Modifier = Modifier) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val entries = remember(builds) { changelogEntries(builds) }
     if (entries.isEmpty()) {
         Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text(
-                s.versionPickerNoChangelog,
+                s.text("versionPickerNoChangelog"),
                 style = MaterialTheme.typography.bodySmall,
                 color = NxInk.quiet,
             )

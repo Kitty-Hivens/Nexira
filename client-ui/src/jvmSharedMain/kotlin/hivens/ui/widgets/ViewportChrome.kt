@@ -9,7 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxHorizontalScrollbar
@@ -42,7 +42,7 @@ val NxMapControls: MapControls = { away, goHome ->
         modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
     ) {
         NxButton(
-            label   = LocalStrings.current.mapGoHome,
+            label   = nexiraStrings().text("mapGoHome"),
             onClick = goHome,
             icon    = NxIcon.Dashboard,
             compact = true,

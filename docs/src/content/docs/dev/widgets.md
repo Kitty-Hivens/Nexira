@@ -55,7 +55,7 @@ ksp {
 tasks.jar {
     manifest {
         attributes(
-            "Nexira-Widget-Api" to 1,
+            "Nexira-Widget-Api" to 3,
             "Nexira-Module-Id" to "mymodule",
             "Nexira-Module-Name" to "My Module",
         )
@@ -99,11 +99,18 @@ These always come from the launcher, and a copy in your jar is ignored. That is 
 
 ### Other modules' APIs
 
-To use another module's API, for example the packs, the accounts or the catalogue module, name it in the manifest beside the other attributes:
+To use another module's API, for example the packs, the accounts, the catalogue or the language module, name it in the manifest beside the other attributes:
 
 ```kotlin
-"Nexira-Module-Requires" to "nexira.packs=1.0, nexira.accounts=1.0, nexira.catalogue=1.0",
+"Nexira-Module-Requires" to "nexira.i18n=1.0, nexira.packs=1.0, nexira.accounts=1.0, nexira.catalogue=1.0",
 ```
+
+| API id             | Artifact         | Package                | What it is for                                              |
+|--------------------|------------------|------------------------|-------------------------------------------------------------|
+| `nexira.i18n`      | `:i18n-api`      | `hivens.i18n.api`      | Looking words up, the language in use, the language setting |
+| `nexira.packs`     | `:packs-api`     | `hivens.packs.api`     | Listing, launching, installing and updating packs           |
+| `nexira.accounts`  | `:accounts-api`  | `hivens.accounts.api`  | Who is signed in, the stored accounts, signing in and out   |
+| `nexira.catalogue` | `:catalogue-api` | `hivens.catalogue.api` | Searching the catalogue and putting a project into a pack   |
 
 Each entry is an API id and the version you compiled against. The launcher refuses your jar, with the reason in the log, when it does not carry that API or carries a version that does not serve yours: another major version, or an older minor one. An API you name is visible to your module. One you do not name is not, even when the launcher carries it.
 
@@ -118,6 +125,76 @@ While the launcher runs your module's code itself, its constructors, its key dec
 Modules cannot see each other's classes. Two modules can carry a class of the same name without interfering.
 
 You may draw with the launcher's design system or bring your own. The example deliberately does the second: it defines its own palette and draws its own controls.
+
+## Words
+
+A module brings its words as files in its jar, one per language, UTF-8, `key=text`:
+
+- `i18n/<tag>.properties` for its own words, `i18n/en.properties`, `i18n/ru.properties` and so on. They are registered under the module's id as their namespace.
+- `i18n/<namespace>/<tag>.properties` for words it adds to another namespace: a translation of the launcher's own words (namespace `nexira`) or of another module's.
+- `i18n/<tag>/language.properties` for a language it adds, declared the way a person's own translation folder declares one (`name`, `plural`, `fallback`, see [Translations](/Nexira/translations/)). A translation module can bring a whole language this way.
+
+Words a module carries for another namespace are laid over that namespace's own, and a person's own translation files are laid over both. Where a module writes its own words both as `i18n/<tag>.properties` and as `i18n/<its id>/<tag>.properties`, the first wins.
+
+A label a contribution or a setting declares is a key into the module's own words. A key with no entry is shown as written, so a module in one language can put plain text there and ship no files at all.
+
+To look words up, name `nexira.i18n` in the manifest and compile against `:i18n-api`:
+
+```kotlin
+@Composable
+fun Greeting(name: String) {
+    val words = strings("mymodule")
+    Text(words.text("greeting", name))          // greeting=Hello, {0}
+}
+```
+
+Outside a composition, a service reads the `Translations` service: `context.services.get<Translations>().strings("mymodule").text("done")`.
+
+A key is looked up in the person's language, then in each language that one falls back to, then in English, then shown as itself. Each text is a message in a small part of ICU MessageFormat:
+
+| Form                                                 | What it does                                              |
+|------------------------------------------------------|-----------------------------------------------------------|
+| `{0}`, `{1}`                                         | The arguments in order                                    |
+| `{0, plural, one {# file} other {# files}}`          | A form by the number's plural category, `#` is the number |
+| `{0, plural, =0 {nothing} other {# things}}`         | An exact value before the category                        |
+| `{0, select, smartycraft {SmartyCraft} other {{0}}}` | A form by the argument's text                             |
+| `'{'`, `'}'`, `'#'`                                  | A literal brace or hash                                   |
+
+`other` is required in every plural and select, and forms nest. Unlike ICU, an apostrophe anywhere else is just an apostrophe, so `'{0}'` is the argument in quotes. The categories a language uses are those of its plural family, see [Translations](/Nexira/translations/).
+
+:::note[Moving from earlier launchers]
+`ModuleStrings` no longer looks anything up: it carries a module's tables, and the language module answers them. `ModuleStrings.get` is gone, and a lookup is `strings(namespace).text(key, args)`. The files are the same and `{0}`, `{1}` mean what they meant. Two things read differently now: a literal `{` or `}` in a text has to be written `'{'` or `'}'`, and a text that does not parse is shown as written with a warning in the log.
+:::
+
+## Settings
+
+A module keeps its own settings as a settings domain: one value with its defaults, which the launcher stores in a file of its own under the data directory's `settings` folder. Declare it beside the keys, with an app source to read it and an app command to change it, both in your own API:
+
+```kotlin
+@Serializable
+data class ClockSettings(val seconds: Boolean = false)
+
+object ClockDomain : SettingsDomain<ClockSettings>("mymodule.clock", ClockSettings.serializer()) {
+    override fun defaults() = ClockSettings()
+}
+
+object ClockKeys {
+    val Settings = SourceKey<ClockSettings>("mymodule.clock.settings")
+    val Update = CommandKey<SettingsChange<ClockSettings>>("mymodule.clock.settings.update")
+}
+
+class MyKeys : KeyContribution {
+    override val id = "mymodule.keys"
+    override val label = "mymodule.keys"
+    override fun declare(keys: ModuleKeys) {
+        keys.settings(ClockDomain, ClockKeys.Settings, ClockKeys.Update)
+    }
+}
+```
+
+A widget reads `rememberScopedSource(ClockKeys.Settings)` and changes it by firing `ClockKeys.Update` with `SettingsChange { it.copy(seconds = true) }`. A service of the module reads the same value through `context.services.get<SettingsStores>().of(ClockDomain)`.
+
+The launcher applies changes one at a time and writes the file whole. Where the file is absent or cannot be read, the module gets its defaults, or what `imported` takes from the launcher's former single settings file for a domain that was kept there before. Nothing is written for that, so it is asked again at every start until the first change is saved. A domain that was kept there can name, in `mirrored`, the fields an older build reads, and the launcher writes them there with every change, so going back to an older build keeps the choice, and a choice made there is taken back on the way up again. A file written by a newer build of the module, with a higher `schema` than the domain declares, is read as far as it can be and never written. A domain id is the module's for good, since the file is named by it, and a domain id another module already declared keeps your module's keys out entirely.
 
 ## Installing while you work
 

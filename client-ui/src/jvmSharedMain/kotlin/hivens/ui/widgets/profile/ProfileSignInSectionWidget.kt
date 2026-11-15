@@ -24,7 +24,7 @@ import androidx.compose.ui.unit.dp
 import hivens.accounts.api.AccountKeys
 import hivens.accounts.api.AccountView
 import hivens.ui.components.MicrosoftSignInButton
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.platform.SystemActions
@@ -96,7 +96,7 @@ private fun MicrosoftAccount(session: AccountView, othersLeft: Boolean) {
     // is left after it, that is a full logout, which asks first through the window's
     // sign-out question (see the SmartyCraft section for the same shape).
     val signOut = rememberAccountSignOut(MS_KEY, othersLeft) ?: return
-    val s = LocalStrings.current
+    val s = nexiraStrings()
 
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text(
@@ -110,7 +110,7 @@ private fun MicrosoftAccount(session: AccountView, othersLeft: Boolean) {
         // service this section's identity comes from) is the next pass.
         Flexible("profile_ms_signout_btn", FlexibleKind.Button) {
             NxButton(
-                label = s.profileSignOutMicrosoft,
+                label = s.text("profileSignOutMicrosoft"),
                 onClick = { signOut() },
                 modifier = Modifier.widthIn(min = 200.dp),
                 style = NxButtonStyle.Secondary,

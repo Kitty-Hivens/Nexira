@@ -29,7 +29,7 @@ import hivens.accounts.api.AccountKeys
 import hivens.accounts.api.SkinUpload
 import hivens.accounts.api.SkinUploadStatus
 import hivens.ui.accounts.outcomeOf
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.identity.SkinManager
@@ -137,7 +137,7 @@ fun rememberSkinUploader(
     asSignedIn: Boolean = false,
     onSkinChanged: () -> Unit,
 ): SkinUploader {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val skinManager: SkinManager = koinInject()
     val scope = rememberCoroutineScope()
     // The picker is UI and belongs to the composition. The upload that follows it
@@ -147,7 +147,7 @@ fun rememberSkinUploader(
     val upload = rememberScopedCommand(AccountKeys.UploadSkin)
     val level = LocalScope.current
     var status by remember { mutableStateOf<UploadStatus>(UploadStatus.None) }
-    val dialogSettings = rememberFileDialogSettings(s.profileUploadSkin)
+    val dialogSettings = rememberFileDialogSettings(s.text("profileUploadSkin"))
 
     val pick: () -> Unit = pick@{
         // One upload at a time, as the diagnostic bundle's button holds one write:
@@ -170,9 +170,9 @@ fun rememberSkinUploader(
                         SkinUploadStatus.Done -> {
                             skinManager.invalidate(playerName)
                             onSkinChanged()
-                            UploadStatus.Success(s.profileUploadSuccess)
+                            UploadStatus.Success(s.text("profileUploadSuccess"))
                         }
-                        is SkinUploadStatus.Failed -> UploadStatus.Error(s.profileUploadError(outcome.message ?: s.loginErrorGeneric))
+                        is SkinUploadStatus.Failed -> UploadStatus.Error(s.text("profileUploadError", outcome.message ?: s.text("loginErrorGeneric")))
                         SkinUploadStatus.Uploading -> UploadStatus.Loading
                     }
                 }
@@ -198,14 +198,14 @@ fun SkinControls(
     modifier: Modifier = Modifier,
     asSignedIn: Boolean = false,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val uploader = rememberSkinUploader(providerKey, playerName, asSignedIn, onSkinChanged)
     Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
         SkinUploadStatusLine(uploader.status)
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = uploader.pick) { Text(s.profileUploadSkin) }
+            OutlinedButton(onClick = uploader.pick) { Text(s.text("profileUploadSkin")) }
             IconButton(onClick = uploader.refresh) {
-                Symbol(NxIcon.Refresh, s.profileRefresh, tint = NxInk.quiet)
+                Symbol(NxIcon.Refresh, s.text("profileRefresh"), tint = NxInk.quiet)
             }
         }
     }
@@ -213,10 +213,10 @@ fun SkinControls(
 
 @Composable
 fun SkinUploadStatusLine(status: UploadStatus) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     when (status) {
         is UploadStatus.Error -> StatusLine(status.message, NxColor.status(Status.Error))
-        UploadStatus.Loading  -> StatusLine(s.profileUploadSkinLoading, NxInk.quiet)
+        UploadStatus.Loading  -> StatusLine(s.text("profileUploadSkinLoading"), NxInk.quiet)
         // Success is silent on purpose -- the changed skin is the feedback.
         is UploadStatus.Success, UploadStatus.None -> Unit
     }

@@ -32,7 +32,7 @@ import hivens.ui.Screen
 import hivens.ui.effects.pixelArtBackground
 import hivens.ui.flexible.Flexible
 import hivens.ui.flexible.FlexibleKind
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.InitialsAvatar
 import hivens.ui.nx.PlayGround
 import hivens.ui.nx.PlayLayout
@@ -86,13 +86,13 @@ data class HeroProps(
 fun HomeNewHero(instance: WidgetInstance) {
     val p = instance.rememberProps<HeroProps>()
     val navigate = rememberScopedCommand(Commands.Navigate) ?: return
-    val s = LocalStrings.current
-    val quickLaunch = rememberQuickLaunchTarget(s.homeQuickButton) ?: return
+    val s = nexiraStrings()
+    val quickLaunch = rememberQuickLaunchTarget(s.text("homeQuickButton")) ?: return
     val target = quickLaunch.target
     val (hueA, hueB) = decorativePair(target.id)
     val art = rememberPackArt(target)
 
-    val eyebrow = if (target.lastPlayedEpochSecond > 0L) s.homeQuickContinue else s.homeQuickStart
+    val eyebrow = if (target.lastPlayedEpochSecond > 0L) s.text("homeQuickContinue") else s.text("homeQuickStart")
     val openDetail = { navigate(Screen.PackDetail(target.id)) }
 
     BoxWithConstraints(Modifier.fillMaxWidth().padding(top = 12.dp)) {
@@ -168,7 +168,7 @@ fun HomeNewHero(instance: WidgetInstance) {
                         val meta = buildList {
                             target.source.version?.let { add(it) }
                             val hours = target.playtimeSeconds / 3600
-                            if (hours > 0) add(s.homeHeroPlaytime(hours))
+                            if (hours > 0) add(s.text("homeHeroPlaytime", hours))
                             if (target.lastPlayedEpochSecond > 0L) add(lastPlayedLabel(target.lastPlayedEpochSecond))
                         }
                         if (meta.isNotEmpty()) {

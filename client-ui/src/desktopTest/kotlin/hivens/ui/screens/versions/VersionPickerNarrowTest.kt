@@ -9,8 +9,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.unit.Density
 import hivens.core.update.VersionChannel
-import hivens.ui.i18n.AppLocale
-import hivens.ui.i18n.LocaleProvider
+import hivens.ui.i18n.ShippedLanguageProvider
 import hivens.ui.layers.LayerHost
 import hivens.ui.layers.WindowLayers
 import hivens.ui.theme.NxTheme
@@ -42,7 +41,7 @@ class VersionPickerNarrowTest {
     @Test
     fun `the notes keep a readable width on a phone`() {
         val scene = ImageComposeScene(1080, 2400, density = Density(2.5f)) {
-            LocaleProvider(AppLocale.RUSSIAN) {
+            ShippedLanguageProvider("ru") {
                 NxTheme(dark = true) {
                     LayerHost(WindowLayers(), Modifier.fillMaxSize()) {
                         VersionPickerWindow(

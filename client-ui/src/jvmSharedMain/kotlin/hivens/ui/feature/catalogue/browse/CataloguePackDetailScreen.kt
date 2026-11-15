@@ -36,6 +36,7 @@ import hivens.catalogue.api.PackOrigins
 import hivens.catalogue.api.PackPageStatus
 import hivens.catalogue.api.PackVisit
 import hivens.catalogue.api.ProjectBuild
+import hivens.i18n.api.Strings
 import hivens.packs.api.InstallRequest
 import hivens.packs.api.InstallStatus
 import hivens.packs.api.PackKeys
@@ -52,8 +53,8 @@ import hivens.ui.feature.catalogue.project.ProjectHeader
 import hivens.ui.feature.catalogue.project.compactCount
 import hivens.ui.feature.catalogue.project.rememberLinkFollower
 import hivens.ui.feature.catalogue.rememberPageVisit
-import hivens.ui.i18n.AppStrings
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.modrinthCategory
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.nx.CenteredProgress
 import hivens.ui.nx.NxButton
@@ -290,7 +291,7 @@ internal fun CataloguePackPageHeader(page: CataloguePackPage) {
 
 @Composable
 internal fun CataloguePackPageTabs(page: CataloguePackPage) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     NxTabRow(
         tabs = page.tabs.map { it.label(s) },
         selected = page.tabs.indexOf(page.tab).coerceAtLeast(0),
@@ -302,14 +303,14 @@ internal fun CataloguePackPageTabs(page: CataloguePackPage) {
 /** The tab's pane, or the page's loading and failure where the pack is not read yet. */
 @Composable
 internal fun CataloguePackPageBody(page: CataloguePackPage, modifier: Modifier = Modifier) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     Box(modifier) {
         when (val st = page.detail) {
             PackPageStatus.Loading -> CenteredProgress(Modifier.fillMaxSize())
             is PackPageStatus.Failed -> RetryStateBlock(
-                title      = s.browseDetailErrorTitle,
-                message    = st.message ?: s.browseDetailErrorMessage,
-                retryLabel = s.browseRetry,
+                title      = s.text("browseDetailErrorTitle"),
+                message    = st.message ?: s.text("browseDetailErrorMessage"),
+                retryLabel = s.text("browseRetry"),
                 onRetry    = page.onRetry,
                 modifier   = Modifier.fillMaxWidth().padding(32.dp),
             )
@@ -327,11 +328,11 @@ internal fun CataloguePackPageBody(page: CataloguePackPage, modifier: Modifier =
 /** The pack's tabs, and only those it has something behind. */
 internal enum class PackTab { Description, Versions, Changelog, Gallery }
 
-private fun PackTab.label(s: AppStrings): String = when (this) {
-    PackTab.Description -> s.modPageTabDescription
-    PackTab.Versions -> s.modPageTabVersions
-    PackTab.Changelog -> s.modPageTabChangelog
-    PackTab.Gallery -> s.modPageTabGallery
+private fun PackTab.label(s: Strings): String = when (this) {
+    PackTab.Description -> s.text("modPageTabDescription")
+    PackTab.Versions -> s.text("modPageTabVersions")
+    PackTab.Changelog -> s.text("modPageTabChangelog")
+    PackTab.Gallery -> s.text("modPageTabGallery")
 }
 
 private fun tabsOf(d: PackDetails): List<PackTab> = buildList {
@@ -349,7 +350,7 @@ private fun PackHeader(
     installError: String?,
     onInstall: (PackDetails, ProjectBuild) -> Unit,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val scope = rememberCoroutineScope()
     val uriHandler = LocalUriHandler.current
     val clipboard = LocalClipboard.current
@@ -360,8 +361,8 @@ private fun PackHeader(
         iconUrl = details?.iconUrl,
         facts = {
             if (details != null) {
-                details.downloads?.let { HeaderStat(NxIcon.Download, compactCount(it, s), s.modPageStatDownloads) }
-                details.followers?.let { HeaderStat(NxIcon.Favorite, compactCount(it, s), s.modPageStatFollowers) }
+                details.downloads?.let { HeaderStat(NxIcon.Download, compactCount(it, s), s.text("modPageStatDownloads")) }
+                details.followers?.let { HeaderStat(NxIcon.Favorite, compactCount(it, s), s.text("modPageStatFollowers")) }
                 if (details.tags.isNotEmpty()) {
                     FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -385,18 +386,18 @@ private fun PackHeader(
                 // corner of a picture was the one action on the page and the one a
                 // reader had to guess at.
                 NxButton(
-                    label = if (installingVersion != null) s.modPageInstalling else s.browseDetailInstallButton,
+                    label = if (installingVersion != null) s.text("modPageInstalling") else s.text("browseDetailInstallButton"),
                     onClick = { latest?.let { onInstall(details, it) } },
                     icon = NxIcon.Download,
                     enabled = installingVersion == null && latest != null,
                 )
                 details.pageUrl?.let { url ->
-                    NxKebabButton(contentDescription = s.contentActionDetails) { dismiss ->
-                        NxMenuItem(label = s.modPageOpenInCatalogue, icon = NxIcon.OpenInNew) {
+                    NxKebabButton(contentDescription = s.text("contentActionDetails")) { dismiss ->
+                        NxMenuItem(label = s.text("modPageOpenInCatalogue"), icon = NxIcon.OpenInNew) {
                             uriHandler.openUri(url)
                             dismiss()
                         }
-                        NxMenuItem(label = s.modPageCopyLink, icon = NxIcon.ContentCopy) {
+                        NxMenuItem(label = s.text("modPageCopyLink"), icon = NxIcon.ContentCopy) {
                             scope.launch { clipboard.copyPlainText(url) }
                             dismiss()
                         }
@@ -428,7 +429,7 @@ private fun PackBody(
     installingVersion: String?,
     onInstall: (ProjectBuild) -> Unit,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     // A body link to a video (direct file or a service page) opens in-app; a link
     // to a project opens its page here, and the rest go where links go.
     val follow = rememberLinkFollower()
@@ -448,7 +449,7 @@ private fun PackBody(
                 // A source that says nothing about its pack is not a page that
                 // failed to load, and must not read like one.
                 Box(Modifier.fillMaxWidth().heightIn(min = 120.dp), contentAlignment = Alignment.Center) {
-                    Text(s.browseDetailNoDescription, style = MaterialTheme.typography.bodyMedium, color = NxInk.quiet)
+                    Text(s.text("browseDetailNoDescription"), style = MaterialTheme.typography.bodyMedium, color = NxInk.quiet)
                 }
             }
         }
@@ -461,7 +462,7 @@ private fun PackBody(
             rowAction = { b ->
                 NxIconButton(
                     icon = NxIcon.Download,
-                    contentDescription = s.modPageInstallShort,
+                    contentDescription = s.text("modPageInstallShort"),
                     onClick = { onInstall(b) },
                     enabled = installingVersion == null,
                     tint = NxColor.lead(),

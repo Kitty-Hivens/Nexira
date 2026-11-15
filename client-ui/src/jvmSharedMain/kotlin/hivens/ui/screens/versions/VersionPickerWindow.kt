@@ -57,7 +57,7 @@ import hivens.ui.components.ChannelChip
 import hivens.ui.components.ReleaseNotes
 import hivens.ui.components.channelColor
 import hivens.ui.components.formatBuildTimestamp
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.layers.Layer
@@ -325,7 +325,7 @@ private const val SEARCH_THRESHOLD = 8
 
 @Composable
 private fun Header(title: String, packName: String, icon: Any?, onDismiss: () -> Unit) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     Row(
         modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 10.dp, top = 12.dp, bottom = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -349,7 +349,7 @@ private fun Header(title: String, packName: String, icon: Any?, onDismiss: () ->
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        NxIconButton(icon = NxIcon.Close, contentDescription = s.packSettingsClose, onClick = onDismiss)
+        NxIconButton(icon = NxIcon.Close, contentDescription = s.text("packSettingsClose"), onClick = onDismiss)
     }
 }
 
@@ -366,7 +366,7 @@ private fun VersionRail(
     onToggleIncompatible: () -> Unit,
     modifier: Modifier,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     // Its own plane. The list and the notes have to read as two places, not as
     // one field with a rule down the middle.
     // No hairline of its own. Every surface draws one by default, which is right
@@ -391,7 +391,7 @@ private fun VersionRail(
                     NxField(
                         value = query,
                         onValueChange = onQuery,
-                        placeholder = s.versionPickerSearch,
+                        placeholder = s.text("versionPickerSearch"),
                         modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 6.dp),
                     )
                 }
@@ -438,8 +438,8 @@ private fun VersionRail(
                     contentAlignment = Alignment.BottomCenter,
                 ) {
                     NxButton(
-                        label = if (showIncompatible) s.versionPickerHideIncompatible
-                                else s.versionPickerShowIncompatible(hiddenCount),
+                        label = if (showIncompatible) s.text("versionPickerHideIncompatible")
+                                else s.text("versionPickerShowIncompatible", hiddenCount),
                         onClick = onToggleIncompatible,
                         style = NxButtonStyle.Tertiary,
                         icon = if (showIncompatible) NxIcon.VisibilityOff else NxIcon.Visibility,
@@ -460,7 +460,7 @@ private fun VersionRail(
  */
 @Composable
 private fun VersionRow(v: PickerVersion, selected: Boolean, onClick: () -> Unit) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     // Unselected is the plane itself, a wash of nothing, so the row reads on what it sits on.
     val fill = NxColor.wash(NxColor.lead(), if (selected) 0.16f else 0f)
     OnFill(fill) {
@@ -491,12 +491,12 @@ private fun VersionRow(v: PickerVersion, selected: Boolean, onClick: () -> Unit)
             when {
                 !v.compatible -> Symbol(
                     NxIcon.Warning,
-                    contentDescription = s.versionPickerIncompatible,
+                    contentDescription = s.text("versionPickerIncompatible"),
                     tint = NxColor.status(Status.Warning),
                     size = 15.dp,
                 )
-                v.installed -> NxMetaChip(s.packVersionCurrentTag, tone = NxMetaChipTone.Success)
-                v.latest -> NxMetaChip(s.packVersionsLatestTag, tone = NxMetaChipTone.Surface)
+                v.installed -> NxMetaChip(s.text("packVersionCurrentTag"), tone = NxMetaChipTone.Success)
+                v.latest -> NxMetaChip(s.text("packVersionsLatestTag"), tone = NxMetaChipTone.Surface)
             }
         }
     }
@@ -508,10 +508,10 @@ private fun DetailPane(
     modifier: Modifier = Modifier,
     action: (@Composable (PickerVersion) -> Unit)? = null,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     if (v == null) {
         Box(modifier, contentAlignment = Alignment.Center) {
-            Text(s.versionPickerEmpty, style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
+            Text(s.text("versionPickerEmpty"), style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
         }
         return
     }
@@ -551,7 +551,7 @@ private fun DetailPane(
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Symbol(NxIcon.Warning, contentDescription = null, tint = NxColor.status(Status.Warning), size = 16.dp)
                     Text(
-                        s.versionPickerIncompatible,
+                        s.text("versionPickerIncompatible"),
                         style = MaterialTheme.typography.labelMedium,
                         color = NxColor.status(Status.Warning),
                     )
@@ -576,7 +576,7 @@ private fun DetailPane(
                 // Most mirror builds ship no notes, so this is the pane's ordinary
                 // state rather than an exception.
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(s.versionPickerNoChangelog, style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
+                    Text(s.text("versionPickerNoChangelog"), style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
                 }
             }
         }
@@ -599,7 +599,7 @@ private fun Footer(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     HorizontalDivider(color = NxInk.line)
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
@@ -620,7 +620,7 @@ private fun Footer(
             Spacer(Modifier.weight(1f))
         }
         NxButton(
-            label = s.createPackCancel,
+            label = s.text("createPackCancel"),
             onClick = onDismiss,
             style = NxButtonStyle.Tertiary,
             enabled = !busy,
@@ -634,12 +634,12 @@ private fun Footer(
         // and the action refuses, rather than offering a download that changes
         // nothing and a minute of wondering whether it worked.
         val label = when {
-            selected?.installed == true -> s.packVersionCurrentTag
+            selected?.installed == true -> s.text("packVersionCurrentTag")
             else -> when (intent) {
-                PickerIntent.Install -> s.versionPickerInstall(selected?.label.orEmpty())
-                PickerIntent.Upgrade -> s.versionPickerUpgrade(selected?.label.orEmpty())
-                PickerIntent.Rollback -> s.versionPickerRollback(selected?.label.orEmpty())
-                PickerIntent.Switch, null -> s.versionPickerSwitch(selected?.label.orEmpty())
+                PickerIntent.Install -> s.text("versionPickerInstall", selected?.label.orEmpty())
+                PickerIntent.Upgrade -> s.text("versionPickerUpgrade", selected?.label.orEmpty())
+                PickerIntent.Rollback -> s.text("versionPickerRollback", selected?.label.orEmpty())
+                PickerIntent.Switch, null -> s.text("versionPickerSwitch", selected?.label.orEmpty())
             }
         }
         val actionable = selected != null && !selected.installed && !busy

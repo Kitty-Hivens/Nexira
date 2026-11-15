@@ -39,7 +39,7 @@ import hivens.ui.audio.PlaybackState
 import hivens.ui.audio.RepeatMode
 import hivens.ui.audio.TrackInfo
 import hivens.ui.audio.Waveform
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.nx.NxButton
@@ -171,7 +171,7 @@ internal fun ColumnPlayerCard(
     onSeek: (Long) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val idle = state is PlaybackState.Idle
     val loaded = !idle && state !is PlaybackState.Error
     val duration = durationMsOf(state)
@@ -206,7 +206,7 @@ internal fun ColumnPlayerCard(
             Column(
                 Modifier
                     .fillMaxWidth()
-                    .openWhenEmpty(idle, s.audioPickTrack, onPick)
+                    .openWhenEmpty(idle, s.text("audioPickTrack"), onPick)
                     .padding(12.dp),
             ) {
                 if (showCover) {
@@ -270,7 +270,7 @@ internal fun ColumnPlayerCard(
                     if (showSkips) {
                         NxIconButton(
                             icon               = NxIcon.SkipPrevious,
-                            contentDescription = s.audioSkipPrevious,
+                            contentDescription = s.text("audioSkipPrevious"),
                             onClick            = onSkipPrev,
                             tint               = NxInk.quiet,
                             enabled            = loaded,
@@ -287,7 +287,7 @@ internal fun ColumnPlayerCard(
                         ) {
                             NxIconButton(
                                 icon               = if (state is PlaybackState.Playing) NxIcon.Pause else NxIcon.PlayArrow,
-                                contentDescription = if (state is PlaybackState.Playing) s.audioPause else s.audioPlay,
+                                contentDescription = if (state is PlaybackState.Playing) s.text("audioPause") else s.text("audioPlay"),
                                 onClick            = onPlayPause,
                                 tint               = NxInk.main,
                                 enabled            = loaded,
@@ -300,7 +300,7 @@ internal fun ColumnPlayerCard(
                     if (showSkips) {
                         NxIconButton(
                             icon               = NxIcon.SkipNext,
-                            contentDescription = s.audioSkipNext,
+                            contentDescription = s.text("audioSkipNext"),
                             onClick            = onSkipNext,
                             tint               = NxInk.quiet,
                             enabled            = loaded,
@@ -334,7 +334,7 @@ internal fun ColumnPlayerCard(
                 ) {
                     NxIconButton(
                         icon               = NxIcon.MoreVert,
-                        contentDescription = s.packCardMore,
+                        contentDescription = s.text("packCardMore"),
                         onClick            = { menuOpen = true },
                         tint               = if (showCover) Color.White else NxInk.main,
                     )
@@ -342,17 +342,17 @@ internal fun ColumnPlayerCard(
                 NxPopoverPanel(
                     expanded         = menuOpen,
                     onDismissRequest = { menuOpen = false },
-                    title            = s.audioPlaybackOptions,
+                    title            = s.text("audioPlaybackOptions"),
                     footer           = {
                         NxButton(
-                            label   = s.audioOpenFile,
+                            label   = s.text("audioOpenFile"),
                             onClick = { menuOpen = false; onPick() },
                             style   = NxButtonStyle.Tertiary,
                             icon    = NxIcon.FolderOpen,
                             compact = true,
                         )
                         NxButton(
-                            label   = s.audioStop,
+                            label   = s.text("audioStop"),
                             onClick = { menuOpen = false; onStop() },
                             style   = NxButtonStyle.Tertiary,
                             icon    = NxIcon.Stop,
@@ -362,14 +362,14 @@ internal fun ColumnPlayerCard(
                     },
                 ) {
                     NxSlider(
-                        label         = s.audioVolume,
+                        label         = s.text("audioVolume"),
                         value         = volume,
                         range         = 0f..1f,
                         valueText     = "${(volume * 100).toInt()}%",
                         onValueChange = onVolume,
                         compact       = true,
                     )
-                    NxPanelGroup(label = s.audioRepeat) {
+                    NxPanelGroup(label = s.text("audioRepeat")) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             NxCycleToggle(
                                 states  = repeatStates(s),

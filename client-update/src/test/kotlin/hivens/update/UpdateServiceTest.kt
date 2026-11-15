@@ -294,6 +294,18 @@ class UpdateServiceTest {
     }
 
     @Test
+    fun `a language with no notes of its own reads those of the language it falls back to`() = runTest {
+        val service = createService(
+            MockResponse(urlContains = "CHANGELOG_UK.md", body = "Not Found", status = HttpStatusCode.NotFound),
+            MockResponse(urlContains = "CHANGELOG_RU.md", body = russianChangelog),
+            MockResponse(urlContains = "releases", body = "[]"),
+        )
+        val notes = service.fetchLocalizedNotes("v2.4.0-beta5", listOf("uk", "ru"))
+        assertNotNull(notes)
+        assertTrue("Первое." in notes, "the Russian notes did not arrive: $notes")
+    }
+
+    @Test
     fun `a language with no changelog falls back rather than failing`() = runTest {
         val service = createService(
             MockResponse(urlContains = "CHANGELOG_FR.md", body = "Not Found", status = HttpStatusCode.NotFound),

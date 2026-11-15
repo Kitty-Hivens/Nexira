@@ -1,11 +1,15 @@
 package hivens.ui.bootstrap
 
+import hivens.config.Storage
+import hivens.i18n.api.Translator
 import hivens.launcher.CrashReporter
 import hivens.launcher.bootstrap.LauncherBootstrap
+import hivens.ui.i18n.NexiraStrings
 import hivens.ui.diag.CrashDialog
 import hivens.ui.diag.ShellRecovery
 import org.koin.core.module.Module
 import org.slf4j.LoggerFactory
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.atomic.AtomicReference
 import javax.swing.SwingUtilities
 
@@ -39,7 +43,17 @@ object GuiBootstrap {
         val core: LauncherBootstrap.PreWindow,
         val peek: SettingsPeek,
         val crashReporter: AtomicReference<CrashReporter>,
-    )
+    ) {
+        /**
+         * The words the boot window speaks, in the language [peek] read and with the person's own
+         * translation files. Made on a background thread from the moment the language is known,
+         * since reading the tables cold takes longer than a frame, so the window that waits for
+         * them waits only for what the toolkit coming up has not already covered.
+         */
+        val words: CompletableFuture<Translator> = CompletableFuture.supplyAsync {
+            NexiraStrings.engine(core.initialPaths.dataDir.resolve(Storage.TRANSLATIONS_DIR), peek.locale).current.value
+        }
+    }
 
     /**
      * Run the synchronous pre-window pipeline. Cheap by construction; a

@@ -1,15 +1,15 @@
 package hivens.ui.widgets.bgsettings
 
 import androidx.compose.runtime.Composable
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.widget.model.Widget
 
 @Widget(id = "bg.fx.darken", displayName = "widget.bg.fx.darken", needs = ["background.settings", "background.update"])
 @Composable
 fun BgFxDarkenWidget() {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     BgSlider(
-        label  = s.backgroundDarken,
+        label  = s.text("backgroundDarken"),
         range  = 0f..0.9f,
         read   = { darkenAmount },
         format = { "%.0f%%".format(it * 100) },

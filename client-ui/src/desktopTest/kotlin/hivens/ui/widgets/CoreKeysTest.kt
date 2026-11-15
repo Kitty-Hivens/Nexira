@@ -60,6 +60,12 @@ import hivens.packs.PackOutcomes
 import hivens.packs.PacksHost
 import hivens.packs.PacksModule
 import hivens.packs.ReattachPreviewState
+import hivens.config.Storage
+import hivens.i18n.I18nEngine
+import hivens.i18n.I18nModule
+import hivens.i18n.I18nSettingsDomain
+import hivens.i18n.api.I18nApi
+import hivens.i18n.api.I18nKeys
 import hivens.packs.ReattachPreviews
 import hivens.packs.api.InstallRequest
 import hivens.packs.api.PackKeys
@@ -80,8 +86,9 @@ import hivens.ui.host.LauncherHostAccess
 import hivens.ui.host.launcherServices
 import hivens.ui.appearance.AppearanceStore
 import hivens.ui.background.BackgroundSettings
-import hivens.ui.i18n.AppLocale
-import hivens.ui.i18n.stringsFor
+import hivens.ui.i18n.NexiraStrings
+import hivens.ui.settings.SettingsDomainFiles
+import hivens.ui.widgets.modules.wordsOf
 import hivens.ui.levelServicesModule
 import hivens.ui.notifications.CorePart
 import hivens.ui.notifications.CoreProblem
@@ -108,6 +115,8 @@ import hivens.widget.api.KeyOrigin
 import hivens.widget.api.LocalScope
 import hivens.widget.api.LocalWidgetCommandRegistry
 import hivens.widget.api.LocalWidgetDataRegistry
+import hivens.widget.api.SettingsChange
+import hivens.widget.api.SettingsStores
 import hivens.widget.api.WidgetScope
 import hivens.widget.api.current
 import hivens.widget.api.find
@@ -370,6 +379,7 @@ class CoreKeysTest {
         withPacks: Boolean = true,
         withAccounts: Boolean = true,
         withCatalogue: Boolean = true,
+        withI18n: Boolean = true,
         notified: Boolean = false,
         /** What signs a stored account in at startup. */
         auth: AuthProvider = OfflineAuthProvider(),
@@ -388,7 +398,7 @@ class CoreKeysTest {
         val archived = CopyOnWriteArrayList<PersistedNotification>()
         val center = NotificationCenter(archive = { archived += it })
         val reporter: CoreProblems =
-            if (notified) NotifiedCoreProblems(center, scope, Dispatchers.Unconfined) { stringsFor(AppLocale.ENGLISH) } else problems
+            if (notified) NotifiedCoreProblems(center, scope, Dispatchers.Unconfined) { NexiraStrings.shipped("en") } else problems
         val packs = Packs(listOf(pack))
         val measured = AtomicInteger()
         val previews = ReattachPreviews(measure = { measured.incrementAndGet(); shownPreview }, operations = operations, scope = scope)
@@ -403,12 +413,23 @@ class CoreKeysTest {
             background       = MutableStateFlow(BackgroundSettings()),
         )
         val commands = uiCommandRegistry({}, {}, {})
+
+        /** The modules' settings, written where the launcher writes them, under the test's data folder. */
+        val domains = SettingsDomainFiles(dir.resolve(Storage.SETTINGS_DIR), dir.resolve(Storage.SETTINGS_FILE), preferences::write)
+        val words: I18nEngine = NexiraStrings.engine(null, domains.of(I18nSettingsDomain).value.value.language).also { engine ->
+            engine.follow(domains.of(I18nSettingsDomain), scope)
+            listOf(I18nModule, PacksModule, AccountsModule, CatalogueModule).forEach { engine.contribute(it.id, it.strings.wordsOf(it.id)) }
+        }
         val keys = HostKeys(data, commands, ContributedServices()).also { keys ->
             moduleKeys(
                 keys     = keys,
-                named    = setOfNotNull(PacksApi.ID.takeIf { withPacks }, AccountsApi.ID.takeIf { withAccounts }, CatalogueApi.ID.takeIf { withCatalogue }),
-                compiled = listOf(PacksModule, AccountsModule, CatalogueModule),
+                named    = setOfNotNull(
+                    PacksApi.ID.takeIf { withPacks }, AccountsApi.ID.takeIf { withAccounts },
+                    CatalogueApi.ID.takeIf { withCatalogue }, I18nApi.ID.takeIf { withI18n },
+                ),
+                compiled = listOf(I18nModule, PacksModule, AccountsModule, CatalogueModule),
                 jars     = emptyList(),
+                nameOf   = { moduleId, key -> words.strings(moduleId).text(key) },
             )
         }.also { hostKeys += it }
         val paths = PlatformPaths(
@@ -426,6 +447,7 @@ class CoreKeysTest {
                 Files.writeString(file, content)
             },
             contributed = MutableStateFlow(emptyList()),
+            translations = words,
             scope       = scope,
         )
 
@@ -458,6 +480,8 @@ class CoreKeysTest {
                     single<AccountsHost> { ClientAccountsHost(reporter, preferences, CertificateTrustGate(Grants()), "smartycraft.example") }
                     single { console }
                     single { appearance }
+                    single<SettingsStores> { domains }
+                    single { words }
                     single {
                         val services = keys.appServices(KoinLevelServicesHost.app(this), Dispatchers.Unconfined)
                         WidgetScope.app(data, services, Dispatchers.Unconfined, commands, access = LauncherHostAccess, failures = reportedTo(reporter, keys))
@@ -529,7 +553,7 @@ class CoreKeysTest {
     // ── Resolution ────────────────────────────────────────────────────
 
     private val composed: List<SourceKey<*>> = listOf(
-        Sources.ThemeLibrary, Sources.DarkTheme, Sources.ThemeMode, Sources.Locale,
+        Sources.ThemeLibrary, Sources.DarkTheme, Sources.ThemeMode,
     )
 
     /** Every source the accounts module brings. */
@@ -548,17 +572,17 @@ class CoreKeysTest {
     private val appWide: List<SourceKey<*>> = listOf(
         Sources.SystemSchemeAvailable, PackKeys.Library, PackKeys.Launches,
         PackKeys.Launch, PackKeys.Installs, PackKeys.Updates, PackKeys.Operations, PackKeys.ReattachPreviews,
-        Sources.ConsoleVisible,
+        Sources.ConsoleVisible, I18nKeys.Settings, I18nKeys.Language, I18nKeys.Languages,
     ) + accountSources
 
     private val composedCommands: List<CommandKey<*>> = listOf(
-        Commands.ApplyTheme, Commands.SetDarkTheme, Commands.SetThemeMode, Commands.SetLocale,
+        Commands.ApplyTheme, Commands.SetDarkTheme, Commands.SetThemeMode,
     )
 
     private val appCommands: List<CommandKey<*>> = listOf(
         PackKeys.LaunchPack, PackKeys.StopPack, PackKeys.InstallPack,
         PackKeys.DismissInstall, PackKeys.CancelInstall, PackKeys.UpdatePack, PackKeys.DeletePack, PackKeys.PreviewReattach,
-        PackKeys.ReattachPack, Commands.SetConsoleVisible,
+        PackKeys.ReattachPack, Commands.SetConsoleVisible, I18nKeys.UpdateSettings,
     ) + accountCommands
 
     /** Every key the packs module brings, by id. */
@@ -612,7 +636,7 @@ class CoreKeysTest {
         val archived = CopyOnWriteArrayList<PersistedNotification>()
         val center = NotificationCenter(archive = { archived += it })
         // Pushed on the reporting thread, so every report has landed once its thread is joined.
-        val reporter = NotifiedCoreProblems(center, scope, Dispatchers.Unconfined) { stringsFor(AppLocale.ENGLISH) }
+        val reporter = NotifiedCoreProblems(center, scope, Dispatchers.Unconfined) { NexiraStrings.shipped("en") }
         val start = CyclicBarrier(16)
         val threads = (1..16).map { n ->
             thread {
@@ -1162,8 +1186,9 @@ class CoreKeysTest {
         assertTrue(launcher.source(composition, Sources.DarkTheme), "a dark wallpaper turns the wallpaper mode dark")
         assertEquals(ThemeMode.Wallpaper, launcher.source(composition, Sources.ThemeMode))
 
-        launcher.fire(composition, Commands.SetLocale, AppLocale.fromTag("de"))
-        assertEquals("de", launcher.source(other, Sources.Locale).tag)
+        launcher.fire(launcher.app, I18nKeys.UpdateSettings, SettingsChange { it.copy(language = "de") })
+        assertEquals("de", launcher.source(other, I18nKeys.Settings).language, "every composition reads the one choice")
+        awaitTrue("the words follow it") { launcher.source(other, I18nKeys.Language).tag == "de" }
 
         launcher.appearance.setSystemSchemeAvailable(true)
         assertTrue(launcher.source(launcher.app, Sources.SystemSchemeAvailable))
@@ -1173,7 +1198,8 @@ class CoreKeysTest {
         assertTrue(saved.isDarkTheme)
         assertEquals(ThemeMode.Wallpaper, saved.themeMode)
         assertTrue(saved.themeFromWallpaper)
-        assertEquals("de", saved.locale)
+        assertEquals("en", saved.locale, "the language is the language module's, and the old file keeps what it had")
+        assertEquals("de", SettingsDomainFiles(dir.resolve(Storage.SETTINGS_DIR), dir.resolve(Storage.SETTINGS_FILE)).peek(I18nSettingsDomain).language)
         assertTrue(dir.resolve("themes.json").exists())
         assertEquals(theme, ThemeManager(dir) { _, _ -> }.load().selected, "the choice is in the theme file")
     }

@@ -245,20 +245,31 @@ class WidgetModuleLoaderTest {
         val strings = scan().loaded.single().strings
 
         assertEquals(setOf("en", "ru"), strings.languages)
-        assertEquals("Тестовый эффект", strings.get("fixture.label", "ru"))
-        assertEquals("Fixture Effect", strings.get("fixture.label", "en"))
+        assertEquals("Тестовый эффект", strings.tables.getValue("ru")["fixture.label"])
+        assertEquals("Fixture Effect", strings.tables.getValue("en")["fixture.label"])
+        assertEquals("Sum {0} and {1}", strings.tables.getValue("en")["fixture.sum"], "read as written, for the language module to format")
     }
 
     @Test
-    fun `a key a language lacks is read in English, and a key nobody has as itself`() {
+    fun `words a module carries for another namespace are read under that namespace`() {
         install("good.jar")
 
         val strings = scan().loaded.single().strings
 
-        assertEquals("Flag", strings.get("fixture.flag", "ru"))
-        assertEquals("Flag", strings.get("fixture.flag", "ja"))
-        assertEquals("no.such.key", strings.get("no.such.key", "ru"))
-        assertEquals("Sum 1 and 2", strings.get("fixture.sum", "de", 1, 2))
+        assertEquals(setOf("nexira"), strings.namespaces.keys)
+        assertEquals("Vom Fixture zu den Worten des Launchers gelegt", strings.namespaces.getValue("nexira").getValue("de")["fixture.inLauncher"])
+        assertTrue("de" !in strings.languages, "they are not the module's own words")
+    }
+
+    @Test
+    fun `a language a module adds is read from its declaration, and is not taken for a namespace`() {
+        install("good.jar")
+
+        val strings = scan().loaded.single().strings
+
+        assertEquals(mapOf("name" to "Українська", "plural" to "east-slavic", "fallback" to "ru"), strings.languageDeclarations["uk"])
+        assertTrue("uk" !in strings.namespaces, "a folder holding only a language declaration is no namespace")
+        assertEquals("Покладено фікстурою до слів лаунчера", strings.namespaces.getValue("nexira").getValue("uk")["fixture.inLauncher"])
     }
 
     @Test

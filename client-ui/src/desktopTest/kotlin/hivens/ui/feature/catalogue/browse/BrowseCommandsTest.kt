@@ -14,8 +14,7 @@ import hivens.catalogue.api.BrowseView
 import hivens.catalogue.api.CatalogueKeys
 import hivens.catalogue.api.PackOrigins
 import hivens.catalogue.api.ProjectKind
-import hivens.ui.i18n.AppLocale
-import hivens.ui.i18n.LocaleProvider
+import hivens.ui.i18n.ShippedLanguageProvider
 import hivens.ui.puppet.PuppetRegistry
 import hivens.ui.theme.NxTheme
 import hivens.widget.api.ContributedServices
@@ -91,7 +90,7 @@ class BrowseCommandsTest {
             LocalWidgetRegistry provides GeneratedWidgetRegistry,
             LocalScope provides window,
         ) {
-            LocaleProvider(AppLocale.ENGLISH) { NxTheme(dark = true) { content() } }
+            ShippedLanguageProvider("en") { NxTheme(dark = true) { content() } }
         }
     }
 

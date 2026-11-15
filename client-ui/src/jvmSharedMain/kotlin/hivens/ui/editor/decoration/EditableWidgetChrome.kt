@@ -1,5 +1,7 @@
 package hivens.ui.editor.decoration
 
+import hivens.i18n.api.Strings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.widgets.modules.widgetLabel
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
@@ -90,8 +92,6 @@ import hivens.ui.editor.gridResizeSpan
 import hivens.ui.editor.dnd.DragController
 import hivens.ui.editor.dnd.DragPayload
 import hivens.ui.editor.dnd.DropTargetRegistry
-import hivens.ui.i18n.AppStrings
-import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.nx.NxAlertDialog
@@ -153,7 +153,7 @@ fun EditableWidgetChrome(
     onCommitDrop: (committedPointer: Offset) -> Unit,
     content: @Composable () -> Unit,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val haptics = LocalHapticFeedback.current
     val chromeMotionMs = Motion.fade.durationMs
     val interaction = remember { MutableInteractionSource() }
@@ -875,14 +875,14 @@ fun EditableWidgetChrome(
         OnFill(container) {
             NxAlertDialog(
                 onDismissRequest  = { forceRemoveOpen = false },
-                paneTitle         = s.editorForceRemoveTitle,
+                paneTitle         = s.text("editorForceRemoveTitle"),
                 containerColor    = container,
                 titleContentColor = NxInk.main,
                 textContentColor  = NxInk.quiet,
-                title             = { Text(s.editorForceRemoveTitle) },
+                title             = { Text(s.text("editorForceRemoveTitle")) },
                 text              = {
                     Text(
-                        text = s.editorForceRemoveBody(widgetLabel(descriptor.kind, descriptor.displayName)),
+                        text = s.text("editorForceRemoveBody", widgetLabel(descriptor.kind, descriptor.displayName)),
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 },
@@ -890,10 +890,10 @@ fun EditableWidgetChrome(
                     TextButton(onClick = {
                         forceRemoveOpen = false
                         onRemove()
-                    }) { Text(s.editorDelete, color = NxColor.status(Status.Error)) }
+                    }) { Text(s.text("editorDelete"), color = NxColor.status(Status.Error)) }
                 },
                 dismissButton = {
-                    TextButton(onClick = { forceRemoveOpen = false }) { Text(s.editorCancel) }
+                    TextButton(onClick = { forceRemoveOpen = false }) { Text(s.text("editorCancel")) }
                 },
             )
         }
@@ -917,15 +917,15 @@ private fun WidgetContextMenuContent(
     onForceRemove: () -> Unit,
     onClose: () -> Unit,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val graph = LocalLayoutGraph.current
-    NxMenuItem(s.editorConfigure) { onConfigure() }
+    NxMenuItem(s.text("editorConfigure")) { onConfigure() }
     // Only where something moves: in a slot that does not, a widget is already
     // where it stays, and the item would do nothing anybody could see.
     val slot = graph.traverse(path)
     if (slot != null && slot.viewportMode != ViewportMode.Static) {
         val pinned = slot.widgets.firstOrNull { it.instanceId == instanceId }?.placement?.pinned == true
-        NxMenuItem(if (pinned) s.editorUnpin else s.editorPin) {
+        NxMenuItem(if (pinned) s.text("editorUnpin") else s.text("editorPin")) {
             editController.setWidgetPinned(path, instanceId, !pinned); onClose()
         }
     }
@@ -941,24 +941,24 @@ private fun WidgetContextMenuContent(
         // corner picked here would change nothing anybody could see.
         if (!anchorsIgnored) {
             Text(
-                text     = s.editorAnchorTitle,
+                text     = s.text("editorAnchorTitle"),
                 style    = MaterialTheme.typography.labelSmall,
                 color    = NxInk.quiet,
                 modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 6.dp, bottom = 2.dp),
             )
             AnchorGrid(current) { editController.setWidgetAnchor(path, instanceId, it); onClose() }
         }
-        NxMenuItem(s.editorToFront) {
+        NxMenuItem(s.text("editorToFront")) {
             val maxZ = graph.traverse(path)?.widgets?.maxOfOrNull { it.placement?.z ?: 0 } ?: 0
             editController.setWidgetZ(path, instanceId, maxZ + 1); onClose()
         }
-        NxMenuItem(s.editorToBack) {
+        NxMenuItem(s.text("editorToBack")) {
             val minZ = graph.traverse(path)?.widgets?.minOfOrNull { it.placement?.z ?: 0 } ?: 0
             editController.setWidgetZ(path, instanceId, minZ - 1); onClose()
         }
     }
-    if (removable) NxMenuItem(s.editorDelete) { onRemove() }
-    else NxMenuItem(s.editorForceRemove) { onForceRemove() }
+    if (removable) NxMenuItem(s.text("editorDelete")) { onRemove() }
+    else NxMenuItem(s.text("editorForceRemove")) { onForceRemove() }
 }
 
 /**
@@ -971,7 +971,7 @@ private fun WidgetContextMenuContent(
  */
 @Composable
 private fun AnchorGrid(current: String, onPick: (String) -> Unit) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     Column(
         modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 2.dp, bottom = 6.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -1003,16 +1003,16 @@ private fun AnchorGrid(current: String, onPick: (String) -> Unit) {
     }
 }
 
-private fun anchorLabel(anchor: String, s: AppStrings): String = when (anchor) {
-    Placement.TOP_START -> s.editorAnchorTopStart
-    Placement.TOP_CENTER -> s.editorAnchorTopCenter
-    Placement.TOP_END -> s.editorAnchorTopEnd
-    Placement.CENTER_START -> s.editorAnchorCenterStart
-    Placement.CENTER -> s.editorAnchorCenter
-    Placement.CENTER_END -> s.editorAnchorCenterEnd
-    Placement.BOTTOM_START -> s.editorAnchorBottomStart
-    Placement.BOTTOM_CENTER -> s.editorAnchorBottomCenter
-    else -> s.editorAnchorBottomEnd
+private fun anchorLabel(anchor: String, s: Strings): String = when (anchor) {
+    Placement.TOP_START -> s.text("editorAnchorTopStart")
+    Placement.TOP_CENTER -> s.text("editorAnchorTopCenter")
+    Placement.TOP_END -> s.text("editorAnchorTopEnd")
+    Placement.CENTER_START -> s.text("editorAnchorCenterStart")
+    Placement.CENTER -> s.text("editorAnchorCenter")
+    Placement.CENTER_END -> s.text("editorAnchorCenterEnd")
+    Placement.BOTTOM_START -> s.text("editorAnchorBottomStart")
+    Placement.BOTTOM_CENTER -> s.text("editorAnchorBottomCenter")
+    else -> s.text("editorAnchorBottomEnd")
 }
 
 /** The widget as [layer] last recorded it, at the size it was drawn. */

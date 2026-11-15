@@ -1,7 +1,7 @@
 package hivens.ui.screens.settings
 
 import androidx.compose.runtime.Composable
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.nx.NxSection
 import hivens.ui.nx.NxToggle
@@ -20,20 +20,20 @@ internal fun SmartySection(
     form: SettingsFormState,
     save: () -> Unit,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
 
-    NxSection(s.settingsSectionSmarty) {
-        NxToggle(s.settingsNetworkAgentTitle, form.useNetworkAgent, description = s.settingsNetworkAgentDesc, icon = NxIcon.Lan) {
+    NxSection(s.text("settingsSectionSmarty")) {
+        NxToggle(s.text("settingsNetworkAgentTitle"), form.useNetworkAgent, description = s.text("settingsNetworkAgentDesc"), icon = NxIcon.Lan) {
             form.useNetworkAgent = it; save()
         }
         PuppetToggle("settings.useNetworkAgent", form.useNetworkAgent) { form.useNetworkAgent = it; save() }
 
-        NxToggle(s.settingsSmartyAuthLibTitle, form.useSmartycraftAuthLib, description = s.settingsSmartyAuthLibDesc, icon = NxIcon.VpnKey) {
+        NxToggle(s.text("settingsSmartyAuthLibTitle"), form.useSmartycraftAuthLib, description = s.text("settingsSmartyAuthLibDesc"), icon = NxIcon.VpnKey) {
             form.useSmartycraftAuthLib = it; save()
         }
         PuppetToggle("settings.useSmartycraftAuthLib", form.useSmartycraftAuthLib) { form.useSmartycraftAuthLib = it; save() }
 
-        NxToggle(s.settingsReuseSessionTitle, form.experimentalReuseSession, description = s.settingsReuseSessionDesc, icon = NxIcon.Sync) {
+        NxToggle(s.text("settingsReuseSessionTitle"), form.experimentalReuseSession, description = s.text("settingsReuseSessionDesc"), icon = NxIcon.Sync) {
             form.experimentalReuseSession = it; save()
         }
         PuppetToggle("settings.experimentalReuseSession", form.experimentalReuseSession) { form.experimentalReuseSession = it; save() }

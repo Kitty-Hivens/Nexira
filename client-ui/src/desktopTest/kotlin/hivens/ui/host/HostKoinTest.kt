@@ -5,7 +5,7 @@ import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.unit.Density
 import hivens.launcher.platform.PlatformPaths
 import hivens.ui.ShellLook
-import hivens.ui.i18n.AppLocale
+import hivens.ui.i18n.NexiraStrings
 import hivens.ui.screens.ConsoleWindow
 import hivens.ui.uiCommandRegistry
 import hivens.ui.utils.GameConsoleService
@@ -58,7 +58,7 @@ class HostKoinTest {
         try {
             assertFalse(console.shouldShowConsole, "the premise: a hidden console opens no window")
             val scene = ImageComposeScene(40, 40, density = Density(1f)) {
-                ConsoleWindow(ShellLook(dark = true, locale = AppLocale.ENGLISH), graph)
+                ConsoleWindow(ShellLook(dark = true, words = NexiraStrings.translator("en")), graph)
             }
             try {
                 scene.render()

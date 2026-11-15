@@ -38,7 +38,7 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.audio.PlaybackState
 import hivens.ui.audio.RepeatMode
 import hivens.ui.audio.TrackInfo
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
@@ -161,7 +161,7 @@ internal fun SeededPlayerCard(
     onSeek: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val loaded = state !is PlaybackState.Idle && state !is PlaybackState.Error
     val duration = durationMsOf(state)
     var menuOpen by remember { mutableStateOf(false) }
@@ -183,7 +183,7 @@ internal fun SeededPlayerCard(
         BoxWithConstraints(
             Modifier
                 .fillMaxWidth()
-                .openWhenEmpty(state is PlaybackState.Idle, s.audioPickTrack, onPick),
+                .openWhenEmpty(state is PlaybackState.Idle, s.text("audioPickTrack"), onPick),
         ) {
             val art = maxWidth >= 240.dp
             val album = showAlbum && maxWidth >= 300.dp
@@ -238,18 +238,18 @@ internal fun SeededPlayerCard(
                         Spacer(Modifier.height(8.dp))
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             if (skips) {
-                                Glyph(NxIcon.SkipPrevious, s.audioSkipPrevious, 18.dp, NxInk.quiet, loaded, onSkipPrev)
+                                Glyph(NxIcon.SkipPrevious, s.text("audioSkipPrevious"), 18.dp, NxInk.quiet, loaded, onSkipPrev)
                             }
                             Glyph(
                                 icon    = if (state is PlaybackState.Playing) NxIcon.Pause else NxIcon.PlayArrow,
-                                name    = if (state is PlaybackState.Playing) s.audioPause else s.audioPlay,
+                                name    = if (state is PlaybackState.Playing) s.text("audioPause") else s.text("audioPlay"),
                                 size    = 22.dp,
                                 tint    = NxInk.main,
                                 enabled = loaded,
                                 onClick = onPlayPause,
                             )
                             if (skips) {
-                                Glyph(NxIcon.SkipNext, s.audioSkipNext, 18.dp, NxInk.quiet, loaded, onSkipNext)
+                                Glyph(NxIcon.SkipNext, s.text("audioSkipNext"), 18.dp, NxInk.quiet, loaded, onSkipNext)
                             }
                             Spacer(Modifier.width(10.dp))
                             // At rest this is the concept's 3dp bar and nothing else.
@@ -269,23 +269,23 @@ internal fun SeededPlayerCard(
                 Box(Modifier.align(Alignment.TopEnd).padding(4.dp)) {
                     NxIconButton(
                         icon               = NxIcon.MoreVert,
-                        contentDescription = s.packCardMore,
+                        contentDescription = s.text("packCardMore"),
                         onClick            = { menuOpen = true },
                     )
                     NxPopoverPanel(
                         expanded         = menuOpen,
                         onDismissRequest = { menuOpen = false },
-                        title            = s.audioPlaybackOptions,
+                        title            = s.text("audioPlaybackOptions"),
                         footer           = {
                             NxButton(
-                                label   = s.audioOpenFile,
+                                label   = s.text("audioOpenFile"),
                                 onClick = { menuOpen = false; onPick() },
                                 style   = NxButtonStyle.Tertiary,
                                 icon    = NxIcon.FolderOpen,
                                 compact = true,
                             )
                             NxButton(
-                                label   = s.audioStop,
+                                label   = s.text("audioStop"),
                                 onClick = { menuOpen = false; onStop() },
                                 style   = NxButtonStyle.Tertiary,
                                 icon    = NxIcon.Stop,
@@ -295,14 +295,14 @@ internal fun SeededPlayerCard(
                         },
                     ) {
                         NxSlider(
-                            label         = s.audioVolume,
+                            label         = s.text("audioVolume"),
                             value         = volume,
                             range         = 0f..1f,
                             valueText     = "${(volume * 100).toInt()}%",
                             onValueChange = onVolume,
                             compact       = true,
                         )
-                        NxPanelGroup(label = s.audioRepeat) {
+                        NxPanelGroup(label = s.text("audioRepeat")) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 NxCycleToggle(
                                     states  = repeatStates(s),
@@ -350,7 +350,7 @@ private fun rememberSeededFill(artwork: ImageBitmap?, tint: Float): Color? {
 /** The picture, and a way in when there is none: the square is the biggest target on the card. */
 @Composable
 private fun CoverSquare(artwork: ImageBitmap?, onPick: () -> Unit, side: Dp = 88.dp) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val well = NxColor.wash(NxColor.lead(), 0.18f)
     OnFill(well) {
         Box(
@@ -371,7 +371,7 @@ private fun CoverSquare(artwork: ImageBitmap?, onPick: () -> Unit, side: Dp = 88
             } else {
                 Symbol(
                     icon               = NxIcon.MusicNote,
-                    contentDescription = s.audioPickTrack,
+                    contentDescription = s.text("audioPickTrack"),
                     tint               = NxColor.lead(),
                     modifier           = Modifier.size(side * 0.34f),
                 )

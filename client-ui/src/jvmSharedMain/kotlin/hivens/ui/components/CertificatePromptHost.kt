@@ -17,7 +17,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.core.diag.ActionRing
 import hivens.launcher.network.CertificateTrustGate
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.NxAlertDialog
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.theme.NxTheme
@@ -45,7 +45,7 @@ import hivens.ui.theme.Status
 @Composable
 fun CertificatePromptHost() {
     val gate: CertificateTrustGate = koinInject()
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val pending by gate.pending.collectAsState()
 
     fun accept(unit: ChronoUnit, amount: Long, label: String) {
@@ -66,14 +66,14 @@ fun CertificatePromptHost() {
     val body = NxTheme.colours.step(NxTheme.colours.topStep)
     NxAlertDialog(
         onDismissRequest = { gate.dismiss() },
-        paneTitle        = s.sslWarningTitle,
-        title = { OnFill(body) { Text(s.sslWarningTitle, color = NxInk.main, fontWeight = FontWeight.Bold) } },
+        paneTitle        = s.text("sslWarningTitle"),
+        title = { OnFill(body) { Text(s.text("sslWarningTitle"), color = NxInk.main, fontWeight = FontWeight.Bold) } },
         text = {
             OnFill(body) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(s.sslWarningBody, style = MaterialTheme.typography.bodyMedium, color = NxInk.quiet)
+                    Text(s.text("sslWarningBody"), style = MaterialTheme.typography.bodyMedium, color = NxInk.quiet)
                     Text(request.host, style = MaterialTheme.typography.labelMedium, color = NxInk.main)
-                    Text(s.sslWarningTrustPrompt, style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
+                    Text(s.text("sslWarningTrustPrompt"), style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
                 }
             }
         },
@@ -94,26 +94,26 @@ fun CertificatePromptHost() {
                         modifier = Modifier.weight(1f),
                         shape = MaterialTheme.shapes.small,
                         colors = colors,
-                    ) { Text(s.sslWarningTrustHour, color = onWarn) }
+                    ) { Text(s.text("sslWarningTrustHour"), color = onWarn) }
                     Button(
                         onClick = { accept(ChronoUnit.DAYS, 30, "30 days") },
                         modifier = Modifier.weight(1f),
                         shape = MaterialTheme.shapes.small,
                         colors = colors,
-                    ) { Text(s.sslWarningTrust30Days, color = onWarn) }
+                    ) { Text(s.text("sslWarningTrust30Days"), color = onWarn) }
                     Button(
                         onClick = { accept(ChronoUnit.DAYS, ALWAYS_DAYS, "always (100y)") },
                         modifier = Modifier.weight(1f),
                         shape = MaterialTheme.shapes.small,
                         colors = colors,
-                    ) { Text(s.sslWarningTrustAlways, color = onWarn) }
+                    ) { Text(s.text("sslWarningTrustAlways"), color = onWarn) }
                 }
             }
         },
         dismissButton = {
             OnFill(body) {
                 TextButton(onClick = { gate.dismiss() }) {
-                    Text(s.sslWarningCancel, color = NxInk.quiet)
+                    Text(s.text("sslWarningCancel"), color = NxInk.quiet)
                 }
             }
         },

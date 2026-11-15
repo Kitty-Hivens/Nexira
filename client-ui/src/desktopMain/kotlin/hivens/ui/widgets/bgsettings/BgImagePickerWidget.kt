@@ -21,7 +21,7 @@ import hivens.ui.background.BackgroundMediaKind
 import hivens.ui.background.BackgroundOptimizer
 import hivens.ui.background.backgroundMediaKind
 import hivens.ui.background.physicalScreenHeight
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
@@ -47,7 +47,7 @@ import hivens.ui.theme.Status
 @Composable
 fun BgImagePickerWidget() {
     val bg = rememberBgSettings() ?: return
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val settings = bg.value
     val scope = rememberCoroutineScope()
     // Process singleton: a transcode runs in the app scope and outlives this screen,
@@ -63,17 +63,17 @@ fun BgImagePickerWidget() {
     // Read off the optimizer, not off local state: leaving the screen mid-transcode and
     // coming back used to show an idle picker over work that was still running.
     val optimizing by optimizer.optimizing.collectAsState()
-    val dialogSettings = rememberFileDialogSettings(s.backgroundPickFile)
+    val dialogSettings = rememberFileDialogSettings(s.text("backgroundPickFile"))
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        SectionTitle(s.backgroundSectionImage)
+        SectionTitle(s.text("backgroundSectionImage"))
         Row(
             modifier              = Modifier.fillMaxWidth(),
             verticalAlignment     = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             NxButton(
-                label    = s.backgroundPickButton,
+                label    = s.text("backgroundPickButton"),
                 icon     = NxIcon.Image,
                 style    = NxButtonStyle.Secondary,
                 enabled  = optimizing == null,
@@ -107,7 +107,7 @@ fun BgImagePickerWidget() {
             if (optimizing != null) {
                 CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = NxColor.lead())
                 NxIconButton(
-                    NxIcon.Close, s.backgroundCancelOptimize,
+                    NxIcon.Close, s.text("backgroundCancelOptimize"),
                     onClick = { optimizer.cancel() },
                     tint    = NxColor.status(Status.Error),
                 )

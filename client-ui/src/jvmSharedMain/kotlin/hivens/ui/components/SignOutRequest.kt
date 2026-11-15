@@ -8,7 +8,7 @@ import androidx.compose.runtime.remember
 import hivens.accounts.api.AccountKeys
 import hivens.accounts.api.SessionState
 import hivens.ui.host.launcherServices
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.puppet.PuppetClick
 import hivens.widget.api.LocalScope
 import hivens.widget.api.find
@@ -93,11 +93,11 @@ fun SignOutPrompt() {
         signOut?.invoke()
     }
     if (asking && signOut != null) {
-        val s = LocalStrings.current
+        val s = nexiraStrings()
         DestructiveConfirmDialog(
-            title        = s.logoutConfirmTitle,
-            body         = s.logoutConfirmBody,
-            confirmLabel = s.navLogout,
+            title        = s.text("logoutConfirmTitle"),
+            body         = s.text("logoutConfirmBody"),
+            confirmLabel = s.text("navLogout"),
             onConfirm    = signOut,
             onDismiss    = requests::close,
         )

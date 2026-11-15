@@ -1,6 +1,7 @@
 package hivens.ui.utils
 
-import hivens.ui.i18n.AppStrings
+import hivens.i18n.api.Strings
+import hivens.ui.i18n.byteUnits
 
 /**
  * A byte count as a person reads it: binary units, one decimal, the unit that
@@ -12,7 +13,7 @@ import hivens.ui.i18n.AppStrings
  * and renders "1.5 GB" in the middle of a Russian sentence (and "1,5 GB" in the
  * middle of an English one) whenever the two disagree.
  */
-internal fun humanSize(bytes: Long, strings: AppStrings): String {
+internal fun humanSize(bytes: Long, strings: Strings): String {
     val units = strings.byteUnits
     if (bytes < 1024) return "$bytes ${units.first()}"
     var value = bytes.toDouble() / 1024.0

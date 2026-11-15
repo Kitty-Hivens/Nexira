@@ -7,7 +7,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.collectAsState
 import hivens.launcher.launch.RunningPackSource
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import org.koin.compose.koinInject
 
 /**
@@ -50,11 +50,11 @@ internal class RunningPackGuard {
     @Composable
     fun Dialog() {
         val action = pending ?: return
-        val s = LocalStrings.current
+        val s = nexiraStrings()
         DestructiveConfirmDialog(
-            title = s.packBusyRunningTitle,
-            body = s.packBusyRunningBody,
-            confirmLabel = s.packBusyRunningConfirm,
+            title = s.text("packBusyRunningTitle"),
+            body = s.text("packBusyRunningBody"),
+            confirmLabel = s.text("packBusyRunningConfirm"),
             onConfirm = action,
             onDismiss = { pending = null },
         )

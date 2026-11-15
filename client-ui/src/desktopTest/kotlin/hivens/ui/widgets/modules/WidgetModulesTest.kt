@@ -1,5 +1,6 @@
 package hivens.ui.widgets.modules
 
+import hivens.i18n.I18nEngine
 import hivens.widget.generated.GeneratedWidgetRegistry
 import hivens.widget.model.WidgetKind
 import kotlinx.coroutines.CoroutineScope
@@ -115,7 +116,9 @@ class WidgetModulesTest {
         val effect = modules().state.value.effects.single()
 
         assertEquals("fixture/fixture.effect", effect.scope)
-        assertEquals("Fixture Effect", effect.strings.get(effect.item.label, "en"))
+        val words = modules().state.value.words.getValue(effect.moduleId)
+        val english = I18nEngine(null, "en").apply { contribute(effect.moduleId, words.wordsOf(effect.moduleId)) }
+        assertEquals("Fixture Effect", english.strings(effect.moduleId).text(effect.item.label))
         assertEquals(3, (modules().state.value.entries.single() as WidgetModules.Entry.Loaded).contributions, "the fixture carries an effect, a theme and its keys")
     }
 

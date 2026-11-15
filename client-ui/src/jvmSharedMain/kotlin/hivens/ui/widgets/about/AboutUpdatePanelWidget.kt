@@ -21,7 +21,7 @@ import androidx.compose.ui.unit.dp
 import hivens.config.Branding
 import hivens.core.data.ReleaseChannel
 import hivens.ui.components.channelColor
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.flexible.Flexible
@@ -62,19 +62,19 @@ fun AboutUpdatePanelWidget(instance: WidgetInstance) {
     val p = instance.rememberProps<AboutUpdateProps>()
     val state = rememberScopedSource(AboutUpdateSource).valueOrNull() ?: return
     val openDialog = rememberScopedAction(OpenUpdateDialog) ?: return
-    val s = LocalStrings.current
+    val s = nexiraStrings()
 
     val versionText = remember { "v${Branding.VERSION.removePrefix("v")}" }
     val channel = remember { ReleaseChannel.classify(Branding.VERSION.removePrefix("v")) }
     val accent = channelColor(channel)
 
     Column(Modifier.fillMaxWidth().padding(20.dp)) {
-        SectionLabel(p.title.ifBlank { s.aboutSectionUpdates })
+        SectionLabel(p.title.ifBlank { s.text("aboutSectionUpdates") })
         Spacer(Modifier.height(16.dp))
 
         // Current version.
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(s.aboutCurrentVersion, color = NxInk.quiet, style = MaterialTheme.typography.bodyMedium)
+            Text(s.text("aboutCurrentVersion"), color = NxInk.quiet, style = MaterialTheme.typography.bodyMedium)
             Spacer(Modifier.width(12.dp))
             Text(
                 text       = versionText,
@@ -108,7 +108,7 @@ fun AboutUpdatePanelWidget(instance: WidgetInstance) {
             Spacer(Modifier.height(12.dp))
             Flexible("about_open_update_btn", FlexibleKind.Button) {
                 NxButton(
-                    label = if (current.update.isCritical) s.updateDownloadNow else s.updateDownload,
+                    label = if (current.update.isCritical) s.text("updateDownloadNow") else s.text("updateDownload"),
                     onClick = openDialog,
                     modifier = Modifier.fillMaxWidth(),
                     style = if (current.update.isCritical) NxButtonStyle.Destructive else NxButtonStyle.Secondary,

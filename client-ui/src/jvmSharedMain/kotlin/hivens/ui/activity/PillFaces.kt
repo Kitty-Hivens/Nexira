@@ -19,7 +19,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.SubcomposeAsyncImage
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.LocalPlane
@@ -88,7 +88,7 @@ internal fun StackOverflow(count: Int) {
         borderColor   = bodyColour(),
     ) {
         Text(
-            LocalStrings.current.activityPillMore(count),
+            nexiraStrings().text("activityPillMore", count),
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.Bold,
             color = NxInk.quiet,

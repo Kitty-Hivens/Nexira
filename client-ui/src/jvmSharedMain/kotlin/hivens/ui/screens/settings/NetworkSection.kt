@@ -16,7 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.core.diag.ActionRing
 import hivens.core.security.SslBypassStore
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxSection
@@ -33,7 +33,7 @@ import hivens.ui.theme.NxInk
  */
 @Composable
 internal fun NetworkSection() {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val bypassStore: SslBypassStore = koinInject()
 
     // The store publishes its grants, so the list follows a revoke made from
@@ -44,10 +44,10 @@ internal fun NetworkSection() {
         .ofLocalizedDateTime(FormatStyle.MEDIUM)
         .withZone(java.time.ZoneId.systemDefault())
 
-    NxSection(s.settingsSectionNetwork) {
-        Text(s.sslBypassListTitle, color = NxInk.main, fontWeight = FontWeight.Bold)
+    NxSection(s.text("settingsSectionNetwork")) {
+        Text(s.text("sslBypassListTitle"), color = NxInk.main, fontWeight = FontWeight.Bold)
         if (bypasses.isEmpty()) {
-            Text(s.sslBypassNoEntries, style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
+            Text(s.text("sslBypassNoEntries"), style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
         } else {
             bypasses.forEach { entry ->
                 Row(
@@ -66,13 +66,13 @@ internal fun NetworkSection() {
                         val expires = runCatching { dateFormatter.format(java.time.Instant.parse(entry.expiresAt)) }
                             .getOrDefault(entry.expiresAt)
                         Text(
-                            text  = s.sslBypassExpiresAt(expires),
+                            text  = s.text("sslBypassExpiresAt", expires),
                             style = MaterialTheme.typography.bodySmall,
                             color = NxInk.quiet,
                         )
                     }
                     NxButton(
-                        label   = s.sslBypassRevoke,
+                        label   = s.text("sslBypassRevoke"),
                         onClick = {
                             ActionRing.record("SSL bypass revoked by user from Settings: ${entry.host}")
                             bypassStore.revoke(entry.host)

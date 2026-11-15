@@ -1,8 +1,6 @@
 package hivens.ui.utils
 
-import hivens.ui.i18n.EnglishStrings
-import hivens.ui.i18n.GermanStrings
-import hivens.ui.i18n.RussianStrings
+import hivens.ui.i18n.NexiraStrings
 import java.util.Locale
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
@@ -33,31 +31,31 @@ class HumanSizeTest {
     fun `russian strings render russian units and decimal mark on an english system`() {
         Locale.setDefault(Locale.ENGLISH)
 
-        assertEquals("1,5 ГБ", humanSize(1_610_612_736L, RussianStrings))
-        assertEquals("300 Б", humanSize(300L, RussianStrings))
+        assertEquals("1,5 ГБ", humanSize(1_610_612_736L, NexiraStrings.shipped("ru")))
+        assertEquals("300 Б", humanSize(300L, NexiraStrings.shipped("ru")))
     }
 
     @Test
     fun `english strings keep the dot on a russian system`() {
         Locale.setDefault(Locale.of("ru", "RU"))
 
-        assertEquals("1.5 GB", humanSize(1_610_612_736L, EnglishStrings))
-        assertEquals("300 B", humanSize(300L, EnglishStrings))
+        assertEquals("1.5 GB", humanSize(1_610_612_736L, NexiraStrings.shipped("en")))
+        assertEquals("300 B", humanSize(300L, NexiraStrings.shipped("en")))
     }
 
     @Test
     fun `the unit climbs with the number`() {
-        assertEquals("1.0 KB", humanSize(1024L, EnglishStrings))
-        assertEquals("1.0 MB", humanSize(1024L * 1024, EnglishStrings))
-        assertEquals("1.0 TB", humanSize(1024L * 1024 * 1024 * 1024, EnglishStrings))
+        assertEquals("1.0 KB", humanSize(1024L, NexiraStrings.shipped("en")))
+        assertEquals("1.0 MB", humanSize(1024L * 1024, NexiraStrings.shipped("en")))
+        assertEquals("1.0 TB", humanSize(1024L * 1024 * 1024 * 1024, NexiraStrings.shipped("en")))
         // Nothing above the last unit: petabytes read as four-digit terabytes.
-        assertEquals("1024.0 TB", humanSize(1024L * 1024 * 1024 * 1024 * 1024, EnglishStrings))
+        assertEquals("1024.0 TB", humanSize(1024L * 1024 * 1024 * 1024 * 1024, NexiraStrings.shipped("en")))
     }
 
     @Test
     fun `german renders its own decimal mark`() {
         Locale.setDefault(Locale.ENGLISH)
 
-        assertEquals("1,5 GB", humanSize(1_610_612_736L, GermanStrings))
+        assertEquals("1,5 GB", humanSize(1_610_612_736L, NexiraStrings.shipped("de")))
     }
 }

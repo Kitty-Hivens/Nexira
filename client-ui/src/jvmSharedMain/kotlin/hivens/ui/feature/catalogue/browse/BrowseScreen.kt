@@ -58,7 +58,7 @@ import hivens.catalogue.api.SearchResults
 import hivens.catalogue.api.SearchStatus
 import hivens.ui.RIGHT_RAIL_SURFACE
 import hivens.ui.RailFamily
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.nx.NxBasicTextField
@@ -173,7 +173,7 @@ internal fun PackBrowse(
      */
     shown: (CatalogueCard) -> Boolean = { true },
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val imageContext = LocalPlatformContext.current
     val retry = rememberScopedAction(CatalogueKeys.RetryResults)
     val more = rememberScopedAction(CatalogueKeys.MoreResults)
@@ -196,12 +196,12 @@ internal fun PackBrowse(
     when (val status = results.status) {
         SearchStatus.Loading -> BrowseLoading()
         SearchStatus.Empty -> BrowseEmpty(onRetry = { retry?.invoke() })
-        is SearchStatus.Failed -> BrowseError(message = status.message ?: s.browseErrorMessage, onRetry = { retry?.invoke() })
+        is SearchStatus.Failed -> BrowseError(message = status.message ?: s.text("browseErrorMessage"), onRetry = { retry?.invoke() })
         SearchStatus.Loaded -> {
             val visible = results.packs.filter(shown)
             if (visible.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(s.contentEmpty, style = MaterialTheme.typography.bodyMedium, color = NxInk.quiet)
+                    Text(s.text("contentEmpty"), style = MaterialTheme.typography.bodyMedium, color = NxInk.quiet)
                 }
             } else {
                 // One list per question: it starts where the reader left that question's
@@ -397,37 +397,37 @@ internal fun BrowseLoading() {
 
 @Composable
 private fun BrowseEmpty(onRetry: () -> Unit) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
-                text       = s.browseEmptyTitle,
+                text       = s.text("browseEmptyTitle"),
                 style      = MaterialTheme.typography.titleLarge,
                 color      = NxInk.main,
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
-                text      = s.browseEmptyMessage,
+                text      = s.text("browseEmptyMessage"),
                 style     = MaterialTheme.typography.bodyMedium,
                 color     = NxInk.quiet,
                 textAlign = TextAlign.Center,
                 modifier  = Modifier.widthIn(max = 420.dp),
             )
-            NxButton(label = s.browseRetry, onClick = onRetry)
+            NxButton(label = s.text("browseRetry"), onClick = onRetry)
         }
     }
 }
 
 @Composable
 private fun BrowseError(message: String, onRetry: () -> Unit) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     RetryStateBlock(
-        title      = s.browseErrorTitle,
+        title      = s.text("browseErrorTitle"),
         message    = message,
-        retryLabel = s.browseRetry,
+        retryLabel = s.text("browseRetry"),
         onRetry    = onRetry,
         modifier   = Modifier.fillMaxSize(),
     )

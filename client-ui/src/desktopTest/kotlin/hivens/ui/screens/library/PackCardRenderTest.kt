@@ -29,8 +29,7 @@ import hivens.packs.api.PackKeys
 import hivens.packs.api.PackUpdateView
 import hivens.packs.toPackView
 import hivens.ui.host.HostKoin
-import hivens.ui.i18n.AppLocale
-import hivens.ui.i18n.LocaleProvider
+import hivens.ui.i18n.ShippedLanguageProvider
 import hivens.ui.navigation.NavRequests
 import hivens.ui.notifications.IndicationCenter
 import hivens.ui.feature.catalogue.browse.BrowsePackCard
@@ -149,7 +148,7 @@ class PackCardRenderTest {
         val d = 2f
         val scene = ImageComposeScene((520 * d).toInt(), (480 * d).toInt(), density = Density(d)) {
             HostKoin(graph) {
-                LocaleProvider(AppLocale.RUSSIAN) {
+                ShippedLanguageProvider("ru") {
                     NxTheme(dark = dark) {
                         CompositionLocalProvider(LocalWidgetDataRegistry provides keys) {
                             Box(Modifier.fillMaxSize().background(NxColor.page).padding(16.dp)) {

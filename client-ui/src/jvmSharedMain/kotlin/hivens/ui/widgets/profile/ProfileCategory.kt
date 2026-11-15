@@ -1,7 +1,7 @@
 package hivens.ui.widgets.profile
 
 import hivens.accounts.api.AccountKeys
-import hivens.ui.i18n.AppStrings
+import hivens.i18n.api.Strings
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 
@@ -16,7 +16,7 @@ import hivens.ui.icons.NxIcon
 // so they are literal rather than localized. Order = display order in the nav.
 enum class ProfileCategory(
     val icon: IconKey,
-    val label: (AppStrings) -> String,
+    val label: (Strings) -> String,
     /** The credential provider this category speaks for, as stored on an account. */
     val providerKey: String,
 ) {

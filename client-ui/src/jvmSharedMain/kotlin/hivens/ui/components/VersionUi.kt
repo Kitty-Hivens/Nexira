@@ -2,7 +2,7 @@ package hivens.ui.components
 
 import androidx.compose.runtime.Composable
 import hivens.core.update.VersionChannel
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.NxMetaChip
 import hivens.ui.nx.NxMetaChipTone
 import java.time.Instant
@@ -18,11 +18,11 @@ private val BUILD_TIME: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM
  */
 @Composable
 fun ChannelChip(channel: VersionChannel) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val (label, tone) = when (channel) {
-        VersionChannel.Release -> s.packVersionsChannelRelease to NxMetaChipTone.Surface
-        VersionChannel.Beta    -> s.packVersionsChannelBeta to NxMetaChipTone.Warning
-        VersionChannel.Alpha   -> s.packVersionsChannelAlpha to NxMetaChipTone.Error
+        VersionChannel.Release -> s.text("packVersionsChannelRelease") to NxMetaChipTone.Surface
+        VersionChannel.Beta    -> s.text("packVersionsChannelBeta") to NxMetaChipTone.Warning
+        VersionChannel.Alpha   -> s.text("packVersionsChannelAlpha") to NxMetaChipTone.Error
     }
     NxMetaChip(label, tone = tone)
 }

@@ -2,7 +2,7 @@ package hivens.ui.screens.custom
 
 import hivens.ui.Screen
 import hivens.ui.editor.EditorSurfaces
-import hivens.ui.i18n.EnglishStrings
+import hivens.ui.i18n.NexiraStrings
 import hivens.widget.model.DefaultLayout
 import hivens.widget.model.FamilyId
 import hivens.widget.model.LayoutGraph
@@ -77,7 +77,7 @@ class MadeScreensTest {
         val surfaces = EditorSurfaces.availableFor(Screen.Custom("mine"), graph)
         assertEquals(spec.surface, surfaces.first(), "the page is the first tab, like any screen's")
         val s = EditorSurfaces.specIn(spec.surface, graph)!!
-        assertEquals("Mine", s.name(EnglishStrings))
+        assertEquals("Mine", s.name(NexiraStrings.shipped("en")))
         assertTrue(s.hasSettings, "a made screen has its own settings: name, icon, delete")
         assertEquals(ScreenIcons.of("star"), s.icon)
     }
@@ -85,7 +85,7 @@ class MadeScreensTest {
     @Test
     fun `an unnamed screen is called untitled rather than nothing`() {
         val g = DefaultLayout.load().addScreen(spec.copy(title = ""))
-        assertEquals(EnglishStrings.screenUntitled, EditorSurfaces.specIn(spec.surface, g)!!.shortName(EnglishStrings))
+        assertEquals(NexiraStrings.shipped("en").text("screenUntitled"), EditorSurfaces.specIn(spec.surface, g)!!.shortName(NexiraStrings.shipped("en")))
     }
 
     @Test

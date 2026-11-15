@@ -3,9 +3,9 @@ package hivens.ui.components
 import androidx.compose.runtime.*
 import hivens.config.Branding
 import hivens.core.data.LauncherUpdate
+import hivens.ui.i18n.nexiraStrings
 import hivens.update.DesktopIntegration
 import hivens.update.UpdateService
-import hivens.ui.i18n.LocalStrings
 import hivens.ui.notifications.Kind
 import hivens.ui.notifications.NotifAction
 import hivens.ui.notifications.NotifGlyph
@@ -27,7 +27,7 @@ fun UpdateManager() {
     val desktopIntegration = koinInject<DesktopIntegration>()
     val center        = koinInject<NotificationCenter>()
     val updateState   = koinInject<LauncherUpdateState>()
-    val s             = LocalStrings.current
+    val s             = nexiraStrings()
 
     var availableUpdate by remember { mutableStateOf<LauncherUpdate?>(null) }
     var showDialog      by remember { mutableStateOf(false) }
@@ -44,12 +44,12 @@ fun UpdateManager() {
             iconUrl   = null,
             severity  = Severity.Info,
             kind      = Kind.ActionRequired,
-            title     = s.updateTitle,
-            body      = s.updateVersion(update.version),
+            title     = s.text("updateTitle"),
+            body      = s.text("updateVersion", update.version),
             glyph     = NotifGlyph.Update,
             actions   = listOf(
-                NotifAction("details", s.updateDetails) { showDialog = true },
-                NotifAction("later", s.updateLater) {},
+                NotifAction("details", s.text("updateDetails")) { showDialog = true },
+                NotifAction("later", s.text("updateLater")) {},
             ),
         )
     }

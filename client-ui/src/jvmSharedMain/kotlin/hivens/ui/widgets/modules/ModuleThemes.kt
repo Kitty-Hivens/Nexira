@@ -1,5 +1,6 @@
 package hivens.ui.widgets.modules
 
+import hivens.i18n.api.Translator
 import hivens.ui.theme.Scheme
 import hivens.ui.theme.Theme
 import hivens.ui.theme.Themes
@@ -14,16 +15,16 @@ private val log = LoggerFactory.getLogger("Widgets")
  * The themes modules brought, as themes the picker can list.
  *
  * A theme's id is its module's, a slash, then its own, so a module cannot take the id of a theme
- * that ships or of another module's. It is named in the person's language by the module's own
- * words. A theme that cannot make a scheme, or whose module throws while being read, is left out
+ * that ships or of another module's. It is named by the module's own words in the language of
+ * [words]. A theme that cannot make a scheme, or whose module throws while being read, is left out
  * with a line in the log, so it costs only itself: this runs in the shell's own composition, where a
  * module's failure would otherwise take the interface down.
  */
-fun List<Contributed<ThemeContribution>>.toThemes(languageTag: String): List<Theme> = mapNotNull { entry ->
+fun List<Contributed<ThemeContribution>>.toThemes(words: Translator): List<Theme> = mapNotNull { entry ->
     runCatching {
         Theme(
             id = entry.scope,
-            name = entry.strings.get(entry.item.label, languageTag),
+            name = words.strings(entry.moduleId).text(entry.item.label),
             dark = entry.item.dark.toScheme(Themes.Celestia.dark),
             light = entry.item.light?.toScheme(Themes.Celestia.light!!),
         )

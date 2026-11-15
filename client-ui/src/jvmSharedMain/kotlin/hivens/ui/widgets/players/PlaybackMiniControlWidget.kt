@@ -48,7 +48,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import hivens.ui.audio.PlaybackState
 import hivens.ui.audio.TrackInfo
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
@@ -125,7 +125,7 @@ internal fun PlaybackMiniControl(
     onSeek: (Long) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val idle = state is PlaybackState.Idle
     val loaded = !idle && state !is PlaybackState.Error
     val duration = durationMsOf(state)
@@ -141,7 +141,7 @@ internal fun PlaybackMiniControl(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .openWhenEmpty(idle, s.audioPickTrack, onPick)
+                    .openWhenEmpty(idle, s.text("audioPickTrack"), onPick)
                     .padding(horizontal = 12.dp, vertical = 10.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
@@ -169,7 +169,7 @@ internal fun PlaybackMiniControl(
                     Spacer(Modifier.width(10.dp))
 
                     if (showSkips) {
-                        MiniGlyph(NxIcon.SkipPrevious, s.audioSkipPrevious, loaded, onSkipPrev)
+                        MiniGlyph(NxIcon.SkipPrevious, s.text("audioSkipPrevious"), loaded, onSkipPrev)
                         Spacer(Modifier.width(2.dp))
                     }
                     val isPlaying = state is PlaybackState.Playing
@@ -177,11 +177,11 @@ internal fun PlaybackMiniControl(
                         icon        = if (isPlaying) NxIcon.Pause else NxIcon.PlayArrow,
                         enabled     = loaded,
                         onClick     = onPlayPause,
-                        description = if (isPlaying) s.audioPause else s.audioPlay,
+                        description = if (isPlaying) s.text("audioPause") else s.text("audioPlay"),
                     )
                     if (showSkips) {
                         Spacer(Modifier.width(2.dp))
-                        MiniGlyph(NxIcon.SkipNext, s.audioSkipNext, loaded, onSkipNext)
+                        MiniGlyph(NxIcon.SkipNext, s.text("audioSkipNext"), loaded, onSkipNext)
                     }
                     if (showVolume) {
                         Spacer(Modifier.width(10.dp))

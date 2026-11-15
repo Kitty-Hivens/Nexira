@@ -29,7 +29,7 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.audio.PlaybackState
 import hivens.ui.audio.RepeatMode
 import hivens.ui.audio.TrackInfo
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
@@ -136,7 +136,7 @@ internal fun TimelinePlayerCard(
     onSeek: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val idle = state is PlaybackState.Idle
     val loaded = !idle && state !is PlaybackState.Error
     val duration = durationMsOf(state)
@@ -184,7 +184,7 @@ internal fun TimelinePlayerCard(
             Box(
                 Modifier
                     .fillMaxSize()
-                    .openWhenEmpty(idle, s.audioPickTrack, onPick)
+                    .openWhenEmpty(idle, s.text("audioPickTrack"), onPick)
                     .seekAlong(vertical = false, onSeekFraction = seekFraction),
             )
 
@@ -235,7 +235,7 @@ internal fun TimelinePlayerCard(
                 if (skips) {
                     NxIconButton(
                         icon               = NxIcon.SkipPrevious,
-                        contentDescription = s.audioSkipPrevious,
+                        contentDescription = s.text("audioSkipPrevious"),
                         onClick            = onSkipPrev,
                         tint               = NxInk.quiet,
                         enabled            = loaded,
@@ -246,7 +246,7 @@ internal fun TimelinePlayerCard(
                 }
                 NxIconButton(
                     icon               = if (state is PlaybackState.Playing) NxIcon.Pause else NxIcon.PlayArrow,
-                    contentDescription = if (state is PlaybackState.Playing) s.audioPause else s.audioPlay,
+                    contentDescription = if (state is PlaybackState.Playing) s.text("audioPause") else s.text("audioPlay"),
                     onClick            = onPlayPause,
                     tint               = NxInk.main,
                     enabled            = loaded,
@@ -257,7 +257,7 @@ internal fun TimelinePlayerCard(
                 if (skips) {
                     NxIconButton(
                         icon               = NxIcon.SkipNext,
-                        contentDescription = s.audioSkipNext,
+                        contentDescription = s.text("audioSkipNext"),
                         onClick            = onSkipNext,
                         tint               = NxInk.quiet,
                         enabled            = loaded,
@@ -271,23 +271,23 @@ internal fun TimelinePlayerCard(
                 Box {
                     NxIconButton(
                         icon               = NxIcon.MoreVert,
-                        contentDescription = s.packCardMore,
+                        contentDescription = s.text("packCardMore"),
                         onClick            = { menuOpen = true },
                     )
                     NxPopoverPanel(
                         expanded         = menuOpen,
                         onDismissRequest = { menuOpen = false },
-                        title            = s.audioPlaybackOptions,
+                        title            = s.text("audioPlaybackOptions"),
                         footer           = {
                             NxButton(
-                                label   = s.audioOpenFile,
+                                label   = s.text("audioOpenFile"),
                                 onClick = { menuOpen = false; onPick() },
                                 style   = NxButtonStyle.Tertiary,
                                 icon    = NxIcon.FolderOpen,
                                 compact = true,
                             )
                             NxButton(
-                                label   = s.audioStop,
+                                label   = s.text("audioStop"),
                                 onClick = { menuOpen = false; onStop() },
                                 style   = NxButtonStyle.Tertiary,
                                 icon    = NxIcon.Stop,
@@ -297,14 +297,14 @@ internal fun TimelinePlayerCard(
                         },
                     ) {
                         NxSlider(
-                            label         = s.audioVolume,
+                            label         = s.text("audioVolume"),
                             value         = volume,
                             range         = 0f..1f,
                             valueText     = "${(volume * 100).toInt()}%",
                             onValueChange = onVolume,
                             compact       = true,
                         )
-                        NxPanelGroup(label = s.audioRepeat) {
+                        NxPanelGroup(label = s.text("audioRepeat")) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 NxCycleToggle(
                                     states  = repeatStates(s),

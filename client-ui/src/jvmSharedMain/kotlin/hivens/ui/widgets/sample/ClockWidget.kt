@@ -29,7 +29,7 @@ import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.LocalPlane
@@ -90,7 +90,7 @@ fun ClockWidget(instance: WidgetInstance) {
     // Formatted in the launcher's language, not the machine's: the weekday and
     // month names below sit inside a Russian shell on an English Windows unless
     // the locale is passed, and the AM/PM marker has the same problem.
-    val locale = LocalStrings.current.locale
+    val locale = nexiraStrings().locale
     val timeFormatter = remember(p.format24h, p.showSeconds, locale) {
         DateTimeFormatter.ofPattern(
             buildString {

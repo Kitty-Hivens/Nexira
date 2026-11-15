@@ -116,7 +116,7 @@ class MirrorPackCatalogueTest {
     fun `a card reads in the reader's language where the curator wrote it, and untagged where not`() = runBlocking {
         val (client, _) = mirror(translated)
         var tag = "en"
-        val catalogue = MirrorPackCatalogue(client, language = { tag })
+        val catalogue = MirrorPackCatalogue(client, languages = { listOf(tag) })
         assertEquals(listOf("Heavy industry.", "Без перевода"), catalogue.search("").map { it.tagline })
         tag = "de"
         assertEquals(listOf("Тяжёлая промышленность.", "Без перевода"), catalogue.search("").map { it.tagline })
@@ -125,7 +125,7 @@ class MirrorPackCatalogueTest {
     @Test
     fun `a search matches the tagline the reader sees`() = runBlocking {
         val (client, _) = mirror(translated)
-        val catalogue = MirrorPackCatalogue(client, language = { "en" })
+        val catalogue = MirrorPackCatalogue(client, languages = { listOf("en") })
         assertEquals(listOf("t"), catalogue.search("industry").map { it.id })
     }
 

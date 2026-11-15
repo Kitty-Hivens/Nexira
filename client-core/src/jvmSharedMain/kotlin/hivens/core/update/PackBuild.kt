@@ -84,8 +84,11 @@ data class PackBuild(
     val key: String get() = id ?: versionNumber
 
     /** This build with its release notes in the reader's language [tag], where the source wrote them. */
-    fun forLanguage(tag: String): PackBuild =
-        if (changelogI18n == null) this else copy(changelog = inLanguage(changelog, changelogI18n, tag))
+    fun forLanguage(tag: String): PackBuild = forLanguage(listOf(tag))
+
+    /** This build with its release notes in the first of the reader's languages [tags] the source wrote them in. */
+    fun forLanguage(tags: List<String>): PackBuild =
+        if (changelogI18n == null) this else copy(changelog = inLanguage(changelog, changelogI18n, tags))
 }
 
 /**

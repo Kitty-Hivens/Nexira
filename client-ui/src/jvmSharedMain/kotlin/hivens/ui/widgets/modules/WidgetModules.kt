@@ -91,18 +91,24 @@ class WidgetModules(
         val registry: WidgetRegistry,
         val entries: List<Entry>,
         val contributions: List<Contributed<ModuleContribution>> = emptyList(),
-        val widgetStrings: Map<WidgetKind, ModuleStrings> = emptyMap(),
+        /** The module each widget kind a module brought comes from, by kind: the namespace its names are looked up in. */
+        val widgetModules: Map<WidgetKind, String> = emptyMap(),
+        /** The words each loaded module ships, by module id, for the language module. */
+        val words: Map<String, ModuleStrings> = emptyMap(),
     ) {
         /** The contributions of one kind, in the order the modules load. */
         inline fun <reified T : ModuleContribution> of(): List<Contributed<T>> =
-            contributions.mapNotNull { c -> (c.item as? T)?.let { Contributed(c.moduleId, c.moduleName, it, c.strings) } }
+            contributions.mapNotNull { c -> (c.item as? T)?.let { Contributed(c.moduleId, c.moduleName, it) } }
 
         val effects: List<Contributed<ScreenEffect>> get() = of<ScreenEffect>()
         val themes: List<Contributed<ThemeContribution>> get() = of<ThemeContribution>()
     }
 
-    /** A contribution with the module that brought it and the words that module ships. */
-    class Contributed<out T : ModuleContribution>(val moduleId: String, val moduleName: String, val item: T, val strings: ModuleStrings) {
+    /**
+     * A contribution with the module that brought it. What it declares for a person to read is a
+     * key into that module's words, looked up under [moduleId] as their namespace.
+     */
+    class Contributed<out T : ModuleContribution>(val moduleId: String, val moduleName: String, val item: T) {
         /** The key the person's choices for this contribution are stored under. */
         val scope: String get() = "$moduleId/${item.id}"
     }
@@ -235,7 +241,7 @@ class WidgetModules(
         // A module's particle fields are widgets of its own, so they join the registry beside its others.
         val particleWidgets = scan.loaded.associate { module ->
             module.id to ModuleParticleWidgets(module.contributions.filterIsInstance<ParticleContribution>().map {
-                Contributed(module.id, module.name, it, module.strings)
+                Contributed(module.id, module.name, it)
             })
         }
         val sources = listOf(builtIn) + scan.loaded.flatMap { listOf(it.registry, particleWidgets.getValue(it.id)) }
@@ -250,7 +256,7 @@ class WidgetModules(
         // Effects are told apart by module, so two modules may use one id. An id repeated inside a
         // module is refused by the loader before it gets here.
         val contributions = scan.loaded.flatMap { module ->
-            module.contributions.map { Contributed(module.id, module.name, it, module.strings) }
+            module.contributions.map { Contributed(module.id, module.name, it) }
         }
         val present = (scan.loaded.map { it.id } + scan.disabled.map { it.id }).toSet()
         val entries = buildList {
@@ -259,10 +265,10 @@ class WidgetModules(
             scan.rejected.forEach { add(Entry.Refused(it.file, it.reason)) }
             (saved.known.keys + saved.disabled.keys).filter { it !in present }.sorted().forEach { add(Entry.Gone(it)) }
         }
-        val widgetStrings = scan.loaded.flatMap { module ->
-            (module.registry.all().keys + particleWidgets.getValue(module.id).all().keys).map { it to module.strings }
+        val widgetModules = scan.loaded.flatMap { module ->
+            (module.registry.all().keys + particleWidgets.getValue(module.id).all().keys).map { it to module.id }
         }.toMap()
-        return Snapshot(composite, entries, contributions, widgetStrings)
+        return Snapshot(composite, entries, contributions, widgetModules, scan.loaded.associate { it.id to it.strings })
     }
 
     private fun release(leaving: List<LoadedModule>) {

@@ -28,7 +28,7 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import hivens.ui.Screen
 import hivens.ui.effects.pixelArtBackground
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.NxMetaChipTone
 import hivens.ui.nx.PlayGround
 import hivens.ui.nx.PlayLayout
@@ -77,8 +77,8 @@ data class ContinueProps(
 fun HomeNewContinue(instance: WidgetInstance) {
     val p = instance.rememberProps<ContinueProps>()
     val navigate = rememberScopedCommand(Commands.Navigate) ?: return
-    val s = LocalStrings.current
-    val quickLaunch = rememberQuickLaunchTarget(s.homeQuickButton) ?: return
+    val s = nexiraStrings()
+    val quickLaunch = rememberQuickLaunchTarget(s.text("homeQuickButton")) ?: return
     val pack = quickLaunch.target
     val art = rememberPackArt(pack)
     val (hueA, hueB) = decorativePair(pack.id)
@@ -97,8 +97,8 @@ fun HomeNewContinue(instance: WidgetInstance) {
                 verticalArrangement   = Arrangement.spacedBy(12.dp),
             ) {
                 val hours = pack.playtimeSeconds / 3600
-                if (hours > 0) Numeral(s.homeFactHours(hours), s.homeFactPlaytime)
-                Numeral(lastPlayedLabel(pack.lastPlayedEpochSecond), s.homeFactLastSession)
+                if (hours > 0) Numeral(s.text("homeFactHours", hours), s.text("homeFactPlaytime"))
+                Numeral(lastPlayedLabel(pack.lastPlayedEpochSecond), s.text("homeFactLastSession"))
                 pack.gameVersion?.let { version -> Numeral(version, loaderLabel(pack.loader ?: "vanilla")) }
             }
         }
@@ -110,7 +110,7 @@ fun HomeNewContinue(instance: WidgetInstance) {
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text       = if (pack.lastPlayedEpochSecond > 0L) s.homeQuickContinue else s.homeQuickStart,
+                    text       = if (pack.lastPlayedEpochSecond > 0L) s.text("homeQuickContinue") else s.text("homeQuickStart"),
                     style      = MaterialTheme.typography.labelLarge,
                     color      = NxInk.quiet,
                     modifier   = Modifier.weight(1f),

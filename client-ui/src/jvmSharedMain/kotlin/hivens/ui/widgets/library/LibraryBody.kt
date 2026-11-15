@@ -24,9 +24,9 @@ import hivens.launcher.platform.PlatformPaths
 import hivens.packs.api.PackKeys
 import hivens.packs.api.PackView
 import hivens.ui.Screen
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.NxButton
 import hivens.ui.components.DestructiveConfirmDialog
-import hivens.ui.i18n.LocalStrings
 import hivens.ui.platform.SystemActions
 import hivens.ui.screens.library.PackCard
 import hivens.ui.surface.NxSurface
@@ -75,14 +75,14 @@ fun LibraryBody(instance: WidgetInstance) {
     // Runs on the app's level, not this composition: leaving the Library mid-delete
     // cancelled it halfway through the tree.
     val deletePack = rememberScopedCommand(PackKeys.DeletePack) ?: return
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val paths: PlatformPaths = koinInject()
     var pendingDelete by remember { mutableStateOf<PackView?>(null) }
 
     if (instances.isEmpty()) {
         LibraryEmpty(
-            title    = p.emptyTitle.ifBlank { s.libraryEmptyTitle },
-            body     = p.emptyText.ifBlank { s.libraryEmptyBody },
+            title    = p.emptyTitle.ifBlank { s.text("libraryEmptyTitle") },
+            body     = p.emptyText.ifBlank { s.text("libraryEmptyBody") },
             onBrowse = { navigate(Screen.Browse) },
         )
     } else {
@@ -96,9 +96,9 @@ fun LibraryBody(instance: WidgetInstance) {
 
     pendingDelete?.let { target ->
         DestructiveConfirmDialog(
-            title        = s.packCardDeleteTitle,
-            body         = s.packCardDeleteBody,
-            confirmLabel = s.editorDelete,
+            title        = s.text("packCardDeleteTitle"),
+            body         = s.text("packCardDeleteBody"),
+            confirmLabel = s.text("editorDelete"),
             onConfirm    = {
                 // Files first, registry second (locked jar -> keep the entry, no
                 // orphaned data); ordering lives in PackInstanceService now.
@@ -137,7 +137,7 @@ private fun LibraryList(
 
 @Composable
 private fun LibraryEmpty(title: String, body: String, onBrowse: () -> Unit) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         // A panel the size of what it says. The words are the whole screen here, and
         // on the bare page they lay over whatever the wallpaper had in the middle.
@@ -160,7 +160,7 @@ private fun LibraryEmpty(title: String, body: String, onBrowse: () -> Unit) {
                     textAlign = TextAlign.Center,
                     modifier  = Modifier.widthIn(max = 360.dp),
                 )
-                NxButton(label = s.browseOpen, onClick = onBrowse)
+                NxButton(label = s.text("browseOpen"), onClick = onBrowse)
             }
         }
     }

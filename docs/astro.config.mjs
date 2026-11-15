@@ -25,6 +25,7 @@ export default defineConfig({
           items: [
             { label: 'Installation', slug: 'installation', translations: { ru: 'Установка' } },
             { label: 'Widget modules', slug: 'widgets', translations: { ru: 'Модули виджетов' } },
+            { label: 'Translations', slug: 'translations', translations: { ru: 'Переводы' } },
             { label: 'Troubleshooting', slug: 'troubleshooting', translations: { ru: 'Устранение неполадок' } },
             { label: 'Code signing policy', slug: 'code-signing', translations: { ru: 'Политика подписи кода' } },
           ],

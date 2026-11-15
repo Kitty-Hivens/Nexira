@@ -47,7 +47,8 @@ import hivens.ui.feature.catalogue.browse.reason
 import hivens.ui.feature.catalogue.rememberPageVisit
 import hivens.ui.RIGHT_RAIL_SURFACE
 import hivens.ui.RailFamily
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.modrinthCategory
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
@@ -247,7 +248,7 @@ internal fun tabOnceLoaded(tab: ModPageTab, loading: Boolean, noGallery: Boolean
 
 @Composable
 internal fun Body(state: ProjectPageView, onRetry: () -> Unit) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val follow = rememberLinkFollower(state.packId)
     when {
         state.loading -> Box(Modifier.fillMaxWidth().padding(vertical = 40.dp), contentAlignment = Alignment.Center) {
@@ -260,9 +261,9 @@ internal fun Body(state: ProjectPageView, onRetry: () -> Unit) {
         // The lookup did not run. Distinct from a project that has no body, and
         // the only one of the three that is worth offering to try again.
         state.failed -> RetryStateBlock(
-            title = s.contentTabFetchErrorTitle,
-            message = s.contentTabFetchErrorGeneric,
-            retryLabel = s.contentTabRetry,
+            title = s.text("contentTabFetchErrorTitle"),
+            message = s.text("contentTabFetchErrorGeneric"),
+            retryLabel = s.text("contentTabRetry"),
             onRetry = onRetry,
             modifier = Modifier.fillMaxWidth().padding(20.dp),
             titleStyle = MaterialTheme.typography.titleMedium,
@@ -276,8 +277,8 @@ internal fun Body(state: ProjectPageView, onRetry: () -> Unit) {
         // Two different silences. The catalogue has an entry and the author left
         // it blank, or there is no entry at all and the description lives
         // somewhere this file is not linked to.
-        state.source == ProjectSource.Catalogue -> Unknown(s.modPageBodyEmpty)
-        else -> Unknown(s.modPageBodyUnknown)
+        state.source == ProjectSource.Catalogue -> Unknown(s.text("modPageBodyEmpty"))
+        else -> Unknown(s.text("modPageBodyUnknown"))
     }
 }
 
@@ -292,7 +293,7 @@ private fun Unknown(text: String) = Text(
 @Composable
 internal fun Header(state: ProjectPageView) {
     val scope = rememberCoroutineScope()
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val uriHandler = LocalUriHandler.current
     val clipboard = LocalClipboard.current
     val project = state.project
@@ -306,8 +307,8 @@ internal fun Header(state: ProjectPageView) {
             if (project != null) {
                 // Metrics are separate facts and want air between them; the
                 // chips are one list and want to read as one.
-                HeaderStat(NxIcon.Download, compactCount(project.downloads, s), s.modPageStatDownloads)
-                HeaderStat(NxIcon.Favorite, compactCount(project.followers, s), s.modPageStatFollowers)
+                HeaderStat(NxIcon.Download, compactCount(project.downloads, s), s.text("modPageStatDownloads"))
+                HeaderStat(NxIcon.Favorite, compactCount(project.followers, s), s.text("modPageStatFollowers"))
                 // All of them, not the first three. The reference shows the whole
                 // set here AND again as a block in the rail; taking three was my
                 // own edit, and it silently said a project has three tags.
@@ -331,7 +332,7 @@ internal fun Header(state: ProjectPageView) {
                 // knows says who publishes it instead, or that the mirror does.
                 val mirror = state.mirror
                 NxMetaChip(
-                    if (mirror != null) mirror.publishedOn ?: MIRROR_NAME else s.modPageLocalFile,
+                    if (mirror != null) mirror.publishedOn ?: MIRROR_NAME else s.text("modPageLocalFile"),
                     tone = NxMetaChipTone.Surface,
                 )
                 installed?.version?.let { NxMetaChip(it, tone = NxMetaChipTone.Surface) }
@@ -356,13 +357,13 @@ internal fun Header(state: ProjectPageView) {
             val pageUrl = project?.let { "https://modrinth.com/${it.projectType}/${it.slug}" }
             val homepage = installed?.homepageUrl?.takeIf { it.isNotBlank() }
             if (pageUrl != null || homepage != null) {
-                NxKebabButton(contentDescription = s.contentActionDetails) { dismiss ->
+                NxKebabButton(contentDescription = s.text("contentActionDetails")) { dismiss ->
                     if (pageUrl != null) {
-                        NxMenuItem(label = s.modPageOpenInCatalogue, icon = NxIcon.OpenInNew) {
+                        NxMenuItem(label = s.text("modPageOpenInCatalogue"), icon = NxIcon.OpenInNew) {
                             uriHandler.openUri(pageUrl)
                             dismiss()
                         }
-                        NxMenuItem(label = s.modPageCopyLink, icon = NxIcon.ContentCopy) {
+                        NxMenuItem(label = s.text("modPageCopyLink"), icon = NxIcon.ContentCopy) {
                             // The write suspends now, so it rides the composition's
                             // scope: the menu dismisses on this frame and the
                             // clipboard lands on its own, which is what the console's
@@ -372,7 +373,7 @@ internal fun Header(state: ProjectPageView) {
                         }
                     }
                     if (homepage != null) {
-                        NxMenuItem(label = s.modPageHomepage, icon = NxIcon.Language) {
+                        NxMenuItem(label = s.text("modPageHomepage"), icon = NxIcon.Language) {
                             uriHandler.openUri(homepage)
                             dismiss()
                         }
@@ -383,7 +384,7 @@ internal fun Header(state: ProjectPageView) {
         notes = {
             installed?.version?.let {
                 Text(
-                    s.modPageInstalledVersion(it),
+                    s.text("modPageInstalledVersion", it),
                     style = MaterialTheme.typography.labelSmall,
                     color = NxInk.quiet,
                 )
@@ -399,7 +400,7 @@ internal fun Header(state: ProjectPageView) {
  */
 @Composable
 internal fun InstallNotes(state: ProjectPageView) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     // Why nothing happened, under the button that was pressed, naming the
     // two things that decided it. Without this the click did nothing and
     // said nothing, which reads as the launcher having ignored it.
@@ -412,7 +413,7 @@ internal fun InstallNotes(state: ProjectPageView) {
             .filter { it.isNotBlank() }
             .joinToString(" / ")
         Text(
-            if (target.isBlank()) s.modPageNoBuildAny else s.modPageNoBuildFor(target),
+            if (target.isBlank()) s.text("modPageNoBuildAny") else s.text("modPageNoBuildFor", target),
             style = MaterialTheme.typography.labelSmall,
             color = NxColor.status(Status.Warning),
         )
@@ -422,7 +423,7 @@ internal fun InstallNotes(state: ProjectPageView) {
     // only place on the page that would ever mention it.
     if (state.installMissing.isNotEmpty()) {
         Text(
-            s.modPageInstallMissing(state.installMissing.size),
+            s.text("modPageInstallMissing", state.installMissing.size),
             style = MaterialTheme.typography.labelSmall,
             color = NxColor.status(Status.Warning),
         )
@@ -432,7 +433,7 @@ internal fun InstallNotes(state: ProjectPageView) {
     // count, since a column of twenty reasons under a button is not read.
     state.installLeftOut.take(MAX_LEFT_OUT_LINES).forEach { left ->
         Text(
-            s.installSkipLine(left.title, left.reason.reason(s)),
+            s.text("installSkipLine", left.title, left.reason.reason(s)),
             style = MaterialTheme.typography.labelSmall,
             color = NxInk.quiet,
             maxLines = 1,
@@ -468,14 +469,14 @@ private val LEFT_OUT_MEASURE = 320.dp
  */
 @Composable
 private fun InstallButton(state: ProjectPageView) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val install = rememberScopedCommand(CatalogueKeys.InstallProject)
     val retry = rememberScopedAction(CatalogueKeys.RetryInstall)
     when (val action = state.install) {
         InstallOffer.None -> Unit
         InstallOffer.Choose -> state.project?.let { InstallChooser(InstallSubject(it.id, it.title, it.iconUrl)) }
         is InstallOffer.Present -> NxButton(
-            label = s.modPageInstalledIn(action.packName),
+            label = s.text("modPageInstalledIn", action.packName),
             onClick = {},
             icon = NxIcon.Check,
             enabled = false,
@@ -486,9 +487,9 @@ private fun InstallButton(state: ProjectPageView) {
             // same action again, rather than reverting to its first wording as if
             // nothing had happened.
             label = when {
-                state.installing -> s.modPageInstalling
-                state.installFailed -> s.modPageInstallRetry
-                else -> s.modPageInstallInto(action.packName)
+                state.installing -> s.text("modPageInstalling")
+                state.installFailed -> s.text("modPageInstallRetry")
+                else -> s.text("modPageInstallInto", action.packName)
             },
             // A retry repeats what failed: a row's build when a row asked for one.
             onClick = { if (state.installFailed) retry?.invoke() else install?.invoke(ProjectInstall()) },
@@ -513,15 +514,15 @@ internal fun Tabs(
     modifier: Modifier = Modifier,
     hasGallery: Boolean = false,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     // The gallery appears only where there are shots, the way the reference does
     // it. A tab that opens an empty pane is a click that tells a reader nothing
     // its absence would not have told them.
     val tabs = buildList {
-        add(ModPageTab.Description to s.modPageTabDescription)
-        add(ModPageTab.Versions to s.modPageTabVersions)
-        add(ModPageTab.Changelog to s.modPageTabChangelog)
-        if (hasGallery) add(ModPageTab.Gallery to s.modPageTabGallery)
+        add(ModPageTab.Description to s.text("modPageTabDescription"))
+        add(ModPageTab.Versions to s.text("modPageTabVersions"))
+        add(ModPageTab.Changelog to s.text("modPageTabChangelog"))
+        if (hasGallery) add(ModPageTab.Gallery to s.text("modPageTabGallery"))
     }
 
     // The row and its travelling mark are the library's now: the pack settings

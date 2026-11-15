@@ -33,7 +33,7 @@ import androidx.compose.ui.unit.dp
 import hivens.core.update.VersionChannel
 import hivens.ui.components.channelColor
 import hivens.ui.components.formatBuildTimestamp
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.nx.NxButton
@@ -168,7 +168,7 @@ class VersionListConceptProbe {
 
     @Composable
     private fun VersionRow(b: Build, installed: Boolean, latest: Boolean, selected: Boolean) {
-        val s = LocalStrings.current
+        val s = nexiraStrings()
         val v = b.head
         val note = noteLine(v.changelog)
         Column(

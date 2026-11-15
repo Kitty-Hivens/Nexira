@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.NxBasicTextField
 import androidx.compose.foundation.text.input.KeyboardActionHandler
 import androidx.compose.foundation.text.KeyboardOptions
@@ -34,7 +35,6 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.theme.NxColor
@@ -84,7 +84,7 @@ data class ChecklistState(val items: List<ChecklistItem> = emptyList(), val next
 @Composable
 fun ChecklistWidget(instance: WidgetInstance) {
     val p = instance.rememberProps<ChecklistProps>()
-    val strings = LocalStrings.current
+    val strings = nexiraStrings()
     var state by instance.rememberWidgetState { ChecklistState() }
     val tooLong = instance.widgetStateRefused()
 
@@ -111,7 +111,7 @@ fun ChecklistWidget(instance: WidgetInstance) {
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                 Text(
-                    text       = p.title.ifBlank { strings.widgetLabel("widget.checklist") },
+                    text       = p.title.ifBlank { strings.text("widget.checklist") },
                     style      = MaterialTheme.typography.labelLarge.scaled(scale),
                     color      = NxInk.quiet,
                     fontWeight = FontWeight.Medium,
@@ -121,7 +121,7 @@ fun ChecklistWidget(instance: WidgetInstance) {
                 // As in the notes widget: past what the store keeps, the tally gives
                 // way to the reason.
                 Text(
-                    text  = if (tooLong) strings.widgetStateTooLong else "$doneCount/${state.items.size}",
+                    text  = if (tooLong) strings.text("widgetStateTooLong") else "$doneCount/${state.items.size}",
                     style = MaterialTheme.typography.labelSmall.scaled(scale),
                     color = if (tooLong) NxColor.status(Status.Error) else NxInk.quiet,
                 )
@@ -135,7 +135,7 @@ fun ChecklistWidget(instance: WidgetInstance) {
             ) {
                 if (shown.isEmpty()) {
                     Text(
-                        text     = strings.widgetLabel("widget.checklist.empty"),
+                        text     = strings.text("widget.checklist.empty"),
                         style    = MaterialTheme.typography.bodySmall.scaled(scale),
                         color    = NxInk.quiet,
                         modifier = Modifier.padding(vertical = 8.dp * scale),
@@ -185,7 +185,7 @@ private fun ChecklistRow(item: ChecklistItem, scale: Float, onToggle: () -> Unit
 
 @Composable
 private fun AddRow(scale: Float, onAdd: (String) -> Unit) {
-    val strings = LocalStrings.current
+    val strings = nexiraStrings()
     var draft by remember { mutableStateOf("") }
     fun commit() {
         onAdd(draft)
@@ -204,7 +204,7 @@ private fun AddRow(scale: Float, onAdd: (String) -> Unit) {
             decorationBox   = { inner ->
                 if (draft.isEmpty()) {
                     Text(
-                        text  = strings.widgetLabel("widget.checklist.add"),
+                        text  = strings.text("widget.checklist.add"),
                         style = MaterialTheme.typography.bodyMedium.scaled(scale),
                         color = NxInk.quiet,
                     )

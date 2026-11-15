@@ -8,7 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
 import hivens.widget.api.rememberProps
 import hivens.widget.model.PropLabel
@@ -35,17 +35,17 @@ data class AboutLinksProps(
 @Composable
 fun AboutLinksCardWidget(instance: WidgetInstance) {
     val p = instance.rememberProps<AboutLinksProps>()
-    val s = LocalStrings.current
+    val s = nexiraStrings()
 
     // No inner scroll: the surface already scrolls the right slot in narrow
     // layouts, and nesting a second scroll crashes (unbounded height).
     Column(Modifier.fillMaxWidth().padding(20.dp)) {
-        SectionLabel(p.title.ifBlank { s.aboutSectionLinks })
+        SectionLabel(p.title.ifBlank { s.text("aboutSectionLinks") })
         Spacer(Modifier.height(12.dp))
-        LinkButton(s.aboutLinkGithub,    "https://github.com/Kitty-Hivens/Nexira",         NxIcon.Code)
+        LinkButton(s.text("aboutLinkGithub"),    "https://github.com/Kitty-Hivens/Nexira",         NxIcon.Code)
         Spacer(Modifier.height(8.dp))
-        LinkButton(s.aboutLinkBugReport, "https://github.com/Kitty-Hivens/Nexira/issues",  NxIcon.BugReport)
+        LinkButton(s.text("aboutLinkBugReport"), "https://github.com/Kitty-Hivens/Nexira/issues",  NxIcon.BugReport)
         Spacer(Modifier.height(8.dp))
-        LinkButton(s.aboutLinkReleases,  "https://github.com/Kitty-Hivens/Nexira/releases", NxIcon.Download)
+        LinkButton(s.text("aboutLinkReleases"),  "https://github.com/Kitty-Hivens/Nexira/releases", NxIcon.Download)
     }
 }

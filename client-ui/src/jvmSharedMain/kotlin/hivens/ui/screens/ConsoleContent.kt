@@ -23,6 +23,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import hivens.i18n.api.Strings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.NxBasicTextField
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -77,8 +79,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import hivens.ui.i18n.AppStrings
-import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.layers.persistentInput
@@ -209,7 +209,7 @@ internal fun ConsoleContent(
     source: ConsoleSource = ConsoleSource.Live,
 ) {
     val isLive = source is ConsoleSource.Live
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val clipboard = LocalClipboard.current
     val scope = rememberCoroutineScope()
     val gameConsole: GameConsoleService = koinInject()
@@ -448,7 +448,7 @@ internal fun ConsoleContent(
     fun copyAll() {
         val text = copyAllText(entries)
         scope.launch { clipboard.copyPlainText(text) }
-        flash(s.consoleCopied)
+        flash(s.text("consoleCopied"))
     }
 
     // Copy the logical line under the caret (last click / F3 target). One entry is
@@ -459,7 +459,7 @@ internal fun ConsoleContent(
         val caret = selection.focus?.line ?: selection.anchor?.line
         val lineText = copyLineText(models.lines.size, caret) { models.lines[it].text } ?: return
         scope.launch { clipboard.copyPlainText(lineText) }
-        flash(s.consoleCopied)
+        flash(s.text("consoleCopied"))
     }
 
     // Copy the active selection, assembled from the model across lines. No active
@@ -468,7 +468,7 @@ internal fun ConsoleContent(
         val text = selection.copyText(models)
         if (text.isEmpty()) return
         scope.launch { clipboard.copyPlainText(text) }
-        flash(s.consoleCopied)
+        flash(s.text("consoleCopied"))
     }
 
     // ── Match jumping ──────────────────────────────────────────────────────
@@ -617,7 +617,7 @@ internal fun ConsoleContent(
             onSave        = {
                 val exported = gameConsole.exportEntries(entries)
                 if (exported != null) {
-                    scope.launch { if (deliverConsoleExport(exported)) flash(s.consoleSaved) }
+                    scope.launch { if (deliverConsoleExport(exported)) flash(s.text("consoleSaved")) }
                 }
             },
             // Clear only acts on the live buffer; a file-backed view is
@@ -647,9 +647,9 @@ internal fun ConsoleContent(
             ConsoleContextMenu(
                 entries = {
                     listOf(
-                        ConsoleMenuEntry(s.consoleMenuCopyLine) { copyLine() },
-                        ConsoleMenuEntry(s.consoleMenuCopySelection) { copySelection() },
-                        ConsoleMenuEntry(s.consoleCopyAll) { copyAll() },
+                        ConsoleMenuEntry(s.text("consoleMenuCopyLine")) { copyLine() },
+                        ConsoleMenuEntry(s.text("consoleMenuCopySelection")) { copySelection() },
+                        ConsoleMenuEntry(s.text("consoleCopyAll")) { copyAll() },
                     )
                 },
             ) {
@@ -689,7 +689,7 @@ internal fun ConsoleContent(
 
             if (fingerSelected && selection.active) {
                 NxButton(
-                    label    = s.consoleMenuCopySelection,
+                    label    = s.text("consoleMenuCopySelection"),
                     onClick  = {
                         copySelection()
                         selection.collapse()
@@ -848,7 +848,7 @@ internal fun ConsoleContent(
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 private fun Toolbar(
-    strings: AppStrings,
+    strings: Strings,
     filtered: Int,
     total: Int,
     warnCount: Int,
@@ -885,7 +885,7 @@ private fun Toolbar(
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Text(
-            text       = strings.consoleHeaderCount(filtered, total),
+            text       = strings.text("consoleHeaderCount", filtered, total),
             color      = NxInk.main,
             fontWeight = FontWeight.Bold,
             fontFamily = LocalMonoFamily.current,
@@ -946,24 +946,24 @@ private fun Toolbar(
 
             // The keys that open the search are not on a touch screen
             IconButton(onClick = onOpenSearch, modifier = Modifier.size(32.dp)) {
-                Symbol(NxIcon.Search, strings.consoleSearchPlaceholder, tint = NxInk.quiet)
+                Symbol(NxIcon.Search, strings.text("consoleSearchPlaceholder"), tint = NxInk.quiet)
             }
             IconButton(onClick = onToggleWrap, modifier = Modifier.size(32.dp)) {
                 Symbol(NxIcon.WrapText,
-                    contentDescription = strings.consoleWrap,
+                    contentDescription = strings.text("consoleWrap"),
                     tint = if (wrapText) NxColor.status(Status.Success) else NxInk.quiet,
                 )
             }
             IconButton(onClick = onSave, modifier = Modifier.size(32.dp)) {
-                Symbol(NxIcon.Save, strings.consoleSaveToFile, tint = NxInk.quiet)
+                Symbol(NxIcon.Save, strings.text("consoleSaveToFile"), tint = NxInk.quiet)
             }
             IconButton(onClick = onCopyAll, modifier = Modifier.size(32.dp)) {
-                Symbol(NxIcon.ContentCopy, strings.consoleCopyAll, tint = NxInk.quiet)
+                Symbol(NxIcon.ContentCopy, strings.text("consoleCopyAll"), tint = NxInk.quiet)
             }
             IconButton(onClick = onClear, enabled = canClear, modifier = Modifier.size(32.dp)) {
                 Symbol(
                     NxIcon.Delete,
-                    strings.consoleClear,
+                    strings.text("consoleClear"),
                     tint = if (canClear) NxInk.quiet else NxInk.off,
                 )
             }
@@ -974,7 +974,7 @@ private fun Toolbar(
             var gearOpen by remember { mutableStateOf(false) }
             Box {
                 IconButton(onClick = { gearOpen = true }, modifier = Modifier.size(32.dp)) {
-                    Symbol(NxIcon.Settings, strings.consoleSettingsLabel, tint = NxInk.quiet)
+                    Symbol(NxIcon.Settings, strings.text("consoleSettingsLabel"), tint = NxInk.quiet)
                 }
                 DropdownMenu(
                     expanded         = gearOpen,
@@ -983,7 +983,7 @@ private fun Toolbar(
                     DropdownMenuItem(
                         text = {
                             Text(
-                                text = if (showGutter) strings.consoleHideGutter else strings.consoleShowGutter,
+                                text = if (showGutter) strings.text("consoleHideGutter") else strings.text("consoleShowGutter"),
                                 fontFamily = LocalMonoFamily.current,
                                 fontSize   = 11.sp,
                             )
@@ -993,7 +993,7 @@ private fun Toolbar(
                     DropdownMenuItem(
                         text = {
                             Text(
-                                text = if (showTimestamps) strings.consoleHideTimestamps else strings.consoleShowTimestamps,
+                                text = if (showTimestamps) strings.text("consoleHideTimestamps") else strings.text("consoleShowTimestamps"),
                                 fontFamily = LocalMonoFamily.current,
                                 fontSize   = 11.sp,
                             )
@@ -1066,7 +1066,7 @@ private fun SearchPrompt(
     onClose: () -> Unit,
     focusRequester: FocusRequester,
     onFocusChanged: (Boolean) -> Unit,
-    strings: AppStrings,
+    strings: Strings,
     onNext: () -> Unit,
     onPrev: () -> Unit,
 ) {
@@ -1103,7 +1103,7 @@ private fun SearchPrompt(
             decorationBox = { inner ->
                 if (query.isEmpty()) {
                     Text(
-                        text       = strings.consoleSearchPlaceholder,
+                        text       = strings.text("consoleSearchPlaceholder"),
                         color      = NxColor.wash(NxInk.quiet, 0.5f),
                         fontSize   = 12.sp,
                         fontFamily = LocalMonoFamily.current,
@@ -1209,7 +1209,7 @@ private fun CommandInputRow(
     onEscape: () -> Boolean,
     onFocusChanged: (Boolean) -> Unit,
     focusRequester: FocusRequester,
-    strings: AppStrings,
+    strings: Strings,
 ) {
     Row(
         Modifier
@@ -1260,7 +1260,7 @@ private fun CommandInputRow(
             decorationBox = { inner ->
                 if (value.isEmpty()) {
                     Text(
-                        text       = strings.consoleCommandPlaceholder,
+                        text       = strings.text("consoleCommandPlaceholder"),
                         color      = NxColor.wash(NxInk.quiet, 0.45f),
                         fontSize   = 12.sp,
                         fontFamily = LocalMonoFamily.current,
@@ -1276,7 +1276,7 @@ private fun CommandInputRow(
 
 @Composable
 internal fun StatusFooter(
-    strings: AppStrings,
+    strings: Strings,
     filtered: Int,
     total: Int,
     historyOffset: Int,
@@ -1299,9 +1299,9 @@ internal fun StatusFooter(
         // both the live count and the on-disk total so the user knows
         // scrolling up will reach further than the in-memory size.
         val linesText = if (historyOffset > 0) {
-            strings.consoleStatusLinesWithHistory(filtered, total, historyOffset)
+            strings.text("consoleStatusLinesWithHistory", filtered, total, historyOffset)
         } else {
-            strings.consoleStatusLines(filtered, total)
+            strings.text("consoleStatusLines", filtered, total)
         }
         // The counts give way where the row is short, never the follow chip: it is
         // the one control on the row, and squeezed into it on a phone held upright it
@@ -1318,7 +1318,7 @@ internal fun StatusFooter(
             )
             Spacer(Modifier.width(12.dp))
             Text(
-                text       = strings.consoleStatusFiltered(warnCount, errorCount),
+                text       = strings.text("consoleStatusFiltered", warnCount, errorCount),
                 color      = NxInk.quiet,
                 fontFamily = LocalMonoFamily.current,
                 fontSize   = 10.sp,
@@ -1333,7 +1333,7 @@ internal fun StatusFooter(
             // "+" suffix marks that matches hit MAX_SEARCH_MATCHES and the rest
             // were not highlighted -- F3 still steps through the first cap-worth.
             Text(
-                text       = strings.consoleStatusMatch(matchCurrent, matchTotal) + if (searchCapped) "+" else "",
+                text       = strings.text("consoleStatusMatch", matchCurrent, matchTotal) + if (searchCapped) "+" else "",
                 color      = NxInk.quiet,
                 fontFamily = LocalMonoFamily.current,
                 fontSize   = 10.sp,
@@ -1349,7 +1349,7 @@ internal fun StatusFooter(
         // Its own size, like the severity chips: a Material text button forced
         // into the slim row kept its padding inside and left the label a few
         // pixels of height.
-        val followText  = if (following) strings.consoleStatusFollow else strings.consoleStatusPaused
+        val followText  = if (following) strings.text("consoleStatusFollow") else strings.text("consoleStatusPaused")
         val followColor = if (following) NxColor.status(Status.Success) else CONSOLE_PAUSE_ACCENT
         Box(
             modifier = Modifier
@@ -1456,7 +1456,7 @@ private fun handleKey(
  */
 @Composable
 private fun ConsoleEmptyState(extraArts: List<String>) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     // Built-in shapes + the bundled art file + the user's Settings-managed art
     // ([extraArts] = ConsoleSettings.customArt). All three pools, one random pick.
     val arts by produceState(CONSOLE_EMPTY_ARTS + extraArts, extraArts) {
@@ -1484,7 +1484,7 @@ private fun ConsoleEmptyState(extraArts: List<String>) {
         )
         Spacer(Modifier.height(16.dp))
         Text(
-            text      = s.consoleEmptyHint,
+            text      = s.text("consoleEmptyHint"),
             style     = MaterialTheme.typography.bodySmall,
             color     = NxColor.wash(NxInk.quiet, 0.7f),
             textAlign = TextAlign.Center,

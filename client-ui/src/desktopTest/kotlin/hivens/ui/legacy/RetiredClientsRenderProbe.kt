@@ -12,8 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import hivens.launcher.legacy.RetiredClient
-import hivens.ui.i18n.AppLocale
-import hivens.ui.i18n.LocaleProvider
+import hivens.ui.i18n.ShippedLanguageProvider
 import hivens.ui.theme.NxTheme
 import org.jetbrains.skia.EncodedImageFormat
 import java.nio.file.Files
@@ -70,7 +69,7 @@ class RetiredClientsRenderProbe {
         Files.createDirectories(out.parent)
         val scene = ImageComposeScene(width, height, density = Density(1f)) {
             NxTheme(dark = dark) {
-                LocaleProvider(AppLocale.RUSSIAN) { content() }
+                ShippedLanguageProvider("ru") { content() }
             }
         }
         try {

@@ -53,6 +53,16 @@ interface ModuleKeys {
     fun owned(key: CommandKey<*>)
 
     /**
+     * The module's own settings, [domain], kept by the host in a file of its own: read through
+     * [source] and changed through [update], both app keys of the module's own API. Every other
+     * part of the module reaches the same value through the [SettingsStores] service.
+     *
+     * A domain id another module already declared refuses this module's keys, all of them, like
+     * a key id already taken does.
+     */
+    fun <T : Any> settings(domain: SettingsDomain<T>, source: SourceKey<T>, update: CommandKey<SettingsChange<T>>)
+
+    /**
      * A service of [type] made once per level of kind [level] by [make], the first time
      * something at or below such a level asks for it, and closed with that level when
      * it is [AutoCloseable]. At [ScopeLevel.App] it is one for the whole app. Factories

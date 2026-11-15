@@ -112,6 +112,10 @@ object RecoveryIo {
      * "Defaults" means what a fresh install gets, [FirstRunDefaults] included: a
      * reset is someone starting over, and dropping them into English on a light
      * desktop is not where a first launch would have put them either.
+     *
+     * The modules' own settings go with it, every domain's file under
+     * [Storage.SETTINGS_DIR]. A domain with no file reads what settings.json holds
+     * of it once more, so the language comes back as the first run would pick it.
      */
     fun resetSettings(dataDir: Path) {
         val keep = readDisabledModules(dataDir)
@@ -120,6 +124,9 @@ object RecoveryIo {
             dataDir,
             if (keep.isEmpty()) root else JsonObject(root + ("disabledModules" to modulesArray(keep))),
         )
+        val _ = runCatching {
+            Files.newDirectoryStream(dataDir.resolve(Storage.SETTINGS_DIR), "*.json").use { files -> files.forEach(::deleteQuietly) }
+        }
     }
 
     /**

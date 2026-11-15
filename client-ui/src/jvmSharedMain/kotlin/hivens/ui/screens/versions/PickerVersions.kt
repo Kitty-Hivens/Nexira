@@ -2,7 +2,7 @@ package hivens.ui.screens.versions
 
 import hivens.core.api.dto.modrinth.ModrinthVersion
 import hivens.core.update.VersionChannel
-import hivens.ui.i18n.AppStrings
+import hivens.i18n.api.Strings
 import hivens.ui.utils.humanSize
 
 /**
@@ -23,7 +23,7 @@ fun pickerVersionsOf(
     mcVersion: String,
     loaders: List<String>,
     installedId: String?,
-    s: AppStrings,
+    s: Strings,
 ): List<PickerVersion> {
     // Everything that has a file, newest first. A version with no file is a record
     // of a release nobody can install.

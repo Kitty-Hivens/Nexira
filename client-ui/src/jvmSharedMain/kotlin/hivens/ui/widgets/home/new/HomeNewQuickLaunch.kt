@@ -16,7 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.PlayGround
 import hivens.ui.nx.PlayLayout
 import hivens.widget.api.rememberProps
@@ -47,11 +47,11 @@ data class QuickLaunchProps(
 @Composable
 fun HomeNewQuickLaunch(instance: WidgetInstance) {
     val p = instance.rememberProps<QuickLaunchProps>()
-    val s = LocalStrings.current
-    val quickLaunch = rememberQuickLaunchTarget(p.buttonLabel.ifBlank { s.homeQuickButton }) ?: return
+    val s = nexiraStrings()
+    val quickLaunch = rememberQuickLaunchTarget(p.buttonLabel.ifBlank { s.text("homeQuickButton") }) ?: return
     val target = quickLaunch.target
 
-    val label = if (target.lastPlayedEpochSecond > 0L) s.homeQuickContinue else s.homeQuickStart
+    val label = if (target.lastPlayedEpochSecond > 0L) s.text("homeQuickContinue") else s.text("homeQuickStart")
 
     Column(
         modifier = Modifier

@@ -62,14 +62,14 @@ import hivens.core.update.PackUpdateStatus
 import hivens.core.update.PackUpdateStatusHub
 import hivens.core.update.UpdateDirection
 import hivens.accounts.api.SessionState
+import hivens.i18n.api.Strings
 import hivens.ui.components.BannerVideo
 import hivens.ui.components.FullscreenVideo
 import hivens.ui.components.LaunchControl
 import hivens.ui.components.isVideoUrl
 import hivens.ui.components.rememberLaunchControl
 import hivens.ui.effects.pixelArtBackground
-import hivens.ui.i18n.AppStrings
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
@@ -169,7 +169,7 @@ fun PackDetailScreen(
     val instanceDir = state.instanceDir ?: return
 
     var tabIndex by rememberSaveable(pack.id) { mutableIntStateOf(0) }
-    val s = LocalStrings.current
+    val s = nexiraStrings()
 
     // Which section the sheet opens on. The gear opens it at the top; a locked
     // content row opens it where detaching is, since that is what its menu offers.
@@ -449,7 +449,7 @@ private fun LogSessionPicker(
     onSelectGeneral: () -> Unit,
     onSelectFile: (File) -> Unit,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     var open by remember { mutableStateOf(false) }
     var shown by remember { mutableStateOf(false) }
     val turn by animateFloatAsState(if (open) 180f else 0f, animationSpec = Motion.tap, label = "logChevron")
@@ -463,7 +463,7 @@ private fun LogSessionPicker(
         label = "logPickerWash",
     )
 
-    val currentLabel = selectedFile?.name ?: s.consoleSessionLive
+    val currentLabel = selectedFile?.name ?: s.text("consoleSessionLive")
 
     Box(Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
         Row(
@@ -477,7 +477,7 @@ private fun LogSessionPicker(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text     = s.consoleSessionPickerLabel(currentLabel),
+                text     = s.text("consoleSessionPickerLabel", currentLabel),
                 color    = NxInk.quiet,
                 style    = MaterialTheme.typography.labelSmall,
             )
@@ -490,7 +490,7 @@ private fun LogSessionPicker(
         }
         NxChoiceMenu(expanded = open, onDismissRequest = { open = false }, onShownChange = { shown = it }) {
             NxChoiceItem(
-                label    = s.consoleSessionLive,
+                label    = s.text("consoleSessionLive"),
                 selected = selectedFile == null,
                 onClick  = { onSelectGeneral(); open = false },
             )
@@ -518,7 +518,7 @@ private fun Hero(
     pending: PackUpdateStatus.Pending?,
     onOpenVersions: () -> Unit,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val art = rememberPackArt(pack)
     val bannerUrl = art.bannerUrl
     val bannerIsVideo = bannerUrl != null && isVideoUrl(bannerUrl)
@@ -551,9 +551,9 @@ private fun Hero(
 
         val actions: @Composable () -> Unit = {
             Row {
-                if (bannerIsVideo) HeroAction(NxIcon.OpenInFull, s.videoFullscreen) { bannerFullscreen = true }
+                if (bannerIsVideo) HeroAction(NxIcon.OpenInFull, s.text("videoFullscreen")) { bannerFullscreen = true }
                 HeroAction(NxIcon.FolderOpen, null, onOpenFolder)
-                HeroAction(NxIcon.Settings, s.packCardSettings, onOpenSettings)
+                HeroAction(NxIcon.Settings, s.text("packCardSettings"), onOpenSettings)
             }
         }
 
@@ -631,7 +631,7 @@ private fun Hero(
                         pending?.let { p ->
                             val rollback = p.direction == UpdateDirection.Older
                             HeroUpdateBadge(
-                                text     = if (rollback) s.packVersionRollbackBadge else s.packVersionUpdateBadge,
+                                text     = if (rollback) s.text("packVersionRollbackBadge") else s.text("packVersionUpdateBadge"),
                                 rollback = rollback,
                                 onClick  = onOpenVersions,
                             )
@@ -667,12 +667,12 @@ internal fun HeroAction(icon: IconKey, contentDescription: String?, onClick: () 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun PackTabBar(selected: Int, onSelect: (Int) -> Unit) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val tabs = listOf(
-        NxIcon.Widgets to s.packDetailTabContent,
-        NxIcon.FolderOpen to s.packDetailTabFiles,
-        NxIcon.Public to s.packDetailTabWorlds,
-        NxIcon.Description to s.packDetailTabLogs,
+        NxIcon.Widgets to s.text("packDetailTabContent"),
+        NxIcon.FolderOpen to s.text("packDetailTabFiles"),
+        NxIcon.Public to s.text("packDetailTabWorlds"),
+        NxIcon.Description to s.text("packDetailTabLogs"),
     )
     FlowRow(
         modifier              = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
@@ -769,15 +769,15 @@ private fun playtimeLabel(seconds: Long): String {
     return if (hours > 0) "${hours}h" else "${minutes}m"
 }
 
-private fun lastPlayedShort(epoch: Long, s: AppStrings): String {
-    if (epoch <= 0L) return s.packCardNeverPlayed
+private fun lastPlayedShort(epoch: Long, s: Strings): String {
+    if (epoch <= 0L) return s.text("packCardNeverPlayed")
     val dur = Duration.between(Instant.ofEpochSecond(epoch), Instant.now())
     return when {
-        dur.toMinutes() < 1  -> s.packCardPlayedJustNow
-        dur.toHours()   < 1  -> s.packCardPlayedMinutesAgo(dur.toMinutes())
-        dur.toDays()    < 1  -> s.packCardPlayedHoursAgo(dur.toHours())
-        dur.toDays()    < 14 -> s.packCardPlayedDaysAgo(dur.toDays())
-        else                 -> s.packCardPlayedLongAgo
+        dur.toMinutes() < 1  -> s.text("packCardPlayedJustNow")
+        dur.toHours()   < 1  -> s.text("packCardPlayedMinutesAgo", dur.toMinutes())
+        dur.toDays()    < 1  -> s.text("packCardPlayedHoursAgo", dur.toHours())
+        dur.toDays()    < 14 -> s.text("packCardPlayedDaysAgo", dur.toDays())
+        else                 -> s.text("packCardPlayedLongAgo")
     }
 }
 
@@ -805,12 +805,12 @@ private fun HeroAvatar(iconUrl: String?, displayName: String, hue: Color, size: 
 
 @Composable
 private fun NotFound(onBack: () -> Unit) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(s.packDetailNotFoundTitle, style = MaterialTheme.typography.titleLarge, color = NxInk.main)
-            Text(s.packDetailNotFoundHint, style = MaterialTheme.typography.bodyMedium, color = NxInk.quiet)
-            NxButton(label = s.packDetailNotFoundBack, onClick = onBack)
+            Text(s.text("packDetailNotFoundTitle"), style = MaterialTheme.typography.titleLarge, color = NxInk.main)
+            Text(s.text("packDetailNotFoundHint"), style = MaterialTheme.typography.bodyMedium, color = NxInk.quiet)
+            NxButton(label = s.text("packDetailNotFoundBack"), onClick = onBack)
         }
     }
 }

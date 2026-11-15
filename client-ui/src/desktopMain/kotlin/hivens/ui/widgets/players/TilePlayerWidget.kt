@@ -43,7 +43,7 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.audio.PlaybackState
 import hivens.ui.audio.RepeatMode
 import hivens.ui.audio.TrackInfo
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
@@ -176,7 +176,7 @@ internal fun TilePlayerCard(
     onSeek: (Long) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val idle = state is PlaybackState.Idle
     val loaded = !idle && state !is PlaybackState.Error
     val duration = durationMsOf(state)
@@ -206,7 +206,7 @@ internal fun TilePlayerCard(
             .playerObject(maxSide)
             .aspectRatio(1f)
             .clip(MaterialTheme.shapes.medium)
-            .openWhenEmpty(idle, s.audioPickTrack, onPick),
+            .openWhenEmpty(idle, s.text("audioPickTrack"), onPick),
     ) {
         val side = minOf(maxWidth, maxHeight)
         // One threshold, and it is about the words rather than the controls: a
@@ -229,7 +229,7 @@ internal fun TilePlayerCard(
                 if (queueSize > 1 && side >= 132.dp) {
                     NxIconButton(
                         icon               = NxIcon.SkipPrevious,
-                        contentDescription = s.audioSkipPrevious,
+                        contentDescription = s.text("audioSkipPrevious"),
                         onClick            = onSkipPrev,
                         tint               = Color.White.copy(alpha = 0.85f),
                         enabled            = loaded,
@@ -240,7 +240,7 @@ internal fun TilePlayerCard(
                 }
                 NxIconButton(
                     icon               = if (state is PlaybackState.Playing) NxIcon.Pause else NxIcon.PlayArrow,
-                    contentDescription = if (state is PlaybackState.Playing) s.audioPause else s.audioPlay,
+                    contentDescription = if (state is PlaybackState.Playing) s.text("audioPause") else s.text("audioPlay"),
                     onClick            = onPlayPause,
                     tint               = Color.White,
                     enabled            = loaded,
@@ -251,7 +251,7 @@ internal fun TilePlayerCard(
                 if (queueSize > 1 && side >= 132.dp) {
                     NxIconButton(
                         icon               = NxIcon.SkipNext,
-                        contentDescription = s.audioSkipNext,
+                        contentDescription = s.text("audioSkipNext"),
                         onClick            = onSkipNext,
                         tint               = Color.White.copy(alpha = 0.85f),
                         enabled            = loaded,
@@ -336,24 +336,24 @@ internal fun TilePlayerCard(
         Box(Modifier.align(Alignment.TopEnd).alpha(reveal)) {
             NxIconButton(
                 icon               = NxIcon.MoreVert,
-                contentDescription = s.packCardMore,
+                contentDescription = s.text("packCardMore"),
                 onClick            = { menuOpen = true },
                 tint               = Color.White.copy(alpha = 0.85f),
             )
             NxPopoverPanel(
                 expanded         = menuOpen,
                 onDismissRequest = { menuOpen = false },
-                title            = s.audioPlaybackOptions,
+                title            = s.text("audioPlaybackOptions"),
                 footer           = {
                     NxButton(
-                        label   = s.audioOpenFile,
+                        label   = s.text("audioOpenFile"),
                         onClick = { menuOpen = false; onPick() },
                         style   = NxButtonStyle.Tertiary,
                         icon    = NxIcon.FolderOpen,
                         compact = true,
                     )
                     NxButton(
-                        label   = s.audioStop,
+                        label   = s.text("audioStop"),
                         onClick = { menuOpen = false; onStop() },
                         style   = NxButtonStyle.Tertiary,
                         icon    = NxIcon.Stop,
@@ -363,14 +363,14 @@ internal fun TilePlayerCard(
                 },
             ) {
                 NxSlider(
-                    label         = s.audioVolume,
+                    label         = s.text("audioVolume"),
                     value         = volume,
                     range         = 0f..1f,
                     valueText     = "${(volume * 100).toInt()}%",
                     onValueChange = onVolume,
                     compact       = true,
                 )
-                NxPanelGroup(label = s.audioRepeat) {
+                NxPanelGroup(label = s.text("audioRepeat")) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         NxCycleToggle(
                             states  = repeatStates(s),

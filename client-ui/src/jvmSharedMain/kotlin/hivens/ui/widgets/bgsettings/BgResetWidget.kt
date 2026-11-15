@@ -9,7 +9,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import hivens.ui.background.BackgroundSettings
 import hivens.ui.components.DestructiveConfirmDialog
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
@@ -21,11 +21,11 @@ import hivens.widget.model.Widget
 @Composable
 fun BgResetWidget() {
     val update = rememberScopedCommand(Commands.UpdateBackground) ?: return
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     var confirming by remember { mutableStateOf(false) }
 
     NxButton(
-        label    = s.backgroundReset,
+        label    = s.text("backgroundReset"),
         icon     = NxIcon.RestartAlt,
         style    = NxButtonStyle.Secondary,
         onClick  = { confirming = true },
@@ -34,9 +34,9 @@ fun BgResetWidget() {
 
     if (confirming) {
         DestructiveConfirmDialog(
-            title        = s.backgroundResetConfirmTitle,
-            body         = s.backgroundResetConfirmBody,
-            confirmLabel = s.backgroundReset,
+            title        = s.text("backgroundResetConfirmTitle"),
+            body         = s.text("backgroundResetConfirmBody"),
+            confirmLabel = s.text("backgroundReset"),
             onConfirm    = { update { BackgroundSettings() } },
             onDismiss    = { confirming = false },
         )

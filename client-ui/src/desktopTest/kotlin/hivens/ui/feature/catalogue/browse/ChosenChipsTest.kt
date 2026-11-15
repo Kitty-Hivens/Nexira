@@ -4,7 +4,7 @@ import hivens.catalogue.api.FilterField
 import hivens.catalogue.api.GameVersionTag
 import hivens.catalogue.api.SearchFilter
 import hivens.core.api.dto.modrinth.ModrinthGameVersion
-import hivens.ui.i18n.EnglishStrings
+import hivens.ui.i18n.NexiraStrings
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -24,14 +24,14 @@ class ChosenChipsTest {
     @Test
     fun `a whole minor line is one chip that takes every version off`() {
         val line = listOf("1.20", "1.20.1", "1.20.2", "1.20.3", "1.20.4", "1.20.5", "1.20.6").map(::v)
-        val chips = chosenChips(line, versions, EnglishStrings)
+        val chips = chosenChips(line, versions, NexiraStrings.shipped("en"))
         assertEquals(listOf("1.20.x"), chips.map { it.label })
         assertEquals(line.toSet(), chips.single().filters.toSet())
     }
 
     @Test
     fun `a run inside a line reads as a range, and a lone version as itself`() {
-        val chips = chosenChips(listOf(v("1.20.2"), v("1.20.3"), v("1.20.4"), v("1.19.2")), versions, EnglishStrings)
+        val chips = chosenChips(listOf(v("1.20.2"), v("1.20.3"), v("1.20.4"), v("1.19.2")), versions, NexiraStrings.shipped("en"))
         assertEquals(listOf("1.20.2-1.20.4", "1.19.2"), chips.map { it.label })
     }
 
@@ -40,7 +40,7 @@ class ChosenChipsTest {
         val chips = chosenChips(
             listOf(SearchFilter(FilterField.Category, "magic"), v("1.20.1"), SearchFilter(FilterField.Loader, "fabric", excluded = true)),
             versions,
-            EnglishStrings,
+            NexiraStrings.shipped("en"),
         )
         assertEquals(listOf("1.20.1", "Fabric", "Magic"), chips.map { it.label })
         assertEquals(listOf(false, true, false), chips.map { it.excluded })
@@ -48,7 +48,7 @@ class ChosenChipsTest {
 
     @Test
     fun `without the catalogue's list every version is its own chip`() {
-        val chips = chosenChips(listOf(v("1.20"), v("1.20.1")), emptyList(), EnglishStrings)
+        val chips = chosenChips(listOf(v("1.20"), v("1.20.1")), emptyList(), NexiraStrings.shipped("en"))
         assertEquals(listOf("1.20", "1.20.1"), chips.map { it.label })
     }
 }

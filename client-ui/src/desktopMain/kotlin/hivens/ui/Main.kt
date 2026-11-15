@@ -18,8 +18,6 @@ import hivens.ui.threshold.toStage
 import hivens.ui.diag.CrashDialog
 import hivens.ui.diag.ShellRecovery
 import hivens.ui.diag.UiRecoverySignal
-import hivens.ui.i18n.AppLocale
-import hivens.ui.i18n.stringsFor
 import hivens.launcher.platform.PlatformPaths
 import hivens.ui.identity.DefaultSkinProvider
 import hivens.ui.identity.SkinLibrary

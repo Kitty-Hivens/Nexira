@@ -10,8 +10,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import hivens.ui.i18n.LocalAppLocale
-import hivens.ui.i18n.LocalStrings
+import hivens.i18n.api.strings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.NxChoiceChip
 import hivens.ui.nx.NxSlider
 import hivens.ui.nx.NxToggle
@@ -39,16 +39,16 @@ internal fun ModuleEffectRows(modifier: Modifier = Modifier) {
     val effects = modules.state.collectAsState().value.effects
     if (effects.isEmpty()) return
     val stored by modules.settings.collectAsState()
-    val s = LocalStrings.current
+    val s = nexiraStrings()
 
     Column(modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        SectionTitle(s.moduleSettingsTitle)
+        SectionTitle(s.text("moduleSettingsTitle"))
         effects.forEach { entry ->
             EffectBlock(entry, stored[entry.scope].orEmpty()) { key, value -> modules.setEffectSetting(entry.scope, key, value) }
         }
         if (effects.any { stored[it.scope]?.get(WidgetModules.EFFECT_ENABLED) == "true" }) {
             Text(
-                text  = s.screenEffectWarning,
+                text  = s.text("screenEffectWarning"),
                 style = MaterialTheme.typography.bodySmall,
                 color = NxInk.quiet,
             )
@@ -58,8 +58,8 @@ internal fun ModuleEffectRows(modifier: Modifier = Modifier) {
 
 @Composable
 private fun EffectBlock(entry: Contributed<ScreenEffect>, stored: Map<String, String>, onSet: (key: String, value: String) -> Unit) {
-    val tag = LocalAppLocale.current.tag
-    val text = { key: String -> entry.strings.get(key, tag) }
+    val words = strings(entry.moduleId)
+    val text = { key: String -> words.text(key) }
     val on = stored[WidgetModules.EFFECT_ENABLED]?.toBooleanStrictOrNull() == true
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {

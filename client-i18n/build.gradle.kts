@@ -1,19 +1,17 @@
+import hivens.i18n.TranslationCheckTask
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
 
-// Localisation layer. Holds the AppStrings interface, the English / Russian /
-// German implementations, the AppLocale enum and the LocalStrings
-// CompositionLocal. Compose runtime only -- no foundation, no material3, no
-// desktop: nothing here draws.
+// The launcher's own words: the tables of the `nexira` namespace, one
+// i18n/nexira/<tag>.properties per shipped language, which the language module
+// (:i18n) answers lookups from, and the composable that reads them. A string edit
+// is an edit to a table and recompiles nothing.
 //
-// The one dependency into the tree is client-core, for the provider key a pack's
-// auth-requirement string switches on. It carries no reverse edge: nothing under
-// hivens.core, hivens.launcher or nx-ui names AppStrings.
+// Compose runtime only, for the composable lookup: nothing here draws.
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.compose)
     alias(libs.plugins.kotlin.compose.compiler)
-    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.android.kmp.library)
 }
 
@@ -46,13 +44,12 @@ kotlin {
         getByName("commonMain") {
             dependencies {
                 implementation(libs.compose.runtime)
-                implementation(libs.kotlinx.serialization.json)
             }
         }
 
         getByName("jvmSharedMain") {
             dependencies {
-                implementation(project(":client-core"))
+                api(project(":i18n"))
             }
         }
 
@@ -71,3 +68,21 @@ tasks.withType<KotlinJvmCompile>().matching { !it.name.contains("Android") }.con
         jvmTarget.set(JvmTarget.JVM_27)
     }
 }
+
+// Warns, and never fails, about the tables: a key a language lacks, a key the code
+// looks up that English does not have, a message that does not parse. Part of check,
+// so build runs it. A malformed message also fails NexiraTablesTest: that one is a
+// bug, where a missing translation is only a key shown as written.
+val checkTranslations = tasks.register<TranslationCheckTask>("checkTranslations") {
+    group = "verification"
+    description = "Warns about missing and malformed translations of the launcher's own words."
+    checker.from(configurations.named("desktopRuntimeClasspath"))
+    tables.set(layout.projectDirectory.dir("src/jvmSharedMain/resources/i18n/nexira"))
+    english.set("en")
+    // The main sources of the modules that read the launcher's own words. A test may look
+    // up a key of another namespace, a module's, which English here has no business with.
+    listOf("client-ui", "client-easter", "android-app").forEach { module ->
+        sources.from(layout.settingsDirectory.dir("$module/src").asFileTree.matching { include("*Main/**/*.kt", "main/**/*.kt") })
+    }
+}
+tasks.named("check") { dependsOn(checkTranslations) }

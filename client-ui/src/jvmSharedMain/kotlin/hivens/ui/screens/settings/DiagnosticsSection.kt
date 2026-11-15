@@ -14,6 +14,7 @@ import hivens.config.Branding
 import hivens.core.api.interfaces.ISettingsService
 import hivens.launcher.diag.DiagnosticBundle
 import hivens.launcher.diag.IssueReporter
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.platform.rememberHostActions
 import hivens.launcher.platform.PlatformPaths
 import hivens.ui.diag.RenderBackend
@@ -21,7 +22,6 @@ import hivens.ui.diag.reportPrompts
 import hivens.ui.easter.LocalAprilFools
 import hivens.ui.flexible.Flexible
 import hivens.ui.flexible.FlexibleKind
-import hivens.ui.i18n.LocalStrings
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxNavRow
@@ -63,7 +63,7 @@ internal fun DiagnosticsSection(
     paths: PlatformPaths,
     onOpenAbout: () -> Unit,
 ) {
-    val s  = LocalStrings.current
+    val s  = nexiraStrings()
     val af = LocalAprilFools.current
     val host = rememberHostActions()
     // Read at bundle time rather than composition time: recovery can switch a
@@ -137,7 +137,7 @@ internal fun DiagnosticsSection(
         }
     }
 
-    NxSection(s.settingsSectionDiagnostics, titleModifier = titleModifier) {
+    NxSection(s.text("settingsSectionDiagnostics"), titleModifier = titleModifier) {
         if (af.providesDebugPanel && showAprilDebug) {
             Box(Modifier.bringIntoViewRequester(debugPanelBringIntoView)) {
                 af.DebugPanel()
@@ -148,7 +148,7 @@ internal fun DiagnosticsSection(
             Box(Modifier.weight(1f)) {
                 Flexible("settings_open_logs_btn", FlexibleKind.Button) {
                     NxButton(
-                        label    = s.settingsOpenLogs,
+                        label    = s.text("settingsOpenLogs"),
                         onClick  = { SystemActions.openFolder(paths.logsDir.toString()) },
                         modifier = Modifier.fillMaxWidth(),
                         style    = NxButtonStyle.Secondary,
@@ -158,7 +158,7 @@ internal fun DiagnosticsSection(
             Box(Modifier.weight(1f)) {
                 Flexible("settings_crash_reports_btn", FlexibleKind.Button) {
                     NxButton(
-                        label    = s.settingsOpenCrashReports,
+                        label    = s.text("settingsOpenCrashReports"),
                         onClick  = { SystemActions.openFolder(paths.crashDir.toString()) },
                         modifier = Modifier.fillMaxWidth(),
                         style    = NxButtonStyle.Secondary,
@@ -175,7 +175,7 @@ internal fun DiagnosticsSection(
                 Box(Modifier.weight(1f)) {
                     Flexible("settings_create_diag_bundle_btn", FlexibleKind.Button) {
                         NxButton(
-                            label    = s.settingsCreateDiagnosticBundle,
+                            label    = s.text("settingsCreateDiagnosticBundle"),
                             onClick  = { createBundle(reveal = true) },
                             modifier = Modifier.fillMaxWidth(),
                             style    = NxButtonStyle.Secondary,
@@ -186,7 +186,7 @@ internal fun DiagnosticsSection(
                 Box(Modifier.weight(1f)) {
                     Flexible("settings_report_github_btn", FlexibleKind.Button) {
                         NxButton(
-                            label    = s.settingsReportOnGithub,
+                            label    = s.text("settingsReportOnGithub"),
                             onClick  = {
                                 val zip = lastBundlePath ?: return@NxButton
                                 val _ = runCatching {
@@ -215,7 +215,7 @@ internal fun DiagnosticsSection(
             }
             Spacer(Modifier.height(4.dp))
             Text(
-                text     = s.settingsDiagnosticBundleHint,
+                text     = s.text("settingsDiagnosticBundleHint"),
                 style    = MaterialTheme.typography.bodySmall,
                 color    = NxInk.quiet,
                 modifier = Modifier.padding(start = 8.dp),
@@ -235,7 +235,7 @@ internal fun DiagnosticsSection(
         if (host.restartSupported) {
             Flexible("settings_restart_recovery_btn", FlexibleKind.Button) {
                 NxButton(
-                    label    = s.recoveryRestartInApp,
+                    label    = s.text("recoveryRestartInApp"),
                     onClick  = { host.restartIntoRecovery(paths.dataDir) },
                     modifier = Modifier.fillMaxWidth(),
                     style    = NxButtonStyle.Secondary,

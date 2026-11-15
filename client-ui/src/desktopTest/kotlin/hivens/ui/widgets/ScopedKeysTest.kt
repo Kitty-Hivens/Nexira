@@ -14,9 +14,8 @@ import hivens.ui.Screen
 import hivens.ui.editor.EditModeController
 import hivens.ui.editor.EditModeState
 import hivens.ui.editor.LocalEditMode
+import hivens.ui.i18n.ShippedLanguageProvider
 import hivens.ui.layout.LayoutGraphRepository
-import hivens.ui.i18n.AppLocale
-import hivens.ui.i18n.LocaleProvider
 import hivens.ui.navigation.NavState
 import hivens.ui.onEventThread
 import hivens.ui.settle
@@ -316,7 +315,7 @@ class ScopedKeysTest {
         val editing = EditModeState.On(SurfaceId("s"), editController())
         val inked = onEventThread {
             val scene = ImageComposeScene(240, 80, density = Density(1f)) {
-                LocaleProvider(AppLocale.ENGLISH) {
+                ShippedLanguageProvider("en") {
                     NxTheme(dark = true) {
                         CompositionLocalProvider(
                             LocalWidgetDataRegistry provides data,

@@ -6,7 +6,8 @@ import hivens.core.data.ReadOnlyStore
 import hivens.core.data.ThemeMode
 import hivens.core.data.darkThemeFor
 import hivens.core.data.resolveInitialThemeMode
-import hivens.ui.i18n.AppLocale
+import hivens.i18n.api.Translations
+import hivens.i18n.api.Translator
 import hivens.ui.theme.ThemeLibrary
 import hivens.ui.theme.ThemeManager
 import hivens.ui.utils.PreferenceWriter
@@ -20,8 +21,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 /**
- * How the launcher looks and speaks: the themes there are and the one in use,
- * whether it is drawn dark, what decides that, and the language.
+ * How the launcher looks: the themes there are and the one in use, whether it is
+ * drawn dark, and what decides that. The language is the language module's.
  *
  * One for the app, read by every window and every composition through the sources
  * in [hivens.ui.widgets.Sources] and changed through the commands in
@@ -35,14 +36,15 @@ import kotlinx.coroutines.launch
  * through [systemSchemeChanged]. Only the source [mode] names is listened to, and a
  * source that agrees with the current flag writes nothing (see [darkThemeFor]).
  *
- * [contributed] is what the loaded widget modules bring, read in the current
- * language, and never stored.
+ * [contributed] is what the loaded widget modules bring, named in the language
+ * [translations] are in now, and never stored.
  */
 class AppearanceStore(
     private val settings: ISettingsService,
     private val preferences: PreferenceWriter,
     private val themes: ThemeManager,
     private val contributed: StateFlow<List<Contributed<ThemeContribution>>>,
+    private val translations: Translations,
     scope: CoroutineScope,
 ) {
     private val lock = Any()
@@ -59,11 +61,6 @@ class AppearanceStore(
     /** Which source decides [dark]: the person, the system scheme or the wallpaper. */
     val mode: StateFlow<ThemeMode> = _mode.asStateFlow()
 
-    private val _locale = MutableStateFlow(AppLocale.fromTag(initial.locale))
-
-    /** The language the launcher speaks. */
-    val locale: StateFlow<AppLocale> = _locale.asStateFlow()
-
     private val _systemSchemeAvailable = MutableStateFlow(false)
 
     /** Whether the host can read the system's colour scheme at all, so following it can be offered. */
@@ -77,7 +74,7 @@ class AppearanceStore(
         if (themes.readOnly) NewerBuildData.record(ReadOnlyStore.Theme)
     }
 
-    private val _library = MutableStateFlow(compose(stored, contributed.value, _locale.value))
+    private val _library = MutableStateFlow(compose(stored, contributed.value, translations.current.value))
 
     /** Every theme there is and the one in use, the modules' among them. */
     val library: StateFlow<ThemeLibrary> = _library.asStateFlow()
@@ -87,6 +84,8 @@ class AppearanceStore(
 
     init {
         scope.launch { contributed.collect { refresh() } }
+        // The module themes are named in the language, so a new language names them anew.
+        scope.launch { translations.current.collect { refresh() } }
     }
 
     /** Draws dark or light as the person chose. An explicit choice always wins, so an automatic mode drops back to the person's own. */
@@ -155,15 +154,6 @@ class AppearanceStore(
         preferences.write("the wallpaper colours") { themes.save(library) }
     }
 
-    /** Speaks [locale] from now on. The module themes are named in it too. */
-    fun setLocale(locale: AppLocale) {
-        synchronized(lock) {
-            _locale.value = locale
-            refreshLocked()
-        }
-        preferences.write("the language") { settings.updateSettings { it.copy(locale = locale.tag) } }
-    }
-
     // Sets the flag to what [wanted] says from the current one and saves it, so the
     // next start opens on what was last seen instead of flashing the old scheme.
     private fun follow(wanted: (current: Boolean) -> Boolean?) {
@@ -176,9 +166,9 @@ class AppearanceStore(
     private fun refresh() = synchronized(lock) { refreshLocked() }
 
     private fun refreshLocked() {
-        _library.value = compose(stored, contributed.value, _locale.value)
+        _library.value = compose(stored, contributed.value, translations.current.value)
     }
 
-    private fun compose(stored: ThemeLibrary, modules: List<Contributed<ThemeContribution>>, locale: AppLocale): ThemeLibrary =
-        stored.copy(contributed = modules.toThemes(locale.tag))
+    private fun compose(stored: ThemeLibrary, modules: List<Contributed<ThemeContribution>>, words: Translator): ThemeLibrary =
+        stored.copy(contributed = modules.toThemes(words))
 }

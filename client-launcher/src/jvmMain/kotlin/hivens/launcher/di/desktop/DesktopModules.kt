@@ -7,6 +7,7 @@ import dev.hivens.libvault.VaultTier
 import hivens.auth.LazySecretVault
 import hivens.core.api.interfaces.IJavaManager
 import hivens.core.api.interfaces.ISettingsService
+import hivens.core.api.interfaces.ReadingLanguage
 import hivens.core.api.interfaces.IUpdateApplicator
 import hivens.core.data.ModuleId
 import hivens.core.security.IKeyringStorage
@@ -107,13 +108,16 @@ val desktopHostModule = module {
  */
 val updateModule = module {
     single {
+        val settings = get<ISettingsService>()
+        val reading = getOrNull<ReadingLanguage>()
         UpdateService(
             clientProvider  = get(named("direct")),
             transfers       = get(),
             json            = get(),
             dataDirectory   = get(),
-            settingsService = get(),
+            settingsService = settings,
             applicator      = get(),
+            languages       = { reading?.tags() ?: listOf(settings.getSettings().locale) },
         )
     }
 

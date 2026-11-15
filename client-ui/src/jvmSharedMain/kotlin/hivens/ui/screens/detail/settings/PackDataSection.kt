@@ -19,12 +19,12 @@ import hivens.launcher.instance.InstanceBusyException
 import hivens.launcher.instance.InstanceSizeService
 import hivens.launcher.instance.PackInstanceService
 import hivens.launcher.update.PackUpdateService
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.utils.humanSize
 import hivens.ui.components.DestructiveConfirmDialog
 import hivens.ui.components.rememberPackDeleteBlock
 import hivens.ui.components.label
 import hivens.ui.components.rememberRunningPackGuard
-import hivens.ui.i18n.LocalStrings
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxSettingGroup
@@ -67,7 +67,7 @@ internal fun PackDataSection(
     /** Says something in the sheet's footer, for a refusal that has no operation of its own. */
     onNotice: (String) -> Unit = {},
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val service: PackInstanceService = koinInject()
     val updates: PackUpdateService = koinInject()
     val operations: PackOperationService = koinInject()
@@ -117,7 +117,7 @@ internal fun PackDataSection(
     // Reattaching is promised only where a reattach can happen. In practice the one
     // origin without a source that takes a pack back is an old record from the
     // former SmartyCraft server sync: packs for a game server now come from the mirror.
-    val detachDesc = if (service.canReattachAfterDetach(pack)) s.packSettingsDetachDesc else s.packSettingsDetachDescFinal
+    val detachDesc = if (service.canReattachAfterDetach(pack)) s.text("packSettingsDetachDesc") else s.text("packSettingsDetachDescFinal")
 
     // Reattaching drops what the player changed in the pack's mods, so it asks with
     // the list of what goes and what comes back. It rewrites files like an update
@@ -131,10 +131,10 @@ internal fun PackDataSection(
         withContext(Dispatchers.IO) { service.reattachSourceName(pack) }?.let { value = it }
     }
 
-    NxSettingGroup(s.packSettingsStorage) {
-        NxSettingRow(s.packSettingsFolder, detail = sizeText ?: s.packSettingsSizeComputing) {
+    NxSettingGroup(s.text("packSettingsStorage")) {
+        NxSettingRow(s.text("packSettingsFolder"), detail = sizeText ?: s.text("packSettingsSizeComputing")) {
             NxButton(
-                s.packSettingsOpenFolder,
+                s.text("packSettingsOpenFolder"),
                 onClick = { SystemActions.openFolder(instanceDir.toString()) },
                 style = NxButtonStyle.Secondary,
                 compact = true,
@@ -143,10 +143,10 @@ internal fun PackDataSection(
         // Mirror-only: a repair measures the instance against a published manifest,
         // and a local or imported pack has none to measure against.
         if (pack.packRef.origin == PackOrigin.Mirror) {
-            NxSettingRow(s.packSettingsRepair, detail = s.packSettingsRepairDesc) {
+            NxSettingRow(s.text("packSettingsRepair"), detail = s.text("packSettingsRepairDesc")) {
                 PuppetClick("packSettings.data.repair") { runningGuard.run(::runRepair) }
                 NxButton(
-                    s.packSettingsRepairAction,
+                    s.text("packSettingsRepairAction"),
                     onClick = { runningGuard.run(::runRepair) },
                     style = NxButtonStyle.Secondary,
                     enabled = !busy,
@@ -155,10 +155,10 @@ internal fun PackDataSection(
             }
         }
         reattachSource?.let { source ->
-            NxSettingRow(s.packSettingsReattach(sourceName.ifBlank { source.id }), detail = s.packSettingsReattachDesc) {
+            NxSettingRow(s.text("packSettingsReattach", sourceName.ifBlank { source.id }), detail = s.text("packSettingsReattachDesc")) {
                 PuppetClick("packSettings.data.reattach") { runningGuard.run { confirmReattach = true } }
                 NxButton(
-                    s.packSettingsReattachAction,
+                    s.text("packSettingsReattachAction"),
                     onClick = { runningGuard.run { confirmReattach = true } },
                     style = NxButtonStyle.Secondary,
                     enabled = !held,
@@ -167,9 +167,9 @@ internal fun PackDataSection(
             }
         }
         if (pack.packRef.origin != PackOrigin.Local) {
-            NxSettingRow(s.packSettingsDetach, detail = detachDesc) {
+            NxSettingRow(s.text("packSettingsDetach"), detail = detachDesc) {
                 NxButton(
-                    s.packSettingsDetachAction,
+                    s.text("packSettingsDetachAction"),
                     onClick = { confirmDetach = true },
                     style = NxButtonStyle.Secondary,
                     // Not while other work holds the pack: the launcher refuses a
@@ -182,10 +182,10 @@ internal fun PackDataSection(
         }
     }
 
-    NxSettingGroup(s.packSettingsDangerZone, danger = true) {
-        NxSettingRow(s.packSettingsDelete, detail = deleteBlock ?: s.packSettingsDeleteDesc) {
+    NxSettingGroup(s.text("packSettingsDangerZone"), danger = true) {
+        NxSettingRow(s.text("packSettingsDelete"), detail = deleteBlock ?: s.text("packSettingsDeleteDesc")) {
             NxButton(
-                s.packSettingsDelete,
+                s.text("packSettingsDelete"),
                 onClick = { pendingDelete = true },
                 style = NxButtonStyle.Destructive,
                 enabled = deleteBlock == null,
@@ -198,9 +198,9 @@ internal fun PackDataSection(
 
     if (confirmDetach) {
         DestructiveConfirmDialog(
-            title        = s.packSettingsDetach,
+            title        = s.text("packSettingsDetach"),
             body         = detachDesc,
-            confirmLabel = s.packSettingsDetachAction,
+            confirmLabel = s.text("packSettingsDetachAction"),
             onConfirm    = {
                 scope.launch {
                     // Work that started between the click and the write holds the
@@ -209,7 +209,7 @@ internal fun PackDataSection(
                     try {
                         service.detachToLocal(pack)
                     } catch (e: InstanceBusyException) {
-                        onNotice(s.packOperationRefused(e.work.label(s)))
+                        onNotice(s.text("packOperationRefused", e.work.label(s)))
                     }
                 }
             },
@@ -230,9 +230,9 @@ internal fun PackDataSection(
 
     if (pendingDelete) {
         DestructiveConfirmDialog(
-            title = s.packCardDeleteTitle,
-            body = s.packCardDeleteBody,
-            confirmLabel = s.packSettingsDelete,
+            title = s.text("packCardDeleteTitle"),
+            body = s.text("packCardDeleteBody"),
+            confirmLabel = s.text("packSettingsDelete"),
             onConfirm = {
                 pendingDelete = false
                 scope.launch {

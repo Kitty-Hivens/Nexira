@@ -13,12 +13,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import hivens.i18n.api.LocalTranslator
 import hivens.ui.audio.PlaybackState
 import hivens.ui.audio.RepeatMode
 import hivens.ui.audio.TrackInfo
+import hivens.ui.i18n.NexiraStrings
 import hivens.ui.widgets.players.ReadoutPlayerCard
-import hivens.ui.i18n.EnglishStrings
-import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.NxTheme
 import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.EncodedImageFormat
@@ -70,7 +70,7 @@ class PlaybackWidgetsRenderTest {
         ) {
             NxTheme(dark = dark) {
                 CompositionLocalProvider(
-                    LocalStrings provides EnglishStrings,
+                    LocalTranslator provides NexiraStrings.translator("en"),
                 ) {
                     progressAccent = NxColor.status(Status.Info)
                     Column(

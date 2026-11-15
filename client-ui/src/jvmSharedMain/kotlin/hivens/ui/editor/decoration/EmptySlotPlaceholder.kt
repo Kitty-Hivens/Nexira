@@ -28,7 +28,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.ui.editor.dnd.DropTargetRegistry
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.theme.Motion
@@ -52,7 +52,7 @@ fun EmptySlotPlaceholder(
     path: SlotPath,
     registry: DropTargetRegistry,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     DisposableEffect(path, registry) { onDispose { registry.withdrawPlaceholder(path) } }
     val breathRhythm = Motion.ownRhythm(BREATH_MS)
     val breath by rememberInfiniteTransition(label = "empty-slot-breath").animateFloat(
@@ -110,7 +110,7 @@ fun EmptySlotPlaceholder(
                     modifier           = Modifier.padding(end = 6.dp),
                 )
                 Text(
-                    text       = s.editorDragWidgetHere,
+                    text       = s.text("editorDragWidgetHere"),
                     style      = MaterialTheme.typography.bodySmall,
                     color      = NxInk.quiet,
                     fontWeight = FontWeight.Medium,

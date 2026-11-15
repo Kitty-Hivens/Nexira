@@ -22,6 +22,13 @@ class MirrorTextTest {
     }
 
     @Test
+    fun `a reader's languages are tried in order, then the untagged copy`() {
+        assertEquals("Тяжёлая промышленность.", inLanguage("untagged", byLanguage, listOf("uk", "ru")))
+        assertEquals("untagged", inLanguage("untagged", byLanguage, listOf("uk", "be")))
+        assertEquals("Heavy industry.", PackBuild(versionNumber = "1", changelog = "untagged", changelogI18n = mapOf("en" to "Heavy industry.")).forLanguage(listOf("uk", "en")).changelog)
+    }
+
+    @Test
     fun `no map reads the untagged copy, as before there were maps`() {
         assertEquals("plain", inLanguage("plain", null, "en"))
         assertNull(inLanguage(null, null, "en"))

@@ -25,6 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxChoiceChip
@@ -36,7 +37,6 @@ import hivens.ui.nx.NxSlider
 import hivens.ui.nx.NxSwitch
 import hivens.ui.nx.NxToggle
 import hivens.ui.surface.NxCard
-import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.theme.nexiraBrailleFamily
 import hivens.ui.utils.ConsoleSettings
@@ -61,27 +61,27 @@ import hivens.ui.theme.Status
  */
 @Composable
 internal fun ConsoleSection() {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val store: ConsoleSettingsStore = koinInject()
     val settings by store.settings.collectAsState()
     var artDraft by rememberSaveable { mutableStateOf("") }
     fun update(next: ConsoleSettings) = store.update(next)
 
     Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        NxSection(s.consoleSecDisplay) {
+        NxSection(s.text("consoleSecDisplay")) {
             NxSlider(
-                label         = s.consoleSecFontSize,
+                label         = s.text("consoleSecFontSize"),
                 value         = settings.fontSize.toFloat(),
                 range         = ConsoleSettings.MIN_FONT_SIZE.toFloat()..ConsoleSettings.MAX_FONT_SIZE.toFloat(),
                 valueText     = "${settings.fontSize} sp",
                 onValueChange = { update(settings.copy(fontSize = it.roundToInt())) },
                 keyStep       = 1f,
             )
-            NxToggle(s.consoleSecWrap, settings.wrapText) { update(settings.copy(wrapText = it)) }
-            NxToggle(s.consoleSecGutter, settings.showGutterStrip) { update(settings.copy(showGutterStrip = it)) }
-            NxToggle(s.consoleSecTimestamps, settings.showTimestamps) { update(settings.copy(showTimestamps = it)) }
+            NxToggle(s.text("consoleSecWrap"), settings.wrapText) { update(settings.copy(wrapText = it)) }
+            NxToggle(s.text("consoleSecGutter"), settings.showGutterStrip) { update(settings.copy(showGutterStrip = it)) }
+            NxToggle(s.text("consoleSecTimestamps"), settings.showTimestamps) { update(settings.copy(showTimestamps = it)) }
             NxSlider(
-                label         = s.consoleSecBuffer,
+                label         = s.text("consoleSecBuffer"),
                 value         = settings.maxInMemoryLines.toFloat(),
                 range         = ConsoleSettings.MIN_IN_MEMORY_LINES.toFloat()..ConsoleSettings.MAX_IN_MEMORY_LINES.toFloat(),
                 valueText     = "${settings.maxInMemoryLines}",
@@ -90,18 +90,18 @@ internal fun ConsoleSection() {
             )
         }
 
-        NxSection(s.consoleSecColors) {
-            ConsoleColorRow(s.consoleSecColorInfo, settings.infoColor, s.consoleSecColorAuto) { update(settings.copy(infoColor = it)) }
-            ConsoleColorRow(s.consoleSecColorWarn, settings.warnColor, s.consoleSecColorAuto) { update(settings.copy(warnColor = it)) }
-            ConsoleColorRow(s.consoleSecColorError, settings.errorColor, s.consoleSecColorAuto) { update(settings.copy(errorColor = it)) }
+        NxSection(s.text("consoleSecColors")) {
+            ConsoleColorRow(s.text("consoleSecColorInfo"), settings.infoColor, s.text("consoleSecColorAuto")) { update(settings.copy(infoColor = it)) }
+            ConsoleColorRow(s.text("consoleSecColorWarn"), settings.warnColor, s.text("consoleSecColorAuto")) { update(settings.copy(warnColor = it)) }
+            ConsoleColorRow(s.text("consoleSecColorError"), settings.errorColor, s.text("consoleSecColorAuto")) { update(settings.copy(errorColor = it)) }
             Text(
-                text  = s.consoleSecApplyNote,
+                text  = s.text("consoleSecApplyNote"),
                 style = MaterialTheme.typography.bodySmall,
                 color = NxInk.quiet,
             )
         }
 
-        NxSection(s.consoleSecHighlightRules) {
+        NxSection(s.text("consoleSecHighlightRules")) {
             settings.highlightRules.forEachIndexed { i, rule ->
                 HighlightRuleCard(
                     rule     = rule,
@@ -109,9 +109,9 @@ internal fun ConsoleSection() {
                     onDelete = { update(settings.copy(highlightRules = settings.highlightRules.filterIndexed { j, _ -> j != i })) },
                 )
             }
-            if (settings.highlightRules.isEmpty()) EmptyRulesHint(s.consoleSecRulesEmpty)
+            if (settings.highlightRules.isEmpty()) EmptyRulesHint(s.text("consoleSecRulesEmpty"))
             NxButton(
-                label   = s.consoleSecAddRule,
+                label   = s.text("consoleSecAddRule"),
                 onClick = { update(settings.copy(highlightRules = settings.highlightRules + HighlightRule())) },
                 style   = NxButtonStyle.Secondary,
                 icon    = NxIcon.Add,
@@ -119,7 +119,7 @@ internal fun ConsoleSection() {
             )
         }
 
-        NxSection(s.consoleSecFilterRules) {
+        NxSection(s.text("consoleSecFilterRules")) {
             settings.filterRules.forEachIndexed { i, rule ->
                 FilterRuleCard(
                     rule     = rule,
@@ -127,9 +127,9 @@ internal fun ConsoleSection() {
                     onDelete = { update(settings.copy(filterRules = settings.filterRules.filterIndexed { j, _ -> j != i })) },
                 )
             }
-            if (settings.filterRules.isEmpty()) EmptyRulesHint(s.consoleSecRulesEmpty)
+            if (settings.filterRules.isEmpty()) EmptyRulesHint(s.text("consoleSecRulesEmpty"))
             NxButton(
-                label   = s.consoleSecAddRule,
+                label   = s.text("consoleSecAddRule"),
                 onClick = { update(settings.copy(filterRules = settings.filterRules + FilterRule())) },
                 style   = NxButtonStyle.Secondary,
                 icon    = NxIcon.Add,
@@ -137,14 +137,14 @@ internal fun ConsoleSection() {
             )
         }
 
-        NxSection(s.consoleSecArt) {
+        NxSection(s.text("consoleSecArt")) {
             settings.customArt.forEachIndexed { i, art ->
                 ArtCard(
                     art      = art,
                     onDelete = { update(settings.copy(customArt = settings.customArt.filterIndexed { j, _ -> j != i })) },
                 )
             }
-            if (settings.customArt.isEmpty()) EmptyRulesHint(s.consoleSecArtEmpty)
+            if (settings.customArt.isEmpty()) EmptyRulesHint(s.text("consoleSecArtEmpty"))
             ArtAdder(
                 draft       = artDraft,
                 onDraft     = { artDraft = it },
@@ -152,8 +152,8 @@ internal fun ConsoleSection() {
                     val a = artDraft.trim('\n')
                     if (a.isNotBlank()) { update(settings.copy(customArt = settings.customArt + a)); artDraft = "" }
                 },
-                addLabel    = s.consoleSecArtAdd,
-                placeholder = s.consoleSecArtPaste,
+                addLabel    = s.text("consoleSecArtAdd"),
+                placeholder = s.text("consoleSecArtPaste"),
             )
         }
     }
@@ -186,7 +186,7 @@ private fun ConsoleColorRow(label: String, hex: String?, autoLabel: String, onCh
 
 @Composable
 private fun HighlightRuleCard(rule: HighlightRule, onChange: (HighlightRule) -> Unit, onDelete: () -> Unit) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     NxCard {
         Column(
             Modifier.fillMaxWidth().padding(12.dp),
@@ -194,13 +194,13 @@ private fun HighlightRuleCard(rule: HighlightRule, onChange: (HighlightRule) -> 
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 NxSwitch(checked = rule.enabled, onCheckedChange = { onChange(rule.copy(enabled = it)) })
-                NxField(rule.pattern, { onChange(rule.copy(pattern = it)) }, s.consoleSecRulePattern, Modifier.weight(1f))
+                NxField(rule.pattern, { onChange(rule.copy(pattern = it)) }, s.text("consoleSecRulePattern"), Modifier.weight(1f))
                 NxIconButton(NxIcon.Delete, null, onDelete, tint = NxColor.status(Status.Error))
             }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                NxChoiceChip(s.consoleSecRegex, rule.regex) { onChange(rule.copy(regex = !rule.regex)) }
+                NxChoiceChip(s.text("consoleSecRegex"), rule.regex) { onChange(rule.copy(regex = !rule.regex)) }
                 NxColorField(hex = rule.colorHex, onValueChange = { onChange(rule.copy(colorHex = it.orEmpty())) }, modifier = Modifier.weight(1f))
-                NxChoiceChip(s.consoleSecBold, rule.bold) { onChange(rule.copy(bold = !rule.bold)) }
+                NxChoiceChip(s.text("consoleSecBold"), rule.bold) { onChange(rule.copy(bold = !rule.bold)) }
             }
         }
     }
@@ -208,7 +208,7 @@ private fun HighlightRuleCard(rule: HighlightRule, onChange: (HighlightRule) -> 
 
 @Composable
 private fun FilterRuleCard(rule: FilterRule, onChange: (FilterRule) -> Unit, onDelete: () -> Unit) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     NxCard {
         Row(
             Modifier.fillMaxWidth().padding(12.dp),
@@ -216,8 +216,8 @@ private fun FilterRuleCard(rule: FilterRule, onChange: (FilterRule) -> Unit, onD
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             NxSwitch(checked = rule.enabled, onCheckedChange = { onChange(rule.copy(enabled = it)) })
-            NxField(rule.pattern, { onChange(rule.copy(pattern = it)) }, s.consoleSecRulePattern, Modifier.weight(1f))
-            NxChoiceChip(s.consoleSecRegex, rule.regex) { onChange(rule.copy(regex = !rule.regex)) }
+            NxField(rule.pattern, { onChange(rule.copy(pattern = it)) }, s.text("consoleSecRulePattern"), Modifier.weight(1f))
+            NxChoiceChip(s.text("consoleSecRegex"), rule.regex) { onChange(rule.copy(regex = !rule.regex)) }
             NxIconButton(NxIcon.Delete, null, onDelete, tint = NxColor.status(Status.Error))
         }
     }

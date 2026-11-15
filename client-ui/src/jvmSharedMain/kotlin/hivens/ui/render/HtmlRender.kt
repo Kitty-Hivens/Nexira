@@ -84,7 +84,6 @@ import coil3.size.Size as CoilSize
 import coil3.compose.SubcomposeAsyncImage
 import hivens.ui.components.isPlayableVideoUrl
 import androidx.compose.ui.text.style.TextOverflow
-import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.layers.layerTrigger

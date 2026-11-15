@@ -13,9 +13,10 @@ import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.unit.Density
 import hivens.core.data.SettingsData
-import hivens.ui.i18n.AppLocale
-import hivens.ui.i18n.LocaleProvider
+import hivens.i18n.ShippedLanguages
 import hivens.ui.host.HostKoin
+import hivens.ui.i18n.NexiraStrings
+import hivens.ui.i18n.ShippedLanguageProvider
 import hivens.ui.puppet.PuppetRegistry
 import hivens.ui.theme.NxTheme
 import org.koin.dsl.koinApplication
@@ -45,7 +46,7 @@ class UnsupportedToggleTest {
         assertTrue(form.useCustomChrome && form.closeAfterStart, "the premise: both are stored on")
         val scene = ImageComposeScene(900, 2000, density = Density(1f)) {
             HostKoin(koin) {
-                LocaleProvider(AppLocale.ENGLISH) {
+                ShippedLanguageProvider("en") {
                     NxTheme(dark = true) {
                         Column(Modifier.verticalScroll(rememberScrollState())) {
                             AppearanceSection(
@@ -55,8 +56,9 @@ class UnsupportedToggleTest {
                                 onToggleTheme = {},
                                 onOpenThemePicker = {},
                                 onOpenBackgroundSettings = {},
-                                currentLocale = AppLocale.ENGLISH,
-                                onLocaleChanged = {},
+                                currentLanguage = NexiraStrings.translator("en").language,
+                                languages = ShippedLanguages.all,
+                                onLanguageChanged = {},
                             )
                         }
                     }

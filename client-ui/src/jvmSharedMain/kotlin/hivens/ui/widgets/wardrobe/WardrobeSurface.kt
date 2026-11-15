@@ -47,11 +47,12 @@ import hivens.accounts.api.AccountKeys
 import hivens.accounts.api.SessionView
 import hivens.accounts.api.SkinUpload
 import hivens.accounts.api.SkinUploadStatus
+import hivens.i18n.api.Strings
 import hivens.ui.accounts.outcomeOf
 import hivens.ui.components.DestructiveConfirmDialog
 import hivens.ui.flexible.Flexible
 import hivens.ui.flexible.FlexibleKind
-import hivens.ui.i18n.AppStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxChoiceChip
@@ -59,7 +60,6 @@ import hivens.ui.nx.NxSectionHeader
 import hivens.ui.nx.NxTooltip
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
-import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.layers.layerTrigger
@@ -114,7 +114,7 @@ private val CardCaptionHeight = 24.dp
 // Mojang apply + default skins + capes build on this.
 @Composable
 fun WardrobeSurface(session: SessionView?, onBack: () -> Unit) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     PuppetScreen("Wardrobe")
     // The window frame carries the visible back arrow, so the screen draws none.
     // Automation has no frame to click, and without this the wardrobe was the one
@@ -126,7 +126,7 @@ fun WardrobeSurface(session: SessionView?, onBack: () -> Unit) {
         NxSurface(SurfaceKind.Panel, modifier = Modifier.weight(1f).fillMaxWidth()) {
             if (session == null) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(s.wardrobeSignedOut, style = MaterialTheme.typography.bodyMedium, color = NxInk.quiet)
+                    Text(s.text("wardrobeSignedOut"), style = MaterialTheme.typography.bodyMedium, color = NxInk.quiet)
                 }
             } else {
                 Wardrobe(session)
@@ -169,17 +169,17 @@ private fun WardrobePose.source(): PoseSource = when (this) {
     WardrobePose.Walk -> Cycles.walk()
 }
 
-private fun WardrobePose.label(s: AppStrings): String = when (this) {
-    WardrobePose.Stand -> s.wardrobePoseStand
-    WardrobePose.Wave -> s.wardrobePoseWave
-    WardrobePose.Sit -> s.wardrobePoseSit
-    WardrobePose.FaceCover -> s.wardrobePoseFaceCover
-    WardrobePose.Walk -> s.wardrobePoseWalk
+private fun WardrobePose.label(s: Strings): String = when (this) {
+    WardrobePose.Stand -> s.text("wardrobePoseStand")
+    WardrobePose.Wave -> s.text("wardrobePoseWave")
+    WardrobePose.Sit -> s.text("wardrobePoseSit")
+    WardrobePose.FaceCover -> s.text("wardrobePoseFaceCover")
+    WardrobePose.Walk -> s.text("wardrobePoseWalk")
 }
 
 @Composable
 private fun Wardrobe(session: SessionView) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val library: SkinLibrary = koinInject()
     val skinManager: SkinManager = koinInject()
     val defaultSkinProvider: DefaultSkinProvider = koinInject()
@@ -256,9 +256,9 @@ private fun Wardrobe(session: SessionView) {
     var pendingDelete by remember { mutableStateOf<String?>(null) }
     pendingDelete?.let { id ->
         DestructiveConfirmDialog(
-            title        = s.wardrobeDeleteTitle,
-            body         = s.wardrobeDeleteBody,
-            confirmLabel = s.editorDelete,
+            title        = s.text("wardrobeDeleteTitle"),
+            body         = s.text("wardrobeDeleteBody"),
+            confirmLabel = s.text("editorDelete"),
             onConfirm    = {
                 scope.launch {
                     withContext(Dispatchers.IO) { library.delete(id) }
@@ -351,7 +351,7 @@ private fun Wardrobe(session: SessionView) {
                 skinManager.invalidate(sc.name)
                 refreshKey++
             } else {
-                error = s.profileUploadError((outcome as? SkinUploadStatus.Failed)?.message ?: "error")
+                error = s.text("profileUploadError", (outcome as? SkinUploadStatus.Failed)?.message ?: "error")
             }
         }
     }
@@ -421,7 +421,7 @@ private fun Wardrobe(session: SessionView) {
                         skinSel?.let { (file, markId) ->
                             Flexible("wardrobe_apply_sc_btn", FlexibleKind.Button) {
                                 NxButton(
-                                    label = s.wardrobeApplySmartycraft,
+                                    label = s.text("wardrobeApplySmartycraft"),
                                     onClick = { if (!busy) applyToSc(file, isCloak = false, markId = markId) },
                                     style = NxButtonStyle.Primary,
                                     enabled = !busy,
@@ -434,7 +434,7 @@ private fun Wardrobe(session: SessionView) {
                                 val capeFile = library.file(id).toFile()
                                 Flexible("wardrobe_apply_cape_sc_btn", FlexibleKind.Button) {
                                     NxButton(
-                                        label = s.wardrobeApplyCape,
+                                        label = s.text("wardrobeApplyCape"),
                                         onClick = { if (!busy) applyToSc(capeFile, isCloak = true, markId = id) },
                                         style = NxButtonStyle.Secondary,
                                         enabled = !busy,
@@ -472,7 +472,7 @@ private fun Wardrobe(session: SessionView) {
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 item(key = "skins-h", span = { GridItemSpan(maxLineSpan) }) {
-                    NxSectionHeader(s.wardrobeSaved, muted = true, modifier = Modifier.padding(top = 4.dp))
+                    NxSectionHeader(s.text("wardrobeSaved"), muted = true, modifier = Modifier.padding(top = 4.dp))
                 }
                 item(key = "add-skin") { AddTile(onClick = { importInto(SkinLibrary.Kind.Skin) { selectedId = it } }) }
                 items(data.skins, key = { it.id }) { entry ->
@@ -491,11 +491,11 @@ private fun Wardrobe(session: SessionView) {
                 // fail-open Unknown case.
                 if (showCapes) {
                     item(key = "capes-h", span = { GridItemSpan(maxLineSpan) }) {
-                        NxSectionHeader(s.wardrobeCapes, muted = true, modifier = Modifier.padding(top = 4.dp))
+                        NxSectionHeader(s.text("wardrobeCapes"), muted = true, modifier = Modifier.padding(top = 4.dp))
                     }
                     item(key = "capes-hint", span = { GridItemSpan(maxLineSpan) }) {
                         Text(
-                            s.wardrobeCapeClanHint,
+                            s.text("wardrobeCapeClanHint"),
                             style = MaterialTheme.typography.bodySmall,
                             color = NxInk.quiet,
                         )
@@ -517,7 +517,7 @@ private fun Wardrobe(session: SessionView) {
                 // bundled). Read-only -- pick to preview / apply, no delete.
                 if (defaults.isNotEmpty()) {
                     item(key = "defaults-h", span = { GridItemSpan(maxLineSpan) }) {
-                        NxSectionHeader(s.wardrobeDefaults, muted = true, modifier = Modifier.padding(top = 4.dp))
+                        NxSectionHeader(s.text("wardrobeDefaults"), muted = true, modifier = Modifier.padding(top = 4.dp))
                     }
                     items(defaults, key = { it.name }) { def ->
                         SkinCard(
@@ -562,7 +562,7 @@ private fun SkinCard(
     onClick: () -> Unit,
     onDelete: (() -> Unit)?,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     NxSurface(
         kind          = SurfaceKind.Card,
         // The ring is the surface's own edge, which is stroked outside its clip: a
@@ -597,7 +597,7 @@ private fun SkinCard(
                 // Default skins are read-only (not library entries), so no delete.
                 onDelete?.let { del ->
                     IconButton(onClick = del, modifier = Modifier.size(24.dp).layerTrigger()) {
-                        Symbol(NxIcon.Delete, s.accountRemove, tint = NxInk.quiet, size = 16.dp)
+                        Symbol(NxIcon.Delete, s.text("accountRemove"), tint = NxInk.quiet, size = 16.dp)
                     }
                 }
             }
@@ -626,7 +626,7 @@ private fun CardCaption(name: String, modifier: Modifier = Modifier) {
 // as one strip (Modrinth's "Add a skin").
 @Composable
 private fun AddTile(onClick: () -> Unit) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     NxSurface(SurfaceKind.Card) {
         Column(
             modifier = Modifier
@@ -636,10 +636,10 @@ private fun AddTile(onClick: () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Box(Modifier.fillMaxWidth().aspectRatio(1f), contentAlignment = Alignment.Center) {
-                Symbol(NxIcon.Add, s.wardrobeUpload, tint = NxColor.lead(), size = 32.dp)
+                Symbol(NxIcon.Add, s.text("wardrobeUpload"), tint = NxColor.lead(), size = 32.dp)
             }
             Box(Modifier.height(CardCaptionHeight), contentAlignment = Alignment.Center) {
-                Text(s.wardrobeUpload, style = MaterialTheme.typography.labelSmall, color = NxInk.quiet, maxLines = 1)
+                Text(s.text("wardrobeUpload"), style = MaterialTheme.typography.labelSmall, color = NxInk.quiet, maxLines = 1)
             }
         }
     }
@@ -655,7 +655,7 @@ private fun CapeCard(
     onClick: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     NxSurface(
         kind          = SurfaceKind.Card,
         // The ring is the surface's own edge, which is stroked outside its clip: a
@@ -685,7 +685,7 @@ private fun CapeCard(
             Row(Modifier.height(CardCaptionHeight), verticalAlignment = Alignment.CenterVertically) {
                 CardCaption(name, Modifier.weight(1f, fill = false))
                 IconButton(onClick = onDelete, modifier = Modifier.size(24.dp).layerTrigger()) {
-                    Symbol(NxIcon.Delete, s.accountRemove, tint = NxInk.quiet, size = 16.dp)
+                    Symbol(NxIcon.Delete, s.text("accountRemove"), tint = NxInk.quiet, size = 16.dp)
                 }
             }
         }

@@ -20,7 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.NxChoiceChip
 import hivens.widget.api.SlotRenderer
 import hivens.widget.api.rememberProps
@@ -63,9 +63,9 @@ data class TabContainerProps(
 @Composable
 fun TabContainerWidget(instance: WidgetInstance) {
     val p = instance.rememberProps<TabContainerProps>()
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val labels = listOf(p.label1, p.label2, p.label3)
-        .mapIndexed { idx, label -> label.ifBlank { s.widgetTabDefaultLabel(idx + 1) } }
+        .mapIndexed { idx, label -> label.ifBlank { s.text("widgetTabDefaultLabel", idx + 1) } }
     val count = p.tabCount.coerceIn(1, labels.size)
 
     // Keyed on instanceId so two tab containers keep independent selection.

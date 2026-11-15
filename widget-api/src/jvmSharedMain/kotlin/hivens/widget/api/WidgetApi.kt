@@ -17,9 +17,11 @@ package hivens.widget.api
  * `nexira.widgetApi` Gradle property, which a test holds equal to this.
  *
  * 2: source and command keys gained a level, so their constructors changed.
+ * 3: a module declares settings domains through its keys, and [ModuleStrings] carries a
+ *    module's words for the language module instead of looking them up.
  */
 object WidgetApi {
-    const val VERSION: Int = 2
+    const val VERSION: Int = 3
 
     /** Jar manifest attribute carrying [VERSION]. */
     const val MANIFEST_VERSION = "Nexira-Widget-Api"

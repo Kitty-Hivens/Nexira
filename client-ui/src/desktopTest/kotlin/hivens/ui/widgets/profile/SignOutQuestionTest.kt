@@ -34,6 +34,8 @@ import hivens.ui.accounts.accountsEngineStandIns
 import hivens.ui.background.BackgroundSettings
 import hivens.ui.host.LauncherHostAccess
 import hivens.ui.host.launcherServices
+import hivens.ui.i18n.NexiraStrings
+import hivens.ui.i18n.ShippedLanguageProvider
 import hivens.ui.moduleKeys
 import hivens.ui.uiCommandRegistry
 import hivens.ui.uiDataRegistry
@@ -46,9 +48,6 @@ import hivens.accounts.api.SignInFlow
 import hivens.ui.components.SignOutPrompt
 import hivens.ui.components.SignOutRequests
 import hivens.ui.components.rememberSignOutRequest
-import hivens.ui.i18n.AppLocale
-import hivens.ui.i18n.LocaleProvider
-import hivens.ui.i18n.stringsFor
 import hivens.ui.layers.LayerHost
 import hivens.ui.layers.rememberWindowLayers
 import hivens.ui.levelServicesModule
@@ -151,7 +150,7 @@ class SignOutQuestionTest {
         var window: WidgetScope? = null
         onEventThread {
             val scene = ImageComposeScene(900, 900, density = Density(1f)) {
-                LocaleProvider(AppLocale.ENGLISH) {
+                ShippedLanguageProvider("en") {
                     NxTheme(dark = true) {
                         LayerHost(rememberWindowLayers(), Modifier.fillMaxSize()) {
                             CompositionLocalProvider(
@@ -320,7 +319,7 @@ class SignOutQuestionTest {
     // dialog drawn at all. This one answers the way a person does.
     @Test
     fun `the question is drawn over the window and its own yes signs out`() {
-        val yes = stringsFor(AppLocale.ENGLISH).navLogout
+        val yes = NexiraStrings.shipped("en").text("navLogout")
         var ask: (() -> Unit)? = null
         drawn({ ask = rememberSignOutRequest() }) { scene, requests ->
             assertNotNull(ask).invoke()

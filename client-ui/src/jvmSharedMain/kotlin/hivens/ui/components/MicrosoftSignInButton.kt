@@ -19,10 +19,10 @@ import hivens.accounts.api.DeviceCodeSignIn
 import hivens.accounts.api.ProviderView
 import hivens.accounts.api.SignInError
 import hivens.accounts.api.SignInFlow
+import hivens.i18n.api.Strings
 import hivens.ui.flexible.Flexible
 import hivens.ui.flexible.FlexibleKind
-import hivens.ui.i18n.AppStrings
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.platform.SystemActions
@@ -61,7 +61,7 @@ fun MicrosoftSignInButton(
     val flows = rememberScopedSource(AccountKeys.SignIns).valueOrNull() ?: return
     val signIn = rememberScopedCommand(AccountKeys.SignInMicrosoft) ?: return
     val cancel = rememberScopedCommand(AccountKeys.CancelSignIn) ?: return
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val flow = flows[AccountKeys.MICROSOFT]
 
     // A press while one is under way does nothing: the module holds one at a time.
@@ -73,14 +73,14 @@ fun MicrosoftSignInButton(
             verificationUri = shown.verificationUri,
             onOpenBrowser = { SystemActions.openUrl(shown.verificationUri) },
             onCancel = { cancel(AccountKeys.MICROSOFT) },
-            errorMessage = shown.error?.let { it.message ?: s.loginErrorGeneric },
+            errorMessage = shown.error?.let { it.message ?: s.text("loginErrorGeneric") },
         )
     }
 
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Flexible("login_microsoft_btn", FlexibleKind.Button) {
             NxButton(
-                label = label ?: s.loginMicrosoft,
+                label = label ?: s.text("loginMicrosoft"),
                 onClick = { start() },
                 modifier = Modifier.fillMaxWidth(),
                 style = NxButtonStyle.Tertiary,
@@ -95,7 +95,7 @@ fun MicrosoftSignInButton(
                     color = NxColor.lead(),
                 )
                 Spacer(Modifier.width(8.dp))
-                Text(s.msaWaiting, style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
+                Text(s.text("msaWaiting"), style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
             }
             // Errors from the request itself (before any dialog) show here. The
             // dialog owns errors from the wait once it is open.
@@ -111,9 +111,9 @@ fun MicrosoftSignInButton(
 }
 
 /** What a failed sign-in step says, in the person's words where the provider gave none. */
-internal fun SignInError.words(s: AppStrings): String = when (code) {
-    SignInError.EMPTY -> s.loginErrorEmpty
-    SignInError.WRONG_CODE -> s.auth2faInvalid
-    SignInError.SECOND_FACTOR_EXPIRED -> s.auth2faExpired
-    else -> message ?: s.loginErrorGeneric
+internal fun SignInError.words(s: Strings): String = when (code) {
+    SignInError.EMPTY -> s.text("loginErrorEmpty")
+    SignInError.WRONG_CODE -> s.text("auth2faInvalid")
+    SignInError.SECOND_FACTOR_EXPIRED -> s.text("auth2faExpired")
+    else -> message ?: s.text("loginErrorGeneric")
 }

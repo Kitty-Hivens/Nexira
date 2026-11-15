@@ -1,5 +1,7 @@
 package hivens.ui
 
+import hivens.i18n.api.Strings
+import hivens.ui.i18n.nexiraStrings
 import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.withTimeoutOrNull
@@ -79,8 +81,8 @@ import hivens.ui.editor.EditModeController
 import hivens.ui.editor.WidgetGraphReconciler
 import hivens.ui.generated.resources.Res
 import hivens.ui.appearance.AppearanceStore
-import hivens.ui.i18n.LocalStrings
-import hivens.ui.i18n.LocaleProvider
+import hivens.i18n.api.LocalTranslator
+import hivens.i18n.api.Translations
 import hivens.ui.layers.LayerHost
 import hivens.ui.layers.rememberWindowLayers
 import hivens.ui.notifications.Kind
@@ -365,7 +367,9 @@ private fun FrameWindowScope.ShellContent(
     val appearance: AppearanceStore = koinInject()
     val isDarkTheme by appearance.dark.collectAsState()
     val themeMode by appearance.mode.collectAsState()
-    val currentLocale by appearance.locale.collectAsState()
+    // The words the shell is drawn in: the language module's engine, which the host made.
+    val translations: Translations = koinInject()
+    val words by translations.current.collectAsState()
     // Whether the OS scheme is readable at all (no portal backend on Linux -> no).
     // Probed once; drives the System chip's enabled state in the theme island.
     LaunchedEffect(Unit) {
@@ -549,8 +553,8 @@ private fun FrameWindowScope.ShellContent(
     val af = AprilFoolsLoader.instance
 
     CompositionLocalProvider(LocalAprilFools provides af) {
-    LocaleProvider(locale = currentLocale) {
-        val s = LocalStrings.current
+    CompositionLocalProvider(LocalTranslator provides words) {
+        val s = nexiraStrings()
 
         // Which face draws the interface. Roboto Flex is subset to Latin,
         // Cyrillic and Greek, so a locale outside those has to be drawn by the
@@ -560,7 +564,7 @@ private fun FrameWindowScope.ShellContent(
         // the next locale that needs this is picked up without touching a list
         // here. A handful of structural labels is enough: if the interface is in
         // that language at all, they are in it too.
-        val uiNeedsCjk = needsCjkFace(s.settingsTitle + s.navLibrary + s.aboutTitle)
+        val uiNeedsCjk = needsCjkFace(s.text("settingsTitle") + s.text("navLibrary") + s.text("aboutTitle"))
         val uiFamily = if (uiNeedsCjk) nexiraCjkFamily() else null
 
         // Came back from a crash restart: surface a one-shot notice so the reload
@@ -594,7 +598,7 @@ private fun FrameWindowScope.ShellContent(
                     iconUrl   = null,
                     severity  = Severity.Warn,
                     kind      = Kind.OneShot,
-                    title     = s.recoveryReloadedNotice,
+                    title     = s.text("recoveryReloadedNotice"),
                 )
             }
         }
@@ -615,10 +619,11 @@ private fun FrameWindowScope.ShellContent(
             affected.entries.groupBy({ it.value }, { it.key }).forEach { (reason, stores) ->
                 val named = stores.joinToString(", ") { store ->
                     when (store) {
-                        ReadOnlyStore.PackLibrary -> s.readOnlyDataLibrary
-                        ReadOnlyStore.Layout      -> s.readOnlyDataLayout
-                        ReadOnlyStore.Theme       -> s.readOnlyDataTheme
-                        ReadOnlyStore.Accounts    -> s.readOnlyDataAccounts
+                        ReadOnlyStore.PackLibrary -> s.text("readOnlyDataLibrary")
+                        ReadOnlyStore.Layout      -> s.text("readOnlyDataLayout")
+                        ReadOnlyStore.Theme       -> s.text("readOnlyDataTheme")
+                        ReadOnlyStore.Accounts    -> s.text("readOnlyDataAccounts")
+                        ReadOnlyStore.Settings    -> s.text("readOnlyDataSettings")
                     }
                 }
                 notificationCenter.push(
@@ -627,11 +632,11 @@ private fun FrameWindowScope.ShellContent(
                     iconUrl   = null,
                     severity  = Severity.Warn,
                     kind      = Kind.Sticky,
-                    title     = s.readOnlyDataTitle,
+                    title     = s.text("readOnlyDataTitle"),
                     body      = when (reason) {
-                        ReadOnlyReason.NewerBuild       -> s.readOnlyDataBody(named)
-                        ReadOnlyReason.UnreadableFormat -> s.readOnlyDataBodyOldFormat(named)
-                        ReadOnlyReason.Damaged          -> s.readOnlyDataBodyDamaged(named)
+                        ReadOnlyReason.NewerBuild       -> s.text("readOnlyDataBody", named)
+                        ReadOnlyReason.UnreadableFormat -> s.text("readOnlyDataBodyOldFormat", named)
+                        ReadOnlyReason.Damaged          -> s.text("readOnlyDataBodyDamaged", named)
                     },
                 )
             }
@@ -649,8 +654,8 @@ private fun FrameWindowScope.ShellContent(
                 iconUrl   = null,
                 severity  = Severity.Warn,
                 kind      = Kind.Sticky,
-                title     = s.moduleCrashedTitle(notice.name),
-                body      = s.moduleCrashedBody(notice.failure),
+                title     = s.text("moduleCrashedTitle", notice.name),
+                body      = s.text("moduleCrashedBody", notice.failure),
             )
             widgetModules.consumeCrashNotice()
         }
@@ -674,12 +679,12 @@ private fun FrameWindowScope.ShellContent(
                 iconUrl   = null,
                 severity  = Severity.Info,
                 kind      = Kind.Sticky,
-                title     = s.retiredTitle,
-                body      = s.retiredNoticeBody(count),
+                title     = s.text("retiredTitle"),
+                body      = s.text("retiredNoticeBody", count),
                 actions   = listOf(
                     hivens.ui.notifications.NotifAction(
                         id = "retired-clients-open",
-                        label = s.retiredNoticeAction,
+                        label = s.text("retiredNoticeAction"),
                         onClick = { retiredGate.show() },
                     ),
                 ),
@@ -711,11 +716,11 @@ private fun FrameWindowScope.ShellContent(
         // locale-reactive effect below re-fire only when a label actually
         // changes -- not on every unrelated recomposition.
         val trayLabels = TrayStrings(
-            statusIdle    = s.trayStatusIdle,
-            statusRunning = s.trayStatusRunning,
-            show          = s.trayShow,
-            console       = s.trayConsole,
-            exit          = s.trayExit,
+            statusIdle    = s.text("trayStatusIdle"),
+            statusRunning = s.text("trayStatusRunning"),
+            show          = s.text("trayShow"),
+            console       = s.text("trayConsole"),
+            exit          = s.text("trayExit"),
         )
 
         // ── Bring-up: tray, notifier, background services (run once) ──
@@ -800,9 +805,9 @@ private fun FrameWindowScope.ShellContent(
             if (settingsService.getSettings().trayHintShown) return@LaunchedEffect
             val posted = withContext(Dispatchers.IO) {
                 SystemNotifier.notifyTrayHint(
-                    title     = s.trayHintTitle,
-                    body      = s.trayHintBody,
-                    showLabel = s.trayHintShow,
+                    title     = s.text("trayHintTitle"),
+                    body      = s.text("trayHintBody"),
+                    showLabel = s.text("trayHintShow"),
                 )
             }
             if (posted) withContext(Dispatchers.IO) {
@@ -812,7 +817,7 @@ private fun FrameWindowScope.ShellContent(
 
         // The console is a window of its own beside this one (see ShellHost) and
         // draws in what this shell decided, published for it here.
-        PublishShellLook(look, appearance, uiFamily, customization)
+        PublishShellLook(look, appearance, translations, uiFamily, customization)
 
         // ── Main window ────────────────────────────────────────────────
         // af.requestCloseDialog dispatches: chaos active -> pop the torturous

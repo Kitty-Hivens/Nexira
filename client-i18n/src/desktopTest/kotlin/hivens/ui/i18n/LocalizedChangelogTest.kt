@@ -1,5 +1,6 @@
 package hivens.ui.i18n
 
+import hivens.i18n.ShippedLanguages
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertTrue
@@ -54,21 +55,21 @@ class LocalizedChangelogTest {
     }
 
     @Test
-    fun `every locale in the picker has a notes file`() {
-        val missing = AppLocale.entries
+    fun `every shipped language has a notes file`() {
+        val missing = ShippedLanguages.all
             .map { "CHANGELOG_${it.tag.uppercase()}.md" }
             .filterNot { changelog(it).isFile }
 
         assertTrue(
             missing.isEmpty(),
-            "a locale the picker offers has no player notes, so its readers silently get English:\n" +
+            "a language the launcher ships has no player notes, so its readers silently get English:\n" +
                 missing.joinToString("\n") { "  $it" },
         )
     }
 
     @Test
     fun `every notes file carries the newest release, under the same header`() {
-        val files = AppLocale.entries.map { "CHANGELOG_${it.tag.uppercase()}.md" } + "CHANGELOG.md"
+        val files = ShippedLanguages.all.map { "CHANGELOG_${it.tag.uppercase()}.md" } + "CHANGELOG.md"
 
         val wrong = files.mapNotNull { name ->
             val file = changelog(name)
@@ -97,8 +98,8 @@ class LocalizedChangelogTest {
      */
     @Test
     fun `the notes are not hand-wrapped`() {
-        val wrapped = AppLocale.entries.mapNotNull { locale ->
-            val name = "CHANGELOG_${locale.tag.uppercase()}.md"
+        val wrapped = ShippedLanguages.all.mapNotNull { language ->
+            val name = "CHANGELOG_${language.tag.uppercase()}.md"
             val file = changelog(name)
             if (!file.isFile) return@mapNotNull null
             val offenders = sectionOf(file.readText())

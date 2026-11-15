@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.NxBasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
@@ -21,7 +22,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.Status
@@ -66,7 +66,7 @@ data class NotesState(
 @Composable
 fun NotesWidget(instance: WidgetInstance) {
     val p = instance.rememberProps<NotesProps>()
-    val strings = LocalStrings.current
+    val strings = nexiraStrings()
     var notes by instance.rememberWidgetState { NotesState() }
     val tooLong = instance.widgetStateRefused()
 
@@ -78,7 +78,7 @@ fun NotesWidget(instance: WidgetInstance) {
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                 Text(
-                    text       = p.title.ifBlank { strings.widgetLabel("widget.notes.scratch") },
+                    text       = p.title.ifBlank { strings.text("widget.notes.scratch") },
                     style      = MaterialTheme.typography.labelLarge.scaled(scale),
                     color      = NxInk.quiet,
                     fontWeight = FontWeight.Medium,
@@ -88,7 +88,7 @@ fun NotesWidget(instance: WidgetInstance) {
                 // The count turns into the reason while the note is past what the
                 // store keeps, since what is on screen is then not what comes back.
                 Text(
-                    text  = if (tooLong) strings.widgetStateTooLong else notes.body.length.toString(),
+                    text  = if (tooLong) strings.text("widgetStateTooLong") else notes.body.length.toString(),
                     style = MaterialTheme.typography.labelSmall.scaled(scale),
                     color = if (tooLong) NxColor.status(Status.Error) else NxInk.quiet,
                 )
@@ -108,7 +108,7 @@ fun NotesWidget(instance: WidgetInstance) {
                 decorationBox = { inner ->
                     if (notes.body.isEmpty()) {
                         Text(
-                            text  = strings.widgetLabel("widget.notes.scratch.placeholder"),
+                            text  = strings.text("widget.notes.scratch.placeholder"),
                             style = MaterialTheme.typography.bodyMedium.scaled(scale),
                             color = NxInk.quiet,
                         )

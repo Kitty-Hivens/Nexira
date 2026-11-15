@@ -1,6 +1,6 @@
 package hivens.ui.components
 
-import hivens.ui.i18n.AppStrings
+import hivens.i18n.api.Strings
 import java.time.Duration
 import java.time.Instant
 
@@ -17,20 +17,20 @@ import java.time.Instant
  * Anything unparseable comes back as the raw string rather than as nothing: a
  * stamp this build does not understand is still the only thing anyone knows.
  */
-fun relativeAge(iso: String?, s: AppStrings, now: Instant = Instant.now()): String {
+fun relativeAge(iso: String?, s: Strings, now: Instant = Instant.now()): String {
     val raw = iso?.takeIf { it.isNotBlank() } ?: return ""
     val at = runCatching { Instant.parse(raw) }.getOrNull() ?: return raw
     val seconds = Duration.between(at, now).seconds
-    if (seconds < 0) return s.ageJustNow
+    if (seconds < 0) return s.text("ageJustNow")
     val minutes = seconds / 60
     val hours = minutes / 60
     val days = hours / 24
     return when {
-        seconds < 60 -> s.ageJustNow
-        minutes < 60 -> s.ageMinutes(minutes)
-        hours < 24 -> s.ageHours(hours)
-        days < 30 -> s.ageDays(days)
-        days < 365 -> s.ageMonths(days / 30)
-        else -> s.ageYears(days / 365)
+        seconds < 60 -> s.text("ageJustNow")
+        minutes < 60 -> s.text("ageMinutes", minutes)
+        hours < 24 -> s.text("ageHours", hours)
+        days < 30 -> s.text("ageDays", days)
+        days < 365 -> s.text("ageMonths", days / 30)
+        else -> s.text("ageYears", days / 365)
     }
 }

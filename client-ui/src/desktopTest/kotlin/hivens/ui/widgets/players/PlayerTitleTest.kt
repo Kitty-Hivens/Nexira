@@ -4,7 +4,7 @@ import hivens.ui.audio.AudioError
 import hivens.ui.audio.PlaybackState
 import hivens.ui.audio.TrackInfo
 import hivens.ui.audio.trackInfoFrom
-import hivens.ui.i18n.EnglishStrings
+import hivens.ui.i18n.NexiraStrings
 import java.nio.file.Path
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -22,7 +22,7 @@ import kotlin.test.assertEquals
  */
 class PlayerTitleTest {
 
-    private val s = EnglishStrings
+    private val s = NexiraStrings.shipped("en")
     private val file: Path = Path.of("/music/03 - bus-stop.flac")
 
     /** Every state that has a file behind it, which is every state but Idle. */
@@ -61,7 +61,7 @@ class PlayerTitleTest {
 
     @Test
     fun `nothing loaded asks for a file rather than naming one`() {
-        assertEquals(s.audioPickTrack, playerTitle(PlaybackState.Idle, track = null, s))
+        assertEquals(s.text("audioPickTrack"), playerTitle(PlaybackState.Idle, track = null, s))
     }
 
     @Test

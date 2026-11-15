@@ -7,7 +7,7 @@ import hivens.core.api.interfaces.INewsFeed
 import hivens.launcher.news.CuratedNewsFeed
 import hivens.launcher.news.SyndicationNewsFeed
 import hivens.ui.CompactNewsFeed
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.widgets.Sources
 import hivens.widget.api.rememberProps
 import hivens.widget.api.rememberScopedSource
@@ -72,7 +72,7 @@ data class CompactNewsProps(
 fun RightRailCompactNews(instance: WidgetInstance) {
     val sslBypass = rememberScopedSource(Sources.SslBypass).valueOrNull() ?: return
     val props = instance.rememberProps<CompactNewsProps>()
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     // Each resolved by its own concrete type: registering either as a second
     // INewsFeed would make "the news feed" ambiguous everywhere else in the graph.
     val upstream: INewsFeed = koinInject()
@@ -92,7 +92,7 @@ fun RightRailCompactNews(instance: WidgetInstance) {
         // one that was never pointed anywhere: say that instead of offering a retry
         // that cannot succeed. The curated pool needs no address, so it never lands
         // here unless the pool itself is missing from the build.
-        unavailable = s.newsAltNoAddress.takeIf {
+        unavailable = s.text("newsAltNoAddress").takeIf {
             props.channel == NewsChannelKind.Custom && !custom.configured
         },
         modifier    = Modifier.fillMaxSize(),

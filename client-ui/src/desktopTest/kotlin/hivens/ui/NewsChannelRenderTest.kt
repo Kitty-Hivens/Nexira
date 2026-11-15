@@ -20,8 +20,7 @@ import hivens.core.data.NewsPage
 import hivens.launcher.network.ServerProtocolConfig
 import hivens.launcher.news.CuratedNewsFeed
 import hivens.ui.host.HostKoin
-import hivens.ui.i18n.AppLocale
-import hivens.ui.i18n.LocaleProvider
+import hivens.ui.i18n.ShippedLanguageProvider
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.Spacing
 import org.jetbrains.skia.EncodedImageFormat
@@ -72,7 +71,7 @@ class NewsChannelRenderTest {
         val d = 2f
         val scene = ImageComposeScene((320 * d).toInt(), (300 * d).toInt(), density = Density(d)) {
             HostKoin(koin) {
-                LocaleProvider(AppLocale.RUSSIAN) {
+                ShippedLanguageProvider("ru") {
                     NxTheme(dark = dark) {
                         Box(
                             Modifier.fillMaxSize().background(NxColor.page).padding(Spacing.s8),

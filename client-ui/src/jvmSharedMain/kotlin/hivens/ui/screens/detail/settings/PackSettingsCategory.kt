@@ -1,6 +1,6 @@
 package hivens.ui.screens.detail.settings
 
-import hivens.ui.i18n.AppStrings
+import hivens.i18n.api.Strings
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 
@@ -22,13 +22,13 @@ import hivens.ui.icons.NxIcon
  */
 enum class PackSettingsCategory(
     val icon: IconKey,
-    val label: (AppStrings) -> String,
+    val label: (Strings) -> String,
     val needsVersionFeed: Boolean = false,
     val needsOptionalContent: Boolean = false,
 ) {
-    General(NxIcon.Tune, { it.packSettingsCategoryGeneral }),
-    Runtime(NxIcon.Memory, { it.packSettingsCategoryRuntime }),
-    Version(NxIcon.Update, { it.packSettingsCategoryVersion }, needsVersionFeed = true),
-    Content(NxIcon.Layers, { it.packSettingsCategoryContent }, needsOptionalContent = true),
-    Data(NxIcon.Storage, { it.packSettingsCategoryData }),
+    General(NxIcon.Tune, { it.text("packSettingsCategoryGeneral") }),
+    Runtime(NxIcon.Memory, { it.text("packSettingsCategoryRuntime") }),
+    Version(NxIcon.Update, { it.text("packSettingsCategoryVersion") }, needsVersionFeed = true),
+    Content(NxIcon.Layers, { it.text("packSettingsCategoryContent") }, needsOptionalContent = true),
+    Data(NxIcon.Storage, { it.text("packSettingsCategoryData") }),
 }

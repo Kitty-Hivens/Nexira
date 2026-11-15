@@ -8,7 +8,7 @@ import hivens.core.update.CompatChange
 import hivens.core.update.PackUpdateStatus
 import hivens.core.update.PackUpdateStatusHub
 import hivens.core.update.UpdateDirection
-import hivens.ui.i18n.EnglishStrings
+import hivens.ui.i18n.NexiraStrings
 import hivens.ui.navigation.MainWindowRequests
 import hivens.ui.notifications.Kind
 import hivens.ui.notifications.NotificationCenter
@@ -68,7 +68,7 @@ class PackUpdateDriverTest {
      */
     private fun TestScope.startDriver(hub: FakeHub, center: NotificationCenter): CoroutineScope {
         val scope = CoroutineScope(StandardTestDispatcher(testScheduler))
-        PackUpdateDriver(hub, FakeRepo(instance), center, MainWindowRequests(), scope) { EnglishStrings }.start()
+        PackUpdateDriver(hub, FakeRepo(instance), center, MainWindowRequests(), scope) { NexiraStrings.shipped("en") }.start()
         advanceUntilIdle()
         return scope
     }

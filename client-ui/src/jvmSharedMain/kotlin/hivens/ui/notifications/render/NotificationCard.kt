@@ -52,8 +52,9 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import hivens.ui.i18n.AppStrings
-import hivens.ui.i18n.LocalStrings
+import hivens.i18n.api.Strings
+import hivens.ui.i18n.nexiraStrings
+import hivens.ui.i18n.notificationAbsoluteTime
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.notifications.Kind
@@ -205,7 +206,7 @@ private fun HeaderRow(
     onToggle: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val strings = LocalStrings.current
+    val strings = nexiraStrings()
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
         NotificationAvatar(group.iconUrl, group.glyph)
         Spacer(Modifier.width(10.dp))
@@ -243,8 +244,8 @@ private fun HeaderRow(
                         color = NxInk.quiet,
                     )
                     Symbol(icon = if (expanded) NxIcon.ExpandLess else NxIcon.ExpandMore,
-                        contentDescription = if (expanded) strings.notificationCollapseHistory
-                                             else strings.notificationExpandHistory,
+                        contentDescription = if (expanded) strings.text("notificationCollapseHistory")
+                                             else strings.text("notificationExpandHistory"),
                         modifier          = Modifier.size(16.dp),
                         tint              = NxInk.quiet,
                     )
@@ -254,7 +255,7 @@ private fun HeaderRow(
         Spacer(Modifier.width(2.dp))
         IconButton(onClick = onDismiss, modifier = Modifier.size(20.dp)) {
             Symbol(icon = NxIcon.Close,
-                contentDescription = strings.notificationDismiss,
+                contentDescription = strings.text("notificationDismiss"),
                 modifier          = Modifier.size(14.dp),
                 tint              = NxColor.wash(NxInk.quiet, 0.6f),
             )
@@ -325,7 +326,7 @@ private fun ActionsRow(actions: List<NotifAction>, onDismiss: () -> Unit) {
 
 @Composable
 private fun HistoryRow(event: NotificationEvent, now: Instant) {
-    val strings = LocalStrings.current
+    val strings = nexiraStrings()
     Row(
         modifier          = Modifier.fillMaxWidth().padding(vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -371,14 +372,14 @@ private fun severityStatus(severity: Severity, kind: Kind): Status? = when (seve
     Severity.Critical -> Status.Error
 }
 
-private fun relativeTime(created: Instant, now: Instant, strings: AppStrings): String {
+private fun relativeTime(created: Instant, now: Instant, strings: Strings): String {
     val seconds = Duration.between(created, now).seconds
     return when {
-        seconds < 5      -> strings.notifTimeNow
-        seconds < 60     -> strings.notifTimeSeconds(seconds)
-        seconds < 3600   -> strings.notifTimeMinutes(seconds / 60)
-        seconds < 86_400 -> strings.notifTimeHours(seconds / 3600)
-        else             -> strings.notifTimeDays(seconds / 86_400)
+        seconds < 5      -> strings.text("notifTimeNow")
+        seconds < 60     -> strings.text("notifTimeSeconds", seconds)
+        seconds < 3600   -> strings.text("notifTimeMinutes", seconds / 60)
+        seconds < 86_400 -> strings.text("notifTimeHours", seconds / 3600)
+        else             -> strings.text("notifTimeDays", seconds / 86_400)
     }
 }
 

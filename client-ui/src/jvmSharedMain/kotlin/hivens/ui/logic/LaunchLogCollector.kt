@@ -6,9 +6,9 @@ import androidx.compose.runtime.rememberUpdatedState
 import hivens.core.data.LauncherLogType
 import hivens.core.launch.LaunchError
 import hivens.core.launch.LaunchLogEvent
+import hivens.i18n.api.Strings
 import hivens.launcher.launch.LauncherController
-import hivens.ui.i18n.AppStrings
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.utils.GameConsoleService
 import hivens.ui.utils.LogType
 import kotlinx.coroutines.flow.SharedFlow
@@ -29,10 +29,10 @@ private val PROGRESS_LINE = Regex("""^(Runtime) \d+/\d+(:.*)?$""")
  * `application { ... }` block so events fire even when the dashboard
  * (where launches are initiated) is not the current screen.
  *
- * Strings come from [LocalStrings] (the Compose CompositionLocal) wrapped
- * in [rememberUpdatedState] so a runtime locale switch reaches the
- * (non-Composable) `collect` lambda without restarting the LaunchedEffect:
- * latest locale wins at read time.
+ * Strings come from [hivens.ui.i18n.nexiraStrings] (the launcher's words in
+ * the composition's language) wrapped in [rememberUpdatedState] so a runtime
+ * language switch reaches the (non-Composable) `collect` lambda without
+ * restarting the LaunchedEffect: the latest language wins at read time.
  *
  * Severity mapping: `LauncherLogType` is the wire enum from `client-core`,
  * `LogType` is the UI enum the console renders.
@@ -42,37 +42,37 @@ fun LaunchLogCollector(
     events: SharedFlow<LaunchLogEvent>,
     gameConsole: GameConsoleService,
 ) {
-    val currentStrings = rememberUpdatedState(LocalStrings.current)
+    val currentStrings = rememberUpdatedState(nexiraStrings())
 
     LaunchedEffect(events, gameConsole) {
         events.collect { event ->
             val s = currentStrings.value
             when (event) {
                 is LaunchLogEvent.SessionStarted -> gameConsole.startSession(event.targetId, event.targetLabel)
-                is LaunchLogEvent.AppBanner -> gameConsole.append("${s.appName}...", LogType.INFO)
+                is LaunchLogEvent.AppBanner -> gameConsole.append("${s.text("appName")}...", LogType.INFO)
                 is LaunchLogEvent.TargetServer -> gameConsole.append(
                     "-> ${event.name}" + if (event.offline) " [OFFLINE]" else "",
                     LogType.INFO,
                 )
-                is LaunchLogEvent.OfflineSkipAuth -> gameConsole.append(s.stateOfflineSkipAuth, LogType.WARN)
-                is LaunchLogEvent.UnboundOffline -> gameConsole.append(s.stateUnboundOffline, LogType.INFO)
-                is LaunchLogEvent.AuthSucceeded -> gameConsole.append(s.authSuccess(event.uuid), LogType.INFO)
-                is LaunchLogEvent.NoPassword -> gameConsole.append(s.stateNoPassword, LogType.WARN)
+                is LaunchLogEvent.OfflineSkipAuth -> gameConsole.append(s.text("stateOfflineSkipAuth"), LogType.WARN)
+                is LaunchLogEvent.UnboundOffline -> gameConsole.append(s.text("stateUnboundOffline"), LogType.INFO)
+                is LaunchLogEvent.AuthSucceeded -> gameConsole.append(s.text("authSuccess", event.uuid), LogType.INFO)
+                is LaunchLogEvent.NoPassword -> gameConsole.append(s.text("stateNoPassword"), LogType.WARN)
                 is LaunchLogEvent.AuthFailed -> gameConsole.append(
-                    "${s.stateAuthFail}: ${event.message ?: ""}",
+                    "${s.text("stateAuthFail")}: ${event.message ?: ""}",
                     LogType.WARN,
                 )
                 is LaunchLogEvent.ForeignContentRemoved -> gameConsole.append(
-                    s.stateForeignContentRemoved(event.paths.size, event.paths.joinToString(", ")),
+                    s.text("stateForeignContentRemoved", event.paths.size, event.paths.joinToString(", ")),
                     LogType.WARN,
                 )
                 is LaunchLogEvent.InstanceUnverified -> gameConsole.append(
-                    s.notifInstanceUnverifiedBody,
+                    s.text("notifInstanceUnverifiedBody"),
                     LogType.WARN,
                 )
                 is LaunchLogEvent.TwoFactorDetected -> Unit  // persisted in AppShell; nothing to print
-                is LaunchLogEvent.OfflineSkipSync -> gameConsole.append(s.stateOfflineSkipSync, LogType.INFO)
-                is LaunchLogEvent.Launching -> gameConsole.append(s.stateLaunching, LogType.INFO)
+                is LaunchLogEvent.OfflineSkipSync -> gameConsole.append(s.text("stateOfflineSkipSync"), LogType.INFO)
+                is LaunchLogEvent.Launching -> gameConsole.append(s.text("stateLaunching"), LogType.INFO)
                 is LaunchLogEvent.ProcessOutput -> {
                     val uiType = when (event.severity) {
                         LauncherLogType.INFO  -> LogType.INFO
@@ -105,13 +105,13 @@ fun LaunchLogCollector(
  * console copy can diverge from the notification driver's phrasing. Strings are
  * passed in (not read from a global) so the caller controls the locale snapshot.
  */
-private fun localizeError(error: LaunchError, s: AppStrings): String = when (error) {
-    is LaunchError.ExitCode             -> s.stateExitCode(error.code)
-    is LaunchError.Internal             -> s.stateError(error.message)
-    is LaunchError.ContentChangedDuringLaunch -> s.stateContentChanged
-    is LaunchError.OfflineNoClient      -> s.stateOfflineNoClient
-    is LaunchError.TwoFactorExpired     -> s.auth2faExpired
-    is LaunchError.AuthlibUnavailable   -> s.stateAuthlibUnavailable(error.mcVersion)
-    is LaunchError.MissingAuthProvider  -> s.stateMissingAuthProvider(error.providerKey)
-    is LaunchError.InstanceBusy         -> s.notifReasonInstanceBusy
+private fun localizeError(error: LaunchError, s: Strings): String = when (error) {
+    is LaunchError.ExitCode             -> s.text("stateExitCode", error.code)
+    is LaunchError.Internal             -> s.text("stateError", error.message)
+    is LaunchError.ContentChangedDuringLaunch -> s.text("stateContentChanged")
+    is LaunchError.OfflineNoClient      -> s.text("stateOfflineNoClient")
+    is LaunchError.TwoFactorExpired     -> s.text("auth2faExpired")
+    is LaunchError.AuthlibUnavailable   -> s.text("stateAuthlibUnavailable", error.mcVersion)
+    is LaunchError.MissingAuthProvider  -> s.text("stateMissingAuthProvider", error.providerKey)
+    is LaunchError.InstanceBusy         -> s.text("notifReasonInstanceBusy")
 }

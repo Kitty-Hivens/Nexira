@@ -49,7 +49,7 @@ import hivens.accounts.api.SessionState
 import hivens.ui.Screen
 import hivens.ui.components.rememberLaunchControl
 import hivens.ui.effects.pixelArtBackground
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.PlayGround
 import hivens.ui.nx.PlayLayout
 import hivens.ui.screens.library.PendingUpdateBadge
@@ -135,7 +135,7 @@ private fun Spine(
     onChoose: () -> Unit,
     modifier: Modifier,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val art = rememberPackArt(pack)
     val (hueA, hueB) = decorativePair(pack.id)
     val shape = RoundedCornerShape(16.dp)
@@ -170,7 +170,7 @@ private fun Spine(
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
-                        text  = if (pack.lastPlayedEpochSecond > 0L) s.homeQuickContinue else s.homeQuickStart,
+                        text  = if (pack.lastPlayedEpochSecond > 0L) s.text("homeQuickContinue") else s.text("homeQuickStart"),
                         style = MaterialTheme.typography.labelLarge,
                         color = Color.White.copy(alpha = 0.7f),
                     )
@@ -189,8 +189,8 @@ private fun Spine(
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(32.dp)) {
                     val hours = pack.playtimeSeconds / 3600
-                    if (hours > 0) OnArtNumeral(s.homeFactHours(hours), s.homeFactPlaytime)
-                    OnArtNumeral(lastPlayedLabel(pack.lastPlayedEpochSecond), s.homeFactLastSession)
+                    if (hours > 0) OnArtNumeral(s.text("homeFactHours", hours), s.text("homeFactPlaytime"))
+                    OnArtNumeral(lastPlayedLabel(pack.lastPlayedEpochSecond), s.text("homeFactLastSession"))
                     pack.gameVersion?.let { version ->
                         OnArtNumeral(version, loaderLabel(pack.loader ?: "vanilla"))
                     }
@@ -208,7 +208,7 @@ private fun Spine(
 /** A closed spine: the name up the strip, the hours under it, a dot when a build waits. */
 @Composable
 private fun ClosedFace(pack: PackView, modifier: Modifier) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     Column(modifier.padding(bottom = 18.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
             text       = pack.name,
@@ -223,7 +223,7 @@ private fun ClosedFace(pack: PackView, modifier: Modifier) {
         val hours = pack.playtimeSeconds / 3600
         if (hours > 0) {
             Spacer(Modifier.height(12.dp))
-            Text(s.homeFactHours(hours), style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.75f))
+            Text(s.text("homeFactHours", hours), style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.75f))
         }
         PendingDot(pack.id)
     }

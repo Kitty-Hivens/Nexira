@@ -3,7 +3,7 @@ package hivens.ui.feature.catalogue.browse
 import hivens.catalogue.api.CatalogueTags
 import hivens.catalogue.api.CategoryTag
 import hivens.catalogue.api.LoaderTag
-import hivens.ui.i18n.EnglishStrings
+import hivens.ui.i18n.NexiraStrings
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -23,7 +23,7 @@ class LoaderChoicesTest {
     )
 
     private fun loaders(type: String) =
-        choicesFor(FilterGroup.Loader, type, tags, EnglishStrings).map { it.filter.value }
+        choicesFor(FilterGroup.Loader, type, tags, NexiraStrings.shipped("en")).map { it.filter.value }
 
     @Test
     fun `a resource pack is offered no loader, which would undo a chosen resolution`() {

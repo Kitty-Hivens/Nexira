@@ -19,8 +19,8 @@ import hivens.core.activity.Activity
 import hivens.core.activity.ActivityAction
 import hivens.core.activity.ActivityKind
 import hivens.core.activity.ActivityPhase
-import hivens.ui.i18n.EnglishStrings
-import hivens.ui.i18n.LocalStrings
+import hivens.i18n.api.LocalTranslator
+import hivens.ui.i18n.NexiraStrings
 import hivens.ui.theme.NxTheme
 import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.EncodedImageFormat
@@ -106,7 +106,7 @@ class ActivityPillRenderTest {
             // the sheet shows is then what the app resolves, tonal ladder included.
             NxTheme(dark = dark) {
                 CompositionLocalProvider(
-                    LocalStrings provides EnglishStrings,
+                    LocalTranslator provides NexiraStrings.translator("en"),
                 ) {
                     accent = NxColor.status(Status.Info)
                     Column(
@@ -142,10 +142,10 @@ class ActivityPillRenderTest {
     @Composable
     private fun Sheet(props: PillProps) {
         val commands: ActivityCommands? = null // static sheet: nothing to click
-        Box { Pill(running, listOf(running, failed, sync, repair), {}, props, commands, EnglishStrings, 720.dp) }
-        Box { Pill(failed, listOf(failed), {}, props, commands, EnglishStrings, 720.dp) }
+        Box { Pill(running, listOf(running, failed, sync, repair), {}, props, commands, NexiraStrings.shipped("en"), 720.dp) }
+        Box { Pill(failed, listOf(failed), {}, props, commands, NexiraStrings.shipped("en"), 720.dp) }
         // Selection holds the body while the launcher's own work stays at the lead.
-        Box { SelectionPill(selection, running, props, EnglishStrings, 720.dp) }
+        Box { SelectionPill(selection, running, props, NexiraStrings.shipped("en"), 720.dp) }
     }
 
     @Test
@@ -178,7 +178,7 @@ class ActivityPillRenderTest {
                 "install:A", ActivityKind.Install, "A", ActivityPhase.Running(done, 100),
             )
             val bmp = render(true, "measure-$done") {
-                Box { Pill(one, listOf(one), {}, PillProps(), null, EnglishStrings, 720.dp) }
+                Box { Pill(one, listOf(one), {}, PillProps(), null, NexiraStrings.shipped("en"), 720.dp) }
             }
             var hits = 0
             // Whole frame: at a low value the arc sits on the pill's lower edge,

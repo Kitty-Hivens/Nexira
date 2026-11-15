@@ -1,5 +1,7 @@
 package hivens.ui.editor.props
 
+import hivens.i18n.api.Strings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.widgets.modules.widgetLabel
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
@@ -38,7 +40,6 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.ui.editor.EditModeController
-import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.theme.Motion
@@ -54,7 +55,6 @@ import hivens.widget.api.resolveEntrance
 import hivens.widget.api.readableProps
 import hivens.widget.model.Entrance
 import hivens.widget.model.WidgetMotion
-import hivens.ui.i18n.AppStrings
 import hivens.ui.nx.NxSelect
 import hivens.ui.widgets.MAX_DELAY_MS
 import hivens.ui.widgets.autoEntranceDelayMs
@@ -155,7 +155,7 @@ private fun PropPanelBody(
     controller: EditModeController,
     onDismiss: () -> Unit,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val sd = serializer?.descriptor
     // Effective values: the encoded default baseline overlaid with the
     // instance's stored overrides, the ones the widget can read. Every key is
@@ -204,7 +204,7 @@ private fun PropPanelBody(
             }
             IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
                 Symbol(icon = NxIcon.Close,
-                    contentDescription = s.editorClose,
+                    contentDescription = s.text("editorClose"),
                     tint               = NxInk.quiet,
                     modifier           = Modifier.size(16.dp),
                 )
@@ -228,7 +228,7 @@ private fun PropPanelBody(
                     val label = widgetLabel(descriptor.kind, anns.filterIsInstance<PropLabel>().firstOrNull()?.value ?: name)
                     if (name in instance.props && name !in readable) {
                         Text(
-                            text  = s.editorPropUnreadable,
+                            text  = s.text("editorPropUnreadable"),
                             style = MaterialTheme.typography.bodySmall,
                             color = NxColor.status(Status.Warning),
                         )
@@ -284,7 +284,7 @@ private fun PropPanelBody(
             // every widget, propless included. Each row writes one field and leaves
             // the rest alone, so nothing here can move something the eye is not on.
             Text(
-                text       = s.editorBackingTitle,
+                text       = s.text("editorBackingTitle"),
                 style      = MaterialTheme.typography.labelMedium,
                 color      = NxInk.quiet,
                 fontWeight = FontWeight.SemiBold,
@@ -298,20 +298,20 @@ private fun PropPanelBody(
             fun write(next: SurfaceSpec) = controller.updateSurface(path, instanceId, next)
             if (descriptor.drawsOwnSurface) {
                 Text(
-                    text  = s.editorSurfaceOwn,
+                    text  = s.text("editorSurfaceOwn"),
                     style = MaterialTheme.typography.bodySmall,
                     color = NxInk.quiet.copy(alpha = 0.7f),
                 )
             } else if (resolved == null) {
                 Text(
-                    text  = s.editorSurfaceNone,
+                    text  = s.text("editorSurfaceNone"),
                     style = MaterialTheme.typography.bodySmall,
                     color = NxInk.quiet.copy(alpha = 0.7f),
                 )
                 TextButton(onClick = { write(SurfaceSpec(fill = "panel", opacity = 0.5f)) }) {
                     Symbol(NxIcon.Add, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text(s.editorSurfaceAdd, style = MaterialTheme.typography.labelMedium)
+                    Text(s.text("editorSurfaceAdd"), style = MaterialTheme.typography.labelMedium)
                 }
             } else {
                 SurfaceRows(surface = resolved, write = ::write)
@@ -328,7 +328,7 @@ private fun PropPanelBody(
         ) {
             Symbol(NxIcon.RestartAlt, contentDescription = null, modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(6.dp))
-            Text(s.editorResetToDefault, style = MaterialTheme.typography.labelMedium)
+            Text(s.text("editorResetToDefault"), style = MaterialTheme.typography.labelMedium)
         }
     }
     }
@@ -354,16 +354,16 @@ private fun defaultOpacityOf(spec: SurfaceSpec): Float = parseFill(spec.fill).ki
  */
 @Composable
 private fun SurfaceRows(surface: SurfaceSpec, write: (SurfaceSpec) -> Unit) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val corner = 12f
 
     // One field, a value or a name. Blank follows the theme, a surface word
     // follows it relative to what holds the widget, a literal does not. A typo
     // falls back to the theme rather than to black, so a mistake never looks
     // deliberate.
-    StringRow(s.editorSurfaceFill, surface.fill) { write(surface.copy(fill = it)) }
+    StringRow(s.text("editorSurfaceFill"), surface.fill) { write(surface.copy(fill = it)) }
     Text(
-        text  = s.editorSurfaceFillHint,
+        text  = s.text("editorSurfaceFillHint"),
         style = MaterialTheme.typography.bodySmall,
         color = NxInk.quiet.copy(alpha = 0.7f),
     )
@@ -372,7 +372,7 @@ private fun SurfaceRows(surface: SurfaceSpec, write: (SurfaceSpec) -> Unit) {
     // own null would report a number the renderer never used. Moving either one
     // writes it down, which is what makes the number true from then on.
     LabeledSlider(
-        label         = s.editorSurfaceOpacity,
+        label         = s.text("editorSurfaceOpacity"),
         value         = (surface.opacity ?: defaultOpacityOf(surface)) * 100f,
         range         = 0f..100f,
         format        = "%.0f%%",
@@ -380,7 +380,7 @@ private fun SurfaceRows(surface: SurfaceSpec, write: (SurfaceSpec) -> Unit) {
         onValueChange = { write(surface.copy(opacity = it / 100f)) },
     )
     LabeledSlider(
-        label         = s.editorSurfaceBlur,
+        label         = s.text("editorSurfaceBlur"),
         // Zero when unset, because that is what the renderer draws for a
         // widget that names no radius. It opened on the style's value, which
         // the widget path does not use.
@@ -395,7 +395,7 @@ private fun SurfaceRows(surface: SurfaceSpec, write: (SurfaceSpec) -> Unit) {
     // used to replace the whole record, so moving this slider silently threw
     // away corners set one at a time.
     LabeledSlider(
-        label         = s.editorBackingCorner,
+        label         = s.text("editorBackingCorner"),
         value         = surface.shape.corners.all ?: corner,
         range         = 0f..40f,
         format        = "%.0f",
@@ -410,7 +410,7 @@ private fun SurfaceRows(surface: SurfaceSpec, write: (SurfaceSpec) -> Unit) {
     // plane most widgets set two of, and a wall of controls is its own way of
     // hiding the ones that matter.
     var showMore by remember { mutableStateOf(false) }
-    DisclosureRow(s.editorSurfaceMore, showMore) { showMore = !showMore }
+    DisclosureRow(s.text("editorSurfaceMore"), showMore) { showMore = !showMore }
     // Revealed rather than switched on. Twelve rows appearing between two
     // frames reads as the panel having been replaced; the same rows growing
     // out of the row that asked for them reads as one panel with more in it.
@@ -420,16 +420,16 @@ private fun SurfaceRows(surface: SurfaceSpec, write: (SurfaceSpec) -> Unit) {
         exit = Motion.reveal.exit,
     ) {
       Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-          StringRow(s.editorSurfaceShapeKind, surface.shape.kind) {
+          StringRow(s.text("editorSurfaceShapeKind"), surface.shape.kind) {
               write(surface.copy(shape = surface.shape.copy(kind = it)))
           }
           Text(
-              text  = s.editorSurfaceShapeKindHint,
+              text  = s.text("editorSurfaceShapeKindHint"),
               style = MaterialTheme.typography.bodySmall,
               color = NxInk.quiet.copy(alpha = 0.7f),
           )
           LabeledSlider(
-              label         = s.editorSurfaceSmoothing,
+              label         = s.text("editorSurfaceSmoothing"),
               value         = (surface.shape.smoothing ?: 0f) * 100f,
               range         = 0f..100f,
               format        = "%.0f%%",
@@ -442,7 +442,7 @@ private fun SurfaceRows(surface: SurfaceSpec, write: (SurfaceSpec) -> Unit) {
           val kind = surface.shape.kind.trim().lowercase()
           if (kind == "star" || kind == "polygon") {
               LabeledSlider(
-                  label         = s.editorSurfaceShapePoints,
+                  label         = s.text("editorSurfaceShapePoints"),
                   value         = (surface.shape.points ?: if (kind == "star") 5 else 6).toFloat(),
                   range         = 3f..16f,
                   format        = "%.0f",
@@ -451,7 +451,7 @@ private fun SurfaceRows(surface: SurfaceSpec, write: (SurfaceSpec) -> Unit) {
               )
               if (kind == "star") {
                   LabeledSlider(
-                      label         = s.editorSurfaceShapeInnerRadius,
+                      label         = s.text("editorSurfaceShapeInnerRadius"),
                       value         = (surface.shape.innerRadius ?: 0.5f) * 100f,
                       range         = 5f..95f,
                       format        = "%.0f%%",
@@ -460,7 +460,7 @@ private fun SurfaceRows(surface: SurfaceSpec, write: (SurfaceSpec) -> Unit) {
                   )
               }
               LabeledSlider(
-                  label         = s.editorSurfaceShapePointRounding,
+                  label         = s.text("editorSurfaceShapePointRounding"),
                   value         = (surface.shape.pointRounding ?: 0f) * 100f,
                   range         = 0f..100f,
                   format        = "%.0f%%",
@@ -471,31 +471,31 @@ private fun SurfaceRows(surface: SurfaceSpec, write: (SurfaceSpec) -> Unit) {
           // Each corner opens at whatever the baseline resolves to and, once
           // moved, pins that corner independently -- which is what makes a plane
           // square on one side and round on the other.
-          CornerRow(s.editorSurfaceCornerTopStart, surface.shape.corners.topStart(corner)) {
+          CornerRow(s.text("editorSurfaceCornerTopStart"), surface.shape.corners.topStart(corner)) {
               write(surface.copy(shape = surface.shape.copy(corners = surface.shape.corners.copy(topStart = it))))
           }
-          CornerRow(s.editorSurfaceCornerTopEnd, surface.shape.corners.topEnd(corner)) {
+          CornerRow(s.text("editorSurfaceCornerTopEnd"), surface.shape.corners.topEnd(corner)) {
               write(surface.copy(shape = surface.shape.copy(corners = surface.shape.corners.copy(topEnd = it))))
           }
-          CornerRow(s.editorSurfaceCornerBottomEnd, surface.shape.corners.bottomEnd(corner)) {
+          CornerRow(s.text("editorSurfaceCornerBottomEnd"), surface.shape.corners.bottomEnd(corner)) {
               write(surface.copy(shape = surface.shape.copy(corners = surface.shape.corners.copy(bottomEnd = it))))
           }
-          CornerRow(s.editorSurfaceCornerBottomStart, surface.shape.corners.bottomStart(corner)) {
+          CornerRow(s.text("editorSurfaceCornerBottomStart"), surface.shape.corners.bottomStart(corner)) {
               write(surface.copy(shape = surface.shape.copy(corners = surface.shape.corners.copy(bottomStart = it))))
           }
           LabeledSlider(
-              label         = s.editorSurfaceBorder,
+              label         = s.text("editorSurfaceBorder"),
               value         = surface.border.widthDp ?: 0f,
               range         = 0f..6f,
               format        = "%.1f",
               keyStep       = 0.5f,
               onValueChange = { write(surface.copy(border = surface.border.copy(widthDp = it))) },
           )
-          StringRow(s.editorSurfaceBorderColor, surface.border.color) {
+          StringRow(s.text("editorSurfaceBorderColor"), surface.border.color) {
               write(surface.copy(border = surface.border.copy(color = it)))
           }
           LabeledSlider(
-              label         = s.editorSurfaceBorderOpacity,
+              label         = s.text("editorSurfaceBorderOpacity"),
               value         = (surface.border.opacity ?: 1f) * 100f,
               range         = 0f..100f,
               format        = "%.0f%%",
@@ -503,7 +503,7 @@ private fun SurfaceRows(surface: SurfaceSpec, write: (SurfaceSpec) -> Unit) {
               onValueChange = { write(surface.copy(border = surface.border.copy(opacity = it / 100f))) },
           )
           LabeledSlider(
-              label         = s.editorSurfaceShadow,
+              label         = s.text("editorSurfaceShadow"),
               value         = surface.shadowDp ?: 0f,
               range         = 0f..24f,
               format        = "%.0f",
@@ -524,14 +524,14 @@ private fun SurfaceRows(surface: SurfaceSpec, write: (SurfaceSpec) -> Unit) {
  */
 @Composable
 private fun MotionSection(entrance: Entrance, delayMs: Int, motion: WidgetMotion, write: (WidgetMotion) -> Unit) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     Text(
-        text       = s.editorMotionTitle,
+        text       = s.text("editorMotionTitle"),
         style      = MaterialTheme.typography.labelMedium,
         color      = NxInk.quiet,
         fontWeight = FontWeight.SemiBold,
     )
-    PanelRow(s.editorMotionEnter) {
+    PanelRow(s.text("editorMotionEnter")) {
         NxSelect(
             options  = Entrance.entries,
             selected = entrance,
@@ -541,7 +541,7 @@ private fun MotionSection(entrance: Entrance, delayMs: Int, motion: WidgetMotion
         )
     }
     LabeledSlider(
-        label         = s.editorMotionDelay,
+        label         = s.text("editorMotionDelay"),
         value         = delayMs.toFloat(),
         range         = 0f..MAX_DELAY_MS.toFloat(),
         format        = "%.0f",
@@ -550,11 +550,11 @@ private fun MotionSection(entrance: Entrance, delayMs: Int, motion: WidgetMotion
     )
 }
 
-private fun Entrance.label(s: AppStrings): String = when (this) {
-    Entrance.None -> s.entranceNone
-    Entrance.Fade -> s.entranceFade
-    Entrance.Rise -> s.entranceRise
-    Entrance.Settle -> s.entranceSettle
+private fun Entrance.label(s: Strings): String = when (this) {
+    Entrance.None -> s.text("entranceNone")
+    Entrance.Fade -> s.text("entranceFade")
+    Entrance.Rise -> s.text("entranceRise")
+    Entrance.Settle -> s.text("entranceSettle")
 }
 
 /**
@@ -568,15 +568,15 @@ private fun Entrance.label(s: AppStrings): String = when (this) {
  */
 @Composable
 private fun PaddingSection(padding: SurfaceInsets, write: (SurfaceInsets) -> Unit) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     Text(
-        text       = s.editorPaddingTitle,
+        text       = s.text("editorPaddingTitle"),
         style      = MaterialTheme.typography.labelMedium,
         color      = NxInk.quiet,
         fontWeight = FontWeight.SemiBold,
     )
     LabeledSlider(
-        label         = s.editorBackingPadding,
+        label         = s.text("editorBackingPadding"),
         value         = padding.all ?: 0f,
         range         = 0f..64f,
         format        = "%.0f",
@@ -584,7 +584,7 @@ private fun PaddingSection(padding: SurfaceInsets, write: (SurfaceInsets) -> Uni
         onValueChange = { write(padding.copy(all = it)) },
     )
     var showMore by remember { mutableStateOf(false) }
-    DisclosureRow(s.editorSurfaceMore, showMore) { showMore = !showMore }
+    DisclosureRow(s.text("editorSurfaceMore"), showMore) { showMore = !showMore }
     AnimatedVisibility(
         visible = showMore,
         enter = Motion.reveal.enter,
@@ -593,10 +593,10 @@ private fun PaddingSection(padding: SurfaceInsets, write: (SurfaceInsets) -> Uni
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             // Each side opens at the uniform value and, once moved, pins that side
             // independently of it.
-            CornerRow(s.editorBackingPaddingTop, padding.top(0f)) { write(padding.copy(top = it)) }
-            CornerRow(s.editorBackingPaddingEnd, padding.end(0f)) { write(padding.copy(end = it)) }
-            CornerRow(s.editorBackingPaddingBottom, padding.bottom(0f)) { write(padding.copy(bottom = it)) }
-            CornerRow(s.editorBackingPaddingStart, padding.start(0f)) { write(padding.copy(start = it)) }
+            CornerRow(s.text("editorBackingPaddingTop"), padding.top(0f)) { write(padding.copy(top = it)) }
+            CornerRow(s.text("editorBackingPaddingEnd"), padding.end(0f)) { write(padding.copy(end = it)) }
+            CornerRow(s.text("editorBackingPaddingBottom"), padding.bottom(0f)) { write(padding.copy(bottom = it)) }
+            CornerRow(s.text("editorBackingPaddingStart"), padding.start(0f)) { write(padding.copy(start = it)) }
         }
     }
 }

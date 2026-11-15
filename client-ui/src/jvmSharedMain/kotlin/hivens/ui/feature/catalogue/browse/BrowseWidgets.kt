@@ -59,11 +59,11 @@ import hivens.catalogue.api.ProjectKind
 import hivens.catalogue.api.ProjectTarget
 import hivens.catalogue.api.SearchResults
 import hivens.catalogue.api.catalogueTypeOf
+import hivens.i18n.api.Strings
 import hivens.ui.Screen
 import hivens.ui.components.LoaderGlyph
 import hivens.ui.components.hasLoaderGlyph
-import hivens.ui.i18n.AppStrings
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
@@ -108,7 +108,7 @@ import hivens.widget.model.WidgetInstance
 fun BrowseSearchWidget(instance: WidgetInstance) {
     val browse = rememberScopedSource(CatalogueKeys.Browse).valueOrNull() ?: return
     val setQuery = rememberScopedCommand(CatalogueKeys.SetQuery) ?: return
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val (text, type) = rememberEchoedText(browse.query, setQuery)
     PuppetField("browse.search", text) { type(it) }
     BoxWithConstraints(Modifier.fillMaxWidth()) {
@@ -132,17 +132,17 @@ fun BrowseSearchWidget(instance: WidgetInstance) {
 
 private val NARROW_SEARCH = 560.dp
 
-private fun searchPlaceholder(kind: ProjectKind?, s: AppStrings): String = when (kind) {
-    null -> s.browseSearchPlaceholder
-    ProjectKind.Mod -> s.browseSearchMods
-    ProjectKind.ResourcePack -> s.browseSearchResourcePacks
-    ProjectKind.ShaderPack -> s.browseSearchShaders
+private fun searchPlaceholder(kind: ProjectKind?, s: Strings): String = when (kind) {
+    null -> s.text("browseSearchPlaceholder")
+    ProjectKind.Mod -> s.text("browseSearchMods")
+    ProjectKind.ResourcePack -> s.text("browseSearchResourcePacks")
+    ProjectKind.ShaderPack -> s.text("browseSearchShaders")
 }
 
 /** The order of a catalogue search, as a pill at the end of the field. */
 @Composable
 private fun SortPicker(current: BrowseSort, wordless: Boolean) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val setSort = rememberScopedCommand(CatalogueKeys.SetSort)
     var open by remember { mutableStateOf(false) }
     var shown by remember { mutableStateOf(false) }
@@ -169,9 +169,9 @@ private fun SortPicker(current: BrowseSort, wordless: Boolean) {
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             if (wordless) {
-                Symbol(NxIcon.Tune, contentDescription = s.browseSortLabel, tint = NxInk.main, size = 18.dp)
+                Symbol(NxIcon.Tune, contentDescription = s.text("browseSortLabel"), tint = NxInk.main, size = 18.dp)
             } else {
-                Text(s.browseSortLabel, style = MaterialTheme.typography.labelLarge, color = NxInk.quiet, maxLines = 1)
+                Text(s.text("browseSortLabel"), style = MaterialTheme.typography.labelLarge, color = NxInk.quiet, maxLines = 1)
                 AnimatedContent(
                     targetState    = current,
                     transitionSpec = { fade.enter togetherWith fade.exit using SizeTransform(clip = false) { _, _ -> tap.of() } },
@@ -250,7 +250,7 @@ fun BrowseInstallingWidget(instance: WidgetInstance) {
     val browse = rememberScopedSource(CatalogueKeys.Browse).valueOrNull() ?: return
     val setTarget = rememberScopedCommand(CatalogueKeys.SetTarget)
     val navigate = rememberScopedCommand(Commands.Navigate)
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val target = browse.target
     PuppetClick("browse.target.none") { setTarget?.invoke(null) }
     AnimatedVisibility(visible = target != null, enter = Motion.reveal.enter, exit = Motion.reveal.exit) {
@@ -262,12 +262,12 @@ fun BrowseInstallingWidget(instance: WidgetInstance) {
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    NxTooltip(text = s.browseBackToPack) {
-                        NxIconButton(icon = NxIcon.ArrowBack, contentDescription = s.browseBackToPack, onClick = { navigate?.invoke(Screen.PackDetail(t.packId)) })
+                    NxTooltip(text = s.text("browseBackToPack")) {
+                        NxIconButton(icon = NxIcon.ArrowBack, contentDescription = s.text("browseBackToPack"), onClick = { navigate?.invoke(Screen.PackDetail(t.packId)) })
                     }
                     PackMark(t.packId, t.name, 48.dp)
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                        Text(s.browseInstallingInto, style = MaterialTheme.typography.labelMedium, color = NxInk.quiet)
+                        Text(s.text("browseInstallingInto"), style = MaterialTheme.typography.labelMedium, color = NxInk.quiet)
                         Text(
                             t.name,
                             style = MaterialTheme.typography.titleLarge,
@@ -286,8 +286,8 @@ fun BrowseInstallingWidget(instance: WidgetInstance) {
                             }
                         }
                     }
-                    NxTooltip(text = s.browseLeaveTarget) {
-                        NxIconButton(icon = NxIcon.Close, contentDescription = s.browseLeaveTarget, onClick = { setTarget?.invoke(null) })
+                    NxTooltip(text = s.text("browseLeaveTarget")) {
+                        NxIconButton(icon = NxIcon.Close, contentDescription = s.text("browseLeaveTarget"), onClick = { setTarget?.invoke(null) })
                     }
                 }
             }
@@ -296,7 +296,7 @@ fun BrowseInstallingWidget(instance: WidgetInstance) {
             AnimatedVisibility(visible = browse.kind != null && !t.takes(browse.kind), enter = Motion.reveal.enter, exit = Motion.reveal.exit) {
                 Row(Modifier.padding(start = 6.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Symbol(NxIcon.Info, contentDescription = null, tint = NxColor.status(Status.Warning), size = 16.dp)
-                    Text(s.installTargetNotTaken, style = MaterialTheme.typography.bodySmall, color = NxColor.status(Status.Warning))
+                    Text(s.text("installTargetNotTaken"), style = MaterialTheme.typography.bodySmall, color = NxColor.status(Status.Warning))
                 }
             }
         }
@@ -322,7 +322,7 @@ fun BrowseChipsWidget(instance: WidgetInstance) {
     val browse = rememberScopedSource(CatalogueKeys.Browse).valueOrNull() ?: return
     val remove = rememberScopedCommand(CatalogueKeys.RemoveFilter)
     val clear = rememberScopedCommand(CatalogueKeys.ClearFilters)
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val type = browse.type
     val locked = if (type == null) emptyList() else browse.locked
     val lockedFields = locked.mapTo(HashSet()) { it.field }
@@ -339,7 +339,7 @@ fun BrowseChipsWidget(instance: WidgetInstance) {
             // Counted in chips, the way they read: one folded `1.20.x` is one choice
             // to the reader however many versions it holds.
             if (chips.size > 1 && type != null) {
-                FilterChip(s.browseFiltersClearAll, leading = NxIcon.FilterAltOff, emphasis = true) { clear?.invoke(FilterClear(type)) }
+                FilterChip(s.text("browseFiltersClearAll"), leading = NxIcon.FilterAltOff, emphasis = true) { clear?.invoke(FilterClear(type)) }
             }
             chips.forEach { chip ->
                 FilterChip(chip.label, leading = NxIcon.Close, excluded = chip.excluded) {
@@ -351,7 +351,7 @@ fun BrowseChipsWidget(instance: WidgetInstance) {
                     FilterField.Loader -> values.joinToString(", ") { loaderLabel(it.value) }
                     else -> values.joinToString(", ") { it.value }
                 }
-                NxTooltip(text = s.browseFilterLockedBy(browse.target?.name.orEmpty())) {
+                NxTooltip(text = s.text("browseFilterLockedBy", browse.target?.name.orEmpty())) {
                     FilterChip(text, leading = NxIcon.Lock, onClick = null)
                 }
             }
@@ -410,18 +410,18 @@ fun BrowseScopeWidget(instance: WidgetInstance) {
     val browse = rememberScopedSource(CatalogueKeys.Browse).valueOrNull() ?: return
     val setKind = rememberScopedCommand(CatalogueKeys.SetKind)
     val setOrigin = rememberScopedCommand(CatalogueKeys.SetOrigin)
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val origins = browse.origins
     val target = browse.target
 
-    RailBlock(s.browseRailFind) {
+    RailBlock(s.text("browseRailFind")) {
         Column(verticalArrangement = Arrangement.spacedBy(TILE_GAP)) {
             BROWSE_KINDS.chunked(2).forEach { pair ->
                 // As tall as its taller tile, so a name that takes two lines does not
                 // leave its neighbour short.
                 Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(TILE_GAP)) {
                     pair.forEach { kind ->
-                        val reason = if (target != null && kind != null && !target.takes(kind)) s.installTargetNotTaken else null
+                        val reason = if (target != null && kind != null && !target.takes(kind)) s.text("installTargetNotTaken") else null
                         Box(Modifier.weight(1f).fillMaxHeight()) {
                             val tile = @Composable {
                                 KindTile(
@@ -445,7 +445,7 @@ fun BrowseScopeWidget(instance: WidgetInstance) {
             exit    = Motion.reveal.exit,
         ) {
             RailGroup {
-                RailLabel(s.browseRailSource)
+                RailLabel(s.text("browseRailSource"))
                 SourceSwitch(origins, browse.origin) { setOrigin?.invoke(it) }
             }
         }

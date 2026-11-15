@@ -1,5 +1,6 @@
 package hivens.ui.screens
 
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.theme.LocalMonoFamily
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -19,7 +20,6 @@ import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
-import hivens.ui.i18n.LocalStrings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -112,15 +112,15 @@ private fun ReadyContent(
     target: Path,
     onStart: () -> Unit,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     Text(
-        text = s.migrationWelcome,
+        text = s.text("migrationWelcome"),
         style = MaterialTheme.typography.headlineSmall,
         fontWeight = FontWeight.Bold,
         color = NxInk.main,
     )
     Text(
-        text = s.migrationDescription,
+        text = s.text("migrationDescription"),
         style = MaterialTheme.typography.bodyMedium,
         color = NxInk.quiet,
         textAlign = TextAlign.Center,
@@ -132,18 +132,18 @@ private fun ReadyContent(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            PathRow(label = s.migrationFromHeader, path = source.path.toString())
-            PathRow(label = s.migrationToHeader, path = target.toString())
+            PathRow(label = s.text("migrationFromHeader"), path = source.path.toString())
+            PathRow(label = s.text("migrationToHeader"), path = target.toString())
             Spacer(Modifier.height(4.dp))
             Text(
-                text = s.migrationSize(megabytes = (source.totalBytes / 1_048_576L).toInt(), files = source.fileCount),
+                text = s.text("migrationSize", (source.totalBytes / 1_048_576L).toInt(), source.fileCount),
                 style = MaterialTheme.typography.bodySmall,
                 color = NxInk.quiet,
             )
         }
     }
     NxButton(
-        label = s.migrationStart,
+        label = s.text("migrationStart"),
         onClick = onStart,
         modifier = Modifier.fillMaxWidth(),
         style = NxButtonStyle.Primary,
@@ -152,7 +152,7 @@ private fun ReadyContent(
 
 @Composable
 private fun ProgressContent(source: DataDirMigration.Source, state: UiState.InProgress) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val totalMb = (source.totalBytes / 1_048_576L).coerceAtLeast(1L).toInt()
     val doneMb = (state.bytesDone / 1_048_576L).toInt()
     val fraction = if (source.totalBytes > 0L) {
@@ -160,14 +160,14 @@ private fun ProgressContent(source: DataDirMigration.Source, state: UiState.InPr
     } else 0f
 
     Text(
-        text = s.migrationInProgress,
+        text = s.text("migrationInProgress"),
         style = MaterialTheme.typography.headlineSmall,
         fontWeight = FontWeight.Bold,
         color = NxInk.main,
     )
     if (state.currentFile != null) {
         Text(
-            text = s.migrationCurrentFile(state.currentFile),
+            text = s.text("migrationCurrentFile", state.currentFile),
             style = MaterialTheme.typography.bodySmall,
             color = NxInk.quiet,
             fontFamily = LocalMonoFamily.current,
@@ -186,7 +186,7 @@ private fun ProgressContent(source: DataDirMigration.Source, state: UiState.InPr
         drawStopIndicator = {},
     )
     Text(
-        text = s.migrationProgressBytes(doneMb = doneMb, totalMb = totalMb),
+        text = s.text("migrationProgressBytes", doneMb, totalMb),
         style = MaterialTheme.typography.bodySmall,
         color = NxInk.quiet,
         fontWeight = FontWeight.Bold,
@@ -195,21 +195,21 @@ private fun ProgressContent(source: DataDirMigration.Source, state: UiState.InPr
 
 @Composable
 private fun CompletedContent(onQuit: () -> Unit) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     Text(
-        text = s.migrationCompletedTitle,
+        text = s.text("migrationCompletedTitle"),
         style = MaterialTheme.typography.headlineSmall,
         fontWeight = FontWeight.Bold,
         color = NxColor.status(Status.Success),
     )
     Text(
-        text = s.migrationCompletedBody,
+        text = s.text("migrationCompletedBody"),
         style = MaterialTheme.typography.bodyMedium,
         color = NxInk.quiet,
         textAlign = TextAlign.Center,
     )
     NxButton(
-        label = s.migrationQuit,
+        label = s.text("migrationQuit"),
         onClick = onQuit,
         modifier = Modifier.fillMaxWidth(),
         style = NxButtonStyle.Primary,
@@ -218,15 +218,15 @@ private fun CompletedContent(onQuit: () -> Unit) {
 
 @Composable
 private fun FailedContent(error: String, onRetry: () -> Unit, onQuit: () -> Unit) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     Text(
-        text = s.migrationFailedTitle,
+        text = s.text("migrationFailedTitle"),
         style = MaterialTheme.typography.headlineSmall,
         fontWeight = FontWeight.Bold,
         color = NxColor.status(Status.Error),
     )
     Text(
-        text = s.migrationFailedBody(error),
+        text = s.text("migrationFailedBody", error),
         style = MaterialTheme.typography.bodyMedium,
         color = NxInk.quiet,
         textAlign = TextAlign.Center,
@@ -236,13 +236,13 @@ private fun FailedContent(error: String, onRetry: () -> Unit, onQuit: () -> Unit
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         NxButton(
-            label = s.migrationRetry,
+            label = s.text("migrationRetry"),
             onClick = onRetry,
             modifier = Modifier.weight(1f),
             style = NxButtonStyle.Primary,
         )
         NxButton(
-            label = s.migrationQuit,
+            label = s.text("migrationQuit"),
             onClick = onQuit,
             modifier = Modifier.weight(1f),
             style = NxButtonStyle.Secondary,

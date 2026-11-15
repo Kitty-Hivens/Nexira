@@ -16,9 +16,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.core.jvm.SystemMemory
+import hivens.i18n.api.Strings
 import hivens.ui.customization.sliderKeyboardAdjust
-import hivens.ui.i18n.AppStrings
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.NxChoiceChip
 import hivens.ui.nx.NxField
 import hivens.ui.nx.NxReveal
@@ -63,20 +63,20 @@ fun RamSelector(
     onAutoSelected: () -> Unit,
     onValueChanged: (Int) -> Unit,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val systemRamMb = remember { SystemMemory.totalPhysicalMb() }
     // From what the game may take, not from the whole machine: on a phone the system and the launcher keep a share
     // the game cannot have, and a heap sized from the total gets the game killed.
     val recommendedMb = remember { (SystemMemory.heapBudgetMb() * RECOMMENDED_SHARE).toInt() }
 
     NxSettingRow(
-        title  = s.ramModeTitle,
-        detail = if (isAuto) s.ramAutoDetail(formatRam(resolvedAutoMb, s)) else s.ramOwnDetail,
+        title  = s.text("ramModeTitle"),
+        detail = if (isAuto) s.text("ramAutoDetail", formatRam(resolvedAutoMb, s)) else s.text("ramOwnDetail"),
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            NxChoiceChip(s.ramModeAuto, selected = isAuto) { if (!isAuto) onAutoSelected() }
+            NxChoiceChip(s.text("ramModeAuto"), selected = isAuto) { if (!isAuto) onAutoSelected() }
             // Leaving Auto starts from the number Auto was using, not from a constant.
-            NxChoiceChip(s.ramModeOwn, selected = !isAuto) { if (isAuto) onValueChanged(resolvedAutoMb) }
+            NxChoiceChip(s.text("ramModeOwn"), selected = !isAuto) { if (isAuto) onValueChanged(resolvedAutoMb) }
         }
     }
 
@@ -91,7 +91,7 @@ fun RamSelector(
             val onSlide: (Float) -> Unit = { gb -> onValueChanged((snapGb(gb) * MB_PER_GB).roundToInt()) }
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    s.ramAllocated,
+                    s.text("ramAllocated"),
                     style      = MaterialTheme.typography.bodyMedium,
                     color      = NxInk.main,
                     fontWeight = FontWeight.Medium,
@@ -125,13 +125,13 @@ fun RamSelector(
                     placeholder   = gbText(currentMb),
                     modifier      = Modifier.width(88.dp),
                 )
-                Text(s.ramUnitGb, style = MaterialTheme.typography.bodyMedium, color = NxInk.quiet)
+                Text(s.text("ramUnitGb"), style = MaterialTheme.typography.bodyMedium, color = NxInk.quiet)
             }
 
             val hint = when {
-                outOfRange -> s.ramOutOfRange(formatRam(MIN_MB, s), formatRam(MAX_MB, s))
-                currentMb > recommendedMb -> s.ramAboveRecommended(formatRam(recommendedMb, s))
-                else -> s.ramSystemHint(formatRam(systemRamMb, s), formatRam(recommendedMb, s))
+                outOfRange -> s.text("ramOutOfRange", formatRam(MIN_MB, s), formatRam(MAX_MB, s))
+                currentMb > recommendedMb -> s.text("ramAboveRecommended", formatRam(recommendedMb, s))
+                else -> s.text("ramSystemHint", formatRam(systemRamMb, s), formatRam(recommendedMb, s))
             }
             Text(
                 text  = hint,
@@ -158,10 +158,10 @@ private fun gbText(mb: Int): String {
     return if (gb % 1f == 0f) gb.toInt().toString() else String.format(Locale.ROOT, "%.1f", gb)
 }
 
-internal fun formatRam(mb: Int, s: AppStrings): String = when {
-    mb >= 1024 && mb % 1024 == 0 -> "${mb / 1024} ${s.ramUnitGb}"
-    mb >= 1024 -> String.format(Locale.ROOT, "%.1f %s", mb / MB_PER_GB, s.ramUnitGb)
-    else -> "$mb ${s.ramUnitMb}"
+internal fun formatRam(mb: Int, s: Strings): String = when {
+    mb >= 1024 && mb % 1024 == 0 -> "${mb / 1024} ${s.text("ramUnitGb")}"
+    mb >= 1024 -> String.format(Locale.ROOT, "%.1f %s", mb / MB_PER_GB, s.text("ramUnitGb"))
+    else -> "$mb ${s.text("ramUnitMb")}"
 }
 
 private const val MB_PER_GB = 1024f

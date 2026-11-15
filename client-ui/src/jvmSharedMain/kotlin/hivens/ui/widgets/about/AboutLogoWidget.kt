@@ -25,7 +25,7 @@ import hivens.ui.easter.GibberishMode
 import hivens.ui.easter.LocalAprilFools
 import hivens.ui.generated.resources.Res
 import hivens.ui.generated.resources.favicon
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.widget.api.rememberProps
 import hivens.widget.model.PropLabel
 import hivens.widget.model.Widget
@@ -61,7 +61,7 @@ data class AboutLogoProps(
 fun AboutLogoWidget(instance: WidgetInstance) {
     val p = instance.rememberProps<AboutLogoProps>()
     val af = LocalAprilFools.current
-    val s = LocalStrings.current
+    val s = nexiraStrings()
 
     Column(
         modifier            = Modifier.fillMaxWidth().padding(28.dp),
@@ -69,7 +69,7 @@ fun AboutLogoWidget(instance: WidgetInstance) {
     ) {
         Image(
             painter            = painterResource(Res.drawable.favicon),
-            contentDescription = s.aboutLogoDesc,
+            contentDescription = s.text("aboutLogoDesc"),
             modifier           = Modifier.size(86.dp),
         )
         Spacer(Modifier.height(16.dp))
@@ -113,7 +113,7 @@ fun AboutLogoWidget(instance: WidgetInstance) {
             }
             Spacer(Modifier.height(8.dp))
             Text(
-                text  = af.maybeGibberish(s.aboutBuildDate(buildDate), probability = 0.25f),
+                text  = af.maybeGibberish(s.text("aboutBuildDate", buildDate), probability = 0.25f),
                 style = MaterialTheme.typography.bodySmall,
                 color = NxInk.quiet.copy(alpha = 0.6f),
             )
@@ -123,7 +123,7 @@ fun AboutLogoWidget(instance: WidgetInstance) {
             Spacer(Modifier.height(16.dp))
             Text(
                 text      = af.maybeGibberish(
-                    s.aboutDescription(Branding.UPSTREAM_NAME),
+                    s.text("aboutDescription", Branding.UPSTREAM_NAME),
                     probability = 0.20f,
                 ),
                 style     = MaterialTheme.typography.bodyMedium,

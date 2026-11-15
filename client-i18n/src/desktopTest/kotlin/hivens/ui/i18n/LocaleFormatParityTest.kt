@@ -1,22 +1,18 @@
 package hivens.ui.i18n
 
+import hivens.i18n.Message
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
 /**
- * A translator-static string must never carry a printf conversion specifier.
- * Such a string is rendered with String.format(), where a dropped, reordered or
- * mistyped %s/%d crashes at runtime (MissingFormatArgumentException) with no
- * compile-time or CI guard. Strings that interpolate a value go through fun-style
- * overrides ($-interpolation), which the compiler checks. This catches a
- * regression that reintroduces the %s/%d pattern on a plain val.
+ * A message must never carry a printf conversion specifier. Arguments go into a
+ * message as `{0}`, `{1}`, which every language's table writes out itself, and
+ * a %s or %d left in a table is either text a person was never meant to read or
+ * a string some caller still runs through String.format(), where a dropped,
+ * reordered or mistyped one crashes at runtime (MissingFormatArgumentException).
+ * Every form of every message in every shipped table is read.
  */
 class LocaleFormatParityTest {
-
-    // Taken from the enum rather than listed here, so a locale added to the
-    // picker is checked without this list being remembered. It was not
-    // remembered: Japanese shipped while this map still named three locales.
-    private val locales = AppLocale.entries.associate { it.name to stringsFor(it) }
 
     // '%', optional argument index, flags, optional width/precision, then a
     // value-consuming conversion letter. Space and ',' are deliberately excluded
@@ -27,23 +23,20 @@ class LocaleFormatParityTest {
         Regex("""%(?:\d+\${'$'})?[-#+0(]*\d*(?:\.\d+)?[bBhHsScCdoxXeEfgGaA]""")
 
     @Test
-    fun `static strings carry no printf conversion specifier`() {
-        val staticGetters = AppStrings::class.java.declaredMethods
-            .filter { it.parameterCount == 0 && it.returnType == String::class.java }
-
+    fun `messages carry no printf conversion specifier`() {
         val violations = buildList {
-            for ((name, locale) in locales) {
-                for (getter in staticGetters) {
-                    val value = getter.invoke(locale) as String
-                    val match = printfConversion.find(value) ?: continue
-                    add("$name.${getter.name}: \"$value\" contains \"${match.value}\"")
+            for ((tag, table) in NexiraStrings.tables()) {
+                for ((key, text) in table) {
+                    val forms = runCatching { Message.parse(text).variants() }.getOrDefault(listOf(text))
+                    val match = forms.firstNotNullOfOrNull { printfConversion.find(it) } ?: continue
+                    add("$tag.$key: \"$text\" contains \"${match.value}\"")
                 }
             }
         }
 
         assertTrue(
             violations.isEmpty(),
-            "Translator-static strings must use fun-style \$-interpolation, not printf placeholders:\n" +
+            "Messages take their arguments as {0}, {1}, not printf placeholders:\n" +
                 violations.joinToString("\n") { "  $it" },
         )
     }

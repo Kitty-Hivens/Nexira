@@ -4,7 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.dp
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.NxColorField
 import hivens.ui.nx.NxSlider
 import hivens.widget.model.Widget
@@ -16,11 +16,11 @@ import hivens.widget.model.Widget
 @Composable
 fun BgTintWidget() {
     val bg = rememberBgSettings() ?: return
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val settings = bg.value
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        SectionTitle(s.backgroundSectionTint)
+        SectionTitle(s.text("backgroundSectionTint"))
 
         NxColorField(
             hex           = settings.tintColor,
@@ -28,13 +28,13 @@ fun BgTintWidget() {
                 bg.update { copy(tintColor = hex, tintOpacity = if (hex != null) tintOpacity.coerceAtLeast(0.3f) else 0f) }
             },
             onClear       = { bg.update { copy(tintColor = null, tintOpacity = 0f) } },
-            clearLabel    = s.backgroundTintNone,
+            clearLabel    = s.text("backgroundTintNone"),
         )
 
         if (settings.tintColor != null) {
             val v = settings.tintOpacity
             NxSlider(
-                label         = s.backgroundTintIntensity,
+                label         = s.text("backgroundTintIntensity"),
                 value         = v,
                 range         = 0f..0.7f,
                 valueText     = "%.0f%%".format(v * 100),

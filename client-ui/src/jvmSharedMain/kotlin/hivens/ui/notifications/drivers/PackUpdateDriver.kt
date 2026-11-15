@@ -3,8 +3,8 @@ package hivens.ui.notifications.drivers
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.update.PackUpdateStatus
 import hivens.core.update.PackUpdateStatusHub
+import hivens.i18n.api.Strings
 import hivens.ui.Screen
-import hivens.ui.i18n.AppStrings
 import hivens.ui.navigation.MainWindowRequests
 import hivens.ui.notifications.Kind
 import hivens.ui.notifications.NotifAction
@@ -31,7 +31,7 @@ class PackUpdateDriver(
     private val notifications: NotificationCenter,
     private val nav: MainWindowRequests,
     private val appScope: CoroutineScope,
-    private val stringsProvider: () -> AppStrings,
+    private val stringsProvider: () -> Strings,
 ) {
     private val lastStatus = HashMap<String, PackUpdateStatus>()
     private val announcedPending = HashMap<String, String>()
@@ -70,7 +70,7 @@ class PackUpdateDriver(
                     glyph     = NotifGlyph.Update,
                     severity  = Severity.Success,
                     kind      = Kind.OneShot,
-                    title     = s.notifPackUpdated(title, status.toVersion),
+                    title     = s.text("notifPackUpdated", title, status.toVersion),
                 )
             }
             is PackUpdateStatus.Pending -> {
@@ -87,9 +87,9 @@ class PackUpdateDriver(
                     glyph     = NotifGlyph.Update,
                     severity  = Severity.Info,
                     kind      = Kind.ActionRequired,
-                    title     = s.notifPackUpdatePending(title, status.toVersion),
+                    title     = s.text("notifPackUpdatePending", title, status.toVersion),
                     actions   = listOf(
-                        NotifAction("open-versions", s.notifActionOpenVersions) { nav.open(Screen.PackVersions(id)) },
+                        NotifAction("open-versions", s.text("notifActionOpenVersions")) { nav.open(Screen.PackVersions(id)) },
                     ),
                 )
             }
@@ -100,10 +100,10 @@ class PackUpdateDriver(
                 glyph     = NotifGlyph.Update,
                 severity  = Severity.Critical,
                 kind      = Kind.Sticky,
-                title     = s.notifPackUpdateFailed(title),
+                title     = s.text("notifPackUpdateFailed", title),
                 body      = status.reason.ifBlank { null },
                 actions   = listOf(
-                    NotifAction("open-versions", s.notifActionOpenVersions) { nav.open(Screen.PackVersions(id)) },
+                    NotifAction("open-versions", s.text("notifActionOpenVersions")) { nav.open(Screen.PackVersions(id)) },
                 ),
             )
         }

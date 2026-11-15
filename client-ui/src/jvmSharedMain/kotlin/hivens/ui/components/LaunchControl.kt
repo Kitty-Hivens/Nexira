@@ -14,6 +14,7 @@ import hivens.core.launch.LaunchBlock
 import hivens.core.launch.LaunchControlMode
 import hivens.core.launch.LaunchState
 import hivens.core.launch.launchBlockFor
+import hivens.i18n.api.Strings
 import hivens.launcher.PackOperationPhase
 import hivens.launcher.PackOperationService
 import hivens.launcher.instance.InstanceContentUpdater
@@ -22,8 +23,7 @@ import hivens.launcher.platform.PlatformPaths
 import hivens.packs.api.PackKeys
 import hivens.packs.api.PackView
 import hivens.ui.Screen
-import hivens.ui.i18n.AppStrings
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.navigation.NavRequests
@@ -103,7 +103,7 @@ fun rememberLaunchControl(
     playLabel: String? = null,
 ): LaunchControl {
     val session = (appState as? SessionState.SignedIn)?.session
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val controller: LauncherController = koinInject()
     val indications: IndicationCenter = koinInject()
     val registry: InstanceWorkRegistry = koinInject()
@@ -175,11 +175,11 @@ fun rememberLaunchControl(
 
     return when {
         mode == LaunchControlMode.Stop -> LaunchControl(
-            mode, null, s.packPlayExit, NxIcon.Stop, PlayTone.Ready, null, onClick = { stopPack?.invoke(packId) },
+            mode, null, s.text("packPlayExit"), NxIcon.Stop, PlayTone.Ready, null, onClick = { stopPack?.invoke(packId) },
         )
         mode == LaunchControlMode.Wait -> LaunchControl(
             mode, null,
-            if (indication == LaunchIndication.Stopping) s.launchStopping else s.packPlayWait,
+            if (indication == LaunchIndication.Stopping) s.text("launchStopping") else s.text("packPlayWait"),
             if (indication == LaunchIndication.Stopping) NxIcon.Stop else NxIcon.PlayArrow,
             PlayTone.Waiting,
             progress = (indication as? LaunchIndication.Downloading)?.progress,
@@ -207,7 +207,7 @@ fun rememberLaunchControl(
         else -> LaunchControl(
             mode = mode,
             block = null,
-            label = if (session == null) s.loginPlayOffline else playLabel ?: s.packDetailPlay,
+            label = if (session == null) s.text("loginPlayOffline") else playLabel ?: s.text("packDetailPlay"),
             icon = NxIcon.PlayArrow,
             tone = PlayTone.Ready,
             progress = null,
@@ -216,22 +216,22 @@ fun rememberLaunchControl(
     }
 }
 
-private fun LaunchBlock.label(s: AppStrings): String = when (this) {
+private fun LaunchBlock.label(s: Strings): String = when (this) {
     is LaunchBlock.Busy -> work.label(s)
-    LaunchBlock.Missing -> s.launchBlockMissing
-    LaunchBlock.OtherGameRunning -> s.launchBlockOtherRunning
-    LaunchBlock.ResolvingIdentity -> s.launchBlockSigningIn
-    LaunchBlock.NoIdentity -> s.packDetailPlayLoginRequired
+    LaunchBlock.Missing -> s.text("launchBlockMissing")
+    LaunchBlock.OtherGameRunning -> s.text("launchBlockOtherRunning")
+    LaunchBlock.ResolvingIdentity -> s.text("launchBlockSigningIn")
+    LaunchBlock.NoIdentity -> s.text("packDetailPlayLoginRequired")
 }
 
 /** What the work in progress on a pack is called, wherever it is the reason for waiting. */
-internal fun InstanceWork.label(s: AppStrings): String = when (this) {
-    InstanceWork.Update -> s.launchBlockUpdating
-    InstanceWork.Repair -> s.launchBlockRepairing
-    InstanceWork.Recovery -> s.launchBlockRecovering
-    InstanceWork.ContentUpdate -> s.launchBlockUpdatingContent
-    InstanceWork.ContentInstall -> s.launchBlockInstallingContent
-    InstanceWork.Delete -> s.launchBlockDeleting
+internal fun InstanceWork.label(s: Strings): String = when (this) {
+    InstanceWork.Update -> s.text("launchBlockUpdating")
+    InstanceWork.Repair -> s.text("launchBlockRepairing")
+    InstanceWork.Recovery -> s.text("launchBlockRecovering")
+    InstanceWork.ContentUpdate -> s.text("launchBlockUpdatingContent")
+    InstanceWork.ContentInstall -> s.text("launchBlockInstallingContent")
+    InstanceWork.Delete -> s.text("launchBlockDeleting")
 }
 
 private fun LaunchBlock.icon(): IconKey = when (this) {

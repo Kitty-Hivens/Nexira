@@ -43,7 +43,7 @@ import hivens.ui.audio.PlaybackState
 import hivens.ui.audio.RepeatMode
 import hivens.ui.audio.TrackInfo
 import hivens.ui.audio.Waveform
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.nx.NxButton
@@ -174,7 +174,7 @@ internal fun RecordPlayerCard(
     chrome: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val idle = state is PlaybackState.Idle
     val loaded = !idle && state !is PlaybackState.Error
     var menuOpen by remember { mutableStateOf(false) }
@@ -209,7 +209,7 @@ internal fun RecordPlayerCard(
                         }
                         // The disc is the only affordance this shape has, so with
                         // nothing loaded it has to be the one that opens a file.
-                        .openWhenEmpty(idle, s.audioPickTrack, onPick),
+                        .openWhenEmpty(idle, s.text("audioPickTrack"), onPick),
                     contentAlignment = Alignment.Center,
                 ) {
                     val side = minOf(maxWidth, maxHeight)
@@ -236,7 +236,7 @@ internal fun RecordPlayerCard(
                     ) {
                         NxIconButton(
                             icon               = if (state is PlaybackState.Playing) NxIcon.Pause else NxIcon.PlayArrow,
-                            contentDescription = if (state is PlaybackState.Playing) s.audioPause else s.audioPlay,
+                            contentDescription = if (state is PlaybackState.Playing) s.text("audioPause") else s.text("audioPlay"),
                             onClick            = onPlayPause,
                             tint               = Color.White,
                             enabled            = loaded,
@@ -251,23 +251,23 @@ internal fun RecordPlayerCard(
             Box(Modifier.align(Alignment.TopEnd).alpha(reveal)) {
                 NxIconButton(
                     icon               = NxIcon.MoreVert,
-                    contentDescription = s.packCardMore,
+                    contentDescription = s.text("packCardMore"),
                     onClick            = { menuOpen = true },
                 )
                 NxPopoverPanel(
                     expanded         = menuOpen,
                     onDismissRequest = { menuOpen = false },
-                    title            = s.audioPlaybackOptions,
+                    title            = s.text("audioPlaybackOptions"),
                     footer           = {
                         NxButton(
-                            label   = s.audioOpenFile,
+                            label   = s.text("audioOpenFile"),
                             onClick = { menuOpen = false; onPick() },
                             style   = NxButtonStyle.Tertiary,
                             icon    = NxIcon.FolderOpen,
                             compact = true,
                         )
                         NxButton(
-                            label   = s.audioStop,
+                            label   = s.text("audioStop"),
                             onClick = { menuOpen = false; onStop() },
                             style   = NxButtonStyle.Tertiary,
                             icon    = NxIcon.Stop,
@@ -279,17 +279,17 @@ internal fun RecordPlayerCard(
                     // The face carries no skips, so a queue would be unreachable
                     // from a screen holding only this widget. They live here.
                     if (queueSize > 1) {
-                        NxPanelGroup(label = s.audioQueue) {
+                        NxPanelGroup(label = s.text("audioQueue")) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 NxIconButton(
                                     icon               = NxIcon.SkipPrevious,
-                                    contentDescription = s.audioSkipPrevious,
+                                    contentDescription = s.text("audioSkipPrevious"),
                                     onClick            = onSkipPrev,
                                     enabled            = loaded,
                                 )
                                 NxIconButton(
                                     icon               = NxIcon.SkipNext,
-                                    contentDescription = s.audioSkipNext,
+                                    contentDescription = s.text("audioSkipNext"),
                                     onClick            = onSkipNext,
                                     enabled            = loaded,
                                 )
@@ -297,14 +297,14 @@ internal fun RecordPlayerCard(
                         }
                     }
                     NxSlider(
-                        label         = s.audioVolume,
+                        label         = s.text("audioVolume"),
                         value         = volume,
                         range         = 0f..1f,
                         valueText     = "${(volume * 100).toInt()}%",
                         onValueChange = onVolume,
                         compact       = true,
                     )
-                    NxPanelGroup(label = s.audioRepeat) {
+                    NxPanelGroup(label = s.text("audioRepeat")) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             NxCycleToggle(
                                 states  = repeatStates(s),

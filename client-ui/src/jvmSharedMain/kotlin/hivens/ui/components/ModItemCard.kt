@@ -15,7 +15,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import hivens.core.data.OptionalMod
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.theme.Motion
@@ -34,7 +34,7 @@ fun ModItemCard(
     onToggle: (Boolean) -> Unit,
     enabledModIds: Set<String> = emptySet()
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     var expanded by remember { mutableStateOf(false) }
     val hasDescription = !mod.description.isNullOrBlank()
     val conflictingIds = mod.incompatibleIds.filter { it in enabledModIds && it != mod.id }
@@ -116,11 +116,11 @@ fun ModItemCard(
                     Row(Modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium).background(NxColor.status(Status.Error).copy(alpha = 0.08f)).padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
                         Symbol(NxIcon.Warning, null, tint = NxColor.status(Status.Error), modifier = Modifier.size(14.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text(s.modConflictWarning(conflictingIds.joinToString(", ")), style = MaterialTheme.typography.labelSmall, color = NxColor.status(Status.Error))
+                        Text(s.text("modConflictWarning", conflictingIds.joinToString(", ")), style = MaterialTheme.typography.labelSmall, color = NxColor.status(Status.Error))
                     }
                 } else if (mod.incompatibleIds.isNotEmpty()) {
                     Spacer(Modifier.height(6.dp))
-                    Text(s.modIncompatibleHint(mod.incompatibleIds.joinToString(", ")), style = MaterialTheme.typography.labelSmall, color = NxInk.quiet.copy(alpha = 0.4f))
+                    Text(s.text("modIncompatibleHint", mod.incompatibleIds.joinToString(", ")), style = MaterialTheme.typography.labelSmall, color = NxInk.quiet.copy(alpha = 0.4f))
                 }
             }
         }

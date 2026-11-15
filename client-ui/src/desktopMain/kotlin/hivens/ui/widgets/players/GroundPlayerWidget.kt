@@ -37,7 +37,7 @@ import hivens.ui.audio.PlaybackState
 import hivens.ui.audio.RepeatMode
 import hivens.ui.audio.TrackInfo
 import hivens.ui.audio.Waveform
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
@@ -148,7 +148,7 @@ internal fun GroundPlayerCard(
     onSeek: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val idle = state is PlaybackState.Idle
     val loaded = !idle && state !is PlaybackState.Error
     val duration = durationMsOf(state)
@@ -162,7 +162,7 @@ internal fun GroundPlayerCard(
             .clip(MaterialTheme.shapes.medium)
             // With nothing loaded the whole plane opens the picker: the ground is
             // the only affordance this shape has, so it has to be the one.
-            .openWhenEmpty(idle, s.audioPickTrack, onPick),
+            .openWhenEmpty(idle, s.text("audioPickTrack"), onPick),
     ) {
         Ground(track?.artwork)
         // Three stops, and only the middle one is on the knob.
@@ -214,7 +214,7 @@ internal fun GroundPlayerCard(
                     if (skips) {
                         NxIconButton(
                             icon               = NxIcon.SkipPrevious,
-                            contentDescription = s.audioSkipPrevious,
+                            contentDescription = s.text("audioSkipPrevious"),
                             onClick            = onSkipPrev,
                             tint               = Color.White.copy(alpha = 0.8f),
                             enabled            = loaded,
@@ -225,7 +225,7 @@ internal fun GroundPlayerCard(
                     }
                     NxIconButton(
                         icon               = if (state is PlaybackState.Playing) NxIcon.Pause else NxIcon.PlayArrow,
-                        contentDescription = if (state is PlaybackState.Playing) s.audioPause else s.audioPlay,
+                        contentDescription = if (state is PlaybackState.Playing) s.text("audioPause") else s.text("audioPlay"),
                         onClick            = onPlayPause,
                         tint               = Color.White,
                         enabled            = loaded,
@@ -236,7 +236,7 @@ internal fun GroundPlayerCard(
                     if (skips) {
                         NxIconButton(
                             icon               = NxIcon.SkipNext,
-                            contentDescription = s.audioSkipNext,
+                            contentDescription = s.text("audioSkipNext"),
                             onClick            = onSkipNext,
                             tint               = Color.White.copy(alpha = 0.8f),
                             enabled            = loaded,
@@ -267,24 +267,24 @@ internal fun GroundPlayerCard(
             Box(Modifier.align(Alignment.TopEnd).padding(4.dp)) {
                 NxIconButton(
                     icon               = NxIcon.MoreVert,
-                    contentDescription = s.packCardMore,
+                    contentDescription = s.text("packCardMore"),
                     onClick            = { menuOpen = true },
                     tint               = Color.White.copy(alpha = 0.8f),
                 )
                 NxPopoverPanel(
                     expanded         = menuOpen,
                     onDismissRequest = { menuOpen = false },
-                    title            = s.audioPlaybackOptions,
+                    title            = s.text("audioPlaybackOptions"),
                     footer           = {
                         NxButton(
-                            label   = s.audioOpenFile,
+                            label   = s.text("audioOpenFile"),
                             onClick = { menuOpen = false; onPick() },
                             style   = NxButtonStyle.Tertiary,
                             icon    = NxIcon.FolderOpen,
                             compact = true,
                         )
                         NxButton(
-                            label   = s.audioStop,
+                            label   = s.text("audioStop"),
                             onClick = { menuOpen = false; onStop() },
                             style   = NxButtonStyle.Tertiary,
                             icon    = NxIcon.Stop,
@@ -294,14 +294,14 @@ internal fun GroundPlayerCard(
                     },
                 ) {
                     NxSlider(
-                        label         = s.audioVolume,
+                        label         = s.text("audioVolume"),
                         value         = volume,
                         range         = 0f..1f,
                         valueText     = "${(volume * 100).toInt()}%",
                         onValueChange = onVolume,
                         compact       = true,
                     )
-                    NxPanelGroup(label = s.audioRepeat) {
+                    NxPanelGroup(label = s.text("audioRepeat")) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             NxCycleToggle(
                                 states  = repeatStates(s),

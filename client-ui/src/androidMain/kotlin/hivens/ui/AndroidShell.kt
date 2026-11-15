@@ -57,8 +57,9 @@ import hivens.ui.easter.AprilFoolsLoader
 import hivens.ui.easter.LocalAprilFools
 import hivens.ui.editor.WidgetGraphReconciler
 import hivens.ui.appearance.AppearanceStore
-import hivens.ui.i18n.LocaleProvider
-import hivens.ui.i18n.LocalStrings
+import hivens.i18n.api.LocalTranslator
+import hivens.i18n.api.Translations
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.layers.Layer
 import hivens.ui.layers.LayerHost
 import hivens.ui.layers.rememberWindowLayers
@@ -182,7 +183,9 @@ private fun AndroidShellContent() {
     remember { appearance.setSystemSchemeAvailable(true) }
     val isDarkTheme by appearance.dark.collectAsState()
     val themeMode by appearance.mode.collectAsState()
-    val currentLocale by appearance.locale.collectAsState()
+    // The words the shell is drawn in: the language module's engine, which the host made.
+    val translations: Translations = koinInject()
+    val words by translations.current.collectAsState()
 
     // The store listens to the source the mode names, so the scheme is handed over
     // whenever it or the mode changes. AppRoot hands it what the wallpaper shows.
@@ -234,9 +237,9 @@ private fun AndroidShellContent() {
     }
 
     CompositionLocalProvider(LocalAprilFools provides AprilFoolsLoader.instance) {
-        LocaleProvider(locale = currentLocale) {
-            val s = LocalStrings.current
-            val uiFamily = if (needsCjkFace(s.settingsTitle + s.navLibrary + s.aboutTitle)) nexiraCjkFamily() else null
+        CompositionLocalProvider(LocalTranslator provides words) {
+            val s = nexiraStrings()
+            val uiFamily = if (needsCjkFace(s.text("settingsTitle") + s.text("navLibrary") + s.text("aboutTitle"))) nexiraCjkFamily() else null
 
             val themeLibrary by appearance.library.collectAsState()
             val customizationJson = remember { Json { ignoreUnknownKeys = true; encodeDefaults = true; coerceInputValues = true } }

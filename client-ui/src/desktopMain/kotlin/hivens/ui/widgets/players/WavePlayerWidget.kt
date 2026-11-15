@@ -31,7 +31,7 @@ import hivens.ui.audio.PlaybackState
 import hivens.ui.audio.RepeatMode
 import hivens.ui.audio.TrackInfo
 import hivens.ui.audio.Waveform
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
@@ -147,7 +147,7 @@ internal fun WavePlayerCard(
     onSeek: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val idle = state is PlaybackState.Idle
     val loaded = !idle && state !is PlaybackState.Error
     val duration = durationMsOf(state)
@@ -176,7 +176,7 @@ internal fun WavePlayerCard(
                         // With nothing loaded the plane opens the picker: there is no
                         // artwork here to click, and an empty player that answers
                         // nowhere is a dead end.
-                        .openWhenEmpty(idle, s.audioPickTrack, onPick)
+                        .openWhenEmpty(idle, s.text("audioPickTrack"), onPick)
                         .padding(14.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -188,7 +188,7 @@ internal fun WavePlayerCard(
                         OnFill(disc) {
                             NxIconButton(
                                 icon               = if (state is PlaybackState.Playing) NxIcon.Pause else NxIcon.PlayArrow,
-                                contentDescription = if (state is PlaybackState.Playing) s.audioPause else s.audioPlay,
+                                contentDescription = if (state is PlaybackState.Playing) s.text("audioPause") else s.text("audioPlay"),
                                 onClick            = onPlayPause,
                                 tint               = NxInk.main,
                                 enabled            = loaded,
@@ -242,7 +242,7 @@ internal fun WavePlayerCard(
                                 if (skips) {
                                     NxIconButton(
                                         icon               = NxIcon.SkipPrevious,
-                                        contentDescription = s.audioSkipPrevious,
+                                        contentDescription = s.text("audioSkipPrevious"),
                                         onClick            = onSkipPrev,
                                         tint               = NxColor.wash(NxInk.main, 0.7f),
                                         enabled            = loaded,
@@ -252,7 +252,7 @@ internal fun WavePlayerCard(
                                     )
                                     NxIconButton(
                                         icon               = NxIcon.SkipNext,
-                                        contentDescription = s.audioSkipNext,
+                                        contentDescription = s.text("audioSkipNext"),
                                         onClick            = onSkipNext,
                                         tint               = NxColor.wash(NxInk.main, 0.7f),
                                         enabled            = loaded,
@@ -280,23 +280,23 @@ internal fun WavePlayerCard(
                 Box(Modifier.align(Alignment.TopEnd).padding(4.dp)) {
                     NxIconButton(
                         icon               = NxIcon.MoreVert,
-                        contentDescription = s.packCardMore,
+                        contentDescription = s.text("packCardMore"),
                         onClick            = { menuOpen = true },
                     )
                     NxPopoverPanel(
                         expanded         = menuOpen,
                         onDismissRequest = { menuOpen = false },
-                        title            = s.audioPlaybackOptions,
+                        title            = s.text("audioPlaybackOptions"),
                         footer           = {
                             NxButton(
-                                label   = s.audioOpenFile,
+                                label   = s.text("audioOpenFile"),
                                 onClick = { menuOpen = false; onPick() },
                                 style   = NxButtonStyle.Tertiary,
                                 icon    = NxIcon.FolderOpen,
                                 compact = true,
                             )
                             NxButton(
-                                label   = s.audioStop,
+                                label   = s.text("audioStop"),
                                 onClick = { menuOpen = false; onStop() },
                                 style   = NxButtonStyle.Tertiary,
                                 icon    = NxIcon.Stop,
@@ -306,14 +306,14 @@ internal fun WavePlayerCard(
                         },
                     ) {
                         NxSlider(
-                            label         = s.audioVolume,
+                            label         = s.text("audioVolume"),
                             value         = volume,
                             range         = 0f..1f,
                             valueText     = "${(volume * 100).toInt()}%",
                             onValueChange = onVolume,
                             compact       = true,
                         )
-                        NxPanelGroup(label = s.audioRepeat) {
+                        NxPanelGroup(label = s.text("audioRepeat")) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 NxCycleToggle(
                                     states  = repeatStates(s),

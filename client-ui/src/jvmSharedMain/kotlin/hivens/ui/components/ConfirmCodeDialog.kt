@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.NxBasicTextField
 import androidx.compose.foundation.text.input.KeyboardActionHandler
 import androidx.compose.foundation.text.KeyboardOptions
@@ -36,7 +37,6 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import hivens.ui.i18n.LocalStrings
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxDialog
@@ -84,7 +84,7 @@ fun ConfirmCodeDialog(
     isSubmitting: Boolean = false,
     puppetPrefix: String = "login.twoFactor",
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     var code by remember { mutableStateOf("") }
 
     val codeFocus = remember { FocusRequester() }
@@ -97,7 +97,7 @@ fun ConfirmCodeDialog(
 
     val complete = code.length == CODE_LENGTH
 
-    NxDialog(onDismissRequest = onDismiss, defaultWidth = false, paneTitle = s.auth2faTitle) {
+    NxDialog(onDismissRequest = onDismiss, defaultWidth = false, paneTitle = s.text("auth2faTitle")) {
         // The code is time-boxed, so put the caret in the field the moment the dialog
         // opens, otherwise the user has to click it first, friction on a focus-finicky
         // Wayland stack. Asked from inside the dialog, which joins the window a frame
@@ -109,13 +109,13 @@ fun ConfirmCodeDialog(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 Text(
-                    s.auth2faTitle,
+                    s.text("auth2faTitle"),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = NxInk.main,
                 )
                 Text(
-                    s.auth2faPrompt,
+                    s.text("auth2faPrompt"),
                     style = MaterialTheme.typography.bodyMedium,
                     color = NxInk.quiet,
                 )
@@ -170,7 +170,7 @@ fun ConfirmCodeDialog(
                         Spacer(Modifier.width(12.dp))
                     }
                     NxButton(
-                        label   = s.auth2faCancel,
+                        label   = s.text("auth2faCancel"),
                         onClick = onDismiss,
                         style   = NxButtonStyle.Tertiary,
                         enabled = !isSubmitting,
@@ -178,7 +178,7 @@ fun ConfirmCodeDialog(
                     PuppetClick("$puppetPrefix.cancel", enabled = !isSubmitting) { onDismiss() }
                     Spacer(Modifier.width(8.dp))
                     NxButton(
-                        label   = s.auth2faSubmit,
+                        label   = s.text("auth2faSubmit"),
                         onClick = { onSubmit(code) },
                         enabled = complete && !isSubmitting,
                     )

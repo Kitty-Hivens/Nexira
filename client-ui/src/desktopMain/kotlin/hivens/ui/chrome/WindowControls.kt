@@ -22,7 +22,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.unit.dp
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.Status
@@ -60,7 +60,7 @@ fun WindowControls(
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val maximized = host.status.collectAsState().value.maximized
     val ink = NxInk.main
     val plain = CaptionColours(
@@ -79,7 +79,7 @@ fun WindowControls(
 
     Row(modifier.fillMaxHeight()) {
         if (capabilities.minimize) {
-            CaptionButton(s.windowMinimize, plain, onClick = host::minimize) { c ->
+            CaptionButton(s.text("windowMinimize"), plain, onClick = host::minimize) { c ->
                 val stroke = glyphStroke()
                 val y = snap(size.height / 2f, stroke)
                 drawLine(c, Offset(0f, y), Offset(size.width, y), stroke, StrokeCap.Butt)
@@ -89,7 +89,7 @@ fun WindowControls(
         // The toolkit's answer stays in as well: on Windows and macOS it is the
         // only one there is.
         if (host.maximizeSupported && capabilities.maximize) {
-            CaptionButton(if (maximized) s.windowRestore else s.windowMaximize, plain, onClick = host::toggleMaximize) { c ->
+            CaptionButton(if (maximized) s.text("windowRestore") else s.text("windowMaximize"), plain, onClick = host::toggleMaximize) { c ->
                 val stroke = glyphStroke()
                 if (maximized) {
                     // The window in front, and the edges of the one behind it that show.
@@ -105,7 +105,7 @@ fun WindowControls(
             }
         }
 
-        CaptionButton(s.windowClose, close, onClick = onClose) { c ->
+        CaptionButton(s.text("windowClose"), close, onClick = onClose) { c ->
             val stroke = glyphStroke()
             drawLine(c, Offset(0f, 0f), Offset(size.width, size.height), stroke, StrokeCap.Butt)
             drawLine(c, Offset(size.width, 0f), Offset(0f, size.height), stroke, StrokeCap.Butt)

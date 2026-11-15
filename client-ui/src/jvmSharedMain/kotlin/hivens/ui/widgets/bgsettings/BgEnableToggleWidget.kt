@@ -1,7 +1,7 @@
 package hivens.ui.widgets.bgsettings
 
 import androidx.compose.runtime.Composable
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.nx.NxToggle
 import hivens.widget.model.Widget
@@ -10,11 +10,11 @@ import hivens.widget.model.Widget
 @Composable
 fun BgEnableToggleWidget() {
     val bg = rememberBgSettings() ?: return
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val settings = bg.value
 
     NxToggle(
-        label           = s.backgroundEnable,
+        label           = s.text("backgroundEnable"),
         checked         = settings.enabled,
         icon            = NxIcon.Wallpaper,
         onCheckedChange = { bg.update { copy(enabled = it) } },

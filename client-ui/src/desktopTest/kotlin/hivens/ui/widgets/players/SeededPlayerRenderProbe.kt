@@ -16,8 +16,7 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.audio.PlaybackState
 import hivens.ui.audio.RepeatMode
 import hivens.ui.audio.TrackInfo
-import hivens.ui.i18n.AppLocale
-import hivens.ui.i18n.LocaleProvider
+import hivens.ui.i18n.ShippedLanguageProvider
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.Spacing
 import org.jetbrains.skia.EncodedImageFormat
@@ -57,7 +56,7 @@ class SeededPlayerRenderProbe {
     private fun sheet(name: String, wDp: Int, hDp: Int, dark: Boolean, body: @androidx.compose.runtime.Composable () -> Unit) {
         val d = 2f
         val scene = ImageComposeScene((wDp * d).toInt(), (hDp * d).toInt(), density = Density(d)) {
-            LocaleProvider(AppLocale.ENGLISH) {
+            ShippedLanguageProvider("en") {
                 NxTheme(dark = dark) {
                     Box(
                         Modifier.fillMaxSize().background(NxColor.page).padding(Spacing.s16),

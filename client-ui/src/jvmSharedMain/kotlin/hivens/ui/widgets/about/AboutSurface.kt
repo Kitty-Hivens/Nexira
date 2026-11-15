@@ -14,7 +14,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.AdaptiveWidth
 import hivens.ui.nx.WidthClass
 import hivens.ui.puppet.PuppetClick
@@ -50,7 +50,7 @@ private const val SURFACE = "about"
 // via the editor render with bounded constraints.
 @Composable
 fun AboutSurface(onBack: () -> Unit) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val host = rememberHostActions()
     val scope = rememberCoroutineScope()
 
@@ -58,7 +58,7 @@ fun AboutSurface(onBack: () -> Unit) {
     val showUpdateDialog  = remember { mutableStateOf(false) }
     val openDialog        = rememberLatestCommand<Unit> { showUpdateDialog.value = true }
 
-    val unknownErrorText = s.updateErrorUnknown
+    val unknownErrorText = s.text("updateErrorUnknown")
     val triggerUpdateCheck: () -> Unit = remember(scope, host, unknownErrorText) {
         {
             updateState.value = UpdateCheckState.Checking

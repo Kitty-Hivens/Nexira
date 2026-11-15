@@ -30,10 +30,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import hivens.i18n.api.Strings
 import hivens.launcher.legacy.RetiredClientAdopter
 import hivens.launcher.legacy.RetiredClientScanner
 import hivens.launcher.legacy.RetiredDataSweeper
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.nx.NxButton
@@ -84,7 +85,7 @@ fun RetiredClientsHost() {
 
     LaunchedEffect(Unit) { state.load() }
 
-    NxDialog(onDismissRequest = { if (!state.running) gate.dismiss() }, paneTitle = LocalStrings.current.retiredTitle) {
+    NxDialog(onDismissRequest = { if (!state.running) gate.dismiss() }, paneTitle = nexiraStrings().text("retiredTitle")) {
         RetiredClientsBody(
             rows = state.rows,
             loading = state.loading,
@@ -135,10 +136,10 @@ private fun Loading() {
 
 @Composable
 private fun Done(rows: List<RetiredRow>, reclaimedBytes: Long, onClose: () -> Unit) {
-    val s = LocalStrings.current
-    Text(s.retiredTitle, style = MaterialTheme.typography.titleLarge, color = NxInk.main)
+    val s = nexiraStrings()
+    Text(s.text("retiredTitle"), style = MaterialTheme.typography.titleLarge, color = NxInk.main)
     Text(
-        text = if (reclaimedBytes > 0) s.retiredDone(byteSizeLabel(reclaimedBytes)) else s.retiredDoneNothing,
+        text = if (reclaimedBytes > 0) s.text("retiredDone", byteSizeLabel(reclaimedBytes)) else s.text("retiredDoneNothing"),
         style = MaterialTheme.typography.bodyMedium,
         color = NxInk.quiet,
     )
@@ -149,26 +150,26 @@ private fun Done(rows: List<RetiredRow>, reclaimedBytes: Long, onClose: () -> Un
         rows.forEach { row -> OutcomeLine(row) }
     }
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-        NxButton(label = s.retiredClose, onClick = onClose, style = NxButtonStyle.Primary)
+        NxButton(label = s.text("retiredClose"), onClick = onClose, style = NxButtonStyle.Primary)
     }
 }
 
 @Composable
 private fun OutcomeLine(row: RetiredRow) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val outcome = row.outcome
     val (text, tint) = when (outcome) {
         // A kept source is a success with a condition attached, and green says
         // there is nothing left to read. The reader has to go and look at that one.
         is RetiredOutcome.Adopted -> if (outcome.sourceKept) {
-            s.retiredAdoptedSourceKept to NxColor.status(Status.Warning)
+            s.text("retiredAdoptedSourceKept") to NxColor.status(Status.Warning)
         } else {
-            s.retiredAdopted to NxColor.status(Status.Success)
+            s.text("retiredAdopted") to NxColor.status(Status.Success)
         }
-        RetiredOutcome.Deleted -> s.retiredDeleted to NxInk.quiet
-        RetiredOutcome.PartlyDeleted -> s.retiredPartlyDeleted to NxColor.status(Status.Warning)
+        RetiredOutcome.Deleted -> s.text("retiredDeleted") to NxInk.quiet
+        RetiredOutcome.PartlyDeleted -> s.text("retiredPartlyDeleted") to NxColor.status(Status.Warning)
         is RetiredOutcome.Failed ->
-            (if (outcome.reason == "remove") s.retiredRemoveFailed else s.retiredFailed) to NxColor.status(Status.Error)
+            (if (outcome.reason == "remove") s.text("retiredRemoveFailed") else s.text("retiredFailed")) to NxColor.status(Status.Error)
         // Left alone, which is an outcome and not an instruction -- naming the
         // button they did not press would read as one.
         null -> "\u2014" to NxInk.quiet.copy(alpha = 0.6f)
@@ -195,13 +196,13 @@ private fun Chooser(
     onClose: () -> Unit,
     onApply: () -> Unit,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val totalBytes = rows.sumOf { it.client.sizeBytes }
     val anyChosen = rows.any { it.choice != RetiredChoice.Keep }
-    Text(s.retiredTitle, style = MaterialTheme.typography.titleLarge, color = NxInk.main)
-    Text(s.retiredIntro, style = MaterialTheme.typography.bodyMedium, color = NxInk.quiet)
+    Text(s.text("retiredTitle"), style = MaterialTheme.typography.titleLarge, color = NxInk.main)
+    Text(s.text("retiredIntro"), style = MaterialTheme.typography.bodyMedium, color = NxInk.quiet)
     Text(
-        text = s.retiredFound(rows.size, byteSizeLabel(totalBytes)),
+        text = s.text("retiredFound", rows.size, byteSizeLabel(totalBytes)),
         style = MaterialTheme.typography.labelLarge,
         color = NxColor.lead(),
     )
@@ -233,7 +234,7 @@ private fun Chooser(
     if (rows.any { it.choice == RetiredChoice.Delete }) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Symbol(NxIcon.Warning, contentDescription = null, tint = NxColor.status(Status.Warning), size = 16.dp)
-            Text(s.retiredWarning, style = MaterialTheme.typography.bodySmall, color = NxColor.status(Status.Warning))
+            Text(s.text("retiredWarning"), style = MaterialTheme.typography.bodySmall, color = NxColor.status(Status.Warning))
         }
     }
 
@@ -246,7 +247,7 @@ private fun Chooser(
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Symbol(NxIcon.Warning, contentDescription = null, tint = NxColor.status(Status.Warning), size = 16.dp)
             Text(
-                text = s.retiredBlockedBy(blocking.joinToString(", ") { it.client.name }),
+                text = s.text("retiredBlockedBy", blocking.joinToString(", ") { it.client.name }),
                 style = MaterialTheme.typography.bodySmall,
                 color = NxColor.status(Status.Warning),
                 maxLines = 2,
@@ -266,12 +267,12 @@ private fun Chooser(
                 strokeWidth = 2.dp,
                 modifier = Modifier.width(16.dp).height(16.dp),
             )
-            Text(s.retiredBusy, style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
+            Text(s.text("retiredBusy"), style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
             Spacer(Modifier.width(8.dp))
         }
-        NxButton(label = s.retiredClose, onClick = onClose, style = NxButtonStyle.Tertiary, enabled = !running)
+        NxButton(label = s.text("retiredClose"), onClick = onClose, style = NxButtonStyle.Tertiary, enabled = !running)
         NxButton(
-            label = s.retiredApply,
+            label = s.text("retiredApply"),
             onClick = onApply,
             style = NxButtonStyle.Primary,
             // Nothing chosen is a real answer -- the reader looked and left -- so
@@ -285,7 +286,7 @@ private fun Chooser(
 
 @Composable
 private fun ClientRow(row: RetiredRow, running: Boolean) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     NxCard(modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -318,14 +319,14 @@ private fun ClientRow(row: RetiredRow, running: Boolean) {
                 // gating it here made the one row that needs typing the one row
                 // nobody could type into.
                 NxChoiceChip(
-                    label = s.retiredChoiceAdopt,
+                    label = s.text("retiredChoiceAdopt"),
                     selected = row.choice == RetiredChoice.Adopt,
                     enabled = !running,
                 ) {
                     row.choice = if (row.choice == RetiredChoice.Adopt) RetiredChoice.Keep else RetiredChoice.Adopt
                 }
                 NxChoiceChip(
-                    label = s.retiredChoiceDelete,
+                    label = s.text("retiredChoiceDelete"),
                     selected = row.choice == RetiredChoice.Delete,
                     enabled = !running,
                 ) {
@@ -344,7 +345,7 @@ private fun ClientRow(row: RetiredRow, running: Boolean) {
                     NxField(
                         value = row.loader,
                         onValueChange = { row.loader = it },
-                        placeholder = s.retiredLoaderVanilla,
+                        placeholder = s.text("retiredLoaderVanilla"),
                         modifier = Modifier.width(120.dp),
                     )
                     // Which sentence depends on whether the fields hold enough to
@@ -352,7 +353,7 @@ private fun ClientRow(row: RetiredRow, running: Boolean) {
                     // back, and it is said here rather than left to a button that
                     // does nothing when pressed.
                     Text(
-                        text = if (row.adoptable) s.retiredDetected else s.retiredNeedsVersion,
+                        text = if (row.adoptable) s.text("retiredDetected") else s.text("retiredNeedsVersion"),
                         style = MaterialTheme.typography.bodySmall,
                         color = if (row.adoptable) NxInk.quiet else NxColor.status(Status.Warning),
                         modifier = Modifier.weight(1f),
@@ -371,14 +372,14 @@ private fun ClientRow(row: RetiredRow, running: Boolean) {
  * all and it belongs beside the other two rather than in a sentence further down.
  */
 @Composable
-private fun factsOf(row: RetiredRow, s: hivens.ui.i18n.AppStrings): String {
+private fun factsOf(row: RetiredRow, s: Strings): String {
     val parts = buildList {
         add(byteSizeLabel(row.client.sizeBytes))
-        if (row.client.modCount > 0) add(s.retiredMods(row.client.modCount))
+        if (row.client.modCount > 0) add(s.text("retiredMods", row.client.modCount))
         if (row.adoptable) {
-            add(listOf(row.mcVersion, row.loader.ifBlank { s.retiredLoaderVanilla }).joinToString(" "))
+            add(listOf(row.mcVersion, row.loader.ifBlank { s.text("retiredLoaderVanilla") }).joinToString(" "))
         } else {
-            add(s.retiredNoVersion)
+            add(s.text("retiredNoVersion"))
         }
     }
     return parts.joinToString(" \u00b7 ")

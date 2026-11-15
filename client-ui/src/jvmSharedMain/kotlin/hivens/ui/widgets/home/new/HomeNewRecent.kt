@@ -18,6 +18,7 @@ import hivens.core.launch.LaunchControlMode
 import hivens.packs.api.PackKeys
 import hivens.packs.api.PackView
 import hivens.ui.components.rememberLaunchControl
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.PlayGround
 import hivens.ui.nx.PlayLayout
 import hivens.ui.screens.library.PendingUpdateBadge
@@ -56,7 +57,6 @@ import hivens.accounts.api.AccountKeys
 import hivens.accounts.api.SessionState
 import hivens.ui.Screen
 import hivens.ui.effects.pixelArtBackground
-import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.screens.library.lastPlayedLabel
@@ -115,7 +115,7 @@ fun HomeNewRecent(instance: WidgetInstance) {
     val p = instance.rememberProps<RecentProps>()
     val appState = rememberScopedSource(AccountKeys.Session).valueOrNull()
     val navigate = rememberScopedCommand(Commands.Navigate) ?: return
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val all = rememberScopedSource(PackKeys.Library).valueOrNull() ?: return
 
     if (all.isEmpty()) {
@@ -129,7 +129,7 @@ fun HomeNewRecent(instance: WidgetInstance) {
 
     Column(Modifier.fillMaxWidth().padding(16.dp)) {
         Text(
-            text       = p.title.ifBlank { s.homeRecentTitle },
+            text       = p.title.ifBlank { s.text("homeRecentTitle") },
             style      = MaterialTheme.typography.titleSmall,
             color      = NxInk.main,
             fontWeight = FontWeight.SemiBold,
@@ -285,7 +285,7 @@ private val ROOMY_TILE = 300.dp
 
 @Composable
 internal fun EmptyPacksCta(onBrowse: () -> Unit) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -293,13 +293,13 @@ internal fun EmptyPacksCta(onBrowse: () -> Unit) {
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(
-            text       = s.homeNoPacksTitle,
+            text       = s.text("homeNoPacksTitle"),
             style      = MaterialTheme.typography.titleSmall,
             color      = NxInk.main,
             fontWeight = FontWeight.SemiBold,
         )
         Text(
-            text  = s.homeNoPacksBody,
+            text  = s.text("homeNoPacksBody"),
             style = MaterialTheme.typography.bodySmall,
             color = NxInk.quiet,
         )
@@ -313,7 +313,7 @@ internal fun EmptyPacksCta(onBrowse: () -> Unit) {
         ) {
             Symbol(NxIcon.Search, contentDescription = null, modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(6.dp))
-            Text(s.browseOpen, fontWeight = FontWeight.Medium)
+            Text(s.text("browseOpen"), fontWeight = FontWeight.Medium)
         }
     }
 }

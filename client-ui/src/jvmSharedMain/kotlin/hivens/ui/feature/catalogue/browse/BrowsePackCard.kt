@@ -34,7 +34,8 @@ import hivens.catalogue.api.CatalogueCard
 import hivens.catalogue.api.PackOrigins
 import hivens.ui.components.SourceBadge
 import hivens.ui.effects.pixelArtBackground
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.modrinthCategory
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.nx.InitialsAvatar
@@ -62,7 +63,7 @@ fun BrowsePackCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val (hueA, hueB) = decorativePair(pack.id)
     Box(
         modifier = modifier
@@ -114,7 +115,7 @@ fun BrowsePackCard(
                     if (!narrow) {
                         pack.author?.let { author ->
                             Text(
-                                text     = s.browseByAuthor(author),
+                                text     = s.text("browseByAuthor", author),
                                 style    = MaterialTheme.typography.bodySmall,
                                 color    = Color.White.copy(alpha = 0.75f),
                                 maxLines = 1,
@@ -127,7 +128,7 @@ fun BrowsePackCard(
                 if (narrow) {
                     pack.author?.let { author ->
                         Text(
-                            text     = s.browseByAuthor(author),
+                            text     = s.text("browseByAuthor", author),
                             style    = MaterialTheme.typography.bodySmall,
                             color    = Color.White.copy(alpha = 0.75f),
                             maxLines = 1,

@@ -10,8 +10,7 @@ import androidx.compose.ui.unit.Density
 import hivens.launcher.CrashReporter
 import hivens.launcher.bootstrap.LauncherBootstrap
 import hivens.launcher.platform.PlatformPaths
-import hivens.ui.i18n.AppLocale
-import hivens.ui.i18n.stringsFor
+import hivens.ui.i18n.NexiraStrings
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.jetbrains.skia.EncodedImageFormat
 import org.koin.dsl.koinApplication
@@ -70,7 +69,7 @@ class ThresholdOverlayRenderTest {
         val tmp = Files.createTempDirectory("threshold-render")
         val stage = MutableStateFlow(BootStage.Modules)
         val outcome = readyOutcome(tmp)
-        val strings = stringsFor(AppLocale.fromTag("ru"))
+        val strings = NexiraStrings.shipped("ru")
 
         val width = 1280
         val height = 800
@@ -131,7 +130,7 @@ class ThresholdOverlayRenderTest {
                 ThresholdOverlay(
                     stageFlow = MutableStateFlow(BootStage.Modules),
                     outcome   = BootOutcome.Failed(IllegalStateException("no definition found for a thing")),
-                    strings   = stringsFor(AppLocale.fromTag("ru")),
+                    strings   = NexiraStrings.shipped("ru"),
                     logsDir   = tmp,
                     dark      = true,
                     onQuit    = {},

@@ -65,6 +65,7 @@ import hivens.core.update.PackUpdater
 import hivens.core.update.UpdateCheck
 import hivens.core.update.UpdateOutcome
 import hivens.core.update.VersionChannel
+import hivens.i18n.api.Strings
 import hivens.launcher.PackOperation
 import hivens.launcher.PackOperationKind
 import hivens.launcher.PackOperationPhase
@@ -75,8 +76,7 @@ import hivens.ui.components.ReleaseNotes
 import hivens.ui.components.formatBuildTime
 import hivens.ui.components.formatBuildTimestamp
 import hivens.ui.components.label
-import hivens.ui.i18n.AppStrings
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.nx.CenteredProgress
 import hivens.ui.nx.NxButton
@@ -133,7 +133,7 @@ fun PackVersionsScreen(instanceId: String, onBack: () -> Unit) {
     val icons: ModIconResolver = koinInject()
     val hub: PackUpdateStatusHub = koinInject()
     val operations: PackOperationService = koinInject()
-    val s = LocalStrings.current
+    val s = nexiraStrings()
 
     // Follows the registry rather than reading it once: an apply started in the
     // settings window this screen was opened from lands underneath it, and so does
@@ -295,7 +295,7 @@ fun PackVersionsScreen(instanceId: String, onBack: () -> Unit) {
                             )
                         }
                     } else if (builds != null && builds!!.isEmpty() && !loadFailed) {
-                        Text(s.packVersionsLoadError, color = NxInk.quiet)
+                        Text(s.text("packVersionsLoadError"), color = NxInk.quiet)
                     }
                 }
             }
@@ -307,7 +307,7 @@ fun PackVersionsScreen(instanceId: String, onBack: () -> Unit) {
         PuppetClick("packVersions.close") { onBack() }
         NxIconButton(
             icon               = NxIcon.Close,
-            contentDescription = s.packSettingsClose,
+            contentDescription = s.text("packSettingsClose"),
             onClick            = onBack,
             modifier           = Modifier.align(Alignment.TopEnd).padding(10.dp),
         )
@@ -317,13 +317,13 @@ fun PackVersionsScreen(instanceId: String, onBack: () -> Unit) {
         // The plan is absent for a source that cannot describe the change without
         // being handed the pack; the confirmation then names the versions only.
         val planLines = preview.plan?.let { plan ->
-            "\n" + s.packVersionsPlanCounts(plan.toAdd.size, plan.toUpdate.size, plan.toDelete.size) +
-                if (plan.conflicts.isNotEmpty()) "\n" + s.packVersionsConflicts(plan.conflicts.size) else ""
+            "\n" + s.text("packVersionsPlanCounts", plan.toAdd.size, plan.toUpdate.size, plan.toDelete.size) +
+                if (plan.conflicts.isNotEmpty()) "\n" + s.text("packVersionsConflicts", plan.conflicts.size) else ""
         }.orEmpty()
         DestructiveConfirmDialog(
-            title        = s.packVersionsConfirmTitle,
-            body         = s.packVersionsConfirmBody(installedVersion ?: "?", preview.toVersion) + planLines,
-            confirmLabel = s.packVersionSwitch,
+            title        = s.text("packVersionsConfirmTitle"),
+            body         = s.text("packVersionsConfirmBody", installedVersion ?: "?", preview.toVersion) + planLines,
+            confirmLabel = s.text("packVersionSwitch"),
             onConfirm    = {
                 // The identity, not the label: two builds can share a number and
                 // the one applied must be the one the row stood for.
@@ -354,11 +354,11 @@ private fun BuildListPane(
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     when {
         loadFailed -> Column(modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            NxCalloutBanner(body = s.packVersionsLoadError, tone = NxCalloutTone.Error) {
-                NxButton(s.packVersionsRetry, onClick = onRetry, style = NxButtonStyle.Secondary, compact = true)
+            NxCalloutBanner(body = s.text("packVersionsLoadError"), tone = NxCalloutTone.Error) {
+                NxButton(s.text("packVersionsRetry"), onClick = onRetry, style = NxButtonStyle.Secondary, compact = true)
             }
         }
         builds == null -> Box(modifier, contentAlignment = Alignment.Center) {
@@ -447,7 +447,7 @@ private fun BuildRow(
     onToggleRun: () -> Unit,
     onClick: () -> Unit,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val shape = MaterialTheme.shapes.medium
     val interaction = remember { MutableInteractionSource() }
     val fill = if (isSelected) NxColor.wash(NxColor.lead(), 0.14f) else Color.Transparent
@@ -478,8 +478,8 @@ private fun BuildRow(
                     modifier = Modifier.weight(1f, fill = false),
                 )
                 ChannelChip(build.channel)
-                if (isInstalled) NxMetaChip(s.packVersionCurrentTag, tone = NxMetaChipTone.Success)
-                else if (isLatest) NxMetaChip(s.packVersionsLatestTag, tone = NxMetaChipTone.Surface)
+                if (isInstalled) NxMetaChip(s.text("packVersionCurrentTag"), tone = NxMetaChipTone.Success)
+                else if (isLatest) NxMetaChip(s.text("packVersionsLatestTag"), tone = NxMetaChipTone.Surface)
             }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
@@ -492,7 +492,7 @@ private fun BuildRow(
                     // those rows stop reading as though something were missing.
                     text  = listOfNotNull(
                         formatBuildTimestamp(build.datePublished),
-                        build.modsCount?.let { mods -> build.assetsCount?.let { assets -> s.packVersionsCounts(mods, assets) } },
+                        build.modsCount?.let { mods -> build.assetsCount?.let { assets -> s.text("packVersionsCounts", mods, assets) } },
                         listOfNotNull(build.minecraftVersion, build.loaderName)
                             .takeIf { it.isNotEmpty() }
                             ?.joinToString(" "),
@@ -503,7 +503,7 @@ private fun BuildRow(
             }
             if (rebuildTail > 0) {
                 Text(
-                    text     = s.packVersionsRebuilds(rebuildTail),
+                    text     = s.text("packVersionsRebuilds", rebuildTail),
                     style    = MaterialTheme.typography.labelSmall,
                     color    = if (tailShown) NxColor.lead() else NxInk.quiet,
                     modifier = Modifier
@@ -532,7 +532,7 @@ private fun BuildDetailPane(
     busy: Boolean,
     onSwitch: (UpdateCheck.Available) -> Unit,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val isInstalled = build.key == installedKey
 
     // Compat preview for a would-be switch; refreshed when the selection or the
@@ -561,7 +561,7 @@ private fun BuildDetailPane(
                 modifier   = Modifier.weight(1f, fill = false),
             )
             ChannelChip(build.channel)
-            if (isInstalled) NxMetaChip(s.packVersionCurrentTag, tone = NxMetaChipTone.Success)
+            if (isInstalled) NxMetaChip(s.text("packVersionCurrentTag"), tone = NxMetaChipTone.Success)
         }
         formatBuildTimestamp(build.datePublished)?.let {
             Text(it, style = MaterialTheme.typography.labelMedium, color = NxInk.quiet)
@@ -569,7 +569,7 @@ private fun BuildDetailPane(
 
         // The curator's "why" next to the structural diff's "what".
         build.changelog?.takeIf { it.isNotBlank() }?.let { notes ->
-            NxSection(s.packVersionsNotes) {
+            NxSection(s.text("packVersionsNotes")) {
                 ReleaseNotes(notes)
             }
         }
@@ -585,16 +585,16 @@ private fun BuildDetailPane(
                     // Without a plan the banner leads with the version instead of
                     // a file tally, rather than showing a tally of nothing.
                     title = p.plan
-                        ?.let { s.packVersionsPlanCounts(it.toAdd.size, it.toUpdate.size, it.toDelete.size) }
-                        ?: s.packVersionsSwitchTo,
-                    body  = (if (p.compat.isSafe) s.packVersionSafe else s.packVersionNeedsCare) +
-                        (p.plan?.takeIf { it.conflicts.isNotEmpty() }?.let { "\n" + s.packVersionsConflicts(it.conflicts.size) }.orEmpty()),
+                        ?.let { s.text("packVersionsPlanCounts", it.toAdd.size, it.toUpdate.size, it.toDelete.size) }
+                        ?: s.text("packVersionsSwitchTo"),
+                    body  = (if (p.compat.isSafe) s.text("packVersionSafe") else s.text("packVersionNeedsCare")) +
+                        (p.plan?.takeIf { it.conflicts.isNotEmpty() }?.let { "\n" + s.text("packVersionsConflicts", it.conflicts.size) }.orEmpty()),
                     tone  = if (p.compat.isSafe) NxCalloutTone.Info else NxCalloutTone.Warning,
                 ) {
                     Row {
                         PuppetClick("packVersions.switch.${build.versionNumber}", enabled = !busy) { onSwitch(p) }
                         NxButton(
-                            label   = s.packVersionsSwitchTo,
+                            label   = s.text("packVersionsSwitchTo"),
                             onClick = { onSwitch(p) },
                             enabled = !busy,
                             compact = true,
@@ -611,7 +611,7 @@ private fun BuildDetailPane(
         if (describesContents) {
             DiffSection(pack, builds, build, installedKey, installedVersion, mirror, icons)
         } else {
-            Text(s.packVersionsNoDiffSource, style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
+            Text(s.text("packVersionsNoDiffSource"), style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
         }
     }
 }
@@ -626,7 +626,7 @@ private fun DiffSection(
     mirror: IMirrorPackClient,
     icons: ModIconResolver,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     var base by remember(build.key) { mutableStateOf(DiffBase.Previous) }
 
     // Previous distinct-content build: skip same-fingerprint rebuild siblings so
@@ -646,9 +646,9 @@ private fun DiffSection(
     }
 
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        NxChoiceChip(s.packVersionsDiffVsPrevious, selected = base == DiffBase.Previous) { base = DiffBase.Previous }
+        NxChoiceChip(s.text("packVersionsDiffVsPrevious"), selected = base == DiffBase.Previous) { base = DiffBase.Previous }
         NxChoiceChip(
-            label    = s.packVersionsDiffVsInstalled,
+            label    = s.text("packVersionsDiffVsInstalled"),
             selected = base == DiffBase.Installed,
             enabled  = !isInstalled && installedVersion != null,
         ) { base = DiffBase.Installed }
@@ -656,11 +656,11 @@ private fun DiffSection(
 
     when {
         base == DiffBase.Previous && previous == null ->
-            Text(s.packVersionsFirstBuild, style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
+            Text(s.text("packVersionsFirstBuild"), style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
         baseVersion == null ->
-            Text(s.packVersionsFirstBuild, style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
+            Text(s.text("packVersionsFirstBuild"), style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
         baseVersion == build.versionNumber ->
-            Text(s.packVersionsIdentical, style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
+            Text(s.text("packVersionsIdentical"), style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
         else -> {
             val diff by produceState<Result<Pair<PackVersionDiff, SmrtBuildDiff?>>?>(null, build.versionNumber, baseVersion) {
                 value = null
@@ -692,7 +692,7 @@ private fun DiffSection(
                 else -> result.fold(
                     onSuccess = { (computed, enriched) -> DiffBody(computed, enriched, icons) },
                     onFailure = {
-                        NxCalloutBanner(body = s.packVersionsFailed(it.message ?: it.toString()), tone = NxCalloutTone.Error)
+                        NxCalloutBanner(body = s.text("packVersionsFailed", it.message ?: it.toString()), tone = NxCalloutTone.Error)
                     },
                 )
             }
@@ -702,11 +702,11 @@ private fun DiffSection(
 
 @Composable
 private fun DiffBody(diff: PackVersionDiff, enriched: SmrtBuildDiff?, icons: ModIconResolver) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val labels = remember(enriched) { DiffLabels.from(enriched) }
 
     if (diff.identicalContent && diff.minecraft == null && diff.loader == null && diff.java == null) {
-        Text(s.packVersionsIdentical, style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
+        Text(s.text("packVersionsIdentical"), style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
         return
     }
 
@@ -716,7 +716,7 @@ private fun DiffBody(diff: PackVersionDiff, enriched: SmrtBuildDiff?, icons: Mod
         diff.java?.let { "Java: ${it.from} → ${it.to}" },
     )
     if (packChanges.isNotEmpty()) {
-        NxSection(s.packVersionsSectionPack) {
+        NxSection(s.text("packVersionsSectionPack")) {
             packChanges.forEach { line ->
                 Text(line, style = MaterialTheme.typography.bodySmall, color = NxInk.main)
             }
@@ -724,17 +724,17 @@ private fun DiffBody(diff: PackVersionDiff, enriched: SmrtBuildDiff?, icons: Mod
     }
 
     if (diff.identicalContent) {
-        Text(s.packVersionsIdentical, style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
+        Text(s.text("packVersionsIdentical"), style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
         return
     }
 
     if (diff.mods.isNotEmpty()) {
-        NxSection(s.packVersionsSectionMods) {
+        NxSection(s.text("packVersionsSectionMods")) {
             DiffGroup(diff.mods, labels, icons)
         }
     }
     if (diff.assets.isNotEmpty()) {
-        NxSection(s.packVersionsSectionAssets) {
+        NxSection(s.text("packVersionsSectionAssets")) {
             diff.assets.forEach { entry ->
                 val subject = entry.to ?: entry.from
                 NxDiffRow(
@@ -749,7 +749,7 @@ private fun DiffBody(diff: PackVersionDiff, enriched: SmrtBuildDiff?, icons: Mod
 
 @Composable
 private fun DiffGroup(entries: List<DiffEntry<SmrtModEntry>>, labels: DiffLabels, icons: ModIconResolver) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val added = entries.filter { it.kind == DiffKind.Added }
     val updated = entries.filter { it.kind == DiffKind.Updated }
     val removed = entries.filter { it.kind == DiffKind.Removed }
@@ -759,22 +759,22 @@ private fun DiffGroup(entries: List<DiffEntry<SmrtModEntry>>, labels: DiffLabels
         Text(text, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = NxInk.quiet)
 
     if (added.isNotEmpty()) {
-        header(s.packVersionsAdded(added.size))
+        header(s.text("packVersionsAdded", added.size))
         added.forEach { ModDiffRow(it, labels, icons) }
     }
     if (updated.isNotEmpty()) {
-        header(s.packVersionsUpdated(updated.size))
+        header(s.text("packVersionsUpdated", updated.size))
         updated.forEach { ModDiffRow(it, labels, icons) }
     }
     if (removed.isNotEmpty()) {
-        header(s.packVersionsRemoved(removed.size))
+        header(s.text("packVersionsRemoved", removed.size))
         removed.forEach { ModDiffRow(it, labels, icons) }
     }
 }
 
 @Composable
 private fun ModDiffRow(entry: DiffEntry<SmrtModEntry>, labels: DiffLabels, icons: ModIconResolver) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val subject = entry.to ?: entry.from ?: return
     val title = subject.display?.name?.takeIf { it.isNotBlank() } ?: subject.filename
     // The mirror's registry labels beat anything derivable from the manifests:
@@ -861,15 +861,15 @@ private fun SnapshotsSection(
     busy: Boolean,
     onRestore: (PackSnapshot) -> Unit,
 ) {
-    val s = LocalStrings.current
-    NxSection(s.packVersionSnapshots) {
+    val s = nexiraStrings()
+    NxSection(s.text("packVersionSnapshots")) {
         snapshots.forEach { snap ->
             val whenLabel = runCatching {
                 formatBuildTime(Instant.ofEpochMilli(snap.createdAtEpoch))
             }.getOrDefault(snap.id)
             NxRow(title = whenLabel, subtitle = snap.fromVersion) {
                 NxButton(
-                    label   = s.packVersionRestore,
+                    label   = s.text("packVersionRestore"),
                     onClick = { onRestore(snap) },
                     style   = NxButtonStyle.Tertiary,
                     enabled = !busy,
@@ -877,7 +877,7 @@ private fun SnapshotsSection(
                 )
             }
         }
-        Text(s.packVersionSnapshotsHint, style = MaterialTheme.typography.labelSmall, color = NxInk.quiet)
+        Text(s.text("packVersionSnapshotsHint"), style = MaterialTheme.typography.labelSmall, color = NxInk.quiet)
     }
 }
 
@@ -892,7 +892,7 @@ private fun SnapshotsSection(
  */
 @Composable
 private fun StatusRow(operation: PackOperation?) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     Box(Modifier.fillMaxWidth().height(34.dp).padding(top = 8.dp), contentAlignment = Alignment.CenterStart) {
         when (val phase = operation?.phase) {
             null -> Unit
@@ -904,7 +904,7 @@ private fun StatusRow(operation: PackOperation?) {
                         color    = NxColor.lead(),
                     )
                     Text(
-                        text  = s.packVersionsApplying(phase.current, phase.total, phase.path),
+                        text  = s.text("packVersionsApplying", phase.current, phase.total, phase.path),
                         style = MaterialTheme.typography.labelSmall,
                         color = NxInk.quiet,
                         maxLines = 1,
@@ -916,7 +916,7 @@ private fun StatusRow(operation: PackOperation?) {
             }
             is PackOperationPhase.Updated -> Text(
                 // Said the way the settings sheet says it, so one outcome reads the same on both.
-                text  = if (operation.kind == PackOperationKind.Reattach) s.packSettingsReattached(phase.version) else s.packVersionsApplied(phase.version),
+                text  = if (operation.kind == PackOperationKind.Reattach) s.text("packSettingsReattached", phase.version) else s.text("packVersionsApplied", phase.version),
                 style = MaterialTheme.typography.labelSmall,
                 color = NxColor.status(Status.Success),
             )
@@ -925,9 +925,9 @@ private fun StatusRow(operation: PackOperation?) {
             // success on this screen and as a shortfall on the settings one.
             is PackOperationPhase.Repaired -> Text(
                 text     = if (phase.failed.isEmpty()) {
-                    s.packSettingsRepairDone(phase.checked, phase.repaired)
+                    s.text("packSettingsRepairDone", phase.checked, phase.repaired)
                 } else {
-                    s.packSettingsRepairIncomplete(
+                    s.text("packSettingsRepairIncomplete", 
                         phase.checked,
                         phase.repaired,
                         phase.failed.size,
@@ -940,21 +940,21 @@ private fun StatusRow(operation: PackOperation?) {
                 overflow = TextOverflow.Ellipsis,
             )
             is PackOperationPhase.Failed -> Text(
-                text     = s.packVersionsFailed(phase.message),
+                text     = s.text("packVersionsFailed", phase.message),
                 style    = MaterialTheme.typography.labelSmall,
                 color    = NxColor.status(Status.Error),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             is PackOperationPhase.Refused -> Text(
-                text     = s.packOperationRefused(phase.work.label(s)),
+                text     = s.text("packOperationRefused", phase.work.label(s)),
                 style    = MaterialTheme.typography.labelSmall,
                 color    = NxColor.status(Status.Error),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             PackOperationPhase.PreviewStale -> Text(
-                text     = s.packSettingsReattachStale,
+                text     = s.text("packSettingsReattachStale"),
                 style    = MaterialTheme.typography.labelSmall,
                 color    = NxColor.status(Status.Error),
                 maxLines = 1,
@@ -972,7 +972,7 @@ private fun DiffKind.toRowKind(): NxDiffRowKind = when (this) {
     DiffKind.Updated -> NxDiffRowKind.Updated
 }
 
-private fun sizeLabel(fromBytes: Long?, toBytes: Long?, s: AppStrings): String? = when {
+private fun sizeLabel(fromBytes: Long?, toBytes: Long?, s: Strings): String? = when {
     fromBytes != null && toBytes != null && fromBytes != toBytes -> "${humanSize(fromBytes, s)} → ${humanSize(toBytes, s)}"
     toBytes != null -> humanSize(toBytes, s)
     fromBytes != null -> humanSize(fromBytes, s)

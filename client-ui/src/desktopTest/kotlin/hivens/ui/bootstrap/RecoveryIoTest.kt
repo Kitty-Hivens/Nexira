@@ -132,4 +132,15 @@ class RecoveryIoTest {
     fun `readDisabledModules is empty on a clean install`() {
         assertTrue(RecoveryIo.readDisabledModules(dataDir).isEmpty())
     }
+
+    @Test
+    fun `resetSettings deletes the modules' settings files, so the language comes back as the first run picks it`() {
+        val domains = dataDir / Storage.SETTINGS_DIR
+        Files.createDirectories(domains)
+        Files.writeString(domains / "i18n.json", """{"schema":1,"value":{"language":"ja"}}""")
+        Files.writeString(domains / "notes.txt", "kept")
+        RecoveryIo.resetSettings(dataDir)
+        assertFalse(Files.exists(domains / "i18n.json"))
+        assertTrue(Files.exists(domains / "notes.txt"), "only the domains' own files go")
+    }
 }

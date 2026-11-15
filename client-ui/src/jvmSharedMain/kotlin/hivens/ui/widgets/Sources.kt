@@ -3,7 +3,6 @@ package hivens.ui.widgets
 import hivens.core.activity.Activity
 import hivens.core.data.ThemeMode
 import hivens.ui.background.BackgroundSettings
-import hivens.ui.i18n.AppLocale
 import hivens.ui.navigation.NavState
 import hivens.ui.notifications.PersistedNotification
 import hivens.ui.host.HostWindowState
@@ -79,9 +78,6 @@ object Sources {
 
     /** Whether the host can read the system's colour scheme, so following it can be offered. A fact of the host, so the app's. */
     val SystemSchemeAvailable = SourceKey<Boolean>("theme.system.available")
-
-    /** The language the composition speaks. Changed through [Commands.SetLocale]. */
-    val Locale = SourceKey<AppLocale>("locale", ScopeLevel.Composition)
 
     /** Whether the console is asked to be on screen. Changed through [Commands.SetConsoleVisible]. */
     val ConsoleVisible = SourceKey<Boolean>("console.visible")

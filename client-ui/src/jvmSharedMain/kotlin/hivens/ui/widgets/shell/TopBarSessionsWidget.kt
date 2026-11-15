@@ -26,7 +26,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import hivens.ui.editor.EditModeState
 import hivens.ui.editor.LocalEditMode
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
@@ -53,11 +53,11 @@ import java.time.Duration
 fun TopBarSessionsWidget() {
     val registry: SessionRegistry = koinInject()
     val active by registry.active.collectAsState()
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     if (active.isEmpty()) {
         if (LocalEditMode.current is EditModeState.On) {
             Text(
-                text = s.sessionsActiveTitle,
+                text = s.text("sessionsActiveTitle"),
                 style = MaterialTheme.typography.labelMedium,
                 color = NxInk.quiet,
                 modifier = Modifier.padding(horizontal = 8.dp),
@@ -73,7 +73,7 @@ fun TopBarSessionsWidget() {
 @Composable
 private fun SessionEntry(session: ActiveSession) {
     val uptime by session.uptime.collectAsState()
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
@@ -99,8 +99,8 @@ private fun SessionEntry(session: ActiveSession) {
             color = NxInk.quiet,
         )
         Spacer(Modifier.width(2.dp))
-        BarAction(NxIcon.MenuOpen, s.notifActionShowConsole, NxInk.quiet, session.showConsole)
-        BarAction(NxIcon.Stop, s.notifActionStop, NxColor.status(Status.Error), session.abort)
+        BarAction(NxIcon.MenuOpen, s.text("notifActionShowConsole"), NxInk.quiet, session.showConsole)
+        BarAction(NxIcon.Stop, s.text("notifActionStop"), NxColor.status(Status.Error), session.abort)
     }
 }
 

@@ -10,7 +10,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.text.font.FontFamily
 import hivens.ui.appearance.AppearanceStore
 import hivens.ui.customization.CustomizationSettings
-import hivens.ui.i18n.AppLocale
+import hivens.i18n.api.Translations
+import hivens.i18n.api.Translator
 import hivens.ui.theme.Theme
 import hivens.ui.theme.Themes
 
@@ -21,35 +22,35 @@ import hivens.ui.theme.Themes
  * main window's shell, where the settings that change them live. A window of the
  * application next to it, the console, is not inside that composition and inherits
  * none of it, so the shell writes what it decided here and the other window reads
- * it. Until the shell has written once, the scheme and the language are the ones
+ * it. Until the shell has written once, the scheme and the words are the ones
  * read before the boot.
  */
 @Stable
-class ShellLook(dark: Boolean, locale: AppLocale) {
+class ShellLook(dark: Boolean, words: Translator) {
     var theme: Theme by mutableStateOf(Themes.default)
         private set
     var dark: Boolean by mutableStateOf(dark)
         private set
-    var locale: AppLocale by mutableStateOf(locale)
+    var words: Translator by mutableStateOf(words)
         private set
     var uiFamily: FontFamily? by mutableStateOf(null)
         private set
     var customization: CustomizationSettings by mutableStateOf(CustomizationSettings())
         private set
 
-    fun update(theme: Theme, dark: Boolean, locale: AppLocale, uiFamily: FontFamily?, customization: CustomizationSettings) {
+    fun update(theme: Theme, dark: Boolean, words: Translator, uiFamily: FontFamily?, customization: CustomizationSettings) {
         this.theme = theme
         this.dark = dark
-        this.locale = locale
+        this.words = words
         this.uiFamily = uiFamily
         this.customization = customization
     }
 }
 
 /**
- * Keeps [look] on what the main window draws with: the theme, the scheme and the
- * language from [appearance], and what only the shell knows, [uiFamily] and
- * [customization].
+ * Keeps [look] on what the main window draws with: the theme and the scheme from
+ * [appearance], the words from [translations], and what only the shell knows,
+ * [uiFamily] and [customization].
  *
  * The appearance is read here, in a restart scope of its own, so a theme or a dark
  * scheme switched anywhere reaches the console at once. Published from the shell's
@@ -60,11 +61,12 @@ class ShellLook(dark: Boolean, locale: AppLocale) {
 internal fun PublishShellLook(
     look: ShellLook,
     appearance: AppearanceStore,
+    translations: Translations,
     uiFamily: FontFamily?,
     customization: CustomizationSettings,
 ) {
     val theme = appearance.library.collectAsState().value.active
     val dark = appearance.dark.collectAsState().value
-    val locale = appearance.locale.collectAsState().value
-    SideEffect { look.update(theme, dark, locale, uiFamily, customization) }
+    val words = translations.current.collectAsState().value
+    SideEffect { look.update(theme, dark, words, uiFamily, customization) }
 }

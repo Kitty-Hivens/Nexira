@@ -14,7 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.theme.NxInk
 import hivens.widget.api.rememberProps
 import hivens.widget.model.PropLabel
@@ -51,7 +51,7 @@ data class TimeProps(
 @Composable
 fun HomeNewTime(instance: WidgetInstance) {
     val p = instance.rememberProps<TimeProps>()
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     var now by remember { mutableStateOf(LocalDateTime.now()) }
     LaunchedEffect(Unit) {
         while (true) {

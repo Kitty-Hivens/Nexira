@@ -20,6 +20,9 @@ import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Density
+import hivens.ui.i18n.NexiraStrings
+import hivens.ui.i18n.ShippedLanguageProvider
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.surface.NxSurface
 import hivens.ui.text.needsCjkFace
 import hivens.ui.theme.NxTheme
@@ -69,13 +72,13 @@ class JapaneseUiRenderProbe {
     private fun Int.dp() = androidx.compose.ui.unit.Dp(this.toFloat())
 
     @OptIn(ExperimentalComposeUiApi::class)
-    private fun sheet(name: String, locale: AppLocale) {
+    private fun sheet(name: String, language: String) {
         val d = 2f
         val scene = ImageComposeScene((760 * d).toInt(), (420 * d).toInt(), density = Density(d)) {
-            LocaleProvider(locale) {
-                val s = LocalStrings.current
+            ShippedLanguageProvider(language) {
+                val s = nexiraStrings()
                 // The same decision AppShell makes, not a copy of its outcome.
-                val family = if (!needsCjkFace(s.settingsTitle + s.navLibrary + s.aboutTitle)) {
+                val family = if (!needsCjkFace(s.text("settingsTitle") + s.text("navLibrary") + s.text("aboutTitle"))) {
                     null
                 } else {
                     nexiraCjkFamily()
@@ -87,21 +90,21 @@ class JapaneseUiRenderProbe {
                     ) {
                         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s16)) {
                             Panel(
-                                s.settingsTitle,
+                                s.text("settingsTitle"),
                                 listOf(
-                                    s.settingsLanguage to locale.displayName,
-                                    s.settingsDarkTheme to s.settingsDarkThemeDesc,
-                                    s.settingsSurfaceBlur to s.settingsSurfaceBlurDesc,
-                                    s.settingsCloseAfterLaunch to s.settingsCloseAfterLaunchDesc,
+                                    s.text("settingsLanguage") to NexiraStrings.translator(language).language.nativeName,
+                                    s.text("settingsDarkTheme") to s.text("settingsDarkThemeDesc"),
+                                    s.text("settingsSurfaceBlur") to s.text("settingsSurfaceBlurDesc"),
+                                    s.text("settingsCloseAfterLaunch") to s.text("settingsCloseAfterLaunchDesc"),
                                 ),
                             )
                             Panel(
-                                s.packDetailTabSettings,
+                                s.text("packDetailTabSettings"),
                                 listOf(
-                                    s.packSettingsRepair to s.packSettingsRepairDesc,
-                                    s.packVersionSnapshots to s.packVersionSnapshotsHint,
-                                    s.audioPickTrack to s.audioFormatHint,
-                                    s.musicPlayerTitle to "追憶のサクラメント / めらみぽっぷ",
+                                    s.text("packSettingsRepair") to s.text("packSettingsRepairDesc"),
+                                    s.text("packVersionSnapshots") to s.text("packVersionSnapshotsHint"),
+                                    s.text("audioPickTrack") to s.text("audioFormatHint"),
+                                    s.text("musicPlayerTitle") to "追憶のサクラメント / めらみぽっぷ",
                                 ),
                             )
                         }
@@ -119,7 +122,7 @@ class JapaneseUiRenderProbe {
 
     @Test
     fun probe() {
-        sheet("ja", AppLocale.JAPANESE)
-        sheet("en", AppLocale.ENGLISH)
+        sheet("ja", "ja")
+        sheet("en", "en")
     }
 }

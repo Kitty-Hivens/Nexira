@@ -17,7 +17,9 @@ import hivens.ui.chrome.rememberWindowClass
 import hivens.ui.background.hasUsableImage
 import hivens.ui.customization.CustomizationSettings
 import hivens.ui.editor.EditorSurfaceHost
-import hivens.ui.i18n.LocalAppLocale
+import hivens.i18n.api.I18nKeys
+import hivens.i18n.api.LocalTranslator
+import hivens.widget.api.SettingsChange
 import androidx.compose.runtime.saveable.SaveableStateHolder
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import hivens.ui.nx.NxSwap
@@ -103,11 +105,14 @@ fun AppLayout(
     val themeMode = rememberScopedSource(Sources.ThemeMode).valueOrNull() ?: ThemeMode.Manual
     val systemThemeAvailable = rememberScopedSource(Sources.SystemSchemeAvailable).valueOrNull() ?: false
     val themeLibrary = rememberScopedSource(Sources.ThemeLibrary).valueOrNull() ?: ThemeLibrary()
-    val currentLocale = rememberScopedSource(Sources.Locale).valueOrNull() ?: LocalAppLocale.current
+    // The language module's: where it is not brought in, the picker shows the one language in use.
+    val currentLanguage = rememberScopedSource(I18nKeys.Language).valueOrNull() ?: LocalTranslator.current.language
+    val languages = rememberScopedSource(I18nKeys.Languages).valueOrNull() ?: listOf(currentLanguage)
     val setDark = rememberScopedCommand(Commands.SetDarkTheme)
     val onToggleDarkTheme: () -> Unit = { setDark?.invoke(!isDarkTheme) }
     val onThemeModeChanged = rememberScopedCommand(Commands.SetThemeMode) ?: {}
-    val onLocaleChanged = rememberScopedCommand(Commands.SetLocale) ?: {}
+    val updateLanguage = rememberScopedCommand(I18nKeys.UpdateSettings)
+    val onLanguageChanged: (String) -> Unit = { tag -> updateLanguage?.invoke(SettingsChange { it.copy(language = tag) }) }
 
     // Whoever signs in reports it upward, and the shell's own state is what comes
     // back down here -- so this is derived rather than held. It used to be a var
@@ -147,8 +152,9 @@ fun AppLayout(
                         isDarkTheme                  = isDarkTheme,
                         onToggleTheme                = onToggleDarkTheme,
                         onOpenThemePicker            = { onScreenChange(Screen.ThemePicker) },
-                        currentLocale                = currentLocale,
-                        onLocaleChanged              = onLocaleChanged,
+                        currentLanguage              = currentLanguage,
+                        languages                    = languages,
+                        onLanguageChanged            = onLanguageChanged,
                         onOpenBackgroundSettings     = { onScreenChange(Screen.BackgroundSettings) },
                         onOpenAbout                  = { onScreenChange(Screen.About) },
                     )

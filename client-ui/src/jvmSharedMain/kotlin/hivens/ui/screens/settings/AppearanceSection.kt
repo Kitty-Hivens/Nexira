@@ -29,9 +29,9 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.ui.chrome.LocalCustomChromeAvailable
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.platform.rememberHostActions
-import hivens.ui.i18n.AppLocale
-import hivens.ui.i18n.LocalStrings
+import hivens.i18n.api.LanguageInfo
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.nx.NxChoiceItem
@@ -72,21 +72,22 @@ internal fun AppearanceSection(
     onToggleTheme: () -> Unit,
     onOpenThemePicker: () -> Unit,
     onOpenBackgroundSettings: () -> Unit,
-    currentLocale: AppLocale,
-    onLocaleChanged: (AppLocale) -> Unit,
+    currentLanguage: LanguageInfo,
+    languages: List<LanguageInfo>,
+    onLanguageChanged: (tag: String) -> Unit,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     var langExpanded by remember { mutableStateOf(false) }
     var langShown by remember { mutableStateOf(false) }
     val langTurn by animateFloatAsState(if (langExpanded) 180f else 0f, animationSpec = Motion.tap, label = "langChevron")
     var themeSwitchState by remember(isDarkTheme) { mutableStateOf(isDarkTheme) }
 
-    NxSection(s.settingsSectionUI) {
+    NxSection(s.text("settingsSectionUI")) {
         // Language. The whole row opens the picker; the trailing shows the
-        // current locale and hosts the menu. Per-locale PuppetClick lets a driver
-        // switch without opening the menu first.
+        // current language and hosts the menu. A PuppetClick per language, by tag,
+        // lets a driver switch without opening the menu first.
         NxRow(
-            title    = s.settingsLanguage,
+            title    = s.text("settingsLanguage"),
             icon     = NxIcon.Language,
             iconTint = NxColor.lead(),
             onClick  = { langExpanded = true },
@@ -94,13 +95,13 @@ internal fun AppearanceSection(
             trailing = {
                 Box {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        // The picker lists every locale under its own name, so a row can carry a
+                        // The picker lists every language under its own name, so a row can carry a
                         // script the UI face has no glyphs for even while the interface is Latin.
                         Text(
-                            currentLocale.displayName,
+                            currentLanguage.nativeName,
                             color = NxColor.lead(),
                             fontWeight = FontWeight.Bold,
-                            fontFamily = familyForText(currentLocale.displayName),
+                            fontFamily = familyForText(currentLanguage.nativeName),
                         )
                         Symbol(NxIcon.ExpandMore, null, tint = NxColor.lead(), modifier = Modifier.rotate(langTurn))
                     }
@@ -110,14 +111,14 @@ internal fun AppearanceSection(
                         align            = NxMenuAlign.End,
                         onShownChange    = { langShown = it },
                     ) {
-                        AppLocale.entries.forEach { locale ->
+                        languages.forEach { language ->
                             NxChoiceItem(
-                                label    = locale.displayName,
-                                selected = locale == currentLocale,
-                                onClick  = { langExpanded = false; onLocaleChanged(locale) },
+                                label    = language.nativeName,
+                                selected = language.tag == currentLanguage.tag,
+                                onClick  = { langExpanded = false; onLanguageChanged(language.tag) },
                             )
-                            PuppetClick("settings.language.${locale.name}") {
-                                langExpanded = false; onLocaleChanged(locale)
+                            PuppetClick("settings.language.${language.tag}") {
+                                langExpanded = false; onLanguageChanged(language.tag)
                             }
                         }
                     }
@@ -128,8 +129,8 @@ internal fun AppearanceSection(
         // Theme preset shortcut.
         PuppetClick("settings.openThemePicker") { onOpenThemePicker() }
         NxRow(
-            title    = s.settingsThemePicker,
-            subtitle = s.settingsThemePickerSub,
+            title    = s.text("settingsThemePicker"),
+            subtitle = s.text("settingsThemePickerSub"),
             icon     = NxIcon.Star,
             iconTint = NxColor.lead(),
             onClick  = onOpenThemePicker,
@@ -139,8 +140,8 @@ internal fun AppearanceSection(
         // Custom background shortcut.
         PuppetClick("settings.openBackground") { onOpenBackgroundSettings() }
         NxRow(
-            title    = s.settingsBackground,
-            subtitle = s.settingsBackgroundSub,
+            title    = s.text("settingsBackground"),
+            subtitle = s.text("settingsBackgroundSub"),
             icon     = NxIcon.Wallpaper,
             iconTint = NxColor.lead(),
             onClick  = onOpenBackgroundSettings,
@@ -150,8 +151,8 @@ internal fun AppearanceSection(
         // Dark theme: day/night identity (sun warm, moon cool) + GNOME-style reveal.
         DayNightRow(
             checked     = themeSwitchState,
-            title       = s.settingsDarkTheme,
-            description = s.settingsDarkThemeDesc,
+            title       = s.text("settingsDarkTheme"),
+            description = s.text("settingsDarkThemeDesc"),
         ) { isChecked -> themeSwitchState = isChecked; onToggleTheme() }
         PuppetToggle("settings.darkTheme", themeSwitchState) { isChecked ->
             themeSwitchState = isChecked; onToggleTheme()
@@ -166,15 +167,15 @@ internal fun AppearanceSection(
         val host = rememberHostActions()
         val customChromeAvailable = LocalCustomChromeAvailable.current && host.customChromeSupported
         NxToggle(
-            label       = s.settingsCustomChrome,
+            label       = s.text("settingsCustomChrome"),
             checked     = shownChecked(form.useCustomChrome, customChromeAvailable),
-            description = s.settingsCustomChromeDesc,
+            description = s.text("settingsCustomChromeDesc"),
             icon        = NxIcon.Computer,
             enabled     = customChromeAvailable,
         ) { form.useCustomChrome = it; save() }
         if (!customChromeAvailable) {
             Text(
-                text  = if (host.customChromeSupported) s.settingsCustomChromeTiling else s.settingsUnsupportedHere,
+                text  = if (host.customChromeSupported) s.text("settingsCustomChromeTiling") else s.text("settingsUnsupportedHere"),
                 style = MaterialTheme.typography.bodySmall,
                 color = NxInk.quiet,
             )
@@ -186,21 +187,21 @@ internal fun AppearanceSection(
 
     Spacer(Modifier.height(16.dp))
 
-    NxSection(s.settingsSectionBehavior) {
+    NxSection(s.text("settingsSectionBehavior")) {
         val host = rememberHostActions()
         NxToggle(
-            s.settingsCloseAfterLaunch, shownChecked(form.closeAfterStart, host.hideAfterLaunchSupported),
-            description = s.settingsCloseAfterLaunchDesc, icon = NxIcon.MoveToInbox,
+            s.text("settingsCloseAfterLaunch"), shownChecked(form.closeAfterStart, host.hideAfterLaunchSupported),
+            description = s.text("settingsCloseAfterLaunchDesc"), icon = NxIcon.MoveToInbox,
             enabled = host.hideAfterLaunchSupported,
         ) {
             form.closeAfterStart = it; save()
         }
         if (!host.hideAfterLaunchSupported) {
-            Text(text = s.settingsUnsupportedHere, style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
+            Text(text = s.text("settingsUnsupportedHere"), style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
         }
         PuppetToggle("settings.closeAfterStart", shownChecked(form.closeAfterStart, host.hideAfterLaunchSupported), enabled = host.hideAfterLaunchSupported) { form.closeAfterStart = it; save() }
 
-        NxToggle(s.settingsOfflineMode, form.isOfflineMode, description = s.settingsOfflineModeDesc, icon = NxIcon.WifiOff, accent = NxColor.status(Status.Error)) {
+        NxToggle(s.text("settingsOfflineMode"), form.isOfflineMode, description = s.text("settingsOfflineModeDesc"), icon = NxIcon.WifiOff, accent = NxColor.status(Status.Error)) {
             form.isOfflineMode = it; save()
         }
         PuppetToggle("settings.offlineMode", form.isOfflineMode) { form.isOfflineMode = it; save() }

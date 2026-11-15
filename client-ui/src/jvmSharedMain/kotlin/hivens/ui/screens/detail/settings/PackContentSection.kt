@@ -17,11 +17,11 @@ import hivens.core.api.dto.smrt.SmrtPresence
 import hivens.core.api.interfaces.IMirrorPackClient
 import hivens.core.data.OptionalContentRules
 import hivens.core.data.PackInstance
+import hivens.i18n.api.Strings
 import hivens.launcher.launch.LauncherController
 import hivens.launcher.platform.PlatformPaths
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.screens.library.content.problemReason
-import hivens.ui.i18n.AppStrings
-import hivens.ui.i18n.LocalStrings
 import hivens.ui.nx.NxMetaChip
 import hivens.ui.nx.NxMetaChipTone
 import hivens.ui.nx.NxSettingBlock
@@ -51,7 +51,7 @@ import org.koin.compose.koinInject
  */
 @Composable
 internal fun PackContentSection(pack: PackInstance, adopt: (PackEdit) -> Unit) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val mirrorClient: IMirrorPackClient = koinInject()
     val controller: LauncherController = koinInject()
     val paths: PlatformPaths = koinInject()
@@ -106,13 +106,13 @@ internal fun PackContentSection(pack: PackInstance, adopt: (PackEdit) -> Unit) {
     }
     val problems = remember(manifest, state) { manifest?.let { OptionalContentRules.problems(it.mods, state) }.orEmpty() }
 
-    NxSettingGroup(s.packSettingsOptional) {
+    NxSettingGroup(s.text("packSettingsOptional")) {
         when {
-            loading -> Muted(s.packSettingsContentLoading)
-            manifest == null -> Muted(s.packSettingsContentUnavailable)
-            optional.isEmpty() && optionalAssets.isEmpty() -> Muted(s.packSettingsOptionalNone)
+            loading -> Muted(s.text("packSettingsContentLoading"))
+            manifest == null -> Muted(s.text("packSettingsContentUnavailable"))
+            optional.isEmpty() && optionalAssets.isEmpty() -> Muted(s.text("packSettingsOptionalNone"))
             else -> {
-                Muted(s.packSettingsOptionalCoToggle)
+                Muted(s.text("packSettingsOptionalCoToggle"))
                 optional.forEach { mod ->
                     val presence = mod.display?.presenceClass
                     val problem = problems[mod.filename]?.firstOrNull()
@@ -150,10 +150,10 @@ private fun Muted(text: String) {
 }
 
 /** Side badge for an optional entry; `required` and unknown values render none. */
-private fun presenceLabel(presence: SmrtPresence?, s: AppStrings): String? = when (presence) {
-    SmrtPresence.OptionalClient -> s.packContentPresenceClient
-    SmrtPresence.OptionalServer -> s.packContentPresenceServer
-    SmrtPresence.OptionalBoth   -> s.packContentPresenceBoth
-    SmrtPresence.Coremod        -> s.packContentPresenceCoremod
+private fun presenceLabel(presence: SmrtPresence?, s: Strings): String? = when (presence) {
+    SmrtPresence.OptionalClient -> s.text("packContentPresenceClient")
+    SmrtPresence.OptionalServer -> s.text("packContentPresenceServer")
+    SmrtPresence.OptionalBoth   -> s.text("packContentPresenceBoth")
+    SmrtPresence.Coremod        -> s.text("packContentPresenceCoremod")
     SmrtPresence.Required, null -> null
 }

@@ -9,8 +9,7 @@ import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
-import hivens.ui.i18n.AppLocale
-import hivens.ui.i18n.LocaleProvider
+import hivens.ui.i18n.ShippedLanguageProvider
 import hivens.ui.widgets.WidgetSurface
 import hivens.ui.theme.NxTheme
 import hivens.widget.api.LocalLayoutGraph
@@ -113,7 +112,7 @@ class WidgetPreviewCensusTest {
         val scene = ImageComposeScene(width = SIDE, height = SIDE, density = Density(1f))
         return runCatching {
             scene.setContent {
-                LocaleProvider(AppLocale.ENGLISH) {
+                ShippedLanguageProvider("en") {
                     NxTheme(dark = true) {
                         Environment {
                             Box(Modifier.size(SIDE.dp)) { descriptor.Render(instance) }

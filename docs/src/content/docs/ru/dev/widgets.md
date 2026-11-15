@@ -55,7 +55,7 @@ ksp {
 tasks.jar {
     manifest {
         attributes(
-            "Nexira-Widget-Api" to 1,
+            "Nexira-Widget-Api" to 3,
             "Nexira-Module-Id" to "mymodule",
             "Nexira-Module-Name" to "My Module",
         )

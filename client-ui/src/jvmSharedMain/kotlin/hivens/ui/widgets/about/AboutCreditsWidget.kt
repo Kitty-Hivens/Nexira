@@ -25,7 +25,7 @@ import coil3.compose.AsyncImage
 import hivens.ui.BuildConfig
 import hivens.ui.easter.GibberishMode
 import hivens.ui.easter.LocalAprilFools
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.widget.api.rememberProps
 import hivens.widget.model.PropLabel
 import hivens.widget.model.Widget
@@ -63,7 +63,7 @@ data class AboutCreditsProps(
 fun AboutCreditsWidget(instance: WidgetInstance) {
     val p = instance.rememberProps<AboutCreditsProps>()
     val af = LocalAprilFools.current
-    val s = LocalStrings.current
+    val s = nexiraStrings()
 
     Column(
         modifier = Modifier
@@ -71,7 +71,7 @@ fun AboutCreditsWidget(instance: WidgetInstance) {
             .padding(20.dp)
             .verticalScroll(rememberScrollState()),
     ) {
-        SectionLabel(p.title.ifBlank { s.aboutSectionCreator })
+        SectionLabel(p.title.ifBlank { s.text("aboutSectionCreator") })
         Spacer(Modifier.height(12.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             AsyncImage(
@@ -101,16 +101,16 @@ fun AboutCreditsWidget(instance: WidgetInstance) {
         }
 
         Spacer(Modifier.height(20.dp))
-        SectionLabel(s.aboutSectionTechnologies)
+        SectionLabel(s.text("aboutSectionTechnologies"))
         Spacer(Modifier.height(8.dp))
 
         val techs = listOf(
-            "Kotlin ${KotlinVersion.CURRENT}"      to s.techKotlinDesc,
-            "Compose ${BuildConfig.COMPOSE_VERSION}" to s.techComposeDesc,
-            "Ktor ${BuildConfig.KTOR_VERSION}"     to s.techKtorDesc,
-            "Koin ${BuildConfig.KOIN_VERSION}"     to s.techKoinDesc,
-            "Coil ${BuildConfig.COIL_VERSION}"     to s.techCoilDesc,
-            "Skia (Skiko)"                          to s.techSkiaDesc,
+            "Kotlin ${KotlinVersion.CURRENT}"      to s.text("techKotlinDesc"),
+            "Compose ${BuildConfig.COMPOSE_VERSION}" to s.text("techComposeDesc"),
+            "Ktor ${BuildConfig.KTOR_VERSION}"     to s.text("techKtorDesc"),
+            "Koin ${BuildConfig.KOIN_VERSION}"     to s.text("techKoinDesc"),
+            "Coil ${BuildConfig.COIL_VERSION}"     to s.text("techCoilDesc"),
+            "Skia (Skiko)"                          to s.text("techSkiaDesc"),
         )
 
         techs.forEach { (name, desc) ->
@@ -133,12 +133,12 @@ fun AboutCreditsWidget(instance: WidgetInstance) {
         }
 
         Spacer(Modifier.height(20.dp))
-        SectionLabel(s.aboutSectionLicense)
+        SectionLabel(s.text("aboutSectionLicense"))
         Spacer(Modifier.height(8.dp))
 
         Text(
             text  = af.maybeGibberish(
-                s.aboutLicenseText,
+                s.text("aboutLicenseText"),
                 probability = 0.45f,
                 mode        = GibberishMode.LOREM,
             ),

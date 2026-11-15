@@ -13,7 +13,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.accounts.api.AccountKeys
 import hivens.accounts.api.SessionState
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.widget.api.rememberProps
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
@@ -46,7 +46,7 @@ data class WelcomeProps(
 fun HomeNewWelcome(instance: WidgetInstance) {
     val p = instance.rememberProps<WelcomeProps>()
     val appState = rememberScopedSource(AccountKeys.Session).valueOrNull() ?: return
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val playerName = (appState as? SessionState.SignedIn)?.session?.name
 
     // No plane of its own. The widget's surface is declared in the layout and painted
@@ -58,8 +58,8 @@ fun HomeNewWelcome(instance: WidgetInstance) {
         Text(
             text       = when {
                 p.customGreeting.isNotBlank() -> p.customGreeting
-                playerName != null            -> s.homeWelcomeGreeting(playerName)
-                else                          -> s.appName
+                playerName != null            -> s.text("homeWelcomeGreeting", playerName)
+                else                          -> s.text("appName")
             },
             style      = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
@@ -68,7 +68,7 @@ fun HomeNewWelcome(instance: WidgetInstance) {
         if (p.showSubtitle) {
             Spacer(Modifier.height(4.dp))
             Text(
-                text  = s.homeWelcomeSubtitle,
+                text  = s.text("homeWelcomeSubtitle"),
                 style = MaterialTheme.typography.bodySmall,
                 color = NxInk.quiet,
             )

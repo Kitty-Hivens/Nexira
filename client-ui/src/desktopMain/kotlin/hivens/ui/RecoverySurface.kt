@@ -34,8 +34,8 @@ import hivens.core.data.ModuleId
 import hivens.launcher.platform.AppRelauncher
 import hivens.ui.bootstrap.RecoveryIo
 import hivens.ui.diag.UiRecoverySignal
-import hivens.ui.i18n.AppLocale
-import hivens.ui.i18n.stringsFor
+import hivens.config.Storage
+import hivens.ui.i18n.NexiraStrings
 import java.nio.file.Path
 import java.util.Locale
 
@@ -49,7 +49,8 @@ import java.util.Locale
  * settings service -- those are exactly what a recovery boot distrusts (and, on a
  * user-requested recovery, boot is skipped entirely so none of them exist). It
  * reads and writes settings.json through the raw [RecoveryIo] and resolves its
- * strings through a pure stringsFor() lookup.
+ * strings through an engine of its own over the shipped words and the person's
+ * translation files, which a file it cannot read costs only that file.
  *
  * It offers what recovers a launcher an environment breaks: toggle a system module
  * off (tray on a DE without SNI, skinema when its natives fail, ...), reset a
@@ -74,7 +75,10 @@ fun RecoveryWindow(
      */
     locale: String? = null,
 ) {
-    val s = remember(locale) { stringsFor(AppLocale.fromTag(locale ?: Locale.getDefault().language)) }
+    val s = remember(locale) {
+        NexiraStrings.engine(dataDir.resolve(Storage.TRANSLATIONS_DIR), locale ?: Locale.getDefault().language)
+            .strings(NexiraStrings.NAMESPACE)
+    }
     var disabled by remember { mutableStateOf(RecoveryIo.readDisabledModules(dataDir)) }
     var relaunchFailed by remember { mutableStateOf(false) }
     val windowState = rememberWindowState(position = WindowPosition(Alignment.Center))
@@ -82,8 +86,8 @@ fun RecoveryWindow(
     // A crash-latched entry keeps the failure-framed copy; a user request gets the
     // neutral recovery copy. The controls are identical either way.
     val crash = reason == UiRecoverySignal.RecoveryReason.CrashLoop
-    val title = if (crash) s.recoverySafeModeTitle else s.recoveryTitle
-    val body = if (crash) s.recoverySafeModeBody else s.recoveryBody
+    val title = if (crash) s.text("recoverySafeModeTitle") else s.text("recoveryTitle")
+    val body = if (crash) s.text("recoverySafeModeBody") else s.text("recoveryBody")
 
     fun setDisabled(id: String, off: Boolean) {
         disabled = if (off) disabled + id else disabled - id
@@ -96,10 +100,10 @@ fun RecoveryWindow(
     // Customization deleted the user's widget notes.
     val resets = remember(s) {
         listOf(
-            Reset(s.recoveryResetLayout, s.recoveryResetLayoutBody) { RecoveryIo.resetLayout(dataDir) },
-            Reset(s.recoveryResetCustomization, s.recoveryResetCustomizationBody) { RecoveryIo.resetCustomization(dataDir) },
-            Reset(s.recoveryResetWidgetState, s.recoveryResetWidgetStateBody) { RecoveryIo.resetWidgetState(dataDir) },
-            Reset(s.recoveryResetSettings, s.recoveryResetSettingsBody) { RecoveryIo.resetSettings(dataDir) },
+            Reset(s.text("recoveryResetLayout"), s.text("recoveryResetLayoutBody")) { RecoveryIo.resetLayout(dataDir) },
+            Reset(s.text("recoveryResetCustomization"), s.text("recoveryResetCustomizationBody")) { RecoveryIo.resetCustomization(dataDir) },
+            Reset(s.text("recoveryResetWidgetState"), s.text("recoveryResetWidgetStateBody")) { RecoveryIo.resetWidgetState(dataDir) },
+            Reset(s.text("recoveryResetSettings"), s.text("recoveryResetSettingsBody")) { RecoveryIo.resetSettings(dataDir) },
         )
     }
     var pending by remember { mutableStateOf<Reset?>(null) }
@@ -119,13 +123,13 @@ fun RecoveryWindow(
                         modifier = Modifier.widthIn(max = 560.dp),
                     )
 
-                    Text(s.recoveryModulesHeading, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
+                    Text(s.text("recoveryModulesHeading"), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
                     ModuleId.entries.forEach { module ->
                         val label = when (module) {
-                            ModuleId.Tray -> s.recoveryModuleTray
-                            ModuleId.Notify -> s.recoveryModuleNotify
-                            ModuleId.Skinema -> s.recoveryModuleSkinema
-                            ModuleId.Keyring -> s.recoveryModuleKeyring
+                            ModuleId.Tray -> s.text("recoveryModuleTray")
+                            ModuleId.Notify -> s.text("recoveryModuleNotify")
+                            ModuleId.Skinema -> s.text("recoveryModuleSkinema")
+                            ModuleId.Keyring -> s.text("recoveryModuleKeyring")
                         }
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -136,7 +140,7 @@ fun RecoveryWindow(
                         }
                     }
 
-                    Text(s.recoveryResetsHeading, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
+                    Text(s.text("recoveryResetsHeading"), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
                     // FlowRow, not Row: the labels name what they clear, which in a
                     // declined language is wider than the window at the default size.
                     FlowRow(
@@ -149,20 +153,20 @@ fun RecoveryWindow(
                     }
 
                     if (relaunchFailed) {
-                        Text(s.recoveryRelaunchFailed, color = MaterialTheme.colorScheme.error)
+                        Text(s.text("recoveryRelaunchFailed"), color = MaterialTheme.colorScheme.error)
                     }
 
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         Button(onClick = { if (AppRelauncher.relaunch()) onExit() else relaunchFailed = true }) {
-                            Text(s.recoveryContinue)
+                            Text(s.text("recoveryContinue"))
                         }
-                        OutlinedButton(onClick = onExit) { Text(s.recoverySafeModeQuit) }
+                        OutlinedButton(onClick = onExit) { Text(s.text("recoverySafeModeQuit")) }
                     }
 
                     pending?.let { reset ->
                         AlertDialog(
                             onDismissRequest = { pending = null },
-                            title = { Text(s.recoveryResetConfirmTitle(reset.label)) },
+                            title = { Text(s.text("recoveryResetConfirmTitle", reset.label)) },
                             text  = { Text(reset.body, style = MaterialTheme.typography.bodyMedium) },
                             confirmButton = {
                                 TextButton(onClick = {
@@ -172,11 +176,11 @@ fun RecoveryWindow(
                                     disabled = RecoveryIo.readDisabledModules(dataDir)
                                     pending = null
                                 }) {
-                                    Text(s.recoveryResetConfirm, color = MaterialTheme.colorScheme.error)
+                                    Text(s.text("recoveryResetConfirm"), color = MaterialTheme.colorScheme.error)
                                 }
                             },
                             dismissButton = {
-                                TextButton(onClick = { pending = null }) { Text(s.editorCancel) }
+                                TextButton(onClick = { pending = null }) { Text(s.text("editorCancel")) }
                             },
                         )
                     }

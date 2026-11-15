@@ -34,7 +34,7 @@ import hivens.ui.components.FullscreenVideoWithHandoff
 import hivens.ui.components.VideoHandoff
 import hivens.ui.components.VideoMedia
 import hivens.ui.components.isPlayableVideoUrl
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.widget.api.rememberProps
@@ -60,7 +60,7 @@ data class VideoPlayerProps(
 @Composable
 fun VideoPlayerWidget(instance: WidgetInstance) {
     val p = instance.rememberProps<VideoPlayerProps>()
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val url = p.videoUrl.trim()
 
     var playing by remember(url) { mutableStateOf(false) }
@@ -101,7 +101,7 @@ fun VideoPlayerWidget(instance: WidgetInstance) {
         contentAlignment = Alignment.Center,
     ) {
         when {
-            url.isBlank() || !isPlayableVideoUrl(url) -> EmptyState(s.videoWidgetEmpty)
+            url.isBlank() || !isPlayableVideoUrl(url) -> EmptyState(s.text("videoWidgetEmpty"))
             // While expanded, drop the inline player so only the fullscreen one decodes.
             playing && !expanded -> VideoMedia(
                 url                 = url,

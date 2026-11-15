@@ -186,8 +186,8 @@ fun AppRoot(
     val effects = modules?.state?.collectAsState()?.value?.effects.orEmpty()
     val effectSettings = modules?.settings?.collectAsState()?.value.orEmpty()
     // Names of a module's widgets in the person's language, which the editor panels read.
-    val widgetStrings = modules?.state?.collectAsState()?.value?.widgetStrings.orEmpty()
-    val widgetLabels = remember(widgetStrings) { WidgetLabels { widgetStrings[it] } }
+    val widgetModules = modules?.state?.collectAsState()?.value?.widgetModules.orEmpty()
+    val widgetLabels = remember(widgetModules) { WidgetLabels { widgetModules[it] } }
     // The composition's level, around everything it draws, the editor included. The
     // session is read here through the same key a widget reads. Missing, there is no
     // session at all: the document brought no accounts module, or the one it brought

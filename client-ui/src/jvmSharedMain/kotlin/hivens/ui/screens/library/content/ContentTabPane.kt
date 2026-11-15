@@ -1,5 +1,7 @@
 package hivens.ui.screens.library.content
 
+import hivens.i18n.api.Strings
+import hivens.ui.i18n.nexiraStrings
 import kotlinx.coroutines.CoroutineScope
 import androidx.compose.foundation.background
 import androidx.compose.foundation.hoverable
@@ -103,8 +105,6 @@ import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxVerticalScrollbar
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
-import hivens.ui.i18n.AppStrings
-import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.theme.familyForText
@@ -154,14 +154,14 @@ internal fun ContentTabPane(
     /** Opens the pack's settings where detaching lives, offered from a locked row's menu. */
     onOpenPackSettings: () -> Unit = {},
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val selections: SelectionRegistry = koinInject()
     // Replacing files the running game has open is the pack update's risk too, and
     // asked about the same way: on Windows the old jar cannot be removed and the
     // next start finds two builds of one mod.
     val runningGuard = rememberRunningPackGuard(instance.id)
     val scope = rememberCoroutineScope()
-    val addDialogSettings = rememberFileDialogSettings(s.contentAddFiles)
+    val addDialogSettings = rememberFileDialogSettings(s.text("contentAddFiles"))
 
     LaunchedEffect(state) { state.load() }
     // Separate from load(): this one runs for as long as the tab is on screen,
@@ -183,7 +183,7 @@ internal fun ContentTabPane(
     // would otherwise leave a bar offering to delete things the user can no
     // longer see.
     val picked = state.picked
-    val blocked = if (state.lockedCount > 0) s.selectionBlockedByPack(state.lockedCount) else null
+    val blocked = if (state.lockedCount > 0) s.text("selectionBlockedByPack", state.lockedCount) else null
     DisposableEffect(picked, blocked) {
         val published = if (picked.isEmpty()) null else Selection(
             items = picked.map {
@@ -251,7 +251,7 @@ internal fun ContentTabPane(
                 CircularProgressIndicator(color = NxColor.wash(NxColor.lead(), 0.6f), strokeWidth = 2.dp, modifier = Modifier.size(26.dp))
             }
             visible.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(s.contentEmpty, style = MaterialTheme.typography.bodyMedium, color = NxInk.quiet)
+                Text(s.text("contentEmpty"), style = MaterialTheme.typography.bodyMedium, color = NxInk.quiet)
             }
             else -> {
                 val listState = rememberLazyListState()
@@ -286,7 +286,7 @@ internal fun ContentTabPane(
                                 update         = state.liveUpdates[ref],
                                 warning        = rules.problem?.let { problemReason(it, s) }
                                     ?: state.dependencyProblems[ref]?.firstOrNull()?.let { dependencyReason(it, state::providerName, s) }
-                                    ?: state.liveBehind[ref]?.let { s.contentBehindPin(it.neededBy, it.pinned.versionNumber) },
+                                    ?: state.liveBehind[ref]?.let { s.text("contentBehindPin", it.neededBy, it.pinned.versionNumber) },
                                 onUpdate       = { runningGuard.run { state.update(c) } },
                                 // Switching versions is the same write as an update,
                                 // so it is offered on the same rows.
@@ -309,9 +309,9 @@ internal fun ContentTabPane(
     // for the red gate, so it takes the ordinary one with its own verb.
     if (state.pendingUpdateAll > 0) {
         ConfirmDialog(
-            title        = s.contentUpdateConfirmTitle,
-            body         = s.contentUpdateConfirmBody(state.pendingUpdateAll),
-            confirmLabel = s.contentUpdateConfirmAction,
+            title        = s.text("contentUpdateConfirmTitle"),
+            body         = s.text("contentUpdateConfirmBody", state.pendingUpdateAll),
+            confirmLabel = s.text("contentUpdateConfirmAction"),
             onConfirm    = { runningGuard.run(state::updateAll) },
             onDismiss    = state::cancelUpdateAll,
         )
@@ -319,9 +319,9 @@ internal fun ContentTabPane(
 
     if (state.pendingBulkDelete.isNotEmpty()) {
         DestructiveConfirmDialog(
-            title        = s.contentDeleteTitle,
-            body         = s.contentBulkDeleteBody(state.pendingBulkDelete.size),
-            confirmLabel = s.editorDelete,
+            title        = s.text("contentDeleteTitle"),
+            body         = s.text("contentBulkDeleteBody", state.pendingBulkDelete.size),
+            confirmLabel = s.text("editorDelete"),
             onConfirm    = state::confirmDelete,
             onDismiss    = state::cancelDelete,
         )
@@ -329,9 +329,9 @@ internal fun ContentTabPane(
 
     if (state.pendingDelete != null) {
         DestructiveConfirmDialog(
-            title        = s.contentDeleteTitle,
-            body         = s.contentDeleteBody,
-            confirmLabel = s.editorDelete,
+            title        = s.text("contentDeleteTitle"),
+            body         = s.text("contentDeleteBody"),
+            confirmLabel = s.text("editorDelete"),
             onConfirm    = state::confirmDelete,
             onDismiss    = state::cancelDelete,
         )
@@ -400,7 +400,7 @@ internal fun ModVersionsWindow(
     onPick: (ModrinthVersion) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val loaders = loadersFor(content.kind, loader, mcVersion)
     // Everything with a file, marked rather than filtered. Dropping the builds
     // that do not fit answered "is there one for me" by making it unaskable: an
@@ -413,7 +413,7 @@ internal fun ModVersionsWindow(
     val installedAt = all.firstOrNull { it.id == installedId }?.datePublished
 
     VersionPickerWindow(
-        title       = s.contentVersionsTitle,
+        title       = s.text("contentVersionsTitle"),
         packName    = content.displayName,
         packIcon    = icon,
         versions    = rows,
@@ -427,9 +427,9 @@ internal fun ModVersionsWindow(
         // words: Modrinth has never seen this file, or it has and the fetch
         // failed. Neither is "this mod has no versions".
         warning     = when {
-            unknown -> s.contentVersionsUnknown
-            failed  -> s.contentVersionsLoadFailed
-            versions != null && rows.isEmpty() -> s.contentVersionsUnknown
+            unknown -> s.text("contentVersionsUnknown")
+            failed  -> s.text("contentVersionsLoadFailed")
+            versions != null && rows.isEmpty() -> s.text("contentVersionsUnknown")
             else -> null
         },
     )
@@ -458,7 +458,7 @@ internal fun Toolbar(
     onUpdateAll: () -> Unit,
     onCheck: () -> Unit,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     var filtersOpen by remember { mutableStateOf(false) }
     // On a panel of its own, like the project page's header: laid straight over the
     // page, the outlined buttons and the unselected chips were ink on whatever the
@@ -466,7 +466,7 @@ internal fun Toolbar(
     // never seen.
     NxSurface(SurfaceKind.Panel, modifier = Modifier.fillMaxWidth()) {
     Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        ContentSearch(query, onQuery, s.contentSearchPlaceholder)
+        ContentSearch(query, onQuery, s.text("contentSearchPlaceholder"))
         Row(
             modifier              = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -477,10 +477,10 @@ internal fun Toolbar(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment     = Alignment.CenterVertically,
             ) {
-                FilterChip(s.contentFilterAll, filter == ContentFilter.All) { onFilter(ContentFilter.All) }
-                FilterChip(s.contentFilterMods, filter == ContentFilter.Mods) { onFilter(ContentFilter.Mods) }
-                FilterChip(s.contentFilterResourcePacks, filter == ContentFilter.ResourcePacks) { onFilter(ContentFilter.ResourcePacks) }
-                FilterChip(s.contentFilterShaderPacks, filter == ContentFilter.ShaderPacks) { onFilter(ContentFilter.ShaderPacks) }
+                FilterChip(s.text("contentFilterAll"), filter == ContentFilter.All) { onFilter(ContentFilter.All) }
+                FilterChip(s.text("contentFilterMods"), filter == ContentFilter.Mods) { onFilter(ContentFilter.Mods) }
+                FilterChip(s.text("contentFilterResourcePacks"), filter == ContentFilter.ResourcePacks) { onFilter(ContentFilter.ResourcePacks) }
+                FilterChip(s.text("contentFilterShaderPacks"), filter == ContentFilter.ShaderPacks) { onFilter(ContentFilter.ShaderPacks) }
             }
             // The chips answer what kind of thing a row is; everything that
             // narrows WITHIN a section lives in one panel, so the row does not
@@ -503,10 +503,10 @@ internal fun Toolbar(
                 )
             }
             if (canFindProjects) {
-                NxButton(label = s.contentFindProjects, onClick = onFindProjects, style = NxButtonStyle.Secondary, icon = NxIcon.Search, compact = true)
+                NxButton(label = s.text("contentFindProjects"), onClick = onFindProjects, style = NxButtonStyle.Secondary, icon = NxIcon.Search, compact = true)
             }
             if (canAdd) {
-                NxButton(label = s.contentAddFiles, onClick = onAddFiles, style = NxButtonStyle.Secondary, icon = NxIcon.Add, compact = true)
+                NxButton(label = s.text("contentAddFiles"), onClick = onAddFiles, style = NxButtonStyle.Secondary, icon = NxIcon.Add, compact = true)
             }
         }
     }
@@ -539,7 +539,7 @@ private fun UpdateControls(
     onUpdateAll: () -> Unit,
     onCheck: () -> Unit,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val active = run?.takeIf { !it.finished }
     when {
         active != null -> Row(
@@ -549,21 +549,21 @@ private fun UpdateControls(
         ) {
             CircularProgressIndicator(color = NxColor.lead(), strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
             Text(
-                text     = s.contentUpdateRunning(active.done, active.total),
+                text     = s.text("contentUpdateRunning", active.done, active.total),
                 style    = MaterialTheme.typography.labelLarge,
                 color    = NxInk.quiet,
                 maxLines = 1,
             )
         }
         count > 0 -> NxButton(
-            label   = s.contentUpdateAll(count),
+            label   = s.text("contentUpdateAll", count),
             onClick = onUpdateAll,
             icon    = NxIcon.Download,
             compact = true,
         )
         checkFailed -> NxIconButton(
             icon               = NxIcon.Warning,
-            contentDescription = s.contentUpdateCheckFailed,
+            contentDescription = s.text("contentUpdateCheckFailed"),
             onClick            = onCheck,
             tint               = NxColor.status(Status.Warning),
         )
@@ -589,7 +589,7 @@ private fun ContentFilterButton(
     shownCount: Int,
     scannedCount: Int,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     var open by remember { mutableStateOf(false) }
     Box {
         Box(contentAlignment = Alignment.TopEnd) {
@@ -601,7 +601,7 @@ private fun ContentFilterButton(
                 // is the opposite of what an active filter means, so the badge and
                 // the tint carry that instead.
                 icon               = if (open) NxIcon.Close else NxIcon.FilterAlt,
-                contentDescription = s.contentFiltersTitle,
+                contentDescription = s.text("contentFiltersTitle"),
                 onClick            = { open = !open },
                 tint               = if (filters.isEmpty && !open) NxInk.quiet
                                      else NxColor.lead(),
@@ -627,15 +627,15 @@ private fun ContentFilterButton(
         NxPopoverPanel(
             expanded         = open,
             onDismissRequest = { open = false },
-            title            = s.contentFiltersTitle,
+            title            = s.text("contentFiltersTitle"),
             footer           = {
                 Text(
-                    text  = s.contentFiltersShown(shownCount, scannedCount),
+                    text  = s.text("contentFiltersShown", shownCount, scannedCount),
                     style = MaterialTheme.typography.labelSmall,
                     color = NxInk.quiet,
                 )
                 NxButton(
-                    label   = s.contentFiltersReset,
+                    label   = s.text("contentFiltersReset"),
                     onClick = { onFilters(ContentFilters()) },
                     style   = NxButtonStyle.Tertiary,
                     enabled = !filters.isEmpty,
@@ -647,35 +647,35 @@ private fun ContentFilterButton(
                 // A chip, not a settings toggle: every axis in this panel is asked
                 // the same way, and a switch row among chip rows reads as a
                 // different kind of thing than it is.
-                NxPanelGroup(s.contentFilterGroupCurated, hint = s.contentFilterOptionalOnlyHint) {
-                    NxChoiceChip(s.contentFilterOptionalOnly, filters.optionalOnly) {
+                NxPanelGroup(s.text("contentFilterGroupCurated"), hint = s.text("contentFilterOptionalOnlyHint")) {
+                    NxChoiceChip(s.text("contentFilterOptionalOnly"), filters.optionalOnly) {
                         onFilters(filters.copy(optionalOnly = !filters.optionalOnly))
                     }
                 }
             }
-            NxPanelGroup(s.contentFilterGroupStatus) {
+            NxPanelGroup(s.text("contentFilterGroupStatus")) {
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    NxChoiceChip(s.contentFilterAny, filters.status == ContentStatus.Any) {
+                    NxChoiceChip(s.text("contentFilterAny"), filters.status == ContentStatus.Any) {
                         onFilters(filters.copy(status = ContentStatus.Any))
                     }
-                    NxChoiceChip(s.contentFilterEnabled, filters.status == ContentStatus.Enabled) {
+                    NxChoiceChip(s.text("contentFilterEnabled"), filters.status == ContentStatus.Enabled) {
                         onFilters(filters.copy(status = ContentStatus.Enabled))
                     }
-                    NxChoiceChip(s.contentFilterDisabled, filters.status == ContentStatus.Disabled) {
+                    NxChoiceChip(s.text("contentFilterDisabled"), filters.status == ContentStatus.Disabled) {
                         onFilters(filters.copy(status = ContentStatus.Disabled))
                     }
                 }
             }
             if (offersOwner) {
-                NxPanelGroup(s.contentFilterGroupOwner) {
+                NxPanelGroup(s.text("contentFilterGroupOwner")) {
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        NxChoiceChip(s.contentFilterAny, filters.owner == ContentOwner.Any) {
+                        NxChoiceChip(s.text("contentFilterAny"), filters.owner == ContentOwner.Any) {
                             onFilters(filters.copy(owner = ContentOwner.Any))
                         }
-                        NxChoiceChip(s.contentFilterOwnerPack, filters.owner == ContentOwner.Pack) {
+                        NxChoiceChip(s.text("contentFilterOwnerPack"), filters.owner == ContentOwner.Pack) {
                             onFilters(filters.copy(owner = ContentOwner.Pack))
                         }
-                        NxChoiceChip(s.contentFilterOwnerUser, filters.owner == ContentOwner.User) {
+                        NxChoiceChip(s.text("contentFilterOwnerUser"), filters.owner == ContentOwner.User) {
                             onFilters(filters.copy(owner = ContentOwner.User))
                         }
                     }
@@ -775,7 +775,7 @@ internal fun ContentRow(
      */
     warning: String? = null,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val dim = if (rules.effectiveEnabled) 1f else 0.5f
     // A row that cannot be deleted is the pack's: only a mod is ever held back, the
     // rest of the content is the player's whatever the pack shipped.
@@ -858,7 +858,7 @@ internal fun ContentRow(
                 // here is the one thing the reader would do about it.
                 if (update != null) {
                     NxMetaChip(
-                        text    = s.contentUpdateTo(update.versionNumber),
+                        text    = s.text("contentUpdateTo", update.versionNumber),
                         // Capped: the label is a sentence WITH a version number in it, a
                         // Modrinth build number runs to forty characters, and a plain Row
                         // measures this before the name column beside it -- so one long
@@ -877,7 +877,7 @@ internal fun ContentRow(
                         // before", and this picks WHICH build to run -- forward, back or
                         // sideways onto a beta.
                         icon               = NxIcon.SwapHoriz,
-                        contentDescription = s.contentActionVersions,
+                        contentDescription = s.text("contentActionVersions"),
                         onClick            = onVersions,
                         tint               = NxInk.quiet,
                     )
@@ -895,7 +895,7 @@ internal fun ContentRow(
                     Box {
                         NxIconButton(
                             icon               = NxIcon.MoreVert,
-                            contentDescription = s.packCardMore,
+                            contentDescription = s.text("packCardMore"),
                             onClick            = { cardFromKebab = true },
                             tint               = NxInk.quiet,
                         )
@@ -912,7 +912,7 @@ internal fun ContentRow(
                         }
                     }
                 } else {
-                    NxKebabButton(contentDescription = s.packCardMore) { dismiss ->
+                    NxKebabButton(contentDescription = s.text("packCardMore")) { dismiss ->
                         ContentRowMenuItems(content, update, resolveProject, onDetails, onUpdate, onDelete, dismiss)
                     }
                 }
@@ -961,11 +961,11 @@ private fun ContentRowMenuItems(
     onDelete: (() -> Unit)?,
     dismiss: () -> Unit,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val follow = rememberLinkFollower()
-    NxMenuItem(label = s.contentActionDetails, icon = NxIcon.Info, onClick = { dismiss(); onDetails() })
+    NxMenuItem(label = s.text("contentActionDetails"), icon = NxIcon.Info, onClick = { dismiss(); onDetails() })
     if (update != null) {
-        NxMenuItem(label = s.contentUpdateTo(update.versionNumber), icon = NxIcon.Download, onClick = { dismiss(); onUpdate() })
+        NxMenuItem(label = s.text("contentUpdateTo", update.versionNumber), icon = NxIcon.Download, onClick = { dismiss(); onUpdate() })
     }
     // "Open page" is kind-agnostic: the embedded homepage if the archive declared
     // one, else the canonical Modrinth page (mod / resourcepack / shader all
@@ -982,10 +982,10 @@ private fun ContentRowMenuItems(
         }
     }
     page?.let { url ->
-        NxMenuItem(label = s.contentActionOpenPage, icon = NxIcon.OpenInNew, onClick = { dismiss(); follow(url) })
+        NxMenuItem(label = s.text("contentActionOpenPage"), icon = NxIcon.OpenInNew, onClick = { dismiss(); follow(url) })
     }
     if (onDelete != null) {
-        NxMenuItem(label = s.editorDelete, icon = NxIcon.Delete, destructive = true, onClick = { dismiss(); onDelete() })
+        NxMenuItem(label = s.text("editorDelete"), icon = NxIcon.Delete, destructive = true, onClick = { dismiss(); onDelete() })
     }
 }
 
@@ -1059,22 +1059,22 @@ private fun ContentIcon(state: ContentIconState?, seed: String, displayName: Str
 private const val PROBLEM_WASH = 0.10f
 
 /** The sentence under a mod the pack's rules have something to say about. */
-internal fun problemReason(problem: OptionalContentRules.Problem, s: AppStrings): String {
+internal fun problemReason(problem: OptionalContentRules.Problem, s: Strings): String {
     val name = problem.other.display?.name ?: problem.other.filename
     return when (problem) {
-        is OptionalContentRules.Problem.ConflictsWith -> s.optionalConflictsWith(name)
-        is OptionalContentRules.Problem.NeedsDisabled -> s.optionalNeedsOff(name)
-        is OptionalContentRules.Problem.NeededBy -> s.optionalNeededBy(name)
+        is OptionalContentRules.Problem.ConflictsWith -> s.text("optionalConflictsWith", name)
+        is OptionalContentRules.Problem.NeedsDisabled -> s.text("optionalNeedsOff", name)
+        is OptionalContentRules.Problem.NeededBy -> s.text("optionalNeededBy", name)
     }
 }
 
 /** The sentence under a mod whose own metadata asks for something nothing enabled gives it. */
-internal fun dependencyReason(issue: DependencyIssue, nameOf: (String) -> String, s: AppStrings): String {
+internal fun dependencyReason(issue: DependencyIssue, nameOf: (String) -> String, s: Strings): String {
     val wanted = issue.requirement.ranges.joinToString(" / ")
     return when (issue) {
-        is DependencyIssue.Missing -> s.contentDependencyMissing(issue.requirement.id)
+        is DependencyIssue.Missing -> s.text("contentDependencyMissing", issue.requirement.id)
         is DependencyIssue.WrongVersion ->
-            s.contentDependencyVersion(nameOf(issue.requirement.id), wanted, issue.installed.joinToString(", "))
+            s.text("contentDependencyVersion", nameOf(issue.requirement.id), wanted, issue.installed.joinToString(", "))
     }
 }
 

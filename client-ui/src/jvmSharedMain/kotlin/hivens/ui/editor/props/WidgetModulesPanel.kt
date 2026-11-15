@@ -17,7 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
@@ -50,16 +50,16 @@ internal fun WidgetModulesPanel(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val state by modules.state.collectAsState()
     val scope = rememberCoroutineScope()
     // Off the UI thread: a scan opens and copies jars.
     fun inBackground(work: () -> Unit) {
         scope.launch { withContext(Dispatchers.IO) { work() } }
     }
-    EditorSidePanel(visible = visible, title = s.modulesTitle, icon = NxIcon.Folder, onDismiss = onDismiss, modifier = modifier) {
+    EditorSidePanel(visible = visible, title = s.text("modulesTitle"), icon = NxIcon.Folder, onDismiss = onDismiss, modifier = modifier) {
         if (state.entries.isEmpty()) {
-            Text(s.modulesEmpty, style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
+            Text(s.text("modulesEmpty"), style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
         }
         state.entries.forEach { entry ->
             NxSurface(SurfaceKind.Field, Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium) {
@@ -68,8 +68,8 @@ internal fun WidgetModulesPanel(
                         is WidgetModules.Entry.Loaded -> {
                             ModuleHeader(entry.name, on = true) { inBackground { modules.setEnabled(entry.id, false) } }
                             PuppetToggle("modules.${entry.id}", true) { on -> inBackground { modules.setEnabled(entry.id, on) } }
-                            Detail(s.moduleWidgets(entry.kinds))
-                            if (entry.contributions > 0) Detail(s.moduleContributions(entry.contributions))
+                            Detail(s.text("moduleWidgets", entry.kinds))
+                            if (entry.contributions > 0) Detail(s.text("moduleContributions", entry.contributions))
                             Detail(entry.file.fileName.toString())
                         }
                         is WidgetModules.Entry.Off -> {
@@ -77,27 +77,27 @@ internal fun WidgetModulesPanel(
                             PuppetToggle("modules.${entry.id}", false) { on -> inBackground { modules.setEnabled(entry.id, on) } }
                             if (entry.crash != null) {
                                 Text(
-                                    s.moduleOffAfterCrash(entry.crash),
+                                    s.text("moduleOffAfterCrash", entry.crash),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = NxColor.status(Status.Warning),
                                 )
                             } else {
-                                Detail(s.moduleOff)
+                                Detail(s.text("moduleOff"))
                             }
                         }
                         is WidgetModules.Entry.Refused -> {
                             Text(entry.file.fileName.toString(), color = NxInk.main, fontWeight = FontWeight.SemiBold)
                             Text(
-                                s.moduleRefused(entry.reason),
+                                s.text("moduleRefused", entry.reason),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = NxColor.status(Status.Error),
                             )
                         }
                         is WidgetModules.Entry.Gone -> {
                             Text(entry.id, color = NxInk.main, fontWeight = FontWeight.SemiBold)
-                            Detail(s.moduleGone)
+                            Detail(s.text("moduleGone"))
                             NxButton(
-                                label   = s.moduleForget,
+                                label   = s.text("moduleForget"),
                                 onClick = { inBackground { modules.forget(entry.id) } },
                                 style   = NxButtonStyle.Secondary,
                                 compact = true,
@@ -110,14 +110,14 @@ internal fun WidgetModulesPanel(
         }
         Spacer(Modifier.height(8.dp))
         NxButton(
-            label    = s.modulesReload,
+            label    = s.text("modulesReload"),
             onClick  = { inBackground { modules.reload() } },
             icon     = NxIcon.Refresh,
             modifier = Modifier.fillMaxWidth(),
         )
         PuppetClick("modules.reload") { inBackground { modules.reload() } }
         NxButton(
-            label    = s.modulesOpenFolder,
+            label    = s.text("modulesOpenFolder"),
             onClick  = {
                 inBackground {
                     SystemActions.openFolder(modules.folder.toString())

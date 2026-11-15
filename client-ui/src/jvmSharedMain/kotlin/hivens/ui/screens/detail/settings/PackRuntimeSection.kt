@@ -29,7 +29,7 @@ import hivens.launcher.component.EarlyLoadingScreen
 import hivens.launcher.component.JvmHeapArgs
 import hivens.ui.components.JvmArgsBuilderDialog
 import hivens.ui.components.RamSelector
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxField
@@ -62,7 +62,7 @@ internal fun PackRuntimeSection(
     instanceDir: Path,
     save: (PackEdit) -> Unit,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val profilerStore: ProfilerProfileStore = koinInject()
     val settingsService: ISettingsService = koinInject()
     val javaManager: IJavaManager = koinInject()
@@ -88,7 +88,7 @@ internal fun PackRuntimeSection(
     var ownJava by remember(pack.id) { mutableStateOf(false) }
     val customJava = !runtime.javaPath.isNullOrBlank()
 
-    NxSettingGroup(s.packSettingsMemory) {
+    NxSettingGroup(s.text("packSettingsMemory")) {
         RamSelector(
             isAuto = !runtime.fixedMemory,
             resolvedAutoMb = resolvedAutoMb,
@@ -105,7 +105,7 @@ internal fun PackRuntimeSection(
         if (typedHeap.isNotEmpty()) {
             NxSettingBlock {
                 Text(
-                    s.packSettingsMemoryFromArgs(typedHeap.joinToString(" ")),
+                    s.text("packSettingsMemoryFromArgs", typedHeap.joinToString(" ")),
                     style = MaterialTheme.typography.bodySmall,
                     color = NxInk.quiet,
                 )
@@ -113,22 +113,22 @@ internal fun PackRuntimeSection(
         }
     }
 
-    NxSettingGroup(s.packSettingsEnvironment) {
+    NxSettingGroup(s.text("packSettingsEnvironment")) {
         val major = requiredJavaMajor(pack, javaManager)
         NxSettingRow(
-            title  = s.packSettingsJava,
-            detail = if (customJava) s.packSettingsJavaCustom else major?.let { s.packSettingsJavaManaged(it) } ?: s.packSettingsJavaCustom,
+            title  = s.text("packSettingsJava"),
+            detail = if (customJava) s.text("packSettingsJavaCustom") else major?.let { s.text("packSettingsJavaManaged", it) } ?: s.text("packSettingsJavaCustom"),
         ) {
             if (customJava || ownJava) {
                 NxButton(
-                    s.packSettingsJavaReset,
+                    s.text("packSettingsJavaReset"),
                     onClick = { ownJava = false; commit { rt -> rt.copy(javaPath = null) } },
                     style = NxButtonStyle.Secondary,
                     compact = true,
                 )
             } else {
                 NxButton(
-                    s.packSettingsJavaPickOwn,
+                    s.text("packSettingsJavaPickOwn"),
                     onClick = { ownJava = true },
                     style = NxButtonStyle.Secondary,
                     compact = true,
@@ -140,18 +140,18 @@ internal fun PackRuntimeSection(
                 NxField(
                     value = runtime.javaPath ?: "",
                     onValueChange = { commit { rt -> rt.copy(javaPath = it.ifBlank { null }) } },
-                    placeholder = s.packSettingsJavaPathPlaceholder,
+                    placeholder = s.text("packSettingsJavaPathPlaceholder"),
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
         }
 
         NxSettingRow(
-            title  = s.packSettingsJvmArgs,
-            detail = runtime.jvmArgs?.takeIf { it.isNotBlank() } ?: s.packSettingsJvmArgsDefault,
+            title  = s.text("packSettingsJvmArgs"),
+            detail = runtime.jvmArgs?.takeIf { it.isNotBlank() } ?: s.text("packSettingsJvmArgsDefault"),
         ) {
             NxButton(
-                s.packSettingsJvmArgsEdit,
+                s.text("packSettingsJvmArgsEdit"),
                 onClick = { showJvmBuilder = true },
                 style = NxButtonStyle.Secondary,
                 compact = true,
@@ -159,8 +159,8 @@ internal fun PackRuntimeSection(
         }
     }
 
-    NxSettingGroup(s.packSettingsWindow) {
-        NxSettingRow(s.packSettingsWindowOverride, detail = s.packSettingsWindowOverrideDesc) {
+    NxSettingGroup(s.text("packSettingsWindow")) {
+        NxSettingRow(s.text("packSettingsWindowOverride"), detail = s.text("packSettingsWindowOverrideDesc")) {
             NxSwitch(runtime.windowSizeOverride, { on -> commit { rt -> rt.copy(windowSizeOverride = on) } })
         }
 
@@ -171,26 +171,26 @@ internal fun PackRuntimeSection(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(s.packSettingsWidth, style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
+                        Text(s.text("packSettingsWidth"), style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
                         NxField(
                             value = widthText,
                             onValueChange = { raw ->
                                 widthText = raw.filter { it.isDigit() }.take(5)
                                 widthText.toIntOrNull()?.takeIf { it in 1..10000 }?.let { commit { rt -> rt.copy(windowWidth = it) } }
                             },
-                            placeholder = s.packSettingsWidth,
+                            placeholder = s.text("packSettingsWidth"),
                             modifier = Modifier.fillMaxWidth(),
                         )
                     }
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(s.packSettingsHeight, style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
+                        Text(s.text("packSettingsHeight"), style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
                         NxField(
                             value = heightText,
                             onValueChange = { raw ->
                                 heightText = raw.filter { it.isDigit() }.take(5)
                                 heightText.toIntOrNull()?.takeIf { it in 1..10000 }?.let { commit { rt -> rt.copy(windowHeight = it) } }
                             },
-                            placeholder = s.packSettingsHeight,
+                            placeholder = s.text("packSettingsHeight"),
                             modifier = Modifier.fillMaxWidth(),
                         )
                     }
@@ -198,7 +198,7 @@ internal fun PackRuntimeSection(
             }
         }
 
-        NxSettingRow(s.packSettingsFullscreen) {
+        NxSettingRow(s.text("packSettingsFullscreen")) {
             NxSwitch(runtime.fullScreen, { on -> commit { rt -> rt.copy(fullScreen = on) } })
         }
 
@@ -218,13 +218,13 @@ internal fun PackRuntimeSection(
             // pack that ships the screen off.
             if (read || choice != null || launcherDecides) {
                 NxSettingRow(
-                    title  = s.packSettingsEarlyScreen,
-                    detail = if (launcherDecides) s.packSettingsEarlyScreenWayland else s.packSettingsEarlyScreenDesc,
+                    title  = s.text("packSettingsEarlyScreen"),
+                    detail = if (launcherDecides) s.text("packSettingsEarlyScreenWayland") else s.text("packSettingsEarlyScreenDesc"),
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         if (choice != null) {
                             NxButton(
-                                s.packSettingsEarlyScreenReset,
+                                s.text("packSettingsEarlyScreenReset"),
                                 onClick = { commit { rt -> rt.copy(earlyLoadingScreen = null) } },
                                 style = NxButtonStyle.Tertiary,
                                 compact = true,

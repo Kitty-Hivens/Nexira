@@ -5,8 +5,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.unit.Density
-import hivens.ui.i18n.AppLocale
-import hivens.ui.i18n.LocaleProvider
+import hivens.ui.i18n.ShippedLanguageProvider
 import hivens.ui.onEventThread
 import hivens.ui.puppet.PuppetRegistry
 import hivens.ui.settle
@@ -65,7 +64,7 @@ class ThemePickerApplyTest {
         val fired = ArrayList<String>()
         onEventThread {
             val scene = ImageComposeScene(900, 700, density = Density(1f)) {
-                LocaleProvider(AppLocale.ENGLISH) {
+                ShippedLanguageProvider("en") {
                     NxTheme(dark = true) {
                         CompositionLocalProvider(
                             LocalWidgetDataRegistry provides data,

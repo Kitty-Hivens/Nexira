@@ -23,7 +23,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import hivens.core.activity.Activity
 import hivens.core.activity.ActivityPhase
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.widgets.Sources
 import hivens.widget.api.rememberProps
 import hivens.widget.api.rememberSource
@@ -54,7 +54,7 @@ data class ProgressProps(
 @Composable
 fun ProgressWidget(instance: WidgetInstance) {
     val p = instance.rememberProps<ProgressProps>()
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     // Bound declaratively to the activity source -- the widget no longer knows
     // which service backs it (the SourceKey is wired in Sources + Main DI).
     val activities by rememberSource(Sources.Activity)
@@ -69,7 +69,7 @@ fun ProgressWidget(instance: WidgetInstance) {
             .padding(horizontal = 16.dp, vertical = 14.dp),
     ) {
         Text(
-            text       = p.title.ifBlank { s.widgetProgressTitle },
+            text       = p.title.ifBlank { s.text("widgetProgressTitle") },
             style      = MaterialTheme.typography.labelLarge,
             color      = NxInk.quiet,
             fontWeight = FontWeight.Medium,
@@ -79,7 +79,7 @@ fun ProgressWidget(instance: WidgetInstance) {
         if (running != null) {
             InProgressBody(running)
         } else {
-            IdleBody(p.idleText.ifBlank { s.widgetProgressIdle })
+            IdleBody(p.idleText.ifBlank { s.text("widgetProgressIdle") })
         }
     }
 }

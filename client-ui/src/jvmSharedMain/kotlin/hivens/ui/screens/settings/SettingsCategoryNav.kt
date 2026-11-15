@@ -2,6 +2,7 @@ package hivens.ui.screens.settings
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.theme.NxInk
 import hivens.ui.icons.Symbol
 import androidx.compose.material3.Text
@@ -22,7 +23,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
-import hivens.ui.i18n.LocalStrings
 import hivens.ui.nx.NxNavRowContent
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.theme.NxColor
@@ -44,7 +44,7 @@ internal fun SettingsCategoryNav(
     /** Takes the width it is given instead of a fixed column, for a window with no room beside it. */
     fill: Boolean = false,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     Column(
         modifier = modifier
             .then(if (fill) Modifier else Modifier.width(200.dp).padding(end = 12.dp))
@@ -87,7 +87,7 @@ internal fun SettingsCategoryChips(
     onSelect: (SettingsCategory) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     Row(
         modifier = modifier.horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(8.dp),

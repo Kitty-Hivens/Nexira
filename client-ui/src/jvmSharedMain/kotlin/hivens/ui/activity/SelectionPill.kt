@@ -26,7 +26,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import hivens.core.activity.Activity
-import hivens.ui.i18n.AppStrings
+import hivens.i18n.api.Strings
 import hivens.ui.icons.NxIcon
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
@@ -56,7 +56,7 @@ internal fun SelectionPill(
     selection: Selection,
     ambient: Activity?,
     props: PillProps,
-    s: AppStrings,
+    s: Strings,
     maxWidth: Dp,
     open: Boolean = true,
 ) {
@@ -101,13 +101,13 @@ internal fun SelectionPill(
 
 /** Count, the way to undo it, and the verbs -- all at one level of detail. */
 @Composable
-private fun Body(selection: Selection, s: AppStrings, props: PillProps, labelled: Boolean) {
+private fun Body(selection: Selection, s: Strings, props: PillProps, labelled: Boolean) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(if (labelled) 12.dp else 2.dp),
     ) {
         Text(
-            text = s.selectionCount(selection.items.size),
+            text = s.text("selectionCount", selection.items.size),
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
             color = NxInk.main,
@@ -117,7 +117,7 @@ private fun Body(selection: Selection, s: AppStrings, props: PillProps, labelled
         VerticalDivider(Modifier.height(20.dp), color = NxInk.line)
         if (labelled) {
             NxButton(
-                label = s.selectionClear,
+                label = s.text("selectionClear"),
                 onClick = selection.clear,
                 style = NxButtonStyle.Tertiary,
                 icon = NxIcon.Close,
@@ -125,7 +125,7 @@ private fun Body(selection: Selection, s: AppStrings, props: PillProps, labelled
             )
         } else {
             // No wrapper: the button raises its own name now.
-            NxIconButton(NxIcon.Close, s.selectionClear, selection.clear)
+            NxIconButton(NxIcon.Close, s.text("selectionClear"), selection.clear)
         }
         if (props.showActions && selection.actions.isNotEmpty()) {
             Spacer(Modifier.width(if (labelled) CLUSTER_GAP else 4.dp))
@@ -141,7 +141,7 @@ private fun Body(selection: Selection, s: AppStrings, props: PillProps, labelled
  * one still says why.
  */
 @Composable
-private fun Verbs(selection: Selection, s: AppStrings, labelled: Boolean) {
+private fun Verbs(selection: Selection, s: Strings, labelled: Boolean) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(if (labelled) 12.dp else 0.dp),
@@ -196,10 +196,10 @@ private fun SelectionStack(items: List<SelectionItem>, ambient: Activity?) {
     }
 }
 
-private fun SelectionActionKind.label(s: AppStrings): String = when (this) {
-    SelectionActionKind.Enable -> s.selectionEnable
-    SelectionActionKind.Disable -> s.selectionDisable
-    SelectionActionKind.Delete -> s.selectionDelete
+private fun SelectionActionKind.label(s: Strings): String = when (this) {
+    SelectionActionKind.Enable -> s.text("selectionEnable")
+    SelectionActionKind.Disable -> s.text("selectionDisable")
+    SelectionActionKind.Delete -> s.text("selectionDelete")
 }
 
 private fun SelectionActionKind.icon() = when (this) {

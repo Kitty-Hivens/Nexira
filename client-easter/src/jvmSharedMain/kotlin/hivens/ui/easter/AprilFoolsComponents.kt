@@ -21,7 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.zIndex
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import kotlin.math.*
 import kotlin.random.Random
 import hivens.ui.theme.NxInk
@@ -268,7 +268,7 @@ fun AprilFoolsCloseDialog(
     onStay: () -> Unit,
     surrenderAfter: Int = 8,
 ) {
-    val s         = LocalStrings.current
+    val s         = nexiraStrings()
     val escapes   = ChaosState.closeButtonEscapes
     val surrendered = escapes >= surrenderAfter
 
@@ -303,7 +303,7 @@ fun AprilFoolsCloseDialog(
 
                 // Title changes as escape count grows
                 Text(
-                    text       = s.aprilCloseTitle(escapes),
+                    text       = s.text("aprilCloseTitle", escapes),
                     style      = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     color      = NxInk.main,
@@ -311,7 +311,7 @@ fun AprilFoolsCloseDialog(
                 )
 
                 Text(
-                    text  = s.aprilCloseBody(escapes),
+                    text  = s.text("aprilCloseBody", escapes),
                     color = NxInk.quiet,
                     textAlign = TextAlign.Center,
                     style = MaterialTheme.typography.bodyMedium,
@@ -329,14 +329,14 @@ fun AprilFoolsCloseDialog(
                         onClick  = onStay,
                         modifier = Modifier.align(Alignment.CenterStart),
                         shape    = MaterialTheme.shapes.small,
-                    ) { Text(s.aprilCloseStay) }
+                    ) { Text(s.text("aprilCloseStay")) }
 
                     // Hide to tray (middle, optional)
                     if (onHideTray != null) {
                         TextButton(
                             onClick  = onHideTray,
                             modifier = Modifier.align(Alignment.Center),
-                        ) { Text(s.aprilCloseHideTray) }
+                        ) { Text(s.text("aprilCloseHideTray")) }
                     }
 
                     // Close (right side, runs away). Same single-source rule
@@ -361,7 +361,7 @@ fun AprilFoolsCloseDialog(
                         shape             = MaterialTheme.shapes.small,
                     ) {
                         Text(
-                            text  = if (surrendered) s.aprilCloseSurrender else s.aprilCloseClose,
+                            text  = if (surrendered) s.text("aprilCloseSurrender") else s.text("aprilCloseClose"),
                             color = NxColor.on(NxColor.status(Status.Error)),
                         )
                     }
@@ -370,7 +370,7 @@ fun AprilFoolsCloseDialog(
                 // Escape counter hint
                 if (escapes > 0 && !surrendered) {
                     Text(
-                        text  = s.aprilCloseEscapeCount(escapes, surrenderAfter),
+                        text  = s.text("aprilCloseEscapeCount", escapes, surrenderAfter),
                         style = MaterialTheme.typography.labelSmall,
                         color = NxInk.off,
                     )

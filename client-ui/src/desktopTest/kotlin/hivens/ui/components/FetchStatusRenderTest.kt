@@ -14,9 +14,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import hivens.i18n.api.LocalTranslator
 import hivens.media.MediaFetch
-import hivens.ui.i18n.EnglishStrings
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.NexiraStrings
 import hivens.ui.theme.NxTheme
 import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.EncodedImageFormat
@@ -63,7 +63,7 @@ class FetchStatusRenderTest {
         ) {
             NxTheme(dark = true) {
                 CompositionLocalProvider(
-                    LocalStrings provides EnglishStrings,
+                    LocalTranslator provides NexiraStrings.translator("en"),
                 ) {
                     progressAccent = NxColor.status(Status.Info)
                     Column(

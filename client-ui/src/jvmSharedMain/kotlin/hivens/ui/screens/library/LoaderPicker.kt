@@ -15,7 +15,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.unit.dp
 import hivens.launcher.runtime.RuntimeProvisioner
 import hivens.launcher.runtime.loader.LoaderVersionOption
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.NxChoiceChip
 import hivens.ui.nx.NxChoiceItem
 import hivens.ui.nx.NxChoiceMenu
@@ -67,7 +67,7 @@ internal fun LoaderPicker(
     puppetKey: String,
     label: @Composable (String) -> Unit,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val provisioner: RuntimeProvisioner = koinInject()
 
     var loaderVersions by remember { mutableStateOf<List<LoaderVersionOption>>(emptyList()) }
@@ -97,12 +97,12 @@ internal fun LoaderPicker(
     }
 
     if (loaderId != null) {
-        label(s.createPackLoaderVersion)
+        label(s.text("createPackLoaderVersion"))
         Box {
             NxField(
                 value = loaderVersion,
                 onValueChange = { onLoaderVersion(it); menuOpen = true },
-                placeholder = if (loaderNeedsVersion(loaderId)) s.createPackLoaderVersionRequired else s.createPackLoaderVersionLatest,
+                placeholder = if (loaderNeedsVersion(loaderId)) s.text("createPackLoaderVersionRequired") else s.text("createPackLoaderVersionLatest"),
                 modifier = Modifier.fillMaxWidth().onFocusChanged { if (it.isFocused) menuOpen = true },
             )
             NxChoiceMenu(
@@ -114,8 +114,8 @@ internal fun LoaderPicker(
                     NxChoiceItem(
                         label = option.version,
                         hint = when {
-                            option.recommended -> s.createPackLoaderRecommended
-                            !option.stable -> s.createPackLoaderPreRelease
+                            option.recommended -> s.text("createPackLoaderRecommended")
+                            !option.stable -> s.text("createPackLoaderPreRelease")
                             else -> null
                         },
                         selected = option.version == loaderVersion,

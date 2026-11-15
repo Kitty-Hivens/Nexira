@@ -19,8 +19,7 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.audio.PlaybackState
 import hivens.ui.audio.RepeatMode
 import hivens.ui.audio.TrackInfo
-import hivens.ui.i18n.AppLocale
-import hivens.ui.i18n.LocaleProvider
+import hivens.ui.i18n.ShippedLanguageProvider
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.Spacing
 import org.jetbrains.skia.EncodedImageFormat
@@ -61,7 +60,7 @@ class CoverPlayerRenderProbe {
         val widths = listOf(460, 380, 320, 280, 240, 200, 160)
         val d = 2f
         val scene = ImageComposeScene((500 * d).toInt(), (1240 * d).toInt(), density = Density(d)) {
-            LocaleProvider(AppLocale.ENGLISH) {
+            ShippedLanguageProvider("en") {
                 NxTheme(dark = true) {
                     Box(
                         Modifier.fillMaxSize().background(NxColor.page).padding(Spacing.s16),
@@ -103,7 +102,7 @@ class CoverPlayerRenderProbe {
     fun probe() {
         val d = 2f
         val scene = ImageComposeScene((460 * d).toInt(), (520 * d).toInt(), density = Density(d)) {
-            LocaleProvider(AppLocale.ENGLISH) {
+            ShippedLanguageProvider("en") {
                 NxTheme(dark = true) {
                     Box(
                         Modifier.fillMaxSize().background(NxColor.page).padding(Spacing.s16),
@@ -153,7 +152,7 @@ class CoverPlayerRenderProbe {
         for (dark in listOf(true, false)) {
             val d = 2f
             val scene = ImageComposeScene((460 * d).toInt(), (420 * d).toInt(), density = Density(d)) {
-                LocaleProvider(AppLocale.RUSSIAN) {
+                ShippedLanguageProvider("ru") {
                     NxTheme(dark = dark) {
                         Box(
                             Modifier.fillMaxSize().background(NxColor.page).padding(Spacing.s16),

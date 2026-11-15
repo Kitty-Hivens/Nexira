@@ -39,6 +39,8 @@ class UpdateService(
     private val settingsService: ISettingsService,
     private val applicator: IUpdateApplicator,
     private val currentVersion: String = Branding.VERSION.removePrefix("v"),
+    /** The languages the release notes are fetched in, best first, asked at each check. */
+    private val languages: () -> List<String> = { listOf(settingsService.getSettings().locale) },
 ) {
     private val logger = LoggerFactory.getLogger(UpdateService::class.java)
     private val httpClient get() = clientProvider.current
@@ -251,7 +253,7 @@ class UpdateService(
                 release = release,
                 manifest = manifest,
                 changelog = fetchChangelogBetween(currentVersion, latestVersion, rangeReleases),
-                localizedNotes = fetchLocalizedNotes(release.tagName, settings.locale),
+                localizedNotes = fetchLocalizedNotes(release.tagName, languages()),
                 isMandatory = belowMandatoryFloor,
                 mandatoryReason = if (belowMandatoryFloor) channelMeta.reason else null,
                 criticalInRange = criticalHit != null,
@@ -624,6 +626,12 @@ class UpdateService(
      * no route to raw.githubusercontent still sees the release's notes, in
      * English.
      */
+    /** The notes of release [tag] in the first of [languages] that has them. */
+    internal suspend fun fetchLocalizedNotes(tag: String, languages: List<String>): String? {
+        for (language in languages) fetchLocalizedNotes(tag, language)?.let { return it }
+        return null
+    }
+
     internal suspend fun fetchLocalizedNotes(tag: String, locale: String): String? {
         val lang = locale.substringBefore('-').trim().lowercase()
         if (lang.isEmpty()) return null

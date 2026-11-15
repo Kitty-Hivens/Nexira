@@ -5,7 +5,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.NxAlertDialog
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
@@ -31,7 +31,7 @@ fun ConfirmDialog(
     onDismiss: () -> Unit,
     confirmColor: Color = NxColor.lead(),
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val container = NxTheme.colours.step(NxTheme.colours.topStep)
     OnFill(container) {
         NxAlertDialog(
@@ -45,7 +45,7 @@ fun ConfirmDialog(
                 }
             },
             dismissButton = {
-                TextButton(onClick = onDismiss) { Text(s.editorCancel) }
+                TextButton(onClick = onDismiss) { Text(s.text("editorCancel")) }
             },
             containerColor    = container,
             titleContentColor = NxInk.main,

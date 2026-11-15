@@ -33,10 +33,10 @@ import coil3.compose.AsyncImage
 import hivens.core.data.GameMode
 import hivens.core.data.MultiplayerServerEntry
 import hivens.core.data.WorldEntry
+import hivens.i18n.api.Strings
 import hivens.launcher.instance.ServersDatReader
 import hivens.launcher.instance.WorldScanner
-import hivens.ui.i18n.AppStrings
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.nx.CenteredProgress
@@ -72,7 +72,7 @@ import hivens.ui.theme.NxInk
  */
 @Composable
 fun WorldsTabPane(instanceDir: Path, modifier: Modifier = Modifier) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
 
     var state by remember(instanceDir) { mutableStateOf<WorldsState>(WorldsState.Loading) }
     var retryTick by remember(instanceDir) { mutableIntStateOf(0) }
@@ -100,9 +100,9 @@ fun WorldsTabPane(instanceDir: Path, modifier: Modifier = Modifier) {
             when (st) {
                 WorldsState.Loading -> CenteredProgress(Modifier.fillMaxSize())
                 WorldsState.Error -> RetryStateBlock(
-                    title      = s.worldsTabErrorTitle,
-                    message    = s.worldsTabErrorMessage,
-                    retryLabel = s.contentTabRetry,
+                    title      = s.text("worldsTabErrorTitle"),
+                    message    = s.text("worldsTabErrorMessage"),
+                    retryLabel = s.text("contentTabRetry"),
                     onRetry    = { retryTick++ },
                     modifier   = Modifier.fillMaxSize(),
                 )
@@ -126,24 +126,24 @@ private fun WorldsList(
     worlds: List<WorldEntry>,
     servers: List<MultiplayerServerEntry>,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     LazyColumn(
         modifier            = Modifier.fillMaxSize(),
         contentPadding      = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        item { NxSectionHeader(text = s.worldsTabLocalSection(worlds.size)) }
+        item { NxSectionHeader(text = s.text("worldsTabLocalSection", worlds.size)) }
         if (worlds.isEmpty()) {
-            item { EmptyHint(text = s.worldsTabLocalEmpty) }
+            item { EmptyHint(text = s.text("worldsTabLocalEmpty")) }
         } else {
             items(items = worlds, key = { it.dirName }) { w -> WorldCard(world = w) }
         }
 
         item { Spacer(Modifier.height(4.dp)) }
 
-        item { NxSectionHeader(text = s.worldsTabServersSection(servers.size)) }
+        item { NxSectionHeader(text = s.text("worldsTabServersSection", servers.size)) }
         if (servers.isEmpty()) {
-            item { EmptyHint(text = s.worldsTabServersEmpty) }
+            item { EmptyHint(text = s.text("worldsTabServersEmpty")) }
         } else {
             // Keyed on position, because a server list has no identity of its own:
             // Minecraft lets the same address be added twice, a blank name falls back
@@ -174,7 +174,7 @@ private fun EmptyHint(text: String) {
 
 @Composable
 private fun WorldCard(world: WorldEntry) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     NxCard(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier              = Modifier
@@ -249,7 +249,7 @@ private fun WorldThumb(iconPath: String?) {
 
 @Composable
 private fun ServerCard(entry: MultiplayerServerEntry) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     NxCard(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier              = Modifier
@@ -272,7 +272,7 @@ private fun ServerCard(entry: MultiplayerServerEntry) {
                     )
                     if (entry.hidden) {
                         Symbol(icon = NxIcon.VisibilityOff,
-                            contentDescription = s.worldsTabServerHiddenLabel,
+                            contentDescription = s.text("worldsTabServerHiddenLabel"),
                             tint               = NxInk.quiet,
                             modifier           = Modifier.size(14.dp),
                         )
@@ -328,17 +328,17 @@ private fun worldSubtitle(world: WorldEntry): String {
 }
 
 /** Third line, MC-style: "<game mode>  ·  <version>" (each part dropped when absent). */
-private fun worldInfoLine(world: WorldEntry, s: AppStrings): String =
+private fun worldInfoLine(world: WorldEntry, s: Strings): String =
     listOfNotNull(world.gameMode?.let { gameModeLabel(it, s) }, world.mcVersion)
         .joinToString("  ·  ")
 
 private val WORLD_DATE_FMT: DateTimeFormatter =
     DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM).withZone(ZoneId.systemDefault())
 
-private fun gameModeLabel(mode: GameMode, s: AppStrings): String = when (mode) {
-    GameMode.Survival  -> s.worldsTabGameSurvival
-    GameMode.Creative  -> s.worldsTabGameCreative
-    GameMode.Adventure -> s.worldsTabGameAdventure
-    GameMode.Spectator -> s.worldsTabGameSpectator
-    GameMode.Unknown   -> s.worldsTabGameUnknown
+private fun gameModeLabel(mode: GameMode, s: Strings): String = when (mode) {
+    GameMode.Survival  -> s.text("worldsTabGameSurvival")
+    GameMode.Creative  -> s.text("worldsTabGameCreative")
+    GameMode.Adventure -> s.text("worldsTabGameAdventure")
+    GameMode.Spectator -> s.text("worldsTabGameSpectator")
+    GameMode.Unknown   -> s.text("worldsTabGameUnknown")
 }

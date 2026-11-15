@@ -8,10 +8,11 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.data.SettingsData
+import hivens.i18n.api.FixedTranslations
 import hivens.ui.appearance.AppearanceStore
 import hivens.ui.background.BackgroundSettings
-import hivens.ui.i18n.AppLocale
-import hivens.ui.i18n.LocaleProvider
+import hivens.ui.i18n.NexiraStrings
+import hivens.ui.i18n.ShippedLanguageProvider
 import hivens.ui.onEventThread
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.ThemeManager
@@ -93,6 +94,7 @@ class PalettePreviewSamplesTest {
         preferences = PreferenceWriter("palette-preview-samples-test"),
         themes      = ThemeManager(themes) { _, _ -> },
         contributed = MutableStateFlow(emptyList()),
+        translations = FixedTranslations(NexiraStrings.translator("en")),
         scope       = CoroutineScope(Dispatchers.Unconfined),
     )
 
@@ -117,7 +119,7 @@ class PalettePreviewSamplesTest {
         return onEventThread {
             var host: OffscreenPreviewHost? = null
             val scene = ImageComposeScene(400, 400, density = Density(1f)) {
-                LocaleProvider(AppLocale.ENGLISH) {
+                ShippedLanguageProvider("en") {
                     NxTheme(dark = true) {
                         CompositionLocalProvider(
                             LocalWidgetDataRegistry provides data,

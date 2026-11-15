@@ -20,6 +20,7 @@ import hivens.accounts.api.PasswordSignIn
 import hivens.accounts.api.SignInCode
 import hivens.accounts.api.SignInError
 import hivens.accounts.api.SignInFlow
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.rememberFieldState
 import androidx.compose.ui.unit.dp
 import hivens.ui.components.ConfirmCodeDialog
@@ -31,7 +32,6 @@ import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxCalloutBanner
 import hivens.ui.nx.NxCalloutTone
-import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetField
 import hivens.ui.puppet.PuppetScreen
@@ -67,7 +67,7 @@ fun LoginPanel(
     val answerCode = rememberScopedCommand(AccountKeys.SignInCode) ?: return
     val cancel = rememberScopedCommand(AccountKeys.CancelSignIn) ?: return
     val setRemember = rememberScopedCommand(AccountKeys.SetRemember) ?: return
-    val s            = LocalStrings.current
+    val s            = nexiraStrings()
     val focusManager = LocalFocusManager.current
 
     var login        by remember { mutableStateOf("") }
@@ -141,7 +141,7 @@ fun LoginPanel(
     ) {
         PuppetScreen("Login")
         Text(
-            text       = s.loginTitle,
+            text       = s.text("loginTitle"),
             style      = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
             color      = NxInk.main
@@ -151,15 +151,15 @@ fun LoginPanel(
         if (twoFactorUnsupported) {
             NxCalloutBanner(
                 tone  = NxCalloutTone.Warning,
-                title = s.auth2faUnsupportedTitle,
-                body  = s.auth2faUnsupportedBody,
+                title = s.text("auth2faUnsupportedTitle"),
+                body  = s.text("auth2faUnsupportedBody"),
             ) {
                 OutlinedButton(
                     onClick  = { cancel(provider) },
                     modifier = Modifier.align(Alignment.End),
                     shape    = MaterialTheme.shapes.small,
                 ) {
-                    Text(s.auth2faUnsupportedDismiss, color = NxInk.quiet)
+                    Text(s.text("auth2faUnsupportedDismiss"), color = NxInk.quiet)
                 }
             }
         }
@@ -184,7 +184,7 @@ fun LoginPanel(
         OutlinedTextField(
             value         = login,
             onValueChange = { login = it; edited() },
-            label         = { Text(s.loginUsername) },
+            label         = { Text(s.text("loginUsername")) },
             modifier      = Modifier.fillMaxWidth(),
             singleLine    = true,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
@@ -200,7 +200,7 @@ fun LoginPanel(
         val passwordState = rememberFieldState(password) { password = it; edited() }
         OutlinedSecureTextField(
             state            = passwordState,
-            label            = { Text(s.loginPassword) },
+            label            = { Text(s.text("loginPassword")) },
             modifier         = Modifier.fillMaxWidth(),
             keyboardOptions  = KeyboardOptions(
                 keyboardType = KeyboardType.Password,
@@ -227,7 +227,7 @@ fun LoginPanel(
                 )
             )
             Text(
-                text  = s.loginRemember,
+                text  = s.text("loginRemember"),
                 style = MaterialTheme.typography.bodySmall,
                 color = NxInk.quiet
             )
@@ -255,7 +255,7 @@ fun LoginPanel(
         } else {
             Flexible("login_submit_btn", FlexibleKind.Button) {
                 NxButton(
-                    label     = s.loginButton,
+                    label     = s.text("loginButton"),
                     onClick   = { doLogin() },
                     modifier  = Modifier.fillMaxWidth(),
                     style     = NxButtonStyle.Primary,
@@ -269,7 +269,7 @@ fun LoginPanel(
         if (registerUrl != null) {
             Flexible("login_register_btn", FlexibleKind.Button) {
                 NxButton(
-                    label     = s.loginRegister,
+                    label     = s.text("loginRegister"),
                     onClick   = { SystemActions.openUrl(registerUrl) },
                     modifier  = Modifier.fillMaxWidth(),
                     style     = NxButtonStyle.Tertiary,
@@ -286,7 +286,7 @@ fun LoginPanel(
         if (showOffline) {
             Flexible("login_offline_btn", FlexibleKind.Button) {
                 NxButton(
-                    label     = s.loginPlayOffline,
+                    label     = s.text("loginPlayOffline"),
                     onClick   = { playOffline() },
                     modifier  = Modifier.fillMaxWidth(),
                     style     = NxButtonStyle.Tertiary,

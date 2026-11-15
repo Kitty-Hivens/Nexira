@@ -16,7 +16,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import hivens.core.data.ThemeMode
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.nx.NxChoiceChip
@@ -48,7 +48,7 @@ internal fun AppearanceThemeIsland(
     onOpenThemePicker: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     // Optimistic local so the switch flips at once while the reveal runs; re-keyed on
     // isDarkTheme so an automatic (system / wallpaper) flip also moves it.
     var dark by remember(isDarkTheme) { mutableStateOf(isDarkTheme) }
@@ -58,36 +58,36 @@ internal fun AppearanceThemeIsland(
             Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            DayNightRow(checked = dark, title = s.settingsDarkTheme, description = s.settingsDarkThemeDesc) {
+            DayNightRow(checked = dark, title = s.text("settingsDarkTheme"), description = s.text("settingsDarkThemeDesc")) {
                 dark = it; onToggleDarkTheme()
             }
             // A theme without a light scheme stays dark in light mode rather than
             // having one invented for it, so the switch says why nothing changed.
             if (!activeTheme.hasLight) {
                 Text(
-                    text  = s.themePickerDarkOnly,
+                    text  = s.text("themePickerDarkOnly"),
                     style = MaterialTheme.typography.bodySmall,
                     color = NxInk.quiet,
                 )
             }
 
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                BgPicker(s.settingsThemeModeTitle) {
-                    NxChoiceChip(s.settingsThemeModeManual, themeMode == ThemeMode.Manual) {
+                BgPicker(s.text("settingsThemeModeTitle")) {
+                    NxChoiceChip(s.text("settingsThemeModeManual"), themeMode == ThemeMode.Manual) {
                         onThemeModeChanged(ThemeMode.Manual)
                     }
                     NxChoiceChip(
-                        s.settingsThemeModeSystem,
+                        s.text("settingsThemeModeSystem"),
                         themeMode == ThemeMode.System,
                         enabled = systemThemeAvailable,
                     ) { onThemeModeChanged(ThemeMode.System) }
-                    NxChoiceChip(s.settingsThemeModeWallpaper, themeMode == ThemeMode.Wallpaper) {
+                    NxChoiceChip(s.text("settingsThemeModeWallpaper"), themeMode == ThemeMode.Wallpaper) {
                         onThemeModeChanged(ThemeMode.Wallpaper)
                     }
                 }
                 if (!systemThemeAvailable) {
                     Text(
-                        text  = s.settingsThemeModeSystemUnavailable,
+                        text  = s.text("settingsThemeModeSystemUnavailable"),
                         style = MaterialTheme.typography.bodySmall,
                         color = NxInk.quiet,
                     )
@@ -97,9 +97,9 @@ internal fun AppearanceThemeIsland(
             // A backdrop filter is recomputed every frame by construction, so the
             // one place it can be spent or saved is here rather than per surface.
             NxToggle(
-                label           = s.settingsSurfaceBlur,
+                label           = s.text("settingsSurfaceBlur"),
                 checked         = surfaceBlur,
-                description     = s.settingsSurfaceBlurDesc,
+                description     = s.text("settingsSurfaceBlurDesc"),
                 icon            = NxIcon.Layers,
                 accent          = NxColor.lead(),
                 onCheckedChange = onSurfaceBlurChanged,
@@ -108,9 +108,9 @@ internal fun AppearanceThemeIsland(
             // Beside the blur because it is the same kind of choice: decoration that
             // costs something, switched off in one place rather than widget by widget.
             NxToggle(
-                label           = s.settingsReduceMotion,
+                label           = s.text("settingsReduceMotion"),
                 checked         = reduceMotion,
-                description     = s.settingsReduceMotionDesc,
+                description     = s.text("settingsReduceMotionDesc"),
                 icon            = NxIcon.Speed,
                 accent          = NxColor.lead(),
                 onCheckedChange = onReduceMotionChanged,
@@ -119,8 +119,8 @@ internal fun AppearanceThemeIsland(
             ModuleEffectRows()
 
             NxRow(
-                title    = s.settingsThemePicker,
-                subtitle = s.settingsThemePickerSub,
+                title    = s.text("settingsThemePicker"),
+                subtitle = s.text("settingsThemePickerSub"),
                 icon     = NxIcon.Star,
                 iconTint = NxColor.lead(),
                 onClick  = onOpenThemePicker,

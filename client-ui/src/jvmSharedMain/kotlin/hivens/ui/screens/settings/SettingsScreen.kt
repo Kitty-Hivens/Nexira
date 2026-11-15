@@ -15,9 +15,9 @@ import hivens.config.ExperimentalProtocolOverride
 import hivens.config.Protocol
 import hivens.core.api.interfaces.ISettingsService
 import hivens.launcher.platform.PlatformPaths
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.surface.NxCard
-import hivens.ui.i18n.AppLocale
-import hivens.ui.i18n.LocalStrings
+import hivens.i18n.api.LanguageInfo
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.utils.PreferenceWriter
 import org.koin.compose.koinInject
@@ -40,8 +40,9 @@ fun SettingsScreen(
     isDarkTheme: Boolean,
     onToggleTheme: () -> Unit,
     onOpenThemePicker: () -> Unit,
-    currentLocale: AppLocale,
-    onLocaleChanged: (AppLocale) -> Unit,
+    currentLanguage: LanguageInfo,
+    languages: List<LanguageInfo>,
+    onLanguageChanged: (tag: String) -> Unit,
     onOpenBackgroundSettings: () -> Unit = {},
     onOpenAbout: () -> Unit = {}
 ) {
@@ -50,7 +51,7 @@ fun SettingsScreen(
     val settingsService: ISettingsService = koinInject()
     val preferences: PreferenceWriter     = koinInject()
     val paths: PlatformPaths              = koinInject()
-    val s = LocalStrings.current
+    val s = nexiraStrings()
 
     val initialSettings = remember { settingsService.getSettings() }
     val form            = remember { SettingsFormState(initialSettings) }
@@ -135,8 +136,9 @@ fun SettingsScreen(
                             onToggleTheme                = onToggleTheme,
                             onOpenThemePicker            = onOpenThemePicker,
                             onOpenBackgroundSettings     = onOpenBackgroundSettings,
-                            currentLocale                = currentLocale,
-                            onLocaleChanged              = onLocaleChanged,
+                            currentLanguage              = currentLanguage,
+                            languages                    = languages,
+                            onLanguageChanged            = onLanguageChanged,
                         )
                         SettingsCategory.Console -> ConsoleSection()
                         SettingsCategory.Network -> NetworkSection()

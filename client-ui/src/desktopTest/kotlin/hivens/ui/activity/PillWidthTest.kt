@@ -12,9 +12,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import hivens.ui.i18n.EnglishStrings
-import hivens.ui.i18n.LocalStrings
-import hivens.ui.i18n.RussianStrings
+import hivens.i18n.api.LocalTranslator
+import hivens.ui.i18n.NexiraStrings
 import hivens.core.activity.Activity
 import hivens.core.activity.ActivityKind
 import hivens.core.activity.ActivityPhase
@@ -68,12 +67,12 @@ class PillWidthTest {
 
     @OptIn(ExperimentalComposeUiApi::class)
     private fun frameOf(selection: Selection, maxWidth: Dp, russian: Boolean = false): Bitmap {
-        val strings = if (russian) RussianStrings else EnglishStrings
+        val strings = if (russian) NexiraStrings.shipped("ru") else NexiraStrings.shipped("en")
         val ambient = if (russian) probeAmbient else null
         val scene = ImageComposeScene(width = frame, height = 140, density = Density(1f)) {
             NxTheme(dark = true) {
                 CompositionLocalProvider(
-                    LocalStrings provides strings,
+                    LocalTranslator provides NexiraStrings.translator(strings.language),
                 ) {
                     Box(Modifier.fillMaxSize().background(ground).padding(20.dp)) {
                         SelectionPill(selection, ambient, PillProps(), strings, maxWidth)

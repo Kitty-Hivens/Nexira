@@ -16,7 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxChoiceChip
@@ -53,7 +53,7 @@ import androidx.compose.ui.graphics.Color
 fun ThemePickerPreviewWidget() {
     val dark = rememberScopedSource(Sources.DarkTheme).valueOrNull() ?: return
     val selection = rememberScopedSource(ThemeSelectionSource).valueOrNull() ?: return
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val theme = selection.theme
     val scheme = theme.scheme(dark)
     val face = MaterialTheme.typography.bodyMedium.fontFamily
@@ -65,32 +65,32 @@ fun ThemePickerPreviewWidget() {
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 Text(
-                    text       = s.themePickerPreview,
+                    text       = s.text("themePickerPreview"),
                     style      = MaterialTheme.typography.bodySmall,
                     color      = NxColor.lead(),
                     fontWeight = FontWeight.Bold,
                 )
                 NxSection(title = theme.label()) {
                     NxToggle(
-                        label           = s.settingsDarkTheme,
-                        description     = s.settingsDarkThemeDesc,
+                        label           = s.text("settingsDarkTheme"),
+                        description     = s.text("settingsDarkThemeDesc"),
                         checked         = true,
                         onCheckedChange = {},
                     )
-                    NxField(value = "", onValueChange = {}, placeholder = s.browseSearchPlaceholder)
+                    NxField(value = "", onValueChange = {}, placeholder = s.text("browseSearchPlaceholder"))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        NxChoiceChip(label = s.themePickerSelected, selected = true, onToggle = {})
-                        NxChoiceChip(label = s.themePickerBtnOutlined, selected = false, onToggle = {})
+                        NxChoiceChip(label = s.text("themePickerSelected"), selected = true, onToggle = {})
+                        NxChoiceChip(label = s.text("themePickerBtnOutlined"), selected = false, onToggle = {})
                     }
                     NxCard(Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(12.dp)) {
                             Text(theme.label(), color = NxInk.main, fontWeight = FontWeight.Medium)
-                            Text(s.settingsDarkThemeDesc, style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
+                            Text(s.text("settingsDarkThemeDesc"), style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
                         }
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        NxButton(label = s.themePickerBtnSample, onClick = {}, style = NxButtonStyle.Primary, compact = true)
-                        NxButton(label = s.themePickerBtnOutlined, onClick = {}, style = NxButtonStyle.Secondary, compact = true)
+                        NxButton(label = s.text("themePickerBtnSample"), onClick = {}, style = NxButtonStyle.Primary, compact = true)
+                        NxButton(label = s.text("themePickerBtnOutlined"), onClick = {}, style = NxButtonStyle.Secondary, compact = true)
                     }
                 }
                 Strip(scheme.steps)

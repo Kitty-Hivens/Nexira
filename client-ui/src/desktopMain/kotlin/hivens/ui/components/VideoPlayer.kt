@@ -54,7 +54,7 @@ import dev.hivens.skinema.compose.rememberPlayerState
 import dev.hivens.skinema.libav.HwAccel
 import dev.hivens.skinema.libav.MediaInput
 import dev.hivens.skinema.player.VideoPlayer as SkinemaPlayer
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
@@ -306,7 +306,7 @@ private class InlineVideo(
 private fun VideoUnavailable(modifier: Modifier) {
     Box(modifier, contentAlignment = Alignment.Center) {
         Text(
-            text  = LocalStrings.current.videoError,
+            text  = nexiraStrings().text("videoError"),
             color = Color.White.copy(alpha = 0.85f),
             style = MaterialTheme.typography.bodyMedium,
         )
@@ -334,7 +334,7 @@ fun FullscreenVideoWithHandoff(
     handoff: VideoHandoff? = null,
     onDismiss: () -> Unit,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     Layer(visible = true, modal = true, onDismissRequest = onDismiss, dismissOnOutsidePress = false) {
         Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
             VideoMedia(
@@ -356,7 +356,7 @@ fun FullscreenVideoWithHandoff(
             )
             VideoIconButton(
                 icon     = NxIcon.Close,
-                desc     = s.videoExitFullscreen,
+                desc     = s.text("videoExitFullscreen"),
                 onClick  = onDismiss,
                 size     = 40.dp,
                 modifier = Modifier.align(Alignment.TopEnd).padding(16.dp),
@@ -386,7 +386,7 @@ private fun VideoControls(
     onFullscreen: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val s = LocalStrings.current
+    val s = nexiraStrings()
     val frac = if (durationNanos > 0L) (positionNanos.toFloat() / durationNanos).coerceIn(0f, 1f) else 0f
     Column(
         modifier = modifier
@@ -401,13 +401,13 @@ private fun VideoControls(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier              = Modifier.fillMaxWidth(),
         ) {
-            VideoIconButton(icon = NxIcon.Replay10, desc = s.videoSkipBack, onClick = onSkipBack, size = 30.dp)
+            VideoIconButton(icon = NxIcon.Replay10, desc = s.text("videoSkipBack"), onClick = onSkipBack, size = 30.dp)
             VideoIconButton(
                 icon    = if (isPlaying) NxIcon.Pause else NxIcon.PlayArrow,
-                desc    = when { isPlaying -> s.audioPause; ended -> s.videoReplay; else -> s.audioPlay },
+                desc    = when { isPlaying -> s.text("audioPause"); ended -> s.text("videoReplay"); else -> s.text("audioPlay") },
                 onClick = onPlayPause,
             )
-            VideoIconButton(icon = NxIcon.Forward10, desc = s.videoSkipForward, onClick = onSkipForward, size = 30.dp)
+            VideoIconButton(icon = NxIcon.Forward10, desc = s.text("videoSkipForward"), onClick = onSkipForward, size = 30.dp)
             Text(
                 text  = "${formatTime(positionNanos)} / ${formatTime(durationNanos)}",
                 color = Color.White.copy(alpha = 0.9f),
@@ -417,7 +417,7 @@ private fun VideoControls(
             if (showVolume) {
                 VideoIconButton(
                     icon    = volumeIconFor(muted, volume),
-                    desc    = if (muted) s.videoUnmute else s.videoMute,
+                    desc    = if (muted) s.text("videoUnmute") else s.text("videoMute"),
                     onClick = onToggleMute,
                     size    = 30.dp,
                 )
@@ -425,9 +425,9 @@ private fun VideoControls(
             }
             when (fullscreen) {
                 FullscreenControl.Enter ->
-                    VideoIconButton(icon = NxIcon.OpenInFull, desc = s.videoFullscreen, onClick = onFullscreen, size = 30.dp)
+                    VideoIconButton(icon = NxIcon.OpenInFull, desc = s.text("videoFullscreen"), onClick = onFullscreen, size = 30.dp)
                 FullscreenControl.Exit ->
-                    VideoIconButton(icon = NxIcon.CloseFullscreen, desc = s.videoExitFullscreen, onClick = onFullscreen, size = 30.dp)
+                    VideoIconButton(icon = NxIcon.CloseFullscreen, desc = s.text("videoExitFullscreen"), onClick = onFullscreen, size = 30.dp)
                 FullscreenControl.None -> Unit
             }
         }

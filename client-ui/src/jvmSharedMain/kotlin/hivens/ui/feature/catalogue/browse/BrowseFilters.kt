@@ -9,7 +9,8 @@ import hivens.catalogue.api.GameVersionTag
 import hivens.catalogue.api.ProjectTypes
 import hivens.catalogue.api.SearchFilter
 import hivens.catalogue.api.groupGameVersions
-import hivens.ui.i18n.AppStrings
+import hivens.i18n.api.Strings
+import hivens.ui.i18n.modrinthCategory
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.feature.catalogue.project.loaderLabel
@@ -42,16 +43,16 @@ internal enum class FilterGroup(
     Exclusions(FilterField.Disclosure),
 }
 
-internal fun FilterGroup.title(s: AppStrings): String = when (this) {
-    FilterGroup.GameVersion -> s.browseFilterVersion
-    FilterGroup.Loader -> s.browseFilterLoader
-    FilterGroup.Categories -> s.browseFilterCategories
-    FilterGroup.Features -> s.browseFilterFeatures
-    FilterGroup.Resolutions -> s.browseFilterResolutions
-    FilterGroup.Performance -> s.browseFilterPerformance
-    FilterGroup.Environment -> s.browseFilterEnvironment
-    FilterGroup.License -> s.browseFilterLicense
-    FilterGroup.Exclusions -> s.browseFilterExclusions
+internal fun FilterGroup.title(s: Strings): String = when (this) {
+    FilterGroup.GameVersion -> s.text("browseFilterVersion")
+    FilterGroup.Loader -> s.text("browseFilterLoader")
+    FilterGroup.Categories -> s.text("browseFilterCategories")
+    FilterGroup.Features -> s.text("browseFilterFeatures")
+    FilterGroup.Resolutions -> s.text("browseFilterResolutions")
+    FilterGroup.Performance -> s.text("browseFilterPerformance")
+    FilterGroup.Environment -> s.text("browseFilterEnvironment")
+    FilterGroup.License -> s.text("browseFilterLicense")
+    FilterGroup.Exclusions -> s.text("browseFilterExclusions")
 }
 
 /** How a choice is marked beside its name. */
@@ -86,7 +87,7 @@ internal fun choicesFor(
     group: FilterGroup,
     type: String,
     tags: CatalogueTags?,
-    s: AppStrings,
+    s: Strings,
     allVersions: Boolean = false,
 ): List<FilterChoice> = when (group) {
     FilterGroup.GameVersion -> tags?.gameVersions.orEmpty()
@@ -119,14 +120,14 @@ internal fun choicesFor(
             .let { choices -> if (group == FilterGroup.Resolutions) choices.sortedBy { resolutionOrder(it.filter.value) } else choices.sortedBy { it.label } }
     FilterGroup.Environment -> if (type == ProjectTypes.MOD || type == MODPACK) {
         listOf(
-            FilterChoice(SearchFilter(FilterField.Environment, ENV_CLIENT), s.browseFilterClient, ChoiceMark.Glyph(NxIcon.Computer)),
-            FilterChoice(SearchFilter(FilterField.Environment, ENV_SERVER), s.browseFilterServer, ChoiceMark.Glyph(NxIcon.Storage)),
+            FilterChoice(SearchFilter(FilterField.Environment, ENV_CLIENT), s.text("browseFilterClient"), ChoiceMark.Glyph(NxIcon.Computer)),
+            FilterChoice(SearchFilter(FilterField.Environment, ENV_SERVER), s.text("browseFilterServer"), ChoiceMark.Glyph(NxIcon.Storage)),
         )
     } else {
         emptyList()
     }
     FilterGroup.License -> listOf(
-        FilterChoice(SearchFilter(FilterField.OpenSource, OPEN_SOURCE), s.browseFilterOpenSource, ChoiceMark.Glyph(NxIcon.Code)),
+        FilterChoice(SearchFilter(FilterField.OpenSource, OPEN_SOURCE), s.text("browseFilterOpenSource"), ChoiceMark.Glyph(NxIcon.Code)),
     )
     FilterGroup.Exclusions -> DISCLOSURES
         .filter { (kind, _) -> kind !in MODS_AND_MODPACKS_ONLY || type == ProjectTypes.MOD || type == MODPACK }
@@ -181,24 +182,24 @@ private const val ARCHIVED = "archived"
 
 private val MODS_AND_MODPACKS_ONLY = setOf(Disclosure.TELEMETRY, Disclosure.SYSTEM_INTERACTIONS)
 
-private fun disclosureLabel(kind: String, s: AppStrings): String = when (kind) {
-    Disclosure.TELEMETRY -> s.modDisclosureTelemetry
-    Disclosure.ADVERTISEMENTS -> s.modDisclosureAds
-    Disclosure.PAID_FEATURES -> s.modDisclosurePaid
-    Disclosure.AI_CONTENT -> s.modDisclosureAiContent
-    Disclosure.AI_FUNCTIONALITY -> s.modDisclosureAiFunctionality
-    Disclosure.SYSTEM_INTERACTIONS -> s.modDisclosureSystem
-    Disclosure.EPILEPSY_TRIGGERS -> s.modDisclosureEpilepsy
-    else -> s.browseFilterArchived
+private fun disclosureLabel(kind: String, s: Strings): String = when (kind) {
+    Disclosure.TELEMETRY -> s.text("modDisclosureTelemetry")
+    Disclosure.ADVERTISEMENTS -> s.text("modDisclosureAds")
+    Disclosure.PAID_FEATURES -> s.text("modDisclosurePaid")
+    Disclosure.AI_CONTENT -> s.text("modDisclosureAiContent")
+    Disclosure.AI_FUNCTIONALITY -> s.text("modDisclosureAiFunctionality")
+    Disclosure.SYSTEM_INTERACTIONS -> s.text("modDisclosureSystem")
+    Disclosure.EPILEPSY_TRIGGERS -> s.text("modDisclosureEpilepsy")
+    else -> s.text("browseFilterArchived")
 }
 
 /** The name a chosen filter is shown by in a chip, when the group's choices are not at hand. */
-internal fun filterLabel(filter: SearchFilter, s: AppStrings): String = when (filter.field) {
+internal fun filterLabel(filter: SearchFilter, s: Strings): String = when (filter.field) {
     FilterField.GameVersion -> filter.value
     FilterField.Loader -> loaderLabel(filter.value)
     FilterField.Category, FilterField.Resolution -> s.modrinthCategory(filter.value)
-    FilterField.Environment -> if (filter.value == ENV_CLIENT) s.browseFilterClient else s.browseFilterServer
-    FilterField.OpenSource -> s.browseFilterOpenSource
+    FilterField.Environment -> if (filter.value == ENV_CLIENT) s.text("browseFilterClient") else s.text("browseFilterServer")
+    FilterField.OpenSource -> s.text("browseFilterOpenSource")
     FilterField.Disclosure -> disclosureLabel(filter.value, s)
     FilterField.Project -> filter.value
 }
@@ -216,7 +217,7 @@ internal class ChosenChip(val label: String, val filters: List<SearchFilter>, va
  * snapshot beside releases, keeps a chip of its own, so every choice stays
  * removable. Without the catalogue's list nothing is folded.
  */
-internal fun chosenChips(chosen: Collection<SearchFilter>, versions: List<GameVersionTag>, s: AppStrings): List<ChosenChip> {
+internal fun chosenChips(chosen: Collection<SearchFilter>, versions: List<GameVersionTag>, s: Strings): List<ChosenChip> {
     val sorted = chosen.sortedWith(compareBy({ it.field.ordinal }, { it.value }))
     val (picked, rest) = sorted.partition { it.field == FilterField.GameVersion && !it.excluded }
     val groups = groupGameVersions(picked.map { it.value }, versions)

@@ -16,8 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
-import hivens.ui.i18n.AppLocale
-import hivens.ui.i18n.LocaleProvider
+import hivens.ui.i18n.ShippedLanguageProvider
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.ThemeLibrary
 import hivens.ui.theme.Themes
@@ -207,7 +206,7 @@ class UnboundedSlotTest {
         val scene = ImageComposeScene(width = 320, height = 320, density = Density(1f))
         return runCatching {
             scene.setContent {
-                LocaleProvider(AppLocale.ENGLISH) {
+                ShippedLanguageProvider("en") {
                     NxTheme(dark = true) {
                         CompositionLocalProvider(
                             LocalLayoutGraph provides graph,

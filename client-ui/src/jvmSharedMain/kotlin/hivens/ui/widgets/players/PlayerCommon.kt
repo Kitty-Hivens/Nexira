@@ -9,13 +9,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
+import hivens.i18n.api.Strings
 import hivens.ui.audio.AudioError
 import hivens.ui.audio.PlaybackState
 import hivens.ui.audio.RepeatMode
 import hivens.ui.audio.TrackInfo
 import hivens.ui.audio.fileTitle
-import hivens.ui.i18n.AppStrings
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.nx.NxCycleState
@@ -65,8 +65,8 @@ internal fun rememberAudioFilesPicker(
     scope: CoroutineScope,
     onPicked: (List<Path>) -> Unit,
 ): () -> Unit {
-    val s = LocalStrings.current
-    val settings = rememberFileDialogSettings(s.audioPickTrack)
+    val s = nexiraStrings()
+    val settings = rememberFileDialogSettings(s.text("audioPickTrack"))
     return remember(settings, onPicked) {
         {
             scope.launch {
@@ -93,8 +93,8 @@ internal fun rememberAudioFilesPicker(
  * under the reader. On a track that failed, that reads as a different file rather
  * than as the same one in trouble.
  */
-internal fun playerTitle(state: PlaybackState, track: TrackInfo?, s: AppStrings): String = when (state) {
-    is PlaybackState.Idle    -> s.audioPickTrack
+internal fun playerTitle(state: PlaybackState, track: TrackInfo?, s: Strings): String = when (state) {
+    is PlaybackState.Idle    -> s.text("audioPickTrack")
     is PlaybackState.Ready   -> track?.title ?: fileTitle(state.file)
     is PlaybackState.Playing -> track?.title ?: fileTitle(state.file)
     is PlaybackState.Paused  -> track?.title ?: fileTitle(state.file)
@@ -106,19 +106,19 @@ internal fun playerTitle(state: PlaybackState, track: TrackInfo?, s: AppStrings)
  * no artist. With a real artist to show, the state is already on screen as the
  * shape of the play control, so the credit wins.
  */
-internal fun playerStatus(state: PlaybackState, s: AppStrings): String = when (state) {
-    is PlaybackState.Idle    -> s.audioFormatHint
-    is PlaybackState.Ready   -> s.audioStatusReady
-    is PlaybackState.Playing -> s.audioStatusPlaying
-    is PlaybackState.Paused  -> s.audioStatusPaused
+internal fun playerStatus(state: PlaybackState, s: Strings): String = when (state) {
+    is PlaybackState.Idle    -> s.text("audioFormatHint")
+    is PlaybackState.Ready   -> s.text("audioStatusReady")
+    is PlaybackState.Playing -> s.text("audioStatusPlaying")
+    is PlaybackState.Paused  -> s.text("audioStatusPaused")
     is PlaybackState.Error   -> playerErrorText(state.reason, s)
 }
 
-internal fun playerErrorText(reason: AudioError, s: AppStrings): String = when (reason) {
-    AudioError.UnsupportedFormat -> s.audioErrorUnsupported
-    AudioError.OpenFailed        -> s.audioErrorOpenFailed
-    AudioError.DeviceBusy        -> s.audioErrorDeviceBusy
-    AudioError.PlaybackFailed    -> s.audioErrorPlaybackFailed
+internal fun playerErrorText(reason: AudioError, s: Strings): String = when (reason) {
+    AudioError.UnsupportedFormat -> s.text("audioErrorUnsupported")
+    AudioError.OpenFailed        -> s.text("audioErrorOpenFailed")
+    AudioError.DeviceBusy        -> s.text("audioErrorDeviceBusy")
+    AudioError.PlaybackFailed    -> s.text("audioErrorPlaybackFailed")
 }
 
 /**
@@ -131,10 +131,10 @@ internal val REPEAT_ORDER = listOf(RepeatMode.Off, RepeatMode.One, RepeatMode.Qu
 internal fun repeatIndex(mode: RepeatMode): Int = REPEAT_ORDER.indexOf(mode).coerceAtLeast(0)
 
 /** The answer alone, for a place that has already named the question. */
-internal fun repeatAnswer(mode: RepeatMode, s: AppStrings): String = when (mode) {
-    RepeatMode.Off   -> s.audioRepeatOff
-    RepeatMode.One   -> s.audioRepeatOne
-    RepeatMode.Queue -> s.audioRepeatQueue
+internal fun repeatAnswer(mode: RepeatMode, s: Strings): String = when (mode) {
+    RepeatMode.Off   -> s.text("audioRepeatOff")
+    RepeatMode.One   -> s.text("audioRepeatOne")
+    RepeatMode.Queue -> s.text("audioRepeatQueue")
 }
 
 /**
@@ -142,8 +142,8 @@ internal fun repeatAnswer(mode: RepeatMode, s: AppStrings): String = when (mode)
  * track" -- because they land on a tooltip over a glyph, where the answer on its
  * own leaves the reader to guess what it answers.
  */
-internal fun repeatStates(s: AppStrings): List<NxCycleState> = REPEAT_ORDER.map { mode ->
-    NxCycleState(icon = repeatIcon(mode), label = "${s.audioRepeat}: ${repeatAnswer(mode, s)}")
+internal fun repeatStates(s: Strings): List<NxCycleState> = REPEAT_ORDER.map { mode ->
+    NxCycleState(icon = repeatIcon(mode), label = "${s.text("audioRepeat")}: ${repeatAnswer(mode, s)}")
 }
 
 private fun repeatIcon(mode: RepeatMode): IconKey = when (mode) {
