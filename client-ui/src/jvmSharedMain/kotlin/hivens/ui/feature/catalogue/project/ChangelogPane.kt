@@ -26,14 +26,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import hivens.catalogue.api.CatalogueKeys
+import hivens.catalogue.api.ProjectBuild
+import hivens.catalogue.api.ProjectPageView
 import hivens.core.update.VersionChannel
+import hivens.widget.api.rememberScopedAction
 import hivens.ui.components.ChannelChip
 import hivens.ui.components.ReleaseNotes
 import hivens.ui.components.formatBuildTimestamp
@@ -41,7 +44,6 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.nx.CenteredProgress
 import hivens.ui.nx.NxVerticalScrollbar
 import hivens.ui.nx.RetryStateBlock
-import kotlinx.coroutines.launch
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.Status
@@ -58,16 +60,17 @@ import hivens.ui.theme.Status
  */
 @Composable
 internal fun ChangelogPane(
-    state: ModDetailState,
-    /** Asks the screen to load the project again; see [VersionsPane]. */
+    state: ProjectPageView,
+    /** Asks the page to load the project again, the way [VersionsPane] does. */
     onReload: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val s = LocalStrings.current
-    val scope = rememberCoroutineScope()
+    val loadVersions = rememberScopedAction(CatalogueKeys.LoadVersions)
+    val retryVersions = rememberScopedAction(CatalogueKeys.RetryVersions)
     // Same key as the versions tab, for the same reason: the project arrives after
     // the tab mounts, and asking before it does used to leave a spinner forever.
-    LaunchedEffect(state, state.project) { state.loadVersions() }
+    LaunchedEffect(state.visit, state.project) { loadVersions?.invoke() }
 
     val all = state.versions
 
@@ -91,7 +94,7 @@ internal fun ChangelogPane(
             title = s.modPageVersionsFailed,
             message = s.modPageVersionsFailedBody,
             retryLabel = s.contentTabRetry,
-            onRetry = { scope.launch { state.versions = null; state.loadVersions() } },
+            onRetry = { retryVersions?.invoke() },
             modifier = modifier.padding(20.dp),
             titleStyle = MaterialTheme.typography.titleMedium,
         )
@@ -122,8 +125,7 @@ internal fun ChangelogPane(
         CenteredProgress(modifier.fillMaxSize())
         return
     }
-    val builds = remember(all) { all.map { it.toBuild() } }
-    ChangelogList(builds, modifier)
+    ChangelogList(all, modifier)
 }
 
 /**

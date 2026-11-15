@@ -4,17 +4,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import hivens.catalogue.api.CatalogueKeys
+import hivens.catalogue.api.OpenProject
+import hivens.catalogue.api.ProjectTarget
+import hivens.catalogue.api.packTargetKey
 import hivens.core.api.interfaces.IPackRepository
-import hivens.core.data.PackOrigin
 import hivens.ui.Screen
 import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.feature.catalogue.browse.BrowseSession
-import hivens.ui.feature.catalogue.browse.catalogueTargetKey
-import hivens.ui.feature.catalogue.project.ModTarget
-import hivens.ui.feature.catalogue.project.OpenProject
-import hivens.ui.feature.catalogue.project.OpenProjectState
 import hivens.widget.api.LocalLayoutGraph
+import hivens.widget.api.rememberScopedSource
+import hivens.widget.api.valueOrNull
 import hivens.widget.model.screen
 import org.koin.compose.koinInject
 
@@ -55,9 +55,9 @@ fun staticCrumbLabel(screen: Screen, s: AppStrings): String? = when (screen) {
  * catalogue entry answers with its id, which is usually the slug and reads as a
  * name.
  */
-private fun modFallbackLabel(target: ModTarget): String = when (target) {
-    is ModTarget.Catalogue -> target.projectId
-    is ModTarget.Installed -> target.fileName.substringBeforeLast('.')
+private fun modFallbackLabel(target: ProjectTarget): String = when (target) {
+    is ProjectTarget.Catalogue -> target.projectId
+    is ProjectTarget.Installed -> target.fileName.substringBeforeLast('.')
 }
 
 /**
@@ -103,10 +103,9 @@ fun rememberCrumbLabel(screen: Screen): String {
  * never loaded with the route's own name, which is what the reader clicked.
  */
 @Composable
-private fun modCrumb(target: ModTarget): String {
-    val state: OpenProjectState = koinInject()
-    val open by state.open.collectAsState()
-    val names by state.names.collectAsState()
+private fun modCrumb(target: ProjectTarget): String {
+    val open = rememberScopedSource(CatalogueKeys.OpenProject).valueOrNull()
+    val names = rememberScopedSource(CatalogueKeys.Names).valueOrNull().orEmpty()
     return modCrumbLabel(target, open, names)
 }
 
@@ -115,21 +114,19 @@ private fun modCrumb(target: ModTarget): String {
  * its title, and taken from there it covered the name a visit before had left in
  * [names] until the page had heard back.
  */
-internal fun modCrumbLabel(target: ModTarget, open: OpenProject?, names: Map<String, String>): String =
+internal fun modCrumbLabel(target: ProjectTarget, open: OpenProject?, names: Map<String, String>): String =
     open?.takeIf { it.targetKey == target.key && !it.pending }?.title
         ?: names[target.key]
         ?: modFallbackLabel(target)
 
 /**
- * A catalogue pack's title, from what its page published or last read, the way a
- * project crumb is. Asking the catalogue for the page a second time cost a whole
- * page read per visit, a Modrinth pack's every build and its team included. The id
- * stands in until the page has read the pack, and for one it never could.
+ * A catalogue pack's title, from what its page published, the way a project crumb
+ * is. Asking the catalogue for the page a second time cost a whole page read per
+ * visit, a Modrinth pack's every build and its team included. The id stands in until
+ * the page has read the pack, and for one it never could.
  */
 @Composable
-private fun catalogueCrumb(origin: PackOrigin, id: String): String {
-    val state: OpenProjectState = koinInject()
-    val session: BrowseSession = koinInject()
-    val names by state.names.collectAsState()
-    return names[catalogueTargetKey(origin, id)] ?: session.details(origin, id)?.title ?: id
+private fun catalogueCrumb(origin: String, id: String): String {
+    val names = rememberScopedSource(CatalogueKeys.Names).valueOrNull().orEmpty()
+    return names[packTargetKey(origin, id)] ?: id
 }

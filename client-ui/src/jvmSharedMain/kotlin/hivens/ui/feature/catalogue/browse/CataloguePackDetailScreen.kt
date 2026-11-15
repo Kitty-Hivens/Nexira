@@ -14,12 +14,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -31,25 +29,29 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.dp
-import hivens.auth.AuthProviderRegistry
-import hivens.core.api.catalogue.CatalogueGalleryItem
-import hivens.core.api.catalogue.CatalogueLinkKind
-import hivens.core.api.catalogue.CataloguePack
-import hivens.core.api.catalogue.CataloguePackDetails
-import hivens.core.api.catalogue.CataloguePackVersion
-import hivens.core.api.dto.modrinth.ModrinthGameVersion
-import hivens.core.data.PackOrigin
-import hivens.launcher.InstallPhase
-import hivens.launcher.PackInstallService
-import hivens.launcher.catalogue.PackCatalogueRegistry
+import hivens.catalogue.api.CatalogueKeys
+import hivens.catalogue.api.GameVersionTag
+import hivens.catalogue.api.PackDetails
+import hivens.catalogue.api.PackOrigins
+import hivens.catalogue.api.PackPageStatus
+import hivens.catalogue.api.PackVisit
+import hivens.catalogue.api.ProjectBuild
+import hivens.packs.api.InstallRequest
+import hivens.packs.api.InstallStatus
+import hivens.packs.api.PackKeys
 import hivens.ui.RIGHT_RAIL_SURFACE
 import hivens.ui.RailFamily
 import hivens.ui.components.FullscreenVideo
 import hivens.ui.components.ImageGallery
-import hivens.ui.components.formatBuildTimestamp
 import hivens.ui.components.galleryMedia
 import hivens.ui.components.isPlayableVideoUrl
-import hivens.ui.components.relativeAge
+import hivens.ui.feature.catalogue.project.BuildsTable
+import hivens.ui.feature.catalogue.project.ChangelogList
+import hivens.ui.feature.catalogue.project.HeaderStat
+import hivens.ui.feature.catalogue.project.ProjectHeader
+import hivens.ui.feature.catalogue.project.compactCount
+import hivens.ui.feature.catalogue.project.rememberLinkFollower
+import hivens.ui.feature.catalogue.rememberPageVisit
 import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
@@ -65,20 +67,6 @@ import hivens.ui.nx.RetryStateBlock
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.render.MarkdownHtml
-import hivens.ui.feature.catalogue.project.BuildsTable
-import hivens.ui.feature.catalogue.project.ChangelogList
-import hivens.ui.feature.catalogue.project.HeaderStat
-import hivens.ui.feature.catalogue.project.OpenProject
-import hivens.ui.feature.catalogue.project.OpenProjectState
-import hivens.ui.feature.catalogue.project.ProjectCreator
-import hivens.ui.feature.catalogue.project.ProjectHeader
-import hivens.ui.feature.catalogue.project.ProjectLink
-import hivens.ui.feature.catalogue.project.ProjectLinkKind
-import hivens.ui.feature.catalogue.project.ProjectSource
-import hivens.ui.feature.catalogue.project.compactCount
-import hivens.ui.feature.catalogue.project.gameVersionChips
-import hivens.ui.feature.catalogue.project.rememberLinkFollower
-import hivens.ui.feature.catalogue.project.toBuild
 import hivens.ui.screens.console.copyPlainText
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
@@ -88,15 +76,15 @@ import hivens.ui.theme.Status
 import hivens.widget.api.LocalSurfaceFamilies
 import hivens.widget.api.ProvideScoped
 import hivens.widget.api.SlotRenderer
+import hivens.widget.api.rememberScopedAction
+import hivens.widget.api.rememberScopedCommand
+import hivens.widget.api.rememberScopedSource
+import hivens.widget.api.valueOrNull
 import hivens.widget.model.ScopeLevel
 import hivens.widget.model.SlotId
 import hivens.widget.model.SourceKey
 import hivens.widget.model.SurfaceId
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
-import org.koin.compose.koinInject
 
 /**
  * A pack's page in the catalogue, whichever source lists it.
@@ -104,157 +92,97 @@ import org.koin.compose.koinInject
  * Built from the project page's own parts, because a reader moving between a mod
  * and the pack it sits in should not meet two pages: the same header, the same
  * tabs, the same table of builds and the same changelog, and the facts in the
- * right rail's project view, which reads what this page publishes. A source fills
- * what it has. The catalogue counts downloads and credits a team; the mirror names
- * the runtime, the sign-in and the mods a build holds; what neither says is left
- * out rather than shown empty.
+ * right rail's project view, which reads what the catalogue module publishes for
+ * the page. A source fills what it has. The catalogue counts downloads and credits a
+ * team. The mirror names the runtime, the sign-in and the mods a build holds. What
+ * neither says is left out rather than shown empty.
  *
- * The install runs on [PackInstallService]'s app scope, so progress is read back
- * from the service rather than owned here: leaving this screen does not cancel
- * the download, and coming back re-attaches to it.
+ * The page is the catalogue module's, read through [CatalogueKeys.PackPage]. The
+ * install is the packs module's command, and its progress is read back from the
+ * packs module's installs, so leaving this screen does not cancel the download and
+ * coming back finds it again.
  */
 @Composable
 fun CataloguePackDetailScreen(
-    origin: PackOrigin,
+    origin: String,
     packId: String,
     onBack: () -> Unit,
     onInstalled: (instanceId: String) -> Unit,
 ) {
-    val s = LocalStrings.current
-    val registry: PackCatalogueRegistry = koinInject()
-    val installService: PackInstallService = koinInject()
-    val session: BrowseSession = koinInject()
-    val openProject: OpenProjectState = koinInject()
-    val browseTags: BrowseTags = koinInject()
-    val authProviders: AuthProviderRegistry = koinInject()
     val families = LocalSurfaceFamilies.current
+    val show = rememberScopedCommand(CatalogueKeys.ShowPack)
+    val hide = rememberScopedCommand(CatalogueKeys.HidePack)
+    val retry = rememberScopedAction(CatalogueKeys.RetryPack)
+    val installPack = rememberScopedCommand(PackKeys.InstallPack)
+    val dismissInstall = rememberScopedCommand(PackKeys.DismissInstall)
+    val loadTags = rememberScopedAction(CatalogueKeys.LoadTags)
 
     PuppetScreen("CataloguePack.$packId")
     // Back is the top-bar breadcrumb's job, but automation still needs a handle on it.
     PuppetClick("catalogue.detail.back") { onBack() }
 
-    // Opens on the page as it was last read, not on a spinner. The details are the
-    // same on the way back as they were on the way in, so rebuilding them from
-    // nothing meant the page a reader had just closed came back empty and filled in
-    // again in front of them.
-    var state by remember(origin, packId) {
-        mutableStateOf<DetailState>(
-            session.details(origin, packId)?.let { DetailState.Loaded(it) } ?: DetailState.Loading,
-        )
-    }
-    var retryTick by remember(origin, packId) { mutableIntStateOf(0) }
+    // This visit of the page. The catalogue module opens it on the page as it was last
+    // read rather than on a spinner, and the rail follows it for as long as it is shown.
+    val visit = rememberPageVisit(
+        key = origin to packId,
+        show = show?.let { cmd -> { v: String -> cmd(PackVisit(origin, packId, v)) } },
+        hide = hide,
+    )
+    val page = rememberScopedSource(CatalogueKeys.PackPage).valueOrNull()?.takeIf { it.visit == visit }
+    val status = page?.status ?: PackPageStatus.Loading
 
-    // Install state is owned by the app-scoped service, not this composition.
-    // Match on (origin, packId) so a return to this screen re-attaches to an
-    // install started before we navigated away.
-    val installs by installService.installs.collectAsState()
+    // This visit, as the rail's owner: a page arriving over this one takes the rail.
+    DisposableEffect(visit) {
+        families.switch(RIGHT_RAIL_SURFACE, RailFamily.PROJECT_VIEW, visit)
+        onDispose { families.reset(RIGHT_RAIL_SURFACE, visit) }
+    }
+
+    // The install is the packs module's and runs on past this screen. Matched on the
+    // pack, so a return here finds an install started before the reader left.
+    val installs = rememberScopedSource(PackKeys.Installs).valueOrNull().orEmpty()
     val active = installs.values.firstOrNull { it.origin == origin && it.packId == packId }
-    val installingVersion = (active?.phase as? InstallPhase.Running)?.let { active.versionId }
-    val installError = (active?.phase as? InstallPhase.Failed)?.message
+    val installingVersion = (active?.status as? InstallStatus.Running)?.let { active.versionId }
+    val installError = (active?.status as? InstallStatus.Failed)?.message
 
-    // Success navigates to the installed instance, then evicts the terminal
-    // snapshot so a later reinstall starts clean.
-    LaunchedEffect(active?.key, active?.phase) {
-        val snap = active
-        val phase = snap?.phase
-        if (snap != null && phase is InstallPhase.Succeeded) {
-            installService.dismiss(snap.key)
-            onInstalled(phase.instanceId)
-        }
+    // Success goes to the installed pack, then forgets the finished install so a later
+    // reinstall starts clean.
+    LaunchedEffect(active?.key, active?.status) {
+        val done = active?.status as? InstallStatus.Succeeded ?: return@LaunchedEffect
+        dismissInstall?.invoke(active.key)
+        onInstalled(done.packId)
     }
 
-    fun install(details: CataloguePackDetails, version: CataloguePackVersion) {
-        installService.start(
-            pack = CataloguePack(
-                origin    = details.origin,
-                id        = details.id,
-                title     = details.title,
-                tagline   = details.tagline,
-                iconUrl   = details.iconUrl,
-                bannerUrl = details.bannerUrl,
-            ),
-            version = version,
-        )
+    val install: (PackDetails, ProjectBuild) -> Unit = { details, build ->
+        installPack?.invoke(InstallRequest(details.origin, details.id, build.id))
     }
 
-    LaunchedEffect(origin, packId, retryTick) {
-        // Only a page with nothing on it says so. A refresh behind a page already
-        // read replaces it when it lands, the way the catalogue list does.
-        if (state !is DetailState.Loaded) state = DetailState.Loading
-        val catalogue = registry.forOrigin(origin)
-            ?: return@LaunchedEffect run { state = DetailState.Error(s.browseDetailErrorMessage) }
-        try {
-            // Every answer the source gives, the stored one and the fresh one behind
-            // it. Read once, the page and its Install offered whatever the cache held.
-            catalogue.detailsStream(packId).flowOn(Dispatchers.IO).collect { details ->
-                session.putDetails(origin, packId, details)
-                state = DetailState.Loaded(details)
-            }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            // A source that failed while a page of its own is on screen keeps
-            // showing it: an error page loses more than the error explains.
-            if (state !is DetailState.Loaded) state = DetailState.Error(e.message ?: s.browseDetailErrorMessage)
-        }
-    }
-
-    // The rail follows the page for exactly as long as the page is mounted, the
-    // way the project page holds it, and reads what the page publishes.
-    val targetKey = catalogueTargetKey(origin, packId)
-    // This visit, as the rail's owner: a page arriving over this one takes the rail
-    // and what this one still publishes on its way out is dropped.
-    val railOwner = remember(targetKey) { Any() }
-    DisposableEffect(railOwner) {
-        families.switch(RIGHT_RAIL_SURFACE, RailFamily.PROJECT_VIEW, railOwner)
-        openProject.claim(railOwner)
-        onDispose {
-            families.reset(RIGHT_RAIL_SURFACE, railOwner)
-            openProject.release(railOwner)
-        }
-    }
-    val tags by browseTags.tags.collectAsState()
-    LaunchedEffect(Unit) { browseTags.ensure() }
-    LaunchedEffect(state, tags, s) {
-        val current = state
-        val loaded = (current as? DetailState.Loaded)?.details
-        openProject.publish(
-            railOwner,
-            when {
-                loaded != null -> openPackOf(targetKey, loaded, tags?.gameVersions.orEmpty(), s) { key -> authProviders[key]?.displayName ?: key }
-                // A page that could not be read has no facts to wait for. Pending
-                // here left the rail's blocks empty for as long as the page stayed.
-                current is DetailState.Error -> null
-                else -> OpenProject(targetKey = targetKey, title = packId, slug = packId, source = ProjectSource.Catalogue, pending = true)
-            },
-        )
-        loaded?.let { openProject.name(targetKey, it.title) }
-    }
+    LaunchedEffect(loadTags != null) { loadTags?.invoke() }
+    val tags = rememberScopedSource(CatalogueKeys.Tags).valueOrNull()
 
     val tabState = rememberSaveable(origin, packId, stateSaver = Saver(save = { it.name }, restore = { PackTab.valueOf(it) })) {
         mutableStateOf(PackTab.Description)
     }
     var tab by tabState
-    val loaded = (state as? DetailState.Loaded)?.details
+    val loaded = (status as? PackPageStatus.Loaded)?.details
     val tabs = remember(loaded) { loaded?.let(::tabsOf) ?: listOf(PackTab.Description) }
     LaunchedEffect(tabs) { if (tab !in tabs) tab = PackTab.Description }
-    val page = CataloguePackPage(
+    val pagePart = CataloguePackPage(
         packId = packId,
-        detail = state,
+        detail = status,
         tab = tabState,
         tabs = tabs,
         gameVersionTags = tags?.gameVersions.orEmpty(),
         installingVersion = installingVersion,
         installError = installError,
-        onInstall = ::install,
-        onRetry = { retryTick++ },
+        onInstall = install,
+        onRetry = { retry?.invoke() },
     )
 
     // A widget surface, the way the project page is: the header and the tabs in
     // `header`, the tab's pane in `body`, each slot on the panel it always sat on.
     // The widgets read the page over this page's level, where nothing outside the
     // page can reach it.
-    ProvideScoped(CataloguePackPageSource, page) {
+    ProvideScoped(CataloguePackPageSource, pagePart) {
         Column(Modifier.fillMaxSize()) {
             NxSurface(
                 kind = SurfaceKind.Panel,
@@ -278,13 +206,10 @@ fun CataloguePackDetailScreen(
 
     loaded?.let { d ->
         PuppetClick("catalogue.detail.install", enabled = installingVersion == null && d.versions.isNotEmpty()) {
-            latestOf(d)?.let { install(d, it) }
+            d.latest?.let { install(d, it) }
         }
     }
 }
-
-/** What a catalogue pack's page is known by to the rail and the trail. */
-internal fun catalogueTargetKey(origin: PackOrigin, packId: String): String = "pack:${origin.name}:$packId"
 
 /** The catalogue pack page's surface, see [CataloguePackPage]. */
 internal const val CATALOGUE_PACK_SURFACE = "catalogue.pack"
@@ -296,21 +221,21 @@ internal const val CATALOGUE_PACK_SURFACE = "catalogue.pack"
  */
 internal class CataloguePackPage(
     val packId: String,
-    val detail: DetailState,
+    val detail: PackPageStatus,
     tab: MutableState<PackTab>,
     /** The tabs the pack has something behind. */
     val tabs: List<PackTab>,
-    val gameVersionTags: List<ModrinthGameVersion>,
+    val gameVersionTags: List<GameVersionTag>,
     /** The build being installed, or null. */
     val installingVersion: String?,
     val installError: String?,
-    val onInstall: (CataloguePackDetails, CataloguePackVersion) -> Unit,
+    val onInstall: (PackDetails, ProjectBuild) -> Unit,
     /** Reads the pack again after a read that failed. */
     val onRetry: () -> Unit,
 ) {
     var tab: PackTab by tab
 
-    val details: CataloguePackDetails? get() = (detail as? DetailState.Loaded)?.details
+    val details: PackDetails? get() = (detail as? PackPageStatus.Loaded)?.details
 }
 
 /**
@@ -326,9 +251,9 @@ internal val CataloguePackPageSource: SourceKey<CataloguePackPage> = SourceKey("
  * and retry do nothing.
  */
 internal fun sampleCataloguePackPage(): CataloguePackPage {
-    val build = CataloguePackVersion(id = "1.0.0", name = "1.0.0", versionNumber = "1.0.0")
-    val details = CataloguePackDetails(
-        origin = PackOrigin.Mirror,
+    val build = ProjectBuild(id = "1.0.0", name = "1.0.0", versionNumber = "1.0.0", versionType = "release", gameVersions = emptyList(), loaders = emptyList(), datePublished = "")
+    val details = PackDetails(
+        origin = PackOrigins.MIRROR,
         id = "sample",
         title = "Sample Pack",
         tagline = "A pack as this page shows one.",
@@ -340,7 +265,7 @@ internal fun sampleCataloguePackPage(): CataloguePackPage {
     )
     return CataloguePackPage(
         packId = details.id,
-        detail = DetailState.Loaded(details),
+        detail = PackPageStatus.Loaded(details),
         tab = mutableStateOf(PackTab.Description),
         tabs = listOf(PackTab.Description, PackTab.Versions),
         gameVersionTags = emptyList(),
@@ -380,15 +305,15 @@ internal fun CataloguePackPageBody(page: CataloguePackPage, modifier: Modifier =
     val s = LocalStrings.current
     Box(modifier) {
         when (val st = page.detail) {
-            DetailState.Loading -> CenteredProgress(Modifier.fillMaxSize())
-            is DetailState.Error -> RetryStateBlock(
+            PackPageStatus.Loading -> CenteredProgress(Modifier.fillMaxSize())
+            is PackPageStatus.Failed -> RetryStateBlock(
                 title      = s.browseDetailErrorTitle,
-                message    = st.message,
+                message    = st.message ?: s.browseDetailErrorMessage,
                 retryLabel = s.browseRetry,
                 onRetry    = page.onRetry,
                 modifier   = Modifier.fillMaxWidth().padding(32.dp),
             )
-            is DetailState.Loaded -> PackBody(
+            is PackPageStatus.Loaded -> PackBody(
                 details = st.details,
                 tab = page.tab,
                 gameVersionTags = page.gameVersionTags,
@@ -409,40 +334,20 @@ private fun PackTab.label(s: AppStrings): String = when (this) {
     PackTab.Gallery -> s.modPageTabGallery
 }
 
-private fun tabsOf(d: CataloguePackDetails): List<PackTab> = buildList {
+private fun tabsOf(d: PackDetails): List<PackTab> = buildList {
     add(PackTab.Description)
     if (d.versions.isNotEmpty()) add(PackTab.Versions)
     if (d.versions.any { !it.changelog.isNullOrBlank() }) add(PackTab.Changelog)
-    if (galleryOf(d).isNotEmpty()) add(PackTab.Gallery)
-}
-
-/** The build an install with no choice made reaches for: the source's pointer, else the newest. */
-internal fun latestOf(d: CataloguePackDetails): CataloguePackVersion? =
-    d.versions.firstOrNull { it.id == d.latestVersionId } ?: d.versions.firstOrNull()
-
-/**
- * The pack's shots, its banner first where the source keeps it apart from them.
- *
- * The page has no banner of its own any more, the header is the project page's,
- * and a picture a curator chose to lead with belongs at the head of the gallery
- * rather than nowhere.
- */
-internal fun galleryOf(d: CataloguePackDetails): List<CatalogueGalleryItem> {
-    val banner = d.bannerUrl ?: return d.gallery
-    return if (d.gallery.any { it.full == banner || it.thumb == banner }) {
-        d.gallery
-    } else {
-        listOf(CatalogueGalleryItem(full = banner, thumb = banner)) + d.gallery
-    }
+    if (d.gallery.isNotEmpty()) add(PackTab.Gallery)
 }
 
 @Composable
 private fun PackHeader(
     packId: String,
-    details: CataloguePackDetails?,
+    details: PackDetails?,
     installingVersion: String?,
     installError: String?,
-    onInstall: (CataloguePackDetails, CataloguePackVersion) -> Unit,
+    onInstall: (PackDetails, ProjectBuild) -> Unit,
 ) {
     val s = LocalStrings.current
     val scope = rememberCoroutineScope()
@@ -475,7 +380,7 @@ private fun PackHeader(
         },
         actions = {
             if (details != null) {
-                val latest = latestOf(details)
+                val latest = details.latest
                 // Labelled, as the project page's own button is. A bare glyph in a
                 // corner of a picture was the one action on the page and the one a
                 // reader had to guess at.
@@ -517,19 +422,17 @@ private val ERROR_MEASURE = 320.dp
 
 @Composable
 private fun PackBody(
-    details: CataloguePackDetails,
+    details: PackDetails,
     tab: PackTab,
-    gameVersionTags: List<ModrinthGameVersion>,
+    gameVersionTags: List<GameVersionTag>,
     installingVersion: String?,
-    onInstall: (CataloguePackVersion) -> Unit,
+    onInstall: (ProjectBuild) -> Unit,
 ) {
     val s = LocalStrings.current
     // A body link to a video (direct file or a service page) opens in-app; a link
     // to a project opens its page here, and the rest go where links go.
     val follow = rememberLinkFollower()
     var videoLink by remember { mutableStateOf<String?>(null) }
-    val builds = remember(details) { details.versions.map { it.toBuild() } }
-    val byId = remember(details) { details.versions.associateBy { it.id } }
     when (tab) {
         PackTab.Description -> Column(
             Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
@@ -550,87 +453,26 @@ private fun PackBody(
             }
         }
         PackTab.Versions -> BuildsTable(
-            builds = builds,
+            builds = details.versions,
             gameVersionTags = gameVersionTags,
             onOpenBuild = null,
             // Any build, not only the newest: a pack is installed whole, so the row
             // is where a reader picks an older one on purpose.
             rowAction = { b ->
-                byId[b.id]?.let { v ->
-                    NxIconButton(
-                        icon = NxIcon.Download,
-                        contentDescription = s.modPageInstallShort,
-                        onClick = { onInstall(v) },
-                        enabled = installingVersion == null,
-                        tint = NxColor.lead(),
-                    )
-                }
+                NxIconButton(
+                    icon = NxIcon.Download,
+                    contentDescription = s.modPageInstallShort,
+                    onClick = { onInstall(b) },
+                    enabled = installingVersion == null,
+                    tint = NxColor.lead(),
+                )
             },
             modifier = Modifier.fillMaxSize(),
         )
-        PackTab.Changelog -> ChangelogList(builds, Modifier.fillMaxSize())
+        PackTab.Changelog -> ChangelogList(details.versions, Modifier.fillMaxSize())
         PackTab.Gallery -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
-            ImageGallery(media = remember(details) { galleryMedia(galleryOf(details)) }, modifier = Modifier.fillMaxWidth())
+            ImageGallery(media = remember(details) { galleryMedia(details.gallery) }, modifier = Modifier.fillMaxWidth())
         }
     }
     videoLink?.let { url -> FullscreenVideo(url = url, onDismiss = { videoLink = null }) }
-}
-
-/** What the rail's project view draws for a pack, in the terms it draws a project in. */
-internal fun openPackOf(
-    targetKey: String,
-    d: CataloguePackDetails,
-    gameVersionTags: List<ModrinthGameVersion>,
-    s: AppStrings,
-    /**
-     * A sign-in provider's name by its registry id. The provider names itself; one
-     * this build has not registered goes by its id, the way the launch gate's own
-     * messages say it.
-     */
-    providerName: (String) -> String = { it },
-): OpenProject {
-    val latest = latestOf(d)
-    return OpenProject(
-        targetKey = targetKey,
-        title = d.title,
-        slug = d.slug ?: d.id,
-        source = ProjectSource.Catalogue,
-        projectType = d.projectType,
-        gameVersions = gameVersionChips(d.gameVersions, gameVersionTags),
-        loaders = d.loaders,
-        categories = d.tags,
-        clientSide = d.clientSide,
-        serverSide = d.serverSide,
-        licenseId = d.licenseId,
-        licenseName = d.licenseName,
-        publishedAt = relativeAge(d.publishedAt, s).takeIf { it.isNotBlank() },
-        publishedExact = formatBuildTimestamp(d.publishedAt),
-        updatedAt = relativeAge(d.updatedAt, s).takeIf { it.isNotBlank() },
-        updatedExact = formatBuildTimestamp(d.updatedAt),
-        links = d.links.map { ProjectLink(linkKindOf(it.kind), it.url, it.label) },
-        creators = d.creators.map { ProjectCreator(it.name, it.role, it.avatarUrl, it.owner) },
-        sizeBytes = latest?.sizeBytes,
-        runtime = d.runtimeLabel,
-        signIn = d.auth?.providerKeys.orEmpty().map(providerName),
-        modsCount = latest?.modsCount,
-        // A source that names a licence or a first release names them always, so
-        // neither present means the source has no such field to fill.
-        answersLicence = d.licenseId != null || d.licenseName != null,
-        answersPublished = d.publishedAt != null,
-    )
-}
-
-private fun linkKindOf(kind: CatalogueLinkKind): ProjectLinkKind = when (kind) {
-    CatalogueLinkKind.Issues -> ProjectLinkKind.Issues
-    CatalogueLinkKind.Source -> ProjectLinkKind.Source
-    CatalogueLinkKind.Wiki -> ProjectLinkKind.Wiki
-    CatalogueLinkKind.Discord -> ProjectLinkKind.Discord
-    CatalogueLinkKind.Donate -> ProjectLinkKind.Donate
-}
-
-
-internal sealed class DetailState {
-    object Loading : DetailState()
-    data class Loaded(val details: CataloguePackDetails) : DetailState()
-    data class Error(val message: String) : DetailState()
 }

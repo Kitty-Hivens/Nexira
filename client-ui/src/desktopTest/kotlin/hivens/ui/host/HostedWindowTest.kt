@@ -8,13 +8,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.unit.Density
+import hivens.catalogue.CatalogueModule
+import hivens.catalogue.OpenProjects
+import hivens.catalogue.api.CatalogueApi
+import hivens.catalogue.api.CatalogueKeys
+import hivens.catalogue.api.OpenProject
+import hivens.catalogue.api.ProjectSource
+import hivens.ui.HostKeys
 import hivens.ui.Screen
 import hivens.ui.background.BackgroundSettings
 import hivens.ui.chrome.WindowCapabilities
-import hivens.ui.feature.catalogue.project.OpenProject
-import hivens.ui.feature.catalogue.project.OpenProjectState
-import hivens.ui.feature.catalogue.project.ProjectSource
 import hivens.ui.levelServicesModule
+import hivens.ui.moduleKeys
 import hivens.ui.navigation.MainWindowRequests
 import hivens.ui.navigation.NavRequests
 import hivens.ui.onEventThread
@@ -24,6 +29,7 @@ import hivens.ui.uiDataRegistry
 import hivens.ui.widgets.Commands
 import hivens.ui.widgets.KoinLevelServicesHost
 import hivens.ui.widgets.Sources
+import hivens.widget.api.ContributedServices
 import hivens.widget.api.LocalScope
 import hivens.widget.api.LocalSurfaceFamilies
 import hivens.widget.api.SurfaceFamilies
@@ -82,23 +88,34 @@ class HostedWindowTest {
         }
     }
 
-    /** The launcher's own registries and per-window services under an app level, the way the shell has them. */
+    /**
+     * The launcher's own registries and per-window services under an app level, the way
+     * the shell has them, with the catalogue module's keys brought in, whose project is
+     * the one the rail of each window describes.
+     */
     private fun koin(): Koin = koinApplication {
         modules(
             levelServicesModule,
             module {
                 single {
-                    WidgetScope.app(
-                        registry = uiDataRegistry(
+                    val keys = HostKeys(
+                        sources = uiDataRegistry(
                             activity         = MutableStateFlow(emptyList()),
                             notifications    = MutableStateFlow(emptyList()),
                             doNotDisturb     = MutableStateFlow(false),
                             sslBypass        = flowSource(MutableStateFlow(false)),
                             background       = MutableStateFlow(BackgroundSettings()),
                         ),
-                        services = KoinLevelServicesHost.app(this),
-                        context  = Dispatchers.Unconfined,
                         commands = uiCommandRegistry({}, {}, {}),
+                        services = ContributedServices(),
+                    )
+                    moduleKeys(keys, named = setOf(CatalogueApi.ID), compiled = listOf(CatalogueModule), jars = emptyList())
+                    WidgetScope.app(
+                        registry = keys.sources,
+                        services = keys.appServices(KoinLevelServicesHost.app(this), Dispatchers.Unconfined),
+                        context  = Dispatchers.Unconfined,
+                        commands = keys.commands,
+                        access   = LauncherHostAccess,
                     )
                 }
                 single { MainWindowRequests() }
@@ -118,7 +135,7 @@ class HostedWindowTest {
     private class Seen {
         var state: HostWindowState? = null
         var maximize: (() -> Unit)? = null
-        var openProject: OpenProjectState? = null
+        var openProject: OpenProjects? = null
         var project: OpenProject? = null
         var families: SurfaceFamilies? = null
         var nav: NavRequests? = null
@@ -129,8 +146,8 @@ class HostedWindowTest {
     private fun Reader(seen: Seen) {
         seen.state = rememberScopedSource(Sources.Window).valueOrNull()
         seen.maximize = rememberScopedAction(Commands.MaximizeWindow)
-        seen.openProject = koinInject<OpenProjectState>()
-        seen.project = rememberScopedSource(Sources.OpenProject).valueOrNull()
+        seen.openProject = LocalScope.current?.services?.get<OpenProjects>()
+        seen.project = rememberScopedSource(CatalogueKeys.OpenProject).valueOrNull()
         seen.families = LocalSurfaceFamilies.current
         seen.nav = koinInject<NavRequests>()
         seen.level = LocalScope.current
@@ -185,7 +202,7 @@ class HostedWindowTest {
             try {
                 val mainState = assertNotNull(inMain.openProject)
                 assertNotSame(mainState, inConsole.openProject)
-                assertSame(mainState, inMain.level?.services?.get<OpenProjectState>(), "the injection site and the level agree")
+                assertSame(mainState, inMain.level?.services?.get<OpenProjects>(), "the window's widgets and its level agree")
 
                 val page = Any()
                 mainState.claim(page)

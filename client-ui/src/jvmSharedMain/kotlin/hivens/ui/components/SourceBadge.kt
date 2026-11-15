@@ -24,6 +24,14 @@ fun SourceBadge(origin: PackOrigin, modifier: Modifier = Modifier) {
     NxSourceBadge(label = label, color = originColor(origin), modifier = modifier)
 }
 
+/**
+ * The pill for a source named the way the packs and catalogue APIs name one, in lower
+ * case. A name this build does not know reads as another source.
+ */
+@Composable
+fun SourceBadge(origin: String, modifier: Modifier = Modifier) =
+    SourceBadge(PackOrigin.entries.firstOrNull { it.name.equals(origin, ignoreCase = true) } ?: PackOrigin.Unknown, modifier)
+
 @Composable
 fun SourceBadge(source: SmrtSource, modifier: Modifier = Modifier) {
     val label = when (source) {

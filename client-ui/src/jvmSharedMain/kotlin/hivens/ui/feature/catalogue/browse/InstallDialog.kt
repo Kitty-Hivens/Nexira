@@ -32,8 +32,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -48,23 +48,21 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import coil3.compose.SubcomposeAsyncImage
-import hivens.core.api.dto.modrinth.ModrinthVersion
-import hivens.core.api.interfaces.IPackRepository
-import hivens.core.data.PackInstance
-import hivens.launcher.InstallPhase
-import hivens.launcher.PackInstallService
-import hivens.launcher.imports.LocalPackCreator
-import hivens.launcher.instance.ContentDestination
-import hivens.launcher.instance.InstallTargets
-import hivens.launcher.instance.ModInstaller
-import hivens.launcher.modrinth.ModrinthClient
-import hivens.launcher.modrinth.chooseBuild
+import hivens.catalogue.api.CandidateState
+import hivens.catalogue.api.CandidateVerdict
+import hivens.catalogue.api.CatalogueKeys
+import hivens.catalogue.api.InstallCandidate
+import hivens.catalogue.api.InstallChoiceView
+import hivens.catalogue.api.InstallSubject
+import hivens.catalogue.api.NewPackRequest
+import hivens.catalogue.api.NewPackState
+import hivens.catalogue.api.ProjectBuild
+import hivens.packs.api.PackKeys
 import hivens.ui.Screen
 import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.navigation.NavRequests
 import hivens.ui.nx.InitialsAvatar
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
@@ -77,6 +75,11 @@ import hivens.ui.nx.NxSelect
 import hivens.ui.nx.NxTooltip
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.screens.library.rememberPackArt
+import hivens.ui.widgets.Commands
+import hivens.widget.api.rememberScopedAction
+import hivens.widget.api.rememberScopedCommand
+import hivens.widget.api.rememberScopedSource
+import hivens.widget.api.valueOrNull
 import hivens.ui.feature.catalogue.project.loaderLabel
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
@@ -86,26 +89,6 @@ import hivens.ui.theme.NxInk
 import hivens.ui.theme.Status
 import hivens.ui.theme.decorativeColor
 import hivens.ui.theme.decorativePair
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import org.koin.compose.koinInject
-import org.slf4j.LoggerFactory
-import java.nio.file.Path
-import java.util.UUID
-
-private val log = LoggerFactory.getLogger("InstallDialog")
-
-/** What an install is for, as the dialog names it. */
-internal data class InstallSubject(
-    val projectId: String,
-    val title: String,
-    val iconUrl: String? = null,
-    val author: String = "",
-)
 
 /**
  * Where a catalogue project goes, asked when an install has no pack behind it.
@@ -115,8 +98,10 @@ internal data class InstallSubject(
  * exist yet. A dropdown hung off a card holds neither. The project stays named at
  * the top, so the reader knows what they are placing while they look for where.
  *
- * Every install runs on the app's scope. Closing the dialog, or leaving the screen,
- * leaves an install that has started to finish.
+ * The choice is the window's install that asks where, see [CatalogueKeys.InstallChoice]:
+ * opened when the dialog comes up and closed when it goes. Every install runs on the
+ * app's scope, so closing the dialog, or leaving the screen, leaves an install that has
+ * started to finish.
  */
 @Composable
 internal fun InstallDialog(subject: InstallSubject, onDismiss: () -> Unit) {
@@ -187,7 +172,7 @@ internal fun InstallDialog(subject: InstallSubject, onDismiss: () -> Unit) {
                     Symbol(NxIcon.Inventory2, contentDescription = null, tint = NxInk.quiet, size = 18.dp)
                     Spacer(Modifier.width(8.dp))
                     Text(
-                        model.candidates?.let { list -> s.installDialogFitCount(list.count { it.verdict is InstallTargets.Verdict.Fits }) }.orEmpty(),
+                        model.candidates?.let { list -> s.installDialogFitCount(list.count { it.verdict == CandidateVerdict.Fits }) }.orEmpty(),
                         style = MaterialTheme.typography.bodyMedium,
                         color = NxInk.quiet,
                         modifier = Modifier.weight(1f),
@@ -239,135 +224,49 @@ private fun SubjectBlock(subject: InstallSubject) {
 
 // ── The model ───────────────────────────────────────────────────────────────
 
-/** Where one pack's install stands inside the dialog. */
-private sealed interface RowState {
-    data object Idle : RowState
-    data object Working : RowState
-    /** Landed, with [missing] required dependencies it went without. */
-    data class Done(val missing: Int = 0) : RowState
-    data class Failed(val problem: InstallProblem) : RowState
-}
-
-/** Where making a new pack stands. */
-private sealed interface NewPackState {
-    data object Idle : NewPackState
-    data class Creating(val key: String) : NewPackState
-    data object Installing : NewPackState
-    data class Done(val pack: PackInstance, val missing: Int = 0) : NewPackState
-    data class Failed(val message: String) : NewPackState
-}
-
 private class InstallDialogModel(
-    val candidates: List<InstallTargets.Candidate>?,
+    val candidates: List<InstallCandidate>?,
     val failed: Boolean,
-    val listing: List<ModrinthVersion>,
+    val listing: List<ProjectBuild>,
     val newPackLoaders: List<String?>,
-    val rows: Map<String, RowState>,
+    val rows: Map<String, CandidateState>,
     val newPack: NewPackState,
-    val install: (InstallTargets.Candidate) -> Unit,
+    val install: (InstallCandidate) -> Unit,
     val retry: () -> Unit,
     val createAndInstall: (name: String, mc: String, loader: String?) -> Unit,
     val openPack: (String) -> Unit,
 )
 
+/**
+ * The window's choice for [subject], opened as the dialog comes up and closed as it
+ * goes. Until the choice for this subject is in, the dialog reads as still reading.
+ */
 @Composable
 private fun rememberInstallDialogModel(subject: InstallSubject): InstallDialogModel {
-    val modrinth: ModrinthClient = koinInject()
-    val targets: InstallTargets = koinInject()
-    val installer: ModInstaller = koinInject()
-    val installService: PackInstallService = koinInject()
-    val creator: LocalPackCreator = koinInject()
-    val repo: IPackRepository = koinInject()
-    val dataDir: Path = koinInject()
-    val nav: NavRequests = koinInject()
-    // Installs run on the app's scope: closing the dialog must not stop one halfway.
-    val appScope: CoroutineScope = koinInject()
+    val choose = rememberScopedCommand(CatalogueKeys.ChooseInstall)
+    val dismiss = rememberScopedAction(CatalogueKeys.DismissInstall)
+    val into = rememberScopedCommand(CatalogueKeys.InstallInto)
+    val newPack = rememberScopedCommand(CatalogueKeys.InstallNewPack)
+    val retry = rememberScopedAction(CatalogueKeys.RetryChoice)
+    // Resolved here, where the dialog is asked for, rather than on the layer it is drawn on.
+    val navigate = rememberScopedCommand(Commands.Navigate)
+    val choice: InstallChoiceView? = rememberScopedSource(CatalogueKeys.InstallChoice).valueOrNull()?.takeIf { it.subject == subject }
 
-    var attempt by remember { mutableStateOf(0) }
-    var candidates by remember { mutableStateOf<List<InstallTargets.Candidate>?>(null) }
-    var listing by remember { mutableStateOf(emptyList<ModrinthVersion>()) }
-    var failed by remember { mutableStateOf(false) }
-    var rows by remember { mutableStateOf(emptyMap<String, RowState>()) }
-    var newPack by remember { mutableStateOf<NewPackState>(NewPackState.Idle) }
+    LaunchedEffect(subject, choose != null) { choose?.invoke(subject) }
+    DisposableEffect(subject) { onDispose { dismiss?.invoke() } }
 
-    LaunchedEffect(subject.projectId, attempt) {
-        failed = false
-        candidates = null
-        try {
-            val builds = withContext(Dispatchers.IO) { modrinth.listVersions(subject.projectId) }
-            listing = builds
-            candidates = targets.forProject(subject.projectId, builds)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            log.warn("reading where {} could go failed", subject.projectId, e)
-            failed = true
-            candidates = emptyList()
-        }
-    }
-
-    fun install(candidate: InstallTargets.Candidate) {
-        val build = (candidate.verdict as? InstallTargets.Verdict.Fits)?.build ?: return
-        val id = candidate.pack.id
-        rows = rows + (id to RowState.Working)
-        appScope.launch(Dispatchers.Main) {
-            val target = candidate.destination
-            val state = try {
-                val outcome = withContext(Dispatchers.IO) { installer.install(target.dir, build, target.mcVersion, target.loader) }
-                problemOf(outcome)?.let { RowState.Failed(it) } ?: RowState.Done(outcome.missing.size)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                log.warn("installing {} into {} failed", subject.projectId, target.dir, e)
-                RowState.Failed(InstallProblem.NotLanded)
-            }
-            rows = rows + (id to state)
-        }
-    }
-
-    fun createAndInstall(name: String, mc: String, loader: String?) {
-        val key = "create:${UUID.randomUUID()}"
-        newPack = NewPackState.Creating(key)
-        val builds = listing
-        appScope.launch(Dispatchers.Main) {
-            try {
-                installService.run(key = key, title = name) { reserve, progress ->
-                    creator.create(name, mc, loader, "", reserve, progress)
-                }
-                val phase = installService.installs.first { all -> all[key]?.phase.let { it != null && it !is InstallPhase.Running } }[key]?.phase
-                if (phase !is InstallPhase.Succeeded) {
-                    newPack = NewPackState.Failed((phase as? InstallPhase.Failed)?.message.orEmpty())
-                    return@launch
-                }
-                installService.dismiss(key)
-                newPack = NewPackState.Installing
-                val pack = withContext(Dispatchers.IO) { repo.get(phase.instanceId) }
-                    ?: return@launch run { newPack = NewPackState.Failed("") }
-                val target = ContentDestination.Pack.of(pack, dataDir.resolve("instances"))
-                val build = chooseBuild(builds, target.mcVersion, target.loader)
-                    ?: return@launch run { newPack = NewPackState.Failed("") }
-                val outcome = withContext(Dispatchers.IO) { installer.install(target.dir, build, target.mcVersion, target.loader) }
-                newPack = if (outcome.ok) NewPackState.Done(pack, outcome.missing.size) else NewPackState.Failed("")
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                log.warn("making a pack for {} failed", subject.projectId, e)
-                newPack = NewPackState.Failed(e.message.orEmpty())
-            }
-        }
-    }
-
+    val listing = choice?.listing.orEmpty()
     return InstallDialogModel(
-        candidates = candidates,
-        failed = failed,
+        candidates = choice?.candidates,
+        failed = choice?.failed == true,
         listing = listing,
         newPackLoaders = newPackLoaders(listing),
-        rows = rows,
-        newPack = newPack,
-        install = ::install,
-        retry = { attempt++ },
-        createAndInstall = ::createAndInstall,
-        openPack = { id -> nav.open(Screen.PackDetail(id)) },
+        rows = choice?.rows.orEmpty(),
+        newPack = choice?.newPack ?: NewPackState.Idle,
+        install = { candidate -> into?.invoke(candidate.packId) },
+        retry = { retry?.invoke() },
+        createAndInstall = { name, mc, loader -> newPack?.invoke(NewPackRequest(name, mc, loader)) },
+        openPack = { id -> navigate?.invoke(Screen.PackDetail(id)) },
     )
 }
 
@@ -378,7 +277,7 @@ private fun rememberInstallDialogModel(subject: InstallSubject): InstallDialogMo
  * project, which keeps the new-pack tab off: a shader needs a shader loader the
  * new pack would not have.
  */
-private fun newPackLoaders(listing: List<ModrinthVersion>): List<String?> {
+private fun newPackLoaders(listing: List<ProjectBuild>): List<String?> {
     val published = listing.flatMapTo(LinkedHashSet()) { it.loaders }
     return buildList {
         if ("minecraft" in published) add(null)
@@ -390,7 +289,7 @@ private fun newPackLoaders(listing: List<ModrinthVersion>): List<String?> {
 private val CREATABLE_LOADERS = listOf("fabric", "neoforge", "forge", "quilt")
 
 /** Game versions the project has builds for under [loader], newest first, releases unless [all]. */
-private fun versionsFor(listing: List<ModrinthVersion>, loader: String?, all: Boolean): List<String> {
+private fun versionsFor(listing: List<ProjectBuild>, loader: String?, all: Boolean): List<String> {
     val wanted = loader ?: "minecraft"
     val release = Regex("""^\d+\.\d+(\.\d+)?$""")
     return listing.asSequence()
@@ -444,21 +343,21 @@ private fun ExistingPacks(model: InstallDialogModel) {
             model.failed -> Note(s.installPickerFailed, retry = model.retry)
             else -> {
                 val shown = list
-                    .filter { query.isBlank() || it.pack.displayName.contains(query.trim(), ignoreCase = true) }
-                    .filter { !hideUnfit || it.verdict is InstallTargets.Verdict.Fits || model.rows[it.pack.id] != null }
+                    .filter { query.isBlank() || it.name.contains(query.trim(), ignoreCase = true) }
+                    .filter { !hideUnfit || it.verdict == CandidateVerdict.Fits || model.rows[it.packId] != null }
                 if (shown.isEmpty()) {
                     Note(if (list.isEmpty()) s.installPickerNoPacks else s.contentEmpty)
                 } else {
                     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 8.dp)) {
-                        items(shown, key = { it.pack.id }) { candidate ->
+                        items(shown, key = { it.packId }) { candidate ->
                             CandidateRow(
                                 candidate = candidate,
-                                state = model.rows[candidate.pack.id] ?: RowState.Idle,
+                                state = model.rows[candidate.packId],
                                 onInstall = { model.install(candidate) },
-                                onOpen = { model.openPack(candidate.pack.id) },
+                                onOpen = { model.openPack(candidate.packId) },
                                 modifier = Modifier.animateItem(fadeInSpec = Motion.fade, placementSpec = Motion.reveal.of<IntOffset>(), fadeOutSpec = Motion.fade),
                             )
-                            PuppetClick("installDialog.install.${candidate.pack.id}") { model.install(candidate) }
+                            PuppetClick("installDialog.install.${candidate.packId}") { model.install(candidate) }
                         }
                     }
                 }
@@ -469,16 +368,17 @@ private fun ExistingPacks(model: InstallDialogModel) {
 
 @Composable
 private fun CandidateRow(
-    candidate: InstallTargets.Candidate,
-    state: RowState,
+    candidate: InstallCandidate,
+    /** What came of an install into it, null where none was started. */
+    state: CandidateState?,
     onInstall: () -> Unit,
     onOpen: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val s = LocalStrings.current
     val verdict = candidate.verdict
-    val fits = verdict is InstallTargets.Verdict.Fits
-    val present = verdict is InstallTargets.Verdict.Present || state is RowState.Done
+    val fits = verdict == CandidateVerdict.Fits
+    val present = verdict == CandidateVerdict.Present || state is CandidateState.Done
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
     val wash by animateColorAsState(
@@ -497,25 +397,25 @@ private fun CandidateRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            PackMark(candidate.pack, 32.dp, dimmed = dim)
+            PackMark(candidate.packId, candidate.name, 32.dp, dimmed = dim)
             Column(Modifier.weight(1f)) {
                 Text(
-                    candidate.pack.displayName,
+                    candidate.name,
                     style = MaterialTheme.typography.bodyMedium,
                     color = if (dim) NxInk.quiet else NxInk.main,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                val missing = (state as? RowState.Done)?.missing?.takeIf { it > 0 }
-                val note = (state as? RowState.Failed)?.problem?.label(s)
+                val missing = (state as? CandidateState.Done)?.missing?.takeIf { it > 0 }
+                val note = (state as? CandidateState.Failed)?.problem?.label(s)
                     ?: missing?.let { s.modPageInstallMissing(it) }
                     ?: unfitReason(verdict, s)
                 Text(
-                    note ?: runtimeLabel(candidate.destination),
+                    note ?: runtimeLabel(candidate.mcVersion, candidate.loader),
                     style = MaterialTheme.typography.labelMedium,
                     color = when {
-                        state is RowState.Failed || missing != null -> NxColor.status(Status.Error, text = true)
+                        state is CandidateState.Failed || missing != null -> NxColor.status(Status.Error, text = true)
                         else -> NxInk.quiet
                     },
                     maxLines = 1,
@@ -527,8 +427,8 @@ private fun CandidateRow(
         // One control whose phase moves, so the change animates where the eye already is.
         val phase = when {
             present -> CardPhase.Installed
-            state == RowState.Working -> CardPhase.Working
-            state is RowState.Failed -> CardPhase.Failed
+            state == CandidateState.Working -> CardPhase.Working
+            state is CandidateState.Failed -> CardPhase.Failed
             fits -> CardPhase.Offered
             else -> null
         }
@@ -540,13 +440,11 @@ private fun CandidateRow(
     }
 }
 
-private fun unfitReason(verdict: InstallTargets.Verdict, s: AppStrings): String? = when (verdict) {
-    is InstallTargets.Verdict.NotFit -> when (verdict.reason) {
-        InstallTargets.Unfit.NoBuild -> s.installTargetNoBuild
-        InstallTargets.Unfit.NotTaken -> s.installTargetNotTaken
-    }
-    InstallTargets.Verdict.Unknown -> s.installTargetUnknown
-    else -> null
+private fun unfitReason(verdict: CandidateVerdict, s: AppStrings): String? = when (verdict) {
+    CandidateVerdict.NoBuild -> s.installTargetNoBuild
+    CandidateVerdict.NotTaken -> s.installTargetNotTaken
+    CandidateVerdict.Unknown -> s.installTargetUnknown
+    CandidateVerdict.Fits, CandidateVerdict.Present -> null
 }
 
 @Composable
@@ -635,11 +533,11 @@ private fun NewPack(model: InstallDialogModel) {
                 verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
             ) {
                 Symbol(NxIcon.CheckCircle, contentDescription = null, tint = NxColor.lead(), size = 40.dp)
-                Text(s.installDialogDone(state.pack.displayName), style = MaterialTheme.typography.titleMedium, color = NxInk.main, fontWeight = FontWeight.SemiBold)
+                Text(s.installDialogDone(state.packName), style = MaterialTheme.typography.titleMedium, color = NxInk.main, fontWeight = FontWeight.SemiBold)
                 if (state.missing > 0) {
                     Text(s.modPageInstallMissing(state.missing), style = MaterialTheme.typography.labelMedium, color = NxColor.status(Status.Error, text = true))
                 }
-                NxButton(label = s.installDialogOpenPack, onClick = { model.openPack(state.pack.id) }, style = NxButtonStyle.Secondary, compact = true)
+                NxButton(label = s.installDialogOpenPack, onClick = { model.openPack(state.packId) }, style = NxButtonStyle.Secondary, compact = true)
             }
         }
     }
@@ -648,9 +546,7 @@ private fun NewPack(model: InstallDialogModel) {
 @Composable
 private fun CreatingNote(state: NewPackState) {
     val s = LocalStrings.current
-    val installService: PackInstallService = koinInject()
-    val installs by installService.installs.collectAsState()
-    val phase = (state as? NewPackState.Creating)?.let { installs[it.key]?.phase as? InstallPhase.Running }
+    val creating = state as? NewPackState.Creating
     Column(
         Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -662,8 +558,8 @@ private fun CreatingNote(state: NewPackState) {
             style = MaterialTheme.typography.titleSmall,
             color = NxInk.main,
         )
-        phase?.takeIf { it.total > 0 }?.let {
-            Text("${it.current} / ${it.total}", style = MaterialTheme.typography.labelMedium, color = NxInk.quiet)
+        creating?.takeIf { it.total > 0 }?.let {
+            Text("${it.done} / ${it.total}", style = MaterialTheme.typography.labelMedium, color = NxInk.quiet)
         }
     }
 }
@@ -673,20 +569,24 @@ private fun Label(text: String) {
     Text(text, style = MaterialTheme.typography.labelLarge, color = NxInk.main, fontWeight = FontWeight.SemiBold)
 }
 
-/** A pack's own mark, its icon or its initials over its hue. */
+/**
+ * A pack's own mark, its icon or its initials over its hue. The icon is the library's,
+ * read through the packs module, and a pack it does not list draws its initials.
+ */
 @Composable
-internal fun PackMark(pack: PackInstance, size: Dp, dimmed: Boolean = false) {
-    val art = rememberPackArt(pack)
-    val hue = decorativePair(pack.id).first
+internal fun PackMark(packId: String, name: String, size: Dp, dimmed: Boolean = false) {
+    val pack = rememberScopedSource(PackKeys.Library).valueOrNull()?.firstOrNull { it.id == packId }
+    val iconUrl = pack?.let { rememberPackArt(it).iconUrl }
+    val hue = decorativePair(packId).first
     val alpha = if (dimmed) 0.5f else 1f
     SubcomposeAsyncImage(
-        model              = art.iconUrl,
+        model              = iconUrl,
         contentDescription = null,
         contentScale       = ContentScale.Crop,
         alpha              = alpha,
         modifier           = Modifier.size(size).clip(RoundedCornerShape(size / 4)),
         loading            = { Box(Modifier.fillMaxSize().background(hue.copy(alpha = alpha))) },
-        error              = { InitialsAvatar(pack.displayName, hue.copy(alpha = alpha)) },
+        error              = { InitialsAvatar(name, hue.copy(alpha = alpha)) },
     )
 }
 

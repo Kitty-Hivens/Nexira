@@ -3,6 +3,7 @@ package hivens.ui.feature.catalogue.project
 import hivens.core.api.dto.modrinth.ModrinthFile
 import hivens.core.api.dto.modrinth.ModrinthHashes
 import hivens.core.api.dto.modrinth.ModrinthVersion
+import hivens.ui.feature.catalogue.toBuild
 import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue

@@ -8,16 +8,17 @@ import hivens.ui.notifications.Kind
 import hivens.ui.notifications.NotifGlyph
 import hivens.ui.notifications.PersistedNotification
 import hivens.ui.notifications.Severity
-import hivens.ui.feature.catalogue.project.GameVersionGroup
-import hivens.ui.feature.catalogue.project.OpenProject
-import hivens.ui.feature.catalogue.project.ProjectCreator
-import hivens.ui.feature.catalogue.project.ProjectLink
-import hivens.ui.feature.catalogue.project.ProjectLinkKind
-import hivens.ui.feature.catalogue.project.ProjectSource
+import hivens.catalogue.api.GameVersionGroup
+import hivens.catalogue.api.OpenProject
+import hivens.catalogue.api.ProjectCreator
+import hivens.catalogue.api.ProjectLink
+import hivens.catalogue.api.ProjectLinkKind
+import hivens.catalogue.api.ProjectSource
 import hivens.ui.widgets.Sources
 import hivens.widget.api.WidgetDataRegistry
 import hivens.widget.api.flowSource
 import kotlinx.coroutines.flow.MutableStateFlow
+import java.time.Instant
 
 /**
  * Stand-in data for the gallery, so a widget that draws a list has a list to draw.
@@ -54,13 +55,18 @@ internal fun previewDataRegistry(): WidgetDataRegistry = WidgetDataRegistry().ap
 }
 
 /** The project the gallery and the editor draw the project rail's widgets on. */
-internal fun sampleOpenProject(): OpenProject = SAMPLE_PROJECT
+internal fun sampleOpenProject(): OpenProject = SAMPLE_PROJECT.copy(
+    // Two years ago and last week, read per call for the reason the clock below is.
+    published = Instant.ofEpochMilli(now - 730 * DAY).toString(),
+    updated = Instant.ofEpochMilli(now - 7 * DAY).toString(),
+)
 
 // Read per call rather than once per class load, which is what a `val` here did:
 // the first palette of the session froze the clock, and a launcher left open for
 // an afternoon showed a sample notification from three hours ago.
 private val now: Long get() = System.currentTimeMillis()
 private const val MINUTE = 60_000L
+private const val DAY = 24 * 60 * MINUTE
 
 /**
  * One of each phase a feed can show, because a feed that is all progress bars
@@ -128,10 +134,6 @@ private val SAMPLE_PROJECT = OpenProject(
     serverSide = "required",
     licenseId = "MIT",
     licenseName = "MIT License",
-    publishedAt = "2 years ago",
-    updatedAt = "last week",
-    publishedExact = "12 March 2024",
-    updatedExact = "14 September 2026",
     links = listOf(
         ProjectLink(ProjectLinkKind.Source, "https://example.invalid/source"),
         ProjectLink(ProjectLinkKind.Issues, "https://example.invalid/issues"),

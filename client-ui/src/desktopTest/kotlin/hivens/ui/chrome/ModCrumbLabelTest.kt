@@ -1,14 +1,14 @@
 package hivens.ui.chrome
 
-import hivens.ui.feature.catalogue.project.ModTarget
-import hivens.ui.feature.catalogue.project.OpenProject
-import hivens.ui.feature.catalogue.project.ProjectSource
+import hivens.catalogue.api.OpenProject
+import hivens.catalogue.api.ProjectSource
+import hivens.catalogue.api.ProjectTarget
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class ModCrumbLabelTest {
 
-    private val target = ModTarget.Catalogue("AANobbMI")
+    private val target = ProjectTarget.Catalogue("AANobbMI")
 
     private fun open(title: String, pending: Boolean) =
         OpenProject(targetKey = target.key, title = title, slug = "sodium", source = ProjectSource.Catalogue, pending = pending)

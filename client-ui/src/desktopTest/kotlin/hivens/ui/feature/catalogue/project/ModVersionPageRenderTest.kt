@@ -1,7 +1,5 @@
 package hivens.ui.feature.catalogue.project
 
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.CoroutineScope
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -11,20 +9,24 @@ import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
-import hivens.core.api.HttpClientProvider
+import hivens.catalogue.api.BuildPageView
+import hivens.catalogue.api.DependencyKind
+import hivens.catalogue.api.GameVersionTag
+import hivens.catalogue.api.InstallOffer
+import hivens.catalogue.api.ProjectPageView
+import hivens.catalogue.api.ProjectTarget
+import hivens.catalogue.api.VersionDependency
 import hivens.core.api.dto.modrinth.ModrinthGameVersion
 import hivens.core.api.dto.modrinth.ModrinthProject
 import hivens.core.api.dto.modrinth.ModrinthVersion
-import hivens.core.data.PackInstance
-import hivens.core.api.interfaces.IPackRepository
-import hivens.core.net.TransferEngine
-import hivens.launcher.instance.InstanceContentScanner
-import hivens.launcher.modrinth.ModrinthClient
+import hivens.launcher.content.ContentKind
+import hivens.launcher.instance.loadersFor
+import hivens.ui.feature.catalogue.toBuild
+import hivens.ui.feature.catalogue.toDetails
+import hivens.ui.feature.catalogue.toTags
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.i18n.RussianStrings
 import hivens.ui.theme.NxTheme
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.serialization.json.Json
 import org.jetbrains.skia.Data
 import org.jetbrains.skia.EncodedImageFormat
@@ -52,83 +54,66 @@ class ModVersionPageRenderTest {
         checkNotNull(javaClass.classLoader.getResourceAsStream("catalogue/$name")) { "missing fixture $name" }
             .bufferedReader().use { it.readText() }
 
-    private val gameVersions: List<ModrinthGameVersion> by lazy {
-        json.decodeFromString<List<ModrinthGameVersion>>(resource("game_versions.json"))
+    private val gameVersions: List<GameVersionTag> by lazy {
+        json.decodeFromString<List<ModrinthGameVersion>>(resource("game_versions.json")).toTags()
     }
 
-    /** A client stood up and never reached: the sheet sets every answer directly. */
-    private fun offlineClient(): ModrinthClient {
-        val http = HttpClientProvider { error("a render sheet makes no requests") }
-        return ModrinthClient(http, TransferEngine(http))
+    private val builds: List<ModrinthVersion> by lazy {
+        json.decodeFromString<List<ModrinthVersion>>(resource("iris.versions.json"))
     }
 
-    private object EmptyRepo : IPackRepository {
-        private val flow = MutableStateFlow(emptyList<PackInstance>())
-        override fun observe(): StateFlow<List<PackInstance>> = flow
-        override suspend fun list(): List<PackInstance> = emptyList()
-        override suspend fun get(id: String): PackInstance? = null
-        override suspend fun put(instance: PackInstance) {}
-        override suspend fun delete(id: String) {}
-    }
-
-    private fun project(): ModDetailState {
+    /** The project the build belongs to, read and set directly: a sheet asks nothing. */
+    private fun project(): ProjectPageView {
         val p = json.decodeFromString<ModrinthProject>(resource("sodium.project.json"))
-        val s = ModDetailState(
-            target = ModTarget.Catalogue(p.id, intoInstanceId = "inst-1"),
-            modrinth = offlineClient(),
-            repo = EmptyRepo,
-            dataDir = Path.of("."),
-            scanner = InstanceContentScanner(),
-            open = OpenProjectState(),
-            strings = RussianStrings,
-            // A sheet installs nothing; the scope is there because the page holds one.
-            installScope = CoroutineScope(Dispatchers.Unconfined),
+        return ProjectPageView(
+            target = ProjectTarget.Catalogue(p.id, intoInstanceId = "inst-1"),
+            visit = "sheet",
+            loading = false,
+            project = p.toDetails(),
+            gameVersionTags = gameVersions,
+            // A page reached from a pack's browser, which is the case the action on the
+            // right exists for.
+            install = InstallOffer.Install("Industrial"),
         )
-        s.project = p
-        s.loading = false
-        s.gameVersionTags = gameVersions
-        // A page reached from a pack's browser, which is the case the action on the
-        // right exists for.
-        s.install = InstallAction.Install("Industrial")
-        return s
     }
 
     /** The build with the most to say: several game versions, a changelog, dependencies. */
-    private fun build(): ModVersionState {
-        val versions = json.decodeFromString<List<ModrinthVersion>>(resource("iris.versions.json"))
-        val chosen = versions.firstOrNull { !it.changelog.isNullOrBlank() } ?: versions.first()
-        val state = ModVersionState(offlineClient())
-        state.version = chosen
-        state.loading = false
-        // Named as the page names them, rather than as the wire carries them. Both
-        // kinds are present on purpose: the two headings have to read as different
-        // statements and not as one list split in half.
-        state.dependencies = listOf(
-            // One with the catalogue's art and a pinned build, one with neither, and
-            // one the author warns against: the three shapes a row can take.
-            VersionDependency(
-                projectId = "AANobbMI",
-                title = "Sodium",
-                iconUrl = null,
-                versionNumber = "0.6.13",
-                kind = DependencyKind.Required,
-            ),
-            VersionDependency(
-                projectId = "P7dR8mSH",
-                title = "Fabric API",
-                iconUrl = null,
-                versionNumber = null,
-                kind = DependencyKind.Required,
-            ),
-            VersionDependency(
-                projectId = "H8CaAYZC",
-                title = "Starlight",
-                iconUrl = null,
-                versionNumber = null,
-                kind = DependencyKind.Incompatible,
+    private fun build(): BuildPageView {
+        val chosen = builds.firstOrNull { !it.changelog.isNullOrBlank() } ?: builds.first()
+        return BuildPageView(
+            versionId = chosen.id,
+            visit = "sheet",
+            loading = false,
+            build = chosen.toBuild(),
+            // Named as the page names them, rather than as the wire carries them. Both
+            // kinds are present on purpose: the two headings have to read as different
+            // statements and not as one list split in half.
+            dependencies = listOf(
+                // One with the catalogue's art and a pinned build, one with neither, and
+                // one the author warns against: the three shapes a row can take.
+                VersionDependency(
+                    projectId = "AANobbMI",
+                    title = "Sodium",
+                    iconUrl = null,
+                    versionNumber = "0.6.13",
+                    kind = DependencyKind.Required,
+                ),
+                VersionDependency(
+                    projectId = "P7dR8mSH",
+                    title = "Fabric API",
+                    iconUrl = null,
+                    versionNumber = null,
+                    kind = DependencyKind.Required,
+                ),
+                VersionDependency(
+                    projectId = "H8CaAYZC",
+                    title = "Starlight",
+                    iconUrl = null,
+                    versionNumber = null,
+                    kind = DependencyKind.Incompatible,
+                ),
             ),
         )
-        return state
     }
 
     @Test
@@ -140,22 +125,24 @@ class ModVersionPageRenderTest {
      */
     @Test
     fun `a build that does not fit the pack says so under its install`() {
-        val project = project()
-        project.destination = ModDetailState.Destination(name = "Industrial", dir = Path.of("."), mc = "1.21.1", loader = "neoforge")
-        val build = build()
-        build.version = json.decodeFromString<List<ModrinthVersion>>(resource("iris.versions.json")).first { "fabric" in it.loaders }
+        val project = project().copy(
+            packMcVersion = "1.21.1",
+            packLoader = "neoforge",
+            packLoaders = ContentKind.entries.flatMap { loadersFor(it, "neoforge", "1.21.1") },
+        )
+        val fabric = builds.first { "fabric" in it.loaders }
+        val build = build().copy(versionId = fabric.id, build = fabric.toBuild())
         sheet("modversion-build-misfit.png", project, build)
     }
 
     /** A build already in the pack: the button says where, and the page still reads as the build's own. */
     @Test
     fun `a build already in the pack`() {
-        val project = project()
-        project.install = InstallAction.Present("Industrial")
+        val project = project().copy(install = InstallOffer.Present("Industrial"))
         sheet("modversion-build-present.png", project, build())
     }
 
-    private fun sheet(name: String, project: ModDetailState, build: ModVersionState) {
+    private fun sheet(name: String, project: ProjectPageView, build: BuildPageView) {
         val out = Path.of("build/render", name)
         Files.createDirectories(out.parent)
         var png: Data? = null

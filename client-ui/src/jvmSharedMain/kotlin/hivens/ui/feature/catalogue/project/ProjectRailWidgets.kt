@@ -39,19 +39,23 @@ import hivens.ui.nx.NxMetaChip
 import hivens.ui.nx.NxMetaChipTone
 import hivens.ui.nx.NxTooltip
 import coil3.compose.AsyncImage
-import hivens.ui.feature.catalogue.project.ProjectCreator
+import hivens.accounts.api.AccountKeys
+import hivens.catalogue.api.CatalogueKeys
+import hivens.catalogue.api.Disclosure
+import hivens.catalogue.api.OpenProject
+import hivens.catalogue.api.ProjectCreator
+import hivens.catalogue.api.ProjectLinkKind
+import hivens.catalogue.api.ProjectSource
+import hivens.ui.components.formatBuildTimestamp
+import hivens.ui.components.relativeAge
 import hivens.ui.feature.catalogue.project.rememberLinkFollower
-import hivens.ui.feature.catalogue.project.ProjectLinkKind
-import hivens.core.api.dto.modrinth.ModrinthDisclosure
 import hivens.ui.feature.catalogue.project.disclosureIsWarning
 import hivens.ui.feature.catalogue.project.disclosuresInReadingOrder
 import hivens.ui.feature.catalogue.project.disclosureLine
 import hivens.ui.feature.catalogue.project.Environment
-import hivens.ui.feature.catalogue.project.OpenProject
 import hivens.ui.feature.catalogue.browse.ProjectTag
 import hivens.ui.feature.catalogue.browse.tagSearch
 import hivens.ui.puppet.PuppetClick
-import hivens.ui.feature.catalogue.project.ProjectSource
 import hivens.ui.feature.catalogue.project.environmentLabel
 import hivens.ui.feature.catalogue.project.environments
 import hivens.ui.feature.catalogue.project.licenseLabel
@@ -63,7 +67,6 @@ import hivens.ui.utils.humanSize
 import hivens.ui.widgets.RailBlock
 import hivens.ui.widgets.RailGroup
 import hivens.ui.widgets.RailLabel
-import hivens.ui.widgets.Sources
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
 import hivens.widget.model.Widget
@@ -81,7 +84,7 @@ import hivens.ui.theme.Status
  * news. The blocks go here instead and the page keeps the header, the tabs and
  * the body.
  *
- * Each one reads [Sources.OpenProject] from the window it is drawn in and draws
+ * Each one reads [CatalogueKeys.OpenProject] from the window it is drawn in and draws
  * nothing when it is null or missing, which is every screen but the page. That is
  * what makes them ordinary widgets: the
  * reader can move them between the rail's two project slots, or take one out, and
@@ -116,7 +119,7 @@ private const val PENDING = "…"
 )
 @Composable
 fun ProjectCompatibilityWidget(instance: WidgetInstance) {
-    val p = rememberScopedSource(Sources.OpenProject).valueOrNull() ?: return
+    val p = rememberScopedSource(CatalogueKeys.OpenProject).valueOrNull() ?: return
     val s = LocalStrings.current
 
     RailBlock(s.modRailCompatibility) {
@@ -243,7 +246,7 @@ private fun environmentIcon(environment: Environment): IconKey = when (environme
 )
 @Composable
 fun ProjectTagsWidget(instance: WidgetInstance) {
-    val p = rememberScopedSource(Sources.OpenProject).valueOrNull() ?: return
+    val p = rememberScopedSource(CatalogueKeys.OpenProject).valueOrNull() ?: return
     val s = LocalStrings.current
     if (p.categories.isEmpty()) return
 
@@ -279,7 +282,7 @@ fun ProjectTagsWidget(instance: WidgetInstance) {
 )
 @Composable
 fun ProjectLinksWidget(instance: WidgetInstance) {
-    val p = rememberScopedSource(Sources.OpenProject).valueOrNull() ?: return
+    val p = rememberScopedSource(CatalogueKeys.OpenProject).valueOrNull() ?: return
     val s = LocalStrings.current
     val follow = rememberLinkFollower(p.packId)
     if (p.links.isEmpty()) return
@@ -359,7 +362,7 @@ private fun linkIcon(kind: ProjectLinkKind): IconKey = when (kind) {
 )
 @Composable
 fun ProjectCreatorsWidget(instance: WidgetInstance) {
-    val p = rememberScopedSource(Sources.OpenProject).valueOrNull() ?: return
+    val p = rememberScopedSource(CatalogueKeys.OpenProject).valueOrNull() ?: return
     val s = LocalStrings.current
     if (p.creators.isEmpty()) return
 
@@ -449,7 +452,7 @@ private fun CreatorAvatar(creator: ProjectCreator) {
 )
 @Composable
 fun ProjectDetailsWidget(instance: WidgetInstance) {
-    val p = rememberScopedSource(Sources.OpenProject).valueOrNull() ?: return
+    val p = rememberScopedSource(CatalogueKeys.OpenProject).valueOrNull() ?: return
     val s = LocalStrings.current
 
     RailBlock(s.modRailDetails) {
@@ -487,25 +490,29 @@ fun ProjectDetailsWidget(instance: WidgetInstance) {
         }
         // How long ago in the line, the exact moment on hover. A date column that
         // spells out the timestamp makes the reader do the arithmetic on every row.
+        // Put into words here: the page hands the moments over as they are.
         if (p.answersPublished) {
             DatedFact(
                 NxIcon.NewReleases,
-                p.publishedAt?.let { s.modPublishedOn(it) } ?: if (p.pending) PENDING else s.modPublishedUnknown,
-                p.publishedExact,
+                relativeAge(p.published, s).takeIf { it.isNotBlank() }?.let { s.modPublishedOn(it) } ?: if (p.pending) PENDING else s.modPublishedUnknown,
+                formatBuildTimestamp(p.published),
             )
         }
         if (p.answersUpdated) {
             DatedFact(
                 NxIcon.Update,
-                p.updatedAt?.let { s.modUpdatedOn(it) } ?: if (p.pending) PENDING else s.modUpdatedUnknown,
-                p.updatedExact,
+                relativeAge(p.updated, s).takeIf { it.isNotBlank() }?.let { s.modUpdatedOn(it) } ?: if (p.pending) PENDING else s.modUpdatedUnknown,
+                formatBuildTimestamp(p.updated),
             )
         }
 
         // What a pack asks of the machine and of the player, before what it holds.
         // The sign-in comes first of the three: it is the one that stops a game
         // from starting.
-        p.signIn.forEach { Fact(NxIcon.VpnKey, s.packRailSignIn(it)) }
+        // A provider names itself where the accounts module lists it. One this build does
+        // not list goes by its key, the way the launch gate's own messages say it.
+        val providers = rememberScopedSource(AccountKeys.Providers).valueOrNull().orEmpty()
+        p.signIn.forEach { key -> Fact(NxIcon.VpnKey, s.packRailSignIn(providers.firstOrNull { it.key == key }?.name ?: key)) }
         p.runtime?.let { Fact(NxIcon.Memory, it) }
         p.modsCount?.let { Fact(NxIcon.Widgets, "${s.packRailMods}: $it") }
 
@@ -548,13 +555,13 @@ fun ProjectDetailsWidget(instance: WidgetInstance) {
  * the neutral mark rather than getting a symbol invented for them.
  */
 private fun disclosureIcon(type: String): IconKey = when (type) {
-    ModrinthDisclosure.TELEMETRY -> NxIcon.Wifi
-    ModrinthDisclosure.ADVERTISEMENTS -> NxIcon.Campaign
-    ModrinthDisclosure.PAID_FEATURES -> NxIcon.Paid
-    ModrinthDisclosure.EPILEPSY_TRIGGERS -> NxIcon.Visibility
-    ModrinthDisclosure.AI_CONTENT, ModrinthDisclosure.AI_FUNCTIONALITY -> NxIcon.Science
-    ModrinthDisclosure.SYSTEM_INTERACTIONS -> NxIcon.Computer
-    ModrinthDisclosure.DERIVATIVE_WORK -> NxIcon.Code
+    Disclosure.TELEMETRY -> NxIcon.Wifi
+    Disclosure.ADVERTISEMENTS -> NxIcon.Campaign
+    Disclosure.PAID_FEATURES -> NxIcon.Paid
+    Disclosure.EPILEPSY_TRIGGERS -> NxIcon.Visibility
+    Disclosure.AI_CONTENT, Disclosure.AI_FUNCTIONALITY -> NxIcon.Science
+    Disclosure.SYSTEM_INTERACTIONS -> NxIcon.Computer
+    Disclosure.DERIVATIVE_WORK -> NxIcon.Code
     else -> NxIcon.Info
 }
 

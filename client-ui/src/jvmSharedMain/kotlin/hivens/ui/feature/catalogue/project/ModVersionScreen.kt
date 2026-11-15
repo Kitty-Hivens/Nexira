@@ -1,7 +1,5 @@
 package hivens.ui.feature.catalogue.project
 
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.CoroutineScope
 import androidx.compose.foundation.background
 import hivens.ui.theme.decorativeColor
 import hivens.ui.nx.InitialsAvatar
@@ -28,10 +26,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -39,13 +34,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import hivens.core.api.dto.modrinth.ModrinthVersion
-import hivens.core.api.interfaces.IPackRepository
+import hivens.catalogue.api.BuildPageView
+import hivens.catalogue.api.BuildVisit
+import hivens.catalogue.api.CatalogueKeys
+import hivens.catalogue.api.DependencyKind
+import hivens.catalogue.api.InstallOffer
+import hivens.catalogue.api.ProjectBuild
+import hivens.catalogue.api.ProjectInstall
+import hivens.catalogue.api.ProjectPageView
+import hivens.catalogue.api.ProjectTarget
+import hivens.catalogue.api.VersionDependency
+import hivens.catalogue.api.gameVersionChips
 import hivens.core.update.VersionChannel
-import hivens.launcher.instance.InstanceContentScanner
-import hivens.launcher.instance.ModInstaller
-import hivens.launcher.modrinth.ModrinthClient
-import hivens.launcher.smrt.SmrtPackClient
 import hivens.ui.RIGHT_RAIL_SURFACE
 import hivens.ui.RailFamily
 import hivens.ui.components.LoaderGlyph
@@ -69,9 +69,10 @@ import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import hivens.ui.utils.humanSize
 import hivens.widget.api.LocalSurfaceFamilies
-import kotlinx.coroutines.launch
-import org.koin.compose.koinInject
-import java.nio.file.Path
+import hivens.widget.api.rememberScopedAction
+import hivens.widget.api.rememberScopedCommand
+import hivens.widget.api.rememberScopedSource
+import hivens.widget.api.valueOrNull
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.Status
@@ -85,59 +86,34 @@ import hivens.ui.theme.Status
  * takes -- is a paragraph each and cannot be a column.
  *
  * The rail keeps showing the PROJECT while this is open, which is why the page
- * stands up a [ModDetailState] of its own: a build belongs to a project, and a
- * reader who followed a row here has not left it.
+ * shows the project page of its own level beside the build: a build belongs to a
+ * project, and a reader who followed a row here has not left it.
  */
 @Composable
 fun ModVersionScreen(
-    target: ModTarget,
+    target: ProjectTarget,
     versionId: String,
     modifier: Modifier = Modifier,
 ) {
-    val modrinth: ModrinthClient = koinInject()
-    val repo: IPackRepository = koinInject()
-    val scanner: InstanceContentScanner = koinInject()
-    val openProject: OpenProjectState = koinInject()
-    val dataDir: Path = koinInject()
-    val appScope: CoroutineScope = koinInject()
-    val installer: ModInstaller = koinInject()
-    val mirrorClient: SmrtPackClient = koinInject()
     val families = LocalSurfaceFamilies.current
-    val s = LocalStrings.current
+    val showBuild = rememberScopedCommand(CatalogueKeys.ShowBuild)
+    val reload = rememberScopedAction(CatalogueKeys.ReloadProject)
 
-    // The project, for the rail and for where an install would go.
-    val project = remember(target) {
-        ModDetailState(
-            target, modrinth, repo, dataDir, scanner, openProject,
-            strings = s, installScope = appScope, installer = installer, mirrorLookup = mirrorClient.asMirrorLookup(),
-        )
-    }
-    val build = remember(target, versionId) { ModVersionState(modrinth) }
-    var reloadTick by remember(build) { mutableIntStateOf(0) }
+    // The project, for the rail and for where an install would go, and the build.
+    val visit = rememberProjectVisit(target)
+    val project = rememberProjectPage(target, visit)
+    LaunchedEffect(visit, versionId, showBuild != null) { showBuild?.invoke(BuildVisit(versionId, visit)) }
+    val build = rememberScopedSource(CatalogueKeys.BuildPage).valueOrNull()?.takeIf { it.visit == visit && it.versionId == versionId }
 
-    LaunchedEffect(project, reloadTick) { project.load() }
-    // Keyed on the project, the same as the two panes on the project page: the id
-    // this build belongs to arrives with the project, and asking before it lands
-    // is asking with nothing to ask about.
-    LaunchedEffect(build, project.project, reloadTick) {
-        val id = project.project?.id ?: return@LaunchedEffect
-        project.loadGameVersionTags()
-        build.load(id, versionId)
-    }
-
-    DisposableEffect(project) {
-        families.switch(RIGHT_RAIL_SURFACE, RailFamily.PROJECT_VIEW, project)
-        project.claim()
-        onDispose {
-            families.reset(RIGHT_RAIL_SURFACE, project)
-            project.clear()
-        }
+    DisposableEffect(visit) {
+        families.switch(RIGHT_RAIL_SURFACE, RailFamily.PROJECT_VIEW, visit)
+        onDispose { families.reset(RIGHT_RAIL_SURFACE, visit) }
     }
 
     ModVersionBody(
         project = project,
         build = build,
-        onRetry = { reloadTick++ },
+        onRetry = { reload?.invoke() },
         modifier = modifier.fillMaxSize().padding(14.dp),
     )
 }
@@ -145,23 +121,22 @@ fun ModVersionScreen(
 /**
  * The page without its wiring, so a render sheet can stand one up from fixtures.
  *
- * The screen above resolves five things out of the graph and then draws exactly
+ * The screen above shows the page to the catalogue module and then draws exactly
  * this. Splitting them is what lets the layout be looked at without a catalogue
  * behind it, which is the only way a layout defect gets found before a person
  * finds it.
  */
 @Composable
 internal fun ModVersionBody(
-    project: ModDetailState,
-    build: ModVersionState,
+    project: ProjectPageView,
+    build: BuildPageView?,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val s = LocalStrings.current
-    val installScope = project.installScope
     NxSurface(SurfaceKind.Panel, modifier = modifier) {
         when (buildPageView(project, build)) {
-            BuildPageView.Failed -> RetryStateBlock(
+            BuildPageState.Failed -> RetryStateBlock(
                 title = s.modVersionFailed,
                 message = s.modPageVersionsFailedBody,
                 retryLabel = s.contentTabRetry,
@@ -169,19 +144,19 @@ internal fun ModVersionBody(
                 modifier = Modifier.fillMaxSize().padding(20.dp),
                 titleStyle = MaterialTheme.typography.titleMedium,
             )
-            BuildPageView.NoEntry -> Box(Modifier.fillMaxSize().padding(20.dp), contentAlignment = Alignment.Center) {
+            BuildPageState.NoEntry -> Box(Modifier.fillMaxSize().padding(20.dp), contentAlignment = Alignment.Center) {
                 Text(s.modPageVersionsNoEntry, style = MaterialTheme.typography.bodyMedium, color = NxInk.quiet)
             }
-            BuildPageView.Loading -> CenteredProgress(Modifier.fillMaxSize())
-            BuildPageView.Ready -> build.version?.let { v ->
+            BuildPageState.Loading -> CenteredProgress(Modifier.fillMaxSize())
+            BuildPageState.Ready -> build?.build?.let { v ->
                 Column(
                     modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(SECTION_GAP),
                 ) {
-                    BuildHeader(v, project, installScope)
+                    BuildHeader(v, project)
                     HorizontalDivider(color = NxColor.wash(NxInk.line, 0.25f))
                     Compatibility(v, project)
-                    Dependencies(build, project.packId)
+                    Dependencies(build.dependencies, project.packId)
                     Changes(v)
                     Files(v)
                 }
@@ -191,7 +166,7 @@ internal fun ModVersionBody(
 }
 
 /** What a build's page shows: a retry, that there is nothing to ask about, a spinner, or the build. */
-internal enum class BuildPageView { Failed, NoEntry, Loading, Ready }
+internal enum class BuildPageState { Failed, NoEntry, Loading, Ready }
 
 /**
  * Which of the four the page is in. A page whose project has loaded with no
@@ -199,11 +174,11 @@ internal enum class BuildPageView { Failed, NoEntry, Loading, Ready }
  * or the catalogue never knew it. Before this was its own state, the page waited
  * on a spinner for a build nobody would ever ask for.
  */
-internal fun buildPageView(project: ModDetailState, build: ModVersionState): BuildPageView = when {
-    project.failed || build.failed -> BuildPageView.Failed
-    !project.loading && project.project == null -> BuildPageView.NoEntry
-    project.loading || build.loading || build.version == null -> BuildPageView.Loading
-    else -> BuildPageView.Ready
+internal fun buildPageView(project: ProjectPageView, build: BuildPageView?): BuildPageState = when {
+    project.failed || build?.failed == true -> BuildPageState.Failed
+    !project.loading && project.project == null -> BuildPageState.NoEntry
+    project.loading || build == null || build.loading || build.build == null -> BuildPageState.Loading
+    else -> BuildPageState.Ready
 }
 
 /**
@@ -213,8 +188,9 @@ internal fun buildPageView(project: ModDetailState, build: ModVersionState): Bui
  * reader who came down to a specific build came to take THAT one.
  */
 @Composable
-private fun BuildHeader(v: ModrinthVersion, project: ModDetailState, scope: CoroutineScope) {
+private fun BuildHeader(v: ProjectBuild, project: ProjectPageView) {
     val s = LocalStrings.current
+    val install = rememberScopedCommand(CatalogueKeys.InstallProject)
     val channel = remember(v) { VersionChannel.of(v.versionType, v.versionNumber) }
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -248,7 +224,7 @@ private fun BuildHeader(v: ModrinthVersion, project: ModDetailState, scope: Coro
                 Dot()
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     Symbol(NxIcon.Download, contentDescription = null, tint = NxInk.quiet, size = 14.dp)
-                    NxTooltip(text = v.downloads.toString()) { Subtle(compactCount(v.downloads, s)) }
+                    NxTooltip(text = (v.downloads ?: 0L).toString()) { Subtle(compactCount(v.downloads ?: 0L, s)) }
                 }
             }
         }
@@ -262,17 +238,17 @@ private fun BuildHeader(v: ModrinthVersion, project: ModDetailState, scope: Coro
         // and the line under it says which way they are stepping. What the install
         // came to is said there too, as on the project page.
         val fits = remember(v, project.packMcVersion, project.packLoaders) {
-            runsOn(v.toBuild(), project.packMcVersion, project.packLoaders)
+            runsOn(v, project.packMcVersion, project.packLoaders)
         }
         when (val action = project.install) {
-            is InstallAction.Install -> Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            is InstallOffer.Install -> Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 NxButton(
                     label = when {
                         project.installing -> s.modPageInstalling
                         project.installFailed -> s.modPageInstallRetry
                         else -> s.modPageInstallInto(action.packName)
                     },
-                    onClick = { scope.launch(Dispatchers.Main) { project.installVersion(v) } },
+                    onClick = { install?.invoke(ProjectInstall(v.id)) },
                     icon = if (project.installFailed) NxIcon.Refresh else NxIcon.Download,
                     enabled = !project.installing,
                 )
@@ -281,7 +257,7 @@ private fun BuildHeader(v: ModrinthVersion, project: ModDetailState, scope: Coro
                 }
                 InstallNotes(project)
             }
-            is InstallAction.Present -> Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            is InstallOffer.Present -> Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 NxButton(
                     label = s.modPageInstalledIn(action.packName),
                     onClick = {},
@@ -297,7 +273,7 @@ private fun BuildHeader(v: ModrinthVersion, project: ModDetailState, scope: Coro
 }
 
 @Composable
-private fun Compatibility(v: ModrinthVersion, project: ModDetailState) {
+private fun Compatibility(v: ProjectBuild, project: ProjectPageView) {
     val s = LocalStrings.current
     val type = project.project?.projectType
     Section(s.modRailCompatibility) {
@@ -342,7 +318,7 @@ private fun Compatibility(v: ModrinthVersion, project: ModDetailState) {
  * install what they already have.
  */
 @Composable
-private fun Dependencies(build: ModVersionState, packId: String?) {
+private fun Dependencies(dependencies: List<VersionDependency>, packId: String?) {
     val s = LocalStrings.current
     val groups = listOf(
         DependencyKind.Required to s.modVersionRequires,
@@ -351,7 +327,7 @@ private fun Dependencies(build: ModVersionState, packId: String?) {
     )
     val follow = rememberLinkFollower(packId)
     groups.forEach { (kind, title) ->
-        val rows = build.dependencies.filter { it.kind == kind }
+        val rows = dependencies.filter { it.kind == kind }
         if (rows.isEmpty()) return@forEach
         Section(title) {
             Column(verticalArrangement = Arrangement.spacedBy(GROUP_GAP)) {
@@ -414,7 +390,7 @@ private fun DependencyMark(dep: VersionDependency, kind: DependencyKind) {
 }
 
 @Composable
-private fun Changes(v: ModrinthVersion) {
+private fun Changes(v: ProjectBuild) {
     val s = LocalStrings.current
     Section(s.modPageTabChangelog) {
         val notes = v.changelog?.takeIf { it.isNotBlank() }
@@ -439,7 +415,7 @@ private fun Changes(v: ModrinthVersion) {
  * from the names.
  */
 @Composable
-private fun Files(v: ModrinthVersion) {
+private fun Files(v: ProjectBuild) {
     val s = LocalStrings.current
     Section(s.modVersionFiles) {
         Column(verticalArrangement = Arrangement.spacedBy(GROUP_GAP)) {

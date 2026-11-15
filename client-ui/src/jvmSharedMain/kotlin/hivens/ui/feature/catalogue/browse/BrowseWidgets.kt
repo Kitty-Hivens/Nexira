@@ -32,7 +32,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
@@ -47,11 +46,19 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import hivens.core.api.catalogue.CataloguePack
-import hivens.core.data.PackOrigin
-import hivens.launcher.catalogue.PackCatalogueRegistry
-import hivens.launcher.content.ContentKind
-import hivens.launcher.modrinth.FilterField
+import hivens.catalogue.api.BROWSE_KINDS
+import hivens.catalogue.api.BrowseSort
+import hivens.catalogue.api.BrowseView
+import hivens.catalogue.api.CatalogueCard
+import hivens.catalogue.api.CatalogueKeys
+import hivens.catalogue.api.FilterClear
+import hivens.catalogue.api.FilterField
+import hivens.catalogue.api.FilterPick
+import hivens.catalogue.api.PackOrigins
+import hivens.catalogue.api.ProjectKind
+import hivens.catalogue.api.ProjectTarget
+import hivens.catalogue.api.SearchResults
+import hivens.catalogue.api.catalogueTypeOf
 import hivens.ui.Screen
 import hivens.ui.components.LoaderGlyph
 import hivens.ui.components.hasLoaderGlyph
@@ -61,7 +68,6 @@ import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.layers.layerTrigger
-import hivens.ui.navigation.NavRequests
 import hivens.ui.nx.NxChoiceItem
 import hivens.ui.nx.NxChoiceMenu
 import hivens.ui.nx.NxIconButton
@@ -69,21 +75,6 @@ import hivens.ui.nx.NxMenuAlign
 import hivens.ui.nx.NxTooltip
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetField
-import hivens.ui.feature.catalogue.browse.BROWSE_KINDS
-import hivens.ui.feature.catalogue.browse.BrowseController
-import hivens.ui.feature.catalogue.browse.BrowseSort
-import hivens.ui.feature.catalogue.browse.PackBrowse
-import hivens.ui.feature.catalogue.browse.PackMark
-import hivens.ui.feature.catalogue.browse.ProjectResults
-import hivens.ui.feature.catalogue.browse.SearchField
-import hivens.ui.feature.catalogue.browse.activeOrigin
-import hivens.ui.feature.catalogue.browse.catalogueTypeOf
-import hivens.ui.feature.catalogue.browse.BrowseTags
-import hivens.ui.feature.catalogue.browse.chosenChips
-import hivens.ui.feature.catalogue.browse.kindLabel
-import hivens.ui.feature.catalogue.browse.label
-import hivens.ui.feature.catalogue.browse.originLabel
-import hivens.ui.feature.catalogue.project.ModTarget
 import hivens.ui.feature.catalogue.project.loaderLabel
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
@@ -96,38 +87,42 @@ import hivens.ui.widgets.RailGroup
 import hivens.ui.widgets.Commands
 import hivens.ui.widgets.RailLabel
 import hivens.widget.api.rememberScopedCommand
+import hivens.widget.api.rememberScopedSource
+import hivens.widget.api.valueOrNull
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
-import org.koin.compose.koinInject
 
 /**
  * Browse's widgets: the pack being installed into, the search box, the chosen
  * filters and the results in the centre, and what is searched in the right rail.
  * The filter blocks of the rail are in BrowseFilterWidgets.kt.
  *
- * None of them talks to another. Each reads and writes [BrowseController], which is
- * why the rail can steer a list it has never seen and why any of them can be moved
- * or taken out in the editor without the others noticing.
+ * None of them talks to another. Each reads the window's [CatalogueKeys.Browse] and
+ * changes it through the browse commands, which is why the rail can steer a list it
+ * has never seen and why any of them can be moved or taken out in the editor without
+ * the others noticing. Where no catalogue module is brought in they draw nothing.
  */
 
 @Widget(id = "browse.search", displayName = "widget.browse.search")
 @Composable
 fun BrowseSearchWidget(instance: WidgetInstance) {
-    val c: BrowseController = koinInject()
+    val browse = rememberScopedSource(CatalogueKeys.Browse).valueOrNull() ?: return
+    val setQuery = rememberScopedCommand(CatalogueKeys.SetQuery) ?: return
     val s = LocalStrings.current
-    PuppetField("browse.search", c.query) { c.query = it }
+    val (text, type) = rememberEchoedText(browse.query, setQuery)
+    PuppetField("browse.search", text) { type(it) }
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         // On a narrow column the words of the pill took the field's whole width
         val narrow = maxWidth < NARROW_SEARCH
         SearchField(
-            value         = c.query,
-            onValueChange = { c.query = it },
-            placeholder   = searchPlaceholder(c.kind, s),
+            value         = text,
+            onValueChange = type,
+            placeholder   = searchPlaceholder(browse.kind, s),
             modifier      = Modifier.padding(bottom = 10.dp),
             // The catalogue sorts its own lists and not the mirror's, which comes in the
             // order the mirror publishes it.
-            trailing      = if (c.kind != null || c.origin == PackOrigin.Modrinth) {
-                { SortPicker(c, wordless = narrow) }
+            trailing      = if (browse.kind != null || browse.origin == PackOrigins.MODRINTH) {
+                { SortPicker(browse.sort, wordless = narrow) }
             } else {
                 null
             },
@@ -137,17 +132,18 @@ fun BrowseSearchWidget(instance: WidgetInstance) {
 
 private val NARROW_SEARCH = 560.dp
 
-private fun searchPlaceholder(kind: ContentKind?, s: AppStrings): String = when (kind) {
+private fun searchPlaceholder(kind: ProjectKind?, s: AppStrings): String = when (kind) {
     null -> s.browseSearchPlaceholder
-    ContentKind.Mod -> s.browseSearchMods
-    ContentKind.ResourcePack -> s.browseSearchResourcePacks
-    ContentKind.ShaderPack -> s.browseSearchShaders
+    ProjectKind.Mod -> s.browseSearchMods
+    ProjectKind.ResourcePack -> s.browseSearchResourcePacks
+    ProjectKind.ShaderPack -> s.browseSearchShaders
 }
 
 /** The order of a catalogue search, as a pill at the end of the field. */
 @Composable
-private fun SortPicker(c: BrowseController, wordless: Boolean) {
+private fun SortPicker(current: BrowseSort, wordless: Boolean) {
     val s = LocalStrings.current
+    val setSort = rememberScopedCommand(CatalogueKeys.SetSort)
     var open by remember { mutableStateOf(false) }
     var shown by remember { mutableStateOf(false) }
     val turn by animateFloatAsState(if (open) 180f else 0f, animationSpec = Motion.tap, label = "sortChevron")
@@ -177,7 +173,7 @@ private fun SortPicker(c: BrowseController, wordless: Boolean) {
             } else {
                 Text(s.browseSortLabel, style = MaterialTheme.typography.labelLarge, color = NxInk.quiet, maxLines = 1)
                 AnimatedContent(
-                    targetState    = c.sort,
+                    targetState    = current,
                     transitionSpec = { fade.enter togetherWith fade.exit using SizeTransform(clip = false) { _, _ -> tap.of() } },
                     label          = "sortValue",
                 ) { sort ->
@@ -188,14 +184,14 @@ private fun SortPicker(c: BrowseController, wordless: Boolean) {
         }
         NxChoiceMenu(expanded = open, onDismissRequest = { open = false }, align = NxMenuAlign.End, onShownChange = { shown = it }) {
             BrowseSort.entries.forEach { sort ->
-                NxChoiceItem(label = sort.label(s), selected = sort == c.sort) {
-                    c.sort = sort
+                NxChoiceItem(label = sort.label(s), selected = sort == current) {
+                    setSort?.invoke(sort)
                     open = false
                 }
             }
         }
     }
-    BrowseSort.entries.forEach { sort -> PuppetClick("browse.sort.${sort.name}") { c.sort = sort } }
+    BrowseSort.entries.forEach { sort -> PuppetClick("browse.sort.${sort.name}") { setSort?.invoke(sort) } }
 }
 
 // The ceiling is load-bearing: this lists lazily, and a lazy list cannot be
@@ -205,44 +201,37 @@ private fun SortPicker(c: BrowseController, wordless: Boolean) {
     displayName = "widget.browse.results",
     minWidth = 320, minHeight = 200,
     maxWidth = 2400, maxHeight = 1600,
-    needs = ["nav.open"],
+    needs = ["nav.open", CatalogueKeys.RESULTS_ID],
 )
 @Composable
 fun BrowseResultsWidget(instance: WidgetInstance) {
-    val c: BrowseController = koinInject()
-    val registry: PackCatalogueRegistry = koinInject()
+    val browse = rememberScopedSource(CatalogueKeys.Browse).valueOrNull() ?: return
+    val results = rememberScopedSource(CatalogueKeys.Results).valueOrNull() ?: return
     val navigate = rememberScopedCommand(Commands.Navigate) ?: return
     // A result leaves Browse for its page: a catalogue pack's, or a project's, which
     // carries the target pack so the page can install into it.
-    val openPack: (CataloguePack) -> Unit = remember(navigate) {
+    val openPack: (CatalogueCard) -> Unit = remember(navigate) {
         { pack -> navigate(Screen.CataloguePackDetail(pack.origin, pack.id)) }
     }
-    val openProject: (ModTarget) -> Unit = remember(navigate) { { navigate(Screen.ModDetail(it)) } }
+    val openProject: (ProjectTarget) -> Unit = remember(navigate) { { navigate(Screen.ModDetail(it)) } }
     val fade = Motion.fade
-    val origin = activeOrigin(c.origin, registry.origins)
     // Each kind is its own list, so a change of kind crossfades one list into the
-    // next instead of swapping the cards under the reader's eye.
+    // next instead of swapping the cards under the reader's eye. The list fading out
+    // keeps drawing the answer it had, since the window's search has moved on.
     AnimatedContent(
-        targetState    = c.kind to origin,
+        targetState    = browse.kind to browse.origin,
         transitionSpec = { fade.enter togetherWith fade.exit },
         modifier       = Modifier.fillMaxSize(),
         label          = "browseKind",
     ) { (kind, from) ->
-        val type = catalogueTypeOf(kind, from)
-        if (type == null) {
-            PackBrowse(from, c.query, openPack, shown = c::shows)
+        val last = remember { arrayOf<SearchResults?>(null) }
+        val mine = results.question?.let { it.kind == kind && it.origin == from } == true
+        if (mine) last[0] = results
+        val shown = if (mine) results else last[0] ?: SearchResults()
+        if (catalogueTypeOf(kind, from) == null) {
+            PackBrowse(shown, openPack, shown = browse::shows)
         } else {
-            ProjectResults(
-                type          = type,
-                kind          = kind,
-                query         = c.query,
-                sort          = c.sort,
-                target        = c.target,
-                filters       = c.searchFiltersFor(type, kind),
-                hideInstalled = c.hideInstalled,
-                onOpenProject = openProject,
-                onOpenPack    = openPack,
-            )
+            ProjectResults(results = shown, kind = kind, onOpenProject = openProject, onOpenPack = openPack)
         }
     }
 }
@@ -258,15 +247,14 @@ fun BrowseResultsWidget(instance: WidgetInstance) {
 @Widget(id = "browse.installing", displayName = "widget.browse.installing")
 @Composable
 fun BrowseInstallingWidget(instance: WidgetInstance) {
-    val c: BrowseController = koinInject()
-    val nav: NavRequests = koinInject()
+    val browse = rememberScopedSource(CatalogueKeys.Browse).valueOrNull() ?: return
+    val setTarget = rememberScopedCommand(CatalogueKeys.SetTarget)
+    val navigate = rememberScopedCommand(Commands.Navigate)
     val s = LocalStrings.current
-    val target = c.target
-    PuppetClick("browse.target.none") { c.targetId = null }
+    val target = browse.target
+    PuppetClick("browse.target.none") { setTarget?.invoke(null) }
     AnimatedVisibility(visible = target != null, enter = Motion.reveal.enter, exit = Motion.reveal.exit) {
         val t = target ?: return@AnimatedVisibility
-        val pack = t.destination.pack
-        val runs = t.destination.target
         Column(Modifier.fillMaxWidth().padding(bottom = 12.dp)) {
             NxSurface(SurfaceKind.Panel, shape = MaterialTheme.shapes.large, modifier = Modifier.fillMaxWidth()) {
                 Row(
@@ -275,13 +263,13 @@ fun BrowseInstallingWidget(instance: WidgetInstance) {
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     NxTooltip(text = s.browseBackToPack) {
-                        NxIconButton(icon = NxIcon.ArrowBack, contentDescription = s.browseBackToPack, onClick = { nav.open(Screen.PackDetail(pack.id)) })
+                        NxIconButton(icon = NxIcon.ArrowBack, contentDescription = s.browseBackToPack, onClick = { navigate?.invoke(Screen.PackDetail(t.packId)) })
                     }
-                    PackMark(pack, 48.dp)
+                    PackMark(t.packId, t.name, 48.dp)
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                         Text(s.browseInstallingInto, style = MaterialTheme.typography.labelMedium, color = NxInk.quiet)
                         Text(
-                            pack.displayName,
+                            t.name,
                             style = MaterialTheme.typography.titleLarge,
                             color = NxInk.main,
                             fontWeight = FontWeight.SemiBold,
@@ -289,23 +277,23 @@ fun BrowseInstallingWidget(instance: WidgetInstance) {
                             overflow = TextOverflow.Ellipsis,
                         )
                         FlowRow(itemVerticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                            if (runs.mcVersion.isNotBlank()) Fact(NxIcon.Inventory2, "Minecraft ${runs.mcVersion}")
-                            if (runs.loader.isNotBlank()) {
+                            if (t.mcVersion.isNotBlank()) Fact(NxIcon.Inventory2, "Minecraft ${t.mcVersion}")
+                            if (t.loader.isNotBlank()) {
                                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    if (hasLoaderGlyph(runs.loader)) LoaderGlyph(runs.loader, tint = NxInk.quiet, size = 16.dp)
-                                    Text(loaderLabel(runs.loader), style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
+                                    if (hasLoaderGlyph(t.loader)) LoaderGlyph(t.loader, tint = NxInk.quiet, size = 16.dp)
+                                    Text(loaderLabel(t.loader), style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
                                 }
                             }
                         }
                     }
                     NxTooltip(text = s.browseLeaveTarget) {
-                        NxIconButton(icon = NxIcon.Close, contentDescription = s.browseLeaveTarget, onClick = { c.targetId = null })
+                        NxIconButton(icon = NxIcon.Close, contentDescription = s.browseLeaveTarget, onClick = { setTarget?.invoke(null) })
                     }
                 }
             }
             // A kind the pack does not take is still worth browsing, and only the
             // install is not on offer. Said here, where the pack is named.
-            AnimatedVisibility(visible = c.kind != null && !t.takes(c.kind), enter = Motion.reveal.enter, exit = Motion.reveal.exit) {
+            AnimatedVisibility(visible = browse.kind != null && !t.takes(browse.kind), enter = Motion.reveal.enter, exit = Motion.reveal.exit) {
                 Row(Modifier.padding(start = 6.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Symbol(NxIcon.Info, contentDescription = null, tint = NxColor.status(Status.Warning, text = true), size = 16.dp)
                     Text(s.installTargetNotTaken, style = MaterialTheme.typography.bodySmall, color = NxColor.status(Status.Warning, text = true))
@@ -331,17 +319,17 @@ private fun Fact(icon: IconKey, text: String) {
 @Widget(id = "browse.chips", displayName = "widget.browse.chips")
 @Composable
 fun BrowseChipsWidget(instance: WidgetInstance) {
-    val c: BrowseController = koinInject()
-    val registry: PackCatalogueRegistry = koinInject()
+    val browse = rememberScopedSource(CatalogueKeys.Browse).valueOrNull() ?: return
+    val remove = rememberScopedCommand(CatalogueKeys.RemoveFilter)
+    val clear = rememberScopedCommand(CatalogueKeys.ClearFilters)
     val s = LocalStrings.current
-    val type = catalogueTypeOf(c.kind, activeOrigin(c.origin, registry.origins))
-    val locked = if (type == null) emptyList() else c.lockedFor(c.kind)
+    val type = browse.type
+    val locked = if (type == null) emptyList() else browse.locked
     val lockedFields = locked.mapTo(HashSet()) { it.field }
-    val chosen = type?.let { c.chosenFor(it).filterNot { f -> f.field in lockedFields } }.orEmpty()
-    val browseTags: BrowseTags = koinInject()
-    val versions = browseTags.tags.collectAsState().value?.gameVersions.orEmpty()
+    val chosen = type?.let { browse.chosenFor(it).filterNot { f -> f.field in lockedFields } }.orEmpty()
+    val versions = rememberScopedSource(CatalogueKeys.Tags).valueOrNull()?.gameVersions.orEmpty()
     val chips = chosenChips(chosen, versions, s)
-    PuppetClick("browse.chips.clear") { type?.let { c.clear(it) } }
+    PuppetClick("browse.chips.clear") { type?.let { clear?.invoke(FilterClear(it)) } }
     AnimatedVisibility(visible = chosen.isNotEmpty() || locked.isNotEmpty(), enter = Motion.reveal.enter, exit = Motion.reveal.exit) {
         FlowRow(
             Modifier.fillMaxWidth().padding(bottom = 12.dp).animateContentSize(Motion.reveal.of()),
@@ -351,11 +339,11 @@ fun BrowseChipsWidget(instance: WidgetInstance) {
             // Counted in chips, the way they read: one folded `1.20.x` is one choice
             // to the reader however many versions it holds.
             if (chips.size > 1 && type != null) {
-                FilterChip(s.browseFiltersClearAll, leading = NxIcon.FilterAltOff, emphasis = true) { c.clear(type) }
+                FilterChip(s.browseFiltersClearAll, leading = NxIcon.FilterAltOff, emphasis = true) { clear?.invoke(FilterClear(type)) }
             }
             chips.forEach { chip ->
                 FilterChip(chip.label, leading = NxIcon.Close, excluded = chip.excluded) {
-                    if (type != null) chip.filters.forEach { c.remove(type, it) }
+                    if (type != null) chip.filters.forEach { remove?.invoke(FilterPick(type, it)) }
                 }
             }
             locked.groupBy { it.field }.forEach { (field, values) ->
@@ -363,7 +351,7 @@ fun BrowseChipsWidget(instance: WidgetInstance) {
                     FilterField.Loader -> values.joinToString(", ") { loaderLabel(it.value) }
                     else -> values.joinToString(", ") { it.value }
                 }
-                NxTooltip(text = s.browseFilterLockedBy(c.target?.destination?.pack?.displayName.orEmpty())) {
+                NxTooltip(text = s.browseFilterLockedBy(browse.target?.name.orEmpty())) {
                     FilterChip(text, leading = NxIcon.Lock, onClick = null)
                 }
             }
@@ -419,11 +407,12 @@ private fun FilterChip(
 )
 @Composable
 fun BrowseScopeWidget(instance: WidgetInstance) {
-    val c: BrowseController = koinInject()
-    val registry: PackCatalogueRegistry = koinInject()
+    val browse = rememberScopedSource(CatalogueKeys.Browse).valueOrNull() ?: return
+    val setKind = rememberScopedCommand(CatalogueKeys.SetKind)
+    val setOrigin = rememberScopedCommand(CatalogueKeys.SetOrigin)
     val s = LocalStrings.current
-    val origins = registry.origins
-    val target = c.target
+    val origins = browse.origins
+    val target = browse.target
 
     RailBlock(s.browseRailFind) {
         Column(verticalArrangement = Arrangement.spacedBy(TILE_GAP)) {
@@ -438,47 +427,56 @@ fun BrowseScopeWidget(instance: WidgetInstance) {
                                 KindTile(
                                     label    = kindLabel(kind, s),
                                     icon     = kindIcon(kind),
-                                    selected = c.kind == kind,
+                                    selected = browse.kind == kind,
                                     dimmed   = reason != null,
-                                    onClick  = { c.kind = kind },
+                                    onClick  = { setKind?.invoke(kind) },
                                 )
                             }
                             if (reason != null) NxTooltip(text = reason) { tile() } else tile()
                         }
-                        PuppetClick("browse.kind.${kind?.name ?: "Packs"}") { c.kind = kind }
+                        PuppetClick("browse.kind.${kind?.name ?: "Packs"}") { setKind?.invoke(kind) }
                     }
                 }
             }
         }
         AnimatedVisibility(
-            visible = c.kind == null && origins.size > 1,
+            visible = browse.kind == null && origins.size > 1,
             enter   = Motion.reveal.enter,
             exit    = Motion.reveal.exit,
         ) {
             RailGroup {
                 RailLabel(s.browseRailSource)
-                SourceSwitch(origins, activeOrigin(c.origin, origins)) { c.origin = it }
+                SourceSwitch(origins, browse.origin) { setOrigin?.invoke(it) }
             }
         }
-        origins.forEach { o -> PuppetClick("browse.source.${o.name}") { c.origin = o } }
+        origins.forEach { o -> PuppetClick("browse.source.${PUPPET_ORIGIN_NAMES[o] ?: o}") { setOrigin?.invoke(o) } }
     }
 }
 
 internal val TILE_GAP = 6.dp
 
-private fun kindIcon(kind: ContentKind?): IconKey = when (kind) {
+/** The names a driver clicks a source by, which were the engine's own before the module named them in lower case. */
+private val PUPPET_ORIGIN_NAMES = mapOf(
+    PackOrigins.MIRROR to "Mirror",
+    PackOrigins.MODRINTH to "Modrinth",
+    PackOrigins.SMARTYCRAFT to "Smartycraft",
+    PackOrigins.LOCAL to "Local",
+    PackOrigins.UNKNOWN to "Unknown",
+)
+
+private fun kindIcon(kind: ProjectKind?): IconKey = when (kind) {
     null -> NxIcon.Inventory2
-    ContentKind.Mod -> NxIcon.Build
-    ContentKind.ResourcePack -> NxIcon.Palette
-    ContentKind.ShaderPack -> NxIcon.LightMode
+    ProjectKind.Mod -> NxIcon.Build
+    ProjectKind.ResourcePack -> NxIcon.Palette
+    ProjectKind.ShaderPack -> NxIcon.LightMode
 }
 
-private fun originIcon(origin: PackOrigin): IconKey = when (origin) {
-    PackOrigin.Mirror -> NxIcon.Storage
-    PackOrigin.Modrinth -> NxIcon.Public
-    PackOrigin.Smartycraft -> NxIcon.Lan
-    PackOrigin.Local -> NxIcon.Folder
-    PackOrigin.Unknown -> NxIcon.Language
+private fun originIcon(origin: String): IconKey = when (origin) {
+    PackOrigins.MIRROR -> NxIcon.Storage
+    PackOrigins.MODRINTH -> NxIcon.Public
+    PackOrigins.SMARTYCRAFT -> NxIcon.Lan
+    PackOrigins.LOCAL -> NxIcon.Folder
+    else -> NxIcon.Language
 }
 
 /**
@@ -560,7 +558,7 @@ private val TILE_HEIGHT = 64.dp
  * one, rather than buttons that light up in turn.
  */
 @Composable
-private fun SourceSwitch(origins: List<PackOrigin>, selected: PackOrigin, onSelect: (PackOrigin) -> Unit) {
+private fun SourceSwitch(origins: List<String>, selected: String, onSelect: (String) -> Unit) {
     val shape = MaterialTheme.shapes.medium
     BoxWithConstraints(
         Modifier.fillMaxWidth().height(SWITCH_HEIGHT).clip(shape).background(NxColor.wash(NxInk.quiet, 0.08f)).padding(3.dp),

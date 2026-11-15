@@ -27,14 +27,8 @@ import hivens.ui.debug.DebugOverlayState
 import hivens.ui.editor.EditModeController
 import hivens.ui.editor.WidgetAdmission
 import hivens.ui.editor.presets.PresetRepository
-import hivens.ui.feature.catalogue.browse.BrowseController
-import hivens.ui.feature.catalogue.browse.BrowseSession
-import hivens.ui.feature.catalogue.browse.BrowseTags
 import hivens.ui.feature.catalogue.browse.CataloguePackPageSource
-import hivens.ui.feature.catalogue.browse.ProjectBrowseSession
 import hivens.ui.feature.catalogue.browse.sampleCataloguePackPage
-import hivens.ui.editor.palette.sampleOpenProject
-import hivens.ui.feature.catalogue.project.OpenProjectState
 import hivens.ui.feature.catalogue.project.ProjectPageSource
 import hivens.ui.feature.catalogue.project.sampleProjectPage
 import hivens.packs.PacksHost
@@ -140,14 +134,9 @@ val levelServicesModule: Module = module {
     // One per window each, so a second window has a state of its own and the two
     // stay independent. Everything injected inside a window resolves to its own.
     levelServices(ScopeLevel.Window) {
-        // What Browse is searching and where its installs go. Shared by the screen's
-        // own widgets and the rail's browse family, which have no composition in
-        // common, and kept so a trip to a project page comes back to the same search.
-        scoped { BrowseController() }
-        // What the mod page is looking at, which the right rail's project-view family
-        // reads: the page that writes it and the rail that reads it are different
-        // surfaces with no composition in common, both in this window.
-        scoped { OpenProjectState() }
+        // What Browse searches and the project the rail describes are the catalogue
+        // module's, one of each per window, made by the window's level from its keys.
+        //
         // Which family each surface is showing. Kept out of the composition because
         // a switch is something the window does, a navigation or a pack opening.
         // Deliberately not persisted: it describes the moment, not the arrangement.
@@ -221,11 +210,6 @@ fun uiCoreModule(
     // shell recomposition + the crash-restart loop; inert on release builds.
     single { DebugOverlayState() }
 
-    // What Browse last showed per source and query, so flipping sources or
-    // stepping out of the screen comes back to the list instead of a spinner.
-    single { BrowseSession() }
-    single { ProjectBrowseSession() }
-
     includes(levelServicesModule)
 
     // What the core could not do, said in the notification centre in the person's language.
@@ -236,9 +220,6 @@ fun uiCoreModule(
             stringsFor(AppLocale.fromTag(settingsService.getSettings().locale))
         }.also { problems -> withdrawNoticesOfInstalledPacks(get<IPackRepository>().observe(), problems, get()) }
     }
-
-    // The catalogue's own lists the filter rail is built from, read once a run.
-    single { BrowseTags(get(), get()) }
 
 
     // Widget kernel registry. The generated object is one source among however
@@ -598,10 +579,6 @@ internal fun uiDataRegistry(
     register(Sources.Activity, flowSource(activity))
     register(Sources.Notifications, flowSource(notifications))
     register(Sources.DoNotDisturb, flowSource(doNotDisturb))
-    // Read off the window's own state, the one its pages publish into.
-    registerFactory(Sources.OpenProject, sample = ::sampleOpenProject) { window ->
-        flowSource(window.hostServices.get<OpenProjectState>().open)
-    }
     // What the window's owner provides when it opens the window: its state as the host reads it.
     declare(Sources.Window) { HostWindowState.Sample }
     register(Sources.SslBypass, sslBypass)

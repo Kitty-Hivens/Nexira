@@ -30,7 +30,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -46,10 +45,11 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import hivens.core.data.PackOrigin
-import hivens.launcher.catalogue.PackCatalogueRegistry
-import hivens.launcher.modrinth.FilterField
-import hivens.launcher.modrinth.SearchFilter
+import hivens.catalogue.api.CatalogueKeys
+import hivens.catalogue.api.FilterField
+import hivens.catalogue.api.FilterPick
+import hivens.catalogue.api.PackOrigins
+import hivens.catalogue.api.SearchFilter
 import hivens.ui.components.LoaderGlyph
 import hivens.ui.components.hasLoaderGlyph
 import hivens.ui.i18n.LocalStrings
@@ -62,26 +62,18 @@ import hivens.ui.nx.NxField
 import hivens.ui.nx.NxSwitch
 import hivens.ui.nx.NxTooltip
 import hivens.ui.puppet.PuppetClick
-import hivens.ui.feature.catalogue.browse.BrowseController
-import hivens.ui.feature.catalogue.browse.BrowseTags
-import hivens.ui.feature.catalogue.browse.ChoiceMark
-import hivens.ui.feature.catalogue.browse.FilterChoice
-import hivens.ui.feature.catalogue.browse.FilterGroup
-import hivens.ui.feature.catalogue.browse.activeOrigin
-import hivens.ui.feature.catalogue.browse.catalogueTypeOf
-import hivens.ui.feature.catalogue.browse.choicesFor
-import hivens.ui.feature.catalogue.browse.filterLabel
-import hivens.ui.feature.catalogue.browse.originLabel
-import hivens.ui.feature.catalogue.browse.title
 import hivens.ui.feature.catalogue.project.loaderLabel
 import hivens.ui.theme.Motion
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.Status
 import hivens.ui.widgets.RailBlock
+import hivens.widget.api.rememberScopedAction
+import hivens.widget.api.rememberScopedCommand
+import hivens.widget.api.rememberScopedSource
+import hivens.widget.api.valueOrNull
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
-import org.koin.compose.koinInject
 
 /**
  * The filter rail: one block per filter, after the catalogue's own sidebar.
@@ -137,17 +129,19 @@ fun BrowseExclusionsFilterWidget(instance: WidgetInstance) = FilterBlock(FilterG
 @Widget(id = "browse.filter.installed", displayName = "widget.browse.filter.installed", surface = CARD)
 @Composable
 fun BrowseInstalledFilterWidget(instance: WidgetInstance) {
-    val c: BrowseController = koinInject()
+    val browse = rememberScopedSource(CatalogueKeys.Browse).valueOrNull() ?: return
+    // Flipped where the view is kept, since the view read here arrives a frame late.
+    val toggleHide = rememberScopedAction(CatalogueKeys.ToggleHideInstalled)
     val s = LocalStrings.current
-    if (c.target?.takes(c.kind) != true) return
-    PuppetClick("browse.filter.installed") { c.hideInstalled = !c.hideInstalled }
+    if (browse.target?.takes(browse.kind) != true) return
+    PuppetClick("browse.filter.installed") { toggleHide?.invoke() }
     Row(
-        Modifier.fillMaxWidth().clickable { c.hideInstalled = !c.hideInstalled }.padding(horizontal = 16.dp, vertical = 12.dp),
+        Modifier.fillMaxWidth().clickable { toggleHide?.invoke() }.padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text(s.browseHideInstalled, style = MaterialTheme.typography.bodyMedium, color = NxInk.main, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-        NxSwitch(checked = c.hideInstalled, onCheckedChange = { c.hideInstalled = it })
+        NxSwitch(checked = browse.hideInstalled, onCheckedChange = { toggleHide?.invoke() })
     }
 }
 
@@ -158,12 +152,14 @@ fun BrowseInstalledFilterWidget(instance: WidgetInstance) {
 @Widget(id = "browse.filter.builtBy", displayName = "widget.browse.filter.builtBy", surface = CARD)
 @Composable
 fun BrowseBuiltByFilterWidget(instance: WidgetInstance) {
-    val c: BrowseController = koinInject()
-    val registry: PackCatalogueRegistry = koinInject()
+    val browse = rememberScopedSource(CatalogueKeys.Browse).valueOrNull() ?: return
+    // Flipped where the view is kept, since the view read here arrives a frame late.
+    val toggleOwn = rememberScopedAction(CatalogueKeys.ToggleMirrorOwn)
+    val toggleCommunity = rememberScopedAction(CatalogueKeys.ToggleMirrorCommunity)
     val s = LocalStrings.current
-    if (c.kind != null || activeOrigin(c.origin, registry.origins) != PackOrigin.Mirror) return
-    PuppetClick("browse.filter.builtBy.own") { c.mirrorOwn = !c.mirrorOwn }
-    PuppetClick("browse.filter.builtBy.community") { c.mirrorCommunity = !c.mirrorCommunity }
+    if (browse.kind != null || browse.origin != PackOrigins.MIRROR) return
+    PuppetClick("browse.filter.builtBy.own") { toggleOwn?.invoke() }
+    PuppetClick("browse.filter.builtBy.community") { toggleCommunity?.invoke() }
     // Two tiles switched on and off rather than two switches: the same plane as the
     // kind tiles above, so the rail reads as one set of controls, with the mark
     // filling in for what is listed.
@@ -171,11 +167,11 @@ fun BrowseBuiltByFilterWidget(instance: WidgetInstance) {
         Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(TILE_GAP)) {
             Box(Modifier.weight(1f).fillMaxHeight()) {
                 KindTile(
-                    label = originLabel(PackOrigin.Mirror),
+                    label = originLabel(PackOrigins.MIRROR),
                     icon = NxIcon.Verified,
-                    selected = c.mirrorOwn,
+                    selected = browse.mirrorOwn,
                     dimmed = false,
-                    onClick = { c.mirrorOwn = !c.mirrorOwn },
+                    onClick = { toggleOwn?.invoke() },
                     glyphFill = true,
                 )
             }
@@ -183,14 +179,24 @@ fun BrowseBuiltByFilterWidget(instance: WidgetInstance) {
                 KindTile(
                     label = s.browseFilterCommunity,
                     icon = NxIcon.Groups,
-                    selected = c.mirrorCommunity,
+                    selected = browse.mirrorCommunity,
                     dimmed = false,
-                    onClick = { c.mirrorCommunity = !c.mirrorCommunity },
+                    onClick = { toggleCommunity?.invoke() },
                     glyphFill = true,
                 )
             }
         }
     }
+}
+
+/** How a filter row chooses and rules out: the window's browse commands. */
+private class FilterActions(val toggle: (FilterPick) -> Unit, val exclude: (FilterPick) -> Unit)
+
+@Composable
+private fun rememberFilterActions(): FilterActions {
+    val toggle = rememberScopedCommand(CatalogueKeys.ToggleFilter)
+    val exclude = rememberScopedCommand(CatalogueKeys.ExcludeFilter)
+    return remember(toggle, exclude) { FilterActions({ toggle?.invoke(it) }, { exclude?.invoke(it) }) }
 }
 
 /** Which blocks start open: the short ones a reader reaches for first. */
@@ -199,20 +205,22 @@ private val FilterGroup.openAtFirst: Boolean
 
 @Composable
 private fun FilterBlock(group: FilterGroup, instance: WidgetInstance) {
-    val c: BrowseController = koinInject()
-    val registry: PackCatalogueRegistry = koinInject()
-    val tagsHolder: BrowseTags = koinInject()
-    LaunchedEffect(tagsHolder) { tagsHolder.ensure() }
-    val tags by tagsHolder.tags.collectAsState()
+    val browse = rememberScopedSource(CatalogueKeys.Browse).valueOrNull() ?: return
+    val loadTags = rememberScopedAction(CatalogueKeys.LoadTags)
+    LaunchedEffect(loadTags != null) { loadTags?.invoke() }
+    val tags = rememberScopedSource(CatalogueKeys.Tags).valueOrNull()
+    val unlock = rememberScopedCommand(CatalogueKeys.Unlock)
+    val relock = rememberScopedCommand(CatalogueKeys.Relock)
+    val act = rememberFilterActions()
     val s = LocalStrings.current
-    val type = catalogueTypeOf(c.kind, activeOrigin(c.origin, registry.origins)) ?: return
+    val type = browse.type ?: return
     var allVersions by rememberSaveable(instance.instanceId) { mutableStateOf(false) }
     val choices = remember(group, type, tags, s, allVersions) { choicesFor(group, type, tags, s, allVersions) }
     if (choices.isEmpty()) return
 
-    val locked = c.lockedFor(c.kind).filter { it.field == group.field }
+    val locked = browse.locked.filter { it.field == group.field }
     val values = remember(choices) { choices.mapTo(HashSet()) { it.filter.value } }
-    val chosen = c.chosenFor(type).filter { it.field == group.field && (group == FilterGroup.GameVersion || it.value in values) }
+    val chosen = browse.chosenFor(type).filter { it.field == group.field && (group == FilterGroup.GameVersion || it.value in values) }
     var open by rememberSaveable(instance.instanceId, group) { mutableStateOf(group.openAtFirst || locked.isNotEmpty()) }
     val turn by animateFloatAsState(if (open) 180f else 0f, animationSpec = Motion.reveal, label = "filterChevron")
     val headerHover = remember { MutableInteractionSource() }
@@ -252,19 +260,19 @@ private fun FilterBlock(group: FilterGroup, instance: WidgetInstance) {
             Column(Modifier.fillMaxWidth().padding(start = 8.dp, end = 8.dp, bottom = 10.dp)) {
                 if (locked.isNotEmpty()) {
                     LockedNotice(
-                        packName = c.target?.destination?.pack?.displayName.orEmpty(),
+                        packName = browse.target?.name.orEmpty(),
                         values = locked.joinToString(", ") { if (it.field == FilterField.Loader) loaderLabel(it.value) else it.value },
-                        onUnlock = { c.unlocked += group.field },
+                        onUnlock = { unlock?.invoke(group.field) },
                     )
-                    PuppetClick("browse.filter.${group.name}.unlock") { c.unlocked += group.field }
+                    PuppetClick("browse.filter.${group.name}.unlock") { unlock?.invoke(group.field) }
                 } else {
                     when (group) {
-                        FilterGroup.GameVersion -> VersionChoices(c, type, choices, chosen, allVersions) { allVersions = it }
-                        FilterGroup.Loader -> FoldedChoices(c, type, group, choices, chosen)
-                        else -> choices.forEach { choice -> ChoiceRow(c, type, group, choice, chosen) }
+                        FilterGroup.GameVersion -> VersionChoices(act, type, choices, chosen, allVersions) { allVersions = it }
+                        FilterGroup.Loader -> FoldedChoices(act, type, group, choices, chosen)
+                        else -> choices.forEach { choice -> ChoiceRow(act, type, group, choice, chosen) }
                     }
-                    if (group.field in c.unlocked && c.target?.takes(c.kind) == true) {
-                        TextAction(s.browseFilterRelock, NxIcon.Lock) { c.unlocked -= group.field }
+                    if (group.field in browse.unlocked && browse.target?.takes(browse.kind) == true) {
+                        TextAction(s.browseFilterRelock, NxIcon.Lock) { relock?.invoke(group.field) }
                     }
                 }
             }
@@ -312,7 +320,7 @@ private fun LockedNotice(packName: String, values: String, onUnlock: () -> Unit)
 /** The game versions: a search over a list that scrolls, and the switch that adds snapshots to it. */
 @Composable
 private fun VersionChoices(
-    c: BrowseController,
+    c: FilterActions,
     type: String,
     choices: List<FilterChoice>,
     chosen: List<SearchFilter>,
@@ -342,7 +350,7 @@ private val VERSION_LIST_HEIGHT = 256.dp
 /** The common choices, and the rest behind "show more", which opens rather than jumps. */
 @Composable
 private fun FoldedChoices(
-    c: BrowseController,
+    c: FilterActions,
     type: String,
     group: FilterGroup,
     choices: List<FilterChoice>,
@@ -392,7 +400,7 @@ private fun TextAction(label: String, icon: IconKey, iconRotation: Float = 0f, o
  */
 @Composable
 private fun ChoiceRow(
-    c: BrowseController,
+    c: FilterActions,
     type: String,
     group: FilterGroup,
     choice: FilterChoice,
@@ -430,7 +438,7 @@ private fun ChoiceRow(
         animationSpec = Motion.tap,
         label = "choiceMark",
     )
-    val main = { if (onlyExcludes) c.toggleExclude(type, choice.filter) else c.toggle(type, choice.filter) }
+    val main = { if (onlyExcludes) c.exclude(FilterPick(type, choice.filter)) else c.toggle(FilterPick(type, choice.filter)) }
     PuppetClick("browse.filter.${group.name}.${choice.filter.value}") { main() }
     // One plane for the whole row, the exclude control inside it, so a chosen row's
     // fill runs to the edge instead of stopping short of a gap kept for a control
@@ -462,13 +470,13 @@ private fun ChoiceRow(
                     Modifier.size(24.dp).alpha(excludeAlpha).clip(MaterialTheme.shapes.small)
                         .background(if (excludeHovered) NxColor.wash(error, 0.18f) else Color.Transparent)
                         .hoverable(excludeHover)
-                        .clickable(interactionSource = excludeHover, indication = null, enabled = excludeAlpha > 0f) { c.toggleExclude(type, choice.filter) },
+                        .clickable(interactionSource = excludeHover, indication = null, enabled = excludeAlpha > 0f) { c.exclude(FilterPick(type, choice.filter)) },
                     contentAlignment = Alignment.Center,
                 ) {
                     Symbol(NxIcon.Block, contentDescription = s.browseFilterExclude, tint = if (excludeHovered) NxColor.status(Status.Error, text = true) else NxInk.quiet, size = 16.dp)
                 }
             }
-            PuppetClick("browse.filter.${group.name}.${choice.filter.value}.exclude") { c.toggleExclude(type, choice.filter) }
+            PuppetClick("browse.filter.${group.name}.${choice.filter.value}.exclude") { c.exclude(FilterPick(type, choice.filter)) }
         }
         Box(Modifier.size(24.dp), contentAlignment = Alignment.Center) {
             Symbol(

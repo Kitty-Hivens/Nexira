@@ -30,8 +30,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import coil3.compose.SubcomposeAsyncImage
-import hivens.core.api.catalogue.CataloguePack
-import hivens.core.data.PackOrigin
+import hivens.catalogue.api.CatalogueCard
+import hivens.catalogue.api.PackOrigins
 import hivens.ui.components.SourceBadge
 import hivens.ui.effects.pixelArtBackground
 import hivens.ui.i18n.LocalStrings
@@ -47,18 +47,18 @@ import hivens.ui.theme.decorativePair
  * One Browse row. Same shape as Library's PackCard (banner-as-bg + avatar +
  * title + chips + chevron) so the surfaces read as one design language. The
  * whole card is a click target into the source's detail screen. The source
- * badge follows [CataloguePack.origin], so the card stays source-neutral across
+ * badge follows [CatalogueCard.origin], so the card stays source-neutral across
  * the mirror, Modrinth and future sources.
  *
  * Background layers, back to front: a deterministic pixel-art fill (so a packless
  * banner is never a flat green), the real banner image on top when the source
- * carries one ([CataloguePack.bannerUrl]; transparent while loading or on
+ * carries one ([CatalogueCard.bannerUrl], transparent while loading or on
  * failure, so the art shows through), then a dark scrim for text legibility.
  * The avatar shows the pack icon, falling back to title initials.
  */
 @Composable
 fun BrowsePackCard(
-    pack: CataloguePack,
+    pack: CatalogueCard,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -165,7 +165,7 @@ fun BrowsePackCard(
                     if (narrow) SourceBadge(pack.origin)
                     pack.tags.take(CARD_TAGS).forEach { tag ->
                         NxMetaChip(
-                            if (pack.origin == PackOrigin.Modrinth) s.modrinthCategory(tag) else tag,
+                            if (pack.origin == PackOrigins.MODRINTH) s.modrinthCategory(tag) else tag,
                             tone = NxMetaChipTone.OnMedia,
                         )
                     }
@@ -202,7 +202,7 @@ private val NARROW_AVATAR = 48.dp
 private const val CARD_TAGS = 2
 
 @Composable
-private fun BrowseAvatar(pack: CataloguePack, hue: Color, size: Dp) {
+private fun BrowseAvatar(pack: CatalogueCard, hue: Color, size: Dp) {
     SubcomposeAsyncImage(
         model              = pack.iconUrl,
         contentDescription = null,

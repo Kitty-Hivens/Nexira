@@ -8,7 +8,12 @@ import hivens.accounts.SessionStore
 import hivens.accounts.api.AccountKeys
 import hivens.accounts.api.AccountsApi
 import hivens.auth.AccountStore
+import hivens.catalogue.BrowseState
+import hivens.catalogue.CatalogueModule
+import hivens.catalogue.api.CatalogueApi
+import hivens.catalogue.api.CatalogueKeys
 import hivens.core.api.interfaces.ICredentialStore
+import hivens.launcher.modrinth.ModrinthClient
 import hivens.packs.api.PackKeys
 import hivens.packs.api.PacksApi
 import hivens.ui.theme.NxInk
@@ -55,11 +60,13 @@ class JarModuleIsolationTest {
     private val fixtureJar = jar("nexira.test.fixtureModuleJar")
     private val packsConsumerJar = jar("nexira.test.packsConsumerJar")
     private val accountsConsumerJar = jar("nexira.test.accountsConsumerJar")
+    private val catalogueConsumerJar = jar("nexira.test.catalogueConsumerJar")
     private val pixelPlayerJar = jar("nexira.test.pixelPlayerJar")
     private val exampleJars = listOf(
         fixtureJar,
         packsConsumerJar,
         accountsConsumerJar,
+        catalogueConsumerJar,
         pixelPlayerJar,
         jar("nexira.test.screenFxJar"),
         jar("nexira.test.looksJar"),
@@ -168,6 +175,23 @@ class JarModuleIsolationTest {
     }
 
     @Test
+    fun `a jar that names the catalogue API gets the API and nothing else of the catalogue or the engine`() {
+        val catalogue = load(catalogueConsumerJar).loader
+        assertSame(CatalogueKeys::class.java, catalogue.loadClass(CatalogueKeys::class.java.name))
+        listOf(
+            BrowseState::class.java.name,
+            CatalogueModule::class.java.name,
+            ModrinthClient::class.java.name,
+            PackKeys::class.java.name,
+            AccountKeys::class.java.name,
+        ).forEach { name ->
+            assertFailsWith<ClassNotFoundException>("$name was found through catalogue-consumer") { catalogue.loadClass(name) }
+        }
+        // And the other example jars, which name no catalogue, do not see it either.
+        assertFailsWith<ClassNotFoundException> { load(packsConsumerJar).loader.loadClass(CatalogueKeys::class.java.name) }
+    }
+
+    @Test
     fun `every API a compiled module offers says where its classes are`() {
         CompiledModules.forEach { module ->
             assertEquals(module.provides.keys, module.apiPackages.keys, "${module.id} offers an API without saying where its classes are")
@@ -176,6 +200,7 @@ class JarModuleIsolationTest {
         assertEquals(offeredApis().keys, offeredApiPackages().keys)
         assertEquals(setOf(PackKeys::class.java.name.substringBeforeLast('.')), offeredApiPackages().getValue(PacksApi.ID))
         assertEquals(setOf(AccountKeys::class.java.name.substringBeforeLast('.')), offeredApiPackages().getValue(AccountsApi.ID))
+        assertEquals(setOf(CatalogueKeys::class.java.name.substringBeforeLast('.')), offeredApiPackages().getValue(CatalogueApi.ID))
     }
 
     @Test

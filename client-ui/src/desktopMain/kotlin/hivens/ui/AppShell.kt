@@ -102,7 +102,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
-import hivens.ui.feature.catalogue.project.ModTarget
 import hivens.ui.system.SystemNotifier
 import hivens.ui.utils.GameConsoleService
 import hivens.ui.utils.PreferenceWriter

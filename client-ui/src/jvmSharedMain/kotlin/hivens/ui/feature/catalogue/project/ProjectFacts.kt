@@ -1,7 +1,9 @@
 package hivens.ui.feature.catalogue.project
 
 import androidx.compose.ui.graphics.Color
-import hivens.core.api.dto.modrinth.ModrinthDisclosure
+import hivens.catalogue.api.Disclosure
+import hivens.catalogue.api.ProjectLink
+import hivens.catalogue.api.ProjectLinkKind
 import hivens.ui.i18n.AppStrings
 
 /**
@@ -134,27 +136,27 @@ fun compactCount(n: Long, s: AppStrings): String = when {
  * hiding the newest thing an author can disclose is the one failure this block
  * exists to prevent.
  */
-fun disclosureLine(d: ModrinthDisclosure, s: AppStrings): Pair<String, List<String>> = when (d.type) {
-    ModrinthDisclosure.TELEMETRY -> when (d.consent) {
+fun disclosureLine(d: Disclosure, s: AppStrings): Pair<String, List<String>> = when (d.type) {
+    Disclosure.TELEMETRY -> when (d.consent) {
         "opt_in" -> s.modDisclosureTelemetryOptIn
         "opt_out" -> s.modDisclosureTelemetryOptOut
         "always_active" -> s.modDisclosureTelemetryAlways
         else -> s.modDisclosureTelemetry
     } to d.dataCollected
-    ModrinthDisclosure.ADVERTISEMENTS -> s.modDisclosureAds to listOfNotNull(d.note)
-    ModrinthDisclosure.PAID_FEATURES -> s.modDisclosurePaid to d.features
-    ModrinthDisclosure.AI_CONTENT -> s.modDisclosureAiContent to listOfNotNull(d.note)
-    ModrinthDisclosure.AI_FUNCTIONALITY -> s.modDisclosureAiFunctionality to listOfNotNull(d.note)
-    ModrinthDisclosure.SYSTEM_INTERACTIONS -> s.modDisclosureSystem to listOfNotNull(d.note)
-    ModrinthDisclosure.EPILEPSY_TRIGGERS -> s.modDisclosureEpilepsy to listOfNotNull(d.note)
-    ModrinthDisclosure.DERIVATIVE_WORK ->
+    Disclosure.ADVERTISEMENTS -> s.modDisclosureAds to listOfNotNull(d.note)
+    Disclosure.PAID_FEATURES -> s.modDisclosurePaid to d.features
+    Disclosure.AI_CONTENT -> s.modDisclosureAiContent to listOfNotNull(d.note)
+    Disclosure.AI_FUNCTIONALITY -> s.modDisclosureAiFunctionality to listOfNotNull(d.note)
+    Disclosure.SYSTEM_INTERACTIONS -> s.modDisclosureSystem to listOfNotNull(d.note)
+    Disclosure.EPILEPSY_TRIGGERS -> s.modDisclosureEpilepsy to listOfNotNull(d.note)
+    Disclosure.DERIVATIVE_WORK ->
         d.type to (listOfNotNull(d.note) + d.sources.map { it.label }.filter { it.isNotBlank() })
     else -> d.type to listOfNotNull(d.note)
 }
 
 /** The one declaration that can hurt a reader rather than inform them. */
-fun disclosureIsWarning(d: ModrinthDisclosure): Boolean =
-    d.type == ModrinthDisclosure.EPILEPSY_TRIGGERS
+fun disclosureIsWarning(d: Disclosure): Boolean =
+    d.type == Disclosure.EPILEPSY_TRIGGERS
 
 /**
  * The order declarations are read in, which is not the order they arrive in.
@@ -166,20 +168,20 @@ fun disclosureIsWarning(d: ModrinthDisclosure): Boolean =
  * Anything this build has never heard of keeps its place at the end rather than
  * being dropped.
  */
-fun disclosuresInReadingOrder(disclosures: List<ModrinthDisclosure>): List<ModrinthDisclosure> =
+fun disclosuresInReadingOrder(disclosures: List<Disclosure>): List<Disclosure> =
     disclosures.sortedBy { d ->
         DISCLOSURE_ORDER.indexOf(d.type).takeIf { it >= 0 } ?: DISCLOSURE_ORDER.size
     }
 
 private val DISCLOSURE_ORDER = listOf(
-    ModrinthDisclosure.EPILEPSY_TRIGGERS,
-    ModrinthDisclosure.AI_CONTENT,
-    ModrinthDisclosure.AI_FUNCTIONALITY,
-    ModrinthDisclosure.ADVERTISEMENTS,
-    ModrinthDisclosure.PAID_FEATURES,
-    ModrinthDisclosure.TELEMETRY,
-    ModrinthDisclosure.SYSTEM_INTERACTIONS,
-    ModrinthDisclosure.DERIVATIVE_WORK,
+    Disclosure.EPILEPSY_TRIGGERS,
+    Disclosure.AI_CONTENT,
+    Disclosure.AI_FUNCTIONALITY,
+    Disclosure.ADVERTISEMENTS,
+    Disclosure.PAID_FEATURES,
+    Disclosure.TELEMETRY,
+    Disclosure.SYSTEM_INTERACTIONS,
+    Disclosure.DERIVATIVE_WORK,
 )
 
 /**

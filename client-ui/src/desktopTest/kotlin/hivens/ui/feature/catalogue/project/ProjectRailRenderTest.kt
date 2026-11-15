@@ -19,19 +19,28 @@ import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
-import hivens.core.api.dto.modrinth.ModrinthDisclosure
+import hivens.catalogue.api.CatalogueKeys
+import hivens.catalogue.api.Disclosure
+import hivens.catalogue.api.GameVersionTag
+import hivens.catalogue.api.OpenProject
+import hivens.catalogue.api.ProjectCreator
+import hivens.catalogue.api.ProjectSource
+import hivens.catalogue.api.foldGameVersions
+import hivens.catalogue.api.groupGameVersions
 import hivens.core.api.dto.modrinth.ModrinthDisclosures
 import hivens.core.api.dto.modrinth.ModrinthGameVersion
 import hivens.core.api.dto.modrinth.ModrinthProject
-import hivens.ui.components.formatBuildTimestamp
+import hivens.ui.feature.catalogue.links
+import hivens.ui.feature.catalogue.toTags
+import hivens.ui.feature.catalogue.toView
 import hivens.ui.surface.NxSurface
 import hivens.ui.theme.NxTheme
 import hivens.ui.widgets.ChildLevel
 import hivens.ui.widgets.KoinLevelServicesHost
-import hivens.ui.widgets.Sources
 import hivens.ui.widgets.WidgetSurface
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.LocalScope
+import hivens.widget.api.LocalWidgetDataRegistry
 import hivens.widget.api.LocalSurfaceFamilies
 import hivens.widget.api.LocalWidgetRegistry
 import hivens.widget.api.LocalWidgetSurfaceRenderer
@@ -83,11 +92,11 @@ class ProjectRailRenderTest {
 
     private fun project(slug: String) = json.decodeFromString<ModrinthProject>(resource("$slug.project.json"))
 
-    private fun disclosures(slug: String): List<ModrinthDisclosure> =
-        json.decodeFromString<ModrinthDisclosures>(resource("$slug.disclosures.json")).disclosures
+    private fun disclosures(slug: String): List<Disclosure> =
+        json.decodeFromString<ModrinthDisclosures>(resource("$slug.disclosures.json")).disclosures.map { it.toView() }
 
-    private val gameVersions: List<ModrinthGameVersion> by lazy {
-        json.decodeFromString<List<ModrinthGameVersion>>(resource("game_versions.json"))
+    private val gameVersions: List<GameVersionTag> by lazy {
+        json.decodeFromString<List<ModrinthGameVersion>>(resource("game_versions.json")).toTags()
     }
 
     /** The same reduction the page performs before it publishes. */
@@ -105,20 +114,11 @@ class ProjectRailRenderTest {
             serverSide = p.serverSide,
             licenseId = p.license?.id,
             licenseName = p.license?.name,
-            // Formatted here because the page formats before it publishes. Handing
-            // the raw ISO stamp through made the sheet show something the running
-            // app never shows, which is the one thing a reference sheet must not do.
-            publishedAt = formatBuildTimestamp(p.published),
-            updatedAt = formatBuildTimestamp(p.updated),
-            links = buildList {
-                p.issuesUrl?.let { add(ProjectLink(ProjectLinkKind.Issues, it)) }
-                p.sourceUrl?.let { add(ProjectLink(ProjectLinkKind.Source, it)) }
-                p.wikiUrl?.let { add(ProjectLink(ProjectLinkKind.Wiki, it)) }
-                p.discordUrl?.let { add(ProjectLink(ProjectLinkKind.Discord, it)) }
-                p.donationUrls.forEach {
-                    add(ProjectLink(ProjectLinkKind.Donate, it.url, it.platform.takeIf { n -> n.isNotBlank() }))
-                }
-            },
+            // The moments as the catalogue gives them. The rail puts them into words
+            // itself, the way it does in the running app.
+            published = p.published,
+            updated = p.updated,
+            links = p.links(),
             disclosures = disclosures(slug),
             creators = listOf(
                 ProjectCreator(name = "jellysquid3", role = "Owner", owner = true),
@@ -128,19 +128,22 @@ class ProjectRailRenderTest {
     }
 
     /** An app level whose windows answer the open project with [project], the way a window's page publishes it. */
-    private fun app(project: OpenProject): WidgetScope {
+    private fun app(project: OpenProject): Pair<WidgetScope, WidgetDataRegistry> {
         val registry = WidgetDataRegistry().apply {
-            registerFactory(Sources.OpenProject) { flowSource(MutableStateFlow<OpenProject?>(project)) }
+            registerFactory(CatalogueKeys.OpenProject) { flowSource(MutableStateFlow<OpenProject?>(project)) }
         }
-        return koinApplication {
+        val app: WidgetScope = koinApplication {
             modules(module { single { WidgetScope.app(registry, KoinLevelServicesHost.app(this), Dispatchers.Unconfined) } })
         }.koin.get()
+        return app to registry
     }
 
     @Composable
     private fun Rail(project: OpenProject) {
-        val app = remember(project) { app(project) }
-        CompositionLocalProvider(LocalScope provides app) {
+        val (app, registry) = remember(project) { app(project) }
+        // The registry the host provides at its root, which a block reading an app key, the
+        // sign-in providers, reads through.
+        CompositionLocalProvider(LocalScope provides app, LocalWidgetDataRegistry provides registry) {
             // The rail reads the project off the window it is drawn in.
             ChildLevel(ScopeLevel.Window) { RailInWindow() }
         }

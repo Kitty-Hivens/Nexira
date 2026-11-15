@@ -8,23 +8,12 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Density
-import hivens.auth.AuthProviderRegistry
-import hivens.core.api.HttpClientProvider
-import hivens.core.api.catalogue.CataloguePack
-import hivens.core.api.catalogue.CataloguePackDetails
-import hivens.core.api.catalogue.CataloguePackVersion
-import hivens.core.api.interfaces.IPackCatalogueService
-import hivens.core.data.PackOrigin
-import hivens.core.net.TransferEngine
-import hivens.launcher.PackInstallService
-import hivens.launcher.catalogue.PackCatalogueRegistry
-import hivens.launcher.modrinth.ModrinthClient
+import hivens.catalogue.api.PackOrigins
+import hivens.catalogue.api.ProjectTarget
 import hivens.ui.background.BackgroundSettings
 import hivens.ui.editor.EditorSurfaces
-import hivens.ui.feature.catalogue.browse.BrowseSession
-import hivens.ui.feature.catalogue.browse.BrowseTags
 import hivens.ui.feature.catalogue.browse.CataloguePackDetailScreen
-import hivens.ui.feature.catalogue.project.OpenProjectState
+import hivens.ui.feature.catalogue.project.ModDetailScreen
 import hivens.ui.host.HostKoin
 import hivens.ui.i18n.AppLocale
 import hivens.ui.i18n.LocaleProvider
@@ -58,7 +47,6 @@ import hivens.widget.model.SurfaceId
 import hivens.widget.model.SurfaceLayout
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.koin.core.KoinApplication
@@ -75,9 +63,9 @@ import kotlin.test.assertTrue
  * every listed key is put in each of the surface's slots, the screen is drawn in a
  * page of its own, and the probe has to draw rather than be found misplaced.
  *
- * The project page is not drawn here: its screen pulls the install graph out of Koin,
- * which a probe has no honest stand-in for. Its key is held by the drift test and by
- * the mod page's render sheets, which draw its widgets through the key.
+ * The catalogue's pages are drawn with no catalogue module behind them: what they
+ * hand their widgets is the screen's own, so it is there whether or not the module
+ * answers the page.
  */
 @OptIn(ExperimentalComposeUiApi::class)
 class ScreenProvidesTest {
@@ -183,26 +171,19 @@ class ScreenProvidesTest {
         assertTrue(drew.isNotEmpty())
     }
 
-    private class Listing(override val origin: PackOrigin) : IPackCatalogueService {
-        override suspend fun search(query: String, page: Int): List<CataloguePack> = emptyList()
-        override suspend fun details(packId: String): CataloguePackDetails = error("a probe reads no pack")
-        override suspend fun versions(packId: String): List<CataloguePackVersion> = emptyList()
+    @Test
+    fun `a catalogue pack's page hands its widgets what its surface lists`() {
+        val (drew, missed) = probe("catalogue.pack") {
+            CataloguePackDetailScreen(origin = PackOrigins.MIRROR, packId = "probe", onBack = {}, onInstalled = {})
+        }
+        assertEquals(emptySet(), missed)
+        assertTrue(drew.isNotEmpty())
     }
 
     @Test
-    fun `a catalogue pack's page hands its widgets what its surface lists`() {
-        val http = HttpClientProvider { error("a probe makes no requests") }
-        val scope = CoroutineScope(Dispatchers.Unconfined)
-        val services = module {
-            single { PackCatalogueRegistry(listOf(Listing(PackOrigin.Mirror))) }
-            single { PackInstallService({ _, _, _, _ -> error("a probe installs nothing") }, scope) }
-            single { BrowseSession() }
-            single { OpenProjectState() }
-            single { BrowseTags(ModrinthClient(http, TransferEngine(http)), scope, BrowseTags.Tags(emptyList(), emptyList(), emptyList())) }
-            single { AuthProviderRegistry(emptyList()) }
-        }
-        val (drew, missed) = probe("catalogue.pack", services) {
-            CataloguePackDetailScreen(origin = PackOrigin.Mirror, packId = "probe", onBack = {}, onInstalled = {})
+    fun `a project's page hands its widgets what its surface lists`() {
+        val (drew, missed) = probe("project") {
+            ModDetailScreen(target = ProjectTarget.Catalogue("probe"), onOpenVersion = { _, _ -> })
         }
         assertEquals(emptySet(), missed)
         assertTrue(drew.isNotEmpty())

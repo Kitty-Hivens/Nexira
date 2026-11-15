@@ -6,15 +6,24 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
-import hivens.launcher.content.ContentKind
-import hivens.launcher.modrinth.ENV_CLIENT
-import hivens.launcher.modrinth.ENV_SERVER
-import hivens.launcher.modrinth.FilterField
-import hivens.launcher.modrinth.SearchFilter
+import hivens.catalogue.api.CatalogueKeys
+import hivens.catalogue.api.CatalogueTags
+import hivens.catalogue.api.ENV_CLIENT
+import hivens.catalogue.api.ENV_SERVER
+import hivens.catalogue.api.FilterField
+import hivens.catalogue.api.ProjectKind
+import hivens.catalogue.api.ProjectTypes
+import hivens.catalogue.api.SearchFilter
+import hivens.catalogue.api.TagSearch
 import hivens.ui.Screen
 import hivens.ui.feature.catalogue.project.Environment
+import hivens.widget.api.LocalScope
+import hivens.widget.api.rememberScopedCommand
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import org.koin.compose.koinInject
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -49,7 +58,8 @@ fun interface CatalogueSearch {
 val LocalCatalogueSearch: ProvidableCompositionLocal<CatalogueSearch?> = compositionLocalOf { null }
 
 /**
- * The shell's search: the tag becomes the controller's question, and Browse opens on it.
+ * The shell's search: the tag becomes the window's question, and Browse opens on it.
+ * Null where no catalogue module is brought in, so a tag stays a plain label.
  *
  * Waits a moment for the catalogue's lists when they are still on their way. A
  * category reads as a resolution only by the group the lists file it under, and a
@@ -57,23 +67,33 @@ val LocalCatalogueSearch: ProvidableCompositionLocal<CatalogueSearch?> = composi
  * showed chosen in the wrong group.
  */
 @Composable
-fun rememberShellCatalogueSearch(currentScreen: Screen, onScreenChange: (Screen) -> Unit): CatalogueSearch {
-    val c: BrowseController = koinInject()
-    val tags: BrowseTags = koinInject()
+fun rememberShellCatalogueSearch(currentScreen: Screen, onScreenChange: (Screen) -> Unit): CatalogueSearch? {
+    val searchFor = rememberScopedCommand(CatalogueKeys.SearchFor) ?: return null
+    val loadTags = rememberScopedCommand(CatalogueKeys.LoadTags)
+    val tags = LocalScope.current?.find(CatalogueKeys.Tags)?.state
     val scope = rememberCoroutineScope()
     val screen = rememberUpdatedState(currentScreen)
-    return remember(c, tags, onScreenChange, scope) {
+    return remember(searchFor, loadTags, tags, onScreenChange, scope) {
         CatalogueSearch { type, tag, packId ->
             scope.launch {
                 searchFromTag(
-                    c, type, tag, packId,
-                    known = { if (it is ProjectTag.Category) tags.await(TAGS_PATIENCE) else tags.tags.value },
+                    type, tag, packId,
+                    known = { if (it is ProjectTag.Category) awaitTags(tags, loadTags, TAGS_PATIENCE) else tags?.value },
                     currentScreen = { screen.value },
                     onScreenChange = onScreenChange,
+                    search = searchFor,
                 )
             }
         }
     }
+}
+
+/** The catalogue's lists, asked for and waited for up to [patience]. Null when they could not be had in that time. */
+private suspend fun awaitTags(tags: StateFlow<CatalogueTags?>?, load: ((Unit) -> Unit)?, patience: Duration): CatalogueTags? {
+    val flow = tags ?: return null
+    flow.value?.let { return it }
+    load?.invoke(Unit)
+    return withTimeoutOrNull(patience) { flow.first { it != null } } ?: flow.value
 }
 
 /**
@@ -83,19 +103,19 @@ fun rememberShellCatalogueSearch(currentScreen: Screen, onScreenChange: (Screen)
  * later took the reader away from wherever they had gone since.
  */
 internal suspend fun searchFromTag(
-    c: BrowseController,
     type: String,
     tag: ProjectTag,
     packId: String?,
-    known: suspend (ProjectTag) -> BrowseTags.Tags?,
+    known: suspend (ProjectTag) -> CatalogueTags?,
     currentScreen: () -> Screen,
     onScreenChange: (Screen) -> Unit,
+    search: (TagSearch) -> Unit,
 ) {
     val from = currentScreen()
     val tags = known(tag)
     if (currentScreen() != from) return
     val filters = filtersFor(tag, type, tags) ?: return
-    c.searchFor(type, filters, packId)
+    search(TagSearch(type, filters, packId))
     onScreenChange(Screen.Browse)
 }
 
@@ -115,10 +135,10 @@ fun tagSearch(type: String?, packId: String?, tag: ProjectTag): (() -> Unit)? {
 }
 
 /** The project types Browse searches, with the kind it lists each under. Null is packs. */
-internal val BROWSE_TYPES: Map<String, ContentKind?> = mapOf(
-    "mod" to ContentKind.Mod,
-    "resourcepack" to ContentKind.ResourcePack,
-    "shader" to ContentKind.ShaderPack,
+internal val BROWSE_TYPES: Map<String, ProjectKind?> = mapOf(
+    ProjectTypes.MOD to ProjectKind.Mod,
+    ProjectTypes.RESOURCE_PACK to ProjectKind.ResourcePack,
+    ProjectTypes.SHADER to ProjectKind.ShaderPack,
     MODPACK to null,
 )
 
@@ -132,7 +152,7 @@ internal val BROWSE_TYPES: Map<String, ContentKind?> = mapOf(
  * loader is `minecraft` and nothing else, and the catalogue has no platform filter
  * for it.
  */
-internal fun filtersFor(tag: ProjectTag, type: String, tags: BrowseTags.Tags?): Set<SearchFilter>? {
+internal fun filtersFor(tag: ProjectTag, type: String, tags: CatalogueTags?): Set<SearchFilter>? {
     if (type !in BROWSE_TYPES) return null
     return when (tag) {
         is ProjectTag.Category -> {
@@ -140,14 +160,12 @@ internal fun filtersFor(tag: ProjectTag, type: String, tags: BrowseTags.Tags?): 
             val field = if (header == FilterGroup.Resolutions.header) FilterField.Resolution else FilterField.Category
             setOf(SearchFilter(field, tag.name))
         }
-        is ProjectTag.Loader -> if (type == RESOURCE_PACK) null else setOf(SearchFilter(FilterField.Loader, tag.name))
+        is ProjectTag.Loader -> if (type == ProjectTypes.RESOURCE_PACK) null else setOf(SearchFilter(FilterField.Loader, tag.name))
         is ProjectTag.GameVersions -> tag.versions.map { SearchFilter(FilterField.GameVersion, it) }.toSet().ifEmpty { null }
         is ProjectTag.Runs -> when (tag.environment) {
             Environment.Client -> setOf(SearchFilter(FilterField.Environment, ENV_CLIENT))
             Environment.Server -> setOf(SearchFilter(FilterField.Environment, ENV_SERVER))
             Environment.Both -> setOf(SearchFilter(FilterField.Environment, ENV_CLIENT), SearchFilter(FilterField.Environment, ENV_SERVER))
-        }.takeIf { type == "mod" || type == MODPACK }
+        }.takeIf { type == ProjectTypes.MOD || type == MODPACK }
     }
 }
-
-private const val RESOURCE_PACK = "resourcepack"

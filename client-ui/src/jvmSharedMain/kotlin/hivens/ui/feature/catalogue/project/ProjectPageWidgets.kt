@@ -24,7 +24,7 @@ import hivens.widget.model.WidgetInstance
 @Composable
 fun ProjectHeaderWidget(instance: WidgetInstance) {
     val page = rememberScopedSource(ProjectPageSource).valueOrNull() ?: return
-    Header(page.state)
+    Header(page.view)
 }
 
 /**

@@ -1,8 +1,9 @@
 package hivens.ui.feature.catalogue.browse
 
+import hivens.catalogue.api.FilterField
+import hivens.catalogue.api.GameVersionTag
+import hivens.catalogue.api.SearchFilter
 import hivens.core.api.dto.modrinth.ModrinthGameVersion
-import hivens.launcher.modrinth.FilterField
-import hivens.launcher.modrinth.SearchFilter
 import hivens.ui.i18n.EnglishStrings
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
@@ -13,9 +14,9 @@ class ChosenChipsTest {
 
     private val json = Json { ignoreUnknownKeys = true }
 
-    private val versions: List<ModrinthGameVersion> by lazy {
+    private val versions: List<GameVersionTag> by lazy {
         val text = checkNotNull(javaClass.classLoader.getResourceAsStream("catalogue/game_versions.json")).bufferedReader().use { it.readText() }
-        json.decodeFromString<List<ModrinthGameVersion>>(text)
+        json.decodeFromString<List<ModrinthGameVersion>>(text).map { GameVersionTag(it.version, it.versionType, it.major, it.date) }
     }
 
     private fun v(name: String) = SearchFilter(FilterField.GameVersion, name)

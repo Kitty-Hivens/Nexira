@@ -31,15 +31,13 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.Stable
-import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,21 +51,20 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
-import hivens.core.api.catalogue.CataloguePack
-import hivens.core.api.dto.modrinth.ModrinthSearchHit
-import hivens.core.data.PackOrigin
-import hivens.core.data.PackInstance
-import hivens.launcher.instance.ContentDestination
-import hivens.launcher.instance.ContentInstaller
-import hivens.launcher.content.ContentKind
-import hivens.launcher.instance.ModInstaller
-import hivens.launcher.instance.PackPlacedContent
-import hivens.launcher.content.folderName
-import hivens.launcher.instance.takesFromPlayer
-import hivens.launcher.modrinth.ModrinthClient
-import hivens.launcher.modrinth.FilterField
-import hivens.launcher.modrinth.SearchFilter
-import hivens.launcher.modrinth.acceptedLoaders
+import hivens.catalogue.api.CatalogueCard
+import hivens.catalogue.api.CatalogueKeys
+import hivens.catalogue.api.InstallProblem
+import hivens.catalogue.api.InstallRefusal
+import hivens.catalogue.api.InstallSubject
+import hivens.catalogue.api.PackOrigins
+import hivens.catalogue.api.ProjectHit
+import hivens.catalogue.api.ProjectKind
+import hivens.catalogue.api.ProjectTarget
+import hivens.catalogue.api.ResultsScroll
+import hivens.catalogue.api.ScrollMark
+import hivens.catalogue.api.SearchResults
+import hivens.catalogue.api.SearchStatus
+import hivens.catalogue.api.SkipReason
 import hivens.ui.components.LoaderGlyph
 import hivens.ui.components.hasLoaderGlyph
 import hivens.ui.components.relativeAge
@@ -82,7 +79,6 @@ import hivens.ui.nx.NxMetaChipTone
 import hivens.ui.nx.NxTooltip
 import hivens.ui.nx.RetryStateBlock
 import hivens.ui.puppet.PuppetClick
-import hivens.ui.feature.catalogue.project.ModTarget
 import hivens.ui.feature.catalogue.project.compactCount
 import hivens.ui.feature.catalogue.project.loaderLabel
 import hivens.ui.surface.NxSurface
@@ -92,512 +88,82 @@ import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.Status
 import hivens.ui.theme.decorativeColor
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import org.koin.compose.koinInject
-import org.slf4j.LoggerFactory
-import java.nio.file.Files
-import java.nio.file.Path
-import java.util.stream.Collectors
-import kotlin.time.Duration.Companion.milliseconds
-
-private val log = LoggerFactory.getLogger("ProjectBrowse")
-
-/** The pack a browse installs into, and what it runs. */
-internal class BrowseDestination(val pack: PackInstance, val target: ContentDestination.Pack)
-
-/** The destination for the pack [pack], its folder under [dataDir]. */
-internal fun browseDestination(pack: PackInstance, dataDir: Path) =
-    BrowseDestination(pack, ContentDestination.Pack.of(pack, dataDir.resolve("instances")))
-
-/**
- * What [instanceDir]'s content folders look like, as names, sizes and change times:
- * a cheap local answer to whether anything was added, removed or replaced since the
- * last look, without hashing a file or asking the catalogue. Null when the folders
- * cannot be listed, which never matches a stamp taken before.
- */
-internal fun contentStampOf(instanceDir: Path): String? = runCatching {
-    ContentKind.entries.joinToString("|") { kind ->
-        val dir = instanceDir.resolve(kind.folderName())
-        if (!Files.isDirectory(dir)) "" else Files.list(dir).use { files ->
-            files.map { "${it.fileName}:${Files.size(it)}:${Files.getLastModifiedTime(it).toMillis()}" }.sorted().collect(Collectors.toList()).joinToString(",")
-        }
-    }
-}.getOrNull()
-
-/**
- * The kinds a pack takes from the player, in the order the rail lists them.
- *
- * A mirror pack never takes mods, and a pack with no loader runs none, so a row
- * offering to install one there would be offering something that cannot happen.
- */
-internal fun kindsFor(destination: BrowseDestination?): List<ContentKind> {
-    val all = listOf(ContentKind.Mod, ContentKind.ResourcePack, ContentKind.ShaderPack)
-    val target = destination?.target ?: return all
-    val keepsRecord = Files.isDirectory(target.dir) && PackPlacedContent.paths(target.dir) != null
-    return all.filter { kind ->
-        takesFromPlayer(target.origin, kind, keepsRecord) &&
-            (kind != ContentKind.Mod || acceptedLoaders(target.loader, target.mcVersion).isNotEmpty())
-    }
-}
+import hivens.widget.api.rememberScopedAction
+import hivens.widget.api.rememberScopedCommand
 
 /** What a pack runs, as a reader would write it: "NeoForge 1.21.1". */
-internal fun runtimeLabel(target: ContentDestination.Pack): String =
-    listOf(target.loader.takeIf { it.isNotBlank() }?.let(::loaderLabel), target.mcVersion.takeIf { it.isNotBlank() })
+internal fun runtimeLabel(mcVersion: String, loader: String): String =
+    listOf(loader.takeIf { it.isNotBlank() }?.let(::loaderLabel), mcVersion.takeIf { it.isNotBlank() })
         .filterNotNull()
         .joinToString(" ")
-
-/** Why an install from a row did not land. */
-internal sealed interface InstallProblem {
-    /** No build of the project runs on the pack. */
-    data object NoBuild : InstallProblem
-
-    /** The install did not run, see [ContentInstaller.Refusal]. */
-    data class Refused(val reason: ContentInstaller.Refusal) : InstallProblem
-
-    /** It ran and the build that was asked for did not land. */
-    data object NotLanded : InstallProblem
-
-    /** It ran and left the build that was asked for out, for [skip]'s reason. */
-    data class LeftOut(val skip: ContentInstaller.Skip) : InstallProblem
-}
 
 internal fun InstallProblem.label(s: AppStrings): String = when (this) {
     InstallProblem.NoBuild -> s.installTargetNoBuild
     is InstallProblem.Refused -> when (reason) {
-        ContentInstaller.Refusal.GameRunning -> s.installRefusedGameRunning
-        is ContentInstaller.Refusal.Busy -> s.installRefusedBusy
+        InstallRefusal.GameRunning -> s.installRefusedGameRunning
+        InstallRefusal.Busy -> s.installRefusedBusy
     }
     InstallProblem.NotLanded -> s.contentInstallFailed
-    is InstallProblem.LeftOut -> skip.reason(s)
+    is InstallProblem.LeftOut -> reason.reason(s)
 }
 
 /** Why an install left a project out, in the reader's words. */
-internal fun ContentInstaller.Skip.reason(s: AppStrings): String = when (this) {
-    is ContentInstaller.Skip.NoBuild -> s.installTargetNoBuild
-    is ContentInstaller.Skip.LookupFailed -> s.installSkipLookupFailed
-    is ContentInstaller.Skip.NotPlaceable -> s.installSkipNotPlaceable
-    is ContentInstaller.Skip.NotAllowed -> s.installTargetNotTaken
-    is ContentInstaller.Skip.NameTaken -> s.installSkipNameTaken
-    is ContentInstaller.Skip.Failed -> s.contentInstallFailed
-    is ContentInstaller.Skip.NotAttempted -> s.installSkipNotAttempted
-    is ContentInstaller.Skip.TooDeep -> s.installSkipTooDeep
-    is ContentInstaller.Skip.PackOwned -> s.installSkipPackOwned
-    is ContentInstaller.Skip.SwitchedOff -> s.installSkipSwitchedOff
-    is ContentInstaller.Skip.Present, is ContentInstaller.Skip.AlreadyInstalled -> ""
-}
-
-/** The problem an [outcome] reports, or null when what was asked for landed. */
-internal fun problemOf(outcome: ModInstaller.Outcome): InstallProblem? {
-    if (outcome.ok) return null
-    outcome.refusal?.let { return InstallProblem.Refused(it) }
-    return outcome.headLeftOut?.let { InstallProblem.LeftOut(it) } ?: InstallProblem.NotLanded
+internal fun SkipReason.reason(s: AppStrings): String = when (this) {
+    SkipReason.NoBuild -> s.installTargetNoBuild
+    SkipReason.LookupFailed -> s.installSkipLookupFailed
+    SkipReason.NotPlaceable -> s.installSkipNotPlaceable
+    SkipReason.NotAllowed -> s.installTargetNotTaken
+    SkipReason.NameTaken -> s.installSkipNameTaken
+    SkipReason.Failed -> s.contentInstallFailed
+    SkipReason.NotAttempted -> s.installSkipNotAttempted
+    SkipReason.TooDeep -> s.installSkipTooDeep
+    SkipReason.PackOwned -> s.installSkipPackOwned
+    SkipReason.SwitchedOff -> s.installSkipSwitchedOff
+    SkipReason.Present, SkipReason.AlreadyInstalled -> ""
 }
 
 /**
- * One search of the catalogue: its pages of results, and the installs started
- * from them.
+ * The catalogue's results for one project type, as the window's search found them.
  *
- * With a [destination] every install goes into that pack, and what the pack
- * already holds is read before the first page, so a search that hides it can.
- * Without one a result only opens its page or the install dialog.
- *
- * What a search hides is the pack as it was when the search began. A project
- * installed from the list stays on it, reading installed, and the pages after it
- * are asked for with the same exclusion: one more excluded id moves every later
- * result up a place, and the page read next would start one result past where it
- * should.
- *
- * With a [session] a search already shown is shown again as it was left, see
- * [ProjectBrowseSession], and [keyOf] names a query's place in it.
- */
-@Stable
-internal class ProjectBrowseState(
-    /** The kind searched, null for modpacks, which are not installed into a pack. */
-    val kind: ContentKind?,
-    val destination: BrowseDestination?,
-    /**
-     * One page of results for a query, from an offset in the catalogue's own order,
-     * with [excluded] left out by the catalogue.
-     */
-    private val search: suspend (query: String, offset: Int, limit: Int, excluded: Collection<String>) -> List<ModrinthSearchHit>,
-    /** Installs a result into the destination pack, or null when no build of it runs there. */
-    private val installInto: suspend (ModrinthSearchHit) -> ModInstaller.Outcome?,
-    /** The projects the destination pack already carries. */
-    private val presentProjects: suspend () -> Set<String>,
-    /** Whether what the pack already carries is left out of the results. */
-    private val hideInstalled: Boolean = false,
-    private val session: ProjectBrowseSession? = null,
-    private val keyOf: (query: String) -> ProjectBrowseSession.Key? = { null },
-    /**
-     * What the destination pack's content folders look like now, see [contentStampOf],
-     * or null where there is nothing to look at. Tells a kept search whether the pack
-     * changed under it, without reading every file again.
-     */
-    private val contentStamp: suspend () -> String? = { null },
-) {
-    /** Where the list was scrolled to when this search was last shown, for the list to start at. */
-    var restoredScroll: Pair<Int, Int> = 0 to 0
-        private set
-
-    /** The question whose answer [results] holds, which is what a scroll position belongs to. */
-    var shownQuery by mutableStateOf<String?>(null)
-        private set
-
-    /** [contentStamp] when [present] was read. */
-    private var presentStamp: String? = null
-
-    /** When this state last wrote its search into the session, so an older state cannot write over a newer one. */
-    private var keptAt = Long.MIN_VALUE
-
-    /** Null while the first page is in flight. */
-    var results by mutableStateOf<List<ModrinthSearchHit>?>(null)
-        private set
-
-    /** The search could not be run. Not the same as a search that found nothing. */
-    var searchFailed by mutableStateOf(false)
-        private set
-
-    private var endReached = false
-    private var loadingMore = false
-    private var asked: String? = null
-    private var presentRead = false
-
-    /** Which search is current. A page that arrives for an older one is dropped. */
-    private var generation = 0
-
-    /** Where the next page starts in the catalogue's order, which is not the shown count once some are hidden here. */
-    private var offset = 0
-
-    /** What this search leaves out, fixed when it began. */
-    private var hidden: Set<String> = emptySet()
-
-    /** Projects the destination pack already carries, read from its folders. */
-    var present by mutableStateOf(emptySet<String>())
-        private set
-
-    var working by mutableStateOf(emptySet<String>())
-        private set
-
-    var problems by mutableStateOf(emptyMap<String, InstallProblem>())
-        private set
-
-    /**
-     * How many required dependencies an install that landed went without, by
-     * project. The build is in, and the game will refuse it until they are, which
-     * only the project page used to say: a card read installed and nothing more.
-     */
-    var missing by mutableStateOf(emptyMap<String, Int>())
-        private set
-
-    suspend fun loadPresent() {
-        if (destination == null) return
-        val stamp = contentStamp()
-        // A row reading Install for something already there is a wasted click; a
-        // browser that refuses to open over a folder it cannot read is worse.
-        present = present + runCatching { presentProjects() }
-            .onFailure { if (it is CancellationException) throw it else log.warn("reading what the pack holds failed", it) }
-            .getOrDefault(emptySet())
-        // Marked only once the read is over. Marked before it, a search cancelled
-        // while it ran, which typing on does to the search before it, left the pack
-        // unread for the rest of this state: installed projects offered Install and
-        // hiding them hid nothing.
-        presentStamp = stamp
-        presentRead = true
-    }
-
-    suspend fun search(q: String) {
-        val gen = ++generation
-        if (restore(q)) {
-            // The pack can have changed since the search was kept: a mod installed
-            // from a project page, one removed in the Content tab. Its folders are
-            // read again only when they did.
-            if (destination != null && contentStamp() != presentStamp) {
-                present = emptySet()
-                presentRead = false
-                loadPresent()
-                keep()
-            }
-            return
-        }
-        asked = q
-        // A new question starts at the top of its answer, not where the last one was left.
-        restoredScroll = 0 to 0
-        results = null
-        searchFailed = false
-        endReached = false
-        offset = 0
-        if (!presentRead) loadPresent()
-        if (gen != generation) return
-        hidden = if (hideInstalled) present else emptySet()
-        val first = nextBatch(q, gen, known = emptySet())
-        if (gen != generation) return
-        if (first == null) {
-            searchFailed = true
-            results = emptyList()
-            return
-        }
-        results = first
-        shownQuery = q
-        keep()
-    }
-
-    /**
-     * Shows the search for [q] as it was left, when the session still holds it,
-     * and answers whether it did. Nothing is asked of the catalogue or of the pack.
-     */
-    private fun restore(q: String): Boolean {
-        val key = keyOf(q) ?: return false
-        val snap = session?.get(key) ?: return false
-        asked = q
-        searchFailed = false
-        endReached = snap.endReached
-        offset = snap.offset
-        hidden = snap.hidden
-        present = present + snap.present
-        presentStamp = snap.presentStamp
-        presentRead = true
-        keptAt = snap.takenAt
-        restoredScroll = snap.firstVisibleIndex to snap.firstVisibleOffset
-        results = snap.results
-        shownQuery = q
-        return true
-    }
-
-    /**
-     * Writes where the search has got to into the session, unless a newer state has
-     * since. An install started here runs on to its end after the reader has left,
-     * and its finish used to put this state's shorter list back over the one the
-     * screen they came back to had kept.
-     */
-    private fun keep() {
-        val q = asked ?: return
-        val shown = results ?: return
-        if (searchFailed) return
-        val key = keyOf(q) ?: return
-        val s = session ?: return
-        val kept = s.get(key)
-        if (kept != null && kept.takenAt > keptAt) return
-        val scroll = kept?.let { it.firstVisibleIndex to it.firstVisibleOffset } ?: restoredScroll
-        val now = s.now()
-        s.put(
-            key,
-            ProjectBrowseSession.Snapshot(
-                results = shown, offset = offset, endReached = endReached, hidden = hidden, present = present,
-                presentStamp = presentStamp, firstVisibleIndex = scroll.first, firstVisibleOffset = scroll.second, takenAt = now,
-            ),
-        )
-        keptAt = now
-    }
-
-    /**
-     * Records where the reader has scrolled the answer to [query], for a return to it.
-     * Named by the caller, since by the time a list is taken down the state may
-     * already be asking the next question.
-     */
-    fun rememberScroll(query: String, index: Int, offset: Int) {
-        val key = keyOf(query) ?: return
-        session?.scroll(key, index, offset)
-    }
-
-    /** The next page, when the list has one and none is already on its way. */
-    suspend fun more() {
-        val shown = results ?: return
-        val q = asked ?: return
-        if (endReached || loadingMore) return
-        val gen = generation
-        loadingMore = true
-        try {
-            // A page that could not be read is not the end: the next scroll asks again.
-            val fresh = nextBatch(q, gen, known = shown.mapTo(HashSet()) { it.projectId }) ?: return
-            if (gen == generation && fresh.isNotEmpty()) results = shown + fresh
-            if (gen == generation) keep()
-        } finally {
-            loadingMore = false
-        }
-    }
-
-    /**
-     * The next results worth showing, reading on past a page that held nothing new.
-     *
-     * The catalogue is told to leave out at most [MAX_EXCLUDED] of [hidden], since
-     * every one of them is a clause in the query, and the rest are dropped here. A
-     * pack of a few hundred mods can then fill whole pages with what it already
-     * has, so a page that comes back emptied is read past rather than taken as the
-     * end. Null when a page could not be read.
-     */
-    private suspend fun nextBatch(q: String, gen: Int, known: Set<String>): List<ModrinthSearchHit>? {
-        repeat(MAX_EMPTY_PAGES) {
-            val page = fetch(q, offset) ?: return null
-            if (gen != generation) return emptyList()
-            offset += page.size
-            if (page.size < PAGE_SIZE) endReached = true
-            val fresh = page.filterNot { it.projectId in hidden || it.projectId in known }
-            if (fresh.isNotEmpty() || endReached) return fresh
-        }
-        endReached = true
-        return emptyList()
-    }
-
-    private suspend fun fetch(q: String, offset: Int): List<ModrinthSearchHit>? = try {
-        search(q, offset, PAGE_SIZE, hidden.take(MAX_EXCLUDED))
-    } catch (e: CancellationException) {
-        throw e
-    } catch (e: Exception) {
-        log.warn("searching {} for \"{}\" failed", kind ?: MODPACK, q, e)
-        null
-    }
-
-    /**
-     * Install [hit] into the destination pack. A row reads installed only when the
-     * build landed, and what the install reports the pack holds afterwards is taken
-     * whole, so a dependency pulled in behind it stops offering itself too.
-     */
-    suspend fun install(hit: ModrinthSearchHit) {
-        val id = hit.projectId
-        working = working + id
-        problems = problems - id
-        missing = missing - id
-        val problem = try {
-            val outcome = installInto(hit)
-            if (outcome?.ok == true) present = present + outcome.present + id
-            if (outcome?.ok == true && outcome.missing.isNotEmpty()) missing = missing + (id to outcome.missing.size)
-            if (outcome == null) InstallProblem.NoBuild else problemOf(outcome)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            log.warn("installing {} failed", id, e)
-            InstallProblem.NotLanded
-        } finally {
-            working = working - id
-        }
-        if (problem != null) problems = problems + (id to problem)
-        keep()
-    }
-
-    private companion object {
-        const val PAGE_SIZE = 30
-
-        /** Ids the catalogue is asked to leave out. The query carries each one, so it is bounded. */
-        const val MAX_EXCLUDED = 200
-
-        /** Pages read past in a row because everything on them was hidden, before the list ends. */
-        const val MAX_EMPTY_PAGES = 4
-    }
-}
-
-/**
- * A search of [type] narrowed by [filters], installing into [destination] when there
- * is one. A new search, with its own pages, whenever any of those or [sort] changes.
- * With [hideInstalled] what the pack already holds is left out by id.
- */
-@Composable
-internal fun rememberProjectBrowseState(
-    type: String,
-    kind: ContentKind?,
-    destination: BrowseDestination?,
-    sort: BrowseSort = BrowseSort.Relevance,
-    filters: Set<SearchFilter> = emptySet(),
-    hideInstalled: Boolean = false,
-): ProjectBrowseState {
-    val modrinth: ModrinthClient = koinInject()
-    val installer: ModInstaller = koinInject()
-    val session: ProjectBrowseSession = koinInject()
-    val hiding = hideInstalled && destination != null
-    // Keyed on what the pack runs as well as which pack it is. The target is read off
-    // disk after the screen has drawn once, so the first frame of a return holds the
-    // previous visit's reading, and a pack updated since to another game version kept
-    // that reading for every install from the list, unlocked filters leaving nothing
-    // else to rebuild it.
-    return remember(type, destination?.target, sort, filters, hiding) {
-        val target = destination?.target
-        ProjectBrowseState(
-            kind = kind,
-            destination = destination,
-            search = { q, offset, limit, excluded ->
-                val hidden = excluded.map { SearchFilter(FilterField.Project, it, excluded = true) }
-                withContext(Dispatchers.IO) {
-                    modrinth.search(type, q, filters + hidden, offset, limit, sort.index).hits
-                }
-            },
-            installInto = { hit ->
-                target?.let { t ->
-                    withContext(Dispatchers.IO) {
-                        modrinth.newestMatchingVersion(hit.projectId, t.mcVersion, t.loader)
-                            ?.let { installer.install(t.dir, it, t.mcVersion, t.loader) }
-                    }
-                }
-            },
-            presentProjects = {
-                val dir = target?.dir
-                if (dir == null) emptySet() else withContext(Dispatchers.IO) { installer.presentProjects(dir) }
-            },
-            hideInstalled = hiding,
-            session = session,
-            keyOf = { q -> ProjectBrowseSession.Key(type, q, sort, filters, destination?.pack?.id, hiding) },
-            contentStamp = { target?.dir?.let { dir -> withContext(Dispatchers.IO) { contentStampOf(dir) } } },
-        )
-    }
-}
-
-/**
- * The catalogue's results for one project type.
- *
- * A card opens the project's page, or a modpack's. When [target] takes the kind
- * every card carries an install straight into it. Without one a card carries the
+ * A card opens the project's page, or a modpack's. When the search installs into a
+ * pack every card carries an install straight into it. Without one a card carries the
  * install that asks where, see [InstallDialog]. A modpack is not installed into a
  * pack, so its card is only a way to its page.
  */
 @Composable
 internal fun ProjectResults(
-    type: String,
-    kind: ContentKind?,
-    query: String,
-    sort: BrowseSort,
-    target: BrowseTarget?,
-    filters: Set<SearchFilter>,
-    hideInstalled: Boolean,
-    onOpenProject: (ModTarget) -> Unit,
-    onOpenPack: (CataloguePack) -> Unit,
+    results: SearchResults,
+    kind: ProjectKind?,
+    onOpenProject: (ProjectTarget) -> Unit,
+    onOpenPack: (CatalogueCard) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val s = LocalStrings.current
-    val destination = target?.takeIf { it.takes(kind) }?.destination
-    val state = rememberProjectBrowseState(type, kind, destination, sort, filters, hideInstalled)
-    // Installs run on the app's scope: one fetches the clicked build and then what
-    // it requires, and leaving the screen between the two left a mod without them.
-    val installScope: CoroutineScope = koinInject()
-    var submitted by remember(state) { mutableStateOf(query) }
-    var retryTick by remember(state) { mutableIntStateOf(0) }
+    val retry = rememberScopedAction(CatalogueKeys.RetryResults)
+    val more = rememberScopedAction(CatalogueKeys.MoreResults)
+    val scroll = rememberScopedCommand(CatalogueKeys.ScrollResults)
+    val installResult = rememberScopedCommand(CatalogueKeys.InstallResult)
     var choosing by remember { mutableStateOf<InstallSubject?>(null) }
+    // The pack installs go into, where the search has one that takes the kind.
+    val packId = results.question?.packId?.takeIf { kind != null }
 
-    PuppetClick("browse.retry") { retryTick++ }
-    LaunchedEffect(state, query) {
-        delay(350.milliseconds)
-        submitted = query
-    }
-    LaunchedEffect(state, submitted, retryTick) { state.search(submitted) }
+    PuppetClick("browse.retry") { retry?.invoke() }
 
     choosing?.let { subject -> InstallDialog(subject) { choosing = null } }
 
-    val results = state.results
-    when {
-        results == null -> BrowseLoading()
-        state.searchFailed -> RetryStateBlock(
+    when (results.status) {
+        SearchStatus.Loading -> BrowseLoading()
+        is SearchStatus.Failed -> RetryStateBlock(
             title      = s.modBrowserErrorTitle,
             message    = s.modBrowserErrorMessage,
             retryLabel = s.browseRetry,
-            onRetry    = { retryTick++ },
+            onRetry    = { retry?.invoke() },
             modifier   = modifier.fillMaxSize(),
         )
-        results.isEmpty() -> Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        SearchStatus.Empty -> Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text(s.contentEmpty, style = MaterialTheme.typography.bodyMedium, color = NxInk.quiet)
         }
-        else -> BoxWithConstraints(modifier.fillMaxSize()) {
+        SearchStatus.Loaded -> BoxWithConstraints(modifier.fillMaxSize()) {
             // The catalogue's own break: a narrow column takes the small icon so the
             // title keeps its width.
             val icon = if (maxWidth >= WIDE_CARD) ICON_WIDE else ICON_NARROW
@@ -606,15 +172,18 @@ internal fun ProjectResults(
             // answer, and says where they leave it under that question's name. Shared
             // across questions, a kept answer shown in place of another kept the other's
             // position, and a position was recorded under the question asked next.
-            val shownQuery = state.shownQuery
-            key(shownQuery) {
-                val listState = rememberLazyListState(state.restoredScroll.first, state.restoredScroll.second)
-                DisposableEffect(listState, state) {
-                    onDispose { shownQuery?.let { state.rememberScroll(it, listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset) } }
+            key(results.question) {
+                val question = results.question
+                val listState = rememberLazyListState(results.scroll.index, results.scroll.offset)
+                DisposableEffect(listState) {
+                    onDispose {
+                        question?.let { scroll?.invoke(ResultsScroll(it, ScrollMark(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset))) }
+                    }
                 }
-                LaunchedEffect(listState, state) {
+                LaunchedEffect(listState, results.projects.size) {
+                    val total = results.projects.size
                     snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1 }
-                        .collect { last -> if (last >= (state.results?.size ?: 0) - 3) state.more() }
+                        .collect { last -> if (last >= total - 3) more?.invoke() }
                 }
                 LazyColumn(
                     state               = listState,
@@ -622,27 +191,27 @@ internal fun ProjectResults(
                     contentPadding      = PaddingValues(bottom = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(CARD_GAP),
                 ) {
-                    items(items = results, key = { it.projectId }) { hit ->
+                    items(items = results.projects, key = { it.projectId }) { hit ->
                         val id = hit.projectId
                         val open = if (kind == null) {
                             { onOpenPack(modpackOf(hit)) }
                         } else {
-                            { onOpenProject(ModTarget.Catalogue(id, destination?.pack?.id)) }
+                            { onOpenProject(ProjectTarget.Catalogue(id, packId)) }
                         }
                         val subject = InstallSubject(id, hit.title, hit.iconUrl, hit.author)
-                        val install = if (destination != null) {
-                            { installScope.launch(Dispatchers.Main) { state.install(hit) }; Unit }
+                        val install = if (packId != null) {
+                            { installResult?.invoke(id); Unit }
                         } else {
                             { choosing = subject }
                         }
-                        val problem = state.problems[id]
+                        val problem = results.problems[id]
                         PuppetClick("browse.project.$id") { open() }
                         if (kind != null) PuppetClick("browse.install.$id") { install() }
                         ProjectCard(
                             hit      = hit,
                             iconSize = icon,
                             stacked  = stacked,
-                            note     = problem?.label(s) ?: state.missing[id]?.let { s.modPageInstallMissing(it) },
+                            note     = problem?.label(s) ?: results.missing[id]?.let { s.modPageInstallMissing(it) },
                             onOpen   = open,
                             modifier = Modifier.animateItem(
                                 fadeInSpec    = Motion.fade,
@@ -655,8 +224,8 @@ internal fun ProjectResults(
                                 {
                                     CardInstall(
                                         phase = when {
-                                            id in state.present -> CardPhase.Installed
-                                            id in state.working -> CardPhase.Working
+                                            id in results.present -> CardPhase.Installed
+                                            id in results.working -> CardPhase.Working
                                             problem != null -> CardPhase.Failed
                                             else -> CardPhase.Offered
                                         },
@@ -673,8 +242,8 @@ internal fun ProjectResults(
 }
 
 /** A catalogue modpack as the pack page opens it. */
-private fun modpackOf(hit: ModrinthSearchHit) = CataloguePack(
-    origin = PackOrigin.Modrinth,
+private fun modpackOf(hit: ProjectHit) = CatalogueCard(
+    origin = PackOrigins.MODRINTH,
     id = hit.projectId,
     title = hit.title,
     tagline = hit.description,
@@ -772,7 +341,7 @@ private fun OutlinedAction(
  */
 @Composable
 internal fun ProjectCard(
-    hit: ModrinthSearchHit,
+    hit: ProjectHit,
     modifier: Modifier = Modifier,
     iconSize: Dp = ICON_WIDE,
     /** The numbers and the action under the text rather than beside it, for a column too narrow to spare the width. */
@@ -931,7 +500,7 @@ private fun ProjectTags(tags: List<String>, max: Int) {
 }
 
 @Composable
-private fun ProjectIcon(hit: ModrinthSearchHit, size: Dp) {
+private fun ProjectIcon(hit: ProjectHit, size: Dp) {
     val shape = MaterialTheme.shapes.medium
     if (hit.iconUrl != null) {
         AsyncImage(model = hit.iconUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.size(size).clip(shape))

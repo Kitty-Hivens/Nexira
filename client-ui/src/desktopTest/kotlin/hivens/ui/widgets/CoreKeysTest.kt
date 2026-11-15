@@ -19,6 +19,10 @@ import hivens.auth.AuthProvider
 import hivens.auth.AuthProviderRegistry
 import hivens.auth.OfflineAuthProvider
 import hivens.auth.StoredAccount
+import hivens.catalogue.CatalogueModule
+import hivens.catalogue.api.CatalogueApi
+import hivens.catalogue.api.CatalogueKeys
+import hivens.core.api.HttpClientProvider
 import hivens.core.api.catalogue.CataloguePack
 import hivens.core.api.catalogue.CataloguePackDetails
 import hivens.core.api.catalogue.CataloguePackVersion
@@ -33,6 +37,7 @@ import hivens.core.data.SettingsData
 import hivens.core.data.ThemeMode
 import hivens.core.diag.ActionRing
 import hivens.core.launch.LaunchState
+import hivens.core.net.TransferEngine
 import hivens.core.security.SslBypassEntry
 import hivens.core.security.SslBypassStore
 import hivens.launcher.InstallSnapshot
@@ -44,6 +49,7 @@ import hivens.launcher.PackOperation
 import hivens.launcher.PackOperationKind
 import hivens.launcher.PackOperationPhase
 import hivens.launcher.catalogue.PackCatalogueRegistry
+import hivens.launcher.modrinth.ModrinthClient
 import hivens.launcher.network.CertificateTrustGate
 import hivens.launcher.instance.PackInstanceService.DeleteOutcome
 import hivens.launcher.update.ReattachConfirmation
@@ -353,9 +359,9 @@ class CoreKeysTest {
      * The launcher's Koin with stand-ins under the services the factories read, the
      * launcher's own level module, and nothing of any shell. The packs and accounts
      * modules bring their keys the way the launcher brings them, through their key
-     * contributions, for a document that names them, which [withPacks] and
-     * [withAccounts] false do not. With [withActions] false the pack actions are
-     * missing, the way a broken install would leave them.
+     * contributions, for a document that names them, which [withPacks],
+     * [withAccounts] and [withCatalogue] false do not. With [withActions] false the
+     * pack actions are missing, the way a broken install would leave them.
      */
     private inner class Launcher(
         settings: SettingsData = SettingsData(),
@@ -363,6 +369,7 @@ class CoreKeysTest {
         withActions: Boolean = true,
         withPacks: Boolean = true,
         withAccounts: Boolean = true,
+        withCatalogue: Boolean = true,
         notified: Boolean = false,
         /** What signs a stored account in at startup. */
         auth: AuthProvider = OfflineAuthProvider(),
@@ -399,19 +406,18 @@ class CoreKeysTest {
         val keys = HostKeys(data, commands, ContributedServices()).also { keys ->
             moduleKeys(
                 keys     = keys,
-                named    = setOfNotNull(PacksApi.ID.takeIf { withPacks }, AccountsApi.ID.takeIf { withAccounts }),
-                compiled = listOf(PacksModule, AccountsModule),
+                named    = setOfNotNull(PacksApi.ID.takeIf { withPacks }, AccountsApi.ID.takeIf { withAccounts }, CatalogueApi.ID.takeIf { withCatalogue }),
+                compiled = listOf(PacksModule, AccountsModule, CatalogueModule),
                 jars     = emptyList(),
             )
         }.also { hostKeys += it }
-        val console = GameConsoleService(
-            PlatformPaths(
-                osName = "linux",
-                home = dir,
-                bootstrapDataDir = { null },
-                env = { name -> if (name == "NEXIRA_DATA_DIR") dir.toString() else null },
-            ),
-        ).also { consoles += it }
+        val paths = PlatformPaths(
+            osName = "linux",
+            home = dir,
+            bootstrapDataDir = { null },
+            env = { name -> if (name == "NEXIRA_DATA_DIR") dir.toString() else null },
+        )
+        val console = GameConsoleService(paths).also { consoles += it }
         val appearance = AppearanceStore(
             settings    = this.settings,
             preferences = preferences,
@@ -441,6 +447,12 @@ class CoreKeysTest {
                     single { PackOutcomes(operations, scope) }
                     single<PackUpdateStatusHub> { hub }
                     single { PackCatalogueRegistry(listOf(Catalogue())) }
+                    single { paths }
+                    // Stood up and never reached: whatever a page asks of the network fails.
+                    single {
+                        val offline = HttpClientProvider { error("no network in a keys test") }
+                        ModrinthClient(offline, TransferEngine(offline))
+                    }
                     single { indications }
                     single<PacksHost> { ClientPacksHost({}, indications, reporter, scope) }
                     single<AccountsHost> { ClientAccountsHost(reporter, preferences, CertificateTrustGate(Grants()), "smartycraft.example") }
@@ -968,6 +980,66 @@ class CoreKeysTest {
         assertEquals("Steve", session.playerName, "nobody is signed in, so it runs as the offline name")
         assertTrue(session.offline)
         assertTrue(launcher.center.groups.value.isEmpty(), "a module left out is not a part that failed: ${launcher.center.groups.value}")
+    }
+
+    // ── Catalogue ─────────────────────────────────────────────────────
+
+    /** Every key the catalogue module brings, by id. */
+    private val catalogueIds: List<String> = listOf(
+        CatalogueKeys.TAGS_ID, CatalogueKeys.LOAD_TAGS_ID, CatalogueKeys.BROWSE_ID, CatalogueKeys.RESULTS_ID,
+        CatalogueKeys.OPEN_PROJECT_ID, CatalogueKeys.NAMES_ID, CatalogueKeys.INSTALL_CHOICE_ID, CatalogueKeys.SET_KIND_ID,
+        CatalogueKeys.SET_ORIGIN_ID, CatalogueKeys.SET_QUERY_ID, CatalogueKeys.SET_SORT_ID, CatalogueKeys.SET_TARGET_ID,
+        CatalogueKeys.AIM_ID, CatalogueKeys.TOGGLE_FILTER_ID, CatalogueKeys.EXCLUDE_FILTER_ID, CatalogueKeys.REMOVE_FILTER_ID,
+        CatalogueKeys.CLEAR_FILTERS_ID, CatalogueKeys.SEARCH_FOR_ID, CatalogueKeys.UNLOCK_ID, CatalogueKeys.RELOCK_ID,
+        CatalogueKeys.HIDE_INSTALLED_ID, CatalogueKeys.MIRROR_OWN_ID, CatalogueKeys.MIRROR_COMMUNITY_ID,
+        CatalogueKeys.TOGGLE_HIDE_INSTALLED_ID, CatalogueKeys.TOGGLE_MIRROR_OWN_ID, CatalogueKeys.TOGGLE_MIRROR_COMMUNITY_ID,
+        CatalogueKeys.MORE_RESULTS_ID, CatalogueKeys.RETRY_RESULTS_ID, CatalogueKeys.SHOW_RESULTS_ID, CatalogueKeys.HIDE_RESULTS_ID, CatalogueKeys.SCROLL_RESULTS_ID,
+        CatalogueKeys.INSTALL_RESULT_ID, CatalogueKeys.CHOOSE_INSTALL_ID, CatalogueKeys.INSTALL_INTO_ID,
+        CatalogueKeys.INSTALL_NEW_PACK_ID, CatalogueKeys.RETRY_CHOICE_ID, CatalogueKeys.DISMISS_INSTALL_ID,
+        CatalogueKeys.PROJECT_ID, CatalogueKeys.BUILD_ID, CatalogueKeys.PACK_ID, CatalogueKeys.SHOW_PROJECT_ID,
+        CatalogueKeys.HIDE_PROJECT_ID, CatalogueKeys.RELOAD_PROJECT_ID, CatalogueKeys.LOAD_VERSIONS_ID,
+        CatalogueKeys.RETRY_VERSIONS_ID, CatalogueKeys.INSTALL_PROJECT_ID, CatalogueKeys.RETRY_INSTALL_ID,
+        CatalogueKeys.SHOW_BUILD_ID, CatalogueKeys.SHOW_PACK_ID, CatalogueKeys.HIDE_PACK_ID, CatalogueKeys.RETRY_PACK_ID,
+    )
+
+    @Test
+    fun `a document that does not name the catalogue module has no catalogue keys, and nothing is said to be broken`() {
+        val launcher = Launcher(withCatalogue = false, notified = true)
+        val page = launcher.composition().child(ScopeLevel.Page)
+        catalogueIds.forEach { id -> assertNull(launcher.app.declarationOf(id), "$id is declared without the module") }
+        assertNull(page.find(CatalogueKeys.Browse))
+        assertNull(page.find(CatalogueKeys.Results))
+        assertNull(page.find(CatalogueKeys.OpenProject))
+        assertNull(page.find(CatalogueKeys.ProjectPage))
+        assertNull(page.findCommand(CatalogueKeys.SetQuery))
+        assertNull(page.findCommand(CatalogueKeys.ShowProject))
+        assertNotNull(page.find(PackKeys.Library), "the modules it names are there all the same")
+        assertNotNull(page.find(Sources.ConsoleVisible), "and the host's own keys")
+        assertTrue(launcher.center.groups.value.isEmpty(), "a module left out is not a part that failed: ${launcher.center.groups.value}")
+    }
+
+    @Test
+    fun `the catalogue's keys answer at their levels, one browse per window and one page per page`() {
+        val launcher = Launcher()
+        catalogueIds.forEach { id ->
+            val declared = assertNotNull(launcher.app.declarationOf(id), "$id is not declared")
+            assertEquals(KeyOrigin.Factory, declared.origin, "$id is not made by a factory")
+        }
+        val window = launcher.app.child(ScopeLevel.Window)
+        val other = launcher.app.child(ScopeLevel.Window)
+        val composition = window.child(ScopeLevel.Composition)
+        val page = composition.child(ScopeLevel.Page)
+        val sibling = composition.child(ScopeLevel.Page)
+
+        launcher.fire(page, CatalogueKeys.SetQuery, "sodium")
+        assertEquals("sodium", launcher.source(window, CatalogueKeys.Browse).query, "a page fires into its window's browse")
+        assertEquals("", launcher.source(other, CatalogueKeys.Browse).query, "a second window browses on its own")
+        assertSame(window.find(CatalogueKeys.Browse), page.find(CatalogueKeys.Browse), "a page below a window reads that window's")
+        assertEquals(listOf("mirror"), launcher.source(window, CatalogueKeys.Browse).origins, "the sources the build carries, by name")
+
+        assertNull(page.current(CatalogueKeys.ProjectPage), "a page shows no project until one is shown")
+        assertTrue(page.find(CatalogueKeys.ProjectPage) !== sibling.find(CatalogueKeys.ProjectPage), "two pages do not share one")
+        assertTrue(launcher.problems.reported.isEmpty(), "nothing failed: ${launcher.problems.reported}")
     }
 
     @Test

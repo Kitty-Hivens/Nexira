@@ -1,32 +1,20 @@
 package hivens.ui.feature.catalogue.browse
 
-import hivens.core.api.dto.modrinth.ModrinthDisclosure
-import hivens.core.api.dto.modrinth.ModrinthGameVersion
-import hivens.core.data.PackOrigin
-import hivens.launcher.content.ContentKind
-import hivens.launcher.modrinth.ENV_CLIENT
-import hivens.launcher.modrinth.ENV_SERVER
-import hivens.launcher.modrinth.FilterField
-import hivens.launcher.modrinth.ModrinthClient
-import hivens.launcher.modrinth.SearchFilter
+import hivens.catalogue.api.CatalogueTags
+import hivens.catalogue.api.Disclosure
+import hivens.catalogue.api.ENV_CLIENT
+import hivens.catalogue.api.ENV_SERVER
+import hivens.catalogue.api.FilterField
+import hivens.catalogue.api.GameVersionTag
+import hivens.catalogue.api.ProjectTypes
+import hivens.catalogue.api.SearchFilter
+import hivens.catalogue.api.groupGameVersions
 import hivens.ui.i18n.AppStrings
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
-import hivens.ui.feature.catalogue.project.groupGameVersions
 import hivens.ui.feature.catalogue.project.loaderLabel
 
-/**
- * The catalogue project type a search is for: the kind's own, or modpacks while
- * packs are listed from the catalogue. Null where the source is not the catalogue,
- * which has no filters to offer.
- */
-internal fun catalogueTypeOf(kind: ContentKind?, origin: PackOrigin): String? = when {
-    kind != null -> ModrinthClient.projectTypeOf(kind)
-    origin == PackOrigin.Modrinth -> MODPACK
-    else -> null
-}
-
-internal const val MODPACK = "modpack"
+internal const val MODPACK = ProjectTypes.MODPACK
 
 /**
  * One block of the filter rail, after the catalogue's own sidebar: what it narrows,
@@ -97,12 +85,12 @@ internal class FilterChoice(
 internal fun choicesFor(
     group: FilterGroup,
     type: String,
-    tags: BrowseTags.Tags?,
+    tags: CatalogueTags?,
     s: AppStrings,
     allVersions: Boolean = false,
 ): List<FilterChoice> = when (group) {
     FilterGroup.GameVersion -> tags?.gameVersions.orEmpty()
-        .filter { allVersions || it.versionType == ModrinthGameVersion.RELEASE }
+        .filter { allVersions || it.versionType == GameVersionTag.RELEASE }
         .map { FilterChoice(SearchFilter(FilterField.GameVersion, it.version), it.version) }
     FilterGroup.Loader -> {
         val defaults = DEFAULT_LOADERS[type].orEmpty()
@@ -129,7 +117,7 @@ internal fun choicesFor(
                 )
             }
             .let { choices -> if (group == FilterGroup.Resolutions) choices.sortedBy { resolutionOrder(it.filter.value) } else choices.sortedBy { it.label } }
-    FilterGroup.Environment -> if (type == ModrinthClient.projectTypeOf(ContentKind.Mod) || type == MODPACK) {
+    FilterGroup.Environment -> if (type == ProjectTypes.MOD || type == MODPACK) {
         listOf(
             FilterChoice(SearchFilter(FilterField.Environment, ENV_CLIENT), s.browseFilterClient, ChoiceMark.Glyph(NxIcon.Computer)),
             FilterChoice(SearchFilter(FilterField.Environment, ENV_SERVER), s.browseFilterServer, ChoiceMark.Glyph(NxIcon.Storage)),
@@ -141,7 +129,7 @@ internal fun choicesFor(
         FilterChoice(SearchFilter(FilterField.OpenSource, OPEN_SOURCE), s.browseFilterOpenSource, ChoiceMark.Glyph(NxIcon.Code)),
     )
     FilterGroup.Exclusions -> DISCLOSURES
-        .filter { (kind, _) -> kind !in MODS_AND_MODPACKS_ONLY || type == ModrinthClient.projectTypeOf(ContentKind.Mod) || type == MODPACK }
+        .filter { (kind, _) -> kind !in MODS_AND_MODPACKS_ONLY || type == ProjectTypes.MOD || type == MODPACK }
         .map { (kind, icon) -> FilterChoice(SearchFilter(FilterField.Disclosure, kind, excluded = true), disclosureLabel(kind, s), ChoiceMark.Glyph(icon)) }
 }
 
@@ -179,28 +167,28 @@ private fun resolutionOrder(value: String): Int = value.takeWhile { it.isDigit()
  * modpacks only, so the other kinds do not offer them.
  */
 private val DISCLOSURES = listOf(
-    ModrinthDisclosure.TELEMETRY to NxIcon.Wifi,
-    ModrinthDisclosure.ADVERTISEMENTS to NxIcon.Campaign,
-    ModrinthDisclosure.PAID_FEATURES to NxIcon.Paid,
-    ModrinthDisclosure.AI_CONTENT to NxIcon.Science,
-    ModrinthDisclosure.AI_FUNCTIONALITY to NxIcon.Science,
-    ModrinthDisclosure.SYSTEM_INTERACTIONS to NxIcon.Computer,
-    ModrinthDisclosure.EPILEPSY_TRIGGERS to NxIcon.Visibility,
+    Disclosure.TELEMETRY to NxIcon.Wifi,
+    Disclosure.ADVERTISEMENTS to NxIcon.Campaign,
+    Disclosure.PAID_FEATURES to NxIcon.Paid,
+    Disclosure.AI_CONTENT to NxIcon.Science,
+    Disclosure.AI_FUNCTIONALITY to NxIcon.Science,
+    Disclosure.SYSTEM_INTERACTIONS to NxIcon.Computer,
+    Disclosure.EPILEPSY_TRIGGERS to NxIcon.Visibility,
     ARCHIVED to NxIcon.Inventory2,
 )
 
 private const val ARCHIVED = "archived"
 
-private val MODS_AND_MODPACKS_ONLY = setOf(ModrinthDisclosure.TELEMETRY, ModrinthDisclosure.SYSTEM_INTERACTIONS)
+private val MODS_AND_MODPACKS_ONLY = setOf(Disclosure.TELEMETRY, Disclosure.SYSTEM_INTERACTIONS)
 
 private fun disclosureLabel(kind: String, s: AppStrings): String = when (kind) {
-    ModrinthDisclosure.TELEMETRY -> s.modDisclosureTelemetry
-    ModrinthDisclosure.ADVERTISEMENTS -> s.modDisclosureAds
-    ModrinthDisclosure.PAID_FEATURES -> s.modDisclosurePaid
-    ModrinthDisclosure.AI_CONTENT -> s.modDisclosureAiContent
-    ModrinthDisclosure.AI_FUNCTIONALITY -> s.modDisclosureAiFunctionality
-    ModrinthDisclosure.SYSTEM_INTERACTIONS -> s.modDisclosureSystem
-    ModrinthDisclosure.EPILEPSY_TRIGGERS -> s.modDisclosureEpilepsy
+    Disclosure.TELEMETRY -> s.modDisclosureTelemetry
+    Disclosure.ADVERTISEMENTS -> s.modDisclosureAds
+    Disclosure.PAID_FEATURES -> s.modDisclosurePaid
+    Disclosure.AI_CONTENT -> s.modDisclosureAiContent
+    Disclosure.AI_FUNCTIONALITY -> s.modDisclosureAiFunctionality
+    Disclosure.SYSTEM_INTERACTIONS -> s.modDisclosureSystem
+    Disclosure.EPILEPSY_TRIGGERS -> s.modDisclosureEpilepsy
     else -> s.browseFilterArchived
 }
 
@@ -228,7 +216,7 @@ internal class ChosenChip(val label: String, val filters: List<SearchFilter>, va
  * snapshot beside releases, keeps a chip of its own, so every choice stays
  * removable. Without the catalogue's list nothing is folded.
  */
-internal fun chosenChips(chosen: Collection<SearchFilter>, versions: List<ModrinthGameVersion>, s: AppStrings): List<ChosenChip> {
+internal fun chosenChips(chosen: Collection<SearchFilter>, versions: List<GameVersionTag>, s: AppStrings): List<ChosenChip> {
     val sorted = chosen.sortedWith(compareBy({ it.field.ordinal }, { it.value }))
     val (picked, rest) = sorted.partition { it.field == FilterField.GameVersion && !it.excluded }
     val groups = groupGameVersions(picked.map { it.value }, versions)

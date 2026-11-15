@@ -1,7 +1,5 @@
 package hivens.ui.feature.catalogue.project
 
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.CoroutineScope
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
@@ -35,7 +33,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,9 +42,17 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import hivens.core.api.dto.modrinth.ModrinthGameVersion
-import hivens.core.api.dto.modrinth.ModrinthVersion
+import hivens.catalogue.api.CatalogueKeys
+import hivens.catalogue.api.GameVersionGroup
+import hivens.catalogue.api.GameVersionTag
+import hivens.catalogue.api.InstallOffer
+import hivens.catalogue.api.ProjectBuild
+import hivens.catalogue.api.ProjectInstall
+import hivens.catalogue.api.ProjectPageView
+import hivens.catalogue.api.gameVersionChips
 import hivens.core.update.VersionChannel
+import hivens.widget.api.rememberScopedAction
+import hivens.widget.api.rememberScopedCommand
 import hivens.ui.components.LoaderGlyph
 import hivens.ui.components.formatBuildTimestamp
 import hivens.ui.components.relativeAge
@@ -71,7 +76,6 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.layers.layerTrigger
 import hivens.ui.utils.humanSize
-import kotlinx.coroutines.launch
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.OnFill
@@ -89,36 +93,31 @@ import hivens.ui.theme.Status
  */
 @Composable
 internal fun VersionsPane(
-    state: ModDetailState,
+    view: ProjectPageView,
     /** Opens one build's own page. The row keeps its files expander. */
-    onOpenVersion: (ModrinthVersion) -> Unit,
+    onOpenVersion: (ProjectBuild) -> Unit,
     /**
-     * Asks the SCREEN to load the project again.
-     *
-     * Not `state.load()` on this pane's own scope: the pane goes away when the
-     * reader switches tabs, taking the retry it launched with it, and the two
-     * would race the screen's own effect over the same fields either way.
+     * Asks the page to load the project again: the screen's own read, which the pane
+     * going away with a tab switch does not take with it.
      */
     onReload: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val s = LocalStrings.current
-    val scope = rememberCoroutineScope()
-    val installScope = state.installScope
+    val loadVersions = rememberScopedAction(CatalogueKeys.LoadVersions)
+    val retryVersions = rememberScopedAction(CatalogueKeys.RetryVersions)
     // Keyed on the project too. The page resolves it asynchronously, and a tab
     // opened before it lands used to ask with nothing to ask about, give up
     // silently, and leave a spinner running for the rest of the visit.
-    LaunchedEffect(state, state.project) { state.loadVersions() }
-    // A file the mirror answered for has its releases from there, folded the same way.
-    LaunchedEffect(state, state.mirror) { if (state.mirror != null) state.loadGameVersionTags() }
+    LaunchedEffect(view.visit, view.project) { loadVersions?.invoke() }
 
-    val all = state.versions
+    val all = view.versions
 
     when {
         // The page's own lookup never ran, so whether the catalogue holds an entry
         // for this file is not known. The branch below would answer that it holds
         // none, which is a verdict nobody obtained.
-        state.failed -> {
+        view.failed -> {
             RetryStateBlock(
                 title = s.contentTabFetchErrorTitle,
                 message = s.contentTabFetchErrorGeneric,
@@ -129,12 +128,12 @@ internal fun VersionsPane(
             )
             return
         }
-        state.versionsFailed -> {
+        view.versionsFailed -> {
             RetryStateBlock(
                 title = s.modPageVersionsFailed,
                 message = s.modPageVersionsFailedBody,
                 retryLabel = s.contentTabRetry,
-                onRetry = { scope.launch { state.versions = null; state.loadVersions() } },
+                onRetry = { retryVersions?.invoke() },
                 modifier = modifier.padding(20.dp),
                 titleStyle = MaterialTheme.typography.titleMedium,
             )
@@ -142,18 +141,16 @@ internal fun VersionsPane(
         }
         // Still finding out. Either the page has not resolved its project or the
         // list itself is in flight.
-        state.loading || state.versionsLoading -> {
+        view.loading || view.versionsLoading -> {
             CenteredProgress(modifier.fillMaxSize())
             return
         }
         // The catalogue has no entry and the mirror has one: its releases, with
         // nothing to install, since the mirror's files go in through its packs.
-        !state.knownToCatalogue && state.mirror != null -> {
-            val mirror = state.mirror
-            val builds = remember(mirror) { mirror?.builds().orEmpty() }
+        !view.knownToCatalogue && view.mirror != null -> {
             BuildsTable(
-                builds = builds,
-                gameVersionTags = state.gameVersionTags,
+                builds = view.mirror?.builds.orEmpty(),
+                gameVersionTags = view.gameVersionTags,
                 onOpenBuild = null,
                 rowAction = null,
                 modifier = modifier,
@@ -162,7 +159,7 @@ internal fun VersionsPane(
         }
         // Looked, and there is no entry. A jar the catalogue has never seen has no
         // build list and never will, which is an answer rather than a wait.
-        !state.knownToCatalogue -> {
+        !view.knownToCatalogue -> {
             Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(
                     s.modPageVersionsNoEntry,
@@ -193,17 +190,15 @@ internal fun VersionsPane(
         }
         return
     }
-    val byId = remember(rows) { rows.associateBy { it.id } }
-    val table = remember(rows) { rows.map { it.toBuild() } }
     // The action per row, which is the point of the table. Nothing where there is
     // no pack to put it in.
-    val installable = state.install is InstallAction.Install || state.install is InstallAction.Present
+    val installable = view.install is InstallOffer.Install || view.install is InstallOffer.Present
     BuildsTable(
-        builds = table,
-        gameVersionTags = state.gameVersionTags,
-        onOpenBuild = { b -> byId[b.id]?.let(onOpenVersion) },
+        builds = rows,
+        gameVersionTags = view.gameVersionTags,
+        onOpenBuild = onOpenVersion,
         rowAction = if (installable) {
-            { b -> byId[b.id]?.let { v -> InstallBuildButton(state, b, v, installScope) } }
+            { b -> InstallBuildButton(view, b) }
         } else {
             null
         },
@@ -224,16 +219,17 @@ internal fun VersionsPane(
  * works.
  */
 @Composable
-private fun InstallBuildButton(state: ModDetailState, b: ProjectBuild, v: ModrinthVersion, scope: CoroutineScope) {
+private fun InstallBuildButton(view: ProjectPageView, b: ProjectBuild) {
     val s = LocalStrings.current
-    val fits = remember(b, state.packMcVersion, state.packLoaders) {
-        runsOn(b, state.packMcVersion, state.packLoaders)
+    val install = rememberScopedCommand(CatalogueKeys.InstallProject)
+    val fits = remember(b, view.packMcVersion, view.packLoaders) {
+        runsOn(b, view.packMcVersion, view.packLoaders)
     }
     NxIconButton(
         icon = NxIcon.Download,
         contentDescription = if (fits) s.modPageInstallShort else s.versionsIncompatibleHint,
-        onClick = { scope.launch(Dispatchers.Main) { state.installVersion(v) } },
-        enabled = !state.installing,
+        onClick = { install?.invoke(ProjectInstall(b.id)) },
+        enabled = !view.installing,
         tint = if (fits) NxColor.lead() else NxColor.status(Status.Warning),
     )
 }
@@ -250,7 +246,7 @@ private fun InstallBuildButton(state: ModDetailState, b: ProjectBuild, v: Modrin
 @Composable
 internal fun BuildsTable(
     builds: List<ProjectBuild>,
-    gameVersionTags: List<ModrinthGameVersion>,
+    gameVersionTags: List<GameVersionTag>,
     onOpenBuild: ((ProjectBuild) -> Unit)?,
     rowAction: (@Composable (ProjectBuild) -> Unit)?,
     modifier: Modifier = Modifier,
@@ -566,7 +562,7 @@ private fun VersionTableRow(
     columns: ScrollState,
     nameWidth: Dp,
     b: ProjectBuild,
-    gameVersionTags: List<ModrinthGameVersion>,
+    gameVersionTags: List<GameVersionTag>,
     count: CountColumn?,
     filters: VersionFilters,
     onFilters: (VersionFilters) -> Unit,

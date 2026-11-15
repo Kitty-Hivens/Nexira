@@ -23,7 +23,7 @@ import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import hivens.ui.nx.NxSwap
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.screens.*
-import hivens.ui.feature.catalogue.browse.BrowseController
+import hivens.catalogue.api.CatalogueKeys
 import hivens.ui.feature.catalogue.browse.BrowseScreen
 import hivens.ui.feature.catalogue.browse.CataloguePackDetailScreen
 import hivens.ui.feature.catalogue.browse.LocalCatalogueSearch
@@ -68,7 +68,6 @@ import hivens.widget.api.valueOrNull
 import hivens.widget.model.ScopeLevel
 import hivens.widget.model.SlotId
 import hivens.widget.model.SurfaceId
-import org.koin.compose.koinInject
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxColor
 
@@ -95,7 +94,8 @@ fun AppLayout(
     onCustomizationChanged: (CustomizationSettings) -> Unit = {},
 ) {
     val windowClass = rememberWindowClass()
-    val browse: BrowseController = koinInject()
+    // Aims the window's browse at a pack, where a catalogue module answers it.
+    val aimBrowse = rememberScopedCommand(CatalogueKeys.Aim)
 
     // How the composition looks and speaks, read and changed the way a widget does,
     // for the screens that still take it as arguments.
@@ -217,7 +217,7 @@ fun AppLayout(
                         },
                         onOpenProject          = { onScreenChange(Screen.ModDetail(it)) },
                         onFindProjects         = {
-                            browse.aimAt(screen.instanceId)
+                            aimBrowse?.invoke(screen.instanceId)
                             onScreenChange(Screen.BrowseInto(screen.instanceId))
                         },
                     )

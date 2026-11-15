@@ -157,6 +157,9 @@ kotlin {
                 // module compiled in.
                 implementation(project(":accounts-api"))
                 implementation(project(":accounts"))
+                // The catalogue module, the same way.
+                implementation(project(":catalogue-api"))
+                implementation(project(":catalogue"))
                 implementation(project(":nx-ui"))
                 implementation(project(":ui-layers"))
                 implementation(project(":client-i18n"))
@@ -940,6 +943,7 @@ tasks.named<Test>("desktopTest") {
     // and check that every class it names is there for it. Off the test classpath too.
     mapOf(
         "accountsConsumer" to "accounts-consumer",
+        "catalogueConsumer" to "catalogue-consumer",
         "pixelPlayer" to "widget-pixelplayer",
         "screenFx" to "widget-screenfx",
         "looks" to "widget-looks",

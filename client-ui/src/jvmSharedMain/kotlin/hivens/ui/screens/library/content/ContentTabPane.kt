@@ -64,6 +64,8 @@ import hivens.core.data.OptionalContentRules
 import hivens.core.data.PackInstance
 import hivens.core.api.dto.modrinth.ModrinthVersion
 import hivens.core.update.VersionChannel
+import hivens.catalogue.api.ProjectKind
+import hivens.catalogue.api.ProjectTarget
 import hivens.launcher.content.ContentKind
 import hivens.launcher.instance.ContentRef
 import hivens.launcher.instance.DependencyIssue
@@ -107,7 +109,6 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.theme.familyForText
 import hivens.ui.theme.decorativeColor
-import hivens.ui.feature.catalogue.project.ModTarget
 import hivens.ui.feature.catalogue.project.rememberLinkFollower
 import hivens.ui.screens.versions.pickerIntentFor
 import hivens.ui.screens.versions.pickerVersionsOf
@@ -146,7 +147,7 @@ internal fun ContentTabPane(
      * Opens the project page. A page and not a dialog, because its metadata
      * blocks live in the shell's right rail and a dialog has no rail beside it.
      */
-    onOpenProject: (ModTarget) -> Unit,
+    onOpenProject: (ProjectTarget) -> Unit,
     /** Opens the launcher's browse aimed at this pack. */
     onFindProjects: () -> Unit,
     modifier: Modifier = Modifier,
@@ -279,7 +280,7 @@ internal fun ContentTabPane(
                                 onToggle       = { enabled -> state.toggle(c, enabled) },
                                 onDelete       = if (rules.canDelete) ({ state.requestDelete(c) }) else null,
                                 onDetails      = {
-                                    onOpenProject(ModTarget.Installed(instance.id, c.kind, c.fileName))
+                                    onOpenProject(ProjectTarget.Installed(instance.id, c.kind.toProjectKind(), c.fileName))
                                 },
                                 resolveProject = { state.resolveProject(c) },
                                 update         = state.liveUpdates[ref],
@@ -1082,4 +1083,11 @@ private fun ContentIconState.model(): Any? = when (this) {
     is ContentIconState.Bytes -> data
     is ContentIconState.Url -> url
     ContentIconState.None -> null
+}
+
+/** What a row's folder holds, as the catalogue names it for a page opened on the file. */
+private fun ContentKind.toProjectKind(): ProjectKind = when (this) {
+    ContentKind.Mod -> ProjectKind.Mod
+    ContentKind.ResourcePack -> ProjectKind.ResourcePack
+    ContentKind.ShaderPack -> ProjectKind.ShaderPack
 }

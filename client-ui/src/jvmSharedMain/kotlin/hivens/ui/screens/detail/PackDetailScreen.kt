@@ -91,7 +91,7 @@ import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.screens.ConsoleContent
 import hivens.ui.screens.ConsoleSource
-import hivens.ui.feature.catalogue.project.ModTarget
+import hivens.catalogue.api.ProjectTarget
 import hivens.ui.feature.catalogue.project.loaderLabel
 import hivens.ui.screens.detail.settings.PackSettingsCategory
 import hivens.ui.screens.detail.settings.PackSettingsSheet
@@ -142,7 +142,7 @@ fun PackDetailScreen(
     initialSettingsSection: PackSettingsCategory? = null,
     onOpenVersions: (fromSettings: Boolean) -> Unit = {},
     /** Opens the project page for one of this instance's files. */
-    onOpenProject: (ModTarget) -> Unit = {},
+    onOpenProject: (ProjectTarget) -> Unit = {},
     /** Opens the launcher's browse aimed at this pack. */
     onFindProjects: () -> Unit = {},
 ) {

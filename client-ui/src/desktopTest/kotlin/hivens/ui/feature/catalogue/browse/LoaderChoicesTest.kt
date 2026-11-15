@@ -1,7 +1,8 @@
 package hivens.ui.feature.catalogue.browse
 
-import hivens.core.api.dto.modrinth.ModrinthCategoryTag
-import hivens.core.api.dto.modrinth.ModrinthLoaderTag
+import hivens.catalogue.api.CatalogueTags
+import hivens.catalogue.api.CategoryTag
+import hivens.catalogue.api.LoaderTag
 import hivens.ui.i18n.EnglishStrings
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -10,14 +11,14 @@ import kotlin.test.assertTrue
 /** Which loaders the rail offers each type. */
 class LoaderChoicesTest {
 
-    private val tags = BrowseTags.Tags(
+    private val tags = CatalogueTags(
         gameVersions = emptyList(),
-        categories = listOf(ModrinthCategoryTag("16x", projectType = "resourcepack", header = "resolutions")),
+        categories = listOf(CategoryTag("16x", projectType = "resourcepack", header = "resolutions")),
         loaders = listOf(
-            ModrinthLoaderTag("minecraft", listOf("resourcepack")),
-            ModrinthLoaderTag("fabric", listOf("mod", "modpack")),
-            ModrinthLoaderTag("iris", listOf("shader")),
-            ModrinthLoaderTag("paper", listOf("plugin", "mod")),
+            LoaderTag("minecraft", listOf("resourcepack")),
+            LoaderTag("fabric", listOf("mod", "modpack")),
+            LoaderTag("iris", listOf("shader")),
+            LoaderTag("paper", listOf("plugin", "mod")),
         ),
     )
 

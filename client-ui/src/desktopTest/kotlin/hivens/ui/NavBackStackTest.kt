@@ -1,6 +1,6 @@
 package hivens.ui
 
-import hivens.core.data.PackOrigin
+import hivens.catalogue.api.PackOrigins
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -60,11 +60,11 @@ class NavBackStackTest {
         // install -> installed detail should back out the way it came in, not
         // jump to a fixed Library literal.
         val nav = NavBackStack(Screen.Browse)
-        nav.navigate(Screen.CataloguePackDetail(PackOrigin.Mirror, "Industrial"))
+        nav.navigate(Screen.CataloguePackDetail(PackOrigins.MIRROR, "Industrial"))
         nav.navigate(Screen.PackDetail("inst-1"))
         assertEquals(Screen.PackDetail("inst-1"), nav.current)
         nav.back()
-        assertEquals(Screen.CataloguePackDetail(PackOrigin.Mirror, "Industrial"), nav.current)
+        assertEquals(Screen.CataloguePackDetail(PackOrigins.MIRROR, "Industrial"), nav.current)
         nav.back()
         assertEquals(Screen.Browse, nav.current)
         assertFalse(nav.canGoBack)
@@ -173,10 +173,10 @@ class NavBackStackTest {
     @Test
     fun trailReflectsStackOrder() {
         val nav = NavBackStack(Screen.Browse)
-        nav.navigate(Screen.CataloguePackDetail(PackOrigin.Mirror, "Industrial"))
+        nav.navigate(Screen.CataloguePackDetail(PackOrigins.MIRROR, "Industrial"))
         nav.navigate(Screen.PackDetail("inst-1"))
         assertEquals(
-            listOf(Screen.Browse, Screen.CataloguePackDetail(PackOrigin.Mirror, "Industrial"), Screen.PackDetail("inst-1")),
+            listOf(Screen.Browse, Screen.CataloguePackDetail(PackOrigins.MIRROR, "Industrial"), Screen.PackDetail("inst-1")),
             nav.trail,
         )
     }
@@ -194,7 +194,7 @@ class NavBackStackTest {
     @Test
     fun popToUnwindsToNamedSegment() {
         val nav = NavBackStack(Screen.Browse)
-        nav.navigate(Screen.CataloguePackDetail(PackOrigin.Mirror, "Industrial"))
+        nav.navigate(Screen.CataloguePackDetail(PackOrigins.MIRROR, "Industrial"))
         nav.navigate(Screen.PackDetail("inst-1"))
         nav.popTo(Screen.Browse)
         assertEquals(Screen.Browse, nav.current)
@@ -215,22 +215,22 @@ class NavBackStackTest {
     @Test
     fun forwardReappliesBackedScreen() {
         val nav = NavBackStack(Screen.Browse)
-        nav.navigate(Screen.CataloguePackDetail(PackOrigin.Mirror, "X"))
+        nav.navigate(Screen.CataloguePackDetail(PackOrigins.MIRROR, "X"))
         assertTrue(nav.back())
         assertEquals(Screen.Browse, nav.current)
         assertTrue(nav.canGoForward)
         assertTrue(nav.forward())
-        assertEquals(Screen.CataloguePackDetail(PackOrigin.Mirror, "X"), nav.current)
+        assertEquals(Screen.CataloguePackDetail(PackOrigins.MIRROR, "X"), nav.current)
         assertFalse(nav.canGoForward)
     }
 
     @Test
     fun navigateClearsForward() {
         val nav = NavBackStack(Screen.Browse)
-        nav.navigate(Screen.CataloguePackDetail(PackOrigin.Mirror, "X"))
+        nav.navigate(Screen.CataloguePackDetail(PackOrigins.MIRROR, "X"))
         nav.back()
         assertTrue(nav.canGoForward)
-        nav.navigate(Screen.CataloguePackDetail(PackOrigin.Mirror, "Y")) // new branch -> forward dropped
+        nav.navigate(Screen.CataloguePackDetail(PackOrigins.MIRROR, "Y")) // new branch -> forward dropped
         assertFalse(nav.canGoForward)
         assertFalse(nav.forward())
     }
@@ -238,11 +238,11 @@ class NavBackStackTest {
     @Test
     fun historyHoldsWhatBothArrowsReachAndNothingASwitchDropped() {
         val nav = NavBackStack(Screen.Browse)
-        nav.navigate(Screen.CataloguePackDetail(PackOrigin.Mirror, "X"))
+        nav.navigate(Screen.CataloguePackDetail(PackOrigins.MIRROR, "X"))
         nav.navigate(Screen.PackDetail("i1"))
         nav.back()
         assertEquals(
-            listOf(Screen.Browse, Screen.CataloguePackDetail(PackOrigin.Mirror, "X"), Screen.PackDetail("i1")),
+            listOf(Screen.Browse, Screen.CataloguePackDetail(PackOrigins.MIRROR, "X"), Screen.PackDetail("i1")),
             nav.history,
             "a screen Back stepped off is still reachable by Forward",
         )
@@ -260,13 +260,13 @@ class NavBackStackTest {
     @Test
     fun popToFillsForwardAndReExpandsInOrder() {
         val nav = NavBackStack(Screen.Browse)
-        nav.navigate(Screen.CataloguePackDetail(PackOrigin.Mirror, "X"))
+        nav.navigate(Screen.CataloguePackDetail(PackOrigins.MIRROR, "X"))
         nav.navigate(Screen.PackDetail("i1"))
         nav.popTo(Screen.Browse)
         assertEquals(Screen.Browse, nav.current)
         assertTrue(nav.canGoForward)
         nav.forward()
-        assertEquals(Screen.CataloguePackDetail(PackOrigin.Mirror, "X"), nav.current)
+        assertEquals(Screen.CataloguePackDetail(PackOrigins.MIRROR, "X"), nav.current)
         nav.forward()
         assertEquals(Screen.PackDetail("i1"), nav.current)
     }

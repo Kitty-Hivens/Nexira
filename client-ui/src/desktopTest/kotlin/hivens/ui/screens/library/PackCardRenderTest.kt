@@ -15,7 +15,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import hivens.core.api.HttpClientProvider
-import hivens.core.api.catalogue.CataloguePack
+import hivens.catalogue.api.CatalogueCard
+import hivens.catalogue.api.PackOrigins
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
@@ -96,8 +97,8 @@ class PackCardRenderTest {
         iconUrl = "",
     )
 
-    private val catalogue = CataloguePack(
-        origin = PackOrigin.Mirror,
+    private val catalogue = CatalogueCard(
+        origin = PackOrigins.MIRROR,
         id = "cat-1",
         title = "Fabulously Optimized",
         tagline = "Стабильный набор оптимизаций и удобств",

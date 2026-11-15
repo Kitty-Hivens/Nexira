@@ -1,6 +1,7 @@
 package hivens.ui.feature.catalogue.project
 
-import hivens.core.data.PackOrigin
+import hivens.catalogue.api.PackOrigins
+import hivens.catalogue.api.ProjectTarget
 import hivens.ui.Screen
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -33,16 +34,16 @@ class ProjectLinksTest {
     @Test
     fun `a project link opens a page that installs into the pack it was followed from`() {
         assertEquals(
-            Screen.ModDetail(ModTarget.Catalogue("sodium", intoInstanceId = "pack-1")),
+            Screen.ModDetail(ProjectTarget.Catalogue("sodium", intoInstanceId = "pack-1")),
             linkScreen("https://modrinth.com/mod/sodium", "pack-1"),
         )
-        assertEquals(Screen.ModDetail(ModTarget.Catalogue("sodium")), linkScreen("https://modrinth.com/mod/sodium", null))
+        assertEquals(Screen.ModDetail(ProjectTarget.Catalogue("sodium")), linkScreen("https://modrinth.com/mod/sodium", null))
     }
 
     @Test
     fun `a modpack link opens its own page, never one aimed at a pack`() {
         assertEquals(
-            Screen.CataloguePackDetail(PackOrigin.Modrinth, "fabulously-optimized"),
+            Screen.CataloguePackDetail(PackOrigins.MODRINTH, "fabulously-optimized"),
             linkScreen("https://modrinth.com/modpack/fabulously-optimized", "pack-1"),
         )
         assertNull(linkScreen("https://example.com/mod/sodium", "pack-1"))

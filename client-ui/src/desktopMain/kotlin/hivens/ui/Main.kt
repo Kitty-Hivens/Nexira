@@ -88,7 +88,6 @@ import hivens.ui.widgets.state.WidgetStateGc
 import hivens.ui.widgets.state.WidgetStateStore
 import hivens.widget.api.WidgetCommandRegistry
 import hivens.widget.api.WidgetDataRegistry
-import hivens.ui.feature.catalogue.project.OpenProjectState
 import hivens.widget.api.SurfaceFamilies
 import hivens.ui.widgets.modules.DesktopWidgetModuleHost
 import hivens.ui.widgets.modules.offeredApiPackages
@@ -98,10 +97,6 @@ import hivens.widget.api.WidgetRegistry
 import hivens.widget.api.WidgetServiceRegistry
 import hivens.widget.api.command
 import hivens.ui.debug.DebugOverlayState
-import hivens.ui.feature.catalogue.browse.BrowseController
-import hivens.ui.feature.catalogue.browse.BrowseSession
-import hivens.ui.feature.catalogue.browse.ProjectBrowseSession
-import hivens.ui.feature.catalogue.browse.BrowseTags
 import hivens.widget.api.flowSource
 import hivens.widget.api.suspendCommand
 import hivens.widget.generated.GeneratedWidgetRegistry

@@ -1,7 +1,6 @@
 package hivens.ui.feature.catalogue.project
 
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.CoroutineScope
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,27 +22,34 @@ import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
-import hivens.core.api.HttpClientProvider
-import hivens.core.api.dto.modrinth.ModrinthDisclosure
+import hivens.catalogue.api.CatalogueKeys
+import hivens.catalogue.api.Disclosure
+import hivens.catalogue.api.GameVersionTag
+import hivens.catalogue.api.InstallOffer
+import hivens.catalogue.api.InstalledFile
+import hivens.catalogue.api.OpenProject
+import hivens.catalogue.api.ProjectCreator
+import hivens.catalogue.api.ProjectPageView
+import hivens.catalogue.api.ProjectSource
+import hivens.catalogue.api.ProjectTarget
+import hivens.catalogue.api.groupGameVersions
 import hivens.core.api.dto.modrinth.ModrinthDisclosures
 import hivens.core.api.dto.modrinth.ModrinthGameVersion
 import hivens.core.api.dto.modrinth.ModrinthProject
 import hivens.core.api.dto.modrinth.ModrinthVersion
-import hivens.core.api.interfaces.IPackRepository
-import hivens.core.data.PackInstance
-import hivens.core.net.TransferEngine
 import hivens.launcher.content.ContentKind
-import hivens.launcher.instance.InstalledContent
-import hivens.launcher.instance.InstanceContentScanner
-import hivens.launcher.modrinth.ModrinthClient
+import hivens.launcher.instance.loadersFor
 import hivens.ui.components.ImageGallery
-import hivens.ui.components.formatBuildTimestamp
-import hivens.ui.i18n.RussianStrings
-import hivens.ui.components.modrinthGalleryMedia
+import hivens.ui.components.galleryMedia
+import hivens.ui.feature.catalogue.links
+import hivens.ui.feature.catalogue.toBuild
+import hivens.ui.feature.catalogue.toDetails
+import hivens.ui.feature.catalogue.toGallery
+import hivens.ui.feature.catalogue.toTags
+import hivens.ui.feature.catalogue.toView
 import hivens.ui.surface.NxSurface
 import hivens.ui.theme.NxTheme
 import hivens.ui.widgets.KoinLevelServicesHost
-import hivens.ui.widgets.Sources
 import hivens.ui.widgets.WidgetSurface
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.LocalScope
@@ -66,7 +72,6 @@ import hivens.widget.model.SurfaceId
 import org.koin.dsl.koinApplication
 import org.koin.dsl.module
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.serialization.json.Json
 import org.jetbrains.skia.EncodedImageFormat
 import org.jetbrains.skia.Data
@@ -99,11 +104,11 @@ class ModPageRenderTest {
 
     private fun project(slug: String) = json.decodeFromString<ModrinthProject>(resource("$slug.project.json"))
 
-    private fun disclosures(slug: String): List<ModrinthDisclosure> =
-        json.decodeFromString<ModrinthDisclosures>(resource("$slug.disclosures.json")).disclosures
+    private fun disclosures(slug: String): List<Disclosure> =
+        json.decodeFromString<ModrinthDisclosures>(resource("$slug.disclosures.json")).disclosures.map { it.toView() }
 
-    private val gameVersions: List<ModrinthGameVersion> by lazy {
-        json.decodeFromString<List<ModrinthGameVersion>>(resource("game_versions.json"))
+    private val gameVersions: List<GameVersionTag> by lazy {
+        json.decodeFromString<List<ModrinthGameVersion>>(resource("game_versions.json")).toTags()
     }
 
     private val creators = listOf(
@@ -111,34 +116,23 @@ class ModPageRenderTest {
         ProjectCreator(name = "IMS", role = "Developer"),
     )
 
-    /** A state already loaded, which is what the renderers see a moment after arrival. */
-    private fun state(slug: String): ModDetailState {
+    /**
+     * A page already loaded, which is what the renderers see a moment after arrival.
+     * It offers no install of its own, the way a page with no installer behind it
+     * reads, though its answer says the pack it would go into.
+     */
+    private fun state(slug: String): ProjectPageView {
         val p = project(slug)
-        // The loader's dependencies, stood up but never reached: the sheet sets the
-        // answer directly and never calls load(). A client whose selector throws is
-        // the honest stub here, because anything it did touch would be a network
-        // call inside a render test.
-        val http = HttpClientProvider { error("a render sheet makes no requests") }
-        val s = ModDetailState(
-            target = ModTarget.Catalogue(p.id),
-            modrinth = ModrinthClient(http, TransferEngine(http)),
-            repo = EmptyPackRepository,
-            dataDir = Path.of("."),
-            scanner = InstanceContentScanner(),
-            open = OpenProjectState(),
-            strings = RussianStrings,
-            // A sheet installs nothing; the scope is there because the page holds one.
-            installScope = CoroutineScope(Dispatchers.Unconfined),
+        return ProjectPageView(
+            target = ProjectTarget.Catalogue(p.id),
+            visit = "sheet",
+            loading = false,
+            project = p.toDetails(),
+            // A page reached from a pack's own browser, which is the case the primary
+            // action exists for. Set here rather than resolved, because resolving it
+            // reads a folder that a sheet has no business having.
+            install = InstallOffer.Install("Industrial"),
         )
-        s.project = p
-        s.disclosures = disclosures(slug)
-        s.creators = creators
-        s.loading = false
-        // A page reached from a pack's own browser, which is the case the primary
-        // action exists for. Set here rather than resolved, because resolving it
-        // reads a folder that a sheet has no business having.
-        s.install = InstallAction.Install("Industrial")
-        return s
     }
 
     /**
@@ -161,25 +155,16 @@ class ModPageRenderTest {
         sizeBytes = 1_142_000,
     )
 
-    private fun localState(): ModDetailState {
-        val s = state("cloth-config")
-        s.project = null
-        s.installed = InstalledContent(
-            kind = ContentKind.Mod,
-            fileName = "cloth-config-0.6.13.jar",
-            displayName = "Cloth Config API",
-            version = "0.6.13",
-            description = "Configuration Library for Minecraft Mods",
-            enabled = true,
-            iconBytes = null,
-            sizeBytes = 1_142_000,
-            license = "LGPL-3.0-only",
-            authors = listOf("shedaniel"),
-            loaders = listOf("fabric"),
+    private fun localState(): ProjectPageView =
+        state("cloth-config").copy(
+            project = null,
+            file = InstalledFile(
+                displayName = "Cloth Config API",
+                version = "0.6.13",
+                description = "Configuration Library for Minecraft Mods",
+            ),
+            install = InstallOffer.None,
         )
-        s.install = InstallAction.None
-        return s
-    }
 
     private fun open(slug: String): OpenProject {
         val p = project(slug)
@@ -195,17 +180,9 @@ class ModPageRenderTest {
             serverSide = p.serverSide,
             licenseId = p.license?.id,
             licenseName = p.license?.name,
-            publishedAt = formatBuildTimestamp(p.published),
-            updatedAt = formatBuildTimestamp(p.updated),
-            links = buildList {
-                p.issuesUrl?.let { add(ProjectLink(ProjectLinkKind.Issues, it)) }
-                p.sourceUrl?.let { add(ProjectLink(ProjectLinkKind.Source, it)) }
-                p.wikiUrl?.let { add(ProjectLink(ProjectLinkKind.Wiki, it)) }
-                p.discordUrl?.let { add(ProjectLink(ProjectLinkKind.Discord, it)) }
-                p.donationUrls.forEach {
-                    add(ProjectLink(ProjectLinkKind.Donate, it.url, it.platform.takeIf { n -> n.isNotBlank() }))
-                }
-            },
+            published = p.published,
+            updated = p.updated,
+            links = p.links(),
             disclosures = disclosures(slug),
             creators = creators,
         )
@@ -218,7 +195,7 @@ class ModPageRenderTest {
         val rail = SurfaceId("appshell.rightrail")
         val registry = WidgetDataRegistry().apply {
             // The rail reads the open project off its window, which the page publishes into.
-            registerFactory(Sources.OpenProject) { flowSource(MutableStateFlow<OpenProject?>(railProject)) }
+            registerFactory(CatalogueKeys.OpenProject) { flowSource(MutableStateFlow<OpenProject?>(railProject)) }
             // Declared the way the launcher declares it, so the page's widgets know
             // the key they need lives on the page and find it there.
             declare(ProjectPageSource)
@@ -242,7 +219,7 @@ class ModPageRenderTest {
                 // The page as the screen draws it: its surface's two slots on their
                 // panels, the widgets reading the page from the page's own level.
                 val page = remember(pageState) {
-                    ProjectPage(pageState, mutableStateOf(ModPageTab.Description), emptyList(), onOpenVersion = {}, onReload = {})
+                    ProjectPage(pageState, mutableStateOf(ModPageTab.Description), emptyList(), onOpenVersion = {})
                 }
                 val level = remember { window.child(ScopeLevel.Page) }
                 CompositionLocalProvider(LocalScope provides level) {
@@ -327,15 +304,6 @@ class ModPageRenderTest {
         return checkNotNull(png)
     }
 
-    /** Never consulted: the sheet loads nothing. */
-    private object EmptyPackRepository : IPackRepository {
-        override fun observe(): StateFlow<List<PackInstance>> = MutableStateFlow(emptyList())
-        override suspend fun list(): List<PackInstance> = emptyList()
-        override suspend fun get(id: String): PackInstance? = null
-        override suspend fun put(instance: PackInstance) = Unit
-        override suspend fun delete(id: String) = Unit
-    }
-
     /**
      * The versions tab, on a project with a real build list.
      *
@@ -361,22 +329,21 @@ class ModPageRenderTest {
     private fun versionsSheet(width: Int, name: String) {
         val out = Path.of("build/render", name)
         Files.createDirectories(out.parent)
-        val pageState = state("sodium")
         // A captured build list. Its file records were trimmed to a size when the
         // fixture was taken for another sheet, so the three fields an install
         // needs were filled in afterwards and are derived from the version id
         // rather than captured -- nothing here downloads, and a hash that looked
         // real would be the lie.
-        pageState.versions = json.decodeFromString<List<ModrinthVersion>>(resource("iris.versions.json"))
-        pageState.gameVersionTags = gameVersions
-        pageState.install = InstallAction.Install("Industrial")
+        //
         // Aimed at a NeoForge 1.21.1 pack, so the fabric builds in the fixture are
         // the ones the pack cannot run and the sheet shows both markings at once.
-        pageState.destination = ModDetailState.Destination(
-            name = "Industrial",
-            dir = Path.of("."),
-            mc = "1.21.1",
-            loader = "neoforge",
+        val pageState = state("sodium").copy(
+            versions = json.decodeFromString<List<ModrinthVersion>>(resource("iris.versions.json")).map { it.toBuild() },
+            gameVersionTags = gameVersions,
+            install = InstallOffer.Install("Industrial"),
+            packMcVersion = "1.21.1",
+            packLoader = "neoforge",
+            packLoaders = ContentKind.entries.flatMap { loadersFor(it, "neoforge", "1.21.1") },
         )
 
         val png = renderOnEdt(width, 700) {
@@ -403,8 +370,9 @@ class ModPageRenderTest {
     fun `the changelog tab`() {
         val out = Path.of("build/render", "modpage-changelog.png")
         Files.createDirectories(out.parent)
-        val pageState = state("sodium")
-        pageState.versions = json.decodeFromString<List<ModrinthVersion>>(resource("iris.versions.json"))
+        val pageState = state("sodium").copy(
+            versions = json.decodeFromString<List<ModrinthVersion>>(resource("iris.versions.json")).map { it.toBuild() },
+        )
 
         val png = renderOnEdt(900, 760) {
             NxTheme(dark = true) {
@@ -430,7 +398,7 @@ class ModPageRenderTest {
     fun `the gallery tab`() {
         val out = Path.of("build/render", "modpage-gallery.png")
         Files.createDirectories(out.parent)
-        val media = modrinthGalleryMedia(project("essential").gallery)
+        val media = galleryMedia(project("essential").gallery.toGallery(), videos = false)
         assertTrue(media.isNotEmpty(), "the fixture carries no gallery to draw")
 
         val png = renderOnEdt(1000, 760) {

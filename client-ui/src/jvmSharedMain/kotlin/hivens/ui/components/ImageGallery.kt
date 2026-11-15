@@ -59,8 +59,7 @@ import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
 import coil3.size.Size
 import hivens.ui.icons.IconKey
-import hivens.core.api.catalogue.CatalogueGalleryItem
-import hivens.core.api.dto.modrinth.ModrinthGalleryImage
+import hivens.catalogue.api.GalleryItem
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.layers.Layer
@@ -106,13 +105,17 @@ sealed interface GalleryMedia {
 }
 
 /**
- * Catalogue gallery items as [GalleryMedia], classified by extension
- * ([isVideoUrl]). A video's poster is its thumbnail only when that thumbnail is
- * itself an image (else null -> a placeholder with a play badge).
+ * Catalogue gallery items as [GalleryMedia], classified by extension ([isVideoUrl])
+ * where the source may hand over [videos]. A video's poster is its thumbnail only when
+ * that thumbnail is itself an image, else null and a placeholder with a play badge.
+ *
+ * The same furniture for a pack and a project, because it is the same thing: a strip of
+ * shots with captions and a lightbox behind it. A project's gallery uploads are stills,
+ * so its page asks for no videos, and the order is the catalogue module's, featured first.
  */
-fun galleryMedia(items: List<CatalogueGalleryItem>): List<GalleryMedia> =
+fun galleryMedia(items: List<GalleryItem>, videos: Boolean = true): List<GalleryMedia> =
     items.map { item ->
-        if (isVideoUrl(item.full)) {
+        if (videos && isVideoUrl(item.full)) {
             GalleryMedia.Video(
                 thumb = item.thumb.takeUnless { isVideoUrl(it) },
                 url = item.full,
@@ -128,34 +131,6 @@ fun galleryMedia(items: List<CatalogueGalleryItem>): List<GalleryMedia> =
             )
         }
     }
-
-/**
- * A catalogue project's gallery as [GalleryMedia].
- *
- * The same furniture a pack's gallery uses, because it is the same thing: a strip
- * of shots with captions, a lightbox behind it. A second gallery written for mods
- * would be a second set of cell sizes, a second lightbox and a second answer to
- * what happens when an author uploaded no captions.
- *
- * Featured shots come first. Modrinth returns them in upload order with a flag,
- * and the flag is the author saying which one to look at.
- *
- * Every entry is an image: the catalogue's gallery uploads are stills, so unlike
- * the mirror's there is no video case to classify.
- */
-fun modrinthGalleryMedia(images: List<ModrinthGalleryImage>): List<GalleryMedia> =
-    images
-        .sortedByDescending { it.featured }
-        .map {
-            GalleryMedia.Image(
-                thumb = it.url,
-                // The thumbnail is ~350px and upscales to mush at full-window size,
-                // so the lightbox gets the original where there is one.
-                full = it.rawUrl?.takeIf { raw -> raw.isNotBlank() } ?: it.url,
-                title = it.title,
-                description = it.description,
-            )
-        }
 
 /**
  * The narrowest a screenshot cell is allowed to get before the grid drops a

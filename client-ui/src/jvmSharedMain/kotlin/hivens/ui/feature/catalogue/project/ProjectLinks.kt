@@ -6,7 +6,8 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.UriHandler
-import hivens.core.data.PackOrigin
+import hivens.catalogue.api.PackOrigins
+import hivens.catalogue.api.ProjectTarget
 import hivens.ui.Screen
 import hivens.ui.navigation.NavRequests
 import hivens.ui.render.openInBrowser
@@ -103,9 +104,9 @@ fun rememberLinkFollower(intoInstanceId: String? = null): (String) -> Unit {
 fun linkScreen(url: String, intoInstanceId: String?): Screen? {
     val link = modrinthProjectLink(url) ?: return null
     return if (link.modpack) {
-        Screen.CataloguePackDetail(PackOrigin.Modrinth, link.slug)
+        Screen.CataloguePackDetail(PackOrigins.MODRINTH, link.slug)
     } else {
-        Screen.ModDetail(ModTarget.Catalogue(link.slug, intoInstanceId))
+        Screen.ModDetail(ProjectTarget.Catalogue(link.slug, intoInstanceId))
     }
 }
 

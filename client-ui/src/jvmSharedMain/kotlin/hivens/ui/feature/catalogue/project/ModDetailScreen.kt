@@ -1,6 +1,5 @@
 package hivens.ui.feature.catalogue.project
 
-import kotlinx.coroutines.Dispatchers
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,18 +30,21 @@ import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import hivens.core.api.interfaces.IPackRepository
-import hivens.launcher.instance.InstanceContentScanner
+import hivens.catalogue.api.CatalogueKeys
+import hivens.catalogue.api.InstallOffer
+import hivens.catalogue.api.InstallProblem
+import hivens.catalogue.api.InstallSubject
+import hivens.catalogue.api.ProjectInstall
+import hivens.catalogue.api.ProjectPageView
+import hivens.catalogue.api.ProjectSource
+import hivens.catalogue.api.ProjectTarget
+import hivens.catalogue.api.ProjectVisit
 import hivens.ui.feature.catalogue.browse.InstallChooser
-import hivens.ui.feature.catalogue.browse.InstallSubject
-import hivens.ui.feature.catalogue.browse.InstallProblem
 import hivens.ui.feature.catalogue.browse.ProjectTag
 import hivens.ui.feature.catalogue.browse.tagSearch
 import hivens.ui.feature.catalogue.browse.label
 import hivens.ui.feature.catalogue.browse.reason
-import hivens.launcher.instance.ModInstaller
-import hivens.launcher.modrinth.ModrinthClient
-import hivens.launcher.smrt.SmrtPackClient
+import hivens.ui.feature.catalogue.rememberPageVisit
 import hivens.ui.RIGHT_RAIL_SURFACE
 import hivens.ui.RailFamily
 import hivens.ui.i18n.LocalStrings
@@ -56,7 +58,7 @@ import hivens.ui.nx.NxMetaChipTone
 import hivens.ui.nx.NxTabRow
 import hivens.ui.nx.RetryStateBlock
 import hivens.ui.components.ImageGallery
-import hivens.ui.components.modrinthGalleryMedia
+import hivens.ui.components.galleryMedia
 import hivens.ui.render.MarkdownHtml
 import hivens.ui.screens.console.copyPlainText
 import hivens.ui.surface.NxSurface
@@ -64,12 +66,13 @@ import hivens.ui.surface.SurfaceKind
 import hivens.widget.api.LocalSurfaceFamilies
 import hivens.widget.api.SlotRenderer
 import hivens.widget.api.ProvideScoped
+import hivens.widget.api.rememberScopedAction
+import hivens.widget.api.rememberScopedCommand
+import hivens.widget.api.rememberScopedSource
+import hivens.widget.api.valueOrNull
 import hivens.widget.model.SlotId
 import hivens.widget.model.SurfaceId
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
-import org.koin.compose.koinInject
-import java.nio.file.Path
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.Status
@@ -90,7 +93,7 @@ import hivens.ui.theme.Status
  */
 @Composable
 fun ModDetailScreen(
-    target: ModTarget,
+    target: ProjectTarget,
     /**
      * Opens one build's own page. Carries the build's number as well as its id,
      * because the breadcrumb needs a name on the first frame and the row that was
@@ -99,66 +102,44 @@ fun ModDetailScreen(
     onOpenVersion: (versionId: String, versionNumber: String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val modrinth: ModrinthClient = koinInject()
-    val repo: IPackRepository = koinInject()
-    val scanner: InstanceContentScanner = koinInject()
-    val openProject: OpenProjectState = koinInject()
-    val dataDir: Path = koinInject()
-    val appScope: CoroutineScope = koinInject()
-    val installer: ModInstaller = koinInject()
-    val mirrorClient: SmrtPackClient = koinInject()
     val families = LocalSurfaceFamilies.current
-    val s = LocalStrings.current
+    val visit = rememberProjectVisit(target)
+    val view = rememberProjectPage(target, visit)
 
-    val state = remember(target) {
-        ModDetailState(
-            target, modrinth, repo, dataDir, scanner, openProject,
-            strings = s, installScope = appScope, installer = installer, mirrorLookup = mirrorClient.asMirrorLookup(),
-        )
-    }
-    var reloadTick by remember(state) { mutableStateOf(0) }
     // Saveable, not remembered. The only way to a build's page is the Versions
     // tab, and the shell keeps a screen's saveable state across a visit -- so
     // without this, Back from a build always landed on Description, which is not
     // the tab anybody left from.
     val tabState = rememberSaveable(
-        state,
+        visit,
         stateSaver = Saver(save = { it.name }, restore = { ModPageTab.valueOf(it) }),
     ) { mutableStateOf(ModPageTab.Description) }
     var tab by tabState
-    val gallery = remember(state.project) { modrinthGalleryMedia(state.project?.gallery.orEmpty()) }
+    val gallery = remember(view.project) { galleryMedia(view.project?.gallery.orEmpty(), videos = false) }
     // A tab with nothing behind it is not drawn, which is what the reference does:
     // a project with no shots has no gallery to open, and a tab that leads to an
     // empty pane is a click that tells the reader nothing they could not have been
     // told by its absence. Asked once the page has loaded: before that every page
     // has no shots, and a Gallery tab restored on the way back was reset to
     // Description on the first frame.
-    LaunchedEffect(gallery, tab, state.loading) {
-        tab = tabOnceLoaded(tab, state.loading, noGallery = gallery.isEmpty())
+    LaunchedEffect(gallery, tab, view.loading) {
+        tab = tabOnceLoaded(tab, view.loading, noGallery = gallery.isEmpty())
     }
-    LaunchedEffect(state, reloadTick) { state.load() }
 
     // The rail follows the page for exactly as long as the page is mounted. Tied
     // to the composition rather than to navigation so every way out -- Back, a
     // link, a crash recovery remount -- puts the rail back the same way.
-    DisposableEffect(state) {
-        families.switch(RIGHT_RAIL_SURFACE, RailFamily.PROJECT_VIEW, state)
-        state.claim()
-        onDispose {
-            families.reset(RIGHT_RAIL_SURFACE, state)
-            state.clear()
-        }
+    DisposableEffect(visit) {
+        families.switch(RIGHT_RAIL_SURFACE, RailFamily.PROJECT_VIEW, visit)
+        onDispose { families.reset(RIGHT_RAIL_SURFACE, visit) }
     }
 
-    val page = remember(state, gallery, onOpenVersion) {
-        ProjectPage(
-            state = state,
-            tab = tabState,
-            gallery = gallery,
-            onOpenVersion = { v -> onOpenVersion(v.id, v.versionNumber.ifBlank { v.name }) },
-            onReload = { reloadTick++ },
-        )
-    }
+    val page = ProjectPage(
+        view = view,
+        tab = tabState,
+        gallery = gallery,
+        onOpenVersion = { b -> onOpenVersion(b.id, b.versionNumber.ifBlank { b.name }) },
+    )
 
     // A widget surface: the header and the tabs in `header`, the tab's pane in
     // `body`, each slot on the panel it always sat on. The widgets read the page
@@ -189,6 +170,29 @@ fun ModDetailScreen(
 }
 
 /**
+ * This showing of the project page for [target], shown to the catalogue module as the
+ * screen comes up, so the rail describes it, and hidden as it goes.
+ */
+@Composable
+internal fun rememberProjectVisit(target: ProjectTarget): String {
+    val show = rememberScopedCommand(CatalogueKeys.ShowProject)
+    val hide = rememberScopedCommand(CatalogueKeys.HideProject)
+    return rememberPageVisit(target, show?.let { cmd -> { v: String -> cmd(ProjectVisit(target, v)) } }, hide)
+}
+
+/**
+ * The project page of [visit] as the catalogue module reads it. Where no catalogue
+ * module answers, a page that has nothing to read and names the project by what it
+ * was opened on.
+ */
+@Composable
+internal fun rememberProjectPage(target: ProjectTarget, visit: String): ProjectPageView {
+    val source = rememberScopedSource(CatalogueKeys.ProjectPage)
+    return source.valueOrNull()?.takeIf { it.visit == visit }
+        ?: remember(target, visit) { ProjectPageView(target = target, visit = visit, loading = false) }
+}
+
+/**
  * The pane the page's tab shows. Only the description scrolls as a page: the
  * versions pane is a list beside its notes and does its own scrolling in two
  * places, so wrapping it in a third would move the whole thing to reach the bottom
@@ -196,7 +200,9 @@ fun ModDetailScreen(
  */
 @Composable
 internal fun ProjectPageBody(page: ProjectPage, modifier: Modifier = Modifier) {
-    val state = page.state
+    val view = page.view
+    val reload = rememberScopedAction(CatalogueKeys.ReloadProject)
+    val onReload = { reload?.invoke(); Unit }
     Box(modifier) {
         when (page.tab) {
             ModPageTab.Description -> Column(
@@ -208,15 +214,15 @@ internal fun ProjectPageBody(page: ProjectPage, modifier: Modifier = Modifier) {
                     // page look assembled from parts.
                     .padding(16.dp),
             ) {
-                Body(state, page.onReload)
+                Body(view, onReload)
             }
             ModPageTab.Versions -> VersionsPane(
-                state = state,
+                view = view,
                 onOpenVersion = page.onOpenVersion,
-                onReload = page.onReload,
+                onReload = onReload,
                 modifier = Modifier.fillMaxSize(),
             )
-            ModPageTab.Changelog -> ChangelogPane(state, onReload = page.onReload, modifier = Modifier.fillMaxSize())
+            ModPageTab.Changelog -> ChangelogPane(view, onReload = onReload, modifier = Modifier.fillMaxSize())
             ModPageTab.Gallery -> Column(
                 Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
             ) {
@@ -240,7 +246,7 @@ internal fun tabOnceLoaded(tab: ModPageTab, loading: Boolean, noGallery: Boolean
     if (!loading && noGallery && tab == ModPageTab.Gallery) ModPageTab.Description else tab
 
 @Composable
-internal fun Body(state: ModDetailState, onRetry: () -> Unit) {
+internal fun Body(state: ProjectPageView, onRetry: () -> Unit) {
     val s = LocalStrings.current
     val follow = rememberLinkFollower(state.packId)
     when {
@@ -284,14 +290,13 @@ private fun Unknown(text: String) = Text(
 )
 
 @Composable
-internal fun Header(state: ModDetailState) {
+internal fun Header(state: ProjectPageView) {
     val scope = rememberCoroutineScope()
-    val installScope = state.installScope
     val s = LocalStrings.current
     val uriHandler = LocalUriHandler.current
     val clipboard = LocalClipboard.current
     val project = state.project
-    val installed = state.installed
+    val installed = state.file
 
     ProjectHeader(
         title = state.title,
@@ -341,12 +346,12 @@ internal fun Header(state: ModDetailState) {
             //
             // Whether an install is possible at all is known from the route.
             // WHAT goes in the slot needs the pack read off disk, and until it
-            // lands [InstallAction.None] draws nothing, so this reserves the
+            // lands [InstallOffer.None] draws nothing, so this reserves the
             // fact rather than the width: the button still appears a moment in.
             // Reserving the width would mean knowing the label, and the label
             // names the pack.
             if (state.installPossible) {
-                Box(contentAlignment = Alignment.Center) { InstallButton(state, installScope) }
+                Box(contentAlignment = Alignment.Center) { InstallButton(state) }
             }
             val pageUrl = project?.let { "https://modrinth.com/${it.projectType}/${it.slug}" }
             val homepage = installed?.homepageUrl?.takeIf { it.isNotBlank() }
@@ -393,7 +398,7 @@ internal fun Header(state: ModDetailState) {
  * the project page's header and a single build's page both draw it.
  */
 @Composable
-internal fun InstallNotes(state: ModDetailState) {
+internal fun InstallNotes(state: ProjectPageView) {
     val s = LocalStrings.current
     // Why nothing happened, under the button that was pressed, naming the
     // two things that decided it. Without this the click did nothing and
@@ -427,7 +432,7 @@ internal fun InstallNotes(state: ModDetailState) {
     // count, since a column of twenty reasons under a button is not read.
     state.installLeftOut.take(MAX_LEFT_OUT_LINES).forEach { left ->
         Text(
-            s.installSkipLine(left.title, left.skip.reason(s)),
+            s.installSkipLine(left.title, left.reason.reason(s)),
             style = MaterialTheme.typography.labelSmall,
             color = NxInk.quiet,
             maxLines = 1,
@@ -462,19 +467,21 @@ private val LEFT_OUT_MEASURE = 320.dp
  * nothing.
  */
 @Composable
-private fun InstallButton(state: ModDetailState, scope: CoroutineScope) {
+private fun InstallButton(state: ProjectPageView) {
     val s = LocalStrings.current
+    val install = rememberScopedCommand(CatalogueKeys.InstallProject)
+    val retry = rememberScopedAction(CatalogueKeys.RetryInstall)
     when (val action = state.install) {
-        InstallAction.None -> Unit
-        InstallAction.Choose -> state.project?.let { InstallChooser(InstallSubject(it.id, it.title, it.iconUrl)) }
-        is InstallAction.Present -> NxButton(
+        InstallOffer.None -> Unit
+        InstallOffer.Choose -> state.project?.let { InstallChooser(InstallSubject(it.id, it.title, it.iconUrl)) }
+        is InstallOffer.Present -> NxButton(
             label = s.modPageInstalledIn(action.packName),
             onClick = {},
             icon = NxIcon.Check,
             enabled = false,
             style = NxButtonStyle.Secondary,
         )
-        is InstallAction.Install -> NxButton(
+        is InstallOffer.Install -> NxButton(
             // A failed install says so on the button that failed and offers the
             // same action again, rather than reverting to its first wording as if
             // nothing had happened.
@@ -484,7 +491,7 @@ private fun InstallButton(state: ModDetailState, scope: CoroutineScope) {
                 else -> s.modPageInstallInto(action.packName)
             },
             // A retry repeats what failed: a row's build when a row asked for one.
-            onClick = { scope.launch(Dispatchers.Main) { if (state.installFailed) state.retryInstall() else state.installIntoPack() } },
+            onClick = { if (state.installFailed) retry?.invoke() else install?.invoke(ProjectInstall()) },
             icon = if (state.installFailed) NxIcon.Refresh else NxIcon.Download,
             enabled = !state.installing,
         )

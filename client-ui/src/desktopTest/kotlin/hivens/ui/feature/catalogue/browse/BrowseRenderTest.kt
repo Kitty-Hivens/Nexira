@@ -19,32 +19,32 @@ import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import hivens.catalogue.api.BrowseTarget
+import hivens.catalogue.api.BrowseView
+import hivens.catalogue.api.CatalogueCard
+import hivens.catalogue.api.CatalogueKeys
+import hivens.catalogue.api.CatalogueTags
+import hivens.catalogue.api.CategoryTag
+import hivens.catalogue.api.FilterField
+import hivens.catalogue.api.GameVersionTag
+import hivens.catalogue.api.LoaderTag
+import hivens.catalogue.api.PackOrigins
+import hivens.catalogue.api.ProjectHit
+import hivens.catalogue.api.ProjectKind
+import hivens.catalogue.api.SearchFilter
 import hivens.core.api.HttpClientProvider
-import hivens.core.api.catalogue.CataloguePack
-import hivens.core.api.catalogue.CataloguePackDetails
-import hivens.core.api.catalogue.CataloguePackVersion
-import hivens.core.api.dto.modrinth.ModrinthSearchHit
-import hivens.core.api.dto.modrinth.ModrinthCategoryTag
-import hivens.core.api.dto.modrinth.ModrinthGameVersion
-import hivens.core.api.dto.modrinth.ModrinthLoaderTag
-import hivens.launcher.modrinth.FilterField
-import hivens.launcher.modrinth.SearchFilter
-import hivens.ui.navigation.NavRequests
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import hivens.core.api.interfaces.IPackCatalogueService
 import hivens.core.api.interfaces.IPackRepository
-import hivens.core.data.CachedManifestSnapshot
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
 import hivens.core.data.PackReference
 import hivens.core.net.TransferEngine
 import hivens.launcher.catalogue.PackArtResolver
-import hivens.launcher.catalogue.PackCatalogueRegistry
-import hivens.launcher.content.ContentKind
 import hivens.launcher.modrinth.ModrinthClient
+import hivens.launcher.modrinth.acceptedLoaders
 import hivens.launcher.smrt.SmrtPackClient
 import hivens.ui.host.HostKoin
+import hivens.ui.widgets.KoinLevelServicesHost
+import kotlinx.coroutines.Dispatchers
 import hivens.ui.i18n.AppLocale
 import hivens.ui.i18n.LocaleProvider
 import hivens.ui.settle
@@ -55,14 +55,23 @@ import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxTheme
 import hivens.ui.widgets.WidgetSurface
 import hivens.widget.api.LocalLayoutGraph
+import hivens.widget.api.LocalScope
+import hivens.widget.api.LocalWidgetCommandRegistry
+import hivens.widget.api.LocalWidgetDataRegistry
 import hivens.widget.api.LocalSurfaceFamilies
 import hivens.widget.api.LocalWidgetRegistry
 import hivens.widget.api.LocalWidgetSurfaceRenderer
 import hivens.widget.api.SlotRenderer
 import hivens.widget.api.SurfaceFamilies
+import hivens.widget.api.WidgetCommandRegistry
+import hivens.widget.api.WidgetDataRegistry
+import hivens.widget.api.WidgetScope
+import hivens.widget.api.command
+import hivens.widget.api.flowSource
 import hivens.widget.generated.GeneratedWidgetRegistry
 import hivens.widget.model.DefaultLayout
 import hivens.widget.model.FamilyId
+import hivens.widget.model.ScopeLevel
 import hivens.widget.model.SlotId
 import hivens.widget.model.SurfaceId
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -87,7 +96,8 @@ import kotlin.test.assertTrue
  * drawn side by side: three of them otherwise read as the absence of the fourth.
  * The rail is drawn through the bundled layout and the KSP registry, because each
  * block's card comes from its `@Widget(surface = ...)` and nothing paints it unless
- * the kernel is in the loop.
+ * the kernel is in the loop. What it reads is the window's browse, put up the way the
+ * catalogue module answers it, with each sheet's state set directly.
  */
 class BrowseRenderTest {
 
@@ -107,7 +117,7 @@ class BrowseRenderTest {
         follows: Long,
         daysAgo: Long,
         tags: List<String>,
-    ) = ModrinthSearchHit(
+    ) = ProjectHit(
         projectId = id,
         slug = id,
         title = title,
@@ -163,12 +173,12 @@ class BrowseRenderTest {
         sheet("browse-pack-cards-mirror", width = 900, height = 340) {
             Caption("свой пак зеркала и пак сообщества с подписью владельца")
             BrowsePackCard(
-                CataloguePack(PackOrigin.Mirror, "industrial", "Industrial", "Тяжёлая промышленность.", tags = listOf("tech"), mcVersion = "1.12.2"),
+                CatalogueCard(PackOrigins.MIRROR, "industrial", "Industrial", "Тяжёлая промышленность.", tags = listOf("tech"), mcVersion = "1.12.2"),
                 onClick = {},
             )
             BrowsePackCard(
-                CataloguePack(
-                    PackOrigin.Mirror, "u/7/cozy", "Cozy Valley", "Фермы, уют и ни одного крипера.",
+                CatalogueCard(
+                    PackOrigins.MIRROR, "u/7/cozy", "Cozy Valley", "Фермы, уют и ни одного крипера.",
                     tags = listOf("farming"), mcVersion = "1.21.1", community = true, author = "alex",
                 ),
                 onClick = {},
@@ -196,41 +206,54 @@ class BrowseRenderTest {
         override suspend fun delete(id: String) {}
     }
 
-    private class Listing(override val origin: PackOrigin) : IPackCatalogueService {
-        override suspend fun search(query: String, page: Int): List<CataloguePack> = emptyList()
-        override suspend fun details(packId: String): CataloguePackDetails = error("not on a rail sheet")
-        override suspend fun versions(packId: String): List<CataloguePackVersion> = emptyList()
-    }
-
     private val ring = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/></svg>"""
 
     /** The catalogue's lists, cut down to what a sheet needs and carrying one mark to draw. */
-    private val tags = BrowseTags.Tags(
+    private val tags = CatalogueTags(
         gameVersions = listOf("1.21.4", "1.21.1", "1.20.1", "24w14a", "1.19.2").map {
-            ModrinthGameVersion(it, versionType = if (it.contains('w')) "snapshot" else ModrinthGameVersion.RELEASE)
+            GameVersionTag(it, versionType = if (it.contains('w')) GameVersionTag.SNAPSHOT else GameVersionTag.RELEASE)
         },
         categories = listOf(
-            ModrinthCategoryTag("optimization", "mod", "categories", ring),
-            ModrinthCategoryTag("utility", "mod", "categories", ring),
-            ModrinthCategoryTag("worldgen", "mod", "categories", ring),
-            ModrinthCategoryTag("decoration", "mod", "categories", ring),
-            ModrinthCategoryTag("realistic", "resourcepack", "categories", ring),
-            ModrinthCategoryTag("gui", "resourcepack", "features", ring),
-            ModrinthCategoryTag("16x", "resourcepack", "resolutions"),
-            ModrinthCategoryTag("512x+", "resourcepack", "resolutions"),
-            ModrinthCategoryTag("adventure", "modpack", "categories", ring),
+            CategoryTag("optimization", "mod", "categories", ring),
+            CategoryTag("utility", "mod", "categories", ring),
+            CategoryTag("worldgen", "mod", "categories", ring),
+            CategoryTag("decoration", "mod", "categories", ring),
+            CategoryTag("realistic", "resourcepack", "categories", ring),
+            CategoryTag("gui", "resourcepack", "features", ring),
+            CategoryTag("16x", "resourcepack", "resolutions"),
+            CategoryTag("512x+", "resourcepack", "resolutions"),
+            CategoryTag("adventure", "modpack", "categories", ring),
         ),
         loaders = listOf(
-            ModrinthLoaderTag("fabric", listOf("mod", "modpack")),
-            ModrinthLoaderTag("forge", listOf("mod", "modpack")),
-            ModrinthLoaderTag("neoforge", listOf("mod", "modpack")),
-            ModrinthLoaderTag("quilt", listOf("mod", "modpack")),
-            ModrinthLoaderTag("liteloader", listOf("mod")),
-            ModrinthLoaderTag("paper", listOf("plugin", "mod")),
+            LoaderTag("fabric", listOf("mod", "modpack")),
+            LoaderTag("forge", listOf("mod", "modpack")),
+            LoaderTag("neoforge", listOf("mod", "modpack")),
+            LoaderTag("quilt", listOf("mod", "modpack")),
+            LoaderTag("liteloader", listOf("mod")),
+            LoaderTag("paper", listOf("plugin", "mod")),
         ),
     )
 
-    private fun graph(controller: BrowseController) {
+    /** The window's browse, as the catalogue module would hold it. Each sheet sets it. */
+    private val browse = MutableStateFlow(BrowseView(origins = listOf(PackOrigins.MIRROR, PackOrigins.MODRINTH)))
+
+    /** What the search box was asked to search for. */
+    private val asked = ArrayList<String>()
+
+    private val sources = WidgetDataRegistry().apply {
+        register(CatalogueKeys.Tags, flowSource(MutableStateFlow<CatalogueTags?>(tags)))
+        registerFactory(CatalogueKeys.Browse) { flowSource(browse) }
+    }
+
+    private val commands = WidgetCommandRegistry().apply {
+        registerFactory(CatalogueKeys.SetQuery) { command { asked += it } }
+        register(CatalogueKeys.LoadTags, command { })
+    }
+
+    /** The window the widgets are drawn in, under an app level over [koin]. */
+    private var window: WidgetScope? = null
+
+    private fun graph() {
         val http = HttpClientProvider { error("a render sheet does not go to the network") }
         val data: Path = Files.createTempDirectory("nexira-browse-render")
         val modrinth = ModrinthClient(http, TransferEngine(http))
@@ -238,16 +261,20 @@ class BrowseRenderTest {
         koin = koinApplication {
             modules(
                 module {
-                    single { controller }
-                    single { PackCatalogueRegistry(listOf(Listing(PackOrigin.Mirror), Listing(PackOrigin.Modrinth))) }
                     single<IPackRepository> { FakeRepo(listOf(local)) }
                     single { data }
                     single { PackArtResolver(modrinth, SmrtPackClient(http)) }
-                    single { BrowseTags(modrinth, CoroutineScope(Dispatchers.Unconfined), tags) }
-                    single { NavRequests() }
+                    single { WidgetScope.app(sources, KoinLevelServicesHost.app(this), Dispatchers.Unconfined, commands) }
                 },
             )
         }
+        window = koin.koin.get<WidgetScope>().child(ScopeLevel.Window)
+    }
+
+    /** What the pack decides for a kind it takes: its game version, and for mods the loaders it runs. */
+    private fun lockedBy(target: BrowseTarget, kind: ProjectKind): List<SearchFilter> = buildList {
+        add(SearchFilter(FilterField.GameVersion, target.mcVersion))
+        if (kind == ProjectKind.Mod) acceptedLoaders(target.loader, target.mcVersion).forEach { add(SearchFilter(FilterField.Loader, it)) }
     }
 
     @Composable
@@ -260,6 +287,9 @@ class BrowseRenderTest {
             LocalWidgetRegistry provides GeneratedWidgetRegistry,
             LocalSurfaceFamilies provides families,
             LocalWidgetSurfaceRenderer provides { spec, body -> WidgetSurface(spec, body) },
+            LocalWidgetDataRegistry provides sources,
+            LocalWidgetCommandRegistry provides commands,
+            LocalScope provides window,
         ) { content() }
     }
 
@@ -277,26 +307,26 @@ class BrowseRenderTest {
 
     @Test
     fun `the filter rail for each kind, with a pack and without`() {
-        val controller = BrowseController()
-        graph(controller)
-        val target = BrowseTarget(
-            browseDestination(local.copy(cachedManifest = neoManifest), Path.of("/tmp/nexira-browse-render")),
-            listOf(ContentKind.Mod, ContentKind.ResourcePack),
+        graph()
+        val target = BrowseTarget(local.id, local.displayName, "1.21.1", "neoforge", listOf(ProjectKind.Mod, ProjectKind.ResourcePack))
+        val chosen = mapOf(
+            "mod" to setOf(
+                SearchFilter(FilterField.Category, "optimization"),
+                SearchFilter(FilterField.Loader, "forge", excluded = true),
+                SearchFilter(FilterField.Disclosure, "telemetry", excluded = true),
+            ),
         )
         listOf(
-            "browse-rail-mods" to {
-                controller.kind = ContentKind.Mod
-                controller.targetId = null
-                controller.resolved = null
-                controller.toggle("mod", SearchFilter(FilterField.Category, "optimization"))
-                controller.toggleExclude("mod", SearchFilter(FilterField.Loader, "forge"))
-                controller.toggleExclude("mod", SearchFilter(FilterField.Disclosure, "telemetry"))
+            "browse-rail-mods" to { browse.value = browse.value.copy(kind = ProjectKind.Mod, targetId = null, target = null, chosen = chosen, locked = emptyList()) },
+            "browse-rail-mods-into" to {
+                browse.value = browse.value.copy(kind = ProjectKind.Mod, targetId = local.id, target = target, locked = lockedBy(target, ProjectKind.Mod))
             },
-            "browse-rail-mods-into" to { controller.kind = ContentKind.Mod; controller.targetId = local.id; controller.resolved = target },
-            "browse-rail-resourcepacks" to { controller.kind = ContentKind.ResourcePack; controller.targetId = null; controller.resolved = null },
-            "browse-rail-packs-mirror" to { controller.kind = null; controller.origin = PackOrigin.Mirror },
-            "browse-rail-packs-mirror-own" to { controller.mirrorCommunity = false },
-            "browse-rail-packs-modrinth" to { controller.kind = null; controller.origin = PackOrigin.Modrinth; controller.mirrorCommunity = true },
+            "browse-rail-resourcepacks" to { browse.value = browse.value.copy(kind = ProjectKind.ResourcePack, targetId = null, target = null, locked = emptyList()) },
+            "browse-rail-packs-mirror" to { browse.value = browse.value.copy(kind = null, pickedOrigin = PackOrigins.MIRROR, origin = PackOrigins.MIRROR) },
+            "browse-rail-packs-mirror-own" to { browse.value = browse.value.copy(mirrorCommunity = false) },
+            "browse-rail-packs-modrinth" to {
+                browse.value = browse.value.copy(kind = null, pickedOrigin = PackOrigins.MODRINTH, origin = PackOrigins.MODRINTH, mirrorCommunity = true)
+            },
         ).forEach { (name, arrange) ->
             arrange()
             sheet(name, width = 340, height = 1200, padded = false) { Rail() }
@@ -305,23 +335,29 @@ class BrowseRenderTest {
 
     @Test
     fun `the header over the search, with a pack and filters in force`() {
-        val controller = BrowseController()
-        graph(controller)
-        controller.kind = ContentKind.Mod
-        controller.targetId = local.id
-        controller.resolved = BrowseTarget(browseDestination(local.copy(cachedManifest = neoManifest), Path.of("/tmp/nexira-browse-render")), listOf(ContentKind.Mod))
-        controller.query = "sodium"
-        controller.toggle("mod", SearchFilter(FilterField.Category, "optimization"))
-        controller.toggleExclude("mod", SearchFilter(FilterField.Disclosure, "telemetry"))
+        graph()
+        val target = BrowseTarget(local.id, local.displayName, "1.21.1", "neoforge", listOf(ProjectKind.Mod))
+        browse.value = browse.value.copy(
+            kind = ProjectKind.Mod,
+            targetId = local.id,
+            target = target,
+            locked = lockedBy(target, ProjectKind.Mod),
+            query = "sodium",
+            chosen = mapOf(
+                "mod" to setOf(
+                    SearchFilter(FilterField.Category, "optimization"),
+                    SearchFilter(FilterField.Disclosure, "telemetry", excluded = true),
+                ),
+            ),
+        )
         sheet("browse-header", width = 900, height = 300) {
             val surface = SurfaceId("browse")
             Kernel(surface, null) {
                 SlotRenderer(surface, SlotId("header"), Modifier.fillMaxWidth(), spacing = 8.dp)
             }
         }
+        assertTrue(asked.isEmpty(), "drawing the search box searched for nothing")
     }
-
-    private val neoManifest = CachedManifestSnapshot(minecraftVersion = "1.21.1", loaderName = "neoforge", loaderVersion = "21.1.200", javaMajor = 21)
 
     @Composable
     private fun Caption(text: String) {

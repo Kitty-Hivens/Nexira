@@ -5,46 +5,36 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import hivens.core.api.HttpClientProvider
-import hivens.core.api.dto.modrinth.ModrinthProject
-import hivens.core.api.dto.modrinth.ModrinthVersion
-import hivens.core.api.interfaces.IPackRepository
-import hivens.core.data.PackInstance
-import hivens.core.net.TransferEngine
-import hivens.launcher.instance.InstanceContentScanner
-import hivens.launcher.modrinth.ModrinthClient
+import hivens.catalogue.api.ProjectBuild
+import hivens.catalogue.api.ProjectDetails
+import hivens.catalogue.api.ProjectPageView
+import hivens.catalogue.api.ProjectTarget
 import hivens.ui.components.GalleryMedia
-import hivens.ui.i18n.EnglishStrings
 import hivens.widget.model.ScopeLevel
 import hivens.widget.model.SourceKey
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import java.nio.file.Paths
 
 /** The project page's surface, see [ProjectPage]. */
 internal const val PROJECT_SURFACE = "project"
 
 /**
- * What the project page's widgets share: the page's state, the tab it shows, its
- * shots, and its ways out.
+ * What the project page's widgets share: the page as the catalogue module read it, the
+ * tab it shows, its shots, and its way to a build's own page.
  *
- * The page is a widget surface, its header, tabs and body widgets in the
- * `project` surface's slots. They meet here rather than at a window-level service
- * the way Browse's do, because a project page is one visit with state of its own,
- * and two of them are on screen at once while the shell fades from one to the next.
+ * The page is a widget surface, its header, tabs and body widgets in the `project`
+ * surface's slots. They meet here rather than at the window the way Browse's do,
+ * because a project page is one visit with state of its own, and two of them are on
+ * screen at once while the shell fades from one to the next. What the page knows and
+ * does is the catalogue module's, read through [hivens.catalogue.api.CatalogueKeys.ProjectPage]
+ * and changed through its page commands, which the widgets fire themselves.
  */
 @Stable
 internal class ProjectPage(
-    val state: ModDetailState,
+    val view: ProjectPageView,
     tab: MutableState<ModPageTab>,
     /** The project's shots, which decide whether the gallery tab is offered. */
     val gallery: List<GalleryMedia>,
     /** Opens a build's own page. */
-    val onOpenVersion: (ModrinthVersion) -> Unit,
-    /** Asks for the page again, after a lookup that did not run. */
-    val onReload: () -> Unit,
+    val onOpenVersion: (ProjectBuild) -> Unit,
 ) {
     var tab: ModPageTab by tab
 }
@@ -52,35 +42,31 @@ internal class ProjectPage(
 /**
  * The project page the widgets are drawn for, put over the page's own level by the
  * screen for the widgets it draws. Each of the two pages on screen during a fade
- * carries its own down its own subtree, so each widget reads its own page. Anywhere else the key is missing: a widget of
- * the page dropped on another surface has no project to describe.
+ * carries its own down its own subtree, so each widget reads its own page. Anywhere
+ * else the key is missing: a widget of the page dropped on another surface has no
+ * project to describe.
  */
 internal val ProjectPageSource: SourceKey<ProjectPage> = SourceKey("project.page", ScopeLevel.Page)
 
 /**
- * A project page to show the page's widgets on where there is no project: the
- * palette, and the editor drawing one of them off its page. Display data only. The
- * page reaches nothing: its catalogue client refuses every request, it reads no
- * pack, and it reports to a project state of its own rather than to the rail.
+ * A project page to show the page's widgets on where there is no project: the palette,
+ * and the editor drawing one of them off its page. Display data only: its commands are
+ * the page level's, and where the palette draws it there is no page to answer them.
  */
-internal fun sampleProjectPage(): ProjectPage {
-    val offline = HttpClientProvider { error("a sample page makes no requests") }
-    val state = ModDetailState(
-        target = ModTarget.Catalogue(SAMPLE_PROJECT.id),
-        modrinth = ModrinthClient(offline, TransferEngine(offline)),
-        repo = NoPacks,
-        dataDir = Paths.get("."),
-        scanner = InstanceContentScanner(),
-        open = OpenProjectState(),
-        strings = EnglishStrings,
-        installScope = CoroutineScope(Dispatchers.Default),
+internal fun sampleProjectPage(): ProjectPage =
+    ProjectPage(
+        view = ProjectPageView(
+            target = ProjectTarget.Catalogue(SAMPLE_PROJECT.id),
+            visit = "sample",
+            loading = false,
+            project = SAMPLE_PROJECT,
+        ),
+        tab = mutableStateOf(ModPageTab.Description),
+        gallery = emptyList(),
+        onOpenVersion = {},
     )
-    state.project = SAMPLE_PROJECT
-    state.loading = false
-    return ProjectPage(state, mutableStateOf(ModPageTab.Description), emptyList(), onOpenVersion = {}, onReload = {})
-}
 
-private val SAMPLE_PROJECT = ModrinthProject(
+private val SAMPLE_PROJECT = ProjectDetails(
     id = "sample",
     slug = "sample",
     title = "Sample Project",
@@ -94,11 +80,3 @@ private val SAMPLE_PROJECT = ModrinthProject(
     clientSide = "required",
     serverSide = "optional",
 )
-
-private object NoPacks : IPackRepository {
-    override fun observe(): StateFlow<List<PackInstance>> = MutableStateFlow(emptyList())
-    override suspend fun list(): List<PackInstance> = emptyList()
-    override suspend fun get(id: String): PackInstance? = null
-    override suspend fun put(instance: PackInstance) = Unit
-    override suspend fun delete(id: String) = Unit
-}

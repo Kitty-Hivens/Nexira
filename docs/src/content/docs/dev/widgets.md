@@ -99,10 +99,10 @@ These always come from the launcher, and a copy in your jar is ignored. That is 
 
 ### Other modules' APIs
 
-To use another module's API, for example the packs or the accounts module, name it in the manifest beside the other attributes:
+To use another module's API, for example the packs, the accounts or the catalogue module, name it in the manifest beside the other attributes:
 
 ```kotlin
-"Nexira-Module-Requires" to "nexira.packs=1.0, nexira.accounts=1.0",
+"Nexira-Module-Requires" to "nexira.packs=1.0, nexira.accounts=1.0, nexira.catalogue=1.0",
 ```
 
 Each entry is an API id and the version you compiled against. The launcher refuses your jar, with the reason in the log, when it does not carry that API or carries a version that does not serve yours: another major version, or an older minor one. An API you name is visible to your module. One you do not name is not, even when the launcher carries it.

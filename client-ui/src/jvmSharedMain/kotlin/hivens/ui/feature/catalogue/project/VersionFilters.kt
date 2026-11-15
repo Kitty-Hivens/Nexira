@@ -1,6 +1,9 @@
 package hivens.ui.feature.catalogue.project
 
-import hivens.core.api.dto.modrinth.ModrinthGameVersion
+import hivens.catalogue.api.GameVersionGroup
+import hivens.catalogue.api.GameVersionTag
+import hivens.catalogue.api.ProjectBuild
+import hivens.catalogue.api.groupGameVersions
 
 /**
  * What the versions table is narrowed by.
@@ -73,7 +76,7 @@ data class VersionFacets(
     val loaders: List<String>,
 )
 
-fun facetsOf(versions: List<ProjectBuild>, tags: List<ModrinthGameVersion>): VersionFacets {
+fun facetsOf(versions: List<ProjectBuild>, tags: List<GameVersionTag>): VersionFacets {
     val channels = versions.map { it.versionType }.distinct()
     val loaders = versions.flatMap { it.loaders }.distinct().sorted()
     val supported = versions.flatMap { it.gameVersions }.distinct()

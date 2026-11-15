@@ -6,7 +6,6 @@ import hivens.ui.background.BackgroundSettings
 import hivens.ui.i18n.AppLocale
 import hivens.ui.navigation.NavState
 import hivens.ui.notifications.PersistedNotification
-import hivens.ui.feature.catalogue.project.OpenProject
 import hivens.ui.host.HostWindowState
 import hivens.ui.theme.ThemeLibrary
 import hivens.ui.widgets.about.SystemFacts
@@ -29,7 +28,8 @@ import hivens.widget.model.SourceKey
  * The packs and what is done to them are not here: they are the packs module's keys,
  * in `hivens.packs.api.PackKeys`, and exist only where the document names that module.
  * Nor are the session and the accounts, which are the accounts module's, in
- * `hivens.accounts.api.AccountKeys`.
+ * `hivens.accounts.api.AccountKeys`, nor the catalogue and the project the rail
+ * describes, which are the catalogue module's, in `hivens.catalogue.api.CatalogueKeys`.
  */
 object Sources {
     /**
@@ -45,11 +45,6 @@ object Sources {
     // "Do not disturb" live state -- the notification-history widget reflects it
     // on its mute toggle; NotificationStack reads the same flow to gate popups.
     val DoNotDisturb = SourceKey<Boolean>("notifications.dnd")
-    // The project whose page is open in this window, or null anywhere else. Read by
-    // the right rail's project-view family, which is shown on that page and has
-    // nothing to say off it. Per window, so a second window's rail describes its
-    // own page.
-    val OpenProject = SourceKey<OpenProject?>("mod.open", ScopeLevel.Window)
 
     /**
      * The window a widget is drawn in, as the host reads it: its size, whether it

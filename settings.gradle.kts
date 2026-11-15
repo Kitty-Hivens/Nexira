@@ -159,6 +159,9 @@ include(":examples:packs-consumer")
 // The same for the accounts module's API: reads the session and fires sign-out with
 // the kernel and that API alone.
 include(":examples:accounts-consumer")
+// The same for the catalogue module's API: runs a search and reads what it found with the
+// kernel and that API alone.
+include(":examples:catalogue-consumer")
 // Runtime discovery of widget modules: scans a directory for jars, checks the
 // ABI they declare, and hands back registries. Separate from :widget-api so a
 // module author compiles against the kernel without pulling in its loader.
@@ -174,5 +177,10 @@ include(":packs")
 // Its API carries no secret, and the module itself never depends on the interface.
 include(":accounts-api")
 include(":accounts")
+// The catalogue module: the keys a widget reads and fires to search the pack sources and
+// the catalogue, open a project, a build or a pack page, and put a project into a pack.
+// Like the others, brought in only by a document that names it.
+include(":catalogue-api")
+include(":catalogue")
 include(":profiler-agent")
 include(":authlib-agent")

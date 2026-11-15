@@ -29,7 +29,7 @@ import hivens.widget.api.LocalSlotPath
 import hivens.ui.editor.ShellChromeBounds
 import hivens.ui.editor.LocalShellChromeBounds
 import hivens.ui.widgets.ChildLevel
-import hivens.ui.widgets.Sources
+import hivens.catalogue.api.CatalogueKeys
 import hivens.widget.api.LocalMisplacedWidget
 import hivens.widget.api.ProvideSamples
 import hivens.widget.api.ProvideScoped
@@ -399,7 +399,7 @@ internal fun PreviewEnvironment(data: WidgetDataRegistry, content: @Composable (
         LocalMisplacedWidget provides { _, _, _ -> },
         LocalShellChromeBounds provides ownBounds,
     ) {
-        ProvideScoped(Sources.OpenProject, sampleOpenProject()) {
+        ProvideScoped(CatalogueKeys.OpenProject, sampleOpenProject()) {
             ChildLevel(ScopeLevel.Page, content)
         }
     }

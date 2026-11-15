@@ -1,7 +1,6 @@
 package hivens.ui
 
-import hivens.core.data.PackOrigin
-import hivens.ui.feature.catalogue.project.ModTarget
+import hivens.catalogue.api.ProjectTarget
 import hivens.ui.screens.detail.settings.PackSettingsCategory
 
 // ─── Navigation ──────────────────────────────────────────────────────────────
@@ -54,13 +53,13 @@ sealed class Screen {
     data class BrowseInto(val instanceId: String) : Screen()
 
     /**
-     * Catalogue-side detail target, source-neutral: carries the [origin] + that
-     * source's local pack id. The one [hivens.ui.feature.catalogue.browse.CataloguePackDetailScreen]
-     * resolves both through [hivens.launcher.catalogue.PackCatalogueRegistry] +
-     * [hivens.launcher.PackInstallCoordinator]. Distinct from [PackDetail], which
-     * resolves an already-installed [hivens.core.data.PackInstance].
+     * Catalogue-side detail target, source-neutral: carries the [origin], the source's
+     * name as the catalogue and packs APIs give it, and that source's local pack id.
+     * The one [hivens.ui.feature.catalogue.browse.CataloguePackDetailScreen] has the
+     * catalogue module read both. Distinct from [PackDetail], which resolves an
+     * already-installed pack.
      */
-    data class CataloguePackDetail(val origin: PackOrigin, val packId: String) : Screen()
+    data class CataloguePackDetail(val origin: String, val packId: String) : Screen()
 
     /**
      * The project page, rendered natively rather than linked out.
@@ -71,10 +70,10 @@ sealed class Screen {
      * the news. Opening one therefore navigates; it cannot open in place, because
      * in place the blocks have nowhere to appear.
      *
-     * Carries a [ModTarget] rather than a project id so a jar the catalogue has
+     * Carries a [ProjectTarget] rather than a project id so a jar the catalogue has
      * never indexed gets the same page as one it has.
      */
-    data class ModDetail(val target: ModTarget) : Screen()
+    data class ModDetail(val target: ProjectTarget) : Screen()
 
     /**
      * One build of a project: what it runs on, what it needs, what changed and
@@ -92,7 +91,7 @@ sealed class Screen {
      * nobody clicked.
      */
     data class ModVersion(
-        val target: ModTarget,
+        val target: ProjectTarget,
         val versionId: String,
         val versionNumber: String,
     ) : Screen()

@@ -5,10 +5,6 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
-import hivens.ui.nx.NxIconButton
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,24 +19,27 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
-import hivens.ui.nx.NxBasicTextField
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -50,17 +49,21 @@ import coil3.PlatformContext
 import coil3.SingletonImageLoader
 import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
-import hivens.core.api.catalogue.CataloguePack
-import hivens.core.data.PackOrigin
-import hivens.core.api.interfaces.IPackRepository
+import hivens.catalogue.api.CatalogueCard
+import hivens.catalogue.api.CatalogueKeys
+import hivens.catalogue.api.PackOrigins
+import hivens.catalogue.api.ResultsScroll
+import hivens.catalogue.api.ScrollMark
+import hivens.catalogue.api.SearchResults
+import hivens.catalogue.api.SearchStatus
 import hivens.ui.RIGHT_RAIL_SURFACE
 import hivens.ui.RailFamily
-import java.nio.file.Path
-import hivens.launcher.catalogue.PackCatalogueRegistry
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
+import hivens.ui.nx.NxBasicTextField
 import hivens.ui.nx.NxButton
+import hivens.ui.nx.NxIconButton
 import hivens.ui.nx.RetryStateBlock
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
@@ -68,21 +71,17 @@ import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.Dimens
 import hivens.ui.theme.Motion
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.NxInk
 import hivens.widget.api.LocalSurfaceFamilies
 import hivens.widget.api.SlotRenderer
+import hivens.widget.api.rememberScopedAction
+import hivens.widget.api.rememberScopedCommand
+import hivens.widget.api.rememberScopedSource
+import hivens.widget.api.valueOrNull
 import hivens.widget.model.SlotId
 import hivens.widget.model.SurfaceId
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.withContext
-import org.koin.compose.koinInject
-import org.slf4j.LoggerFactory
-import kotlin.time.Duration.Companion.milliseconds
-import hivens.ui.theme.NxInk
-import hivens.ui.theme.NxColor
-
+import java.util.UUID
 /**
  * Browse = the catalogue of everything installable: packs from every registered
  * source, and mods, resource packs and shaders from Modrinth.
@@ -90,27 +89,29 @@ import hivens.ui.theme.NxColor
  * The screen is a widget surface and owns none of its controls. What is searched,
  * in what order and into which pack is chosen in the right rail's browse family;
  * the search box and the results are this surface's two slots. All of them meet at
- * [BrowseController], so a widget moved, removed or added in the editor needs
- * nothing from its neighbours.
+ * the window's [CatalogueKeys.Browse], so a widget moved, removed or added in the
+ * editor needs nothing from its neighbours.
  *
- * What the screen does own is the work none of the widgets should: switching the
- * rail to its family for as long as Browse is up, and reading the chosen pack off
- * disk so every widget asks the same answer.
+ * What the screen does own is switching the rail to its family for as long as Browse
+ * is up, naming the pack installs go into each time it comes up, so the catalogue
+ * module reads it off disk anew for every widget to ask the same answer, and showing
+ * the window's results for as long as it is up, which is what runs the search.
  */
 @Composable
 fun BrowseScreen(
     /**
      * The pack this browse was opened from. It becomes the install target, and the
      * search moves to a kind the pack takes each time the reader asks for this browse
-     * (see [BrowseController.aimAt]): a reader who then picks something else keeps it.
+     * (see [CatalogueKeys.Aim]): a reader who then picks something else keeps it.
      */
     intoInstanceId: String? = null,
 ) {
     PuppetScreen(if (intoInstanceId == null) "Browse" else "BrowseInto")
 
-    val c: BrowseController = koinInject()
-    val repo: IPackRepository = koinInject()
-    val dataDir: Path = koinInject()
+    val browse = rememberScopedSource(CatalogueKeys.Browse).valueOrNull()
+    val setTarget = rememberScopedCommand(CatalogueKeys.SetTarget)
+    val showResults = rememberScopedCommand(CatalogueKeys.ShowResults)
+    val hideResults = rememberScopedCommand(CatalogueKeys.HideResults)
     val families = LocalSurfaceFamilies.current
 
     // This visit, as the family's owner, so a page leaving over it hands the rail
@@ -122,16 +123,21 @@ fun BrowseScreen(
     }
 
     // The pack is the screen's own subject, so it is the target whenever the screen
-    // comes up. The kind moves only when the reader asked for this browse
-    // ([BrowseController.aimAt]): a flag kept with the screen's saved state outlived
-    // the visit, so a second ask found it spent and stayed on the last kind, and a
-    // remembered one undid the reader's pick on every return from a project page.
-    LaunchedEffect(intoInstanceId) {
-        if (intoInstanceId != null) c.targetId = intoInstanceId
+    // comes up, and the one the rail chose is read again: a pack updated since to
+    // another game version kept the earlier reading otherwise. The kind moves only when
+    // the reader asked for this browse, which the catalogue module keeps apart.
+    LaunchedEffect(intoInstanceId, setTarget != null) {
+        val set = setTarget ?: return@LaunchedEffect
+        set(intoInstanceId ?: browse?.targetId)
     }
-    LaunchedEffect(c.targetId) {
-        val id = c.targetId ?: return@LaunchedEffect run { c.resolved = null }
-        readTarget(c, id, repo, dataDir)
+    // The search runs while this screen shows its results and stops when it leaves,
+    // so a source that polls is not asked while nobody looks. Coming back runs it again
+    // behind what it kept, so an install from a project page or a removal in the
+    // Content tab shows on the card.
+    val viewer = remember { UUID.randomUUID().toString() }
+    DisposableEffect(viewer, showResults, hideResults) {
+        showResults?.invoke(viewer)
+        onDispose { hideResults?.invoke(viewer) }
     }
 
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
@@ -149,340 +155,78 @@ fun BrowseScreen(
     }
 }
 
-private val log = LoggerFactory.getLogger("Browse")
-
-/**
- * Reads the install target [id] off disk into [c], and moves the search to a kind
- * the pack takes when the reader asked for this browse.
- */
-internal suspend fun readTarget(c: BrowseController, id: String, repo: IPackRepository, dataDir: Path) {
-    val pack = try {
-        withContext(Dispatchers.IO) { repo.get(id) }
-    } catch (e: CancellationException) {
-        throw e
-    } catch (e: Exception) {
-        // Unreadable is not gone. The choice stays and the rows install into no
-        // pack until it can be read, rather than quietly forgetting it. The reading
-        // from before is dropped with it: kept, it answered for a pack whose game
-        // version may have moved since.
-        log.warn("reading the install target {} failed", id, e)
-        c.resolved = null
-        return
-    }
-    if (pack == null) {
-        // Deleted while chosen. Nothing can go into it any more.
-        c.targetId = null
-        return
-    }
-    val target = withContext(Dispatchers.IO) { browseDestination(pack, dataDir).let { BrowseTarget(it, kindsFor(it)) } }
-    c.resolved = target
-    if (c.aimingAt == id) {
-        if (!target.takes(c.kind)) target.kinds.firstOrNull()?.let { c.kind = it }
-        c.aimingAt = null
-    }
-}
-
 internal const val BROWSE_SURFACE = "browse"
 
-/** The source packs are listed from: the one picked, else the first registered. */
-internal fun activeOrigin(picked: PackOrigin?, origins: List<PackOrigin>): PackOrigin =
-    picked?.takeIf { it in origins } ?: origins.firstOrNull() ?: PackOrigin.Mirror
-
 /**
- * Packs from one registered catalogue: the paged list for [origin] and [query].
- *
- * The source and the words come from outside, so this is only the list and the
- * work behind it: what was shown last, what the source says now, and the pages
- * after the first.
+ * Packs from one source: the window's search as the catalogue module answers it, with
+ * what was shown last up first, the source's fresh answer behind it, and the pages
+ * after the first asked for as the reader nears the end.
  */
 @Composable
 internal fun PackBrowse(
-    origin: PackOrigin,
-    query: String,
-    onOpenPack: (CataloguePack) -> Unit,
+    results: SearchResults,
+    onOpenPack: (CatalogueCard) -> Unit,
     /**
      * Which of the listed packs are drawn, for a choice the source does not answer
      * itself. The list underneath is kept whole, so taking the choice back shows
      * what it hid without asking the source again.
      */
-    shown: (CataloguePack) -> Boolean = { true },
+    shown: (CatalogueCard) -> Boolean = { true },
 ) {
     val s = LocalStrings.current
-    val registry: PackCatalogueRegistry = koinInject()
-    val session: BrowseSession = koinInject()
     val imageContext = LocalPlatformContext.current
-    var submittedQuery by remember { mutableStateOf(query) }
-    var state by remember { mutableStateOf<BrowseState>(BrowseState.Loading) }
-    var retryTick by remember { mutableIntStateOf(0) }
+    val retry = rememberScopedAction(CatalogueKeys.RetryResults)
+    val more = rememberScopedAction(CatalogueKeys.MoreResults)
+    val scroll = rememberScopedCommand(CatalogueKeys.ScrollResults)
 
-    PuppetClick("browse.retry") { retryTick++ }
+    PuppetClick("browse.retry") { retry?.invoke() }
 
-    // Debounce typing so each keystroke does not hit the network.
-    LaunchedEffect(query) {
-        delay(350.milliseconds)
-        submittedQuery = query
-    }
-
-    // Paging state. The catalogue takes a page and only some of them honour it:
-    // the mirror answers with its whole list every time. So a page is accepted by
-    // what is NEW in it, and a page that adds nothing is the end -- which is
-    // correct for a catalogue that pages and for one that does not, and keeps a
-    // repeat from reaching the list as a duplicate key.
-    // Keyed on the question being asked, all of them. Unkeyed, a request still in
-    // flight when the source changes came back and wrote its answer under the new
-    // source's name, and a flag left true by a cancelled load stayed true for the
-    // life of the screen.
-    var page by remember(origin, submittedQuery, retryTick) { mutableIntStateOf(0) }
-    var endReached by remember(origin, submittedQuery, retryTick) { mutableStateOf(false) }
-    var loadingMore by remember(origin, submittedQuery, retryTick) { mutableStateOf(false) }
-    val listState = rememberLazyListState()
-
-    // What this source and query were last showing goes up first, before anything
-    // is asked of the catalogue. A spinner belongs over an empty screen, not over
-    // a list the user was reading a moment ago and is about to get back nearly
-    // unchanged -- which is every flip of the source switcher and every trip out
-    // of the screen and back.
-    // Every outcome of a browse is written down. None of them were: the catalogue
-    // path holds no logger at all, and this effect turned a failure into UI state
-    // and nothing else -- so a catalogue that stopped working left no line in the
-    // log or in the diagnostic bundle, and the swallowed branch below left no trace
-    // anywhere at all. The client throws with the status and the body, so what the
-    // source actually answered is in the message.
-    LaunchedEffect(origin, submittedQuery, retryTick) {
-        val remembered = session.get(origin, submittedQuery)
-        // Where a browse got to, not only how it ended. A screen stuck on its
-        // spinner produced no line at all, so there was no way to tell an effect
-        // that never started from one waiting on a source that never answered.
-        log.info(
-            "browse: asking {} for \"{}\", {}",
-            origin,
-            submittedQuery,
-            remembered?.let { "showing ${it.packs.size} remembered pack(s) meanwhile" } ?: "nothing remembered",
-        )
-        // Both scrolls are REQUESTED, not awaited. scrollToItem suspends until an
-        // attached, laid-out list has carried it out -- and the line above it puts
-        // the screen on a state that composes no list at all, so in the branch that
-        // has nothing to restore it never returned. Everything below is downstream
-        // of it, which is why a catalogue that could not be shown made no request,
-        // logged nothing, timed out on nothing and held no thread: the fetch was
-        // parked behind a scroll that could not happen. requestScrollToItem records
-        // the position and the next layout applies it, list or no list.
-        if (remembered != null) {
-            state = BrowseState.Loaded(remembered.packs)
-            page = remembered.nextPage
-            endReached = remembered.endReached
-            listState.requestScrollToItem(remembered.firstVisibleIndex, remembered.firstVisibleOffset)
-        } else {
-            state = BrowseState.Loading
-            page = 0
-            endReached = false
-            // A different question deserves the top of its answer. The scroll
-            // state is one object across every query and source, so without this
-            // a search made while scrolled opens at whatever offset the previous
-            // list had reached -- past the end of a shorter one, which the paging
-            // watcher then reads as "near the bottom" and pages on.
-            listState.requestScrollToItem(0)
-        }
-        val catalogue = registry.forOrigin(origin)
-            ?: return@LaunchedEffect run {
-                log.warn("browse: no catalogue is registered for {}", origin)
-                if (state !is BrowseState.Loaded) state = BrowseState.Empty
-            }
-        // A source that answers with its whole listing has no further pages, and
-        // asking it for one only returns the same list again.
-        if (!catalogue.paged) endReached = true
-        try {
-            // Stale first, fresh behind it. Assigning an equal list is not a
-            // repaint -- the state is compared, not trusted -- so a refresh that
-            // found nothing new costs the screen nothing.
-            catalogue.searchStream(submittedQuery, page = 0)
-                .flowOn(Dispatchers.IO)
-                .collect { packs ->
-                    // An empty answer is an answer. Keeping a restored list over
-                    // it left packs on screen that the source had stopped
-                    // listing, with nothing saying so. The put FORGETS rather than
-                    // stores -- the session refuses an empty snapshot -- so the
-                    // screen shows the empty state, with its retry, and the next
-                    // entry asks again instead of restoring the blank.
-                    if (packs.isEmpty()) {
-                        // Answered, with nothing in it. Recorded separately from a
-                        // failure because that is the distinction a report needs and
-                        // the two look identical on screen.
-                        log.info("browse: {} listed no packs for query \"{}\"", origin, submittedQuery)
-                        state = BrowseState.Empty
-                        session.put(origin, submittedQuery, BrowseSession.Snapshot(emptyList(), nextPage = 0, endReached = true))
-                        return@collect
-                    }
-                    // The fresh page is compared against the front of what is
-                    // shown, not swapped in over it. Unchanged is the ordinary
-                    // answer, and there the pages scrolled on top still follow
-                    // from it and must survive -- replacing the list wholesale
-                    // would take a player back to the first twenty results a
-                    // second after they scrolled past them.
-                    // Membership, not order. A catalogue re-ranks constantly, and
-                    // treating a shuffled first page as new content threw away
-                    // every page scrolled onto the end of it -- and overwrote the
-                    // remembered depth with zero, so leaving and returning could
-                    // not get them back either. Only entries the list does not
-                    // already hold are a reason to start again.
-                    val shown = (state as? BrowseState.Loaded)?.packs
-                    // A source with no pages hands over the entire list each time,
-                    // so its answer IS the list: a pack published or withdrawn, or a
-                    // card reworded, replaces it where it stands. Nothing was scrolled
-                    // onto it to lose, and the reader is not sent back to the top.
-                    if (!catalogue.paged) {
-                        if (packs == shown) {
-                            log.debug("browse: {} re-listed the same {} pack(s)", origin, packs.size)
-                            return@collect
-                        }
-                        log.info("browse: {} listed {} pack(s)", origin, packs.size)
-                        state = BrowseState.Loaded(packs)
-                        session.put(
-                            origin,
-                            submittedQuery,
-                            BrowseSession.Snapshot(
-                                packs = packs,
-                                nextPage = 0,
-                                endReached = true,
-                                firstVisibleIndex = listState.firstVisibleItemIndex,
-                                firstVisibleOffset = listState.firstVisibleItemScrollOffset,
-                            ),
-                        )
-                        return@collect
-                    }
-                    if (shown != null && newIn(packs, shown).isEmpty()) {
-                        log.info("browse: {} re-listed the same {} pack(s)", origin, packs.size)
-                        return@collect
-                    }
-                    log.info("browse: {} listed {} pack(s)", origin, packs.size)
-                    page = 0
-                    endReached = false
-                    state = BrowseState.Loaded(packs)
-                    session.put(origin, submittedQuery, BrowseSession.Snapshot(packs, nextPage = 0, endReached = false))
-                    // Requested for the same reason as the two above: the list this
-                    // would scroll is composed by the line before it, and awaiting a
-                    // scroll from inside the collect would hold the rest of the
-                    // stream behind it.
-                    listState.requestScrollToItem(0)
-                }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            // Logged before it is decided what to show, because the branch that shows
-            // nothing is the one that most needs a record.
-            log.warn("browse: {} failed for query \"{}\"", origin, submittedQuery, e)
-            // A source that failed while something of its own is on screen keeps
-            // showing it. Replacing a readable list with an error page loses more
-            // than the error explains.
-            if (state !is BrowseState.Loaded) state = BrowseState.Error(e.message ?: s.browseErrorMessage)
-        }
-    }
-
-    // Both images of every card on the page, resolved as the page lands rather
-    // than as a card scrolls into view. They are all going to be fetched anyway
-    // -- the list is already paged -- and fetching them on sight is what makes a
-    // card change under the eye a moment after it is read.
-    var prefetched by remember(origin, submittedQuery, retryTick) { mutableStateOf(0) }
-    LaunchedEffect(state) {
-        val packs = (state as? BrowseState.Loaded)?.packs ?: return@LaunchedEffect
-        // Only what the page just added. Re-enqueueing the whole list on every
-        // growth asks the loader for page one's images again on page five.
-        if (packs.size <= prefetched) return@LaunchedEffect
+    // Both images of every card on the page, resolved as the page lands rather than as
+    // a card scrolls into view, so a card does not change under the eye a moment after
+    // it is read. Only what the page just added: re-enqueueing the whole list on every
+    // growth asks the loader for page one's images again on page five.
+    var prefetched by remember(results.question) { mutableIntStateOf(0) }
+    LaunchedEffect(results.question, results.packs) {
+        val packs = results.packs
+        if (results.status != SearchStatus.Loaded || packs.size <= prefetched) return@LaunchedEffect
         prefetchCardArt(imageContext, packs.subList(prefetched, packs.size))
         prefetched = packs.size
     }
 
-    // Only the first page was ever asked for, so a catalogue with more to give
-    // simply stopped at twenty results with nothing saying there were more.
-    LaunchedEffect(listState, state, endReached) {
-        if (state !is BrowseState.Loaded || endReached) return@LaunchedEffect
-        // The question this effect is answering, taken once. The request suspends,
-        // and reading the live source and query when it returns is how an answer
-        // to the previous question got written under the name of the current one.
-        val forOrigin = origin
-        val forQuery = submittedQuery
-        // A source that is not registered has no pages, which is not the same as
-        // having reached the last of them: the flag suppresses every later attempt,
-        // and the state that put it there is not one a scroll can leave.
-        val catalogue = registry.forOrigin(forOrigin) ?: return@LaunchedEffect
-        snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1 }
-            .collect { last ->
-                val current = (state as? BrowseState.Loaded)?.packs ?: return@collect
-                if (loadingMore || endReached || last < current.size - 3) return@collect
-                loadingMore = true
-                try {
-                    val next = withContext(Dispatchers.IO) { catalogue.search(forQuery, page = page + 1) }
-                    val fresh = newIn(next, current)
-                    if (fresh.isEmpty()) endReached = true else {
-                        page += 1
-                        val grown = current + fresh
-                        state = BrowseState.Loaded(grown)
-                        session.put(
-                            forOrigin,
-                            forQuery,
-                            BrowseSession.Snapshot(
-                                packs = grown,
-                                nextPage = page,
-                                endReached = false,
-                                firstVisibleIndex = listState.firstVisibleItemIndex,
-                                firstVisibleOffset = listState.firstVisibleItemScrollOffset,
-                            ),
-                        )
-                    }
-                } catch (e: CancellationException) {
-                    // Leaving the screen is not a failure and must not be swallowed:
-                    // a cancellation caught here would leave the coroutine running
-                    // on past the disposal that asked it to stop.
-                    throw e
-                } catch (_: Exception) {
-                    // A failure is not an ending. Marking the listing finished on
-                    // one refused request means a moment without a network takes
-                    // the rest of the catalogue away until the query is retyped.
-                    // The next scroll asks again.
-                } finally {
-                    loadingMore = false
-                }
-            }
-    }
-
-    // Where the reader had got to, kept with the list it belongs to. Written on
-    // the way out rather than on every scroll: the position only matters to a
-    // return, and a write per frame of scrolling is a write per frame.
-    //
-    // Keyed on everything the cursor is keyed on. A retry makes page and endReached
-    // new states, and an effect that outlived it went on reading the old ones, so a
-    // retry followed by paging was put away with the new list and the old cursor.
-    DisposableEffect(origin, submittedQuery, retryTick) {
-        val forOrigin = origin
-        val forQuery = submittedQuery
-        onDispose {
-            val packs = (state as? BrowseState.Loaded)?.packs ?: return@onDispose
-            session.put(
-                forOrigin,
-                forQuery,
-                BrowseSession.Snapshot(
-                    packs = packs,
-                    nextPage = page,
-                    endReached = endReached,
-                    firstVisibleIndex = listState.firstVisibleItemIndex,
-                    firstVisibleOffset = listState.firstVisibleItemScrollOffset,
-                ),
-            )
-        }
-    }
-
-    when (val st = state) {
-        BrowseState.Loading -> BrowseLoading()
-        BrowseState.Empty   -> BrowseEmpty(onRetry = { retryTick++ })
-        is BrowseState.Error -> BrowseError(message = st.message, onRetry = { retryTick++ })
-        is BrowseState.Loaded -> {
-            val visible = st.packs.filter(shown)
+    when (val status = results.status) {
+        SearchStatus.Loading -> BrowseLoading()
+        SearchStatus.Empty -> BrowseEmpty(onRetry = { retry?.invoke() })
+        is SearchStatus.Failed -> BrowseError(message = status.message ?: s.browseErrorMessage, onRetry = { retry?.invoke() })
+        SearchStatus.Loaded -> {
+            val visible = results.packs.filter(shown)
             if (visible.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(s.contentEmpty, style = MaterialTheme.typography.bodyMedium, color = NxInk.quiet)
                 }
             } else {
-                BrowseList(packs = visible, listState = listState, onOpenPack = onOpenPack)
+                // One list per question: it starts where the reader left that question's
+                // answer, and says where they leave it under that question's name.
+                key(results.question) {
+                    val question = results.question
+                    val listState = rememberLazyListState(results.scroll.index, results.scroll.offset)
+                    // A fresh first page that replaced the list sends the reader to its top.
+                    val firstTop = remember { results.toTop }
+                    LaunchedEffect(results.toTop) { if (results.toTop != firstTop) listState.requestScrollToItem(0) }
+                    DisposableEffect(listState) {
+                        onDispose {
+                            question?.let { scroll?.invoke(ResultsScroll(it, ScrollMark(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset))) }
+                        }
+                    }
+                    // Only the first page was ever asked for once, so a catalogue with more
+                    // to give stopped at twenty results with nothing saying there were more.
+                    LaunchedEffect(listState, results.packs.size, results.endReached) {
+                        if (results.endReached) return@LaunchedEffect
+                        val total = results.packs.size
+                        snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1 }
+                            .collect { last -> if (last >= total - 3) more?.invoke() }
+                    }
+                    BrowseList(packs = visible, listState = listState, onOpenPack = onOpenPack)
+                }
             }
         }
     }
@@ -495,13 +239,46 @@ internal fun PackBrowse(
  * the card that composes later finds its icon and its banner already decoded and
  * draws them on its first frame instead of fading them in over a placeholder.
  */
-private fun prefetchCardArt(context: PlatformContext, packs: List<CataloguePack>) {
+private fun prefetchCardArt(context: PlatformContext, packs: List<CatalogueCard>) {
     val loader = SingletonImageLoader.get(context)
     packs.forEach { pack ->
         listOfNotNull(pack.iconUrl, pack.bannerUrl).forEach { url ->
             loader.enqueue(ImageRequest.Builder(context).data(url).build())
         }
     }
+}
+
+/**
+ * The words of a field that a command keeps, as the field shows them, and what to call
+ * as the person types.
+ *
+ * The field shows what was typed at once: the words come back through the window's
+ * browse a moment later, and a field that waited for them dropped keys typed in the
+ * meantime. A change that did not come from here, the words a tag search cleared, is
+ * taken over as it arrives.
+ */
+@Composable
+internal fun rememberEchoedText(kept: String, send: (String) -> Unit): Pair<String, (String) -> Unit> {
+    val text = remember { mutableStateOf(kept) }
+    // Sent and not yet come back, oldest first. Read only by the effect below and the setter.
+    val sent = remember { ArrayDeque<String>() }
+    LaunchedEffect(kept) {
+        val at = sent.indexOf(kept)
+        if (at >= 0) {
+            repeat(at + 1) { sent.removeFirst() }
+        } else if (kept != text.value) {
+            sent.clear()
+            text.value = kept
+        }
+    }
+    val type: (String) -> Unit = remember(send) {
+        { value ->
+            text.value = value
+            sent.addLast(value)
+            send(value)
+        }
+    }
+    return text.value to type
 }
 
 /**
@@ -599,12 +376,12 @@ internal fun SearchField(
     }
 }
 
-internal fun originLabel(origin: PackOrigin): String = when (origin) {
-    PackOrigin.Mirror -> "Hivens"
-    PackOrigin.Modrinth -> "Modrinth"
-    PackOrigin.Smartycraft -> "SmartyCraft"
-    PackOrigin.Local -> "Local"
-    PackOrigin.Unknown -> "Other"
+internal fun originLabel(origin: String): String = when (origin) {
+    PackOrigins.MIRROR -> "Hivens"
+    PackOrigins.MODRINTH -> "Modrinth"
+    PackOrigins.SMARTYCRAFT -> "SmartyCraft"
+    PackOrigins.LOCAL -> "Local"
+    else -> "Other"
 }
 
 @Composable
@@ -658,9 +435,9 @@ private fun BrowseError(message: String, onRetry: () -> Unit) {
 
 @Composable
 private fun BrowseList(
-    packs: List<CataloguePack>,
+    packs: List<CatalogueCard>,
     listState: LazyListState,
-    onOpenPack: (CataloguePack) -> Unit,
+    onOpenPack: (CatalogueCard) -> Unit,
 ) {
     LazyColumn(
         state               = listState,
@@ -668,7 +445,7 @@ private fun BrowseList(
         contentPadding      = PaddingValues(bottom = 16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        items(items = packs, key = { packKey(it) }) { pack ->
+        items(items = packs, key = { it.key }) { pack ->
             BrowsePackCard(
                 pack = pack,
                 onClick = { onOpenPack(pack) },
@@ -681,33 +458,4 @@ private fun BrowseList(
             PuppetClick("browse.open.${pack.origin}.${pack.id}") { onOpenPack(pack) }
         }
     }
-}
-
-/**
- * The entries of [page] that are not already in [shown], in the page's own order.
- *
- * A catalogue takes a page number and only some of them honour it -- the mirror
- * answers with its whole listing every time -- so a page is accepted by what is
- * new in it, and a page that adds nothing is the end. That reading is correct for
- * a source that pages and for one that does not, and it keeps a repeat from
- * reaching a keyed list twice.
- *
- * Named, and tested, because it was written inline once and the identity it
- * compared by was a constant: every entry answered "already seen", every page
- * after the first was empty, and the list stopped at twenty with nothing saying
- * so.
- */
-internal fun newIn(page: List<CataloguePack>, shown: List<CataloguePack>): List<CataloguePack> {
-    val seen = shown.mapTo(HashSet(shown.size)) { packKey(it) }
-    return page.filterNot { packKey(it) in seen }
-}
-
-/** A pack's identity across sources: two catalogues may both have an id "1". */
-internal fun packKey(pack: CataloguePack): String = "${pack.origin}:${pack.id}"
-
-sealed class BrowseState {
-    object Loading : BrowseState()
-    object Empty   : BrowseState()
-    data class Loaded(val packs: List<CataloguePack>) : BrowseState()
-    data class Error(val message: String) : BrowseState()
 }

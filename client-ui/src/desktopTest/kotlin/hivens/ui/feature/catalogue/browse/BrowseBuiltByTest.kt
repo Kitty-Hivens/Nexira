@@ -1,35 +1,33 @@
 package hivens.ui.feature.catalogue.browse
 
-import hivens.core.api.catalogue.CataloguePack
-import hivens.core.data.PackOrigin
+import hivens.catalogue.api.BrowseView
+import hivens.catalogue.api.CatalogueCard
+import hivens.catalogue.api.PackOrigins
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
 /** Whose mirror packs Browse lists, and that the choice reaches no other source. */
 class BrowseBuiltByTest {
 
-    private val own = CataloguePack(PackOrigin.Mirror, "industrial", "Industrial", "")
-    private val members = CataloguePack(PackOrigin.Mirror, "u/7/cozy", "Cozy", "", community = true, author = "alex")
-    private val modrinth = CataloguePack(PackOrigin.Modrinth, "abc", "Fabulously Optimized", "")
+    private val own = CatalogueCard(PackOrigins.MIRROR, "industrial", "Industrial", "")
+    private val members = CatalogueCard(PackOrigins.MIRROR, "u/7/cozy", "Cozy", "", community = true, author = "alex")
+    private val modrinth = CatalogueCard(PackOrigins.MODRINTH, "abc", "Fabulously Optimized", "")
 
     @Test
     fun `both kinds are listed until one is turned off`() {
-        val c = BrowseController()
+        val c = BrowseView()
         assertEquals(listOf(own, members), listOf(own, members).filter(c::shows))
 
-        c.mirrorCommunity = false
-        assertEquals(listOf(own), listOf(own, members).filter(c::shows))
+        val noCommunity = c.copy(mirrorCommunity = false)
+        assertEquals(listOf(own), listOf(own, members).filter(noCommunity::shows))
 
-        c.mirrorCommunity = true
-        c.mirrorOwn = false
-        assertEquals(listOf(members), listOf(own, members).filter(c::shows))
+        val noOwn = c.copy(mirrorCommunity = true, mirrorOwn = false)
+        assertEquals(listOf(members), listOf(own, members).filter(noOwn::shows))
     }
 
     @Test
     fun `another source's packs are listed whatever the mirror choice`() {
-        val c = BrowseController()
-        c.mirrorOwn = false
-        c.mirrorCommunity = false
+        val c = BrowseView(mirrorOwn = false, mirrorCommunity = false)
         assertEquals(listOf(modrinth), listOf(modrinth).filter(c::shows))
     }
 }

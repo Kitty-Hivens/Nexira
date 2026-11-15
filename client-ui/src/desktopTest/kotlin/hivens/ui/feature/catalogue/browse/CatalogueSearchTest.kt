@@ -1,16 +1,23 @@
 package hivens.ui.feature.catalogue.browse
 
-import hivens.core.api.dto.modrinth.ModrinthCategoryTag
-import hivens.core.data.PackOrigin
-import hivens.launcher.content.ContentKind
-import hivens.launcher.modrinth.ENV_CLIENT
-import hivens.launcher.modrinth.ENV_SERVER
-import hivens.launcher.modrinth.FilterField
-import hivens.launcher.modrinth.SearchFilter
+import hivens.catalogue.BrowseState
+import hivens.catalogue.api.CatalogueTags
+import hivens.catalogue.api.CategoryTag
+import hivens.catalogue.api.ENV_CLIENT
+import hivens.catalogue.api.ENV_SERVER
+import hivens.catalogue.api.FilterField
+import hivens.catalogue.api.FilterPick
+import hivens.catalogue.api.PackOrigins
+import hivens.catalogue.api.ProjectKind
+import hivens.catalogue.api.ProjectTarget
+import hivens.catalogue.api.SearchFilter
+import hivens.catalogue.api.TagSearch
 import hivens.ui.Screen
 import hivens.ui.feature.catalogue.project.Environment
-import hivens.ui.feature.catalogue.project.ModTarget
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.runBlocking
+import java.nio.file.Path
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -22,14 +29,25 @@ import kotlin.test.assertTrue
  */
 class CatalogueSearchTest {
 
-    private val tags = BrowseTags.Tags(
+    private val tags = CatalogueTags(
         gameVersions = emptyList(),
         categories = listOf(
-            ModrinthCategoryTag("64x", projectType = "resourcepack", header = "resolutions"),
-            ModrinthCategoryTag("realistic", projectType = "resourcepack", header = "categories"),
-            ModrinthCategoryTag("optimization", projectType = "mod", header = "categories"),
+            CategoryTag("64x", projectType = "resourcepack", header = "resolutions"),
+            CategoryTag("realistic", projectType = "resourcepack", header = "categories"),
+            CategoryTag("optimization", projectType = "mod", header = "categories"),
         ),
         loaders = emptyList(),
+    )
+
+    /**
+     * A window's browse as the catalogue module keeps it. Its work never runs, so a pack
+     * named as the target stays named without being read off a disk the test has not got.
+     */
+    private fun browse() = BrowseState(
+        origins = listOf(PackOrigins.MIRROR, PackOrigins.MODRINTH),
+        packOf = { null },
+        instancesDir = Path.of("/nonexistent"),
+        scope = CoroutineScope(Job().apply { cancel() }),
     )
 
     @Test
@@ -77,82 +95,84 @@ class CatalogueSearchTest {
 
     @Test
     fun `a tag search starts fresh on its own type`() {
-        val c = BrowseController()
-        c.kind = ContentKind.Mod
-        c.query = "sodium"
-        c.toggle("shader", SearchFilter(FilterField.Category, "cartoon"))
-        c.toggle("shader", SearchFilter(FilterField.Loader, "optifine"))
-        c.toggle("mod", SearchFilter(FilterField.Category, "magic"))
+        val c = browse()
+        c.setKind(ProjectKind.Mod)
+        c.setQuery("sodium")
+        c.toggle(FilterPick("shader", SearchFilter(FilterField.Category, "cartoon")))
+        c.toggle(FilterPick("shader", SearchFilter(FilterField.Loader, "optifine")))
+        c.toggle(FilterPick("mod", SearchFilter(FilterField.Category, "magic")))
 
-        c.searchFor("shader", setOf(SearchFilter(FilterField.Loader, "iris")), packId = null)
+        c.searchFor(TagSearch("shader", setOf(SearchFilter(FilterField.Loader, "iris")), packId = null))
 
-        assertEquals(ContentKind.ShaderPack, c.kind)
-        assertEquals("", c.query, "the tag is the question, not what was typed before")
-        assertEquals(setOf(SearchFilter(FilterField.Loader, "iris")), c.chosenFor("shader"))
+        val view = c.view.value
+        assertEquals(ProjectKind.ShaderPack, view.kind)
+        assertEquals("", view.query, "the tag is the question, not what was typed before")
+        assertEquals(setOf(SearchFilter(FilterField.Loader, "iris")), view.chosenFor("shader"))
         assertEquals(
             setOf(SearchFilter(FilterField.Category, "magic")),
-            c.chosenFor("mod"),
+            view.chosenFor("mod"),
             "another type's choices are that type's and stay",
         )
     }
 
     @Test
     fun `a modpack tag lists the catalogue's packs`() {
-        val c = BrowseController()
-        c.origin = PackOrigin.Mirror
-        c.searchFor(MODPACK, setOf(SearchFilter(FilterField.Category, "adventure")), packId = null)
-        assertNull(c.kind)
-        assertEquals(PackOrigin.Modrinth, c.origin)
+        val c = browse()
+        c.setOrigin(PackOrigins.MIRROR)
+        c.searchFor(TagSearch(MODPACK, setOf(SearchFilter(FilterField.Category, "adventure")), packId = null))
+        assertNull(c.view.value.kind)
+        assertEquals(PackOrigins.MODRINTH, c.view.value.origin)
     }
 
     @Test
     fun `the page's pack becomes the target and gives up the field the tag asks about`() {
-        val c = BrowseController()
-        c.targetId = "other"
-        c.unlocked += FilterField.Loader
+        val c = browse()
+        c.setTarget("other")
+        c.unlock(FilterField.Loader)
 
-        c.searchFor("mod", setOf(SearchFilter(FilterField.GameVersion, "1.20.1")), packId = "pack")
+        c.searchFor(TagSearch("mod", setOf(SearchFilter(FilterField.GameVersion, "1.20.1")), packId = "pack"))
 
-        assertEquals("pack", c.targetId)
-        assertEquals(listOf(FilterField.GameVersion), c.unlocked.toList(), "the unlock for the other pack went with it")
+        assertEquals("pack", c.view.value.targetId)
+        assertEquals(setOf(FilterField.GameVersion), c.view.value.unlocked, "the unlock for the other pack went with it")
 
-        c.searchFor("mod", setOf(SearchFilter(FilterField.Category, "magic")), packId = null)
-        assertNull(c.targetId, "a page with no pack behind it aims at none")
-        assertTrue(c.unlocked.isEmpty())
+        c.searchFor(TagSearch("mod", setOf(SearchFilter(FilterField.Category, "magic")), packId = null))
+        assertNull(c.view.value.targetId, "a page with no pack behind it aims at none")
+        assertTrue(c.view.value.unlocked.isEmpty())
     }
 
     /** The lists can take seconds, and the search waits on the shell's scope, not the page's. */
     @Test
     fun `a tag search does not take the reader away from where they went while it waited`() = runBlocking {
-        val c = BrowseController()
-        c.query = "sodium"
-        var screen: Screen = Screen.ModDetail(ModTarget.Catalogue("sodium"))
+        var screen: Screen = Screen.ModDetail(ProjectTarget.Catalogue("sodium"))
         val opened = mutableListOf<Screen>()
+        val asked = mutableListOf<TagSearch>()
 
         searchFromTag(
-            c, "mod", ProjectTag.Category("optimization"), packId = null,
+            "mod", ProjectTag.Category("optimization"), packId = null,
             known = { screen = Screen.Library; tags },
             currentScreen = { screen },
             onScreenChange = { opened += it },
+            search = { asked += it },
         )
 
         assertEquals(emptyList(), opened)
-        assertEquals("sodium", c.query, "Browse's own question is left as it was")
+        assertEquals(emptyList(), asked, "Browse's own question is left as it was")
     }
 
     @Test
     fun `a tag search opens Browse when the reader is still on the page`() = runBlocking {
-        val c = BrowseController()
         val opened = mutableListOf<Screen>()
+        val asked = mutableListOf<TagSearch>()
 
         searchFromTag(
-            c, "mod", ProjectTag.Category("optimization"), packId = null,
+            "mod", ProjectTag.Category("optimization"), packId = null,
             known = { tags },
-            currentScreen = { Screen.ModDetail(ModTarget.Catalogue("sodium")) },
+            currentScreen = { Screen.ModDetail(ProjectTarget.Catalogue("sodium")) },
             onScreenChange = { opened += it },
+            search = { asked += it },
         )
 
         assertEquals(listOf<Screen>(Screen.Browse), opened)
-        assertEquals(setOf(SearchFilter(FilterField.Category, "optimization")), c.chosenFor("mod"))
+        assertEquals(listOf(TagSearch("mod", setOf(SearchFilter(FilterField.Category, "optimization")), null)), asked)
     }
 }
