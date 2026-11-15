@@ -66,7 +66,22 @@ object Themes {
         ),
     )
 
-    val all: List<Theme> = listOf(Celestia, Abyssal, BloodRain, Lotus)
+    val Signal = Theme(
+        id = "signal",
+        name = "Signal",
+        dark = Scheme(
+            steps = listOf(Color(0xFF1C1C1C), Color(0xFF262626), Color(0xFF303030), Color(0xFF3B3B3B), Color(0xFF474747)),
+            inks = listOf(Color(0xFFF2F2F2), Color(0xFFA6A6A6)),
+            colors = listOf(Color(0xFFFF2A3D), Color(0xFFF2F2F2), Color(0xFF8C8C8C)),
+        ),
+        light = Scheme(
+            steps = listOf(Color(0xFFFFFFFF), Color(0xFFF2F2F2), Color(0xFFE6E6E6), Color(0xFFD9D9D9), Color(0xFFCCCCCC)),
+            inks = listOf(Color(0xFF111111), Color(0xFF5C5C5C)),
+            colors = listOf(Color(0xFFE60012), Color(0xFF1A1A1A), Color(0xFF8C8C8C)),
+        ),
+    )
+
+    val all: List<Theme> = listOf(Celestia, Abyssal, BloodRain, Lotus, Signal)
 
     val default: Theme get() = Celestia
 
