@@ -17,8 +17,8 @@ import androidx.compose.ui.graphics.luminance
  * direction and character rather than inventing a different one.
  *
  * [inks] is text, strongest first: the main ink, then the quiet one. It is authored
- * against the whole ladder and has to stay readable on every step, which the theme
- * tests hold it to.
+ * against the whole ladder, and nx-ui moves it in tone only where a plane needs that
+ * to read, so an ink that reads on every step is drawn exactly as given.
  *
  * [colors] carries the theme's character, variant 1 to N. Order means emphasis and
  * nothing else. Which colour plays which part is decided by the request, not by the

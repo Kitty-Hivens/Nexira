@@ -14,6 +14,10 @@ import kotlin.test.assertTrue
  * hands out reaches its target on the plane it is fitted to. The pipeline this
  * replaced had tests that held the mechanism to its own numbers, and passed while
  * every preset drew the same ground.
+ *
+ * Only what is drawn is held, and text is drawn in the inks as fitted to the plane
+ * under it, never as authored. A floor, then: a theme that passes is readable, and
+ * whether it is good is not a question these can answer.
  */
 class ThemeIntentTest {
 
@@ -32,18 +36,6 @@ class ThemeIntentTest {
                 val gap = abs(b - a)
                 val floor = if (scheme.isDark) DARK_STEP else LIGHT_STEP
                 assertTrue(gap >= floor, "$name: neighbouring steps are ${"%.2f".format(gap)} L* apart, under $floor")
-            }
-        }
-    }
-
-    @Test
-    fun `the authored inks are readable on every authored step`() {
-        for ((name, scheme) in schemes()) {
-            for ((i, step) in scheme.steps.withIndex()) {
-                for ((role, ink) in listOf("main" to scheme.inks[0], "quiet" to scheme.inks[1])) {
-                    val r = contrast(ink, step)
-                    assertTrue(r >= TEXT, "$name step $i: $role ink at ${"%.2f".format(r)} is under $TEXT")
-                }
             }
         }
     }
