@@ -455,7 +455,7 @@ private fun Wardrobe(session: SessionView) {
                         Text(
                             text = it,
                             style = MaterialTheme.typography.bodySmall,
-                            color = NxColor.status(Status.Error, text = true),
+                            color = NxColor.status(Status.Error),
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f, fill = false),

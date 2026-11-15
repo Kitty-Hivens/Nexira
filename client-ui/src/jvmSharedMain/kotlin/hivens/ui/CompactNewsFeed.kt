@@ -613,7 +613,7 @@ private fun CompactNewsItem(
                 Text(
                     text  = date,
                     style = MaterialTheme.typography.labelSmall,
-                    color = NxColor.lead(text = true)
+                    color = NxColor.lead()
                 )
             }
         }

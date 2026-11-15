@@ -55,7 +55,6 @@ import hivens.ui.nx.NxSlider
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.OnFill
 import hivens.ui.theme.familyForText
 import hivens.ui.widgets.services.MusicPlayerService
 import hivens.widget.api.rememberProps
@@ -324,17 +323,13 @@ internal fun TilePlayerCard(
                     Modifier.fillMaxWidth().height(3.dp).clip(CircleShape)
                         .background(Color.White.copy(alpha = 0.26f)),
                 )
-                // The foot is darkened to near black on every theme, so the played
-                // part is the lead fitted against black rather than against the page.
-                OnFill(Color.Black) {
-                    Box(
-                        Modifier
-                            .fillMaxWidth(progressFraction(state).coerceIn(0f, 1f))
-                            .height(3.dp)
-                            .clip(CircleShape)
-                            .background(NxColor.lead()),
-                    )
-                }
+                Box(
+                    Modifier
+                        .fillMaxWidth(progressFraction(state).coerceIn(0f, 1f))
+                        .height(3.dp)
+                        .clip(CircleShape)
+                        .background(NxColor.lead()),
+                )
             }
         }
 

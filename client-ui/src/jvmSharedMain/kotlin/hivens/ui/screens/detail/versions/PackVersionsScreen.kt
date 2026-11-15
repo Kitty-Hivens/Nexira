@@ -505,7 +505,7 @@ private fun BuildRow(
                 Text(
                     text     = s.packVersionsRebuilds(rebuildTail),
                     style    = MaterialTheme.typography.labelSmall,
-                    color    = if (tailShown) NxColor.lead(text = true) else NxInk.quiet,
+                    color    = if (tailShown) NxColor.lead() else NxInk.quiet,
                     modifier = Modifier
                         .clip(RoundedCornerShape(6.dp))
                         .clickable(onClick = onToggleRun)
@@ -918,7 +918,7 @@ private fun StatusRow(operation: PackOperation?) {
                 // Said the way the settings sheet says it, so one outcome reads the same on both.
                 text  = if (operation.kind == PackOperationKind.Reattach) s.packSettingsReattached(phase.version) else s.packVersionsApplied(phase.version),
                 style = MaterialTheme.typography.labelSmall,
-                color = NxColor.status(Status.Success, text = true),
+                color = NxColor.status(Status.Success),
             )
             // Green is for a repair that resolved everything it looked at. One that
             // could not is reported as such here too, or the same run reads as a
@@ -935,28 +935,28 @@ private fun StatusRow(operation: PackOperation?) {
                     )
                 },
                 style    = MaterialTheme.typography.labelSmall,
-                color    = if (phase.failed.isEmpty()) NxColor.status(Status.Success, text = true) else NxColor.status(Status.Warning, text = true),
+                color    = if (phase.failed.isEmpty()) NxColor.status(Status.Success) else NxColor.status(Status.Warning),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             is PackOperationPhase.Failed -> Text(
                 text     = s.packVersionsFailed(phase.message),
                 style    = MaterialTheme.typography.labelSmall,
-                color    = NxColor.status(Status.Error, text = true),
+                color    = NxColor.status(Status.Error),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             is PackOperationPhase.Refused -> Text(
                 text     = s.packOperationRefused(phase.work.label(s)),
                 style    = MaterialTheme.typography.labelSmall,
-                color    = NxColor.status(Status.Error, text = true),
+                color    = NxColor.status(Status.Error),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             PackOperationPhase.PreviewStale -> Text(
                 text     = s.packSettingsReattachStale,
                 style    = MaterialTheme.typography.labelSmall,
-                color    = NxColor.status(Status.Error, text = true),
+                color    = NxColor.status(Status.Error),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )

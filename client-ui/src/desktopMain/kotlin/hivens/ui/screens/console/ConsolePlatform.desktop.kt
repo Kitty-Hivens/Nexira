@@ -40,7 +40,7 @@ internal actual fun ConsoleContextMenu(entries: () -> List<ConsoleMenuEntry>, co
         val top = colours.step(colours.topStep)
         DefaultContextMenuRepresentation(
             backgroundColor = top,
-            textColor       = colours.inkMain(top),
+            textColor       = colours.inkMain,
             itemHoverColor  = lerp(top, colours.lead, 0.14f),
         )
     }

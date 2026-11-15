@@ -415,7 +415,7 @@ private fun CandidateRow(
                     note ?: runtimeLabel(candidate.mcVersion, candidate.loader),
                     style = MaterialTheme.typography.labelMedium,
                     color = when {
-                        state is CandidateState.Failed || missing != null -> NxColor.status(Status.Error, text = true)
+                        state is CandidateState.Failed || missing != null -> NxColor.status(Status.Error)
                         else -> NxInk.quiet
                     },
                     maxLines = 1,
@@ -509,7 +509,7 @@ private fun NewPack(model: InstallDialogModel) {
                     Text(
                         state.message.ifBlank { s.contentInstallFailed },
                         style = MaterialTheme.typography.labelMedium,
-                        color = NxColor.status(Status.Error, text = true),
+                        color = NxColor.status(Status.Error),
                         maxLines = 2,
                     )
                 }
@@ -535,7 +535,7 @@ private fun NewPack(model: InstallDialogModel) {
                 Symbol(NxIcon.CheckCircle, contentDescription = null, tint = NxColor.lead(), size = 40.dp)
                 Text(s.installDialogDone(state.packName), style = MaterialTheme.typography.titleMedium, color = NxInk.main, fontWeight = FontWeight.SemiBold)
                 if (state.missing > 0) {
-                    Text(s.modPageInstallMissing(state.missing), style = MaterialTheme.typography.labelMedium, color = NxColor.status(Status.Error, text = true))
+                    Text(s.modPageInstallMissing(state.missing), style = MaterialTheme.typography.labelMedium, color = NxColor.status(Status.Error))
                 }
                 NxButton(label = s.installDialogOpenPack, onClick = { model.openPack(state.packId) }, style = NxButtonStyle.Secondary, compact = true)
             }

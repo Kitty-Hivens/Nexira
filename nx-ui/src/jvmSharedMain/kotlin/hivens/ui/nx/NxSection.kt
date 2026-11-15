@@ -44,7 +44,7 @@ fun NxSection(
             modifier   = titleModifier,
             style      = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.Bold,
-            color      = NxColor.lead(text = true),
+            color      = NxColor.lead(),
             maxLines   = 1,
             overflow   = TextOverflow.Ellipsis,
         )

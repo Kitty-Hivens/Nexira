@@ -61,7 +61,7 @@ fun CertificatePromptHost() {
     PuppetClick("certificate.trust.dismiss", enabled = pending != null) { gate.dismiss() }
 
     val request = pending ?: return
-    // Material draws the dialog body, so its words are fitted to that body by hand: the
+    // Material draws the dialog body, so the plane its words sit on is named by hand: the
     // dialog step of the ladder, which is what a modal is anywhere else in the app.
     val body = NxTheme.colours.step(NxTheme.colours.topStep)
     NxAlertDialog(

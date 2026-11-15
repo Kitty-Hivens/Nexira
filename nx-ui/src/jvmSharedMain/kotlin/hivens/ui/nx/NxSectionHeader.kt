@@ -23,7 +23,7 @@ fun NxSectionHeader(
     Text(
         text       = text,
         style      = MaterialTheme.typography.titleSmall,
-        color      = if (muted) NxInk.quiet else NxColor.lead(text = true),
+        color      = if (muted) NxInk.quiet else NxColor.lead(),
         // Muted leaves the weight to titleSmall (Medium); the accent header bolds it.
         fontWeight = if (muted) null else FontWeight.Bold,
         modifier   = modifier,

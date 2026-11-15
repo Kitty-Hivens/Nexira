@@ -37,7 +37,7 @@ fun NxChoiceChip(
              else NxColor.wash(NxInk.quiet, 0.08f * alpha)
     val interaction = remember { MutableInteractionSource() }
     OnFill(bg) {
-        val fg = (if (selected) NxColor.lead(text = true) else NxInk.quiet).copy(alpha = alpha)
+        val fg = (if (selected) NxColor.lead() else NxInk.quiet).copy(alpha = alpha)
         NxSteadyText(
             text       = label,
             style      = MaterialTheme.typography.labelSmall,

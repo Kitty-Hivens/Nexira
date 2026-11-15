@@ -447,7 +447,7 @@ private fun HistoryRow(entry: PersistedNotification, count: Int, ampm: Boolean, 
                     Text(
                         text       = strings.notifGroupCount(count),
                         style      = MaterialTheme.typography.labelSmall,
-                        color      = NxColor.lead(text = true),
+                        color      = NxColor.lead(),
                         fontWeight = FontWeight.Bold,
                     )
                 }
@@ -508,7 +508,7 @@ private fun TimeStamp(epoch: Long, ampm: Boolean, vertical: Boolean, color: Colo
 // Info / Success read as normal primary text.
 @Composable
 private fun severityColor(severity: Severity): Color = when (severity) {
-    Severity.Critical -> NxColor.status(Status.Error, text = true)
-    Severity.Warn     -> NxColor.status(Status.Warning, text = true)
+    Severity.Critical -> NxColor.status(Status.Error)
+    Severity.Warn     -> NxColor.status(Status.Warning)
     else              -> NxInk.main
 }

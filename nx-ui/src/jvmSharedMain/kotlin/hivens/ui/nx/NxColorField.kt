@@ -94,7 +94,7 @@ fun NxColorField(
             Text(
                 text     = clearLabel,
                 style    = MaterialTheme.typography.labelSmall,
-                color    = NxColor.lead(text = true),
+                color    = NxColor.lead(),
                 modifier = Modifier
                     .clip(MaterialTheme.shapes.small)
                     .clickable { text = ""; onClear() }

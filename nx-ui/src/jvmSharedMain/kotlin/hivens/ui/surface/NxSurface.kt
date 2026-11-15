@@ -52,8 +52,8 @@ internal fun surfaceStep(kind: SurfaceKind, parentStep: Int, topStep: Int): Int 
  * the title, and text on a thin coat over a picture reads only as well as the picture
  * lets it. Named an opacity under one, it turns to glass and blurs what is behind it.
  *
- * Content is handed a [Plane] for this surface and the main ink for it, so anything
- * inside reads against the colour it is really on.
+ * Content is handed a [Plane] for this surface, so anything inside knows the colour it
+ * is really on, and the theme's main ink as its content colour.
  *
  * ONE layout node. Drawing it in order -- backdrop, body, state, content, edge -- puts
  * content inside the clip, which is what a rounded plane means. The hairline is
@@ -145,7 +145,7 @@ fun NxSurface(
     ) {
         CompositionLocalProvider(
             LocalPlane provides plane,
-            LocalContentColor provides scheme.inkMain(plane.color),
+            LocalContentColor provides scheme.inkMain,
         ) {
             content()
         }

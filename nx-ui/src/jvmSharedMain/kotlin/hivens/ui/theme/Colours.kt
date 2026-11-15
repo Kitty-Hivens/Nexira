@@ -8,21 +8,23 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 
 /**
- * Text and lines, resolved against the plane they are drawn on.
+ * Text and lines.
  *
- * A screen says which ink it means and never which colour: the same `NxInk.quiet` is
- * a different value on the page, on a card and on a popup, and is readable on each.
+ * A screen says which ink it means and never which colour. [main] and [quiet] are the
+ * theme's inks exactly as its author gave them, the same on the page, on a card and on
+ * a popup: whether they read on each is the author's to answer for. [line] is made on
+ * the plane it is drawn on, from that plane and the quiet ink.
  */
 object NxInk {
     val main: Color
         @Composable @ReadOnlyComposable
-        get() = LocalScheme.current.inkMain(ground())
+        get() = LocalScheme.current.inkMain
 
     val quiet: Color
         @Composable @ReadOnlyComposable
-        get() = LocalScheme.current.inkQuiet(ground())
+        get() = LocalScheme.current.inkQuiet
 
-    /** Unavailable. Below the reading floor on purpose: it is there to be seen as off, not read. */
+    /** Unavailable. Faded on purpose: it is there to be seen as off, not read. */
     val off: Color
         @Composable @ReadOnlyComposable
         get() = quiet.copy(alpha = OFF_ALPHA)
@@ -37,26 +39,26 @@ object NxInk {
  * Colours with a meaning, asked for by what they mean.
  *
  * Three kinds of request and no more: the theme's [lead], a [status], and a member of
- * a feature's own [ColorCategory]. Every answer comes fitted to the plane it will be
- * drawn on, three to one for a mark and four and a half for [text], by moving its tone
- * and nothing else, so it stays the theme's colour.
+ * a feature's own [ColorCategory]. Every answer is the theme's own colour as its author
+ * gave it, or, where the theme has none to give, one nx-ui made beside it. None is
+ * adjusted to the plane it is drawn on.
  */
 object NxColor {
     @Composable @ReadOnlyComposable
-    fun lead(text: Boolean = false): Color = fitted(LocalScheme.current.lead, text)
+    fun lead(): Color = LocalScheme.current.lead
 
     @Composable @ReadOnlyComposable
-    fun status(status: Status, text: Boolean = false): Color = fitted(LocalScheme.current.status(status), text)
+    fun status(status: Status): Color = LocalScheme.current.status(status)
 
     @Composable @ReadOnlyComposable
-    fun <E> of(member: E, text: Boolean = false): Color where E : Enum<E>, E : ColorCategory {
+    fun <E> of(member: E): Color where E : Enum<E>, E : ColorCategory {
         val count = checkNotNull(member.declaringJavaClass.enumConstants) { "${member.declaringJavaClass} is not an enum" }.size
-        return fitted(LocalScheme.current.distinct(count)[member.ordinal], text)
+        return LocalScheme.current.distinct(count)[member.ordinal]
     }
 
     /** Stable variety for things that only need to differ, such as an avatar per name. */
     @Composable @ReadOnlyComposable
-    fun hashed(key: String, text: Boolean = false): Color = fitted(LocalScheme.current.hashed(key), text)
+    fun hashed(key: String): Color = LocalScheme.current.hashed(key)
 
     /** Ink for content laid on [fill]. */
     @Composable @ReadOnlyComposable
@@ -78,9 +80,10 @@ object NxColor {
 
 /**
  * Content drawn on [fill] rather than on the plane: a chip's label, a badge's text, a
- * banner's words. Inside, every [NxInk] and [NxColor] request is made readable against
- * the fill, and so is the ambient content colour. A translucent fill is taken as what it
- * looks like over the current plane.
+ * banner's words. Inside, the fill is the plane, so a [NxInk.line] or a [NxColor.wash]
+ * is made on it, and the ambient content colour is [NxColor.on] the fill: the theme's
+ * main ink or its page, whichever stands further from it. A translucent fill is taken
+ * as what it looks like over the current plane.
  */
 @Composable
 fun OnFill(fill: Color, content: @Composable () -> Unit) {
@@ -90,7 +93,7 @@ fun OnFill(fill: Color, content: @Composable () -> Unit) {
     val under = if (fill.alpha >= 1f) fill else lerp(base.copy(alpha = 1f), fill.copy(alpha = 1f), fill.alpha)
     CompositionLocalProvider(
         LocalPlane provides Plane(parent?.step ?: 0, under, Backdrop.Plane),
-        LocalContentColor provides scheme.inkMain(under),
+        LocalContentColor provides scheme.on(under),
     ) {
         content()
     }
@@ -98,9 +101,5 @@ fun OnFill(fill: Color, content: @Composable () -> Unit) {
 
 @Composable @ReadOnlyComposable
 internal fun ground(): Color = LocalPlane.current?.color ?: LocalScheme.current.step(0)
-
-@Composable @ReadOnlyComposable
-private fun fitted(colour: Color, text: Boolean): Color =
-    fit(colour, ground(), if (text) SchemeColours.TEXT else SchemeColours.MARK)
 
 private const val OFF_ALPHA = 0.45f

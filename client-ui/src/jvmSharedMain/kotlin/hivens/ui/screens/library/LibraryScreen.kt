@@ -202,7 +202,7 @@ fun LibraryScreen(
             Text(
                 text = err,
                 style = MaterialTheme.typography.bodySmall,
-                color = NxColor.status(Status.Error, text = true),
+                color = NxColor.status(Status.Error),
                 modifier = Modifier.align(Alignment.BottomStart)
                     .padding(start = 24.dp, end = 96.dp, bottom = 34.dp)
                     .clickable {

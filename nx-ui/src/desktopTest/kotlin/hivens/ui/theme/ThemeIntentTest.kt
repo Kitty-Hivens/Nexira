@@ -10,14 +10,15 @@ import kotlin.test.assertTrue
  * What a theme promises, held for every theme that ships, in every mode it has.
  *
  * These assert the intent rather than the arithmetic: the author's ladder reads as
- * separate planes, text is readable on every one of them, and every colour nx-ui
- * hands out reaches its target on the plane it is fitted to. The pipeline this
- * replaced had tests that held the mechanism to its own numbers, and passed while
- * every preset drew the same ground.
+ * separate planes, the colours nx-ui makes beside a theme stay apart, and what is drawn
+ * is what the author wrote. The pipeline this replaced had tests that held the mechanism
+ * to its own numbers, and passed while every preset drew the same ground.
  *
- * Only what is drawn is held, and text is drawn in the inks as fitted to the plane
- * under it, never as authored. A floor, then: a theme that passes is readable, and
- * whether it is good is not a question these can answer.
+ * nx-ui draws a theme's inks as authored and corrects nothing, so the reading held here
+ * is a floor for the authored inks on the authored steps, measured in APCA. It judges no
+ * taste: a theme that passes is not thereby good. A theme's colours drawn as text are not
+ * checked, since which colour a component sets its words in is the component's choice,
+ * and whether that reads is the theme author's to answer for.
  */
 class ThemeIntentTest {
 
@@ -41,13 +42,33 @@ class ThemeIntentTest {
     }
 
     @Test
-    fun `fitted inks stay readable past both ends of the ladder`() {
+    fun `the authored inks clear the reading floor on every authored step`() {
+        for ((name, scheme) in schemes()) {
+            for ((i, ground) in scheme.steps.withIndex()) {
+                val main = abs(apcaLc(scheme.inks[0], ground))
+                val quiet = abs(apcaLc(scheme.inks[1], ground))
+                assertTrue(main >= MAIN_LC, "$name step $i: the main ink reaches Lc ${"%.1f".format(main)}, under $MAIN_LC")
+                assertTrue(quiet >= QUIET_LC, "$name step $i: the quiet ink reaches Lc ${"%.1f".format(quiet)}, under $QUIET_LC")
+            }
+        }
+    }
+
+    @Test
+    fun `the inks are drawn as authored`() {
         for ((name, scheme) in schemes()) {
             val c = SchemeColours(scheme)
-            for (i in -2..8) {
-                val ground = c.step(i)
-                assertTrue(contrast(c.inkMain(ground), ground) >= TEXT, "$name step $i: main ink fails")
-                assertTrue(contrast(c.inkQuiet(ground), ground) >= TEXT, "$name step $i: quiet ink fails")
+            assertEquals(scheme.inks[0], c.inkMain, "$name: the main ink moved")
+            assertEquals(scheme.inks[1], c.inkQuiet, "$name: the quiet ink moved")
+        }
+    }
+
+    @Test
+    fun `content on a fill is drawn in one of the theme's own colours`() {
+        for ((name, scheme) in schemes()) {
+            val c = SchemeColours(scheme)
+            val fills = listOf(c.lead) + Status.entries.map { c.status(it) } + c.distinct(8)
+            for (fill in fills) {
+                assertTrue(c.on(fill) in listOf(scheme.inks[0], scheme.steps[0]), "$name: the ink on $fill is not the theme's")
             }
         }
     }
@@ -62,37 +83,6 @@ class ThemeIntentTest {
             val before = c.step(-1).lstar()
             assertTrue(if (rising) beyond >= authored.last() else beyond <= authored.last(), "$name: the step past the end turns back")
             assertTrue(if (rising) before <= authored.first() else before >= authored.first(), "$name: the step before the page turns back")
-        }
-    }
-
-    @Test
-    fun `every colour handed out reaches its target on every step`() {
-        for ((name, scheme) in schemes()) {
-            val c = SchemeColours(scheme)
-            val asks = listOf("lead" to c.lead) +
-                Status.entries.map { it.name to c.status(it) } +
-                c.distinct(6).mapIndexed { i, col -> "category $i" to col }
-            for (i in 0..scheme.steps.size) {
-                val ground = c.step(i)
-                for ((what, colour) in asks) {
-                    val mark = fit(colour, ground, SchemeColours.MARK)
-                    val text = fit(colour, ground, SchemeColours.TEXT)
-                    assertTrue(contrast(mark, ground) >= SchemeColours.MARK - EPS, "$name step $i: $what as a mark fails")
-                    assertTrue(contrast(text, ground) >= SchemeColours.TEXT - EPS, "$name step $i: $what as text fails")
-                }
-            }
-        }
-    }
-
-    @Test
-    fun `content on any fill the theme hands out is readable`() {
-        for ((name, scheme) in schemes()) {
-            val c = SchemeColours(scheme)
-            val fills = listOf(c.lead) + Status.entries.map { c.status(it) } + c.distinct(8)
-            for (fill in fills) {
-                val r = contrast(c.on(fill), fill)
-                assertTrue(r >= TEXT, "$name: ink on ${fill} reaches only ${"%.2f".format(r)}")
-            }
         }
     }
 
@@ -166,8 +156,14 @@ class ThemeIntentTest {
     ).mapIndexedNotNull { i, argb -> themeFromWallpaper(argb.map { it.toInt() }, "wallpaper $i")?.copy(id = "wallpaper-$i") }
 
     private companion object {
-        const val TEXT = 4.5
-        const val EPS = 0.05
+        /** APCA's floor for body text, which the main ink carries. */
+        const val MAIN_LC = 75.0
+
+        /**
+         * The quiet ink carries secondary text: set just under the quietest pairing among
+         * the shipped themes judged right, so a new theme is held to what they already do.
+         */
+        const val QUIET_LC = 40.0
 
         /**
          * Two flat fields need roughly 3 L* to be told apart by fill alone on a light

@@ -375,7 +375,7 @@ private fun TextPreview(file: Path) {
             Text(
                 text  = s.fileBrowserTextTruncated(TEXT_PREVIEW_MAX_BYTES / 1024),
                 style = MaterialTheme.typography.labelSmall,
-                color = NxColor.status(Status.Error, text = true),
+                color = NxColor.status(Status.Error),
             )
             Spacer(Modifier.height(6.dp))
         }

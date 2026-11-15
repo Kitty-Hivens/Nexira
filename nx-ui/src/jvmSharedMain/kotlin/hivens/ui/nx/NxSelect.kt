@@ -171,7 +171,7 @@ fun <T> NxSelect(
                 Symbol(
                     icon               = NxIcon.ExpandMore,
                     contentDescription = null,
-                    tint               = if (expanded) NxColor.lead(text = true) else NxInk.quiet,
+                    tint               = if (expanded) NxColor.lead() else NxInk.quiet,
                     size               = 20.dp,
                     modifier           = Modifier.graphicsLayer { rotationZ = caret },
                 )

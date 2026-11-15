@@ -146,7 +146,6 @@ fun NotificationCard(
         // Lifted on a soft shadow, a little higher than a notice's own.
         shadowDp = 8f,
     ) {
-        // Asked for inside the card so the accent is fitted to the card it marks.
         val accentColor = accentStatus?.let { NxColor.status(it) } ?: Color.Transparent
         // The two ends of the wash, taken in composition where the plane is known; the
         // draw mixes between them, which is the same colour wash gives at that amount.
@@ -317,7 +316,7 @@ private fun ActionsRow(actions: List<NotifAction>, onDismiss: () -> Unit) {
                 Text(
                     text  = action.label,
                     style = MaterialTheme.typography.labelMedium,
-                    color = NxColor.lead(text = true),
+                    color = NxColor.lead(),
                 )
             }
         }

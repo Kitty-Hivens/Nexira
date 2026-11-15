@@ -553,7 +553,7 @@ private fun DetailPane(
                     Text(
                         s.versionPickerIncompatible,
                         style = MaterialTheme.typography.labelMedium,
-                        color = NxColor.status(Status.Warning, text = true),
+                        color = NxColor.status(Status.Warning),
                     )
                 }
             }

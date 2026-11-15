@@ -161,14 +161,14 @@ private fun OutcomeLine(row: RetiredRow) {
         // A kept source is a success with a condition attached, and green says
         // there is nothing left to read. The reader has to go and look at that one.
         is RetiredOutcome.Adopted -> if (outcome.sourceKept) {
-            s.retiredAdoptedSourceKept to NxColor.status(Status.Warning, text = true)
+            s.retiredAdoptedSourceKept to NxColor.status(Status.Warning)
         } else {
-            s.retiredAdopted to NxColor.status(Status.Success, text = true)
+            s.retiredAdopted to NxColor.status(Status.Success)
         }
         RetiredOutcome.Deleted -> s.retiredDeleted to NxInk.quiet
-        RetiredOutcome.PartlyDeleted -> s.retiredPartlyDeleted to NxColor.status(Status.Warning, text = true)
+        RetiredOutcome.PartlyDeleted -> s.retiredPartlyDeleted to NxColor.status(Status.Warning)
         is RetiredOutcome.Failed ->
-            (if (outcome.reason == "remove") s.retiredRemoveFailed else s.retiredFailed) to NxColor.status(Status.Error, text = true)
+            (if (outcome.reason == "remove") s.retiredRemoveFailed else s.retiredFailed) to NxColor.status(Status.Error)
         // Left alone, which is an outcome and not an instruction -- naming the
         // button they did not press would read as one.
         null -> "\u2014" to NxInk.quiet.copy(alpha = 0.6f)
@@ -203,7 +203,7 @@ private fun Chooser(
     Text(
         text = s.retiredFound(rows.size, byteSizeLabel(totalBytes)),
         style = MaterialTheme.typography.labelLarge,
-        color = NxColor.lead(text = true),
+        color = NxColor.lead(),
     )
 
     // The list carries its own bar. Without one the surface cut a row in half at
@@ -233,7 +233,7 @@ private fun Chooser(
     if (rows.any { it.choice == RetiredChoice.Delete }) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Symbol(NxIcon.Warning, contentDescription = null, tint = NxColor.status(Status.Warning), size = 16.dp)
-            Text(s.retiredWarning, style = MaterialTheme.typography.bodySmall, color = NxColor.status(Status.Warning, text = true))
+            Text(s.retiredWarning, style = MaterialTheme.typography.bodySmall, color = NxColor.status(Status.Warning))
         }
     }
 
@@ -248,7 +248,7 @@ private fun Chooser(
             Text(
                 text = s.retiredBlockedBy(blocking.joinToString(", ") { it.client.name }),
                 style = MaterialTheme.typography.bodySmall,
-                color = NxColor.status(Status.Warning, text = true),
+                color = NxColor.status(Status.Warning),
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -304,7 +304,7 @@ private fun ClientRow(row: RetiredRow, running: Boolean) {
                 Text(
                     text = factsOf(row, s),
                     style = MaterialTheme.typography.bodySmall,
-                    color = if (row.adoptable) NxInk.quiet else NxColor.status(Status.Warning, text = true),
+                    color = if (row.adoptable) NxInk.quiet else NxColor.status(Status.Warning),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
@@ -354,7 +354,7 @@ private fun ClientRow(row: RetiredRow, running: Boolean) {
                     Text(
                         text = if (row.adoptable) s.retiredDetected else s.retiredNeedsVersion,
                         style = MaterialTheme.typography.bodySmall,
-                        color = if (row.adoptable) NxInk.quiet else NxColor.status(Status.Warning, text = true),
+                        color = if (row.adoptable) NxInk.quiet else NxColor.status(Status.Warning),
                         modifier = Modifier.weight(1f),
                     )
                 }

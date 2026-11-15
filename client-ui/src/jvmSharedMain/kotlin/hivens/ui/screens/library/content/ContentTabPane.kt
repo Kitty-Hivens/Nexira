@@ -850,7 +850,7 @@ internal fun ContentRow(
                     // Said on the row and left to the player: the switch still does what
                     // they ask, and an update on offer is the chip beside it.
                     warning?.let {
-                        Text(it, style = MaterialTheme.typography.labelSmall, color = NxColor.status(Status.Error, text = true), maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        Text(it, style = MaterialTheme.typography.labelSmall, color = NxColor.status(Status.Error), maxLines = 2, overflow = TextOverflow.Ellipsis)
                     }
                 }
                 // The chip both reports the newer build and is the way to take it: the

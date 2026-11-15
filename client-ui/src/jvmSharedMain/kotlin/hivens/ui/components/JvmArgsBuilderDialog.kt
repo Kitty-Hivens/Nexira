@@ -125,7 +125,7 @@ fun JvmArgsBuilderDialog(
                     selectedTabIndex = selectedTabIdx,
                     edgePadding = 16.dp,
                     containerColor = Color.Transparent,
-                    contentColor = NxColor.lead(text = true),
+                    contentColor = NxColor.lead(),
                 ) {
                     tabs.forEachIndexed { idx, (label, icon) ->
                         Tab(
@@ -133,7 +133,7 @@ fun JvmArgsBuilderDialog(
                             onClick = { selectedTabIdx = idx },
                             text = { Text(label, style = MaterialTheme.typography.titleSmall) },
                             icon = { Symbol(icon, null, modifier = Modifier.size(18.dp)) },
-                            selectedContentColor = NxColor.lead(text = true),
+                            selectedContentColor = NxColor.lead(),
                             unselectedContentColor = NxInk.quiet,
                         )
                     }
@@ -212,7 +212,7 @@ private fun PresetPickerRow(
                     label = { Text(preset.displayName.substringBefore(" ("), style = MaterialTheme.typography.labelMedium) },
                     colors = FilterChipDefaults.filterChipColors(
                         selectedContainerColor = NxColor.wash(NxColor.lead(), 0.2f),
-                        selectedLabelColor = NxColor.lead(text = true),
+                        selectedLabelColor = NxColor.lead(),
                     ),
                 )
             }
@@ -630,7 +630,7 @@ private fun SliderField(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(label, color = NxInk.main, fontWeight = FontWeight.Bold,
                 modifier = Modifier.weight(1f))
-            Text(display, color = NxColor.lead(text = true), fontFamily = LocalMonoFamily.current)
+            Text(display, color = NxColor.lead(), fontFamily = LocalMonoFamily.current)
         }
         NxSliderTrack(
             value = value,

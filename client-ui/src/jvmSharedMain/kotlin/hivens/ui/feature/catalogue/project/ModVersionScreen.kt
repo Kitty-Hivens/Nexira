@@ -253,7 +253,7 @@ private fun BuildHeader(v: ProjectBuild, project: ProjectPageView) {
                     enabled = !project.installing,
                 )
                 if (!fits) {
-                    Text(s.versionsIncompatibleHint, style = MaterialTheme.typography.labelSmall, color = NxColor.status(Status.Warning, text = true))
+                    Text(s.versionsIncompatibleHint, style = MaterialTheme.typography.labelSmall, color = NxColor.status(Status.Warning))
                 }
                 InstallNotes(project)
             }

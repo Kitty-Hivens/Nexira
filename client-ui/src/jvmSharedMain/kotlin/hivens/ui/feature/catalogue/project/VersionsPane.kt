@@ -456,7 +456,7 @@ private fun FilterDropdown(
                 Text(
                     if (narrowed) "$label: $summary" else label,
                     style = MaterialTheme.typography.labelMedium,
-                    color = if (narrowed) NxColor.lead(text = true) else NxInk.quiet,
+                    color = if (narrowed) NxColor.lead() else NxInk.quiet,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.widthIn(max = 220.dp),

@@ -230,7 +230,7 @@ private fun PropPanelBody(
                         Text(
                             text  = s.editorPropUnreadable,
                             style = MaterialTheme.typography.bodySmall,
-                            color = NxColor.status(Status.Warning, text = true),
+                            color = NxColor.status(Status.Warning),
                         )
                     }
                     PropFieldRow(

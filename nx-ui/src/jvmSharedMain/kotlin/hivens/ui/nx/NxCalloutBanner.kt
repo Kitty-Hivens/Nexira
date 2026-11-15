@@ -55,8 +55,7 @@ fun NxCalloutBanner(
         NxCalloutTone.Error   -> Status.Error
     }
     val accent = NxColor.status(status)
-    // Opaque, so the banner reads the same over a wallpaper as over the page, and its
-    // words are fitted to the banner rather than to the plane under it.
+    // Opaque, so the banner reads the same over a wallpaper as over the page.
     val fill = NxColor.wash(accent, 0.12f)
     val glyph = icon ?: when (tone) {
         NxCalloutTone.Info    -> NxIcon.Info
@@ -80,7 +79,7 @@ fun NxCalloutBanner(
                 verticalArrangement = Arrangement.spacedBy(Spacing.s8),
             ) {
                 if (title != null) {
-                    Text(title, style = MaterialTheme.typography.titleSmall, color = NxColor.status(status, text = true), fontWeight = FontWeight.Bold)
+                    Text(title, style = MaterialTheme.typography.titleSmall, color = NxColor.status(status), fontWeight = FontWeight.Bold)
                 }
                 if (body != null) {
                     Text(body, style = MaterialTheme.typography.bodySmall, color = NxInk.main)

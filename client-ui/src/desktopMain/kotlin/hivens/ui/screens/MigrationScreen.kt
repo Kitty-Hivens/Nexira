@@ -200,7 +200,7 @@ private fun CompletedContent(onQuit: () -> Unit) {
         text = s.migrationCompletedTitle,
         style = MaterialTheme.typography.headlineSmall,
         fontWeight = FontWeight.Bold,
-        color = NxColor.status(Status.Success, text = true),
+        color = NxColor.status(Status.Success),
     )
     Text(
         text = s.migrationCompletedBody,
@@ -223,7 +223,7 @@ private fun FailedContent(error: String, onRetry: () -> Unit, onQuit: () -> Unit
         text = s.migrationFailedTitle,
         style = MaterialTheme.typography.headlineSmall,
         fontWeight = FontWeight.Bold,
-        color = NxColor.status(Status.Error, text = true),
+        color = NxColor.status(Status.Error),
     )
     Text(
         text = s.migrationFailedBody(error),

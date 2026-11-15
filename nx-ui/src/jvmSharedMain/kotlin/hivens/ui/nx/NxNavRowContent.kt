@@ -33,7 +33,7 @@ fun NxNavRowContent(icon: IconKey, label: String, isSelected: Boolean) {
     Text(
         text  = label,
         style = MaterialTheme.typography.bodyMedium,
-        color = if (isSelected) NxColor.lead(text = true) else NxInk.main,
+        color = if (isSelected) NxColor.lead() else NxInk.main,
         fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,

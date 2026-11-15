@@ -42,7 +42,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.key
@@ -74,8 +73,6 @@ import kotlin.math.roundToInt
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.Status
-import hivens.ui.theme.SchemeColours
-import hivens.ui.theme.fit
 import hivens.ui.surface.SurfaceKind
 
 /** Which edge of the trigger the menu's own matching edge lands on. */
@@ -373,12 +370,10 @@ fun NxMenuItem(
         animationSpec = Motion.tap.of(),
         label         = "menuItemWash",
     )
-    // Fitted to the wash the row is on, so a highlighted row's label keeps its contrast.
-    val ground = washTarget ?: NxColor.wash(hoverTint, 0f)
     val color = when {
         !enabled    -> NxInk.off
-        destructive -> fitOn(error, ground)
-        selected    -> fitOn(lead, ground)
+        destructive -> error
+        selected    -> lead
         else        -> NxInk.main
     }
     val quiet = NxInk.quiet
@@ -564,6 +559,3 @@ private fun anchorOrigin(anchorX: Int, popupX: Int, popupWidth: Int, growsDown: 
     val fx = if (popupWidth == 0) 0.5f else ((anchorX - popupX).toFloat() / popupWidth).coerceIn(0f, 1f)
     return TransformOrigin(fx, if (growsDown) 0f else 1f)
 }
-
-/** [colour] made readable as text on [ground], the row's own wash. */
-private fun fitOn(colour: Color, ground: Color): Color = fit(colour, ground, SchemeColours.TEXT)

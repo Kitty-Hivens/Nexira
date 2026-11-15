@@ -58,7 +58,7 @@ fun NxSettingGroup(
             Text(
                 text       = title,
                 style      = MaterialTheme.typography.titleSmall,
-                color      = if (danger) NxColor.status(Status.Error, text = true) else NxInk.main,
+                color      = if (danger) NxColor.status(Status.Error) else NxInk.main,
                 fontWeight = FontWeight.SemiBold,
                 maxLines   = 1,
                 overflow   = TextOverflow.Ellipsis,

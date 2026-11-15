@@ -40,7 +40,7 @@ fun NxNotBuiltYet(
         // The accent and not the warning colour. Nothing here is wrong, and a
         // reader who has learned that red means trouble should not be told it does
         // when the only news is that we have not got to this yet.
-        titleColor = NxColor.lead(text = true),
+        titleColor = NxColor.lead(),
         titleStyle = MaterialTheme.typography.titleMedium,
         action = detail?.let {
             {

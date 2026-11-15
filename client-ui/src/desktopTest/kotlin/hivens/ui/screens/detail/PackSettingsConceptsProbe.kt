@@ -126,7 +126,7 @@ class PackSettingsConceptsProbe {
                                     Box(Modifier.size(40.dp).clip(RoundedCornerShape(6.dp)).background(NxColor.wash(NxInk.quiet, 0.2f)))
                                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                         Text("Итоги конкурса голосований", style = MaterialTheme.typography.bodySmall, color = NxInk.main, maxLines = 1)
-                                        Text("30 сен 2026", style = MaterialTheme.typography.labelSmall, color = NxColor.lead(text = true))
+                                        Text("30 сен 2026", style = MaterialTheme.typography.labelSmall, color = NxColor.lead())
                                     }
                                 }
                             }

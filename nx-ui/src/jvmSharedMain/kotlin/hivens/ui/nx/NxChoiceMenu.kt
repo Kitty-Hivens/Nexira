@@ -49,8 +49,6 @@ import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.Motion
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
-import hivens.ui.theme.SchemeColours
-import hivens.ui.theme.fit
 
 /**
  * A list of answers to one question, hung off the control that asked it.
@@ -188,13 +186,10 @@ fun NxChoiceItem(
         animationSpec = Motion.tap.of(),
         label = "choiceFill",
     )
-    // The accent fitted to the wash it is set on, so the answer in force keeps its
-    // contrast on any seed and under the pointer.
-    val chosen = fit(lead, ground ?: NxColor.wash(lead, 0f), SchemeColours.TEXT)
     val ink by animateColorAsState(
         when {
             !enabled -> NxInk.off
-            selected -> chosen
+            selected -> lead
             lifted -> NxInk.main
             else -> NxInk.main.copy(alpha = 0.86f)
         },
@@ -228,20 +223,13 @@ fun NxChoiceItem(
         )
         if (hint != null) {
             Spacer(Modifier.width(12.dp))
-            // Fitted to the row's wash like the name is: the quiet ink is measured
-            // against the popup's plane and loses contrast on the answer in force.
-            Text(
-                hint,
-                style = MaterialTheme.typography.labelMedium,
-                color = ground?.let { fit(NxInk.quiet, it, SchemeColours.TEXT) } ?: NxInk.quiet,
-                maxLines = 1,
-            )
+            Text(hint, style = MaterialTheme.typography.labelMedium, color = NxInk.quiet, maxLines = 1)
         }
         Spacer(Modifier.width(10.dp))
         // Always laid out, faded in on the answer in force, so choosing does not
         // shift the row's text by the width of a mark.
         Box(Modifier.size(18.dp).alpha(check), contentAlignment = Alignment.Center) {
-            Symbol(NxIcon.Check, contentDescription = null, tint = chosen, size = 18.dp)
+            Symbol(NxIcon.Check, contentDescription = null, tint = lead, size = 18.dp)
         }
     }
 }

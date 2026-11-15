@@ -29,7 +29,7 @@ fun ConfirmDialog(
     confirmLabel: String,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
-    confirmColor: Color = NxColor.lead(text = true),
+    confirmColor: Color = NxColor.lead(),
 ) {
     val s = LocalStrings.current
     val container = NxTheme.colours.step(NxTheme.colours.topStep)

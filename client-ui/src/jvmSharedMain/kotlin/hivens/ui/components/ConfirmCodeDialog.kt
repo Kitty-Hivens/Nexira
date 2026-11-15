@@ -151,7 +151,7 @@ fun ConfirmCodeDialog(
                 if (errorMessage != null) {
                     Text(
                         errorMessage,
-                        color = NxColor.status(Status.Error, text = true),
+                        color = NxColor.status(Status.Error),
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
@@ -229,7 +229,7 @@ private fun CodeCells(code: String, hasError: Boolean, dimmed: Boolean) {
                         style = MaterialTheme.typography.headlineSmall.copy(
                             fontFamily = LocalMonoFamily.current,
                             textAlign = TextAlign.Center,
-                            color = if (hasError) NxColor.status(Status.Error, text = true) else NxInk.main,
+                            color = if (hasError) NxColor.status(Status.Error) else NxInk.main,
                         ),
                     )
                 }

@@ -42,11 +42,11 @@ class SchemeColours internal constructor(val scheme: Scheme) {
         }
     }
 
-    /** The main ink, made readable on [ground]. */
-    fun inkMain(ground: Color): Color = fit(scheme.inks[0], ground, TEXT)
+    /** The main ink, as the author gave it. */
+    val inkMain: Color get() = scheme.inks[0]
 
-    /** The quiet ink, made readable on [ground]. */
-    fun inkQuiet(ground: Color): Color = fit(scheme.inks[1], ground, TEXT)
+    /** The quiet ink, as the author gave it. */
+    val inkQuiet: Color get() = scheme.inks[1]
 
     /** A hairline on [ground]: a rule of the ground's own material toward its quiet ink. */
     fun line(ground: Color): Color = lerp(ground, scheme.inks[1], LINE_MIX)
@@ -94,12 +94,13 @@ class SchemeColours internal constructor(val scheme: Scheme) {
     /** One of a fixed spread of distinct colours, chosen by [key]: stable variety for avatars and tags. */
     fun hashed(key: String): Color = distinct(HASH_SPREAD)[abs(key.hashCode() % HASH_SPREAD)]
 
-    /** Ink for content laid on [fill]: whichever end of the scheme reads, or black or white if neither does. */
+    /**
+     * Ink for content laid on [fill]: the theme's main ink or its page, whichever stands
+     * further from the fill. Always one of the author's own colours.
+     */
     fun on(fill: Color): Color {
         val opaque = fill.copy(alpha = 1f)
-        val best = listOf(scheme.inks[0], scheme.steps[0]).maxBy { contrast(it, opaque) }
-        if (contrast(best, opaque) >= TEXT) return best
-        return if (contrast(Color.White, opaque) >= contrast(Color.Black, opaque)) Color.White else Color.Black
+        return listOf(scheme.inks[0], scheme.steps[0]).maxBy { contrast(it, opaque) }
     }
 
     private val typicalChroma: Double = scheme.colors.map { it.hct().chroma }.median()
@@ -108,12 +109,6 @@ class SchemeColours internal constructor(val scheme: Scheme) {
     private val distinctCache = HashMap<Int, List<Color>>()
 
     internal companion object {
-        /** Body text against what it is read on. */
-        const val TEXT = 4.5
-
-        /** Marks, lines, icons and filled controls against what they sit on. */
-        const val MARK = 3.0
-
         private const val LINE_MIX = 0.28f
         private const val STATUS_TOLERANCE = 28.0
         private const val MIN_STATUS_CHROMA = 24.0

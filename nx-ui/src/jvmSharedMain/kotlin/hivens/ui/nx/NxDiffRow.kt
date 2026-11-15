@@ -61,7 +61,7 @@ fun NxDiffRow(
             contentAlignment = Alignment.Center,
         ) {
             OnFill(badge) {
-                Text(glyph, style = MaterialTheme.typography.labelMedium, color = NxColor.status(status, text = true), fontWeight = FontWeight.Bold)
+                Text(glyph, style = MaterialTheme.typography.labelMedium, color = NxColor.status(status), fontWeight = FontWeight.Bold)
             }
         }
         leading?.invoke()

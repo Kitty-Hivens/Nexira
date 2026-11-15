@@ -414,7 +414,7 @@ internal fun InstallNotes(state: ProjectPageView) {
         Text(
             if (target.isBlank()) s.modPageNoBuildAny else s.modPageNoBuildFor(target),
             style = MaterialTheme.typography.labelSmall,
-            color = NxColor.status(Status.Warning, text = true),
+            color = NxColor.status(Status.Warning),
         )
     }
     // Said under the button, where the click was. A mod that landed without
@@ -424,7 +424,7 @@ internal fun InstallNotes(state: ProjectPageView) {
         Text(
             s.modPageInstallMissing(state.installMissing.size),
             style = MaterialTheme.typography.labelSmall,
-            color = NxColor.status(Status.Warning, text = true),
+            color = NxColor.status(Status.Warning),
         )
     }
     // Each one by name and why, because the count alone sends the reader
@@ -446,7 +446,7 @@ internal fun InstallNotes(state: ProjectPageView) {
         Text(
             InstallProblem.Refused(refusal).label(s),
             style = MaterialTheme.typography.labelSmall,
-            color = NxColor.status(Status.Warning, text = true),
+            color = NxColor.status(Status.Warning),
         )
     }
 }

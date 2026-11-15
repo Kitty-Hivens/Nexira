@@ -246,7 +246,7 @@ private fun NavSelectionControl(
                         Text(
                             text       = navSelectionStyleLabel(variant, s),
                             style      = MaterialTheme.typography.bodySmall,
-                            color      = if (selected) NxColor.lead(text = true) else NxInk.quiet,
+                            color      = if (selected) NxColor.lead() else NxInk.quiet,
                             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                         )
                     }

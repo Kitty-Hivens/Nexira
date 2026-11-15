@@ -112,7 +112,7 @@ internal fun ScreenPropertiesPanel(
                         Symbol(
                             icon               = key,
                             contentDescription = null,
-                            tint               = if (selected) NxColor.lead(text = true) else NxInk.quiet,
+                            tint               = if (selected) NxColor.lead() else NxInk.quiet,
                             modifier           = Modifier.size(18.dp),
                         )
                     }
@@ -156,7 +156,7 @@ internal fun ScreenPropertiesPanel(
                     )
                 },
                 confirmButton = {
-                    TextButton(onClick = delete) { Text(s.editorDelete, color = NxColor.status(Status.Error, text = true)) }
+                    TextButton(onClick = delete) { Text(s.editorDelete, color = NxColor.status(Status.Error)) }
                 },
                 dismissButton = {
                     TextButton(onClick = { confirmDelete = false }) { Text(s.editorCancel) }

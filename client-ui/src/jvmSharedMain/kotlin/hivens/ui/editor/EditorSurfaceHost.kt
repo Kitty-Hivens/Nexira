@@ -747,7 +747,7 @@ fun EditorSurfaceHost(
                             TextButton(onClick = {
                                 controller.resetSurface(surfaceForReset)
                                 resetSurfaceConfirm = false
-                            }) { Text(s.editorReset, color = NxColor.status(Status.Error, text = true)) }
+                            }) { Text(s.editorReset, color = NxColor.status(Status.Error)) }
                         },
                         // Resetting everything is offered from here and asked about on
                         // its own. It sat beside this surface's reset as a second red
@@ -774,7 +774,7 @@ fun EditorSurfaceHost(
                             TextButton(onClick = {
                                 controller.resetAll()
                                 resetAllConfirm = false
-                            }) { Text(s.editorResetAll, color = NxColor.status(Status.Error, text = true)) }
+                            }) { Text(s.editorResetAll, color = NxColor.status(Status.Error)) }
                         },
                         dismissButton = {
                             TextButton(onClick = { resetAllConfirm = false }) { Text(s.editorCancel) }
@@ -1312,7 +1312,7 @@ private fun SurfaceChip(
     val name = humanSurfaceShortName(surface, s, graph)
     val label = if (folded) s.editorSurfaceFolded(name) else name
     OnFill(bg) {
-        val base = if (active) NxColor.lead(text = true) else NxInk.quiet
+        val base = if (active) NxColor.lead() else NxInk.quiet
         val fg = if (folded) NxColor.wash(base, 0.45f) else base
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -1351,7 +1351,7 @@ private fun SurfaceChip(
 private fun FamilyChip(family: FamilyId, active: Boolean, compact: Boolean, onClick: () -> Unit) {
     val bg = if (active) NxColor.wash(NxColor.lead(), 0.18f) else Color.Transparent
     OnFill(bg) {
-        val fg = if (active) NxColor.lead(text = true) else NxInk.quiet
+        val fg = if (active) NxColor.lead() else NxInk.quiet
         Text(
             text       = family.value,
             style      = MaterialTheme.typography.labelSmall,
@@ -1385,8 +1385,8 @@ private fun ToolChip(
     OnFill(bg) {
         val fg = when {
             !enabled    -> NxInk.off
-            destructive -> NxColor.status(Status.Error, text = true)
-            selected    -> NxColor.lead(text = true)
+            destructive -> NxColor.status(Status.Error)
+            selected    -> NxColor.lead()
             else        -> NxInk.main
         }
         Row(
@@ -1450,7 +1450,7 @@ private fun RefusedMountPlaceholder() {
             .border(1.dp, NxColor.status(Status.Warning), RoundedCornerShape(8.dp))
             .padding(horizontal = 12.dp, vertical = 8.dp),
     ) {
-        Text(s.editorMountRefused, style = MaterialTheme.typography.labelMedium, color = NxColor.status(Status.Warning, text = true))
+        Text(s.editorMountRefused, style = MaterialTheme.typography.labelMedium, color = NxColor.status(Status.Warning))
     }
 }
 

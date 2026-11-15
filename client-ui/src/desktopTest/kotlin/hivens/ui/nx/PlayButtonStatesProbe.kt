@@ -158,7 +158,7 @@ class PlayButtonStatesProbe {
                 onPlate = if (dark) onPlate else Color.White,
                 quiet = NxInk.quiet,
                 quietLine = NxInk.quiet.copy(alpha = 0.35f),
-                warn = NxColor.status(Status.Warning, text = true),
+                warn = NxColor.status(Status.Warning),
                 caption = NxInk.quiet,
             )
         } else {

@@ -220,7 +220,7 @@ fun UpdateDialog(
                             Text(
                                 text       = title,
                                 style      = MaterialTheme.typography.titleLarge,
-                                color      = if (isBlocking) NxColor.status(Status.Error, text = true) else NxInk.main,
+                                color      = if (isBlocking) NxColor.status(Status.Error) else NxInk.main,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
@@ -253,7 +253,7 @@ fun UpdateDialog(
                                 Text(
                                     bannerText,
                                     style      = MaterialTheme.typography.bodyMedium,
-                                    color      = NxColor.status(Status.Error, text = true),
+                                    color      = NxColor.status(Status.Error),
                                     fontWeight = FontWeight.Medium
                                 )
                             }
@@ -327,10 +327,10 @@ fun UpdateDialog(
                                     Text(
                                         s.updateErrorTitle,
                                         style      = MaterialTheme.typography.titleSmall,
-                                        color      = NxColor.status(Status.Error, text = true),
+                                        color      = NxColor.status(Status.Error),
                                         fontWeight = FontWeight.Bold
                                     )
-                                    Text(error, style = MaterialTheme.typography.bodyMedium, color = NxColor.status(Status.Error, text = true))
+                                    Text(error, style = MaterialTheme.typography.bodyMedium, color = NxColor.status(Status.Error))
                                 }
                             }
                         }
@@ -478,7 +478,7 @@ private fun DownloadProgress(state: DownloadState.Downloading) {
                 Text(
                     "%.2f MB/s".format(speedMB),
                     style      = MaterialTheme.typography.bodySmall,
-                    color      = NxColor.lead(text = true),
+                    color      = NxColor.lead(),
                     fontWeight = FontWeight.Bold
                 )
             }

@@ -75,7 +75,7 @@ fun NxButton(
         !enabled -> NxInk.main
         style == NxButtonStyle.Primary || style == NxButtonStyle.Destructive -> NxColor.on(container)
         style == NxButtonStyle.Secondary -> NxInk.main
-        else -> NxColor.lead(text = true)
+        else -> NxColor.lead()
     }
     val outline = NxInk.line
     val bordered = style == NxButtonStyle.Secondary

@@ -145,7 +145,7 @@ internal fun HexField(
             }
         }
         if (!valid) {
-            Text(invalidLabel, color = NxColor.status(Status.Error, text = true), style = MaterialTheme.typography.labelSmall)
+            Text(invalidLabel, color = NxColor.status(Status.Error), style = MaterialTheme.typography.labelSmall)
         }
     }
 }

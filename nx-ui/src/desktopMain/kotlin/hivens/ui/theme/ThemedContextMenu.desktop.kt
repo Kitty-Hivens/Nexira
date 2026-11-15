@@ -13,7 +13,7 @@ internal actual fun ThemedContextMenu(colours: SchemeColours, content: @Composab
         val top = colours.step(colours.topStep)
         DefaultContextMenuRepresentation(
             backgroundColor = top,
-            textColor       = colours.inkMain(top),
+            textColor       = colours.inkMain,
             itemHoverColor  = lerp(top, colours.lead, 0.14f),
         )
     }

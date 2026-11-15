@@ -290,7 +290,7 @@ private fun SummaryChip(filter: SearchFilter, locked: Boolean) {
     ) {
         when {
             locked -> Symbol(NxIcon.Lock, contentDescription = null, tint = NxInk.quiet, size = 12.dp)
-            filter.excluded -> Symbol(NxIcon.Block, contentDescription = null, tint = NxColor.status(Status.Error, text = true), size = 12.dp)
+            filter.excluded -> Symbol(NxIcon.Block, contentDescription = null, tint = NxColor.status(Status.Error), size = 12.dp)
         }
         Text(filterLabel(filter, s), style = MaterialTheme.typography.labelSmall, color = NxInk.quiet, fontWeight = FontWeight.Bold, maxLines = 1)
     }
@@ -473,7 +473,7 @@ private fun ChoiceRow(
                         .clickable(interactionSource = excludeHover, indication = null, enabled = excludeAlpha > 0f) { c.exclude(FilterPick(type, choice.filter)) },
                     contentAlignment = Alignment.Center,
                 ) {
-                    Symbol(NxIcon.Block, contentDescription = s.browseFilterExclude, tint = if (excludeHovered) NxColor.status(Status.Error, text = true) else NxInk.quiet, size = 16.dp)
+                    Symbol(NxIcon.Block, contentDescription = s.browseFilterExclude, tint = if (excludeHovered) NxColor.status(Status.Error) else NxInk.quiet, size = 16.dp)
                 }
             }
             PuppetClick("browse.filter.${group.name}.${choice.filter.value}.exclude") { c.exclude(FilterPick(type, choice.filter)) }
@@ -482,7 +482,7 @@ private fun ChoiceRow(
             Symbol(
                 if (excluded || onlyExcludes) NxIcon.Block else NxIcon.Check,
                 contentDescription = null,
-                tint = if (excluded || (onlyExcludes && hovered)) NxColor.status(Status.Error, text = true) else NxColor.lead(text = true),
+                tint = if (excluded || (onlyExcludes && hovered)) NxColor.status(Status.Error) else NxColor.lead(),
                 size = 16.dp,
                 modifier = Modifier.alpha(markAlpha),
             )

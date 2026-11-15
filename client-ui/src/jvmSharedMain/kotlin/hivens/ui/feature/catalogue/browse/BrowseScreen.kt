@@ -309,7 +309,7 @@ internal fun SearchField(
         animationSpec = Motion.colorShift.of(),
         label = "searchEdge",
     )
-    val glass by animateColorAsState(if (focused) NxColor.lead(text = true) else NxInk.quiet, animationSpec = Motion.colorShift.of(), label = "searchGlass")
+    val glass by animateColorAsState(if (focused) NxColor.lead() else NxInk.quiet, animationSpec = Motion.colorShift.of(), label = "searchGlass")
     NxSurface(
         SurfaceKind.Field,
         modifier = modifier.fillMaxWidth(),

@@ -21,8 +21,8 @@ enum class Backdrop {
  * under the content, and what is behind it.
  *
  * Every surface provides one to what it contains, which is what makes depth relative:
- * a card is one step above whatever holds it, and text is made readable against the
- * colour it is really on rather than against a guess.
+ * a card is one step above whatever holds it, and a line or a wash is made from the
+ * colour it is really on rather than from a guess.
  */
 @Immutable
 data class Plane(val step: Int, val color: Color, val over: Backdrop)

@@ -435,7 +435,7 @@ private fun FooterStatus(operation: PackOperation?, notice: String?) {
             phase is PackOperationPhase.Updated -> Text(
                 text  = if (operation.kind == PackOperationKind.Reattach) s.packSettingsReattached(phase.version) else s.packVersionsApplied(phase.version),
                 style = MaterialTheme.typography.labelSmall,
-                color = NxColor.status(Status.Success, text = true),
+                color = NxColor.status(Status.Success),
             )
             // A repair that left something unresolved is not a success line. The
             // instance is short of a file the pack names either way, and saying so
@@ -449,14 +449,14 @@ private fun FooterStatus(operation: PackOperation?, notice: String?) {
                     shortNameList(phase.failed),
                 ),
                 style    = MaterialTheme.typography.labelSmall,
-                color    = NxColor.status(Status.Warning, text = true),
+                color    = NxColor.status(Status.Warning),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             phase is PackOperationPhase.Repaired -> Text(
                 text  = s.packSettingsRepairDone(phase.checked, phase.repaired),
                 style = MaterialTheme.typography.labelSmall,
-                color = NxColor.status(Status.Success, text = true),
+                color = NxColor.status(Status.Success),
             )
             phase is PackOperationPhase.Failed -> FooterError(s.packVersionsFailed(phase.message))
             phase is PackOperationPhase.Refused -> FooterError(s.packOperationRefused(phase.work.label(s)))
@@ -471,7 +471,7 @@ private fun FooterError(text: String) {
     Text(
         text     = text,
         style    = MaterialTheme.typography.labelSmall,
-        color    = NxColor.status(Status.Error, text = true),
+        color    = NxColor.status(Status.Error),
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
     )

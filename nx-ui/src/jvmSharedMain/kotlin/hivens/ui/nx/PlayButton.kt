@@ -309,7 +309,7 @@ private fun playInks(ground: PlayGround): PlayInks {
             onPlate   = scheme.steps[0],
             quiet     = NxInk.quiet,
             quietLine = NxInk.quiet.copy(alpha = 0.35f),
-            warn      = NxColor.status(Status.Warning, text = true),
+            warn      = NxColor.status(Status.Warning),
             caption   = NxInk.quiet,
         )
     }

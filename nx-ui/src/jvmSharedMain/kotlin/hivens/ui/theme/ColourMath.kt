@@ -9,9 +9,9 @@ import kotlin.math.cbrt
 import kotlin.math.pow
 import kotlin.math.sqrt
 
-// The colour arithmetic nx-ui does on a theme's behalf. HCT tone is CIE L*, so every
-// lightness and contrast question here is asked of one number, and materialkolor
-// answers the inverse one ("which tone reaches this ratio") directly.
+// The colour arithmetic nx-ui does beside a theme: comparing its colours and making
+// new ones next to them. HCT tone is CIE L*, so every lightness and contrast question
+// here is asked of one number. Nothing here changes a colour the theme gave.
 
 internal fun Color.hct(): Hct = Hct.fromInt(copy(alpha = 1f).toArgb())
 
@@ -22,29 +22,6 @@ internal fun Color.lstar(): Double = hct().tone
 
 /** WCAG contrast ratio between two opaque colours. */
 internal fun contrast(a: Color, b: Color): Double = Contrast.ratioOfTones(a.lstar(), b.lstar())
-
-/**
- * [colour] moved in tone, and only in tone, until it reaches [ratio] against [ground].
- *
- * Hue and chroma stay, so the answer is still the theme's colour, only lighter or
- * darker. It moves away from the ground on the side it already sits on, and crosses
- * to the other side only when that side cannot reach the ratio at all.
- */
-internal fun fit(colour: Color, ground: Color, ratio: Double): Color {
-    val c = colour.hct()
-    val g = ground.lstar()
-    if (Contrast.ratioOfTones(c.tone, g) >= ratio) return colour
-    val up = Contrast.lighter(g, ratio)
-    val down = Contrast.darker(g, ratio)
-    val tone = when {
-        c.tone >= g && up >= 0.0 -> up
-        c.tone < g && down >= 0.0 -> down
-        up >= 0.0 -> up
-        down >= 0.0 -> down
-        else -> if (g < 50.0) 100.0 else 0.0
-    }
-    return Hct.from(c.hue, c.chroma, tone).toColor().copy(alpha = colour.alpha)
-}
 
 /** Shortest distance between two hues on the circle, in degrees. */
 internal fun hueDistance(a: Double, b: Double): Double {

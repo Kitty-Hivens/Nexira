@@ -90,7 +90,7 @@ fun NotesWidget(instance: WidgetInstance) {
                 Text(
                     text  = if (tooLong) strings.widgetStateTooLong else notes.body.length.toString(),
                     style = MaterialTheme.typography.labelSmall.scaled(scale),
-                    color = if (tooLong) NxColor.status(Status.Error, text = true) else NxInk.quiet,
+                    color = if (tooLong) NxColor.status(Status.Error) else NxInk.quiet,
                 )
             }
 

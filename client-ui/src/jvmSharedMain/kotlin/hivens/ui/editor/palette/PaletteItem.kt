@@ -254,7 +254,7 @@ private fun WidgetThumbnail(preview: WidgetPreview, label: String, sizing: Widge
                         Text(
                             text       = label.firstOrNull()?.uppercase() ?: "?",
                             style      = MaterialTheme.typography.titleMedium,
-                            color      = NxColor.lead(text = true),
+                            color      = NxColor.lead(),
                             fontWeight = FontWeight.SemiBold,
                         )
                     }

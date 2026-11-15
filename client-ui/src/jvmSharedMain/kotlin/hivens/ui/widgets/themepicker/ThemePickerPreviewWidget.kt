@@ -67,7 +67,7 @@ fun ThemePickerPreviewWidget() {
                 Text(
                     text       = s.themePickerPreview,
                     style      = MaterialTheme.typography.bodySmall,
-                    color      = NxColor.lead(text = true),
+                    color      = NxColor.lead(),
                     fontWeight = FontWeight.Bold,
                 )
                 NxSection(title = theme.label()) {

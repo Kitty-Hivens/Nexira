@@ -70,7 +70,7 @@ fun NxTheme(
             // be provided beneath it to win. Placed outside, this is a silent no-op.
             CompositionLocalProvider(
                 LocalIndication provides ThemeStateLayer,
-                LocalContentColor provides colours.inkMain(page),
+                LocalContentColor provides colours.inkMain,
             ) {
                 ThemedContextMenu(colours, content)
             }
@@ -100,8 +100,8 @@ private fun materialScheme(c: SchemeColours): ColorScheme {
     val second = c.scheme.colors.getOrElse(1) { lead }
     val third = c.scheme.colors.getOrElse(2) { second }
     val error = c.status(Status.Error)
-    val ink = c.inkMain(page)
-    val quiet = c.inkQuiet(c.step(2))
+    val ink = c.inkMain
+    val quiet = c.inkQuiet
     return if (c.isDark) {
         darkColorScheme(
             primary = lead, onPrimary = c.on(lead),

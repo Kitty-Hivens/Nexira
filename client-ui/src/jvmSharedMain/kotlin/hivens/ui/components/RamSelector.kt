@@ -137,8 +137,8 @@ fun RamSelector(
                 text  = hint,
                 style = MaterialTheme.typography.bodySmall,
                 color = when {
-                    outOfRange -> NxColor.status(Status.Error, text = true)
-                    currentMb > recommendedMb -> NxColor.status(Status.Warning, text = true)
+                    outOfRange -> NxColor.status(Status.Error)
+                    currentMb > recommendedMb -> NxColor.status(Status.Warning)
                     else -> NxInk.quiet
                 },
             )

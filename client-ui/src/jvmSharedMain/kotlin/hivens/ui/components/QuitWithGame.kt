@@ -63,7 +63,7 @@ fun QuitWithGameHost(
     val pending by gate.pending.collectAsState()
     if (!pending) return
     val s = LocalStrings.current
-    // Material draws the dialog body, so its words are fitted to that body by hand: the
+    // Material draws the dialog body, so the plane its words sit on is named by hand: the
     // dialog step of the ladder, which is what a modal is anywhere else in the app.
     val body = NxTheme.colours.step(NxTheme.colours.topStep)
     NxAlertDialog(
@@ -79,17 +79,17 @@ fun QuitWithGameHost(
             OnFill(body) {
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     TextButton(onClick = { gate.dismiss(); onLeaveRunning() }) {
-                        Text(s.quitLeaveGame, color = NxColor.lead(text = true))
+                        Text(s.quitLeaveGame, color = NxColor.lead())
                     }
                     TextButton(onClick = { gate.dismiss(); onStopGame() }) {
-                        Text(s.quitStopGame, color = NxColor.status(Status.Error, text = true))
+                        Text(s.quitStopGame, color = NxColor.status(Status.Error))
                     }
                 }
             }
         },
         dismissButton = {
             OnFill(body) {
-                TextButton(onClick = gate::dismiss) { Text(s.editorCancel, color = NxColor.lead(text = true)) }
+                TextButton(onClick = gate::dismiss) { Text(s.editorCancel, color = NxColor.lead()) }
             }
         },
         containerColor = body,

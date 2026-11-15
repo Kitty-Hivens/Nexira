@@ -203,7 +203,7 @@ fun PresetManagerPanel(
                     Text(
                         text  = s.editorPresetWriteFailed,
                         style = MaterialTheme.typography.bodySmall,
-                        color = NxColor.status(Status.Error, text = true),
+                        color = NxColor.status(Status.Error),
                     )
                 }
 

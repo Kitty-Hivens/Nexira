@@ -39,7 +39,7 @@ fun NxMetaChip(
     leading: (@Composable () -> Unit)? = null,
     onClick: (() -> Unit)? = null,
 ) {
-    // Fill first, then everything on it is read against the fill. The reference
+    // Fill first, then everything on it is laid on the fill. The reference
     // outlines a tinted tag in its own hue and a plain one in the neutral rule, which
     // is what keeps a muted fact legible on a card: without the line the chip and the
     // card are two fills a shade apart and the chip stops having an edge.
@@ -62,7 +62,7 @@ fun NxMetaChip(
         val (label, border) = when {
             tone == NxMetaChipTone.OnMedia -> Color.White to Color.White.copy(alpha = 0.25f)
             tone == NxMetaChipTone.OnMediaAccent -> NxColor.on(NxColor.lead()) to Color.Transparent
-            statusOf != null -> NxColor.status(statusOf, text = true) to NxColor.status(statusOf).copy(alpha = 0.4f)
+            statusOf != null -> NxColor.status(statusOf) to NxColor.status(statusOf).copy(alpha = 0.4f)
             else -> NxInk.quiet to NxInk.line
         }
         NxPill(

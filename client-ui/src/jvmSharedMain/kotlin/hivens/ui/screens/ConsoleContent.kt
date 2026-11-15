@@ -216,8 +216,8 @@ internal fun ConsoleContent(
     val inkMain = NxInk.main
     val inkQuiet = NxInk.quiet
     val inkLine = NxInk.line
-    val warnText = NxColor.status(Status.Warning, text = true)
-    val errorText = NxColor.status(Status.Error, text = true)
+    val warnText = NxColor.status(Status.Warning)
+    val errorText = NxColor.status(Status.Error)
 
     // Pure-function helpers (the per-line layout cache) consume a value-type
     // palette off the composition; build it once per theme change so they stay
@@ -896,9 +896,9 @@ private fun Toolbar(
         Row(Modifier.horizontalScroll(rememberScrollState()), verticalAlignment = Alignment.CenterVertically) {
             SeverityToggle("INFO",  filterInfo,  NxInk.main,                                  null,       onFilterInfo)
             Spacer(Modifier.width(4.dp))
-            SeverityToggle("WARN",  filterWarn,  NxColor.status(Status.Warning, text = true), warnCount,  onFilterWarn)
+            SeverityToggle("WARN",  filterWarn,  NxColor.status(Status.Warning), warnCount,  onFilterWarn)
             Spacer(Modifier.width(4.dp))
-            SeverityToggle("ERROR", filterError, NxColor.status(Status.Error, text = true),   errorCount, onFilterError)
+            SeverityToggle("ERROR", filterError, NxColor.status(Status.Error),   errorCount, onFilterError)
 
             Spacer(Modifier.width(8.dp))
             VerticalDivider(
@@ -1114,8 +1114,8 @@ private fun SearchPrompt(
         )
         val regexTint = when {
             !regexMode  -> NxColor.wash(NxInk.quiet, 0.4f)
-            !regexValid -> NxColor.status(Status.Error, text = true)
-            else        -> NxColor.status(Status.Success, text = true)
+            !regexValid -> NxColor.status(Status.Error)
+            else        -> NxColor.status(Status.Success)
         }
         PromptButton(onClick = onToggleRegex) {
             Text(
@@ -1135,7 +1135,7 @@ private fun SearchPrompt(
         PromptButton(onClick = onToggleFilter) {
             Text(
                 text       = "f|",
-                color      = if (filterMode) NxColor.status(Status.Success, text = true) else NxColor.wash(NxInk.quiet, 0.4f),
+                color      = if (filterMode) NxColor.status(Status.Success) else NxColor.wash(NxInk.quiet, 0.4f),
                 fontSize   = 12.sp,
                 lineHeight = 14.sp,
                 fontFamily = LocalMonoFamily.current,
@@ -1222,7 +1222,7 @@ private fun CommandInputRow(
         // so the two footer rows look like a family.
         Text(
             text       = ">",
-            color      = NxColor.status(Status.Success, text = true),
+            color      = NxColor.status(Status.Success),
             fontFamily = LocalMonoFamily.current,
             fontWeight = FontWeight.Bold,
             fontSize   = 12.sp,
@@ -1350,7 +1350,7 @@ internal fun StatusFooter(
         // into the slim row kept its padding inside and left the label a few
         // pixels of height.
         val followText  = if (following) strings.consoleStatusFollow else strings.consoleStatusPaused
-        val followColor = if (following) NxColor.status(Status.Success, text = true) else CONSOLE_PAUSE_ACCENT
+        val followColor = if (following) NxColor.status(Status.Success) else CONSOLE_PAUSE_ACCENT
         Box(
             modifier = Modifier
                 .clip(MaterialTheme.shapes.small)

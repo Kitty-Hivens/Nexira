@@ -110,13 +110,13 @@ internal fun SettingsCategoryChips(
                 Symbol(
                     category.icon,
                     contentDescription = null,
-                    tint = if (isSelected) NxColor.lead(text = true) else NxInk.quiet,
+                    tint = if (isSelected) NxColor.lead() else NxInk.quiet,
                     size = 18.dp,
                 )
                 Text(
                     category.label(s),
                     style = MaterialTheme.typography.labelLarge,
-                    color = if (isSelected) NxColor.lead(text = true) else NxInk.main,
+                    color = if (isSelected) NxColor.lead() else NxInk.main,
                     maxLines = 1,
                 )
             }

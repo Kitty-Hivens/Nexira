@@ -265,7 +265,6 @@ internal fun Pill(
         // afterwards.
         shadowDp = 18f,
     ) {
-        // Asked for inside the body so it is fitted to the pill rather than to the page under it.
         val accent = NxColor.status(status)
         // Rule 5: the measure is a property of the object, not a widget parked
         // inside it. Both overlays measure against the surface's OWN bounds via

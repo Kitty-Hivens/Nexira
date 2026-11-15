@@ -890,7 +890,7 @@ fun EditableWidgetChrome(
                     TextButton(onClick = {
                         forceRemoveOpen = false
                         onRemove()
-                    }) { Text(s.editorDelete, color = NxColor.status(Status.Error, text = true)) }
+                    }) { Text(s.editorDelete, color = NxColor.status(Status.Error)) }
                 },
                 dismissButton = {
                     TextButton(onClick = { forceRemoveOpen = false }) { Text(s.editorCancel) }

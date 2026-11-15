@@ -79,7 +79,7 @@ internal fun WidgetModulesPanel(
                                 Text(
                                     s.moduleOffAfterCrash(entry.crash),
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = NxColor.status(Status.Warning, text = true),
+                                    color = NxColor.status(Status.Warning),
                                 )
                             } else {
                                 Detail(s.moduleOff)
@@ -90,7 +90,7 @@ internal fun WidgetModulesPanel(
                             Text(
                                 s.moduleRefused(entry.reason),
                                 style = MaterialTheme.typography.bodySmall,
-                                color = NxColor.status(Status.Error, text = true),
+                                color = NxColor.status(Status.Error),
                             )
                         }
                         is WidgetModules.Entry.Gone -> {

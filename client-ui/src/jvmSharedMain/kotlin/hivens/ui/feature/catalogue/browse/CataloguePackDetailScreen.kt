@@ -409,7 +409,7 @@ private fun PackHeader(
                 Text(
                     it,
                     style = MaterialTheme.typography.labelSmall,
-                    color = NxColor.status(Status.Error, text = true),
+                    color = NxColor.status(Status.Error),
                     maxLines = 3,
                     modifier = Modifier.widthIn(max = ERROR_MEASURE),
                 )

@@ -279,17 +279,17 @@ internal fun CardInstall(phase: CardPhase, onInstall: () -> Unit) {
         label          = "cardInstall",
     ) { p ->
         when (p) {
-            CardPhase.Offered -> OutlinedAction(s.browseDetailInstallButton, NxColor.lead(), NxColor.lead(text = true), onClick = onInstall) {
-                Symbol(NxIcon.Download, contentDescription = null, tint = NxColor.lead(text = true), size = ACTION_ICON)
+            CardPhase.Offered -> OutlinedAction(s.browseDetailInstallButton, NxColor.lead(), NxColor.lead(), onClick = onInstall) {
+                Symbol(NxIcon.Download, contentDescription = null, tint = NxColor.lead(), size = ACTION_ICON)
             }
             CardPhase.Working -> OutlinedAction(s.modPageInstalling, NxInk.line, NxInk.quiet, onClick = null) {
                 CircularProgressIndicator(color = NxColor.lead(), strokeWidth = 2.dp, modifier = Modifier.size(ACTION_ICON - 2.dp))
             }
             CardPhase.Installed -> OutlinedAction(s.installInstalled, NxInk.line, NxInk.quiet, onClick = null) {
-                Symbol(NxIcon.Check, contentDescription = null, tint = NxColor.lead(text = true), size = ACTION_ICON)
+                Symbol(NxIcon.Check, contentDescription = null, tint = NxColor.lead(), size = ACTION_ICON)
             }
-            CardPhase.Failed -> OutlinedAction(s.contentInstallRetry, NxColor.status(Status.Error), NxColor.status(Status.Error, text = true), onClick = onInstall) {
-                Symbol(NxIcon.Refresh, contentDescription = null, tint = NxColor.status(Status.Error, text = true), size = ACTION_ICON)
+            CardPhase.Failed -> OutlinedAction(s.contentInstallRetry, NxColor.status(Status.Error), NxColor.status(Status.Error), onClick = onInstall) {
+                Symbol(NxIcon.Refresh, contentDescription = null, tint = NxColor.status(Status.Error), size = ACTION_ICON)
             }
         }
     }
@@ -405,7 +405,7 @@ internal fun ProjectCard(
                     )
                 }
                 note?.let {
-                    Text(it, style = MaterialTheme.typography.labelMedium, color = NxColor.status(Status.Error, text = true), maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Text(it, style = MaterialTheme.typography.labelMedium, color = NxColor.status(Status.Error), maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
                 ProjectTags(hit.displayCategories.ifEmpty { hit.categories }, max = if (action != null) TAGS_WITH_ACTION else TAGS)
             }

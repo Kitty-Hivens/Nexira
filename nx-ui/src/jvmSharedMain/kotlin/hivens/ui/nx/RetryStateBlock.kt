@@ -31,7 +31,7 @@ fun RetryStateBlock(
         title = title,
         message = message,
         modifier = modifier,
-        titleColor = NxColor.status(Status.Error, text = true),
+        titleColor = NxColor.status(Status.Error),
         titleStyle = titleStyle,
         spacing = spacing,
         action = { NxButton(label = retryLabel, onClick = onRetry) },

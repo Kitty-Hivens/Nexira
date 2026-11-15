@@ -100,7 +100,7 @@ internal fun ReattachConfirmDialog(
                         !available -> Text(
                             s.packSettingsReattachUnavailable,
                             style = MaterialTheme.typography.bodyMedium,
-                            color = NxColor.status(Status.Error, text = true),
+                            color = NxColor.status(Status.Error),
                         )
                         state == ReattachPreviewView.Comparing -> Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -112,7 +112,7 @@ internal fun ReattachConfirmDialog(
                         state is ReattachPreviewView.Failed -> Text(
                             s.packSettingsReattachCompareFailed(state.message),
                             style = MaterialTheme.typography.bodyMedium,
-                            color = NxColor.status(Status.Error, text = true),
+                            color = NxColor.status(Status.Error),
                         )
                         state is ReattachPreviewView.Ready -> PreviewBody(state.preview)
                     }
@@ -191,7 +191,7 @@ private fun PathList(header: String, paths: List<String>) {
                 Text(
                     if (unfolded) s.packSettingsReattachLess else s.packSettingsReattachMore(paths.size - FOLDED_ROWS),
                     style = MaterialTheme.typography.labelMedium,
-                    color = NxColor.lead(text = true),
+                    color = NxColor.lead(),
                 )
             }
         }

@@ -76,7 +76,7 @@ fun DeviceCodeDialog(
                 Text(
                     verificationUri,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = NxColor.lead(text = true),
+                    color = NxColor.lead(),
                 )
                 PuppetField("login.msa.verificationUrl", verificationUri, enabled = false) {}
 
@@ -98,7 +98,7 @@ fun DeviceCodeDialog(
                 if (errorMessage != null) {
                     Text(
                         errorMessage,
-                        color = NxColor.status(Status.Error, text = true),
+                        color = NxColor.status(Status.Error),
                         style = MaterialTheme.typography.bodySmall,
                     )
                 } else {

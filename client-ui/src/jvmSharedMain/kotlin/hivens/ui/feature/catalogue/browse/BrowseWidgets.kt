@@ -295,8 +295,8 @@ fun BrowseInstallingWidget(instance: WidgetInstance) {
             // install is not on offer. Said here, where the pack is named.
             AnimatedVisibility(visible = browse.kind != null && !t.takes(browse.kind), enter = Motion.reveal.enter, exit = Motion.reveal.exit) {
                 Row(Modifier.padding(start = 6.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Symbol(NxIcon.Info, contentDescription = null, tint = NxColor.status(Status.Warning, text = true), size = 16.dp)
-                    Text(s.installTargetNotTaken, style = MaterialTheme.typography.bodySmall, color = NxColor.status(Status.Warning, text = true))
+                    Symbol(NxIcon.Info, contentDescription = null, tint = NxColor.status(Status.Warning), size = 16.dp)
+                    Text(s.installTargetNotTaken, style = MaterialTheme.typography.bodySmall, color = NxColor.status(Status.Warning))
                 }
             }
         }
@@ -388,8 +388,8 @@ private fun FilterChip(
     ) {
         Symbol(leading, contentDescription = null, tint = NxInk.quiet, size = 14.dp)
         // Ruled out, it says so beside the cross that takes it off.
-        if (excluded) Symbol(NxIcon.Block, contentDescription = null, tint = NxColor.status(Status.Error, text = true), size = 14.dp)
-        Text(text, style = MaterialTheme.typography.labelLarge, color = if (emphasis) NxColor.lead(text = true) else NxInk.main, fontWeight = FontWeight.SemiBold, maxLines = 1)
+        if (excluded) Symbol(NxIcon.Block, contentDescription = null, tint = NxColor.status(Status.Error), size = 14.dp)
+        Text(text, style = MaterialTheme.typography.labelLarge, color = if (emphasis) NxColor.lead() else NxInk.main, fontWeight = FontWeight.SemiBold, maxLines = 1)
     }
 }
 
@@ -511,7 +511,7 @@ internal fun KindTile(
     )
     val ink by animateColorAsState(
         when {
-            selected -> NxColor.lead(text = true)
+            selected -> NxColor.lead()
             hovered -> NxInk.main
             else -> NxInk.quiet
         },
@@ -575,7 +575,7 @@ private fun SourceSwitch(origins: List<String>, selected: String, onSelect: (Str
             origins.forEach { origin ->
                 val chosen = origin == selected
                 val ink by animateColorAsState(
-                    if (chosen) NxColor.lead(text = true) else NxInk.quiet,
+                    if (chosen) NxColor.lead() else NxInk.quiet,
                     animationSpec = Motion.colorShift.of(),
                     label = "sourceInk",
                 )
