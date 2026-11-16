@@ -1,6 +1,7 @@
 package hivens.ui
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
@@ -9,12 +10,14 @@ import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.platform.InterceptPlatformTextInput
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.PlatformTextInputMethodRequest
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.CommitTextCommand
 import androidx.compose.ui.text.input.EditCommand
 import androidx.compose.ui.text.input.SetComposingTextCommand
@@ -31,6 +34,8 @@ import kotlin.coroutines.CoroutineContext
  * runs it after the events already queued. An input method's word and a key queued
  * behind it reach the field in that order with nothing run in between, which is what
  * [commit] followed by [press] reproduces.
+ *
+ * Fields copy to and paste from [clipboard], never the system's.
  */
 @OptIn(ExperimentalComposeUiApi::class, InternalComposeUiApi::class)
 internal class TypingScene(width: Int, height: Int, content: @Composable () -> Unit) : AutoCloseable {
@@ -38,12 +43,16 @@ internal class TypingScene(width: Int, height: Int, content: @Composable () -> U
     private var time = 0L
     private val loop = EventLoop()
 
+    val clipboard = TestClipboard()
+
     val scene = ImageComposeScene(width, height, density = Density(1f), coroutineContext = loop) {
         InterceptPlatformTextInput({ asked, next ->
             request = asked
             next.startInputMethod(asked)
         }) {
-            content()
+            CompositionLocalProvider(LocalClipboard provides clipboard) {
+                content()
+            }
         }
     }
 
@@ -93,6 +102,12 @@ internal class TypingScene(width: Int, height: Int, content: @Composable () -> U
     /** What the focused field shows: the text its input session holds. */
     val shown: String get() = session().value().text
 
+    /** The selection in the focused field, collapsed to the caret when nothing is selected. */
+    val selection: TextRange get() = session().value().selection
+
+    /** What is selected in the focused field. */
+    val selected: String get() = shown.substring(selection.min, selection.max)
+
     /** Whether an input method has a word open in the focused field. */
     val composing: Boolean get() = session().value().composition != null
 
@@ -104,11 +119,51 @@ internal class TypingScene(width: Int, height: Int, content: @Composable () -> U
 
     fun edit(vararg commands: EditCommand) = session().onEditCommand(commands.toList())
 
-    /** A whole press of [key], down and up, with nothing run in between. */
-    fun press(key: Key): Boolean {
-        val used = scene.sendKeyEvent(KeyEvent(key, KeyEventType.KeyDown))
-        scene.sendKeyEvent(KeyEvent(key, KeyEventType.KeyUp))
+    /**
+     * A whole press of [key], down and up, with nothing run in between. [shortcut] holds the key
+     * the system's shortcuts are made with, [word] the one that moves or erases a word at a time,
+     * as [onMac] picks them, and [shift] holds Shift.
+     */
+    fun press(key: Key, shortcut: Boolean = false, word: Boolean = false, shift: Boolean = false): Boolean {
+        fun event(type: KeyEventType) = KeyEvent(
+            key,
+            type,
+            isCtrlPressed = (shortcut || word) && !onMac,
+            isMetaPressed = shortcut && onMac,
+            isAltPressed = word && onMac,
+            isShiftPressed = shift,
+        )
+        val used = scene.sendKeyEvent(event(KeyEventType.KeyDown))
+        scene.sendKeyEvent(event(KeyEventType.KeyUp))
         return used
+    }
+
+    /** The caret to the start of its line, selecting on the way with [select]: Home, and the command key with Left on macOS. */
+    fun lineStart(select: Boolean = false) =
+        if (onMac) press(Key.DirectionLeft, shortcut = true, shift = select) else press(Key.MoveHome, shift = select)
+
+    /** The caret to the end of its line, selecting on the way with [select]: End, and the command key with Right on macOS. */
+    fun lineEnd(select: Boolean = false) =
+        if (onMac) press(Key.DirectionRight, shortcut = true, shift = select) else press(Key.MoveEnd, shift = select)
+
+    /** The paste shortcut, then frames until the focused field's text has changed: a paste reads the clipboard on another thread. */
+    fun paste() {
+        val before = shown
+        press(Key.V, shortcut = true)
+        settleUntil("the paste") { shown != before }
+    }
+
+    /** The shortcut with [key], then frames until the clipboard no longer holds what it held. */
+    fun pressToClipboard(key: Key) {
+        val before = clipboard.text
+        press(key, shortcut = true)
+        settleUntil("the clipboard write") { clipboard.text != before }
+    }
+
+    /** Frames with real time between them, enough for a clipboard read or write on another thread to have come back. */
+    fun settleAWhile() = repeat(30) {
+        Thread.sleep(10)
+        settle(1)
     }
 
     private fun session() = checkNotNull(request) { "no field has an input session: none took the focus" }
@@ -118,6 +173,16 @@ internal class TypingScene(width: Int, height: Int, content: @Composable () -> U
         loop.drain()
     }
 }
+
+/**
+ * Whether the framework's text fields read their shortcuts the macOS way here, which its own key
+ * mapping decides by an os.name of exactly "Mac OS X". There the shortcuts are made with the
+ * command key, a word at a time with the option key, and the ends of a line in a field of several
+ * lines with the command key and Left or Right, while Home and End go to the ends of the whole
+ * text. Everywhere else, Windows and Linux and a system it does not know, Ctrl makes both the
+ * shortcuts and the word moves, and Home and End go to the ends of the line.
+ */
+internal val onMac: Boolean = System.getProperty("os.name") == "Mac OS X"
 
 private fun SemanticsNode.withDescendants(): List<SemanticsNode> = listOf(this) + children.flatMap { it.withDescendants() }
 

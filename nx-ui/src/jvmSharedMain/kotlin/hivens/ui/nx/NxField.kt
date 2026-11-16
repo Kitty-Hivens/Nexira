@@ -13,6 +13,7 @@ import androidx.compose.foundation.text.input.then
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
@@ -97,7 +98,8 @@ class FieldState internal constructor(
  * An edit the person makes reaches the caller while it is being made, through [FieldState.input],
  * the way the string field called its caller from inside the edit. Whatever reads the caller's
  * value next, the Enter after an input method's word or a press on a button, finds the edit
- * there. [filter] sees the edit first, and what it keeps is what the caller is given.
+ * there. [filter] sees the edit first, and what it keeps is what the caller is given. An undo or
+ * a redo, which skips the input transformation, reaches the caller as it lands as well.
  *
  * After every composition the field and the caller's value are compared again, also when the
  * value composes the same as before: a caller that took a line and cleared it before the next
@@ -114,6 +116,10 @@ fun rememberFieldState(
     val latestChange = rememberUpdatedState(onValueChange)
     val sync = remember(state) { FieldSync(state, { latestValue.value }, { latestChange.value(it) }) }
     val input = remember(filter, sync) { filter?.then(sync) ?: sync }
+    DisposableEffect(sync) {
+        val watch = Snapshot.registerGlobalWriteObserver { sync.onWrite() }
+        onDispose { watch.dispose() }
+    }
     val shown = state.text.toString()
     // In the frame the value composed in, so a line the caller emptied is empty at that frame.
     SideEffect { sync.reconcile(value, shown) }
@@ -137,7 +143,9 @@ fun rememberFieldState(
  * before an edit it still has not taken is taken back.
  *
  * A change the person makes that skips the input transformation, an undo or a redo, is found by
- * [reconcile] as text the field holds that it never handed over, and is handed over from there.
+ * [onWrite] as the text state is written, and handed over then, so an Enter queued behind an undo
+ * sends what the undo left. [reconcile] finds whatever that missed as text the field holds that it
+ * never handed over, and hands it over from there.
  */
 private class FieldSync(
     private val state: TextFieldState,
@@ -159,6 +167,12 @@ private class FieldSync(
     /** What the caller held before the edits it has not answered yet. */
     private var before: String? = null
 
+    /** The thread the field is composed and edited on. A write on any other thread is not the field's. */
+    private val owner = Thread.currentThread()
+
+    /** The field's text as [onWrite] last saw it. The state holds a new one for every change, so a write that left it alone is told by identity. */
+    private var seen: CharSequence = state.text
+
     override fun TextFieldBuffer.transformInput() {
         hand(asCharSequence().toString())
     }
@@ -176,6 +190,21 @@ private class FieldSync(
         Snapshot.observe(writeObserver = { wrote = true }) { give(typed) }
         answered = wrote
         handOvers++
+    }
+
+    /**
+     * Called after every write to state outside a composition. An undo or a redo writes the text
+     * without passing [transformInput], and is handed over here, as it lands. Text that is already
+     * [known], an edit handed over inside it or a value set here, is not handed over again.
+     */
+    fun onWrite() {
+        if (Thread.currentThread() !== owner) return
+        // A write can land while a layout reads under observation, which must not come to depend on this field.
+        val now = Snapshot.withoutReadObservation { state.text }
+        if (now === seen) return
+        seen = now
+        val text = now.toString()
+        if (text != known) hand(text)
     }
 
     /**

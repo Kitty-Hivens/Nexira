@@ -159,4 +159,182 @@ class NotesTypingTest {
             assertEquals("e", fieldText())
         }
     }
+
+    /** The note shows [expected] at the next frame, and the store keeps it once the write has gone out. */
+    private fun TypingScene.keeps(store: Store, expected: String, what: String) {
+        settle(1)
+        assertEquals(expected, shown, "the note after $what")
+        settle()
+        assertEquals(expected, fieldText(), "the note once settled after $what")
+        assertEquals(expected, store.body(), "what the note keeps after $what")
+    }
+
+    @Test
+    fun `a note cut with Ctrl and X comes back with Ctrl and Z`() {
+        val store = Store()
+        widget(store, { NotesWidget(notes) }) {
+            commit("buy bread")
+            settle()
+            press(Key.A, shortcut = true)
+            pressToClipboard(Key.X)
+            assertEquals("buy bread", clipboard.text)
+            keeps(store, "", "a cut")
+            press(Key.Z, shortcut = true)
+            keeps(store, "buy bread", "an undo of the cut")
+        }
+    }
+
+    @Test
+    fun `a paste over a word in a note, its undo and its redo`() {
+        val store = Store()
+        widget(store, { NotesWidget(notes) }) {
+            clipboard.text = "milk"
+            commit("buy bread")
+            settle()
+            press(Key.DirectionLeft, word = true, shift = true)
+            settle(1)
+            assertEquals("bread", selected)
+            paste()
+            keeps(store, "buy milk", "a paste over the word")
+            press(Key.Z, shortcut = true)
+            keeps(store, "buy bread", "an undo of the paste")
+            press(Key.Y, shortcut = true)
+            keeps(store, "buy milk", "a redo of the paste")
+        }
+    }
+
+    @Test
+    fun `Ctrl and C copies from a note and leaves it as it is`() {
+        val store = Store()
+        widget(store, { NotesWidget(notes) }) {
+            clipboard.text = "from before"
+            commit("call home")
+            settle()
+            press(Key.A, shortcut = true)
+            pressToClipboard(Key.C)
+            assertEquals("call home", clipboard.text)
+            keeps(store, "call home", "a copy")
+        }
+    }
+
+    // Home and End on Windows and Linux, the command key with Left and Right on macOS, where Home
+    // and End go to the ends of the whole note.
+    @Test
+    fun `the line's start and end keys in a note go to the ends of the caret's line`() {
+        val store = Store()
+        widget(store, { NotesWidget(notes) }) {
+            commit("one")
+            press(Key.Enter)
+            commit("two")
+            settle()
+            lineStart()
+            commit("- ")
+            keeps(store, "one\n- two", "typing at the start of the line")
+            lineEnd()
+            commit("!")
+            keeps(store, "one\n- two!", "typing at the end of the line")
+            lineStart(select = true)
+            settle(1)
+            assertEquals("- two!", selected)
+            press(Key.DirectionUp)
+            lineStart()
+            lineEnd(select = true)
+            settle(1)
+            assertEquals("one", selected, "the selection stops at the end of the first line")
+        }
+    }
+
+    @Test
+    fun `Ctrl and Backspace and Ctrl and Delete take words out of a note`() {
+        val store = Store()
+        widget(store, { NotesWidget(notes) }) {
+            commit("buy fresh bread")
+            settle()
+            press(Key.Backspace, word = true)
+            keeps(store, "buy fresh ", "Ctrl and Backspace")
+            press(Key.MoveHome)
+            press(Key.Delete, word = true)
+            keeps(store, " fresh ", "Ctrl and Delete")
+            press(Key.Z, shortcut = true)
+            keeps(store, "buy fresh ", "an undo of Ctrl and Delete")
+        }
+    }
+
+    /** The add field shows [expected] at the next frame, and Enter right then adds it as the newest item. */
+    private fun TypingScene.adds(store: Store, expected: String, what: String) {
+        settle(1)
+        assertEquals(expected, shown, "the add field after $what")
+        press(Key.Enter)
+        settle()
+        assertEquals(expected, store.items().last(), "the item Enter added after $what")
+        assertEquals("", fieldText())
+    }
+
+    @Test
+    fun `a checklist item pasted over a selection is the item Enter adds`() {
+        val store = Store()
+        widget(store, { ChecklistWidget(checklist) }) {
+            clipboard.text = "milk"
+            commit("bread")
+            settle()
+            press(Key.A, shortcut = true)
+            paste()
+            adds(store, "milk", "a paste over the selection")
+        }
+    }
+
+    @Test
+    fun `Ctrl and Z after a paste into a checklist item takes the paste back`() {
+        val store = Store()
+        widget(store, { ChecklistWidget(checklist) }) {
+            clipboard.text = " x6"
+            commit("eggs")
+            settle()
+            paste()
+            settle(1)
+            assertEquals("eggs x6", shown)
+            press(Key.Z, shortcut = true)
+            adds(store, "eggs", "an undo of the paste")
+        }
+    }
+
+    @Test
+    fun `a checklist item cut away adds nothing and comes back with Ctrl and Z`() {
+        val store = Store()
+        widget(store, { ChecklistWidget(checklist) }) {
+            commit("tea")
+            settle()
+            press(Key.A, shortcut = true)
+            pressToClipboard(Key.X)
+            assertEquals("tea", clipboard.text)
+            settle(1)
+            assertEquals("", shown)
+            press(Key.Enter)
+            settle()
+            assertEquals(emptyList(), store.items(), "the widget holds the empty line too")
+            press(Key.Z, shortcut = true)
+            adds(store, "tea", "an undo of the cut")
+        }
+    }
+
+    @Test
+    fun `Home, Shift and End and Ctrl and Backspace in a checklist item`() {
+        val store = Store()
+        widget(store, { ChecklistWidget(checklist) }) {
+            commit("buy oat milk")
+            settle()
+            press(Key.MoveHome)
+            press(Key.MoveEnd, shift = true)
+            settle(1)
+            assertEquals("buy oat milk", selected)
+            commit("oat milk tea")
+            settle(1)
+            assertEquals("oat milk tea", shown)
+            press(Key.Backspace, word = true)
+            settle(1)
+            assertEquals("oat milk ", shown)
+            commit("latte")
+            adds(store, "oat milk latte", "Ctrl and Backspace and typing")
+        }
+    }
 }

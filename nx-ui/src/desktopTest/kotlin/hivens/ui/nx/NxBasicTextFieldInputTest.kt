@@ -217,7 +217,7 @@ class NxBasicTextFieldInputTest {
         text = "abc"
         field.settle()
         field.commit("d")
-        field.press(Key.Z, ctrl = true)
+        field.press(Key.Z, shortcut = true)
         field.settle(2)
         assertEquals("abc", field.shown, "the undo took the letter off the field")
         assertEquals("abc", text, "and the caller follows it")
@@ -229,7 +229,7 @@ class NxBasicTextFieldInputTest {
         field.settle()
         field.commit("d")
         field.settle(1)
-        field.press(Key.Z, ctrl = true)
+        field.press(Key.Z, shortcut = true)
         field.settle(2)
         assertEquals("abc", field.shown)
         assertEquals("abc", text)

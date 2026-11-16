@@ -144,4 +144,64 @@ class LoginPasswordTypingTest {
             "the password field leaves its masking to the framework's default",
         )
     }
+
+    /**
+     * The password field draws [expected] masked at the next frame, and Enter right then signs
+     * in with it: the form holds what the field holds. The name is left empty, so the sign in
+     * keeps the focus in the field.
+     */
+    private fun TypingScene.signsInWith(expected: String, what: String) {
+        settle(1)
+        assertEquals("•".repeat(expected.length), drawnText(PASSWORD), "the field after $what")
+        press(Key.Enter)
+        settle()
+        assertEquals(expected, signIns.last().password, "the password signed in with after $what")
+    }
+
+    @Test
+    fun `Ctrl and C and Ctrl and X copy nothing out of the password`() = form {
+        focusField(PASSWORD)
+        clipboard.text = "from before"
+        commit("hunter2")
+        settle()
+        press(Key.A, shortcut = true)
+        settle(1)
+        assertEquals("hunter2".length, selection.length, "Ctrl and A selected the whole password")
+        press(Key.C, shortcut = true)
+        settleAWhile()
+        assertEquals("from before", clipboard.text, "a copy of the password reached the clipboard")
+        press(Key.X, shortcut = true)
+        settleAWhile()
+        assertEquals("from before", clipboard.text, "a cut of the password reached the clipboard")
+        signsInWith("hunter2", "a refused copy and cut")
+    }
+
+    @Test
+    fun `a password pasted with Ctrl and V is the one signed in with`() = form {
+        focusField(PASSWORD)
+        clipboard.text = "hunter2"
+        paste()
+        signsInWith("hunter2", "a paste")
+    }
+
+    @Test
+    fun `a paste over a selected password replaces it`() = form {
+        focusField(PASSWORD)
+        clipboard.text = "hunter2"
+        commit("wrong")
+        settle()
+        press(Key.A, shortcut = true)
+        paste()
+        signsInWith("hunter2", "a paste over the password")
+    }
+
+    @Test
+    fun `typing over a selected password replaces it`() = form {
+        focusField(PASSWORD)
+        commit("wrong")
+        settle()
+        press(Key.A, shortcut = true)
+        commit("right")
+        signsInWith("right", "typing over the password")
+    }
 }
