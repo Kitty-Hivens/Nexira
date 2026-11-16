@@ -4,6 +4,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.KeyboardActionHandler
+import androidx.compose.foundation.text.input.TextObfuscationMode
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -14,35 +16,34 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.foundation.text.input.KeyboardActionHandler
+import androidx.compose.ui.unit.dp
 import hivens.accounts.api.AccountKeys
 import hivens.accounts.api.PasswordSignIn
 import hivens.accounts.api.SignInCode
 import hivens.accounts.api.SignInError
 import hivens.accounts.api.SignInFlow
-import hivens.ui.i18n.nexiraStrings
-import hivens.ui.nx.rememberFieldState
-import androidx.compose.ui.unit.dp
 import hivens.ui.components.ConfirmCodeDialog
 import hivens.ui.components.MicrosoftSignInButton
 import hivens.ui.components.words
 import hivens.ui.flexible.Flexible
 import hivens.ui.flexible.FlexibleKind
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxCalloutBanner
 import hivens.ui.nx.NxCalloutTone
+import hivens.ui.nx.rememberFieldState
+import hivens.ui.platform.SystemActions
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetField
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.puppet.PuppetToggle
-import hivens.ui.platform.SystemActions
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.Status
 import hivens.widget.api.rememberScopedCommand
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
-import hivens.ui.theme.NxInk
-import hivens.ui.theme.NxColor
-import hivens.ui.theme.Status
 
 /**
  * The SmartyCraft sign-in form, with offline play and, where [showMicrosoft], the
@@ -197,18 +198,23 @@ fun LoginPanel(
             edited()
         }
 
-        val passwordState = rememberFieldState(password) { password = it; edited() }
+        val passwordField = rememberFieldState(password, { password = it; edited() })
         OutlinedSecureTextField(
-            state            = passwordState,
-            label            = { Text(s.text("loginPassword")) },
-            modifier         = Modifier.fillMaxWidth(),
-            keyboardOptions  = KeyboardOptions(
+            state               = passwordField.text,
+            label               = { Text(s.text("loginPassword")) },
+            modifier            = Modifier.fillMaxWidth(),
+            inputTransformation = passwordField.input,
+            // Every letter stays hidden as it is typed, on every platform. Left to its
+            // default the secure field may show the last one for a moment, wherever
+            // the framework version or the system's show-passwords setting allows it.
+            textObfuscationMode = TextObfuscationMode.Hidden,
+            keyboardOptions     = KeyboardOptions(
                 keyboardType = KeyboardType.Password,
                 imeAction    = ImeAction.Done
             ),
-            onKeyboardAction = KeyboardActionHandler { doLogin() },
-            shape            = MaterialTheme.shapes.small,
-            colors           = fieldColors
+            onKeyboardAction    = KeyboardActionHandler { doLogin() },
+            shape               = MaterialTheme.shapes.small,
+            colors              = fieldColors
         )
         PuppetField("login.password", password) {
             password = it

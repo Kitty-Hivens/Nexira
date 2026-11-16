@@ -28,7 +28,7 @@ class NxFieldTextTest {
 
         fun open() {
             scene = ImageComposeScene(100, 40, density = Density(1f)) {
-                state = rememberFieldState(text) { reported += it; if (accept(it)) text = it }
+                state = rememberFieldState(text, { reported += it; if (accept(it)) text = it }).text
             }
             settle()
         }

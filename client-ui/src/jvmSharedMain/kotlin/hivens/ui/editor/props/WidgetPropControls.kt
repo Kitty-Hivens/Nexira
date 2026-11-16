@@ -8,7 +8,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import hivens.ui.nx.NxBasicTextField
+import androidx.compose.foundation.text.input.InputTransformation
+import androidx.compose.foundation.text.input.byValue
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -25,11 +26,15 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.unit.dp
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
+import hivens.ui.nx.NxBasicTextField
 import hivens.ui.nx.NxColorField
 import hivens.ui.nx.NxRow
 import hivens.ui.nx.NxSelect
 import hivens.ui.nx.NxSwitch
 import hivens.ui.surface.NxSurface
+import hivens.ui.surface.SurfaceKind
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.NxInk
 import hivens.ui.theme.Spacing
 import hivens.ui.widgets.customization.LabeledSlider
 import hivens.ui.widgets.customization.panelLabelWidth
@@ -46,9 +51,6 @@ import kotlinx.serialization.json.floatOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.math.roundToInt
-import hivens.ui.theme.NxInk
-import hivens.ui.theme.NxColor
-import hivens.ui.surface.SurfaceKind
 
 // Renders one editor control for a single prop field, dispatching on the
 // serial kind + @SerialInfo annotations. `current` is the effective
@@ -145,6 +147,7 @@ private fun PanelField(
     text: String,
     onValueChange: (String) -> Unit,
     onFocus: (Boolean) -> Unit,
+    inputTransformation: InputTransformation? = null,
 ) {
     NxSurface(
         kind  = SurfaceKind.Field,
@@ -156,6 +159,7 @@ private fun PanelField(
             singleLine    = true,
             textStyle     = MaterialTheme.typography.bodySmall.copy(color = NxInk.main),
             cursorBrush   = SolidColor(NxColor.lead()),
+            inputTransformation = inputTransformation,
             modifier      = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = Spacing.s10, vertical = Spacing.s8)
@@ -189,15 +193,20 @@ private fun NumberRow(
     var focused by remember { mutableStateOf(false) }
     var text by remember { mutableStateOf(value) }
     LaunchedEffect(value, focused) { if (!focused) text = value }
+    // Refused inside the keystroke, so the character is never in the field, not even for
+    // the frames a refusal by the caller takes, and what is typed in those frames stays.
+    val numbersOnly = remember(decimals) {
+        InputTransformation.byValue { current, proposed -> if (isNumeric(proposed.toString(), decimals)) proposed else current }
+    }
     PanelRow(label) {
         PanelField(
-            text          = text,
-            onValueChange = { typed ->
-                if (!isNumeric(typed, decimals)) return@PanelField
+            text                = text,
+            onValueChange       = { typed ->
                 text = typed
                 typed.toDoubleOrNull()?.let(onChange)
             },
-            onFocus       = { focused = it },
+            onFocus             = { focused = it },
+            inputTransformation = numbersOnly,
         )
     }
 }

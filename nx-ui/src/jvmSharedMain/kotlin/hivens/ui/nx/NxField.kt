@@ -4,27 +4,33 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.input.TextFieldDecorator
+import androidx.compose.foundation.text.input.InputTransformation
+import androidx.compose.foundation.text.input.TextFieldBuffer
 import androidx.compose.foundation.text.input.TextFieldState
-import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
+import androidx.compose.foundation.text.input.then
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
 import hivens.ui.surface.NxSurface
-import hivens.ui.theme.Spacing
+import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
-import hivens.ui.surface.SurfaceKind
+import hivens.ui.theme.Spacing
 
 /**
  * One text input: a [BasicTextField] inside a [SurfaceKind.Field] surface with a
@@ -76,52 +82,144 @@ fun NxField(
 }
 
 /**
+ * What a field built on the framework's text state takes from [rememberFieldState]: [text] is its
+ * state, and [input] is its input transformation.
+ */
+@Stable
+class FieldState internal constructor(
+    val text: TextFieldState,
+    val input: InputTransformation,
+)
+
+/**
  * The text state a field edits, kept in step with the caller's string.
  *
- * The caller changed the text from outside: the state follows. Typing goes to the caller, and once
- * the caller has had time to answer, an edit it did not keep is taken back, because it would
- * otherwise stay on screen over a value that never took it. Which of the caller's values are only
- * catching up with the typing is [FieldEcho]'s to tell.
+ * An edit the person makes reaches the caller while it is being made, through [FieldState.input],
+ * the way the string field called its caller from inside the edit. Whatever reads the caller's
+ * value next, the Enter after an input method's word or a press on a button, finds the edit
+ * there. [filter] sees the edit first, and what it keeps is what the caller is given.
+ *
+ * After every composition the field and the caller's value are compared again, also when the
+ * value composes the same as before: a caller that took a line and cleared it before the next
+ * frame passes the same empty value twice, and the field still has to empty. See [FieldSync].
  */
 @Composable
-fun rememberFieldState(value: String, onValueChange: (String) -> Unit): TextFieldState {
+fun rememberFieldState(
+    value: String,
+    onValueChange: (String) -> Unit,
+    filter: InputTransformation? = null,
+): FieldState {
     val state = rememberTextFieldState(value)
     val latestValue = rememberUpdatedState(value)
     val latestChange = rememberUpdatedState(onValueChange)
-    val echo = remember { FieldEcho() }
-
-    LaunchedEffect(value) {
-        echo.onValue(value, state.text.toString())?.let(state::setTextAndPlaceCursorAtEnd)
+    val sync = remember(state) { FieldSync(state, { latestValue.value }, { latestChange.value(it) }) }
+    val input = remember(filter, sync) { filter?.then(sync) ?: sync }
+    val shown = state.text.toString()
+    // In the frame the value composed in, so a line the caller emptied is empty at that frame.
+    SideEffect { sync.reconcile(value, shown) }
+    LaunchedEffect(value, shown, sync.handOvers) {
+        withFrames(ANSWER_FRAMES)
+        sync.takeBackRefused(value)
     }
-    LaunchedEffect(state) {
-        snapshotFlow { state.text.toString() }.collect { typed ->
-            // Compared with what the caller is about to hold, not with the value it
-            // shows yet: erasing back to a value it has not caught up from must still
-            // be sent, or the caller keeps the longer text the field no longer shows.
-            if (typed == (echo.lastSent() ?: latestValue.value)) return@collect
-            val before = latestValue.value
-            echo.sending(typed)
-            latestChange.value(typed)
-            // The caller gets a few frames to take the edit before it counts as
-            // refused. The first frame resumes this before it recomposes the caller,
-            // and a caller that answers through a flow takes longer still.
-            for (frame in 0 until ANSWER_FRAMES) {
-                withFrameNanos { }
-                if (latestValue.value != before) break
-            }
-            echo.settle(typed, before, latestValue.value, state.text.toString())?.let(state::setTextAndPlaceCursorAtEnd)
+    return FieldState(state, input)
+}
+
+/**
+ * Keeps a field's text and its caller's string in step.
+ *
+ * As the field's last input transformation it hands each edit the person makes to the caller
+ * inside the edit. Whether the caller changed any state while it took the edit tells what its
+ * next value means. One that did has answered: whatever it composes next is its word, the edit
+ * kept, rewritten, refused or the line cleared after an Enter, and the field shows it at once.
+ * One that did not either refuses or answers later through a flow, so its value trails the
+ * typing: a value that is one of the field's own earlier edits is it catching up, and setting
+ * the field to it would erase what was typed since. Such a caller gets [ANSWER_FRAMES] frames
+ * before an edit it still has not taken is taken back.
+ *
+ * A change the person makes that skips the input transformation, an undo or a redo, is found by
+ * [reconcile] as text the field holds that it never handed over, and is handed over from there.
+ */
+private class FieldSync(
+    private val state: TextFieldState,
+    private val held: () -> String,
+    private val give: (String) -> Unit,
+) : InputTransformation {
+    private val echo = FieldEcho()
+
+    /** One more for every edit handed over, so the field compares again even when the caller's value composes unchanged. */
+    var handOvers by mutableIntStateOf(0)
+        private set
+
+    /** The text the field holds as far as this knows: the last one handed over or set here. */
+    private var known = state.text.toString()
+
+    /** Whether the caller changed state while it took the newest edit handed over. */
+    private var answered = false
+
+    /** What the caller held before the edits it has not answered yet. */
+    private var before: String? = null
+
+    override fun TextFieldBuffer.transformInput() {
+        hand(asCharSequence().toString())
+    }
+
+    private fun hand(typed: String) {
+        known = typed
+        val value = held()
+        // Compared with what the caller is about to hold, not with the value it
+        // shows yet: erasing back to a value it has not caught up from must still
+        // be sent, or the caller keeps the longer text the field no longer shows.
+        if (typed == (echo.lastSent() ?: value)) return
+        if (echo.lastSent() == null) before = value
+        echo.sending(typed)
+        var wrote = false
+        Snapshot.observe(writeObserver = { wrote = true }) { give(typed) }
+        answered = wrote
+        handOvers++
+    }
+
+    /**
+     * Brings the field and the caller together once [value] has composed while the field shows
+     * [shown]. A caller still at its value from before the edits it has not answered is left to
+     * [takeBackRefused].
+     */
+    fun reconcile(value: String, shown: String) {
+        when {
+            shown != known -> hand(shown)
+            value == shown -> settled()
+            answered || echo.lastSent() == null -> show(value)
+            value == before -> Unit
+            else -> echo.onValue(value, shown)?.let(::show)
         }
     }
-    return state
+
+    /** Called [ANSWER_FRAMES] frames after nothing changed: a caller still at [value], its value from before the edits, refused them. */
+    fun takeBackRefused(value: String) {
+        if (echo.lastSent() != null && !answered && value == before && state.text.toString() != value) show(value)
+    }
+
+    private fun settled() {
+        echo.clear()
+        before = null
+        answered = false
+    }
+
+    private fun show(value: String) {
+        settled()
+        known = value
+        state.setTextAndPlaceCursorAtEnd(value)
+    }
 }
+
+private suspend fun withFrames(count: Int) = repeat(count) { withFrameNanos { } }
 
 /**
  * What a field has handed its caller and not yet seen come back.
  *
- * The caller's value trails the typing by at least a recomposition. A value that is one of the
- * field's own earlier edits is the caller catching up, and setting the field to it erased whatever
- * was typed in between: on a machine slow to draw, a word typed at an ordinary pace lost letters.
- * Only a value the field never sent, a rewrite or a change from outside, replaces what it shows.
+ * A slow caller's value trails the typing. A value that is one of the field's own earlier edits is
+ * the caller catching up, and setting the field to it erased whatever was typed in between: on a
+ * machine slow to draw, a word typed at an ordinary pace lost letters. Only a value the field
+ * never sent, a rewrite or a change from outside, replaces what it shows.
  */
 internal class FieldEcho {
     private val sent = ArrayDeque<String>()
@@ -134,6 +232,11 @@ internal class FieldEcho {
         sent.addLast(typed)
     }
 
+    /** The caller holds what the field shows, so nothing handed over is still on its way. */
+    fun clear() {
+        sent.clear()
+    }
+
     /** The caller's value became [value] while the field shows [shown]: the text to show instead, or null to keep it. */
     fun onValue(value: String, shown: String): String? {
         val i = sent.indexOf(value)
@@ -144,18 +247,7 @@ internal class FieldEcho {
         sent.clear()
         return if (shown != value) value else null
     }
-
-    /**
-     * After the caller had time to answer [typed], sent while its value was [before]: the text to
-     * take the field back to when the caller refused the edit, or null. Nothing is taken back once
-     * more has been typed, since that edit is on its way to the caller too.
-     */
-    fun settle(typed: String, before: String, value: String, shown: String): String? {
-        if (shown != typed || value != before || sent.lastOrNull() != typed) return null
-        sent.clear()
-        return before
-    }
 }
 
-/** How many frames a caller has to take an edit before it counts as refused. */
+/** How many frames a caller that has not answered an edit gets before the edit counts as refused. */
 private const val ANSWER_FRAMES = 8

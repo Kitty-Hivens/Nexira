@@ -12,10 +12,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import hivens.ui.i18n.nexiraStrings
-import hivens.ui.nx.NxBasicTextField
-import androidx.compose.foundation.text.input.KeyboardActionHandler
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.InputTransformation
+import androidx.compose.foundation.text.input.KeyboardActionHandler
+import androidx.compose.foundation.text.input.byValue
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -37,6 +37,8 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import hivens.ui.i18n.nexiraStrings
+import hivens.ui.nx.NxBasicTextField
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxDialog
@@ -45,12 +47,21 @@ import hivens.ui.puppet.PuppetField
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.LocalMonoFamily
-import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxColor
+import hivens.ui.theme.NxInk
 import hivens.ui.theme.Status
 
 /** How many digits the second factor asks for. */
 private const val CODE_LENGTH = 6
+
+/** What the code field lets in, so a letter typed or pasted never lands in it. */
+private val CodeDigits = InputTransformation.byValue { _, proposed -> codeDigits(proposed) }
+
+/**
+ * The digits of [text], as many as a code has. ASCII ones only: [Char.isDigit] also takes a
+ * fullwidth or an Arabic-Indic digit, which the server does not read as one.
+ */
+private fun codeDigits(text: CharSequence): String = text.filter { it in '0'..'9' }.take(CODE_LENGTH).toString()
 
 /**
  * Six-digit TOTP prompt for the second factor of the SmartyCraft login.
@@ -92,7 +103,7 @@ fun ConfirmCodeDialog(
     fun accept(raw: String) {
         // Cap at CODE_LENGTH, strip non-digits -- the server rejects anything else
         // and we would rather not send it. Pasting "code: 123456" becomes "123456".
-        code = raw.filter { it.isDigit() }.take(CODE_LENGTH)
+        code = codeDigits(raw)
     }
 
     val complete = code.length == CODE_LENGTH
@@ -134,11 +145,15 @@ fun ConfirmCodeDialog(
                             keyboardType = KeyboardType.NumberPassword,
                             imeAction = ImeAction.Done,
                         ),
+                        // Counted here rather than read from the composition, so an Enter
+                        // right behind the sixth digit, as a password manager types it,
+                        // sends the code.
                         onKeyboardAction = KeyboardActionHandler {
-                            if (complete && !isSubmitting) onSubmit(code)
+                            if (code.length == CODE_LENGTH && !isSubmitting) onSubmit(code)
                         },
                         cursorBrush = SolidColor(NxColor.lead()),
                         textStyle = TextStyle(color = NxInk.main),
+                        inputTransformation = CodeDigits,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(56.dp)

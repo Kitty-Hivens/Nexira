@@ -28,22 +28,6 @@ class FieldEchoTest {
     }
 
     @Test
-    fun `an edit the caller refused is taken back`() {
-        val echo = FieldEcho()
-        echo.sending("12a")
-        // The caller kept "12": its value never moved.
-        assertEquals("12", echo.settle(typed = "12a", before = "12", value = "12", shown = "12a"))
-    }
-
-    @Test
-    fun `nothing is taken back while the caller has not answered yet but more was typed`() {
-        val echo = FieldEcho()
-        echo.sending("Va")
-        echo.sending("Van")
-        assertNull(echo.settle(typed = "Va", before = "V", value = "V", shown = "Van"))
-    }
-
-    @Test
     fun `an erasure back to a value the caller has not caught up from is still an edit to send`() {
         val echo = FieldEcho()
         echo.sending("ab")
@@ -57,9 +41,13 @@ class FieldEchoTest {
     }
 
     @Test
-    fun `an accepted edit is left alone`() {
+    fun `once the caller holds what the field shows nothing is still on its way`() {
         val echo = FieldEcho()
-        echo.sending("Va")
-        assertNull(echo.settle(typed = "Va", before = "V", value = "Va", shown = "Va"))
+        // A letter typed and erased before the next frame: both went out.
+        echo.sending("x")
+        echo.sending("")
+        echo.clear()
+        assertNull(echo.lastSent())
+        assertEquals("x", echo.onValue("x", shown = ""), "a later x from the caller is its own, not an echo")
     }
 }

@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -448,8 +449,7 @@ class DismissStackTest {
 
 @Composable
 private fun Field(modifier: Modifier = Modifier) {
-    var text by remember { mutableStateOf("") }
-    BasicTextField(text, { text = it }, modifier)
+    BasicTextField(rememberTextFieldState(), modifier)
 }
 
 @Composable

@@ -7,8 +7,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
-import androidx.compose.runtime.Composable
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.input.rememberTextFieldState
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -413,8 +414,7 @@ class NxLayersTest {
 
 @Composable
 private fun Field(modifier: Modifier = Modifier) {
-    var text by remember { mutableStateOf("") }
-    BasicTextField(text, { text = it }, modifier.size(120.dp, 30.dp))
+    BasicTextField(rememberTextFieldState(), modifier.size(120.dp, 30.dp))
 }
 
 private val DIALOG_INK = Color(0xFF3355FF)
