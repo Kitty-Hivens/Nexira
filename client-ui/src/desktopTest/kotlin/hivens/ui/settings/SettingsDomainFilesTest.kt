@@ -135,6 +135,22 @@ class SettingsDomainFilesTest {
     }
 
     @Test
+    fun `changes made while a save waits ask for no save of their own, and the save writes the last`() {
+        val waiting = ArrayDeque<() -> Unit>()
+        val store = SettingsDomainFiles(dir, legacy) { _, block -> waiting.addLast(block) }.of(PrefsDomain)
+        repeat(1000) { store.update { it.copy(volume = it.volume + 1) } }
+        assertEquals(1, waiting.size, "one save stands for every change made while it waited")
+
+        waiting.removeFirst().invoke()
+        assertEquals(1005, files().peek(PrefsDomain).volume, "and it writes the value as it is when it runs")
+
+        store.update { it.copy(volume = 7) }
+        assertEquals(1, waiting.size, "a change after the save asks for the next one")
+        waiting.removeFirst().invoke()
+        assertEquals(7, files().peek(PrefsDomain).volume)
+    }
+
+    @Test
     fun `changes from many threads are applied one at a time and the file holds the last`() {
         val writer = Executors.newSingleThreadExecutor()
         val files = SettingsDomainFiles(dir, legacy) { _, block -> writer.execute(block) }

@@ -20,6 +20,7 @@ import kotlinx.serialization.json.jsonObject
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.concurrent.atomic.AtomicBoolean
 
 private val log = LoggerFactory.getLogger("SettingsDomains")
 
@@ -48,7 +49,7 @@ private val log = LoggerFactory.getLogger("SettingsDomains")
  * Every change is applied to the value at once, in the order the changes were asked for, and the
  * file is then replaced whole through [write], which runs a save where the host wants it, off the
  * event thread say. A save writes the value as it is when the save runs, so the last one to land
- * always holds the last value.
+ * always holds the last value, and while one is waiting a further change asks for none of its own.
  */
 class SettingsDomainFiles(
     private val dir: Path,
@@ -163,13 +164,26 @@ class SettingsDomainFiles(
         // Held while the file is written, so a save reads the value and lands it before the next one starts.
         private val saving = Any()
 
+        // A save reads the value when it runs, so while one is waiting a further change needs no save
+        // of its own. A slider dragged across its range asked for hundreds of whole-file writes.
+        private val queued = AtomicBoolean(false)
+
         override val value: StateFlow<T> = flow.asStateFlow()
         override val readOnly: Boolean = loaded.readOnly
 
         init {
             // Taken back from the former file: written, so the record of what is there is current
             // and the next start does not take it again.
-            if (loaded.retaken && !readOnly) write("the settings of '${domain.id}'") { save() }
+            if (loaded.retaken && !readOnly) queueSave()
+        }
+
+        private fun queueSave() {
+            if (!queued.compareAndSet(false, true)) return
+            write("the settings of '${domain.id}'") {
+                // Cleared before the value is read, so a change that lands during the save queues the next.
+                queued.set(false)
+                save()
+            }
         }
 
         override fun update(change: SettingsChange<T>) {
@@ -182,7 +196,7 @@ class SettingsDomainFiles(
                 log.warn("Not writing the settings of '{}': they belong to a newer build and this session is read only", domain.id)
                 return
             }
-            write("the settings of '${domain.id}'") { save() }
+            queueSave()
         }
 
         private fun save() = synchronized(saving) {
