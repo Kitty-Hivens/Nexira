@@ -23,6 +23,7 @@ object I18nKeys {
     const val UPDATE_SETTINGS_ID = "i18n.settings.update"
     const val LANGUAGE_ID = "i18n.language"
     const val LANGUAGES_ID = "i18n.languages"
+    const val WORDS_ID = "i18n.words"
 
     /** What the person chose, as stored. */
     val Settings = SourceKey<I18nSettings>(SETTINGS_ID, ScopeLevel.App)
@@ -35,4 +36,10 @@ object I18nKeys {
 
     /** Every language installed, the shipped ones first, for a picker. */
     val Languages = SourceKey<List<LanguageInfo>>(LANGUAGES_ID, ScopeLevel.App)
+
+    /**
+     * Every namespace's words in the language they are in now: what the host draws a composition
+     * in, through [LocalTranslator].
+     */
+    val Words = SourceKey<Translator>(WORDS_ID, ScopeLevel.App)
 }

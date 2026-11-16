@@ -30,6 +30,7 @@ import hivens.catalogue.api.ProjectBuild
 import hivens.catalogue.api.SourceFilter
 import hivens.catalogue.api.SourceFilterOption
 import hivens.catalogue.api.SourceView
+import hivens.config.Storage
 import hivens.core.api.HttpClientProvider
 import hivens.core.api.catalogue.CataloguePack
 import hivens.core.api.catalogue.CataloguePackVersion
@@ -45,69 +46,43 @@ import hivens.core.launch.LaunchState
 import hivens.core.net.TransferEngine
 import hivens.core.security.SslBypassEntry
 import hivens.core.security.SslBypassStore
-import hivens.launcher.InstallSnapshot
 import hivens.core.update.CompatChange
 import hivens.core.update.PackUpdateStatus
 import hivens.core.update.PackUpdateStatusHub
 import hivens.core.update.UpdateDirection
+import hivens.i18n.I18nModule
+import hivens.i18n.I18nSettingsDomain
+import hivens.i18n.api.I18nApi
+import hivens.i18n.api.I18nKeys
+import hivens.launcher.InstallSnapshot
 import hivens.launcher.PackOperation
 import hivens.launcher.PackOperationKind
 import hivens.launcher.PackOperationPhase
+import hivens.launcher.instance.PackInstanceService.DeleteOutcome
 import hivens.launcher.modrinth.ModrinthClient
 import hivens.launcher.network.CertificateTrustGate
-import hivens.launcher.instance.PackInstanceService.DeleteOutcome
+import hivens.launcher.platform.PlatformPaths
 import hivens.launcher.update.ReattachConfirmation
 import hivens.launcher.update.ReattachPreview
-import hivens.launcher.platform.PlatformPaths
 import hivens.packs.PackActions
 import hivens.packs.PackOutcomes
 import hivens.packs.PacksHost
 import hivens.packs.PacksModule
 import hivens.packs.ReattachPreviewState
-import hivens.config.Storage
-import hivens.i18n.I18nEngine
-import hivens.i18n.I18nModule
-import hivens.i18n.I18nSettingsDomain
-import hivens.i18n.api.I18nApi
-import hivens.i18n.api.I18nKeys
 import hivens.packs.ReattachPreviews
 import hivens.packs.api.InstallRequest
+import hivens.packs.api.OperationStatus
 import hivens.packs.api.PackKeys
 import hivens.packs.api.PackLaunch
+import hivens.packs.api.PackOperationView
 import hivens.packs.api.PackUpdateView
 import hivens.packs.api.PackView
 import hivens.packs.api.PacksApi
-import hivens.packs.api.ReattachPreviewView
 import hivens.packs.api.ReattachConfirmation as ConfirmationView
-import hivens.packs.api.OperationStatus
-import hivens.packs.api.PackOperationView
+import hivens.packs.api.ReattachPreviewView
 import hivens.packs.api.ReattachRequest
 import hivens.packs.toPackView
 import hivens.packs.toView
-import hivens.ui.HostKeys
-import hivens.ui.accounts.ClientAccountsHost
-import hivens.ui.host.LauncherHostAccess
-import hivens.ui.host.launcherServices
-import hivens.ui.hostThemeManager
-import hivens.ui.background.BackgroundSettings
-import hivens.ui.i18n.NexiraStrings
-import hivens.ui.settings.SettingsDomainFiles
-import hivens.ui.widgets.modules.wordsOf
-import hivens.ui.levelServicesModule
-import hivens.ui.notifications.CorePart
-import hivens.ui.notifications.CoreProblem
-import hivens.ui.notifications.CoreProblems
-import hivens.ui.notifications.IndicationCenter
-import hivens.ui.notifications.IndicationCenter.LaunchIndication
-import hivens.ui.moduleKeys
-import hivens.ui.notifications.NotificationCenter
-import hivens.ui.notifications.NotifiedCoreProblems
-import hivens.ui.notifications.PersistedNotification
-import hivens.ui.onEventThread
-import hivens.ui.packs.ClientPacksHost
-import hivens.ui.packs.withdrawNoticesOfInstalledPacks
-import hivens.ui.reportedTo
-import hivens.ui.settle
 import hivens.themes.ThemeLibraryFile
 import hivens.themes.ThemeManager
 import hivens.themes.Themes
@@ -118,25 +93,53 @@ import hivens.themes.api.ThemeInputs
 import hivens.themes.api.ThemeMode
 import hivens.themes.api.ThemesApi
 import hivens.themes.api.ThemesKeys
+import hivens.ui.HostKeys
+import hivens.ui.accounts.ClientAccountsHost
+import hivens.ui.background.BackgroundSettings
+import hivens.ui.host.HostWords
+import hivens.ui.host.LauncherFiles
+import hivens.ui.host.LauncherHostAccess
+import hivens.ui.host.launcherServices
+import hivens.ui.i18n.NexiraStrings
+import hivens.ui.levelServicesModule
+import hivens.ui.moduleKeys
+import hivens.ui.notifications.CorePart
+import hivens.ui.notifications.CoreProblem
+import hivens.ui.notifications.CoreProblems
+import hivens.ui.notifications.IndicationCenter
+import hivens.ui.notifications.IndicationCenter.LaunchIndication
+import hivens.ui.notifications.NotificationCenter
+import hivens.ui.notifications.NotifiedCoreProblems
+import hivens.ui.notifications.PersistedNotification
+import hivens.ui.onEventThread
+import hivens.ui.packs.ClientPacksHost
+import hivens.ui.packs.withdrawNoticesOfInstalledPacks
+import hivens.ui.reportedTo
+import hivens.ui.settings.SettingsDomainFiles
+import hivens.ui.settle
 import hivens.ui.theme.WallpaperTone
 import hivens.ui.uiCommandRegistry
 import hivens.ui.uiDataRegistry
 import hivens.ui.utils.GameConsoleService
 import hivens.ui.utils.PreferenceWriter
+import hivens.ui.widgets.modules.fixedTakenWords
+import hivens.ui.widgets.modules.launcherWords
 import hivens.widget.api.ContributedServices
-import hivens.widget.api.LevelServices
-import hivens.widget.api.ModuleContribution
-import hivens.widget.api.TakenContribution
-import hivens.widget.api.TakenContributions
+import hivens.widget.api.HostFiles
 import hivens.widget.api.KeyContribution
 import hivens.widget.api.KeyOrigin
+import hivens.widget.api.LevelServices
 import hivens.widget.api.LocalScope
 import hivens.widget.api.LocalWidgetCommandRegistry
 import hivens.widget.api.LocalWidgetDataRegistry
+import hivens.widget.api.ModuleContribution
 import hivens.widget.api.ModuleKeys
 import hivens.widget.api.ModuleKeysResult
 import hivens.widget.api.SettingsChange
 import hivens.widget.api.SettingsStores
+import hivens.widget.api.TakenContribution
+import hivens.widget.api.TakenContributions
+import hivens.widget.api.TakenWords
 import hivens.widget.api.WidgetScope
 import hivens.widget.api.current
 import hivens.widget.api.find
@@ -176,8 +179,8 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.concurrent.thread
 import kotlin.io.path.ExperimentalPathApi
-import kotlin.reflect.KClass
 import kotlin.io.path.deleteRecursively
+import kotlin.reflect.KClass
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -484,10 +487,10 @@ class CoreKeysTest {
         val domains = SettingsDomainFiles(dir.resolve(Storage.SETTINGS_DIR), dir.resolve(Storage.SETTINGS_FILE), preferences::write).also {
             Files.writeString(dir.resolve(Storage.SETTINGS_FILE), legacyJson.encodeToString(SettingsData.serializer(), settings))
         }
-        val words: I18nEngine = NexiraStrings.engine(null, domains.of(I18nSettingsDomain).value.value.language).also { engine ->
-            engine.follow(domains.of(I18nSettingsDomain), scope)
-            listOf(I18nModule, ThemesModule, PacksModule, AccountsModule, CatalogueModule).forEach { engine.contribute(it.id, it.strings.wordsOf(it.id)) }
-        }
+        val compiled = listOf(I18nModule, ThemesModule, PacksModule, AccountsModule, CatalogueModule)
+
+        /** What the host says outside a composition, in the words the language module answers at the app level, as the launcher's Koin makes it. */
+        val words = HostWords { app }
         val keys = HostKeys(data, commands, ContributedServices()).also { keys ->
             moduleKeys(
                 keys     = keys,
@@ -496,7 +499,7 @@ class CoreKeysTest {
                     CatalogueApi.ID.takeIf { withCatalogue }, I18nApi.ID.takeIf { withI18n },
                     ThemesApi.ID.takeIf { withThemes },
                 ),
-                compiled = listOf(I18nModule, ThemesModule, PacksModule, AccountsModule, CatalogueModule),
+                compiled = compiled,
                 jars     = emptyList(),
                 nameOf   = { moduleId, key -> words.strings(moduleId).text(key) },
             )
@@ -508,9 +511,6 @@ class CoreKeysTest {
             env = { name -> if (name == "NEXIRA_DATA_DIR") dir.toString() else null },
         )
         val console = GameConsoleService(paths).also { consoles += it }
-
-        /** The themes module's manager, made the way the host makes it, over the domains above. */
-        val themes: ThemeManager = hostThemeManager(dir, domains, words, scope, preferences::write)
 
         val application: KoinApplication = koinApplication {
             modules(
@@ -540,9 +540,9 @@ class CoreKeysTest {
                     single<PacksHost> { ClientPacksHost({}, indications, reporter, scope) }
                     single<AccountsHost> { ClientAccountsHost(reporter, preferences, CertificateTrustGate(Grants()), "smartycraft.example") }
                     single { console }
-                    single { themes }
                     single<SettingsStores> { domains }
-                    single { words }
+                    single<HostFiles> { LauncherFiles(dir, preferences::write) }
+                    single<TakenWords> { fixedTakenWords(launcherWords(compiled)) }
                     single {
                         val services = keys.appServices(KoinLevelServicesHost.app(this), Dispatchers.Unconfined)
                         WidgetScope.app(data, services, Dispatchers.Unconfined, commands, access = LauncherHostAccess, failures = reportedTo(reporter, keys))
@@ -562,6 +562,9 @@ class CoreKeysTest {
 
         fun <P> fire(level: WidgetScope, key: CommandKey<P>, payload: P) =
             assertNotNull(level.findCommand(key), "${key.id} has no answer at ${level.level}").run(payload)
+
+        /** The themes module's manager, made the way the first read of one of its keys makes it. */
+        val themes: ThemeManager get() = app.launcherServices.get<ThemeManager>()
 
         /** The app's session store, the accounts module's, made the way the first read of the session makes it. */
         val session: SessionStore get() = app.launcherServices.get<SessionStore>()
@@ -650,7 +653,7 @@ class CoreKeysTest {
     private val appWide: List<SourceKey<*>> = listOf(
         PackKeys.Library, PackKeys.Launches,
         PackKeys.Launch, PackKeys.Installs, PackKeys.Updates, PackKeys.Operations, PackKeys.ReattachPreviews,
-        Sources.ConsoleVisible, I18nKeys.Settings, I18nKeys.Language, I18nKeys.Languages,
+        Sources.ConsoleVisible, I18nKeys.Settings, I18nKeys.Language, I18nKeys.Languages, I18nKeys.Words,
     ) + accountSources + themeSources
 
     private val appCommands: List<CommandKey<*>> = listOf(
@@ -1344,7 +1347,7 @@ class CoreKeysTest {
     }
 
     @Test
-    fun `a document that does not name the themes module has none of its keys, and the theme is still drawn`() {
+    fun `a document that does not name the themes module has none of its keys, and nothing keeps a theme`() {
         val launcher = Launcher(withThemes = false, notified = true)
         val page = launcher.composition().child(ScopeLevel.Page)
         (themeSources.map { it.id } + themeCommands.map { it.id }).forEach { id ->
@@ -1353,7 +1356,7 @@ class CoreKeysTest {
         assertNull(page.find(ThemesKeys.Active))
         assertNull(page.findCommand(ThemesKeys.Choose))
         assertNull(launcher.app.launcherServices.find(ThemeInputs::class), "nor the inputs the module keeps for the host")
-        assertEquals(Themes.default, launcher.themes.active.value, "the host draws with the manager all the same")
+        assertNull(launcher.app.launcherServices.find(ThemeManager::class), "nor a manager: the shell draws its fallback, see LookValuesTest")
         assertTrue(launcher.center.groups.value.isEmpty(), "a module left out is not a part that failed: ${launcher.center.groups.value}")
     }
 

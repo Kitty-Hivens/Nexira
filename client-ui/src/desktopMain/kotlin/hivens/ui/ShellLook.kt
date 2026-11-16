@@ -3,16 +3,14 @@ package hivens.ui
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.text.font.FontFamily
-import hivens.themes.ThemeManager
-import hivens.ui.customization.CustomizationSettings
-import hivens.i18n.api.Translations
 import hivens.i18n.api.Translator
+import hivens.ui.customization.CustomizationSettings
 import hivens.ui.theme.Theme
+import hivens.widget.api.WidgetScope
 
 /**
  * How the launcher looks right now, for the windows beside the main one.
@@ -22,7 +20,7 @@ import hivens.ui.theme.Theme
  * application next to it, the console, is not inside that composition and inherits
  * none of it, so the shell writes what it decided here and the other window reads
  * it. Until the shell has written once, the theme, the scheme and the words are the
- * ones read before the boot.
+ * ones the modules answered before the boot.
  */
 @Stable
 class ShellLook(theme: Theme, dark: Boolean, words: Translator) {
@@ -47,9 +45,9 @@ class ShellLook(theme: Theme, dark: Boolean, words: Translator) {
 }
 
 /**
- * Keeps [look] on what the main window draws with: the theme and the scheme from
- * [themes], the words from [translations], and what only the shell knows,
- * [uiFamily] and [customization].
+ * Keeps [look] on what the main window draws with: the theme, the scheme and the
+ * words as [app] answers them (see [ShellLookValues]), and what only the shell
+ * knows, [uiFamily] and [customization].
  *
  * The theme is read here, in a restart scope of its own, so a theme or a dark
  * scheme switched anywhere reaches the console at once. Published from the shell's
@@ -59,13 +57,12 @@ class ShellLook(theme: Theme, dark: Boolean, words: Translator) {
 @Composable
 internal fun PublishShellLook(
     look: ShellLook,
-    themes: ThemeManager,
-    translations: Translations,
+    app: WidgetScope,
     uiFamily: FontFamily?,
     customization: CustomizationSettings,
 ) {
-    val theme = themes.active.collectAsState().value
-    val dark = themes.dark.collectAsState().value
-    val words = translations.current.collectAsState().value
+    val theme = app.read(ShellLookValues.Theme)
+    val dark = app.read(ShellLookValues.Dark)
+    val words = app.read(ShellLookValues.Words)
     SideEffect { look.update(theme, dark, words, uiFamily, customization) }
 }

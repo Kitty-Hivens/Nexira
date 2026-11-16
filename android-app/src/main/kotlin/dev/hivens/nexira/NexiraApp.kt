@@ -7,16 +7,18 @@ import android.os.HandlerThread
 import dev.hivens.nexira.host.androidHostModule
 import hivens.launcher.di.launcherModules
 import hivens.ui.androidUiModule
-import hivens.ui.platform.AndroidAppContext
-import org.koin.core.KoinApplication
-import org.koin.dsl.koinApplication
 import hivens.ui.audio.AudioPlayer
+import hivens.ui.platform.AndroidAppContext
+import hivens.ui.prepareLook
 import hivens.ui.widgets.services.MusicPlayerService
 import hivens.ui.widgets.services.MusicPlayerServiceImpl
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.android.asCoroutineDispatcher
+import org.koin.core.KoinApplication
+import org.koin.dsl.koinApplication
+import kotlin.concurrent.thread
 
 /** Owns the one player for the process, so playback outlives any screen that shows it. */
 class NexiraApp : Application() {
@@ -38,6 +40,13 @@ class NexiraApp : Application() {
         if (Application.getProcessName() == packageName) {
             AndroidAppContext.install(this)
             koin = koinApplication { modules(launcherModules() + androidHostModule(this@NexiraApp) + androidUiModule(playback.service)) }
+            // What the shell is drawn and worded in is made by the modules on its first read, the
+            // language module reading its tables cold for it. Made here, off the main thread, so the
+            // first frame finds it made, or waits on it rather than making it there.
+            val graph = koin
+            thread(name = "nexira-look", isDaemon = true) {
+                val _ = runCatching { prepareLook(graph) }
+            }
         }
     }
 }

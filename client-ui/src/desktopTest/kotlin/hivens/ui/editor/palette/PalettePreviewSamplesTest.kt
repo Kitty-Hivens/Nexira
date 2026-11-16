@@ -8,12 +8,14 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import hivens.config.Storage
 import hivens.i18n.api.FixedTranslations
+import hivens.themes.ThemeLibraryFile
+import hivens.themes.ThemeManager
 import hivens.themes.Themes
 import hivens.themes.ThemesKeysContribution
+import hivens.themes.ThemesSettingsDomain
 import hivens.themes.api.ThemesApi
 import hivens.themes.api.ThemesKeys
 import hivens.ui.background.BackgroundSettings
-import hivens.ui.hostThemeManager
 import hivens.ui.i18n.NexiraStrings
 import hivens.ui.i18n.ShippedLanguageProvider
 import hivens.ui.onEventThread
@@ -89,9 +91,9 @@ class PalettePreviewSamplesTest {
         dataDir.deleteRecursively()
     }
 
-    private val themes = hostThemeManager(
-        dataDir      = dataDir,
-        settings     = SettingsDomainFiles(dataDir.resolve(Storage.SETTINGS_DIR), dataDir.resolve(Storage.SETTINGS_FILE)),
+    private val themes = ThemeManager(
+        store        = SettingsDomainFiles(dataDir.resolve(Storage.SETTINGS_DIR), dataDir.resolve(Storage.SETTINGS_FILE)).of(ThemesSettingsDomain),
+        file         = ThemeLibraryFile(dataDir) { _, _ -> },
         translations = FixedTranslations(NexiraStrings.translator("en")),
         scope        = CoroutineScope(Dispatchers.Unconfined),
     )

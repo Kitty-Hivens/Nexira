@@ -2,8 +2,10 @@ package hivens.ui.bootstrap
 
 import hivens.config.Storage
 import hivens.core.data.SettingsData
+import hivens.i18n.api.I18nKeys
 import hivens.themes.ThemesSettingsDomain
 import hivens.themes.api.ThemeMode
+import hivens.themes.api.ThemesKeys
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonObject
@@ -85,11 +87,11 @@ class FirstRunDefaultsTest {
     fun `the boot window reads the seeded language`() {
         FirstRunDefaults.seed(dataDir, Locale.forLanguageTag("de-DE"))
 
-        // SettingsPeek is the pre-Koin read the boot threshold renders from --
-        // seeding after it would leave the first window English on a German box.
-        val peek = SettingsPeek.read(dataDir)
-        assertEquals("de", peek.locale)
-        assertTrue(peek.isDarkTheme)
+        // What the modules answer before the boot is what the boot threshold renders
+        // from, so seeding after it would leave the first window English on a German box.
+        val boot = bootValues(dataDir)
+        assertEquals("de", boot[I18nKeys.Language]?.tag)
+        assertEquals(true, boot[ThemesKeys.Dark])
     }
 
     @Test

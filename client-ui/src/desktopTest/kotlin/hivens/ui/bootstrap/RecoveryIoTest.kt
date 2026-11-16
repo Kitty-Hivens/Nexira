@@ -3,6 +3,7 @@ package hivens.ui.bootstrap
 import hivens.config.Storage
 import hivens.themes.Themes
 import hivens.themes.ThemesSettingsDomain
+import hivens.themes.api.ThemesKeys
 import hivens.ui.settings.SettingsDomainFiles
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.contentOrNull
@@ -132,9 +133,9 @@ class RecoveryIoTest {
         assertEquals(Storage.SETTINGS_DIR + "/" + ThemesSettingsDomain.id + ".json", RecoveryIo.THEME_CHOICE_FILE, "the file is the domain's")
         assertFalse(Files.exists(domains / "${ThemesSettingsDomain.id}.json"))
         assertTrue(Files.exists(domains / "i18n.json"), "the language is no appearance file")
-        val back = SettingsPeek.read(dataDir)
-        assertEquals(Themes.default, back.theme)
-        assertFalse(back.isDarkTheme, "the scheme comes back from the old settings file, as it stayed before the choice moved")
+        val back = bootValues(dataDir)
+        assertEquals(Themes.default, back[ThemesKeys.Active])
+        assertEquals(false, back[ThemesKeys.Dark], "the scheme comes back from the old settings file, as it stayed before the choice moved")
         assertFalse(SettingsDomainFiles(domains, settings()).peek(ThemesSettingsDomain).dark)
     }
 

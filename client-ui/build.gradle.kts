@@ -164,12 +164,13 @@ kotlin {
                 // the catalogue takes their contributions.
                 implementation(project(":source-mirror"))
                 implementation(project(":source-modrinth"))
-                // The language module, the same way, except that the host makes its engine
-                // before any module loads: the window the launcher boots in already speaks.
+                // The language module and the themes module, the same way: their APIs for the
+                // shell and the built-in widgets, the modules compiled in. The window the
+                // launcher boots in asks them for its words and its theme before the host is up,
+                // through what every module compiled in may answer then, and the host names
+                // nothing of either but their CompiledModule.
                 implementation(project(":i18n-api"))
                 implementation(project(":i18n"))
-                // The themes module, the same way as the language module: the boot window is
-                // drawn in the person's theme, so the host makes its manager first.
                 implementation(project(":themes-api"))
                 implementation(project(":themes"))
                 implementation(project(":nx-ui"))
@@ -939,6 +940,11 @@ tasks.named<Test>("desktopTest") {
     // them an input of this task, so without this a change there was restored from the
     // build cache as a pass the test never gave.
     inputs.dir("src/androidMain/kotlin").withPropertyName("androidMainSources").withPathSensitivity(PathSensitivity.RELATIVE)
+    // HostBoundaryTest reads every main source as text, and an import the compiler drops
+    // changes nothing it builds, so the sources are inputs of their own as well.
+    listOf("commonMain", "jvmSharedMain", "desktopMain", "desktopPuppetMain").forEach { set ->
+        inputs.files(fileTree("src/$set/kotlin")).withPropertyName("${set}Sources").withPathSensitivity(PathSensitivity.RELATIVE)
+    }
     dependsOn(":widget-loader:fixtureModuleJar")
     systemProperty(
         "nexira.test.fixtureModuleJar",

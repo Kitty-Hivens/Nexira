@@ -9,6 +9,7 @@ public final class hivens/i18n/api/FixedTranslations : hivens/i18n/api/Translati
 	public fun <init> (Lhivens/i18n/api/Translator;)V
 	public fun getCurrent ()Lkotlinx/coroutines/flow/StateFlow;
 	public fun getLanguages ()Lkotlinx/coroutines/flow/StateFlow;
+	public fun getReadingOrder ()Ljava/util/List;
 	public fun strings (Ljava/lang/String;)Lhivens/i18n/api/Strings;
 }
 
@@ -26,10 +27,12 @@ public final class hivens/i18n/api/I18nKeys {
 	public static final field LANGUAGE_ID Ljava/lang/String;
 	public static final field SETTINGS_ID Ljava/lang/String;
 	public static final field UPDATE_SETTINGS_ID Ljava/lang/String;
+	public static final field WORDS_ID Ljava/lang/String;
 	public final fun getLanguage ()Lhivens/widget/model/SourceKey;
 	public final fun getLanguages ()Lhivens/widget/model/SourceKey;
 	public final fun getSettings ()Lhivens/widget/model/SourceKey;
 	public final fun getUpdateSettings ()Lhivens/widget/model/CommandKey;
+	public final fun getWords ()Lhivens/widget/model/SourceKey;
 }
 
 public final class hivens/i18n/api/I18nSettings {
@@ -93,10 +96,12 @@ public abstract interface class hivens/i18n/api/Strings {
 public abstract interface class hivens/i18n/api/Translations {
 	public abstract fun getCurrent ()Lkotlinx/coroutines/flow/StateFlow;
 	public abstract fun getLanguages ()Lkotlinx/coroutines/flow/StateFlow;
+	public fun getReadingOrder ()Ljava/util/List;
 	public fun strings (Ljava/lang/String;)Lhivens/i18n/api/Strings;
 }
 
 public final class hivens/i18n/api/Translations$DefaultImpls {
+	public static fun getReadingOrder (Lhivens/i18n/api/Translations;)Ljava/util/List;
 	public static fun strings (Lhivens/i18n/api/Translations;Ljava/lang/String;)Lhivens/i18n/api/Strings;
 }
 

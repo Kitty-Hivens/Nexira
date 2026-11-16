@@ -35,4 +35,15 @@ class NewerBuildDataTest {
         NewerBuildData.record(ReadOnlyStore.PackLibrary)
         assertEquals(setOf(ReadOnlyStore.Layout), seen)
     }
+
+    @Test
+    fun `a module's own store is reported as the module names it, once, beside the launcher's`() {
+        NewerBuildData.record(ReadOnlyStore.Layout)
+        NewerBuildData.record(ModuleStore("nexira.themes", "themes.file"))
+        NewerBuildData.record(ModuleStore("nexira.themes", "themes.file"), ReadOnlyReason.Damaged)
+        assertEquals(setOf(ReadOnlyStore.Layout), NewerBuildData.affected())
+        assertEquals(mapOf(ModuleStore("nexira.themes", "themes.file") to ReadOnlyReason.Damaged), NewerBuildData.modulesWithReason())
+        NewerBuildData.reset()
+        assertTrue(NewerBuildData.modulesWithReason().isEmpty())
+    }
 }

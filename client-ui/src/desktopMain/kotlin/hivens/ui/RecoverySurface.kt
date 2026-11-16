@@ -31,11 +31,13 @@ import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.rememberWindowState
 import hivens.config.Branding
 import hivens.core.data.ModuleId
+import hivens.i18n.api.I18nKeys
+import hivens.i18n.api.Translator
 import hivens.launcher.platform.AppRelauncher
 import hivens.ui.bootstrap.RecoveryIo
 import hivens.ui.diag.UiRecoverySignal
-import hivens.config.Storage
 import hivens.ui.i18n.NexiraStrings
+import hivens.widget.api.BootValues
 import java.nio.file.Path
 import java.util.Locale
 
@@ -48,9 +50,10 @@ import java.util.Locale
  * Deliberately self-contained: it touches NO Koin, NxTheme, widget kernel, or
  * settings service -- those are exactly what a recovery boot distrusts (and, on a
  * user-requested recovery, boot is skipped entirely so none of them exist). It
- * reads and writes settings.json through the raw [RecoveryIo] and resolves its
- * strings through an engine of its own over the shipped words and the person's
- * translation files, which a file it cannot read costs only that file.
+ * reads and writes settings.json through the raw [RecoveryIo], and is worded in
+ * what the language module answered before the boot, from the shipped words and
+ * the person's translation files, which a file it cannot read costs only that
+ * file.
  *
  * It offers what recovers a launcher an environment breaks: toggle a system module
  * off (tray on a DE without SNI, skinema when its natives fail, ...), reset a
@@ -65,20 +68,16 @@ fun RecoveryWindow(
     reason: UiRecoverySignal.RecoveryReason,
     onExit: () -> Unit,
     /**
-     * The launcher's configured language, or null to read the OS default.
+     * The words the surface is drawn in, see [recoveryWords].
      *
      * A crash screen in a language the user did not choose is a crash screen
-     * they cannot act on, and the boot threshold already takes the same care
-     * (see SettingsPeek, whose locale exists for exactly this). It stays a
-     * parameter rather than a lookup so the surface still renders with no
-     * settings at all, which is the case a user-requested recovery boot is.
+     * they cannot act on, and the boot threshold already takes the same care.
+     * It stays a parameter rather than a lookup so the surface still renders with
+     * no settings at all, which is the case a user-requested recovery boot is.
      */
-    locale: String? = null,
+    words: Translator,
 ) {
-    val s = remember(locale) {
-        NexiraStrings.engine(dataDir.resolve(Storage.TRANSLATIONS_DIR), locale ?: Locale.getDefault().language)
-            .strings(NexiraStrings.NAMESPACE)
-    }
+    val s = remember(words) { words.strings(NexiraStrings.NAMESPACE) }
     var disabled by remember { mutableStateOf(RecoveryIo.readDisabledModules(dataDir)) }
     var relaunchFailed by remember { mutableStateOf(false) }
     val windowState = rememberWindowState(position = WindowPosition(Alignment.Center))
@@ -189,6 +188,15 @@ fun RecoveryWindow(
         }
     }
 }
+
+/**
+ * The words the recovery surface is drawn in: the boot window's, where the language module answered
+ * them before the boot, and the launcher's own shipped words in the system's language where it did not,
+ * a document that leaves it out or a module that failed say. Recovery is the floor under every module,
+ * so it speaks without one.
+ */
+internal fun recoveryWords(boot: BootValues): Translator =
+    boot[I18nKeys.Words] ?: NexiraStrings.translator(Locale.getDefault().language)
 
 /**
  * One reset the surface offers: what it is called, what it deletes, and the call

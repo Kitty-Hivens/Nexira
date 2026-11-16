@@ -5,13 +5,14 @@ import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Density
 import hivens.config.Storage
-import hivens.i18n.I18nEngine
+import hivens.i18n.I18nModule
 import hivens.themes.ThemeManager
 import hivens.themes.Themes
+import hivens.themes.ThemesModule
 import hivens.themes.api.ThemeContribution
 import hivens.themes.api.ThemeScheme
-import hivens.ui.hostThemeManager
-import hivens.ui.settings.SettingsDomainFiles
+import hivens.ui.ModuleAppLevel
+import hivens.ui.host.launcherServices
 import hivens.ui.theme.NxTheme
 import hivens.ui.widgets.modules.WidgetModules.Contributed
 import hivens.widget.api.ModuleStrings
@@ -20,6 +21,7 @@ import hivens.widget.api.ParticleMote
 import hivens.widget.api.ParticlePalette
 import hivens.widget.api.WidgetDescriptor
 import hivens.widget.api.WidgetRegistry
+import hivens.widget.api.get
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
 import kotlinx.coroutines.CoroutineScope
@@ -30,7 +32,9 @@ import java.nio.file.Files
 import java.nio.file.Path
 import javax.swing.SwingUtilities
 import kotlin.io.path.ExperimentalPathApi
+import kotlin.io.path.createDirectories
 import kotlin.io.path.deleteRecursively
+import kotlin.io.path.writeText
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -39,31 +43,35 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * What a module's themes and particle fields become inside the launcher. The themes go to the
- * themes module's manager the way the host hands them over, as the module list changes.
+ * What a module's themes and particle fields become inside the launcher. The themes are taken by
+ * the themes module itself, from what the host hands the modules it trusts of the contributions the
+ * modules brought in, as the module list changes.
  */
 @OptIn(ExperimentalComposeUiApi::class)
 class ModuleContributionsTest {
 
     private val dataDir: Path = Files.createTempDirectory("module-contributions")
     private val scope = CoroutineScope(Dispatchers.Unconfined)
+    private val levels = ArrayList<ModuleAppLevel>()
 
     @OptIn(ExperimentalPathApi::class)
     @AfterTest
     fun tearDown() {
+        levels.forEach { it.close() }
         scope.cancel()
         dataDir.deleteRecursively()
     }
 
     private val strings = ModuleStrings(mapOf("en" to mapOf("night" to "Night"), "ru" to mapOf("night" to "Ночь")))
 
-    /** The themes module's manager as the host makes it, naming in the language [tag] with the module's words in. */
-    private fun manager(tag: String): ThemeManager = hostThemeManager(
-        dataDir      = dataDir,
-        settings     = SettingsDomainFiles(dataDir.resolve(Storage.SETTINGS_DIR), dataDir.resolve(Storage.SETTINGS_FILE)),
-        translations = I18nEngine(null, tag).apply { take("looks", strings) },
-        scope        = scope,
-    )
+    /** The launcher's app level with the themes and language modules, speaking the language [tag]. */
+    private fun shell(tag: String): ModuleAppLevel {
+        dataDir.resolve(Storage.SETTINGS_DIR).createDirectories().resolve("i18n.json").writeText("""{"schema":1,"value":{"language":"$tag"}}""")
+        return ModuleAppLevel(dataDir, listOf(I18nModule, ThemesModule), scope).also { levels += it }
+    }
+
+    /** The manager the themes module made for this app level. */
+    private val ModuleAppLevel.manager: ThemeManager get() = app.launcherServices.get<ThemeManager>()
 
     private class Theme1(override val dark: ThemeScheme, override val light: ThemeScheme? = null) : ThemeContribution {
         override val id = "night"
@@ -77,29 +85,34 @@ class ModuleContributionsTest {
         override fun get(kind: WidgetKind): WidgetDescriptor? = null
     }
 
-    /** The module list with the looks module loaded and carrying [themes], or with it gone when there are none. */
-    private fun loaded(vararg themes: ThemeContribution) =
-        WidgetModules.Snapshot(NoWidgets, emptyList(), themes.map { Contributed("looks", "Looks", it) })
+    /** The module list with the looks module loaded and carrying [themes] and its words, or with it gone when there are none. */
+    private fun loaded(vararg themes: ThemeContribution) = WidgetModules.Snapshot(
+        registry      = NoWidgets,
+        entries       = emptyList(),
+        contributions = themes.map { Contributed("looks", "Looks", it) },
+        words         = if (themes.isEmpty()) emptyMap() else mapOf("looks" to strings),
+    )
 
-    /** [manager] following a module list that starts as [first], and the list, to change. */
-    private fun following(manager: ThemeManager, first: WidgetModules.Snapshot): MutableStateFlow<WidgetModules.Snapshot> =
-        MutableStateFlow(first).also { followModuleThemes(it, manager, scope) }
+    /** The module list of [shell], changed to [first], to change again. */
+    private fun following(shell: ModuleAppLevel, first: WidgetModules.Snapshot): MutableStateFlow<WidgetModules.Snapshot> =
+        shell.jars.also { it.value = first }
 
     @Test
     fun `a module's theme takes its module's id and is named in the person's language`() {
-        val ru = manager("ru")
+        val ru = shell("ru")
         following(ru, loaded(Theme1(good)))
-        assertEquals("Ночь", ru.offered.value.single { it.id == "looks/night" }.name)
+        assertEquals("Ночь", ru.manager.offered.value.single { it.id == "looks/night" }.name)
 
-        val ja = manager("ja")
+        val ja = shell("ja")
         following(ja, loaded(Theme1(good)))
-        assertEquals("Night", ja.offered.value.single { it.id == "looks/night" }.name)
+        assertEquals("Night", ja.manager.offered.value.single { it.id == "looks/night" }.name)
     }
 
     @Test
     fun `a module's theme leaves with the module, and a choice of it draws the default until it is back`() {
-        val themes = manager("en")
-        val modules = following(themes, loaded(Theme1(good)))
+        val shell = shell("en")
+        val themes = shell.manager
+        val modules = following(shell, loaded(Theme1(good)))
         themes.choose("looks/night")
         assertEquals("looks/night", themes.active.value.id)
 
@@ -114,16 +127,18 @@ class ModuleContributionsTest {
 
     @Test
     fun `a theme with no inks of its own reads in the launcher's`() {
-        val themes = manager("en")
-        following(themes, loaded(Theme1(good)))
+        val shell = shell("en")
+        val themes = shell.manager
+        following(shell, loaded(Theme1(good)))
 
         assertEquals(Themes.Celestia.dark.inks, themes.offered.value.single { it.id == "looks/night" }.dark.inks)
     }
 
     @Test
     fun `a theme without a light scheme stays dark`() {
-        val themes = manager("en")
-        val modules = following(themes, loaded(Theme1(good)))
+        val shell = shell("en")
+        val themes = shell.manager
+        val modules = following(shell, loaded(Theme1(good)))
         assertEquals(false, themes.offered.value.single { it.id == "looks/night" }.hasLight)
 
         modules.value = loaded(Theme1(good, light = good))
@@ -132,13 +147,14 @@ class ModuleContributionsTest {
 
     @Test
     fun `a theme that cannot make a scheme costs only itself`() {
-        val themes = manager("en")
+        val shell = shell("en")
+        val themes = shell.manager
         val broken = object : ThemeContribution {
             override val id = "broken"
             override val label = "broken"
             override val dark = ThemeScheme(listOf(Color.Black), listOf(Color.Red))
         }
-        following(themes, loaded(broken, Theme1(good)))
+        following(shell, loaded(broken, Theme1(good)))
 
         assertEquals(listOf("looks/night"), themes.offered.value.map { it.id }.filter { it.startsWith("looks/") })
     }

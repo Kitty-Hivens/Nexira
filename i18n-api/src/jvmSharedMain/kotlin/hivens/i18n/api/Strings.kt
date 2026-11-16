@@ -75,6 +75,13 @@ interface Translations {
     /** Every language installed, the shipped ones first. */
     val languages: StateFlow<List<LanguageInfo>>
 
+    /**
+     * The languages the words are read in now, best first: the current one and those it falls back
+     * to, without the English every lookup ends in unless a language names it. For what is fetched in
+     * a language from elsewhere, which takes the first of these it has.
+     */
+    val readingOrder: List<String> get() = listOf(current.value.language.tag)
+
     /** The words of [namespace] in the current language. */
     fun strings(namespace: String): Strings = current.value.strings(namespace)
 }

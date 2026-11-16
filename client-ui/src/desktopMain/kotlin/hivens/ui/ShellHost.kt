@@ -68,11 +68,12 @@ class WindowChromeHooks(defaultClose: () -> Unit) {
  * never remaps -- the whole point on XWayland, where window recreation is
  * a visible flash.
  *
- * Window-creation-time values that normally live behind Koin (undecorated
- * chrome, locale, the theme and whether it is dark) come from the pre-Koin
- * [GuiBootstrap.PreBoot.peek]. Once the boot
- * is ready, the shell and the console each draw themselves inside the boot's own
- * Koin, which is never registered globally.
+ * Window-creation-time values that normally live behind Koin come from before
+ * it: undecorated chrome from the pre-Koin [GuiBootstrap.PreBoot.peek], and the
+ * words, the theme and whether it is dark from what the modules compiled in
+ * answered before the boot ([GuiBootstrap.PreBoot.boot]). Once the boot is ready,
+ * the shell and the console each draw themselves inside the boot's own Koin,
+ * which is never registered globally.
  *
  * The console is a window of the application in its own right, a sibling of the
  * main window here rather than a part of its content: hiding the main window to
@@ -129,12 +130,14 @@ fun ApplicationScope.ShellHost(
     val visibleState = remember { mutableStateOf(true) }
     val chrome = remember { WindowChromeHooks(defaultClose = { exitApplication() }) }
     val windowIcon = painterResource(Res.drawable.icon)
-    // The window speaks before any module loads, so it reads the words through an engine of
-    // its own, which the pre-boot started making off this thread (see PreBoot.words).
-    val bootWords = remember { pre.words.join() }
+    // The window speaks and is drawn before any module's keys are up, so it reads what the
+    // modules compiled in answered before the boot, which the pre-boot started working out off
+    // this thread (see PreBoot.boot), and the shell's fallbacks for what none answered.
+    val boot = remember { pre.boot.join() }
+    val bootWords = remember(boot) { ShellLookValues.Words.atBoot(boot) }
+    val bootDark = remember(boot) { ShellLookValues.Dark.atBoot(boot) }
     val thresholdStrings = remember(bootWords) { bootWords.strings(NexiraStrings.NAMESPACE) }
-    // The theme and the scheme the themes module's manager will open on, read before it exists.
-    val look = remember { ShellLook(theme = pre.peek.theme, dark = pre.peek.isDarkTheme, words = bootWords) }
+    val look = remember { ShellLook(theme = ShellLookValues.Theme.atBoot(boot), dark = bootDark, words = bootWords) }
 
     // A recovery restart with boot already done skips the threshold entirely
     // (no black frame). The restart flag is EXPLICIT, not inferred from the
@@ -166,7 +169,7 @@ fun ApplicationScope.ShellHost(
         // What shows where Skia has not drawn yet, until the shell's theme takes
         // over (see AppShell): the boot screen's own background, not white.
         LaunchedEffect(Unit) {
-            val field = (if (pre.peek.isDarkTheme) ThresholdPalette.Dark else ThresholdPalette.Light).field
+            val field = (if (bootDark) ThresholdPalette.Dark else ThresholdPalette.Light).field
             window.fillUnpainted(AwtColor(field.toArgb(), false))
         }
         if (maximizeFromInside) {
@@ -196,7 +199,7 @@ fun ApplicationScope.ShellHost(
                     outcome   = outcome,
                     strings   = thresholdStrings,
                     logsDir   = pre.core.initialPaths.logsDir,
-                    dark      = pre.peek.isDarkTheme,
+                    dark      = bootDark,
                     onQuit    = { exitApplication() },
                     onDone    = { thresholdDone = true },
                     onRecovery = {

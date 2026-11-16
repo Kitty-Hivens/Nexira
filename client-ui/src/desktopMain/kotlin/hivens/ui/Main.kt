@@ -7,33 +7,50 @@ import androidx.compose.ui.window.LocalWindowExceptionHandlerFactory
 import androidx.compose.ui.window.WindowExceptionHandler
 import androidx.compose.ui.window.WindowExceptionHandlerFactory
 import androidx.compose.ui.window.application
+import hivens.config.Storage
+import hivens.core.activity.ActivityRegistry
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.io.IconProcessor
-import hivens.ui.bootstrap.GuiBootstrap
-import hivens.ui.bootstrap.RecoveryEntry
-import hivens.ui.threshold.BootOutcome
-import hivens.ui.threshold.BootStage
-import hivens.ui.threshold.toStage
-import hivens.ui.diag.CrashDialog
-import hivens.ui.diag.ShellRecovery
-import hivens.ui.diag.UiRecoverySignal
-import hivens.launcher.platform.PlatformPaths
-import hivens.ui.identity.DefaultSkinProvider
-import hivens.ui.identity.SkinLibrary
-import hivens.ui.identity.ClanRoleProvider
-import hivens.ui.identity.SkinManager
-import hivens.ui.navigation.NavRequests
-import hivens.ui.components.LauncherUpdateState
-import hivens.ui.platform.DesktopHostActions
-import hivens.ui.platform.HostActions
-import hivens.core.activity.ActivityRegistry
-import hivens.launcher.PackInstallService
 import hivens.core.update.PackUpdateStatusHub
+import hivens.launcher.PackInstallService
+import hivens.launcher.instance.InstanceContentUpdater
+import hivens.launcher.legacy.RetiredDataSweeper
+import hivens.launcher.platform.PlatformPaths
+import hivens.media.VideoCacheService
+import hivens.media.YtDlpService
+import hivens.tray.LibTrayController
+import hivens.tray.TrayController
 import hivens.ui.activity.ActivityCommands
 import hivens.ui.activity.ActivityDriver
 import hivens.ui.activity.SelectionRegistry
-import hivens.ui.screens.library.content.ContentIconStore
+import hivens.ui.audio.AudioOutput
+import hivens.ui.audio.AudioPlayer
+import hivens.ui.audio.MediaSessionBridge
+import hivens.ui.audio.PlaybackRouter
+import hivens.ui.audio.SkinemaEngines
+import hivens.ui.audio.SystemAudioOutput
+import hivens.ui.audio.WallpaperSession
+import hivens.ui.audio.decodeArtwork
+import hivens.ui.background.BackgroundManager
+import hivens.ui.background.BackgroundOptimizer
+import hivens.ui.bootstrap.GuiBootstrap
+import hivens.ui.bootstrap.RecoveryEntry
+import hivens.ui.components.LauncherUpdateState
+import hivens.ui.debug.DebugOverlayState
+import hivens.ui.diag.CrashDialog
+import hivens.ui.diag.ShellRecovery
+import hivens.ui.diag.UiRecoverySignal
+import hivens.ui.editor.EditModeController
+import hivens.ui.editor.presets.PresetRepository
+import hivens.ui.identity.ClanRoleProvider
+import hivens.ui.identity.DefaultSkinProvider
+import hivens.ui.identity.SkinLibrary
+import hivens.ui.identity.SkinManager
+import hivens.ui.layout.LayoutGraphFlushHook
+import hivens.ui.layout.LayoutGraphRepository
+import hivens.ui.legacy.RetiredClientsGate
+import hivens.ui.navigation.NavRequests
 import hivens.ui.notifications.IndicationCenter
 import hivens.ui.notifications.NotificationArchiveStore
 import hivens.ui.notifications.NotificationCenter
@@ -41,73 +58,56 @@ import hivens.ui.notifications.SessionRegistry
 import hivens.ui.notifications.drivers.InstallDriver
 import hivens.ui.notifications.drivers.LaunchDriver
 import hivens.ui.notifications.drivers.PackUpdateDriver
+import hivens.ui.platform.DesktopHostActions
+import hivens.ui.platform.HostActions
 import hivens.ui.platform.ImageIoIconProcessor
 import hivens.ui.puppet.PuppetServerLoader
-import hivens.config.Storage
-import hivens.ui.audio.AudioPlayer
-import hivens.ui.audio.PlaybackRouter
-import hivens.ui.audio.WallpaperSession
-import hivens.ui.audio.MediaSessionBridge
-import hivens.ui.audio.AudioOutput
-import hivens.ui.audio.SkinemaEngines
-import hivens.ui.audio.decodeArtwork
-import hivens.ui.audio.SystemAudioOutput
-import hivens.ui.background.BackgroundOptimizer
-import hivens.ui.editor.EditModeController
-import hivens.ui.editor.presets.PresetRepository
-import hivens.media.VideoCacheService
-import hivens.media.YtDlpService
-import hivens.tray.LibTrayController
-import hivens.tray.TrayController
-import hivens.ui.background.BackgroundManager
-import hivens.ui.layout.LayoutGraphFlushHook
-import hivens.launcher.legacy.RetiredDataSweeper
-import hivens.ui.legacy.RetiredClientsGate
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import hivens.ui.layout.LayoutGraphRepository
+import hivens.ui.screens.library.content.ContentIconStore
+import hivens.ui.threshold.BootOutcome
+import hivens.ui.threshold.BootStage
+import hivens.ui.threshold.toStage
 import hivens.ui.utils.ConsoleSettingsStore
 import hivens.ui.utils.GameConsoleService
 import hivens.ui.utils.LogRetention
 import hivens.ui.utils.PreferenceWriter
-import hivens.widget.model.DefaultLayout
-import java.nio.file.Path
-import java.util.concurrent.atomic.AtomicReference
-import javax.swing.SwingUtilities
-import org.slf4j.LoggerFactory
-import hivens.launcher.instance.InstanceContentUpdater
-import hivens.update.UpdateService
 import hivens.ui.widgets.Commands
 import hivens.ui.widgets.Sources
-import hivens.ui.widgets.state.WidgetStateFlushHook
-import hivens.ui.widgets.services.MusicPlayerService
-import hivens.ui.widgets.services.MusicPlayerServiceImpl
-import hivens.ui.widgets.state.WidgetStateGc
-import hivens.ui.widgets.state.WidgetStateStore
-import hivens.widget.api.WidgetCommandRegistry
-import hivens.widget.api.WidgetDataRegistry
-import hivens.widget.api.SurfaceFamilies
 import hivens.ui.widgets.modules.DesktopWidgetModuleHost
+import hivens.ui.widgets.modules.WidgetModules
 import hivens.ui.widgets.modules.offeredApiPackages
 import hivens.ui.widgets.modules.offeredApis
 import hivens.ui.widgets.modules.offeredContributionKinds
-import hivens.ui.widgets.modules.WidgetModules
+import hivens.ui.widgets.services.MusicPlayerService
+import hivens.ui.widgets.services.MusicPlayerServiceImpl
+import hivens.ui.widgets.state.WidgetStateFlushHook
+import hivens.ui.widgets.state.WidgetStateGc
+import hivens.ui.widgets.state.WidgetStateStore
+import hivens.update.UpdateService
+import hivens.widget.api.SurfaceFamilies
+import hivens.widget.api.WidgetCommandRegistry
+import hivens.widget.api.WidgetDataRegistry
 import hivens.widget.api.WidgetRegistry
 import hivens.widget.api.WidgetServiceRegistry
 import hivens.widget.api.command
-import hivens.ui.debug.DebugOverlayState
 import hivens.widget.api.flowSource
 import hivens.widget.api.suspendCommand
 import hivens.widget.generated.GeneratedWidgetRegistry
+import hivens.widget.model.DefaultLayout
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.withContext
 import org.jetbrains.compose.resources.ExperimentalResourceApi
-import kotlin.concurrent.thread
-import kotlin.time.Duration.Companion.seconds
-import kotlin.system.exitProcess
 import org.koin.core.KoinApplication
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
+import org.slf4j.LoggerFactory
+import java.nio.file.Path
+import java.util.concurrent.atomic.AtomicReference
+import javax.swing.SwingUtilities
+import kotlin.concurrent.thread
+import kotlin.system.exitProcess
+import kotlin.time.Duration.Companion.seconds
 
 // ─── DI ──────────────────────────────────────────────────────────────────────
 
@@ -328,6 +328,10 @@ fun main(args: Array<String>) {
             // the UI thread. Whatever goes wrong is the registry's to report, and it
             // is no reason to stop the boot.
             val _ = runCatching { result.koin.koin.get<IPackRepository>().observe() }
+            // What the shell is drawn and worded in is made by the modules on its first read, and
+            // the language module reads its tables cold for it, so that is done here too, on this
+            // thread, and the shell's first composition finds it made.
+            val _ = runCatching { prepareLook(result.koin) }
             result
         }.onSuccess { result ->
             bootStage.value   = BootStage.Done
@@ -431,7 +435,7 @@ private fun runShellWithRecovery(
                             dataDir = pre.core.initialPaths.dataDir,
                             reason = reason,
                             onExit = { exitApplication() },
-                            locale = pre.peek.locale,
+                            words = recoveryWords(pre.boot.join()),
                         )
                     } else {
                         // The restart flag lets ShellHost skip the threshold only

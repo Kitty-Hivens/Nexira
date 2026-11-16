@@ -1,18 +1,20 @@
 package hivens.ui
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.unit.Density
-import hivens.config.Storage
-import hivens.i18n.api.FixedTranslations
+import hivens.i18n.I18nModule
+import hivens.i18n.api.I18nApi
 import hivens.themes.Themes
+import hivens.themes.ThemesModule
+import hivens.themes.api.ThemesKeys
+import hivens.ui.bootstrap.bootValues
+import hivens.ui.bootstrap.documentModules
 import hivens.ui.customization.CustomizationSettings
 import hivens.ui.i18n.NexiraStrings
 import hivens.ui.i18n.ShippedLanguageProvider
-import hivens.ui.settings.SettingsDomainFiles
+import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -51,33 +53,56 @@ class ShellLookTest {
 
     @Test
     fun `a dark switch and a theme picked reach the console's look at once`() {
-        val themes = hostThemeManager(
-            dataDir      = dir,
-            settings     = SettingsDomainFiles(dir.resolve(Storage.SETTINGS_DIR), dir.resolve(Storage.SETTINGS_FILE)),
-            translations = FixedTranslations(NexiraStrings.translator("en")),
-            scope        = scope,
-        )
+        val shell = ModuleAppLevel(dir, listOf(I18nModule, ThemesModule), scope)
         val look = ShellLook(theme = Themes.default, dark = true, words = NexiraStrings.translator("en"))
         val picked = Themes.all.last()
-        onEventThread {
-            val scene = ImageComposeScene(100, 100, Density(1f)) {
-                val isDarkTheme by themes.dark.collectAsState()
-                val active by themes.active.collectAsState()
-                ShippedLanguageProvider("en") {
-                    PublishShellLook(look, themes, FixedTranslations(NexiraStrings.translator("en")), null, CustomizationSettings())
-                    Frame { Frame { NxTheme(theme = active, dark = isDarkTheme) {} } }
+        try {
+            onEventThread {
+                val scene = ImageComposeScene(100, 100, Density(1f)) {
+                    val isDarkTheme = shell.app.read(ShellLookValues.Dark)
+                    val active = shell.app.read(ShellLookValues.Theme)
+                    ShippedLanguageProvider("en") {
+                        PublishShellLook(look, shell.app, null, CustomizationSettings())
+                        Frame { Frame { NxTheme(theme = active, dark = isDarkTheme) {} } }
+                    }
+                }
+                try {
+                    scene.settle(4)
+                    shell.fire(ThemesKeys.SetDark, false)
+                    shell.fire(ThemesKeys.Choose, picked.id)
+                    scene.settle(8, sleepMs = 20)
+                } finally {
+                    scene.close()
                 }
             }
-            try {
-                scene.settle(4)
-                themes.setDark(false)
-                themes.choose(picked.id)
-                scene.settle(8, sleepMs = 20)
-            } finally {
-                scene.close()
-            }
+        } finally {
+            shell.close()
         }
         assertFalse(look.dark, "the console was told the old scheme")
         assertEquals(picked.id, look.theme.id, "and the old theme")
+    }
+
+    @Test
+    fun `a document without the themes module has the console told the shell's fallback, and so is the boot window`() {
+        ModuleAppLevel.writeDocument(dir, listOf(I18nApi.ID))
+        val shell = ModuleAppLevel(dir, listOf(I18nModule, ThemesModule), scope, named = documentModules(dir))
+        val look = ShellLook(theme = Themes.default, dark = false, words = NexiraStrings.translator("en"))
+        try {
+            onEventThread {
+                val scene = ImageComposeScene(100, 100, Density(1f)) {
+                    PublishShellLook(look, shell.app, null, CustomizationSettings())
+                }
+                try {
+                    scene.settle(4)
+                } finally {
+                    scene.close()
+                }
+            }
+        } finally {
+            shell.close()
+        }
+        assertEquals(NeutralTheme, look.theme)
+        assertEquals(true, look.dark)
+        assertEquals(NeutralTheme, ShellLookValues.Theme.atBoot(bootValues(dir, listOf(I18nModule, ThemesModule))))
     }
 }

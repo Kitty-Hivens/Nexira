@@ -1,129 +1,84 @@
 package hivens.ui
 
-import hivens.i18n.api.Strings
-import hivens.ui.i18n.nexiraStrings
-import kotlinx.coroutines.launch
-import kotlin.time.Duration.Companion.seconds
-import kotlinx.coroutines.withTimeoutOrNull
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.first
-import hivens.ui.components.QuitWithGameHost
-import hivens.ui.components.QuitGate
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.window.FrameWindowScope
 import androidx.compose.ui.window.WindowState
 import coil3.disk.directory
+import hivens.auth.AccountStore
 import hivens.config.Branding
-import hivens.core.data.NewerBuildData
-import hivens.core.data.ReadOnlyReason
-import hivens.core.data.ReadOnlyStore
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.api.interfaces.IUpdateApplicator
 import hivens.core.data.ModuleId
+import hivens.core.data.NewerBuildData
 import hivens.core.data.PackAuthRequirement
+import hivens.core.data.PackOrigin
+import hivens.core.data.ReadOnlyReason
+import hivens.core.data.ReadOnlyStore
+import hivens.core.data.SessionData
+import hivens.core.diag.ActionRing
+import hivens.core.io.AtomicFiles
 import hivens.core.launch.LaunchLogEvent
+import hivens.core.launch.LaunchState
+import hivens.i18n.api.LocalTranslator
+import hivens.i18n.api.Strings
+import hivens.launcher.bootstrap.LauncherBootstrap
+import hivens.launcher.launch.LauncherController
 import hivens.launcher.legacy.RetiredClientScanner
+import hivens.launcher.network.ServerProtocolConfig
+import hivens.launcher.platform.AppRelauncher
 import hivens.launcher.update.ApplyRecovery
 import hivens.launcher.update.PackAutoUpdateService
-import hivens.core.diag.ActionRing
-import hivens.launcher.bootstrap.LauncherBootstrap
-import hivens.launcher.platform.AppRelauncher
+import hivens.themes.api.SystemScheme
+import hivens.themes.api.ThemeInputs
+import hivens.themes.api.ThemeMode
+import hivens.themes.api.ThemesKeys
+import hivens.tray.TrayController
+import hivens.tray.TrayStrings
+import hivens.ui.bootstrap.ShellStartup
+import hivens.ui.bootstrap.StartupPolicy
+import hivens.ui.chrome.DesktopWindowFrame
+import hivens.ui.chrome.LocalChromeClose
+import hivens.ui.chrome.LocalComposeWindow
+import hivens.ui.chrome.LocalCustomChromeAvailable
+import hivens.ui.chrome.LocalUseCustomChrome
+import hivens.ui.chrome.LocalWindowCapabilities
+import hivens.ui.chrome.LocalWindowFrame
+import hivens.ui.chrome.LocalWindowHide
+import hivens.ui.chrome.LocalWindowHost
+import hivens.ui.chrome.LocalWindowState
+import hivens.ui.chrome.MIN_SHELL_SIZE
+import hivens.ui.chrome.ShellChord
+import hivens.ui.chrome.WindowResizeHandles
+import hivens.ui.chrome.resolveShellChord
+import hivens.ui.chrome.toCapabilities
+import hivens.ui.components.QuitGate
+import hivens.ui.components.QuitWithGameHost
+import hivens.ui.components.UpdateManager
 import hivens.ui.console.ConsoleCommands
+import hivens.ui.customization.CustomizationManager
+import hivens.ui.customization.LocalCustomization
 import hivens.ui.debug.DebugOverlay
 import hivens.ui.debug.DebugOverlayState
 import hivens.ui.debug.IdentitySlotChromeModifier
 import hivens.ui.debug.IdentityWidgetDecorator
-import hivens.widget.api.LocalSlotChromeModifier
-import hivens.widget.api.LocalWidgetDecorator
-import hivens.ui.bootstrap.ShellStartup
-import hivens.ui.bootstrap.StartupPolicy
 import hivens.ui.diag.RenderBackend
-import hivens.ui.diag.probe
 import hivens.ui.diag.SkinemaGate
 import hivens.ui.diag.UiRecoverySignal
-import hivens.auth.AccountStore
-import hivens.core.launch.LaunchState
-import hivens.launcher.launch.LauncherController
-import hivens.tray.TrayController
-import hivens.tray.TrayStrings
-import hivens.ui.chrome.LocalChromeClose
-import hivens.ui.chrome.LocalComposeWindow
-import hivens.ui.chrome.LocalWindowHide
-import hivens.ui.chrome.ShellChord
-import hivens.ui.chrome.resolveShellChord
-import hivens.ui.chrome.LocalUseCustomChrome
-import hivens.ui.chrome.LocalWindowHost
-import hivens.ui.chrome.DesktopWindowFrame
-import hivens.ui.chrome.LocalWindowFrame
-import hivens.ui.chrome.LocalWindowState
-import hivens.ui.chrome.LocalCustomChromeAvailable
-import hivens.ui.chrome.LocalWindowCapabilities
-import hivens.ui.chrome.MIN_SHELL_SIZE
-import hivens.ui.chrome.WindowResizeHandles
-import hivens.ui.chrome.toCapabilities
-import hivens.window.OpeningFrame
-import hivens.window.WindowHost
-import hivens.window.WindowManagerProbe
-import hivens.window.WindowSessionRecorder
-import hivens.window.fillUnpainted
-import hivens.ui.components.UpdateManager
-import hivens.core.io.AtomicFiles
-import hivens.ui.customization.CustomizationManager
-import hivens.ui.customization.LocalCustomization
+import hivens.ui.diag.probe
 import hivens.ui.easter.AprilFools
 import hivens.ui.easter.AprilFoolsLoader
 import hivens.ui.easter.LocalAprilFools
 import hivens.ui.editor.EditModeController
 import hivens.ui.editor.WidgetGraphReconciler
 import hivens.ui.generated.resources.Res
-import hivens.themes.ThemeManager
-import hivens.themes.api.SystemScheme
-import hivens.themes.api.ThemeInputs
-import hivens.themes.api.ThemeMode
-import hivens.i18n.api.LocalTranslator
-import hivens.i18n.api.Translations
-import hivens.ui.layers.LayerHost
-import hivens.ui.layers.rememberWindowLayers
-import hivens.ui.notifications.Kind
-import hivens.ui.notifications.NotificationCenter
-import hivens.ui.notifications.Severity
-import hivens.ui.notifications.render.NotificationStack
-import hivens.ui.screens.MigrationScreen
-import hivens.ui.theme.NxTheme
-import hivens.ui.text.needsCjkFace
-import hivens.ui.theme.nexiraCjkFamily
-import hivens.ui.theme.SystemTheme
-import hivens.ui.theme.ThemeRevealHost
-import hivens.ui.theme.rememberThemeReveal
-import hivens.ui.screens.detail.settings.PackSettingsCategory
-import hivens.core.data.PackOrigin
-import hivens.core.data.SessionData
-import hivens.launcher.network.ServerProtocolConfig
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.draw.clip
-import hivens.ui.system.SystemNotifier
-import hivens.ui.utils.GameConsoleService
-import hivens.ui.utils.PreferenceWriter
-import hivens.ui.layout.LayoutGraphRepository
-import hivens.ui.legacy.RetiredClientsGate
-import hivens.ui.logic.PostLaunchGate
-import hivens.ui.logic.PostLaunchMove
-import hivens.widget.api.LocalLayoutGraph
-import hivens.widget.api.LocalWidgetRegistry
-import hivens.widget.api.LocalWidgetSurfaceRenderer
-import hivens.widget.api.LocalWidgetEntrance
-import hivens.widget.api.LocalMapControls
-import hivens.widget.api.LocalViewportScrollbar
-import hivens.ui.widgets.NxMapControls
-import hivens.ui.widgets.NxViewportScrollbar
-import hivens.ui.widgets.PlayedWidgetEntrance
-import hivens.widget.api.WidgetSurfaceRenderer
-import androidx.compose.foundation.background
 import hivens.ui.host.DesktopWindowBackend
 import hivens.ui.host.HostKoin
 import hivens.ui.host.HostedWindow
@@ -133,36 +88,80 @@ import hivens.ui.host.WindowId
 import hivens.ui.host.WindowOwner
 import hivens.ui.host.WindowRegistry
 import hivens.ui.host.launcherServices
+import hivens.ui.i18n.nexiraStrings
+import hivens.ui.layers.LayerHost
+import hivens.ui.layers.rememberWindowLayers
+import hivens.ui.layout.LayoutGraphRepository
+import hivens.ui.legacy.RetiredClientsGate
+import hivens.ui.logic.PostLaunchGate
+import hivens.ui.logic.PostLaunchMove
+import hivens.ui.notifications.Kind
+import hivens.ui.notifications.NotificationCenter
+import hivens.ui.notifications.Severity
+import hivens.ui.notifications.render.NotificationStack
+import hivens.ui.screens.MigrationScreen
+import hivens.ui.screens.detail.settings.PackSettingsCategory
+import hivens.ui.system.SystemNotifier
+import hivens.ui.text.needsCjkFace
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.NxTheme
+import hivens.ui.theme.SystemTheme
+import hivens.ui.theme.ThemeRevealHost
+import hivens.ui.theme.nexiraCjkFamily
+import hivens.ui.theme.rememberThemeReveal
+import hivens.ui.utils.GameConsoleService
+import hivens.ui.utils.PreferenceWriter
+import hivens.ui.widgets.NxMapControls
+import hivens.ui.widgets.NxViewportScrollbar
+import hivens.ui.widgets.PlayedWidgetEntrance
 import hivens.ui.widgets.WidgetSurface
 import hivens.ui.widgets.modules.WidgetModules
 import hivens.ui.widgets.state.WidgetStateStore
+import hivens.widget.api.LocalLayoutGraph
+import hivens.widget.api.LocalMapControls
+import hivens.widget.api.LocalScope
+import hivens.widget.api.LocalSlotChromeModifier
+import hivens.widget.api.LocalViewportScrollbar
 import hivens.widget.api.LocalWidgetCommandRegistry
 import hivens.widget.api.LocalWidgetDataRegistry
+import hivens.widget.api.LocalWidgetDecorator
+import hivens.widget.api.LocalWidgetEntrance
+import hivens.widget.api.LocalWidgetRegistry
 import hivens.widget.api.LocalWidgetServiceRegistry
 import hivens.widget.api.LocalWidgetStateHost
+import hivens.widget.api.LocalWidgetSurfaceRenderer
 import hivens.widget.api.WidgetCommandRegistry
 import hivens.widget.api.WidgetDataRegistry
-import hivens.widget.api.LocalScope
+import hivens.widget.api.WidgetRegistry
 import hivens.widget.api.WidgetScope
 import hivens.widget.api.WidgetServiceRegistry
-import hivens.widget.api.WidgetRegistry
+import hivens.widget.api.WidgetSurfaceRenderer
 import hivens.widget.model.DefaultLayout
 import hivens.widget.model.walkInstances
+import hivens.window.OpeningFrame
+import hivens.window.WindowHost
+import hivens.window.WindowManagerProbe
+import hivens.window.WindowSessionRecorder
+import hivens.window.fillUnpainted
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
 import org.jetbrains.compose.resources.ExperimentalResourceApi
 import org.koin.compose.koinInject
 import org.koin.core.qualifier.named
 import org.slf4j.LoggerFactory
-import androidx.compose.ui.graphics.toArgb
-import hivens.ui.theme.NxColor
 import java.awt.Color as AwtColor
 import javax.swing.SwingUtilities
 import kotlin.system.exitProcess
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 // Windows Application User Model ID for toast routing (libnotify / SystemNotifier).
 // Matches the macOS bundleID for a single cross-platform identity; ignored on
@@ -361,17 +360,16 @@ private fun FrameWindowScope.ShellContent(
         }
     }
 
-    // How the launcher looks is the themes module's. The shell draws with what its manager
-    // holds, which the host made, and tells the module what only a host can see, through the
+    // How the launcher looks and speaks is the modules'. The shell draws with what their keys
+    // answer at the app level, and with its fallbacks where the document brings no such module
+    // (see ShellLookValues). It tells the themes module what only a host can see, through the
     // inputs the module keeps for the host: whether the system's scheme can be read, and what
-    // it says. The wallpaper is told by AppRoot. Injected here, during the first composition, so a theme
-    // file from a newer build is on record before the read-only notice below looks.
-    val themes: ThemeManager = koinInject()
-    val isDarkTheme by themes.dark.collectAsState()
-    val themeMode by themes.mode.collectAsState()
-    // The words the shell is drawn in: the language module's engine, which the host made.
-    val translations: Translations = koinInject()
-    val words by translations.current.collectAsState()
+    // it says. The wallpaper is told by AppRoot. Read here, during the first composition, so the
+    // themes module has made its manager, and put a theme file from a newer build on record,
+    // before the read-only notice below looks.
+    val isDarkTheme = appLevel.read(ShellLookValues.Dark)
+    val themeMode = appLevel.readOrNull(ThemesKeys.Mode)
+    val words = appLevel.read(ShellLookValues.Words)
     // Missing where the document brings no themes module: then nothing follows the system.
     val inputs = remember(appLevel) { appLevel.launcherServices.find(ThemeInputs::class) }
     // Whether the OS scheme is readable at all (no portal backend on Linux -> no).
@@ -619,22 +617,23 @@ private fun FrameWindowScope.ShellContent(
         // must not age out before the work is done. Keyed, so a shell reload after
         // a crash updates the same entry instead of stacking another.
         LaunchedEffect(Unit) {
-            val affected = NewerBuildData.affectedWithReason()
+            // The launcher's own stores by its own words for them, and a module's by the word
+            // the module gave for it, in the module's words.
+            val affected = NewerBuildData.affectedWithReason().map { (store, reason) ->
+                reason to when (store) {
+                    ReadOnlyStore.PackLibrary -> s.text("readOnlyDataLibrary")
+                    ReadOnlyStore.Layout      -> s.text("readOnlyDataLayout")
+                    ReadOnlyStore.Accounts    -> s.text("readOnlyDataAccounts")
+                    ReadOnlyStore.Settings    -> s.text("readOnlyDataSettings")
+                }
+            } + NewerBuildData.modulesWithReason().map { (store, reason) -> reason to words.strings(store.module).text(store.name) }
             if (affected.isEmpty()) return@LaunchedEffect
             // One notice per reason, because the two say opposite things about
             // what to do: a newer file is fixed by updating, and an older one is
             // fixed by going back. A single sentence covering both would be wrong
             // for whichever half the reader has.
-            affected.entries.groupBy({ it.value }, { it.key }).forEach { (reason, stores) ->
-                val named = stores.joinToString(", ") { store ->
-                    when (store) {
-                        ReadOnlyStore.PackLibrary -> s.text("readOnlyDataLibrary")
-                        ReadOnlyStore.Layout      -> s.text("readOnlyDataLayout")
-                        ReadOnlyStore.Theme       -> s.text("readOnlyDataTheme")
-                        ReadOnlyStore.Accounts    -> s.text("readOnlyDataAccounts")
-                        ReadOnlyStore.Settings    -> s.text("readOnlyDataSettings")
-                    }
-                }
+            affected.groupBy({ it.first }, { it.second }).forEach { (reason, names) ->
+                val named = names.joinToString(", ")
                 notificationCenter.push(
                     sourceKey = "storage-read-only-${reason.name.lowercase()}",
                     sender    = Branding.TITLE,
@@ -702,7 +701,7 @@ private fun FrameWindowScope.ShellContent(
         val packAutoUpdateService: PackAutoUpdateService = koinInject()
         val applyRecovery: ApplyRecovery = koinInject()
         // The theme in use: the one chosen where it is on offer, the modules' among them.
-        val activeTheme by themes.active.collectAsState()
+        val activeTheme = appLevel.read(ShellLookValues.Theme)
 
         // Customization extension: persisted choices for whether surfaces blur
         // and how the nav rail draws its selection. Provided via
@@ -826,7 +825,7 @@ private fun FrameWindowScope.ShellContent(
 
         // The console is a window of its own beside this one (see ShellHost) and
         // draws in what this shell decided, published for it here.
-        PublishShellLook(look, themes, translations, uiFamily, customization)
+        PublishShellLook(look, appLevel, uiFamily, customization)
 
         // ── Main window ────────────────────────────────────────────────
         // af.requestCloseDialog dispatches: chaos active -> pop the torturous

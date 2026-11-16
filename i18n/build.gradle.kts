@@ -8,9 +8,9 @@ plugins {
 
 // The language module: the engine that answers the words of every namespace in every
 // installed language, the person's own translation files among them, and the keys
-// :i18n-api names. Compiled into the application. The host makes the engine before any
-// module loads, since the window the launcher boots in already speaks the person's
-// language, and the module answers its keys over that one engine.
+// :i18n-api names. Compiled into the application. The module makes the engine itself, from
+// the host's data directory and the words every owner ships, and answers the boot window's
+// words before the host is up from an engine made the same way.
 //
 // It knows the widget kernel and its own API and nothing of the launcher.
 kotlin {

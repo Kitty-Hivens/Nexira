@@ -235,6 +235,24 @@ fun ThemeCount() {
 `ThemeContribution` and `ThemeScheme` were in the widget kernel, `hivens.widget.api`. They are the themes module's now, in `hivens.themes.api`, with the same members. Change the imports, rename the service file to `META-INF/services/hivens.themes.api.ThemeContribution`, and name `nexira.themes` in the manifest.
 :::
 
+## The look the launcher draws
+
+The launcher draws its windows with what modules answer, and names nothing of the modules behind it. The theme and whether it is dark are what `ThemesKeys.Active` and `ThemesKeys.Dark` answer at the app level, and the words what `I18nKeys.Words` answers, read the way a widget reads any key. Where the document brings in no module that answers one, the window is drawn with a fallback: a neutral grey theme that `nx-ui` carries for exactly this, dark, and every word shown as its key.
+
+Colour and words are the first parts of the look joined in this way. A later one, motion, geometry, spacing, typography or sound, joins the same way: as values a module brings under keys in its own API, which every widget uses as it sees fit, and which the launcher reads beside these with a fallback of its own.
+
+The themes module and the language module make what answers those keys themselves, as app services: the theme manager over the module's settings and its theme file, the language engine over the person's own translations and the words every module ships. A module compiled into the launcher reaches what it needs for that through services the host keeps for the modules it trusts, and no jar sees: `HostFiles` for the data directory, the host's atomic, ordered writes inside it, and the name a file of the module's is told to the person as when a newer build wrote it, `TakenWords` for the words every owner ships, and `TakenContributions` for what the modules brought in contribute.
+
+The window the launcher boots in is drawn before any key is up, so a module compiled into the launcher answers the app sources that window needs through `CompiledModule.boot`, from the same files its keys open on:
+
+```kotlin
+override val boot = BootAnswers { context ->
+    BootValues.of { put(ClockKeys.Settings, context.settings(ClockDomain)) }
+}
+```
+
+`context.settings` reads a settings domain the way the host opens it and writes nothing. The answer has to be what the key answers once it is up, or the window changes under the person as the boot ends. The modules asked are the compiled modules the document names, read before the boot the way the shell reads it, so a document that leaves a module out has the boot window drawn with the same fallbacks as the shell. A module answers only the app sources its keys declare and reads only the settings domains it declares, and an answer that strays from them is refused whole. Of two modules that declare one key, the first the build lists keeps it. A module whose words, keys or answer throw costs only its own values. A jar is not loaded yet when the boot window is drawn, so it is never asked.
+
 ## Catalogue sources
 
 The catalogue is an engine over sources. Every source it lists packs from, and every source it searches mods, resource packs and shaders in, is a module's contribution: the Hivens mirror and Modrinth ship as two modules of their own, `nexira.source.mirror` and `nexira.source.modrinth`, and a source of yours is a third one beside them. Nothing in the launcher names a source.

@@ -3,19 +3,28 @@ package hivens.ui
 import androidx.compose.ui.graphics.Color
 import hivens.config.Storage
 import hivens.core.data.NewerBuildData
-import hivens.core.data.ReadOnlyStore
+import hivens.i18n.I18nModule
 import hivens.i18n.api.FixedTranslations
+import hivens.i18n.api.I18nKeys
 import hivens.themes.ThemeLibraryFile
 import hivens.themes.ThemeManager
 import hivens.themes.Themes
+import hivens.themes.ThemesModule
 import hivens.themes.ThemesSettingsDomain
 import hivens.themes.api.ThemeContribution
 import hivens.themes.api.ThemeMode
 import hivens.themes.api.ThemeScheme
 import hivens.themes.api.ThemeSettings
-import hivens.ui.bootstrap.SettingsPeek
+import hivens.themes.api.ThemesApi
+import hivens.themes.api.ThemesKeys
+import hivens.ui.bootstrap.bootValues
+import hivens.ui.host.launcherServices
 import hivens.ui.i18n.NexiraStrings
 import hivens.ui.settings.SettingsDomainFiles
+import hivens.ui.theme.Theme
+import hivens.ui.widgets.modules.WidgetModules
+import hivens.ui.widgets.modules.WidgetModules.Contributed
+import hivens.widget.api.get
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
@@ -41,14 +50,16 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * The themes module as the host keeps it: its settings read from the launcher's former settings
- * file until it has a file of its own and written back there with every change, a choice that
- * survives a build from before the move, and the boot window opening on what the manager opens on.
+ * The themes module as the launcher brings it in: its settings read from the launcher's former
+ * settings file until it has a file of its own and written back there with every change, a choice
+ * that survives a build from before the move, and the boot window opening on what the module's keys
+ * answer once they are up.
  */
 class ThemesHostTest {
 
     private val dir: Path = Files.createTempDirectory("themes-host")
     private val scope = CoroutineScope(Dispatchers.Unconfined)
+    private val levels = ArrayList<ModuleAppLevel>()
     private val legacy: Path get() = dir.resolve(Storage.SETTINGS_FILE)
     private val domainFile: Path get() = dir.resolve(Storage.SETTINGS_DIR).resolve("${ThemesSettingsDomain.id}.json")
     private val themesJson: Path get() = dir.resolve(ThemeLibraryFile.FILE_NAME)
@@ -56,14 +67,24 @@ class ThemesHostTest {
     @OptIn(ExperimentalPathApi::class)
     @AfterTest
     fun tearDown() {
+        levels.forEach { it.close() }
         scope.cancel()
         dir.deleteRecursively()
     }
 
     private fun domains() = SettingsDomainFiles(dir.resolve(Storage.SETTINGS_DIR), legacy)
 
-    /** The manager the launcher's Koin makes, over the same files. */
-    private fun manager(): ThemeManager = hostThemeManager(dir, domains(), FixedTranslations(NexiraStrings.translator("en")), scope)
+    /** The app level with the themes module's keys and the language module's, as the launcher brings them in over the same files. */
+    private fun shell(): ModuleAppLevel = ModuleAppLevel(dir, listOf(I18nModule, ThemesModule), scope).also { levels += it }
+
+    /** The manager the themes module makes for such an app level. */
+    private fun manager(): ThemeManager = shell().app.launcherServices.get<ThemeManager>()
+
+    /** The theme the boot window is drawn in, as the modules answer it before the boot. */
+    private fun bootTheme(): Theme? = bootValues(dir)[ThemesKeys.Active]
+
+    /** Whether the boot window is drawn dark, as the modules answer it before the boot. */
+    private fun bootDark(): Boolean? = bootValues(dir)[ThemesKeys.Dark]
 
     private fun legacyJson(): JsonObject = Json.parseToJsonElement(legacy.readText()).jsonObject
 
@@ -124,19 +145,19 @@ class ThemesHostTest {
         themesJson.writeText("""{"selected":"lotus","themes":[],"wallpaper":[],"schema_version":2}""")
 
         // Up again: the boot window and the shell open on that.
-        val boot = SettingsPeek.read(dir)
+        val boot = bootTheme()
         val themes = manager()
-        assertEquals(Themes.Lotus, boot.theme)
+        assertEquals(Themes.Lotus, boot)
         assertEquals(Themes.Lotus, themes.active.value)
-        assertTrue(boot.isDarkTheme)
+        assertEquals(true, bootDark())
         assertEquals(true, themes.dark.value)
         assertEquals(ThemeMode.System, themes.mode.value)
-        assertEquals(Themes.Lotus, SettingsPeek.read(dir).theme, "and keep it at the next start")
+        assertEquals(Themes.Lotus, bootTheme(), "and keep it at the next start")
         assertEquals(Themes.Lotus, manager().active.value)
 
         // A choice made here again is the choice in every file.
         themes.choose(Themes.Abyssal.id)
-        assertEquals(Themes.Abyssal, SettingsPeek.read(dir).theme)
+        assertEquals(Themes.Abyssal, bootTheme())
         assertEquals(Themes.Abyssal.id, ThemeLibraryFile(dir) { _, _ -> }.load().library.selected)
     }
 
@@ -146,7 +167,7 @@ class ThemesHostTest {
         // The older build changes only the theme, so the old settings file holds what this one wrote.
         themesJson.writeText("""{"selected":"lotus","themes":[],"wallpaper":[],"schema_version":2}""")
 
-        assertEquals(Themes.Lotus, SettingsPeek.read(dir).theme)
+        assertEquals(Themes.Lotus, bootTheme())
         assertEquals(Themes.Lotus, manager().active.value)
         assertEquals(Themes.Lotus.id, domains().peek(ThemesSettingsDomain).theme, "taken into the settings, so it stays at the next start")
     }
@@ -190,10 +211,10 @@ class ThemesHostTest {
         setups.forEach { (what, setup) ->
             clear()
             setup()
-            val boot = SettingsPeek.read(dir)
-            val themes = manager()
-            assertEquals(themes.active.value, boot.theme, "$what: the boot window draws another theme than the shell")
-            assertEquals(themes.dark.value, boot.isDarkTheme, "$what: the boot window draws another scheme than the shell")
+            val boot = bootValues(dir)
+            val shell = shell()
+            assertEquals(shell.value(ThemesKeys.Active), boot[ThemesKeys.Active], "$what: the boot window draws another theme than the shell")
+            assertEquals(shell.value(ThemesKeys.Dark), boot[ThemesKeys.Dark], "$what: the boot window draws another scheme than the shell")
         }
     }
 
@@ -209,7 +230,7 @@ class ThemesHostTest {
         assertEquals(false, themes.dark.value, "the older build's scheme is taken")
         assertEquals(Themes.Signal.id, domains().peek(ThemesSettingsDomain).theme, "the choice is still stored")
         assertEquals(Themes.Signal, themes.active.value)
-        assertEquals(Themes.Signal, SettingsPeek.read(dir).theme)
+        assertEquals(Themes.Signal, bootTheme())
     }
 
     @Test
@@ -224,17 +245,21 @@ class ThemesHostTest {
         )
         failing.choose(Themes.Signal.id)
 
-        assertEquals(Themes.Signal, SettingsPeek.read(dir).theme)
+        assertEquals(Themes.Signal, bootTheme())
         assertEquals(Themes.Signal, manager().active.value)
     }
 
     @Test
-    fun `a theme file a newer build wrote is put on record for the notice`() {
+    fun `a theme file a newer build wrote is put on record for the notice, under the name the module gives it`() {
         themesJson.writeText("""{"schema_version":99,"selected":"abyssal"}""")
         NewerBuildData.reset()
         try {
-            manager()
-            assertTrue(ReadOnlyStore.Theme in NewerBuildData.affected())
+            val shell = shell()
+            shell.app.launcherServices.get<ThemeManager>()
+            val recorded = NewerBuildData.modulesWithReason().keys.single()
+            assertEquals(ThemesApi.ID, recorded.module)
+            assertEquals("the theme", shell.value(I18nKeys.Words).strings(recorded.module).text(recorded.name), "named in the module's own words")
+            assertTrue(NewerBuildData.affected().isEmpty(), "and as none of the launcher's own stores")
         } finally {
             NewerBuildData.reset()
         }
@@ -242,22 +267,26 @@ class ThemesHostTest {
 
     @Test
     fun `a module's theme chosen and gone draws the default and stays chosen, in the boot window as in the shell`() {
-        val themes = manager()
-        themes.contribute("looks", listOf(Outrun()))
-        themes.choose("looks/outrun")
-        assertEquals("looks/outrun", themes.active.value.id)
+        val shell = shell()
+        shell.jars.value = withLooks()
+        shell.fire(ThemesKeys.Choose, "looks/outrun")
+        assertEquals("looks/outrun", shell.value(ThemesKeys.Active).id)
 
         // The next start, with the module away.
-        val boot = SettingsPeek.read(dir)
-        val next = manager()
-        assertEquals(Themes.default, boot.theme)
-        assertEquals(Themes.default, next.active.value)
+        val boot = bootTheme()
+        val next = shell()
+        assertEquals(Themes.default, boot)
+        assertEquals(Themes.default, next.value(ThemesKeys.Active))
         assertEquals("looks/outrun", domains().peek(ThemesSettingsDomain).theme, "the choice is still there")
-        assertNull(next.offered.value.firstOrNull { it.id == "looks/outrun" })
+        assertNull(next.value(ThemesKeys.Offered).firstOrNull { it.id == "looks/outrun" })
 
-        next.contribute("looks", listOf(Outrun()))
-        assertEquals("looks/outrun", next.active.value.id, "and comes back with the module")
+        next.jars.value = withLooks()
+        assertEquals("looks/outrun", next.value(ThemesKeys.Active).id, "and comes back with the module")
     }
+
+    /** The module list with a jar that brings Outrun loaded. */
+    private fun withLooks(): WidgetModules.Snapshot =
+        ModuleAppLevel.noJars().copy(contributions = listOf(Contributed("looks", "Looks", Outrun())))
 
     private fun writeDomain(value: String) {
         domainFile.parent.createDirectories()

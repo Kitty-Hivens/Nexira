@@ -3,7 +3,13 @@ package hivens.core.data
 import java.util.Collections
 
 /** A store this build reads but will not write back. */
-enum class ReadOnlyStore { PackLibrary, Layout, Theme, Accounts, Settings }
+enum class ReadOnlyStore { PackLibrary, Layout, Accounts, Settings }
+
+/**
+ * A store a module keeps of its own and reads but will not write back, named by [name], a key into
+ * the words of the module [module], which the person is told the store as.
+ */
+data class ModuleStore(val module: String, val name: String)
 
 /**
  * Why a store is open read-only. The refusal is the same either way; what the
@@ -48,6 +54,9 @@ object NewerBuildData {
     private val stores: MutableMap<ReadOnlyStore, ReadOnlyReason> =
         Collections.synchronizedMap(LinkedHashMap())
 
+    private val modules: MutableMap<ModuleStore, ReadOnlyReason> =
+        Collections.synchronizedMap(LinkedHashMap())
+
     /**
      * Called by a store that has just refused to write itself back.
      *
@@ -59,6 +68,11 @@ object NewerBuildData {
         stores[store] = reason
     }
 
+    /** Called for a store of a module's own that has just refused to write itself back. */
+    fun record(store: ModuleStore, reason: ReadOnlyReason = ReadOnlyReason.NewerBuild) {
+        modules[store] = reason
+    }
+
     /** Every store open read-only, in the order they were found. */
     fun affected(): Set<ReadOnlyStore> = synchronized(stores) { LinkedHashSet(stores.keys) }
 
@@ -66,8 +80,13 @@ object NewerBuildData {
     fun affectedWithReason(): Map<ReadOnlyStore, ReadOnlyReason> =
         synchronized(stores) { LinkedHashMap(stores) }
 
+    /** Every store of a module's own open read-only with why, in the order they were found. */
+    fun modulesWithReason(): Map<ModuleStore, ReadOnlyReason> =
+        synchronized(modules) { LinkedHashMap(modules) }
+
     /** Test seam: nothing in the app clears this, a session decides it once. */
     fun reset() {
         stores.clear()
+        modules.clear()
     }
 }

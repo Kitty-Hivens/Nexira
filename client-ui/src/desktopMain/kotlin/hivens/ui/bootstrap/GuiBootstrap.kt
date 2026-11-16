@@ -1,12 +1,10 @@
 package hivens.ui.bootstrap
 
-import hivens.config.Storage
-import hivens.i18n.api.Translator
 import hivens.launcher.CrashReporter
 import hivens.launcher.bootstrap.LauncherBootstrap
-import hivens.ui.i18n.NexiraStrings
 import hivens.ui.diag.CrashDialog
 import hivens.ui.diag.ShellRecovery
+import hivens.widget.api.BootValues
 import org.koin.core.module.Module
 import org.slf4j.LoggerFactory
 import java.util.concurrent.CompletableFuture
@@ -25,8 +23,9 @@ import javax.swing.SwingUtilities
  *   - [preWindow] is synchronous and cheap: everything that MUST precede
  *     AWT/toolkit init (WM_CLASS reflection, skiko cap, single-instance
  *     gate, log dir) plus a direct [SettingsPeek] of settings.json for the
- *     window-creation-time values (undecorated chrome, locale) that
- *     normally live behind Koin.
+ *     window-creation-time value (undecorated chrome) that normally lives
+ *     behind Koin, and it starts asking the modules compiled in for what
+ *     the boot window is drawn and worded in (see [PreBoot.boot]).
  *   - [completeBoot] is the slow remainder (data move, migration, Koin),
  *     run by hivens.ui.Main on a background thread behind the live
  *     boot-threshold window.
@@ -45,14 +44,14 @@ object GuiBootstrap {
         val crashReporter: AtomicReference<CrashReporter>,
     ) {
         /**
-         * The words the boot window speaks, in the language [peek] read and with the person's own
-         * translation files. Made on a background thread from the moment the language is known,
-         * since reading the tables cold takes longer than a frame, so the window that waits for
-         * them waits only for what the toolkit coming up has not already covered.
+         * What the modules compiled in answer of their app sources before the host is up, the
+         * theme, the scheme and the words the boot window is drawn in among them (see
+         * [bootValues]). Worked out on a background thread from the moment the pre-window steps
+         * are done, since reading the words cold takes longer than a frame, so the window that
+         * waits for them waits only for what the toolkit coming up has not already covered. Never
+         * fails: where nothing could be answered it holds nothing, and the window draws its fallbacks.
          */
-        val words: CompletableFuture<Translator> = CompletableFuture.supplyAsync {
-            NexiraStrings.engine(core.initialPaths.dataDir.resolve(Storage.TRANSLATIONS_DIR), peek.locale).current.value
-        }
+        val boot: CompletableFuture<BootValues> = answeredLater { bootValues(core.initialPaths.dataDir) }
     }
 
     /**
@@ -93,10 +92,10 @@ object GuiBootstrap {
         installGuiCrashHandler(reporter)
 
         // A launcher that has never run has no settings file, and the two things
-        // the very first window shows -- its language and whether it is dark --
-        // would otherwise come from field defaults that know nothing about this
-        // machine. Seeded before the peek so the boot threshold itself opens in
-        // the user's language, not just the shell behind it.
+        // the very first window shows, its language and whether it is dark, would
+        // otherwise come from field defaults that know nothing about this machine.
+        // Seeded before the modules are asked so the boot threshold itself opens
+        // in the user's language, not just the shell behind it.
         FirstRunDefaults.seed(core.initialPaths.dataDir)
 
         val peek = SettingsPeek.read(core.initialPaths.dataDir)

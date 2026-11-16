@@ -3,8 +3,8 @@ package hivens.ui.bootstrap
 import hivens.config.Storage
 import hivens.core.data.SettingsData
 import hivens.core.io.AtomicFiles
-import hivens.i18n.ShippedLanguages
 import hivens.themes.api.ThemeMode
+import hivens.ui.i18n.NexiraStrings
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.encodeToJsonElement
@@ -103,7 +103,7 @@ object FirstRunDefaults {
      */
     internal fun supportedLocaleTag(
         systemLocale: Locale,
-        supported: Set<String> = ShippedLanguages.tags,
+        supported: Set<String> = NexiraStrings.languages,
     ): String {
         val language = systemLocale.language.lowercase(Locale.ROOT)
         return if (language in supported) language else FALLBACK

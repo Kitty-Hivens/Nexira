@@ -76,7 +76,7 @@ class I18nEngine(
      * to, without the English every lookup ends in unless a language names it. For what is fetched in
      * a language from elsewhere, which takes the first of these it has.
      */
-    val readingOrder: List<String> get() = synchronized(lock) { catalog.declaredChainOf(_current.value.language.tag) }
+    override val readingOrder: List<String> get() = synchronized(lock) { catalog.declaredChainOf(_current.value.language.tag) }
 
     /**
      * The words [owner] ships, by namespace, then by language tag, then by key, and the languages it

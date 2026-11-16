@@ -28,7 +28,11 @@ package hivens.widget.api
  *    among them ([TakenContributions], [TakenContribution]): the catalogue module's sources
  *    reach it that way. A trusted module's service maker gets another module's view of a
  *    level's services ([ServiceContext.servicesOf]), to run that module's code with what
- *    that module may use.
+ *    that module may use. A module compiled in answers some of its app sources before the
+ *    host is up ([CompiledModule.boot], [BootAnswers], [BootContext], [BootValues]), and
+ *    makes what it owns from the host's data directory ([HostFiles]), naming a file of its
+ *    own a newer build wrote in its own words, and the words every owner ships
+ *    ([TakenWords]), both host services.
  */
 object WidgetApi {
     const val VERSION: Int = 3

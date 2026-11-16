@@ -10,6 +10,7 @@ import hivens.i18n.api.LocalTranslator
 import hivens.i18n.api.Strings
 import hivens.i18n.api.Translator
 import hivens.i18n.api.strings
+import hivens.widget.api.ModuleStrings
 import java.nio.file.Path
 import java.time.Instant
 import java.time.ZoneId
@@ -37,6 +38,13 @@ object NexiraStrings {
 
     /** [tables] as what the language module takes from an owner: its namespace to its tables. */
     fun contribution(): Map<String, Map<String, Map<String, String>>> = mapOf(NAMESPACE to tables())
+
+    /** [tables] as the words the launcher ships under [NAMESPACE], the way a module ships its own. */
+    fun words(): ModuleStrings = ModuleStrings(tables = tables())
+
+    /** The language tags the launcher's own words ship a table in, without reading any of them. */
+    val languages: Set<String>
+        get() = ShippedLanguages.tags.filterTo(LinkedHashSet()) { NexiraStrings::class.java.getResource("/$ROOT/$it.properties") != null }
 
     /** The keys the binary byte units are under, smallest first: bytes, then kilo-, mega-, giga-, tera-. */
     val BYTE_UNIT_KEYS: List<String> = listOf("byteUnitBytes", "byteUnitKilo", "byteUnitMega", "byteUnitGiga", "byteUnitTera")

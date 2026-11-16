@@ -4,8 +4,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import hivens.i18n.api.LocalTranslator
+import hivens.i18n.take
 import hivens.ui.i18n.NexiraStrings
-import hivens.ui.widgets.modules.take
 import hivens.widget.api.CompiledModule
 
 /**

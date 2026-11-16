@@ -7,6 +7,8 @@ import hivens.i18n.api.I18nApi
 import hivens.i18n.api.I18nKeys
 import hivens.i18n.api.I18nSettings
 import hivens.i18n.api.LanguageInfo
+import hivens.i18n.take
+import hivens.i18n.wordsOf
 import hivens.ui.HostKeys
 import hivens.ui.background.BackgroundSettings
 import hivens.ui.followModuleReloads
@@ -93,7 +95,6 @@ class SettingsDomainModulesTest {
 
     /** The host's keys and app level, the language module named and the jars [modules] has on brought in. */
     private fun app(modules: WidgetModules): Pair<HostKeys, WidgetScope> {
-        val engine = NexiraStrings.engine(null, "en")
         val keys = HostKeys(
             uiDataRegistry(
                 activity      = MutableStateFlow(emptyList()),
@@ -111,7 +112,6 @@ class SettingsDomainModulesTest {
             modules(
                 module {
                     single<SettingsStores> { domains }
-                    single { engine }
                     single {
                         WidgetScope.app(keys.sources, keys.appServices(KoinLevelServicesHost.app(this), Dispatchers.Unconfined), Dispatchers.Unconfined, keys.commands)
                     }

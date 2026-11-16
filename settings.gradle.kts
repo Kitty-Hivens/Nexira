@@ -183,15 +183,15 @@ include(":source-mirror")
 include(":source-modrinth")
 // The language module: the words of the launcher and of every module, by namespace and
 // key, in the languages that ship and in any a person adds as files. Its API is what a
-// module looks its words up through. Unlike the others its engine is made by the host
-// before any module loads, since the window the launcher boots in already speaks.
+// module looks its words up through. The window the launcher boots in already speaks, so
+// the module answers its words before the host is up as well.
 include(":i18n-api")
 include(":i18n")
 // The themes module: the themes that ship, the one made from the wallpaper, the ones modules
 // bring and the person's own, which is in use and what decides dark and light, and where the
 // choice is kept. Drawing stays in nx-ui, which is handed the theme to draw. Like the language
-// module, the host makes its manager before any module loads, since the boot window is drawn
-// in the person's theme.
+// module, it answers the theme before the host is up, since the boot window is drawn in the
+// person's theme.
 include(":themes-api")
 include(":themes")
 include(":profiler-agent")

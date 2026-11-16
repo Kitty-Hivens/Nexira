@@ -1,12 +1,15 @@
 package hivens.ui
 
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.mandatorySystemGestures
 import androidx.compose.foundation.layout.navigationBars
@@ -15,7 +18,6 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.tappableElement
 import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -27,13 +29,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
-import hivens.ui.chrome.ShellChord
-import hivens.ui.chrome.resolveShellChord
-import hivens.ui.editor.EditModeController
-import androidx.activity.compose.BackHandler
-import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
-import hivens.ui.chrome.EscapeAsBack
-import hivens.ui.chrome.keepsFocus
 import hivens.auth.AccountStore
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.data.PackAuthRequirement
@@ -41,11 +36,21 @@ import hivens.core.diag.ActionRing
 import hivens.core.io.AtomicFiles
 import hivens.core.launch.LaunchLogEvent
 import hivens.core.launch.LaunchState
+import hivens.i18n.api.LocalTranslator
 import hivens.launcher.launch.LauncherController
 import hivens.launcher.update.ApplyRecovery
 import hivens.launcher.update.PackAutoUpdateService
+import hivens.themes.api.SystemScheme
+import hivens.themes.api.ThemeInputs
+import hivens.themes.api.ThemesKeys
 import hivens.ui.bootstrap.ShellStartup
 import hivens.ui.bootstrap.StartupPolicy
+import hivens.ui.chrome.EscapeAsBack
+import hivens.ui.chrome.LocalRightRailSheet
+import hivens.ui.chrome.LocalUseCustomChrome
+import hivens.ui.chrome.ShellChord
+import hivens.ui.chrome.keepsFocus
+import hivens.ui.chrome.resolveShellChord
 import hivens.ui.components.CertificatePromptHost
 import hivens.ui.components.TwoFactorPromptHost
 import hivens.ui.console.ConsoleCommands
@@ -55,12 +60,15 @@ import hivens.ui.debug.IdentitySlotChromeModifier
 import hivens.ui.debug.IdentityWidgetDecorator
 import hivens.ui.easter.AprilFoolsLoader
 import hivens.ui.easter.LocalAprilFools
+import hivens.ui.editor.EditModeController
 import hivens.ui.editor.WidgetGraphReconciler
-import hivens.themes.ThemeManager
-import hivens.themes.api.SystemScheme
-import hivens.themes.api.ThemeInputs
-import hivens.i18n.api.LocalTranslator
-import hivens.i18n.api.Translations
+import hivens.ui.host.HostKoin
+import hivens.ui.host.HostedWindow
+import hivens.ui.host.MainWindowNavigation
+import hivens.ui.host.WindowId
+import hivens.ui.host.WindowOwner
+import hivens.ui.host.launcherServices
+import hivens.ui.host.rememberActivityWindow
 import hivens.ui.i18n.nexiraStrings
 import hivens.ui.layers.Layer
 import hivens.ui.layers.LayerHost
@@ -79,15 +87,6 @@ import hivens.ui.theme.rememberThemeReveal
 import hivens.ui.utils.ConsoleSettingsStore
 import hivens.ui.utils.GameConsoleService
 import hivens.ui.utils.PreferenceWriter
-import hivens.ui.chrome.LocalRightRailSheet
-import hivens.ui.chrome.LocalUseCustomChrome
-import hivens.ui.host.HostKoin
-import hivens.ui.host.HostedWindow
-import hivens.ui.host.MainWindowNavigation
-import hivens.ui.host.WindowId
-import hivens.ui.host.WindowOwner
-import hivens.ui.host.launcherServices
-import hivens.ui.host.rememberActivityWindow
 import hivens.ui.widgets.NxMapControls
 import hivens.ui.widgets.NxViewportScrollbar
 import hivens.ui.widgets.PlayedWidgetEntrance
@@ -179,15 +178,13 @@ private fun AndroidShellContent() {
         )
     }
 
-    // How the launcher looks is the themes module's. The shell draws with what its manager
-    // holds, which the host made, and tells the module the system's scheme through the inputs
+    // How the launcher looks and speaks is the modules'. The shell draws with what their keys
+    // answer at the app level, and with its fallbacks where the document brings no such module
+    // (see ShellLookValues). It tells the themes module the system's scheme through the inputs
     // the module keeps for the host: a phone can always read it.
-    val themes: ThemeManager = koinInject()
-    val isDarkTheme by themes.dark.collectAsState()
-    val themeMode by themes.mode.collectAsState()
-    // The words the shell is drawn in: the language module's engine, which the host made.
-    val translations: Translations = koinInject()
-    val words by translations.current.collectAsState()
+    val isDarkTheme = appLevel.read(ShellLookValues.Dark)
+    val themeMode = appLevel.readOrNull(ThemesKeys.Mode)
+    val words = appLevel.read(ShellLookValues.Words)
 
     // The manager listens to the source the mode names, so the scheme is handed over
     // whenever it or the mode changes. AppRoot hands it what the wallpaper shows. Missing
@@ -245,7 +242,7 @@ private fun AndroidShellContent() {
             val s = nexiraStrings()
             val uiFamily = if (needsCjkFace(s.text("settingsTitle") + s.text("navLibrary") + s.text("aboutTitle"))) nexiraCjkFamily() else null
 
-            val activeTheme by themes.active.collectAsState()
+            val activeTheme = appLevel.read(ShellLookValues.Theme)
             val customizationJson = remember { Json { ignoreUnknownKeys = true; encodeDefaults = true; coerceInputValues = true } }
             val customizationManager = remember { CustomizationManager(dataDirectory, customizationJson, AtomicFiles::writeString) }
             var customization by remember { mutableStateOf(customizationManager.load()) }

@@ -3,14 +3,11 @@ package hivens.ui
 import hivens.accounts.AccountsHost
 import hivens.accounts.TwoFactorLaunchGate
 import hivens.config.Storage
+import hivens.core.activity.Activity
+import hivens.core.activity.ActivityRegistry
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.api.interfaces.ReadingLanguage
-import hivens.core.activity.Activity
-import hivens.core.activity.ActivityRegistry
-import hivens.core.data.NewerBuildData
-import hivens.core.data.ReadOnlyStore
-import hivens.core.io.AtomicFiles
 import hivens.core.security.SslBypassStore
 import hivens.core.update.PackUpdateStatusHub
 import hivens.launcher.PackInstallService
@@ -18,13 +15,16 @@ import hivens.launcher.instance.InstanceContentUpdater
 import hivens.launcher.network.ServerProtocolConfig
 import hivens.launcher.platform.PlatformPaths
 import hivens.launcher.sources.SourceWorks
+import hivens.packs.PacksHost
+import hivens.themes.api.ThemesKeys
+import hivens.ui.accounts.ClientAccountsHost
 import hivens.ui.activity.ActivityCommands
 import hivens.ui.activity.ActivityDriver
 import hivens.ui.activity.SelectionRegistry
 import hivens.ui.background.BackgroundManager
-import hivens.ui.components.SignOutRequests
 import hivens.ui.background.BackgroundSettings
 import hivens.ui.components.LauncherUpdateState
+import hivens.ui.components.SignOutRequests
 import hivens.ui.debug.DebugOverlayState
 import hivens.ui.editor.EditModeController
 import hivens.ui.editor.WidgetAdmission
@@ -33,19 +33,13 @@ import hivens.ui.feature.catalogue.browse.CataloguePackPageSource
 import hivens.ui.feature.catalogue.browse.sampleCataloguePackPage
 import hivens.ui.feature.catalogue.project.ProjectPageSource
 import hivens.ui.feature.catalogue.project.sampleProjectPage
-import hivens.packs.PacksHost
-import hivens.ui.accounts.ClientAccountsHost
+import hivens.ui.host.HostWindowState
+import hivens.ui.host.HostWords
+import hivens.ui.host.LauncherFiles
 import hivens.ui.host.LauncherHostAccess
+import hivens.ui.host.WindowPolicy
+import hivens.ui.host.WindowRegistry
 import hivens.ui.host.sourceWorksOf
-import hivens.ui.navigation.NavState
-import hivens.ui.packs.ClientPacksHost
-import hivens.ui.packs.withdrawNoticesOfInstalledPacks
-import hivens.themes.ThemeLibraryFile
-import hivens.themes.ThemeManager
-import hivens.themes.ThemesSettingsDomain
-import hivens.i18n.I18nEngine
-import hivens.i18n.I18nSettingsDomain
-import hivens.i18n.api.Translations
 import hivens.ui.i18n.NexiraStrings
 import hivens.ui.identity.ClanRoleProvider
 import hivens.ui.identity.DefaultSkinProvider
@@ -53,27 +47,28 @@ import hivens.ui.identity.SkinLibrary
 import hivens.ui.identity.SkinManager
 import hivens.ui.layout.LayoutGraphFlushHook
 import hivens.ui.layout.LayoutGraphRepository
-import hivens.ui.host.HostWindowState
-import hivens.ui.host.WindowPolicy
-import hivens.ui.host.WindowRegistry
 import hivens.ui.navigation.MainWindowRequests
 import hivens.ui.navigation.NavRequests
-import hivens.ui.notifications.CoreProblem
+import hivens.ui.navigation.NavState
 import hivens.ui.notifications.CorePart
+import hivens.ui.notifications.CoreProblem
 import hivens.ui.notifications.CoreProblems
 import hivens.ui.notifications.IndicationCenter
 import hivens.ui.notifications.LaunchTarget
 import hivens.ui.notifications.NotificationArchiveStore
-import hivens.ui.notifications.NotifiedCoreProblems
 import hivens.ui.notifications.NotificationCenter
+import hivens.ui.notifications.NotifiedCoreProblems
 import hivens.ui.notifications.PersistedNotification
 import hivens.ui.notifications.SessionRegistry
 import hivens.ui.notifications.drivers.InstallDriver
 import hivens.ui.notifications.drivers.LaunchDriver
 import hivens.ui.notifications.drivers.PackUpdateDriver
+import hivens.ui.packs.ClientPacksHost
+import hivens.ui.packs.withdrawNoticesOfInstalledPacks
 import hivens.ui.screens.library.content.ContentIconStore
 import hivens.ui.settings.LegacySettingsThroughService
 import hivens.ui.settings.SettingsDomainFiles
+import hivens.ui.theme.Theme
 import hivens.ui.utils.ConsoleSettingsStore
 import hivens.ui.utils.GameConsoleService
 import hivens.ui.utils.LogRetention
@@ -89,10 +84,8 @@ import hivens.ui.widgets.levelServices
 import hivens.ui.widgets.modules.CompiledModules
 import hivens.ui.widgets.modules.WidgetModuleHost
 import hivens.ui.widgets.modules.WidgetModules
-import hivens.ui.widgets.modules.followModuleThemes
-import hivens.ui.widgets.modules.followModuleWords
 import hivens.ui.widgets.modules.hostTakenContributions
-import hivens.ui.widgets.modules.take
+import hivens.ui.widgets.modules.hostTakenWords
 import hivens.ui.widgets.profile.ProfileSelection
 import hivens.ui.widgets.profile.ProfileSelectionSource
 import hivens.ui.widgets.state.WidgetStateFlushHook
@@ -103,12 +96,14 @@ import hivens.ui.widgets.themepicker.sampleThemeSelection
 import hivens.widget.api.CompiledModule
 import hivens.widget.api.ContributedServices
 import hivens.widget.api.FactoryFailures
+import hivens.widget.api.HostFiles
 import hivens.widget.api.KeyContribution
 import hivens.widget.api.LevelServicesHost
 import hivens.widget.api.ModuleKeysResult
 import hivens.widget.api.SettingsStores
 import hivens.widget.api.SurfaceFamilies
 import hivens.widget.api.TakenContributions
+import hivens.widget.api.TakenWords
 import hivens.widget.api.WidgetCommandRegistry
 import hivens.widget.api.WidgetDataRegistry
 import hivens.widget.api.WidgetRegistry
@@ -242,35 +237,39 @@ fun uiCoreModule(
     }
     single<SettingsStores> { get<SettingsDomainFiles>() }
 
-    // The launcher's words, and every module's: the language module's engine. Made by the host
-    // rather than by the module because the window the launcher boots in already speaks, so the
-    // engine exists before any module does. It follows the language the person chooses in the
-    // module's settings domain, and takes the words of every module compiled in and of every
-    // jar module as the module list changes.
-    single {
-        val dataDir: Path = get()
-        val appScope: CoroutineScope = get()
-        val language = get<SettingsDomainFiles>().of(I18nSettingsDomain)
-        NexiraStrings.engine(dataDir.resolve(Storage.TRANSLATIONS_DIR), language.value.value.language).also { engine ->
-            engine.follow(language, appScope)
-            compiled.forEach { module -> engine.take(module.id, module.strings) }
-            followModuleWords(get<WidgetModules>().state, engine, appScope)
-        }
+    // The launcher's data directory as the modules compiled in keep their own files there, the
+    // theme file and a person's own translations, saved by the writer the interface's other
+    // choices go through. One of the host's own services, which no jar reaches.
+    single<HostFiles> {
+        val preferences: PreferenceWriter = get()
+        LauncherFiles(dataDir = get(), save = preferences::write)
     }
-    single<Translations> { get<I18nEngine>() }
+
+    // The words every owner ships, the launcher's own and every module's, as the module list
+    // changes: what the language module answers its lookups from.
+    single<TakenWords> { hostTakenWords(compiled, get<WidgetModules>().state, get()) }
+
+    // What the host says outside a composition, in the words the language module answers at the
+    // app level, read there each time they are asked for, since the module makes them there.
+    single {
+        val koin: Scope = this
+        HostWords { koin.get<WidgetScope>() }
+    }
     // What the engine fetches in a language, the catalogue's texts and the release notes, is
-    // fetched in the language the words are in now.
+    // fetched in the language the words are in now, and in the one the settings file names
+    // where the document brings no language module.
     single<ReadingLanguage> {
-        val engine: I18nEngine = get()
-        ReadingLanguage { engine.readingOrder }
+        val words: HostWords = get()
+        val settings: ISettingsService = get()
+        ReadingLanguage { words.readingOrder ?: listOf(settings.getSettings().locale) }
     }
 
     // What the core could not do, said in the notification centre in the person's language.
     // A pack said to be missing is taken back once a pack of that id is installed.
     single<CoreProblems> {
-        val translations: Translations = get()
+        val words: HostWords = get()
         NotifiedCoreProblems(notifications = get(), scope = get()) {
-            translations.strings(NexiraStrings.NAMESPACE)
+            words.strings(NexiraStrings.NAMESPACE)
         }.also { problems -> withdrawNoticesOfInstalledPacks(get<IPackRepository>().observe(), problems, get()) }
     }
 
@@ -326,23 +325,6 @@ fun uiCoreModule(
     // LocalWidgetServiceRegistry resolves before any @Widget renders.
     single { WidgetServiceRegistry() }
 
-    // The library of themes and the choice: the themes module's manager. Made by the host
-    // rather than by the module for the reason the language's engine is: the window the
-    // launcher boots in is already drawn in the person's theme, so the manager exists before
-    // any module does. The host draws its windows with it, the module answers its keys over
-    // it, and it takes the themes of every jar module as the module list changes.
-    single {
-        val appScope: CoroutineScope = get()
-        val preferences: PreferenceWriter = get()
-        hostThemeManager(
-            dataDir      = get(),
-            settings     = get<SettingsDomainFiles>(),
-            translations = get(),
-            scope        = appScope,
-            write        = preferences::write,
-        ).also { manager -> followModuleThemes(get<WidgetModules>().state, manager, appScope) }
-    }
-
     // What the packs module needs from the application around it: the launch notices,
     // and where a missing pack is said.
     single<PacksHost> {
@@ -396,14 +378,14 @@ fun uiCoreModule(
             services = ContributedServices(),
         )
         val modules: WidgetModules = get()
-        val translations: Translations = get()
+        val words: HostWords = get()
         moduleKeys(
             keys     = keys,
             named    = modulesNamedBy(get<LayoutGraphRepository>().value()) { DefaultLayout.modules(get()) },
             compiled = compiled,
             jars     = jarKeysOf(modules),
             onCrash  = modules::switchOffAfterCrash,
-            nameOf   = { moduleId, key -> translations.strings(moduleId).text(key) },
+            nameOf   = { moduleId, key -> words.strings(moduleId).text(key) },
         )
         keys
     } withOptions { onClose { it?.close() } }
@@ -551,7 +533,7 @@ fun uiCoreModule(
     single { TwoFactorLaunchGate() }
     single {
         val settingsService: ISettingsService = get()
-        val translations: Translations = get()
+        val words: HostWords = get()
         LaunchDriver(
             controller      = get(),
             notifications   = get(),
@@ -564,19 +546,19 @@ fun uiCoreModule(
             settingsService = settingsService,
             credentialStore = get(),
             twoFactorGate   = get(),
-            stringsProvider = { translations.strings(NexiraStrings.NAMESPACE) },
+            stringsProvider = { words.strings(NexiraStrings.NAMESPACE) },
         )
     }
     // Surfaces app-scoped installs (PackInstallService) into the notification
     // center. createdAtStart so its collector is live before the first install
     // can fire; start() launches on the shared app scope.
     single(createdAtStart = true) {
-        val translations: Translations = get()
+        val words: HostWords = get()
         InstallDriver(
             service         = get(),
             notifications   = get(),
             appScope        = get(),
-            stringsProvider = { translations.strings(NexiraStrings.NAMESPACE) },
+            stringsProvider = { words.strings(NexiraStrings.NAMESPACE) },
         ).also { it.start() }
     }
     // Feeds the self-identifying services (installs, updates, content) into the
@@ -599,14 +581,14 @@ fun uiCoreModule(
     // the status hub) into the notification center. Same lifecycle rationale as
     // InstallDriver.
     single(createdAtStart = true) {
-        val translations: Translations = get()
+        val words: HostWords = get()
         PackUpdateDriver(
             hub             = get(),
             repository      = get(),
             notifications   = get(),
             nav             = get(),
             appScope        = get(),
-            stringsProvider = { translations.strings(NexiraStrings.NAMESPACE) },
+            stringsProvider = { words.strings(NexiraStrings.NAMESPACE) },
         ).also { it.start() }
     }
 }
@@ -636,26 +618,6 @@ internal fun corePartOf(id: String): CorePart = CORE_PARTS[id] ?: CorePart.Other
 private val CORE_PARTS: Map<String, CorePart> = buildMap {
     listOf(Sources.ConsoleVisible.id, Commands.SetConsoleVisible.id).forEach { put(it, CorePart.Console) }
 }
-
-/**
- * The themes module's manager as the host makes it, over the module's settings domain in
- * [settings] and the theme file in [dataDir]: the one the shell draws with and the module's keys
- * answer over. A theme file a newer build wrote is put on record here, before the shell's first
- * frame, for the notice that says what this session changes in it is not kept.
- */
-internal fun hostThemeManager(
-    dataDir: Path,
-    settings: SettingsDomainFiles,
-    translations: Translations,
-    scope: CoroutineScope,
-    write: (what: String, block: () -> Unit) -> Unit = { _, block -> block() },
-): ThemeManager = ThemeManager(
-    store        = settings.of(ThemesSettingsDomain),
-    file         = ThemeLibraryFile(dataDir, AtomicFiles::writeString),
-    translations = translations,
-    scope        = scope,
-    write        = write,
-).also { if (it.readOnly) NewerBuildData.record(ReadOnlyStore.Theme) }
 
 /**
  * The app's data registry as the launcher builds it, from the flows the services
@@ -695,7 +657,9 @@ internal fun uiDataRegistry(
     // What a page provides for its own widgets, on that page and nowhere else.
     declare(ProjectPageSource, ::sampleProjectPage)
     declare(CataloguePackPageSource, ::sampleCataloguePackPage)
-    declare(ThemeSelectionSource, ::sampleThemeSelection)
+    // The picker's widgets are shown on the sample of the theme in use, the themes module's,
+    // read when the palette asks, by when the module's keys are in.
+    declare(ThemeSelectionSource) { sampleThemeSelection(sampleOf(ThemesKeys.ACTIVE_ID)?.invoke() as? Theme) }
     declare(AboutUpdateSource, ::sampleUpdateCheck)
 }
 

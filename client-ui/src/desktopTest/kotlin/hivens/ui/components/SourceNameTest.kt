@@ -7,11 +7,11 @@ import hivens.catalogue.api.CatalogueKeys
 import hivens.catalogue.api.SourceView
 import hivens.core.data.PackOrigin
 import hivens.i18n.api.LocalTranslator
+import hivens.i18n.take
 import hivens.launcher.sources.EngineSources
 import hivens.source.mirror.MirrorPackSource
 import hivens.source.mirror.MirrorSourceModule
 import hivens.ui.i18n.NexiraStrings
-import hivens.ui.widgets.modules.take
 import hivens.widget.api.LocalWidgetDataRegistry
 import hivens.widget.api.ModuleStrings
 import hivens.widget.api.WidgetDataRegistry

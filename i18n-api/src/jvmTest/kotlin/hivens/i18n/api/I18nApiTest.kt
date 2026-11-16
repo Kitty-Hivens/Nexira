@@ -23,6 +23,7 @@ class I18nApiTest {
             I18nKeys.UPDATE_SETTINGS_ID to I18nKeys.UpdateSettings,
             I18nKeys.LANGUAGE_ID to I18nKeys.Language,
             I18nKeys.LANGUAGES_ID to I18nKeys.Languages,
+            I18nKeys.WORDS_ID to I18nKeys.Words,
         )
         pairs.forEach { (id, key) ->
             val (keyId, level) = when (key) {
@@ -42,5 +43,10 @@ class I18nApiTest {
         assertEquals("some.key", strings.text("some.key"))
         assertEquals("some.key", strings.text("some.key", 3))
         assertFalse(strings.has("some.key"))
+    }
+
+    @Test
+    fun `words read in one language and no other say so by default`() {
+        assertEquals(listOf("en"), FixedTranslations(Translator.KEYS).readingOrder)
     }
 }

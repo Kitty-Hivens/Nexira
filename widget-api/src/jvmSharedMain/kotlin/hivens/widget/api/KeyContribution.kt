@@ -181,4 +181,10 @@ interface CompiledModule {
      * hands a jar's. Effects and particle fields come from jars only.
      */
     val contributions: List<ModuleContribution>
+
+    /**
+     * What it answers of its app sources before the host is up, for the window the launcher boots
+     * in, or null where it answers nothing then. See [BootAnswers].
+     */
+    val boot: BootAnswers? get() = null
 }

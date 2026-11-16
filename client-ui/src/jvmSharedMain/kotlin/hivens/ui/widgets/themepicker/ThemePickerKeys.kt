@@ -5,9 +5,9 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import hivens.themes.Themes
 import hivens.themes.api.ThemesApi
 import hivens.ui.i18n.nexiraStrings
+import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.Theme
 import hivens.widget.model.ScopeLevel
 import hivens.widget.model.SourceKey
@@ -28,8 +28,11 @@ internal class ThemeSelection(initial: Theme) {
  */
 internal val ThemeSelectionSource: SourceKey<ThemeSelection> = SourceKey("theme.picker.selection", ScopeLevel.Page)
 
-/** The choice the picker's widgets are shown on where no picker holds one: the default theme. Display data only. */
-internal fun sampleThemeSelection(): ThemeSelection = ThemeSelection(Themes.default)
+/**
+ * The choice the picker's widgets are shown on where no picker holds one: [theme], the sample of the
+ * theme in use, or the neutral theme where no themes module brings one. Display data only.
+ */
+internal fun sampleThemeSelection(theme: Theme?): ThemeSelection = ThemeSelection(theme ?: NeutralTheme)
 
 /** What the picker calls [this]: the theme's own name, or this launcher's word for the one made from the wallpaper. */
 @Composable

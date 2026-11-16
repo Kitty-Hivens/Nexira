@@ -1,6 +1,7 @@
 package hivens.ui.widgets.modules
 
 import hivens.i18n.I18nEngine
+import hivens.i18n.wordsOf
 import hivens.widget.generated.GeneratedWidgetRegistry
 import hivens.widget.model.WidgetKind
 import kotlinx.coroutines.CoroutineScope

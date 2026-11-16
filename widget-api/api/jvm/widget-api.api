@@ -1,5 +1,35 @@
+public abstract interface class hivens/widget/api/BootAnswers {
+	public abstract fun answer (Lhivens/widget/api/BootContext;)Lhivens/widget/api/BootValues;
+}
+
+public abstract interface class hivens/widget/api/BootContext {
+	public abstract fun getDataDir ()Ljava/nio/file/Path;
+	public abstract fun getServices ()Lhivens/widget/api/LevelServices;
+	public abstract fun settings (Lhivens/widget/api/SettingsDomain;)Ljava/lang/Object;
+}
+
+public final class hivens/widget/api/BootValues {
+	public static final field $stable I
+	public static final field Companion Lhivens/widget/api/BootValues$Companion;
+	public final fun contains (Lhivens/widget/model/SourceKey;)Z
+	public final fun get (Lhivens/widget/model/SourceKey;)Ljava/lang/Object;
+	public final fun getIds ()Ljava/util/Set;
+	public final fun over (Lhivens/widget/api/BootValues;)Lhivens/widget/api/BootValues;
+}
+
+public final class hivens/widget/api/BootValues$Builder {
+	public static final field $stable I
+	public final fun put (Lhivens/widget/model/SourceKey;Ljava/lang/Object;)V
+}
+
+public final class hivens/widget/api/BootValues$Companion {
+	public final fun getNONE ()Lhivens/widget/api/BootValues;
+	public final fun of (Lkotlin/jvm/functions/Function1;)Lhivens/widget/api/BootValues;
+}
+
 public abstract interface class hivens/widget/api/CompiledModule {
 	public fun getApiPackages ()Ljava/util/Map;
+	public fun getBoot ()Lhivens/widget/api/BootAnswers;
 	public fun getContributionKinds ()Ljava/util/List;
 	public abstract fun getContributions ()Ljava/util/List;
 	public abstract fun getId ()Ljava/lang/String;
@@ -10,6 +40,7 @@ public abstract interface class hivens/widget/api/CompiledModule {
 
 public final class hivens/widget/api/CompiledModule$DefaultImpls {
 	public static fun getApiPackages (Lhivens/widget/api/CompiledModule;)Ljava/util/Map;
+	public static fun getBoot (Lhivens/widget/api/CompiledModule;)Lhivens/widget/api/BootAnswers;
 	public static fun getContributionKinds (Lhivens/widget/api/CompiledModule;)Ljava/util/List;
 	public static fun getProvides (Lhivens/widget/api/CompiledModule;)Ljava/util/Map;
 	public static fun getStrings (Lhivens/widget/api/CompiledModule;)Lhivens/widget/api/ModuleStrings;
@@ -78,6 +109,13 @@ public final class hivens/widget/api/HostAccess {
 }
 
 public abstract interface annotation class hivens/widget/api/HostApi : java/lang/annotation/Annotation {
+}
+
+public abstract interface class hivens/widget/api/HostFiles {
+	public abstract fun getDataDir ()Ljava/nio/file/Path;
+	public abstract fun newerBuild (Ljava/nio/file/Path;Ljava/lang/String;Ljava/lang/String;)V
+	public abstract fun publish (Ljava/nio/file/Path;Ljava/lang/String;)V
+	public abstract fun write (Ljava/lang/String;Lkotlin/jvm/functions/Function0;)V
 }
 
 public abstract interface class hivens/widget/api/HostLevelContext : hivens/widget/api/LevelContext {
@@ -611,6 +649,10 @@ public abstract interface class hivens/widget/api/TakenContributions {
 
 public final class hivens/widget/api/TakenContributions$DefaultImpls {
 	public static fun getCompiledIn (Lhivens/widget/api/TakenContributions;)Ljava/util/List;
+}
+
+public abstract interface class hivens/widget/api/TakenWords {
+	public abstract fun getAll ()Lkotlinx/coroutines/flow/StateFlow;
 }
 
 public final class hivens/widget/api/ViewportExtent {

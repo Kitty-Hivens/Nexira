@@ -11,7 +11,10 @@ import hivens.themes.api.ThemeSettings
 import hivens.ui.theme.Scheme
 import hivens.ui.theme.Theme
 import hivens.ui.theme.WallpaperTone
+import hivens.widget.api.ModuleContribution
 import hivens.widget.api.SettingsStore
+import hivens.widget.api.TakenContribution
+import hivens.widget.api.ofKind
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -27,9 +30,9 @@ data class ThemeOpening(val theme: Theme, val dark: Boolean)
 
 /**
  * The library of themes and the choice: which theme the launcher is drawn in, whether dark,
- * and what decides that. One for the app, made by the host before any module loads, since the
- * window the launcher boots in is already drawn in it. The themes module answers its keys over
- * it, and the host draws its windows with what it holds.
+ * and what decides that. One for the app, which the themes module makes as an app service and
+ * answers its keys over. The host draws its windows with what those keys answer, and the window
+ * the launcher boots in, drawn before the manager exists, with what [opening] works out.
  *
  * What the person chose is [settings], the themes settings domain, which also writes the dark
  * flag and the mode into the launcher's former settings file for a build from before the move.
@@ -45,7 +48,8 @@ data class ThemeOpening(val theme: Theme, val dark: Boolean)
  * mode names is listened to, and a source that agrees with the current flag writes nothing (see
  * [darkThemeFor]).
  *
- * Themes modules bring come in through [contribute] and leave through [withdraw]. They are named
+ * Themes modules bring come in through [contribute] and leave through [withdraw], which [follow]
+ * calls as the modules brought in change. They are named
  * in the language [translations] are in now and never stored, so a choice of one whose module is
  * gone lands on the default theme and comes back with the module.
  *
@@ -186,6 +190,23 @@ class ThemeManager(
     fun withdraw(moduleId: String) {
         val had = synchronized(lock) { modules.remove(moduleId) != null }
         if (had) sync()
+    }
+
+    /**
+     * Takes the themes among what the modules brought in contribute, [taken], as it changes, on
+     * [scope]: a module that comes brings its themes, one loaded again brings its new ones, and one
+     * that leaves takes its own with it. What [taken] holds now is taken before this returns.
+     */
+    fun follow(taken: StateFlow<List<TakenContribution<ModuleContribution>>>, scope: CoroutineScope) {
+        var handed = emptySet<String>()
+        fun apply(all: List<TakenContribution<ModuleContribution>>) {
+            val byModule = all.ofKind<ThemeContribution>().groupBy({ it.moduleId }, { it.item })
+            byModule.forEach { (id, themes) -> contribute(id, themes) }
+            (handed - byModule.keys).forEach(::withdraw)
+            handed = byModule.keys
+        }
+        apply(taken.value)
+        scope.launch { taken.collect(::apply) }
     }
 
     // Acts on what changed since the settings were last acted on, then publishes the result.

@@ -1,6 +1,11 @@
 package hivens.ui.layout
 
+import hivens.core.data.NewerBuildData
+import hivens.core.data.ReadOnlyReason
+import hivens.core.data.ReadOnlyStore
+import hivens.core.io.AtomicFiles
 import hivens.core.io.readUtf8
+import hivens.ui.bootstrap.RecoveryIo
 import hivens.widget.model.LayoutGraph
 import hivens.widget.model.SlotId
 import hivens.widget.model.SurfaceId
@@ -28,14 +33,10 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
-import hivens.core.data.NewerBuildData
-import hivens.core.data.ReadOnlyReason
-import hivens.core.data.ReadOnlyStore
-import hivens.core.io.AtomicFiles
-import hivens.ui.bootstrap.RecoveryIo
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
@@ -245,99 +246,23 @@ class LayoutGraphRepository(
     }
 
     private fun load(): LayoutGraph {
-        if (!Files.exists(file)) {
+        val read = read(file, json, standardModules, defaultGraph, log)
+        if (read.firstRun) {
             // First run: write the bundled default so subsequent loads
             // operate on the user's editable copy, not the jar resource.
             // Failure to write is non-fatal -- the launcher still runs
             // against the in-memory default.
-            val def = defaultGraph()
             try {
-                AtomicFiles.writeString(file, json.encodeToString(Envelope(schemaVersion = SCHEMA_VERSION, graph = def)))
+                AtomicFiles.writeString(file, json.encodeToString(Envelope(schemaVersion = SCHEMA_VERSION, graph = read.graph)))
             } catch (e: Exception) {
                 log.warn("Failed to seed default layout graph at {} -- continuing in memory", file, e)
             }
-            return def
         }
-        return try {
-            // Parsed rather than decoded, because the structural half of the ladder
-            // runs on the raw object. A field this build no longer declares is
-            // dropped by ignoreUnknownKeys at decode, which is before a migration
-            // taking a LayoutGraph could ever see it -- so a shape change has to
-            // happen while the file is still a tree of keys.
-            val root = json.parseToJsonElement(readUtf8(file)).jsonObject
-            val envelope = LoadedEnvelope(
-                schemaVersion = root["schema_version"]?.jsonPrimitive?.int
-                    ?: error("layout envelope carries no schema_version"),
-                graph = root["graph"]?.jsonObject ?: JsonObject(emptyMap()),
-            )
-            if (envelope.schemaVersion > SCHEMA_VERSION) {
-                readOnly = true
-                NewerBuildData.record(ReadOnlyStore.Layout)
-                log.warn(
-                    "Layout graph at {} is schema_version {} > supported {} -- written by a newer build. " +
-                        "Loading read-only; this session will not write it back to avoid clobbering newer data.",
-                    file, envelope.schemaVersion, SCHEMA_VERSION,
-                )
-            }
-            if (envelope.schemaVersion in 1 until LayoutReconcile.SURFACE_SCHEMA) {
-                // Deliberately not migrated: see LayoutReconcile.SURFACE_SCHEMA.
-                //
-                // "Left on disk untouched" was the intent and not the behaviour: the
-                // branch returned the bundled default without closing the store, so
-                // the first edit of the session persisted that default over the file
-                // it had just declined to read, and the notice never fired because
-                // nothing had been recorded. Read-only is what makes the sentence
-                // above true.
-                readOnly = true
-                NewerBuildData.record(ReadOnlyStore.Layout, ReadOnlyReason.UnreadableFormat)
-                log.warn(
-                    "Layout graph at {} is schema_version {} and describes widget surfaces in a form " +
-                        "with no faithful reading here; starting from the bundled default. " +
-                        "The file is left as it is.",
-                    file, envelope.schemaVersion,
-                )
-                return defaultGraph()
-            }
-            if (envelope.schemaVersion in 1 until SCHEMA_VERSION) {
-                _migratedFromSchema = envelope.schemaVersion
-            }
-            val def = defaultGraph()
-            val structural = JsonMigrations.apply(envelope.schemaVersion, envelope.graph)
-            val decoded = json.decodeFromJsonElement(LayoutGraph.serializer(), structural).withoutStandardModules()
-            // Migrate + seed missing default surfaces/slots + sweep instanceId
-            // uniqueness via the shared reconciler. A migration or merge that
-            // mints a colliding id would silently break every findByInstanceId
-            // traversal; update() guards live edits, this is the load-time
-            // backstop -- serve the bundled default over a corrupted tree.
-            when (val result = LayoutReconcile.reconcile(envelope.schemaVersion, decoded, def)) {
-                is LayoutReconcile.Result.Ok -> seedNewBundledWidgets(result.graph, def)
-                is LayoutReconcile.Result.DuplicateId -> {
-                    log.error(
-                        "Layout graph at {} has a duplicate instanceId '{}' after {} (schema_version {} -> {}). " +
-                            "Falling back to the bundled default to protect instanceId-keyed traversals.",
-                        file, result.id, result.stage, envelope.schemaVersion, LayoutReconcile.CURRENT_SCHEMA,
-                    )
-                    closeOverDamage()
-                    defaultGraph()
-                }
-            }
-        } catch (e: Exception) {
-            log.error("Failed to load layout graph at {} -- falling back to bundled default", file, e)
-            closeOverDamage()
-            defaultGraph()
-        }
-    }
-
-    /**
-     * The file is somebody's arrangement that could not be read this time, and the
-     * default stands in for it. Read-only, for the reason the old-format branch
-     * above gives: open for writing, the first edit of the session put the default
-     * over a file that a transient read error, one duplicated id or a stray brace
-     * had kept from loading, and the arrangement was gone for good.
-     */
-    private fun closeOverDamage() {
-        readOnly = true
-        NewerBuildData.record(ReadOnlyStore.Layout, ReadOnlyReason.Damaged)
+        read.reasons.forEach { NewerBuildData.record(ReadOnlyStore.Layout, it) }
+        readOnly = read.reasons.isNotEmpty()
+        _migratedFromSchema = read.migratedFrom
+        val default = read.seedFrom ?: return read.graph
+        return seedNewBundledWidgets(read.graph, default)
     }
 
     /**
@@ -393,13 +318,24 @@ class LayoutGraphRepository(
      * one, in any order, so the standard list is read afresh at every start and never
      * frozen into the file.
      */
-    private fun LayoutGraph.withoutStandardModules(): LayoutGraph {
-        val named = modules ?: return this
-        return if (named.toSet() == standardModules().toSet()) copy(modules = null) else this
-    }
+    private fun LayoutGraph.withoutStandardModules(): LayoutGraph = withoutStandard(standardModules)
 
     /** What a read pulled off disk before the structural ladder runs. */
     private data class LoadedEnvelope(val schemaVersion: Int, val graph: JsonObject)
+
+    /**
+     * What a start reads of the file: the graph it opens on, whether there was no file yet, why the
+     * file is left as it is for the session where it is ([reasons], in the order they were found, none
+     * for a file that may be written), the schema it was migrated up from, and the default the bundled
+     * widgets it lacks are seeded from where it is a graph that may take them.
+     */
+    internal class Read(
+        val graph: LayoutGraph,
+        val firstRun: Boolean = false,
+        val reasons: List<ReadOnlyReason> = emptyList(),
+        val migratedFrom: Int? = null,
+        val seedFrom: LayoutGraph? = null,
+    )
 
     @Serializable
     private data class Envelope(
@@ -407,13 +343,104 @@ class LayoutGraphRepository(
         val graph: LayoutGraph,
     )
 
-    private companion object {
-        const val SCHEMA_VERSION = LayoutReconcile.CURRENT_SCHEMA
+    internal companion object {
+        private const val SCHEMA_VERSION = LayoutReconcile.CURRENT_SCHEMA
+
+        /** [this] with the module list it names dropped where that list is [standard], in any order. */
+        private fun LayoutGraph.withoutStandard(standard: () -> List<String>): LayoutGraph {
+            val named = modules ?: return this
+            return if (named.toSet() == standard().toSet()) copy(modules = null) else this
+        }
+
+        /**
+         * The graph [file] opens on, read the way every start reads it, with nothing written and
+         * nothing put on record: the repository's own load, and the window the launcher boots in,
+         * which has to know which modules the document names before the repository exists. [log] is
+         * told what the read found, or nothing where it is null. A file that cannot be read opens on
+         * the bundled default rather than failing.
+         */
+        internal fun read(
+            file: Path,
+            json: Json,
+            standardModules: () -> List<String>,
+            defaultGraph: () -> LayoutGraph,
+            log: Logger? = null,
+        ): Read {
+            if (!Files.exists(file)) return Read(defaultGraph(), firstRun = true)
+            val reasons = ArrayList<ReadOnlyReason>()
+            var migratedFrom: Int? = null
+            return try {
+                // Parsed rather than decoded, because the structural half of the ladder
+                // runs on the raw object. A field this build no longer declares is
+                // dropped by ignoreUnknownKeys at decode, which is before a migration
+                // taking a LayoutGraph could ever see it -- so a shape change has to
+                // happen while the file is still a tree of keys.
+                val root = json.parseToJsonElement(readUtf8(file)).jsonObject
+                val envelope = LoadedEnvelope(
+                    schemaVersion = root["schema_version"]?.jsonPrimitive?.int
+                        ?: error("layout envelope carries no schema_version"),
+                    graph = root["graph"]?.jsonObject ?: JsonObject(emptyMap()),
+                )
+                if (envelope.schemaVersion > SCHEMA_VERSION) {
+                    reasons += ReadOnlyReason.NewerBuild
+                    log?.warn(
+                        "Layout graph at {} is schema_version {} > supported {} -- written by a newer build. " +
+                            "Loading read-only; this session will not write it back to avoid clobbering newer data.",
+                        file, envelope.schemaVersion, SCHEMA_VERSION,
+                    )
+                }
+                if (envelope.schemaVersion in 1 until LayoutReconcile.SURFACE_SCHEMA) {
+                    // Deliberately not migrated: see LayoutReconcile.SURFACE_SCHEMA.
+                    //
+                    // "Left on disk untouched" was the intent and not the behaviour: the
+                    // branch returned the bundled default without closing the store, so
+                    // the first edit of the session persisted that default over the file
+                    // it had just declined to read, and the notice never fired because
+                    // nothing had been recorded. Read-only is what makes the sentence
+                    // above true.
+                    log?.warn(
+                        "Layout graph at {} is schema_version {} and describes widget surfaces in a form " +
+                            "with no faithful reading here; starting from the bundled default. " +
+                            "The file is left as it is.",
+                        file, envelope.schemaVersion,
+                    )
+                    return Read(defaultGraph(), reasons = reasons + ReadOnlyReason.UnreadableFormat)
+                }
+                if (envelope.schemaVersion in 1 until SCHEMA_VERSION) migratedFrom = envelope.schemaVersion
+                val def = defaultGraph()
+                val structural = JsonMigrations.apply(envelope.schemaVersion, envelope.graph)
+                val decoded = json.decodeFromJsonElement(LayoutGraph.serializer(), structural).withoutStandard(standardModules)
+                // Migrate + seed missing default surfaces/slots + sweep instanceId
+                // uniqueness via the shared reconciler. A migration or merge that
+                // mints a colliding id would silently break every findByInstanceId
+                // traversal; update() guards live edits, this is the load-time
+                // backstop -- serve the bundled default over a corrupted tree.
+                when (val result = LayoutReconcile.reconcile(envelope.schemaVersion, decoded, def)) {
+                    is LayoutReconcile.Result.Ok -> Read(result.graph, reasons = reasons, migratedFrom = migratedFrom, seedFrom = def.takeIf { reasons.isEmpty() })
+                    is LayoutReconcile.Result.DuplicateId -> {
+                        log?.error(
+                            "Layout graph at {} has a duplicate instanceId '{}' after {} (schema_version {} -> {}). " +
+                                "Falling back to the bundled default to protect instanceId-keyed traversals.",
+                            file, result.id, result.stage, envelope.schemaVersion, LayoutReconcile.CURRENT_SCHEMA,
+                        )
+                        Read(defaultGraph(), reasons = reasons + ReadOnlyReason.Damaged, migratedFrom = migratedFrom)
+                    }
+                }
+            } catch (e: Exception) {
+                // The file is somebody's arrangement that could not be read this time, and the
+                // default stands in for it. Read-only, for the reason the old-format branch
+                // above gives: open for writing, the first edit of the session put the default
+                // over a file that a transient read error, one duplicated id or a stray brace
+                // had kept from loading, and the arrangement was gone for good.
+                log?.error("Failed to load layout graph at {} -- falling back to bundled default", file, e)
+                Read(defaultGraph(), reasons = reasons + ReadOnlyReason.Damaged, migratedFrom = migratedFrom)
+            }
+        }
 
         // 200ms catches a drag-thrash without delaying single drops
         // noticeably. Verification target in the Phase A plan is "<=5
         // disk writes over a 1s drag-thrash".
-        const val DEBOUNCE_MS = 200L
+        private const val DEBOUNCE_MS = 200L
     }
 }
 
