@@ -27,7 +27,7 @@ import javax.swing.SwingUtilities
  *     behind Koin, and it starts asking the modules compiled in for what
  *     the boot window is drawn and worded in (see [PreBoot.boot]).
  *   - [completeBoot] is the slow remainder (data move, migration, Koin),
- *     run by hivens.ui.Main on a background thread behind the live
+ *     run by hivens.ui.runLauncher on a background thread behind the live
  *     boot-threshold window.
  */
 object GuiBootstrap {
@@ -105,7 +105,7 @@ object GuiBootstrap {
 
     /**
      * Run the slow boot remainder. Called from the boot thread in
-     * hivens.ui.Main; [onPhase] feeds the threshold screen's progress bar.
+     * hivens.ui.runLauncher; [onPhase] feeds the threshold screen's progress bar.
      */
     fun completeBoot(
         pre: PreBoot,
@@ -141,7 +141,7 @@ object GuiBootstrap {
             // This handler is for crashes OFF the composition path (background
             // threads, coroutines). Shell-composition crashes unwind
             // `application {}` and are recovered by the restart loop in
-            // hivens.ui.Main instead -- they never reach here.
+            // hivens.ui.runLauncher instead -- they never reach here.
             runCatching {
                 val reporter   = crashReporter.get()
                 val report     = reporter.generate(throwable, thread)

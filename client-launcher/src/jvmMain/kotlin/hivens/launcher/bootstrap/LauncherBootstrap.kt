@@ -13,14 +13,12 @@ import org.koin.core.KoinApplication
 import org.koin.core.module.Module
 import org.koin.dsl.koinApplication
 import java.nio.file.Files
-import java.util.UUID
 import kotlin.system.exitProcess
 
 /**
  * Everything that has to happen before an entrypoint takes over the JVM:
- * log directory resolution so logback.xml's `${nexira.logs.dir}`
- * substitution works on the very first LoggerFactory call, pending
- * data-dir migration, session-id tagging, crash-report handler,
+ * the log directory and session tag (the entry point names them first,
+ * see [LogDirectory]), pending data-dir migration, crash-report handler,
  * single-instance lock, Koin startup.
  *
  * The pipeline is split in two so the GUI can show a window BEFORE the
@@ -103,11 +101,9 @@ object LauncherBootstrap {
      * milliseconds-cheap by construction -- the point of the split is
      * that a window can go up immediately after this returns.
      *
-     * Resolve logs dir BEFORE any LoggerFactory.getLogger() call so
-     * logback.xml (which reads `${nexira.logs.dir}` for its rolling-file
-     * appenders) sees the platform-correct path on its very first init.
-     * PlatformPaths.system() is pure computation -- no logger init --
-     * safe to call before the property is set.
+     * The log directory is the entry point's to name, before anything it
+     * reaches can create a logger (see [LogDirectory]). Named again here
+     * for the same paths, which keeps the session id the entry made.
      *
      * The resolved paths are an INITIAL value: [completeCore] may commit
      * a pending `data-dir` move and re-resolve; the post-move paths are
@@ -118,16 +114,7 @@ object LauncherBootstrap {
      */
     fun preWindow(singleInstance: Boolean): PreWindow {
         val initialPaths = PlatformPaths.system()
-        System.setProperty("nexira.logs.dir", initialPaths.logsDir.toString())
-
-        // Pulse: tag every log line in this process with a stable 8-char sessionId
-        // so a multi-launch user dump can be sliced per process invocation
-        // (`grep sessionId=abc12345 *.log`). System property (not MDC) because
-        // MDC is thread-local, and we want this on every line from every thread --
-        // the logback pattern reads the property via `${nexira.sessionId}`.
-        // Set BEFORE the first possible logger init (the lock below logs).
-        val sessionId = UUID.randomUUID().toString().take(8)
-        System.setProperty("nexira.sessionId", sessionId)
+        val sessionId = LogDirectory.claim(initialPaths)
 
         // Beacon: the very first entry in the action ring -- handy when reading a
         // bundle to confirm what process / version / OS produced it.
@@ -185,7 +172,7 @@ object LauncherBootstrap {
         // every singleton against it.
         val paths = PlatformPaths.system()
         if (paths.dataDir != pre.initialPaths.dataDir) {
-            System.setProperty("nexira.logs.dir", paths.logsDir.toString())
+            System.setProperty(LogDirectory.LOGS_DIR_PROPERTY, paths.logsDir.toString())
             if (relockOnMove) {
                 // The pre-window lock guards the OLD dir; a duplicate started
                 // after the move would gate on the NEW dir. Best-effort

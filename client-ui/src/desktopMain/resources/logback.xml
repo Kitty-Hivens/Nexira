@@ -2,10 +2,15 @@
 <!--
     ─── Pulse — central logging configuration ────────────────────────────────
 
-    LOGS_DIR resolves from the system property `nexira.logs.dir` set in
-    `hivens.ui.MainKt` BEFORE the first LoggerFactory.getLogger() call.
+    LOGS_DIR resolves from the system property `nexira.logs.dir`, set by
+    hivens.launcher.bootstrap.LogDirectory, which the entry point
+    `hivens.ui.MainKt` calls as its first statement, BEFORE the first
+    LoggerFactory.getLogger() call. Main.kt holds nothing else, because the
+    JVM initialises a file's top-level values before main() runs.
     The property value comes from PlatformPaths.logsDir, so NEXIRA_DATA_DIR
     override and per-OS data-dir layout flow through automatically.
+    EntryLogDirectoryTest starts the entry in a JVM of its own and fails
+    when the logs land anywhere else.
 
     Falls back to `${java.io.tmpdir}/nexira-fallback-logs/` if the
     property is missing. The /tmp location is deliberate; the previous
