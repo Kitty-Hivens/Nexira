@@ -26,6 +26,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -242,6 +244,27 @@ class SignInsTest {
         assertEquals("Steve", accounts.session.state.value.name())
         assertNull(accounts.settings.current.preferredFaceProvider, "the face choice went with the account it named")
         await(accounts.directory.list, "the list read again") { it?.map { a -> a.providerKey } == listOf("smartycraft") }
+    }
+
+    @Test
+    fun `a removal asked right behind a face choice lands after it`() {
+        val accounts = Accounts()
+        val alex = SessionData(playerName = "Alex", uuid = "0123456789abcdef0123456789abcdef", refreshToken = "r")
+        accounts.store.byProvider["microsoft"] = alex
+        accounts.store.byProvider["smartycraft"] = steve
+        accounts.session.signIn(alex, "microsoft")
+        // The choice finds its face and is held there, so a removal that does not wait for it signs
+        // in first and the choice's sign-in lands on top.
+        val held = CountDownLatch(1)
+        accounts.store.onFace = { if (it?.playerName == "Alex" && held.count > 0) { Thread.sleep(300); held.countDown() } }
+
+        accounts.directory.setFace(FaceChoice("microsoft"), accounts.session)
+        accounts.directory.remove(AccountRemoval("microsoft", "t3"), accounts.session)
+        await(accounts.directory.removals, "the removal") { it["microsoft"] == RemovalView("t3", RemovalOutcome.Moved) }
+        assertTrue(held.await(5, TimeUnit.SECONDS), "the choice found its face")
+        Thread.sleep(100)
+        assertEquals("Steve", accounts.session.state.value.name())
+        assertNull(accounts.settings.current.preferredFaceProvider, "the choice went with the account it named")
     }
 
     // A keyring that fails half way lists two accounts and gives no face for them. The

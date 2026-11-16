@@ -33,7 +33,11 @@ internal class MemoryAccounts : AccountStore {
     @Synchronized override fun listAccounts(): List<StoredAccount> =
         byProvider.map { (provider, s) -> StoredAccount(provider, s.uuid.ifBlank { s.playerName }, s.playerName, s.uuid, s.playerName) }
     override fun activeAccountId(): String? = null
-    @Synchronized override fun primarySession(preferredProviderId: String?): SessionData? =
+    /** Called with every face the store gives, outside the store's lock, before the caller gets it. */
+    @Volatile var onFace: (SessionData?) -> Unit = {}
+
+    override fun primarySession(preferredProviderId: String?): SessionData? = face(preferredProviderId).also(onFace)
+    @Synchronized private fun face(preferredProviderId: String?): SessionData? =
         if (noFace) null else preferredProviderId?.let { byProvider[it] } ?: preferredFallback.firstNotNullOfOrNull { byProvider[it] }
     @Synchronized override fun loadSession(providerId: String, accountId: String): SessionData? {
         if (lockedSecrets) error("the keyring is locked")

@@ -11,6 +11,7 @@ import hivens.core.data.SessionData
 import hivens.core.data.releasingFace
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -63,6 +64,10 @@ class AccountDirectory(
     // The providers whose account is being removed, so a second press while the
     // first is still at the store does not find one account left and remove that too.
     private val removing: MutableSet<String> = ConcurrentHashMap.newKeySet()
+
+    // A face choice and a removal each write the choice and sign the session in, so they run one
+    // at a time in the order they were asked for: a removal right behind a choice sees it made.
+    private val facing = Mutex()
 
     private val _removals = MutableStateFlow<Map<String, RemovalView>>(emptyMap())
 
@@ -120,13 +125,21 @@ class AccountDirectory(
      */
     fun setFace(choice: FaceChoice, session: SessionStore) {
         _face.value = choice
-        scope.launch {
+        inTurn {
             val face = withContext(Dispatchers.IO) {
                 settings.updateSettings { it.copy(preferredFaceProvider = choice.providerKey) }
                 faceSession()?.let { it to session.providerOf(it) }
             }
             face?.let { (signed, provider) -> session.signIn(signed, provider) }
         }
+    }
+
+    /**
+     * Runs [block] after every face choice and removal asked for before it. Started on the caller's
+     * thread, so the turn is taken in call order before anything suspends.
+     */
+    private fun inTurn(block: suspend () -> Unit) {
+        scope.launch(start = CoroutineStart.UNDISPATCHED) { facing.withLock { block() } }
     }
 
     /** Says whether a sign-in keeps its account from now on. Accounts already kept stay. */
@@ -149,7 +162,7 @@ class AccountDirectory(
         val provider = request.providerKey
         if (!removing.add(provider)) return
         _removals.update { it + (provider to RemovalView(request.ticket, RemovalOutcome.Removing)) }
-        scope.launch {
+        inTurn {
             val outcome = try {
                 val face = withContext(Dispatchers.IO) {
                     accounts.listAccounts().firstOrNull { it.providerId == provider }
