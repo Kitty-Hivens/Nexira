@@ -23,7 +23,7 @@ interface LookProvision {
      * [LookChoice.overlaidWith]): every axis goes down the whole choice again, the subtree's family for
      * it, the person's own, the subtree's pack or else the person's, the default pack, the base. The
      * providers it needs are opened off the drawing thread while the subtree is drawn, and until they
-     * answer the subtree keeps the look around it. The variant and the blur are the person's.
+     * answer the subtree keeps the look around it.
      */
     @Composable
     fun Override(choice: LookChoice, content: @Composable () -> Unit)

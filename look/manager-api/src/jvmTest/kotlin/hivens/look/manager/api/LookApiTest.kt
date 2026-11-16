@@ -43,12 +43,10 @@ class LookApiTest {
     }
 
     @Test
-    fun `nothing chosen is the default pack with no axis apart and every feature left to the providers`() {
+    fun `nothing chosen is the default pack with no axis apart`() {
         val nothing = LookChoice.DEFAULT
         assertEquals(null, nothing.pack)
         assertEquals(emptyMap(), nothing.overrides)
-        assertEquals(null, nothing.variant)
-        assertEquals(null, nothing.blur)
         assertEquals(nothing, LookChoice.build {})
     }
 
@@ -57,10 +55,8 @@ class LookApiTest {
         val chosen = LookChoice.build {
             pack = "material"
             override("colour", "nx")
-            variant = LookVariant.Light
-            blur = false
         }
-        assertEquals(chosen, LookChoice.DEFAULT.withPack("material").withOverride("colour", "nx").withVariant(LookVariant.Light).withBlur(false))
+        assertEquals(chosen, LookChoice.DEFAULT.withPack("material").withOverride("colour", "nx"))
         assertEquals(mapOf("colour" to "nx"), chosen.overrides)
         assertEquals(emptyMap(), chosen.withOverride("colour", null).overrides, "a null family clears the axis")
         assertEquals(chosen, Json.decodeFromString(LookChoice.serializer(), Json.encodeToString(LookChoice.serializer(), chosen)))
@@ -78,7 +74,6 @@ class LookApiTest {
         val person = LookChoice.build {
             pack = "fluent"
             override("shade", "own")
-            variant = LookVariant.Dark
         }
         val subtree = LookChoice.build {
             pack = "material"
@@ -87,7 +82,6 @@ class LookApiTest {
         val merged = person.overlaidWith(subtree)
         assertEquals("material", merged.pack)
         assertEquals(mapOf("shade" to "own", "motion" to "calm"), merged.overrides)
-        assertEquals(LookVariant.Dark, merged.variant)
         assertEquals("fluent", person.overlaidWith(LookChoice.build { override("shade", "x") }).pack, "a subtree naming no pack keeps the person's")
     }
 
@@ -121,21 +115,19 @@ class LookApiTest {
     }
 
     @Test
-    fun `a feature is offered only where the provider answering the axis declares it`() {
+    fun `a family draws an axis only while its provider answers it`() {
         val state = LookState(
             choice    = LookChoice.DEFAULT,
             axes      = listOf(
-                LookAxisState("surface", ApiVersion(1, 0), "nx", LookSource.DefaultPack, setOf(LookCapability.BLUR)),
-                LookAxisState("colour", ApiVersion(1, 0), null, LookSource.Base, emptySet()),
+                LookAxisState("surface", ApiVersion(1, 0), "nx", LookSource.DefaultPack),
+                LookAxisState("colour", ApiVersion(1, 0), null, LookSource.Base),
             ),
             providers = emptyList(),
             packs     = emptyList(),
         )
-        assertTrue(state.offers("surface", LookCapability.BLUR))
-        assertFalse(state.offers("surface", LookCapability.VARIANTS))
-        assertFalse(state.offers("colour", LookCapability.BLUR), "base answers declare nothing")
-        assertFalse(state.offers("motion", LookCapability.BLUR), "an axis no module brings offers nothing")
-        assertTrue(state.offers(LookCapability.BLUR), "the blur setting exists while one provider in use has a blur")
-        assertFalse(state.offers(LookCapability.VARIANTS))
+        assertTrue(state.draws("surface", "nx"))
+        assertFalse(state.draws("surface", "material"), "another family of the same axis")
+        assertFalse(state.draws("colour", "nx"), "base answers are no family's")
+        assertFalse(state.draws("motion", "nx"), "an axis no module brings is drawn by no family")
     }
 }

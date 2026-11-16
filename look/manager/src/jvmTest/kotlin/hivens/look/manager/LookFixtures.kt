@@ -34,7 +34,6 @@ class TestAxis(id: String, contract: ApiVersion = ApiVersion(1, 0)) : LookAxis<S
 class TestProvider(
     override val axis: String,
     override val family: String,
-    override val capabilities: Set<String> = emptySet(),
     private val failing: Throwable? = null,
     override val contract: ApiVersion = ApiVersion(1, 0),
 ) : LookProvider<Shade> {

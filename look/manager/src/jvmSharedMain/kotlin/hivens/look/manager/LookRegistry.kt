@@ -49,9 +49,8 @@ internal class ProviderEntry(
     val family: String,
     val contract: ApiVersion,
     val label: String,
-    val capabilities: Set<String>,
 ) {
-    fun view() = LookProviderEntry(moduleId, axis, family, label, capabilities)
+    fun view() = LookProviderEntry(moduleId, axis, family, label)
 }
 
 /** A provider that answers an axis, and where in the choice it came from. */
@@ -145,7 +144,7 @@ internal class LookRegistry private constructor(
             val axis = provider.axis
             val family = provider.family
             require(axis.isNotBlank() && family.isNotBlank()) { "provider '${provider.id}' names no axis or no family" }
-            return ProviderEntry(moduleId, provider, axis, family, provider.contract, provider.label, provider.capabilities.toSet())
+            return ProviderEntry(moduleId, provider, axis, family, provider.contract, provider.label)
         }
 
         private fun <K, V> keepFirst(into: MutableMap<K, V>, key: K, entry: V, moduleId: String, what: String) {

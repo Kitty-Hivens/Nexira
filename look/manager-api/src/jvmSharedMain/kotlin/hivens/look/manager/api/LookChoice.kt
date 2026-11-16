@@ -2,13 +2,9 @@ package hivens.look.manager.api
 
 import kotlinx.serialization.Serializable
 
-/** Which of a provider's two variants the person wants, where the provider has both ([LookCapability.VARIANTS]). */
-@Serializable
-enum class LookVariant { Dark, Light }
-
 /**
- * The person's choice of look: a pack, the provider family for any axis they want otherwise, and the
- * optional features the providers in use may offer.
+ * The person's choice of look: a pack, and the provider family for any axis they want otherwise. Every
+ * setting of a provider, a dark and a light variant or a blur say, is the provider's own and not here.
  *
  * Each axis is answered by the provider of the first of these that names one which is there: the
  * family in [overrides] for the axis, the family [pack] names for it, the family the default pack
@@ -24,49 +20,30 @@ class LookChoice private constructor(
     val pack: String? = null,
     /** The provider family per axis the person chose apart from the pack, by axis id. */
     val overrides: Map<String, String> = emptyMap(),
-    /** The variant, handed to the providers that declare [LookCapability.VARIANTS]. Null leaves it to each. */
-    val variant: LookVariant? = null,
-    /** Whether to blur, handed to the providers that declare [LookCapability.BLUR]. Null leaves it to each. */
-    val blur: Boolean? = null,
 ) {
     /** This choice with [pack], null for the default pack. */
-    fun withPack(pack: String?): LookChoice = LookChoice(pack, overrides, variant, blur)
+    fun withPack(pack: String?): LookChoice = LookChoice(pack, overrides)
 
     /** This choice with [family] for [axis], or without a family of the person's own for it where [family] is null. */
     fun withOverride(axis: String, family: String?): LookChoice =
-        LookChoice(pack, if (family == null) overrides - axis else overrides + (axis to family), variant, blur)
-
-    /** This choice with [variant], null to leave it to the providers. */
-    fun withVariant(variant: LookVariant?): LookChoice = LookChoice(pack, overrides, variant, blur)
-
-    /** This choice with [blur], null to leave it to the providers. */
-    fun withBlur(blur: Boolean?): LookChoice = LookChoice(pack, overrides, variant, blur)
+        LookChoice(pack, if (family == null) overrides - axis else overrides + (axis to family))
 
     /**
-     * What choosing [other] on top of this one gives: its pack where it names one, its families over
-     * these axis by axis, and its features where it sets them. A subtree's look is the person's choice
-     * with the subtree's laid over it this way.
+     * What choosing [other] on top of this one gives: its pack where it names one, and its families over
+     * these axis by axis. A subtree's look is the person's choice with the subtree's laid over it this way.
      */
-    fun overlaidWith(other: LookChoice): LookChoice =
-        LookChoice(other.pack ?: pack, overrides + other.overrides, other.variant ?: variant, other.blur ?: blur)
+    fun overlaidWith(other: LookChoice): LookChoice = LookChoice(other.pack ?: pack, overrides + other.overrides)
 
-    override fun equals(other: Any?): Boolean =
-        other is LookChoice && other.pack == pack && other.overrides == overrides && other.variant == variant && other.blur == blur
+    override fun equals(other: Any?): Boolean = other is LookChoice && other.pack == pack && other.overrides == overrides
 
-    override fun hashCode(): Int = listOf(pack, overrides, variant, blur).hashCode()
+    override fun hashCode(): Int = listOf(pack, overrides).hashCode()
 
-    override fun toString(): String = "LookChoice(pack=$pack, overrides=$overrides, variant=$variant, blur=$blur)"
+    override fun toString(): String = "LookChoice(pack=$pack, overrides=$overrides)"
 
     /** Where [build] gathers a choice. */
     class Builder internal constructor() {
         /** See [LookChoice.pack]. */
         var pack: String? = null
-
-        /** See [LookChoice.variant]. */
-        var variant: LookVariant? = null
-
-        /** See [LookChoice.blur]. */
-        var blur: Boolean? = null
 
         private val overrides = LinkedHashMap<String, String>()
 
@@ -75,11 +52,11 @@ class LookChoice private constructor(
             overrides[axis] = family
         }
 
-        internal fun choice() = LookChoice(pack, overrides.toMap(), variant, blur)
+        internal fun choice() = LookChoice(pack, overrides.toMap())
     }
 
     companion object {
-        /** Nothing chosen: the default pack, no axis apart, every feature left to the providers. */
+        /** Nothing chosen: the default pack, no axis apart. */
         val DEFAULT: LookChoice = LookChoice()
 
         /** The choice [block] makes. */

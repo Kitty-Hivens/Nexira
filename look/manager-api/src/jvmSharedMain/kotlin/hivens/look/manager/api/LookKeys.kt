@@ -28,6 +28,6 @@ object LookKeys {
      */
     val Provide = SourceKey<LookProvision>(PROVIDE_ID, ScopeLevel.App)
 
-    /** Which provider answers each axis and why, the optional features each has, and what is on offer. */
+    /** Which provider answers each axis and why, and what is on offer. */
     val State = SourceKey<LookState>(STATE_ID, ScopeLevel.App)
 }

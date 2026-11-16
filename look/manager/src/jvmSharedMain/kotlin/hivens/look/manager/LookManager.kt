@@ -3,14 +3,12 @@ package hivens.look.manager
 import androidx.compose.runtime.RememberObserver
 import hivens.look.manager.api.LookAnswers
 import hivens.look.manager.api.LookAxisState
-import hivens.look.manager.api.LookCapability
 import hivens.look.manager.api.LookChoice
 import hivens.look.manager.api.LookContext
 import hivens.look.manager.api.LookProvider
 import hivens.look.manager.api.LookProvision
 import hivens.look.manager.api.LookSource
 import hivens.look.manager.api.LookState
-import hivens.look.manager.api.LookVariant
 import hivens.widget.api.ModuleContribution
 import hivens.widget.api.TakenContribution
 import kotlinx.coroutines.CoroutineDispatcher
@@ -181,7 +179,7 @@ internal class LookManager(
                 if (provider in input.failed || provider in failedNow) return null
                 input.open[provider]?.let { return it }
                 opening[provider]?.let { return it }
-                return openOf(entry, input.chosen)?.also { opening[provider] = it } ?: null.also { failedNow += provider }
+                return openOf(entry)?.also { opening[provider] = it } ?: null.also { failedNow += provider }
             }
             fun fail(entry: ProviderEntry) {
                 failedNow += entry.provider
@@ -197,7 +195,7 @@ internal class LookManager(
                 }
             } while (failedNow.size > before)
             val unused = ArrayList<Opened>()
-            val (kept, rewatching) = synchronized(lock) {
+            val rewatching = synchronized(lock) {
                 if (closed) return
                 failed += failedNow
                 failed.retainAll(input.registry.providers.mapTo(Collections.newSetFromMap(IdentityHashMap())) { it.provider })
@@ -211,7 +209,7 @@ internal class LookManager(
                 _answers.value = top.map { AxisAnswer(it.axis, it.value) }
                 _state.value = LookState(
                     choice    = input.chosen,
-                    axes      = top.map { LookAxisState(it.axis.id, it.axis.contract, it.opened?.entry?.family, it.source, it.opened?.entry?.capabilities.orEmpty()) },
+                    axes      = top.map { LookAxisState(it.axis.id, it.axis.contract, it.opened?.entry?.family, it.source) },
                     providers = input.registry.providers.map(ProviderEntry::view),
                     packs     = input.registry.packs,
                 )
@@ -219,10 +217,9 @@ internal class LookManager(
                 val keys: Set<LookProvider<Any>> = Collections.newSetFromMap<LookProvider<Any>>(IdentityHashMap()).also { it += next.keys }
                 val changed = keys != watched
                 watched = keys
-                next.values.toList() to changed
+                changed
             }
             unused.forEach(Opened::close)
-            kept.forEach { it.follow(input.chosen) }
             if (rewatching) rewatch()
         } finally {
             if (!installed) opening.values.forEach(Opened::close)
@@ -251,21 +248,17 @@ internal class LookManager(
 
     // The provider opened, or null where opening it failed. Whether it answers in its axis's type is
     // [resolve]'s to find, which reads the answers.
-    private fun openOf(entry: ProviderEntry, choice: LookChoice): Opened? {
+    private fun openOf(entry: ProviderEntry): Opened? {
         val job = SupervisorJob(scope.coroutineContext[Job])
-        val variant = MutableStateFlow(if (LookCapability.VARIANTS in entry.capabilities) choice.variant else null)
-        val blur = MutableStateFlow(if (LookCapability.BLUR in entry.capabilities) choice.blur else null)
         val context = object : LookContext {
             override val coroutineScope = CoroutineScope(scope.coroutineContext + providerDispatcher + job)
-            override val variant: StateFlow<LookVariant?> = variant.asStateFlow()
-            override val blur: StateFlow<Boolean?> = blur.asStateFlow()
         }
         val answers = guarded(alive) { entry.provider.open(context) }.getOrElse {
             job.cancel()
             log.warn("Look provider '{}' of module '{}' could not open, and axis '{}' goes on without it", entry.family, entry.moduleId, entry.axis, it)
             return null
         }
-        return Opened(entry, answers, job, variant, blur)
+        return Opened(entry, answers, job)
     }
 
     // Starts a pass whenever an open provider's answers change from what was last published.
@@ -285,13 +278,11 @@ internal class LookManager(
         synchronized(lock) { watch = job }
     }
 
-    /** A provider while it is open, the job its work runs under, and the features handed to it. */
+    /** A provider while it is open, and the job its work runs under. */
     private inner class Opened(
         val entry: ProviderEntry,
         val answers: LookAnswers<Any>,
         private val job: Job,
-        private val variant: MutableStateFlow<LookVariant?>,
-        private val blur: MutableStateFlow<Boolean?>,
     ) {
         // Its answers now, or null where they cannot be read or are not of [axis]'s type, which fails it.
         fun current(axis: AxisEntry): Any? {
@@ -299,12 +290,6 @@ internal class LookManager(
             if (axis.accepts(value)) return value
             log.warn("Look provider '{}' of module '{}' does not answer axis '{}' in its own type, and is passed over", entry.family, entry.moduleId, entry.axis)
             return null
-        }
-
-        // Hands it what the person chose of the features it declares.
-        fun follow(choice: LookChoice) {
-            if (LookCapability.VARIANTS in entry.capabilities) variant.value = choice.variant
-            if (LookCapability.BLUR in entry.capabilities) blur.value = choice.blur
         }
 
         fun close() {

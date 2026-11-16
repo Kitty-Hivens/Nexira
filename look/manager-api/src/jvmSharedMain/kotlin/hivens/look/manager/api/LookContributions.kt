@@ -47,27 +47,16 @@ abstract class LookAxis<A : Any>(
 }
 
 /**
- * Well known optional features a provider may declare in [LookProvider.capabilities]. A provider may
- * declare others, and the manager answers for any of them alike.
- */
-object LookCapability {
-    /** It answers in a dark and a light variant, so choosing between them is offered ([LookChoice.variant]). */
-    const val VARIANTS: String = "variants"
-
-    /** It draws with a blur that can be switched off, so a switch for it is offered ([LookChoice.blur]). */
-    const val BLUR: String = "blur"
-
-    /** Other modules may extend it, through a contribution its own API declares, a theme say. */
-    const val EXTENSIBLE: String = "extensible"
-}
-
-/**
  * One way to answer an axis: the answers of the axis [axis] in the family [family], which a pack or the
  * person's choice names it by.
  *
  * The manager opens a provider only while the person's choice, or a subtree's, needs it ([open]), off
  * the thread that asked, and closes what it opened when that stops. Two providers of one family for
  * one axis are never both used: the first module to bring one has it.
+ *
+ * Everything behind its answers is its own: its variants and what switches them, a blur, its settings,
+ * its keys, and how other modules extend it. The manager knows none of it. Where any of it changes the
+ * answers, the provider hands the new answers through [LookAnswers.answers].
  *
  * Carried like any other contribution: a jar lists it as a service under this interface's name,
  * `META-INF/services/hivens.look.manager.api.LookProvider`, and names [LookApi.ID] in its manifest.
@@ -88,9 +77,6 @@ interface LookProvider<A : Any> : ModuleContribution {
     /** The version of the axis's contract it was built against. One the axis's version does not serve is refused. */
     val contract: ApiVersion
 
-    /** The optional features it has, see [LookCapability]. A setting for one is offered only where the provider in use declares it. */
-    val capabilities: Set<String> get() = emptySet()
-
     /**
      * Its answers, ready at once and as they change, until they are closed. Called only when the choice
      * needs it, and never on the thread that draws. Whatever it throws, a cancellation of its own
@@ -104,18 +90,6 @@ interface LookProvider<A : Any> : ModuleContribution {
 interface LookContext {
     /** Cancelled when the manager closes the provider's answers, so the work the provider started stops with them. Runs off the drawing thread. */
     val coroutineScope: CoroutineScope
-
-    /**
-     * The variant the person chose, for a provider that declares [LookCapability.VARIANTS], and null where
-     * the person left it to the provider. Always null for a provider that does not declare it.
-     */
-    val variant: StateFlow<LookVariant?>
-
-    /**
-     * Whether the person wants the blur, for a provider that declares [LookCapability.BLUR], and null where
-     * the person left it to the provider. Always null for a provider that does not declare it.
-     */
-    val blur: StateFlow<Boolean?>
 }
 
 /** A provider's answers while it is open. */

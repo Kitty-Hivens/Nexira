@@ -34,9 +34,8 @@ public abstract class hivens/look/manager/api/LookAxis : hivens/widget/api/Modul
 
 public final class hivens/look/manager/api/LookAxisState {
 	public static final field $stable I
-	public fun <init> (Ljava/lang/String;Lhivens/widget/model/ApiVersion;Ljava/lang/String;Lhivens/look/manager/api/LookSource;Ljava/util/Set;)V
+	public fun <init> (Ljava/lang/String;Lhivens/widget/model/ApiVersion;Ljava/lang/String;Lhivens/look/manager/api/LookSource;)V
 	public fun equals (Ljava/lang/Object;)Z
-	public final fun getCapabilities ()Ljava/util/Set;
 	public final fun getContract ()Lhivens/widget/model/ApiVersion;
 	public final fun getFamily ()Ljava/lang/String;
 	public final fun getId ()Ljava/lang/String;
@@ -45,29 +44,17 @@ public final class hivens/look/manager/api/LookAxisState {
 	public fun toString ()Ljava/lang/String;
 }
 
-public final class hivens/look/manager/api/LookCapability {
-	public static final field $stable I
-	public static final field BLUR Ljava/lang/String;
-	public static final field EXTENSIBLE Ljava/lang/String;
-	public static final field INSTANCE Lhivens/look/manager/api/LookCapability;
-	public static final field VARIANTS Ljava/lang/String;
-}
-
 public final class hivens/look/manager/api/LookChoice {
 	public static final field $stable I
 	public static final field Companion Lhivens/look/manager/api/LookChoice$Companion;
 	public fun equals (Ljava/lang/Object;)Z
-	public final fun getBlur ()Ljava/lang/Boolean;
 	public final fun getOverrides ()Ljava/util/Map;
 	public final fun getPack ()Ljava/lang/String;
-	public final fun getVariant ()Lhivens/look/manager/api/LookVariant;
 	public fun hashCode ()I
 	public final fun overlaidWith (Lhivens/look/manager/api/LookChoice;)Lhivens/look/manager/api/LookChoice;
 	public fun toString ()Ljava/lang/String;
-	public final fun withBlur (Ljava/lang/Boolean;)Lhivens/look/manager/api/LookChoice;
 	public final fun withOverride (Ljava/lang/String;Ljava/lang/String;)Lhivens/look/manager/api/LookChoice;
 	public final fun withPack (Ljava/lang/String;)Lhivens/look/manager/api/LookChoice;
-	public final fun withVariant (Lhivens/look/manager/api/LookVariant;)Lhivens/look/manager/api/LookChoice;
 }
 
 public final synthetic class hivens/look/manager/api/LookChoice$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
@@ -84,13 +71,9 @@ public final synthetic class hivens/look/manager/api/LookChoice$$serializer : ko
 
 public final class hivens/look/manager/api/LookChoice$Builder {
 	public static final field $stable I
-	public final fun getBlur ()Ljava/lang/Boolean;
 	public final fun getPack ()Ljava/lang/String;
-	public final fun getVariant ()Lhivens/look/manager/api/LookVariant;
 	public final fun override (Ljava/lang/String;Ljava/lang/String;)V
-	public final fun setBlur (Ljava/lang/Boolean;)V
 	public final fun setPack (Ljava/lang/String;)V
-	public final fun setVariant (Lhivens/look/manager/api/LookVariant;)V
 }
 
 public final class hivens/look/manager/api/LookChoice$Companion {
@@ -100,9 +83,7 @@ public final class hivens/look/manager/api/LookChoice$Companion {
 }
 
 public abstract interface class hivens/look/manager/api/LookContext {
-	public abstract fun getBlur ()Lkotlinx/coroutines/flow/StateFlow;
 	public abstract fun getCoroutineScope ()Lkotlinx/coroutines/CoroutineScope;
-	public abstract fun getVariant ()Lkotlinx/coroutines/flow/StateFlow;
 }
 
 public final class hivens/look/manager/api/LookKeys {
@@ -140,7 +121,6 @@ public final class hivens/look/manager/api/LookPackEntry {
 
 public abstract interface class hivens/look/manager/api/LookProvider : hivens/widget/api/ModuleContribution {
 	public abstract fun getAxis ()Ljava/lang/String;
-	public fun getCapabilities ()Ljava/util/Set;
 	public abstract fun getContract ()Lhivens/widget/model/ApiVersion;
 	public abstract fun getFamily ()Ljava/lang/String;
 	public fun getId ()Ljava/lang/String;
@@ -148,17 +128,15 @@ public abstract interface class hivens/look/manager/api/LookProvider : hivens/wi
 }
 
 public final class hivens/look/manager/api/LookProvider$DefaultImpls {
-	public static fun getCapabilities (Lhivens/look/manager/api/LookProvider;)Ljava/util/Set;
 	public static fun getId (Lhivens/look/manager/api/LookProvider;)Ljava/lang/String;
 	public static fun getSettings (Lhivens/look/manager/api/LookProvider;)Ljava/util/List;
 }
 
 public final class hivens/look/manager/api/LookProviderEntry {
 	public static final field $stable I
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/Set;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAxis ()Ljava/lang/String;
-	public final fun getCapabilities ()Ljava/util/Set;
 	public final fun getFamily ()Ljava/lang/String;
 	public final fun getLabel ()Ljava/lang/String;
 	public final fun getModuleId ()Ljava/lang/String;
@@ -196,31 +174,17 @@ public final class hivens/look/manager/api/LookState {
 	public static final field Companion Lhivens/look/manager/api/LookState$Companion;
 	public fun <init> (Lhivens/look/manager/api/LookChoice;Ljava/util/List;Ljava/util/List;Ljava/util/List;)V
 	public final fun axis (Ljava/lang/String;)Lhivens/look/manager/api/LookAxisState;
+	public final fun draws (Ljava/lang/String;Ljava/lang/String;)Z
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAxes ()Ljava/util/List;
 	public final fun getChoice ()Lhivens/look/manager/api/LookChoice;
 	public final fun getPacks ()Ljava/util/List;
 	public final fun getProviders ()Ljava/util/List;
 	public fun hashCode ()I
-	public final fun offers (Ljava/lang/String;)Z
-	public final fun offers (Ljava/lang/String;Ljava/lang/String;)Z
 	public fun toString ()Ljava/lang/String;
 }
 
 public final class hivens/look/manager/api/LookState$Companion {
 	public final fun getEMPTY ()Lhivens/look/manager/api/LookState;
-}
-
-public final class hivens/look/manager/api/LookVariant : java/lang/Enum {
-	public static final field Companion Lhivens/look/manager/api/LookVariant$Companion;
-	public static final field Dark Lhivens/look/manager/api/LookVariant;
-	public static final field Light Lhivens/look/manager/api/LookVariant;
-	public static fun getEntries ()Lkotlin/enums/EnumEntries;
-	public static fun valueOf (Ljava/lang/String;)Lhivens/look/manager/api/LookVariant;
-	public static fun values ()[Lhivens/look/manager/api/LookVariant;
-}
-
-public final class hivens/look/manager/api/LookVariant$Companion {
-	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
