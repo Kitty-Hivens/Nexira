@@ -1,5 +1,6 @@
 package hivens.ui.layout
 
+import hivens.test.stopThenDelete
 import hivens.widget.model.FamilyId
 import hivens.widget.model.LayoutGraph
 import hivens.widget.model.Placement
@@ -23,7 +24,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -72,8 +72,7 @@ class LayoutGraphRepositoryTest {
     @AfterTest
     fun tearDown() {
         RecoveryIo.resetForTests()
-        scope.cancel()
-        tmpDir.toFile().deleteRecursively()
+        stopThenDelete(scope, tmpDir)
     }
 
     private fun repo() = LayoutGraphRepository(file, json, scope) { sampleDefault }

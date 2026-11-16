@@ -5,6 +5,7 @@ import hivens.i18n.api.I18nApi
 import hivens.i18n.api.I18nKeys
 import hivens.i18n.api.Translator
 import hivens.look.manager.api.LookApi
+import hivens.test.stopThenDelete
 import hivens.themes.api.ThemesApi
 import hivens.themes.api.ThemesKeys
 import hivens.ui.ModuleAppLevel
@@ -17,11 +18,8 @@ import hivens.widget.model.DefaultLayout
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import java.nio.file.Files
 import java.nio.file.Path
-import kotlin.io.path.ExperimentalPathApi
-import kotlin.io.path.deleteRecursively
 import kotlin.io.path.exists
 import kotlin.io.path.writeText
 import kotlin.test.AfterTest
@@ -39,12 +37,8 @@ class DocumentModulesTest {
     private val dir: Path = Files.createTempDirectory("document-modules")
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
 
-    @OptIn(ExperimentalPathApi::class)
     @AfterTest
-    fun tearDown() {
-        scope.cancel()
-        dir.deleteRecursively()
-    }
+    fun tearDown() = stopThenDelete(scope, dir)
 
     @Test
     fun `with no document of the person's the standard list is named, and nothing is written`() {

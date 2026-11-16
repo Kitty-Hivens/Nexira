@@ -9,6 +9,7 @@ import hivens.i18n.api.I18nSettings
 import hivens.i18n.api.LanguageInfo
 import hivens.i18n.take
 import hivens.i18n.wordsOf
+import hivens.test.stopThenDelete
 import hivens.ui.HostKeys
 import hivens.ui.background.BackgroundSettings
 import hivens.ui.followModuleReloads
@@ -31,7 +32,6 @@ import hivens.widget.model.SourceKey
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
@@ -76,11 +76,10 @@ class SettingsDomainModulesTest {
         fixtureJar.copyTo(folder.resolve("fixture.jar"))
     }
 
+    private val opened = OpenedModules()
+
     @AfterTest
-    fun tearDown() {
-        scope.cancel()
-        tmp.toFile().deleteRecursively()
-    }
+    fun tearDown() = stopThenDelete(scope, tmp, settle = opened::closeAll)
 
     private fun modules() = WidgetModules(
         directory = folder,
@@ -88,7 +87,7 @@ class SettingsDomainModulesTest {
         json      = json,
         builtIn   = GeneratedWidgetRegistry,
         scope     = scope,
-        host      = DesktopWidgetModuleHost(folder, shadowDir = tmp.resolve("shadow"), offered = offeredApis(), apiPackages = offeredApiPackages()),
+        host      = opened.keptBy(DesktopWidgetModuleHost(folder, shadowDir = tmp.resolve("shadow"), offered = offeredApis(), apiPackages = offeredApiPackages())),
     )
 
     private val domains by lazy { SettingsDomainFiles(tmp.resolve(Storage.SETTINGS_DIR), tmp.resolve(Storage.SETTINGS_FILE)) }

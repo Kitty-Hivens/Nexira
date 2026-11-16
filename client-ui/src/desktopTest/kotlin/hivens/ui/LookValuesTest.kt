@@ -18,6 +18,7 @@ import hivens.look.manager.api.LookKeys
 import hivens.look.manager.api.LookPack
 import hivens.look.manager.api.LookProvider
 import hivens.look.manager.api.LookProvision
+import hivens.test.stopThenDelete
 import hivens.themes.Themes
 import hivens.themes.ThemesModule
 import hivens.themes.api.ThemesApi
@@ -39,14 +40,11 @@ import hivens.widget.model.ApiVersion
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.atomic.AtomicInteger
-import kotlin.io.path.ExperimentalPathApi
-import kotlin.io.path.deleteRecursively
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -63,12 +61,8 @@ class LookValuesTest {
     private val dir: Path = Files.createTempDirectory("look-values")
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
 
-    @OptIn(ExperimentalPathApi::class)
     @AfterTest
-    fun tearDown() {
-        scope.cancel()
-        dir.deleteRecursively()
-    }
+    fun tearDown() = stopThenDelete(scope, dir)
 
     /** The scheme a window of the shell is drawn in over [shell]'s app level, read the way the shell reads it. */
     private fun drawnScheme(shell: ModuleAppLevel): Scheme? {

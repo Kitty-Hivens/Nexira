@@ -1,5 +1,6 @@
 package hivens.ui.editor
 
+import hivens.test.stopThenDelete
 import hivens.ui.layout.LayoutGraphRepository
 import hivens.widget.model.FlowSpec
 import hivens.widget.model.GRID_MAX
@@ -19,7 +20,6 @@ import hivens.widget.model.walkInstances
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -52,10 +52,7 @@ class EditModeControllerTest {
     }
 
     @AfterTest
-    fun tearDown() {
-        scope.cancel()
-        tmpDir.toFile().deleteRecursively()
-    }
+    fun tearDown() = stopThenDelete(scope, tmpDir)
 
     private fun controller(): EditModeController {
         val repo = LayoutGraphRepository(

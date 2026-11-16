@@ -2,6 +2,7 @@ package hivens.ui.widgets.modules
 
 import hivens.accounts.AccountsModule
 import hivens.accounts.SessionStore
+import hivens.test.stopThenDelete
 import hivens.ui.host.LauncherHostAccess
 import hivens.widget.api.hostServices
 import hivens.accounts.api.AccountKeys
@@ -31,7 +32,6 @@ import hivens.widget.model.SourceKey
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.serialization.json.Json
 import org.koin.dsl.koinApplication
@@ -78,11 +78,10 @@ class JarModuleKeysTest {
         scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     }
 
+    private val opened = OpenedModules()
+
     @AfterTest
-    fun tearDown() {
-        scope.cancel()
-        Files.walk(tmp).use { walk -> walk.sorted(Comparator.reverseOrder()).forEach { val _ = runCatching { Files.deleteIfExists(it) } } }
-    }
+    fun tearDown() = stopThenDelete(scope, tmp, settle = opened::closeAll)
 
     private fun modules() = WidgetModules(
         directory = folder,
@@ -90,7 +89,7 @@ class JarModuleKeysTest {
         json      = json,
         builtIn   = GeneratedWidgetRegistry,
         scope     = scope,
-        host      = DesktopWidgetModuleHost(folder, shadowDir = tmp.resolve("shadow"), offered = offeredApis(), apiPackages = offeredApiPackages()),
+        host      = opened.keptBy(DesktopWidgetModuleHost(folder, shadowDir = tmp.resolve("shadow"), offered = offeredApis(), apiPackages = offeredApiPackages())),
     )
 
     /** The host's keys with the modules [modules] has on, as the launcher builds them at a start. */

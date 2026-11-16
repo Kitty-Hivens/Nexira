@@ -2,12 +2,12 @@ package hivens.ui.widgets.modules
 
 import hivens.i18n.I18nEngine
 import hivens.i18n.wordsOf
+import hivens.test.stopThenDelete
 import hivens.widget.generated.GeneratedWidgetRegistry
 import hivens.widget.model.WidgetKind
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.serialization.json.Json
 import java.nio.file.Files
 import java.nio.file.Path
@@ -41,11 +41,10 @@ class WidgetModulesTest {
         scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     }
 
+    private val opened = OpenedModules()
+
     @AfterTest
-    fun tearDown() {
-        scope.cancel()
-        Files.walk(tmp).use { walk -> walk.sorted(Comparator.reverseOrder()).forEach { val _ = runCatching { Files.deleteIfExists(it) } } }
-    }
+    fun tearDown() = stopThenDelete(scope, tmp, settle = opened::closeAll)
 
     private fun modules() = WidgetModules(
         directory = folder,
@@ -55,12 +54,14 @@ class WidgetModulesTest {
         scope     = scope,
         // As the launcher reads the folder: the module APIs it carries offered, and the kinds
         // of contribution their modules take read beside the kernel's.
-        host      = DesktopWidgetModuleHost(
-            directory         = folder,
-            shadowDir         = tmp.resolve("shadow"),
-            offered           = offeredApis(),
-            apiPackages       = offeredApiPackages(),
-            contributionKinds = offeredContributionKinds(),
+        host      = opened.keptBy(
+            DesktopWidgetModuleHost(
+                directory         = folder,
+                shadowDir         = tmp.resolve("shadow"),
+                offered           = offeredApis(),
+                apiPackages       = offeredApiPackages(),
+                contributionKinds = offeredContributionKinds(),
+            ),
         ),
     )
 

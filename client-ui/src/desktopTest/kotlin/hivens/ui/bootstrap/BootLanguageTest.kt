@@ -6,6 +6,7 @@ import hivens.i18n.I18nModule
 import hivens.i18n.api.I18nApi
 import hivens.i18n.api.I18nKeys
 import hivens.i18n.api.Translator
+import hivens.test.stopThenDelete
 import hivens.themes.ThemesModule
 import hivens.themes.api.ThemesApi
 import hivens.ui.ModuleAppLevel
@@ -14,13 +15,10 @@ import hivens.ui.widgets.modules.CompiledModules
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.serialization.json.Json
 import java.nio.file.Files
 import java.nio.file.Path
-import kotlin.io.path.ExperimentalPathApi
 import kotlin.io.path.createDirectories
-import kotlin.io.path.deleteRecursively
 import kotlin.io.path.writeText
 import kotlin.test.AfterTest
 import kotlin.test.Test
@@ -36,12 +34,8 @@ class BootLanguageTest {
     private val dataDir: Path = Files.createTempDirectory("boot-language")
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
 
-    @OptIn(ExperimentalPathApi::class)
     @AfterTest
-    fun tearDown() {
-        scope.cancel()
-        dataDir.deleteRecursively()
-    }
+    fun tearDown() = stopThenDelete(scope, dataDir)
 
     /** The words the boot window speaks. */
     private fun boot(): Translator = bootValues(dataDir)[I18nKeys.Words] ?: error("the language module answered no words before the boot")

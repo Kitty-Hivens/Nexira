@@ -1,5 +1,6 @@
 package hivens.ui.editor
 
+import hivens.test.stopThenDelete
 import hivens.ui.layout.LayoutGraphRepository
 import hivens.widget.api.KeyDeclaration
 import hivens.widget.api.KeyKind
@@ -18,7 +19,6 @@ import hivens.widget.model.traverse
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import java.nio.file.Files
@@ -98,10 +98,7 @@ class WidgetAdmissionTest {
     }
 
     @AfterTest
-    fun tearDown() {
-        scope.cancel()
-        tmpDir.toFile().deleteRecursively()
-    }
+    fun tearDown() = stopThenDelete(scope, tmpDir)
 
     private val home = SlotPath(SurfaceId("home.new"), SlotId("main"))
     private val project = SlotPath(SurfaceId("project"), SlotId("body"))

@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import hivens.test.stopThenDelete
 import hivens.themes.Themes
 import hivens.ui.editor.EditModeController
 import hivens.ui.editor.dnd.DragController
@@ -32,7 +33,6 @@ import hivens.widget.model.WidgetKind
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import java.nio.file.Files
@@ -52,10 +52,7 @@ class DragGhostLiveCopyTest {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     @AfterTest
-    fun tearDown() {
-        scope.cancel()
-        dir.toFile().deleteRecursively()
-    }
+    fun tearDown() = stopThenDelete(scope, dir)
 
     private object Descriptor : WidgetDescriptor {
         override val kind = WidgetKind("test.probe")

@@ -3,6 +3,7 @@ package hivens.ui.widgets.modules
 import hivens.i18n.I18nModule
 import hivens.i18n.api.I18nKeys
 import hivens.i18n.wordsOf
+import hivens.test.stopThenDelete
 import hivens.ui.ModuleAppLevel
 import hivens.ui.i18n.NexiraStrings
 import hivens.widget.api.ModuleStrings
@@ -12,14 +13,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalForInheritanceCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.awaitCancellation
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.StateFlow
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.atomic.AtomicInteger
-import kotlin.io.path.ExperimentalPathApi
-import kotlin.io.path.deleteRecursively
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -30,12 +28,8 @@ class ModuleWordsTest {
     private val dataDir: Path = Files.createTempDirectory("module-words")
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
 
-    @OptIn(ExperimentalPathApi::class)
     @AfterTest
-    fun tearDown() {
-        scope.cancel()
-        dataDir.deleteRecursively()
-    }
+    fun tearDown() = stopThenDelete(scope, dataDir)
 
     private fun snapshot(words: Map<String, ModuleStrings>) = ModuleAppLevel.noJars().copy(words = words)
 

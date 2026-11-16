@@ -6,6 +6,7 @@ import hivens.core.data.NewerBuildData
 import hivens.i18n.I18nModule
 import hivens.i18n.api.FixedTranslations
 import hivens.i18n.api.I18nKeys
+import hivens.test.stopThenDelete
 import hivens.themes.ThemeLibraryFile
 import hivens.themes.ThemeManager
 import hivens.themes.Themes
@@ -27,7 +28,6 @@ import hivens.ui.widgets.modules.WidgetModules.Contributed
 import hivens.widget.api.get
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.cancel
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.boolean
@@ -36,9 +36,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
-import kotlin.io.path.ExperimentalPathApi
 import kotlin.io.path.createDirectories
-import kotlin.io.path.deleteRecursively
 import kotlin.io.path.exists
 import kotlin.io.path.readText
 import kotlin.io.path.writeText
@@ -64,12 +62,10 @@ class ThemesHostTest {
     private val domainFile: Path get() = dir.resolve(Storage.SETTINGS_DIR).resolve("${ThemesSettingsDomain.id}.json")
     private val themesJson: Path get() = dir.resolve(ThemeLibraryFile.FILE_NAME)
 
-    @OptIn(ExperimentalPathApi::class)
     @AfterTest
     fun tearDown() {
         levels.forEach { it.close() }
-        scope.cancel()
-        dir.deleteRecursively()
+        stopThenDelete(scope, dir)
     }
 
     private fun domains() = SettingsDomainFiles(dir.resolve(Storage.SETTINGS_DIR), legacy)

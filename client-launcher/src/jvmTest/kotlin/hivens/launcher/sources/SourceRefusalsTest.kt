@@ -18,6 +18,7 @@ import hivens.launcher.update.ApplyJournal
 import hivens.launcher.update.PackSnapshotService
 import hivens.launcher.update.ReattachConfirmation
 import hivens.launcher.update.SnapshotRollback
+import hivens.test.stopThenDelete
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.AfterTest
@@ -32,7 +33,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
@@ -51,10 +51,7 @@ class SourceRefusalsTest {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     @AfterTest
-    fun tearDown() {
-        scope.cancel()
-        dir.toFile().deleteRecursively()
-    }
+    fun tearDown() = stopThenDelete(scope, dir)
 
     private class Packs(list: List<PackInstance>) : IPackRepository {
         private val all = MutableStateFlow(list)

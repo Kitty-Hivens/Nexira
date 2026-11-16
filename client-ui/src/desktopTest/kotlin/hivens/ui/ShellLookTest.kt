@@ -6,6 +6,7 @@ import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.unit.Density
 import hivens.i18n.I18nModule
 import hivens.i18n.api.I18nApi
+import hivens.test.stopThenDelete
 import hivens.themes.Themes
 import hivens.themes.ThemesModule
 import hivens.themes.api.ThemesKeys
@@ -19,11 +20,8 @@ import hivens.ui.theme.NxTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import java.nio.file.Files
 import java.nio.file.Path
-import kotlin.io.path.ExperimentalPathApi
-import kotlin.io.path.deleteRecursively
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -40,12 +38,8 @@ class ShellLookTest {
     private val dir: Path = Files.createTempDirectory("shell-look-test")
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
-    @OptIn(ExperimentalPathApi::class)
     @AfterTest
-    fun tearDown() {
-        scope.cancel()
-        dir.deleteRecursively()
-    }
+    fun tearDown() = stopThenDelete(scope, dir)
 
     /** A composable boundary of its own, as the window and its layers are. */
     @Composable

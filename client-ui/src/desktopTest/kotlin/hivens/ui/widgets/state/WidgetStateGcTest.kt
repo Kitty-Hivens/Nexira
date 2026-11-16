@@ -1,5 +1,6 @@
 package hivens.ui.widgets.state
 
+import hivens.test.stopThenDelete
 import hivens.ui.bootstrap.RecoveryIo
 import hivens.ui.layout.LayoutGraphRepository
 import hivens.ui.layout.LayoutReconcile
@@ -13,7 +14,6 @@ import hivens.widget.model.WidgetKind
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
@@ -43,8 +43,7 @@ class WidgetStateGcTest {
 
     @AfterTest
     fun tearDown() {
-        scope.cancel()
-        dir.toFile().deleteRecursively()
+        stopThenDelete(scope, dir)
         RecoveryIo.resetForTests()
     }
 

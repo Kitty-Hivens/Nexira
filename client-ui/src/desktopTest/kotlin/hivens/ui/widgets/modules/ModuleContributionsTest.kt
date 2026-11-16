@@ -6,6 +6,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Density
 import hivens.config.Storage
 import hivens.i18n.I18nModule
+import hivens.test.stopThenDelete
 import hivens.themes.ThemeManager
 import hivens.themes.Themes
 import hivens.themes.ThemesModule
@@ -26,14 +27,11 @@ import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import java.nio.file.Files
 import java.nio.file.Path
 import javax.swing.SwingUtilities
-import kotlin.io.path.ExperimentalPathApi
 import kotlin.io.path.createDirectories
-import kotlin.io.path.deleteRecursively
 import kotlin.io.path.writeText
 import kotlin.test.AfterTest
 import kotlin.test.Test
@@ -54,12 +52,10 @@ class ModuleContributionsTest {
     private val scope = CoroutineScope(Dispatchers.Unconfined)
     private val levels = ArrayList<ModuleAppLevel>()
 
-    @OptIn(ExperimentalPathApi::class)
     @AfterTest
     fun tearDown() {
         levels.forEach { it.close() }
-        scope.cancel()
-        dataDir.deleteRecursively()
+        stopThenDelete(scope, dataDir)
     }
 
     private val strings = ModuleStrings(mapOf("en" to mapOf("night" to "Night"), "ru" to mapOf("night" to "Ночь")))

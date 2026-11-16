@@ -58,6 +58,8 @@ kotlin {
                 implementation(libs.kotlinx.coroutines.test)
                 // The launch controller stands behind the pack actions and is not what a reattach test is about.
                 implementation(libs.mockk)
+                // The teardown that stops a test's coroutines before its folder is deleted.
+                implementation(project(":client-core-testing"))
             }
         }
     }

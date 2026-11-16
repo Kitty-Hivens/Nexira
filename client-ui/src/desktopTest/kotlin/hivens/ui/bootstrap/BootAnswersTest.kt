@@ -1,6 +1,7 @@
 package hivens.ui.bootstrap
 
 import hivens.config.Storage
+import hivens.test.stopThenDelete
 import hivens.ui.ModuleAppLevel
 import hivens.ui.i18n.NexiraStrings
 import hivens.widget.api.BootAnswers
@@ -23,7 +24,6 @@ import hivens.widget.model.SourceKey
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -34,9 +34,7 @@ import kotlinx.serialization.json.intOrNull
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.TimeUnit
-import kotlin.io.path.ExperimentalPathApi
 import kotlin.io.path.createDirectories
-import kotlin.io.path.deleteRecursively
 import kotlin.io.path.exists
 import kotlin.io.path.writeText
 import kotlin.test.AfterTest
@@ -57,12 +55,8 @@ class BootAnswersTest {
     private val dir: Path = Files.createTempDirectory("boot-answers")
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
 
-    @OptIn(ExperimentalPathApi::class)
     @AfterTest
-    fun tearDown() {
-        scope.cancel()
-        dir.deleteRecursively()
-    }
+    fun tearDown() = stopThenDelete(scope, dir)
 
     @Serializable
     data class VolumeSettings(val level: Int = 3)

@@ -83,6 +83,7 @@ import hivens.packs.api.ReattachPreviewView
 import hivens.packs.api.ReattachRequest
 import hivens.packs.toPackView
 import hivens.packs.toView
+import hivens.test.stopThenDelete
 import hivens.themes.ThemeLibraryFile
 import hivens.themes.ThemeManager
 import hivens.themes.Themes
@@ -156,7 +157,6 @@ import hivens.widget.model.SourceKey
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
@@ -178,8 +178,6 @@ import java.util.concurrent.CyclicBarrier
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.concurrent.thread
-import kotlin.io.path.ExperimentalPathApi
-import kotlin.io.path.deleteRecursively
 import kotlin.reflect.KClass
 import kotlin.test.AfterTest
 import kotlin.test.Test
@@ -214,7 +212,6 @@ class CoreKeysTest {
 
     private val writers = ArrayList<PreferenceWriter>()
 
-    @OptIn(ExperimentalPathApi::class)
     @AfterTest
     fun tearDown() {
         // A test may have closed its own already. The keys go first: the modules'
@@ -222,10 +219,8 @@ class CoreKeysTest {
         hostKeys.forEach { keys -> val _ = runCatching { keys.close() } }
         koins.forEach { koin -> val _ = runCatching { koin.close() } }
         runBlocking { consoles.forEach { it.close() } }
-        scope.cancel()
         // The saves a test asked for land in the folder about to be deleted, so they land first.
-        writers.forEach { it.drain(5.seconds) }
-        dir.deleteRecursively()
+        stopThenDelete(scope, dir, settle = { writers.forEach { it.drain(5.seconds) } })
     }
 
     // ── Stand-ins ─────────────────────────────────────────────────────

@@ -106,7 +106,7 @@ jobs:
       - name: Run unit tests
         run: >-
           ./gradlew
-          :client-config:test :client-core:test :client-launcher:test :client-update:test
+          :client-config:test :client-core:test :client-core-testing:test :client-launcher:test :client-update:test
           :client-auth:test :client-auth-smartycraft:test :client-auth-microsoft:test
           :client-media:test :client-playback:test :client-tray:test :client-window:test
           :client-ui:desktopTest :client-i18n:desktopTest :client-render3d:desktopTest

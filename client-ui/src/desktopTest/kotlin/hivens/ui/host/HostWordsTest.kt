@@ -2,6 +2,7 @@ package hivens.ui.host
 
 import hivens.i18n.I18nModule
 import hivens.i18n.api.I18nKeys
+import hivens.test.stopThenDelete
 import hivens.themes.Themes
 import hivens.themes.ThemesModule
 import hivens.themes.api.ThemesKeys
@@ -12,12 +13,9 @@ import hivens.widget.api.TakenWords
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.StateFlow
 import java.nio.file.Files
 import java.nio.file.Path
-import kotlin.io.path.ExperimentalPathApi
-import kotlin.io.path.deleteRecursively
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -33,12 +31,8 @@ class HostWordsTest {
     private val dir: Path = Files.createTempDirectory("host-words")
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
 
-    @OptIn(ExperimentalPathApi::class)
     @AfterTest
-    fun tearDown() {
-        scope.cancel()
-        dir.deleteRecursively()
-    }
+    fun tearDown() = stopThenDelete(scope, dir)
 
     /** Words that cannot be read, so the language module cannot make its engine. */
     private val unreadable = object : TakenWords {

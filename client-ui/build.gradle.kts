@@ -320,6 +320,8 @@ kotlin {
                 implementation(libs.kotlinx.coroutines.test)
                 // On trial for relative placement: the density test runs before it reaches the product.
                 implementation(libs.constraintlayout.compose.multiplatform)
+                // The teardown that stops a test's coroutines before its folder is deleted.
+                implementation(project(":client-core-testing"))
             }
         }
     }

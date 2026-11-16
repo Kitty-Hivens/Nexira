@@ -33,11 +33,10 @@ import hivens.launcher.update.ReattachConfirmation
 import hivens.launcher.update.ReattachPreview
 import hivens.launcher.update.ReattachPreviewStaleException
 import hivens.packs.api.PackLaunch
+import hivens.test.stopThenDelete
 import io.mockk.mockk
 import java.nio.file.Files
 import java.nio.file.Path
-import kotlin.io.path.ExperimentalPathApi
-import kotlin.io.path.deleteRecursively
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -45,7 +44,6 @@ import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -64,12 +62,8 @@ class PackOperationsTest {
     private val dir: Path = Files.createTempDirectory("pack-operations-test")
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
-    @OptIn(ExperimentalPathApi::class)
     @AfterTest
-    fun tearDown() {
-        scope.cancel()
-        dir.deleteRecursively()
-    }
+    fun tearDown() = stopThenDelete(scope, dir)
 
     private val source = PackReference(PackOrigin("Shelf"), "industrial", "5")
 

@@ -1,5 +1,6 @@
 package hivens.ui.layout
 
+import hivens.test.stopThenDelete
 import hivens.ui.customization.CustomizationSettings
 import hivens.ui.editor.EditModeController
 import hivens.ui.editor.presets.PresetRepository
@@ -9,7 +10,6 @@ import hivens.widget.model.LayoutGraph
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
@@ -18,8 +18,6 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.jsonObject
 import java.nio.file.Files
 import java.nio.file.Path
-import kotlin.io.path.ExperimentalPathApi
-import kotlin.io.path.deleteRecursively
 import kotlin.io.path.readText
 import kotlin.io.path.writeText
 import kotlin.test.AfterTest
@@ -44,12 +42,8 @@ class ModuleListPersistenceTest {
     /** The standard list of the build being "started", which a test can grow. */
     private var standard = listOf("nexira.packs")
 
-    @OptIn(ExperimentalPathApi::class)
     @AfterTest
-    fun tearDown() {
-        scope.cancel()
-        dir.deleteRecursively()
-    }
+    fun tearDown() = stopThenDelete(scope, dir)
 
     private fun start() = LayoutGraphRepository(file, json, scope, defaultGraph = { DefaultLayout.load(json) }, standardModules = { standard })
 
