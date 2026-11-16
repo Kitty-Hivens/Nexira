@@ -1,6 +1,8 @@
 # Single source of truth for dependency and plugin versions.
 # Referenced from each subproject's build.gradle.kts via the `libs` accessor.
-# Use ./gradlew dependencyUpdates to surface candidates.
+# Use ./gradlew dependencyUpdates to surface candidates, and
+# ./gradlew -p buildSrc dependencyUpdates for the Kotlin and Android Gradle
+# plugins, which buildSrc carries for the whole build.
 
 [versions]
 # ── Toolchain & language plugins ─────────────────────────────────────────────
@@ -254,14 +256,23 @@ junit-platform-launcher         = { group = "org.junit.platform", name = "junit-
 # and emit GeneratedWidgetRegistry at compile time).
 ksp-api                         = { group = "com.google.devtools.ksp", name = "symbol-processing-api", version.ref = "ksp" }
 
+# Gradle plugins buildSrc puts on every build script's classpath, for the look modules'
+# convention plugin. Their aliases under [plugins] carry no version for that reason:
+# Gradle refuses a versioned request for a plugin already on the classpath.
+kotlin-gradle-plugin            = { group = "org.jetbrains.kotlin",     name = "kotlin-gradle-plugin",           version.ref = "kotlin" }
+compose-compiler-gradle-plugin  = { group = "org.jetbrains.kotlin",     name = "compose-compiler-gradle-plugin", version.ref = "kotlin" }
+android-gradle-plugin           = { group = "com.android.tools.build",  name = "gradle",                         version.ref = "agp" }
+
 [plugins]
-kotlin-jvm                      = { id = "org.jetbrains.kotlin.jvm",                  version.ref = "kotlin" }
-kotlin-multiplatform            = { id = "org.jetbrains.kotlin.multiplatform",        version.ref = "kotlin" }
+# kotlin-jvm, kotlin-multiplatform, kotlin-compose-compiler, android-kmp-library and
+# android-application carry no version: buildSrc's libraries above pin them.
+kotlin-jvm                      = { id = "org.jetbrains.kotlin.jvm" }
+kotlin-multiplatform            = { id = "org.jetbrains.kotlin.multiplatform" }
 kotlin-serialization            = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
-kotlin-compose-compiler         = { id = "org.jetbrains.kotlin.plugin.compose",       version.ref = "kotlin" }
+kotlin-compose-compiler         = { id = "org.jetbrains.kotlin.plugin.compose" }
 compose                         = { id = "org.jetbrains.compose",                     version.ref = "compose" }
 buildconfig                     = { id = "com.github.gmazzo.buildconfig",             version.ref = "buildconfigPlugin" }
 versions                        = { id = "io.github.ben-manes.versions",              version.ref = "versionsPlugin" }
 ksp                             = { id = "com.google.devtools.ksp",                   version.ref = "ksp" }
-android-kmp-library             = { id = "com.android.kotlin.multiplatform.library",  version.ref = "agp" }
-android-application             = { id = "com.android.application",                   version.ref = "agp" }
+android-kmp-library             = { id = "com.android.kotlin.multiplatform.library" }
+android-application             = { id = "com.android.application" }

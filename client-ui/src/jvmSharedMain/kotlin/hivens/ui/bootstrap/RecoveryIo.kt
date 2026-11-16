@@ -41,6 +41,11 @@ object RecoveryIo {
     // before the choice moved.
     internal val THEME_CHOICE_FILE = Storage.SETTINGS_DIR + "/themes.json"
 
+    // The look manager's choice of pack and of a provider per axis, the look's own
+    // settings, for the same reason: a reset of the appearance that kept it would open
+    // on the look it was meant to undo.
+    internal val LOOK_CHOICE_FILE = Storage.SETTINGS_DIR + "/look.json"
+
     // Not one of the above, and not a reset the appearance button is allowed to
     // make: this file is what the user typed into their widgets, and nothing else
     // holds a copy of it.
@@ -89,11 +94,12 @@ object RecoveryIo {
         deleteQuietly(dataDir.resolve(Storage.LAYOUT_GRAPH_FILE))
     }
 
-    /** Delete theme / background / console so each re-seeds its default. */
+    /** Delete theme / background / console / the look's choice so each re-seeds its default. */
     fun resetCustomization(dataDir: Path) {
         stateWasReset = true
         CUSTOMIZATION_FILES.forEach { deleteQuietly(dataDir.resolve(it)) }
         deleteQuietly(dataDir.resolve(THEME_CHOICE_FILE))
+        deleteQuietly(dataDir.resolve(LOOK_CHOICE_FILE))
     }
 
     /**

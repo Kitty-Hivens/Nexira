@@ -14,7 +14,9 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.rememberWindowState
+import hivens.i18n.api.LocalTranslator
 import hivens.ui.ShellLook
+import hivens.ui.ShellLookValues
 import hivens.ui.chrome.LocalChromeClose
 import hivens.ui.chrome.LocalComposeWindow
 import hivens.ui.chrome.LocalCustomChromeAvailable
@@ -31,10 +33,10 @@ import hivens.ui.host.HostedWindow
 import hivens.ui.host.WindowCommand
 import hivens.ui.host.WindowId
 import hivens.ui.host.WindowOwner
-import hivens.i18n.api.LocalTranslator
 import hivens.ui.i18n.nexiraStrings
 import hivens.ui.layers.LayerHost
 import hivens.ui.layers.rememberWindowLayers
+import hivens.ui.read
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.NxTheme
@@ -58,8 +60,9 @@ import java.awt.event.WindowEvent
  * main window does meanwhile: hiding the main window to the tray leaves it open.
  * It is an independent window in the host's registry, with its own [WindowHost], its
  * own window level, its own layers and dismiss stack, and the window locals of its
- * own window. It draws in the look the main shell decided, read through [look].
- * Its frame is the system's, so nothing of the app's frame is offered in it.
+ * own window. It draws in the look the main shell decided, read through [look], and in
+ * the answers of every axis of the look, read off the app level as the main window reads
+ * them. Its frame is the system's, so nothing of the app's frame is offered in it.
  *
  * [koin] is the launcher's graph, which it is drawn inside (see [HostKoin]).
  */
@@ -138,13 +141,15 @@ private fun ConsoleWindowContent(look: ShellLook) {
                 LocalWindowFrame           provides null,
                 LocalWindowCapabilities    provides capabilities,
             ) {
-                HostedWindow(WindowId.Console, WindowOwner.Launcher, backend) {
-                    // Around the theme, as in the main window: the layers belong to the
-                    // window, and a layer takes its theme from where it is opened.
-                    LayerHost(layers, Modifier.fillMaxSize()) {
-                        NxTheme(theme = look.theme, dark = look.dark, uiFamily = look.uiFamily) {
-                            NxSurface(SurfaceKind.Page, Modifier.fillMaxSize(), shape = RectangleShape) {
-                                ConsoleContent(settings = settings, onSettingsChange = settingsStore::update)
+                appLevel.read(ShellLookValues.Look).Provide {
+                    HostedWindow(WindowId.Console, WindowOwner.Launcher, backend) {
+                        // Around the theme, as in the main window: the layers belong to the
+                        // window, and a layer takes its theme from where it is opened.
+                        LayerHost(layers, Modifier.fillMaxSize()) {
+                            NxTheme(theme = look.theme, dark = look.dark, uiFamily = look.uiFamily) {
+                                NxSurface(SurfaceKind.Page, Modifier.fillMaxSize(), shape = RectangleShape) {
+                                    ConsoleContent(settings = settings, onSettingsChange = settingsStore::update)
+                                }
                             }
                         }
                     }

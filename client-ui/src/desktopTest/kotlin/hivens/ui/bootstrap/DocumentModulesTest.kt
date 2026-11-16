@@ -4,6 +4,7 @@ import hivens.config.Storage
 import hivens.i18n.api.I18nApi
 import hivens.i18n.api.I18nKeys
 import hivens.i18n.api.Translator
+import hivens.look.manager.api.LookApi
 import hivens.themes.api.ThemesApi
 import hivens.themes.api.ThemesKeys
 import hivens.ui.ModuleAppLevel
@@ -49,6 +50,12 @@ class DocumentModulesTest {
     fun `with no document of the person's the standard list is named, and nothing is written`() {
         assertEquals(DefaultLayout.modules().toSet(), documentModules(dir))
         assertFalse(dir.resolve(Storage.LAYOUT_GRAPH_FILE).exists(), "the first start's own document is the shell's to write")
+    }
+
+    @Test
+    fun `the standard document names the look manager and no axis, provider or pack of the look`() {
+        val look = DefaultLayout.modules().filter { it.startsWith("nexira.look") }
+        assertEquals(listOf(LookApi.ID), look)
     }
 
     @Test

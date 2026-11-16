@@ -46,14 +46,7 @@ object ModrinthSourceModule : CompiledModule {
 
     override val id: String = ID
     override val name: String = NAME
-    override val strings: ModuleStrings = ModuleStrings(
-        mapOf(
-            "en" to mapOf(NAME to "Modrinth", ModrinthPackSource.LABEL to "Modrinth"),
-            "ru" to mapOf(NAME to "Modrinth", ModrinthPackSource.LABEL to "Modrinth"),
-            "de" to mapOf(NAME to "Modrinth", ModrinthPackSource.LABEL to "Modrinth"),
-            "ja" to mapOf(NAME to "Modrinth", ModrinthPackSource.LABEL to "Modrinth"),
-        ),
-    )
+    override val strings: ModuleStrings = ModuleStrings.resources(ModrinthSourceModule::class.java, ID)
     override val contributions: List<ModuleContribution> = listOf(ModrinthSourceKeys, ModrinthPackSource, ModrinthProjectSource)
 
     private const val NAME = "modrinth.name"

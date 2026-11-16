@@ -10,11 +10,10 @@
 //     JDK 27 toolchain (buildSrc runs under the daemon's JDK, not the
 //     subprojects' toolchain pin).
 //
-// Why buildSrc/ rather than `:build-logic` composite-included module:
-// single consumer (`:client-ui`), no library-reuse story, no incremental-
-// build-of-build-logic benefit on a project this size. The kotlin-dsl
-// scaffolding here is enough; graduate later if multiple consumers appear
-// (they almost certainly will not).
+// Why buildSrc/ rather than `:build-logic` composite-included module: the
+// consumers are `:client-ui` and the modules under look/, all in this build,
+// with no library-reuse story and no incremental-build-of-build-logic benefit
+// on a project this size. The kotlin-dsl scaffolding here is enough.
 //
 // Repositories are scoped to this build only -- the root project's
 // `RepositoriesMode.FAIL_ON_PROJECT_REPOS` policy applies to the main build
@@ -23,14 +22,35 @@
 
 plugins {
     `kotlin-dsl`
+    // The Kotlin and Android Gradle plugins are buildSrc's dependencies, out of the root
+    // build's sight, so their updates are surfaced here: ./gradlew -p buildSrc dependencyUpdates.
+    alias(libs.plugins.versions)
 }
 
 repositories {
+    // The Android Gradle Plugin is published here and nowhere else, the same filter
+    // as the root settings.
+    google {
+        content {
+            includeGroupByRegex("com\\.android(\\..*)?")
+            includeGroupByRegex("com\\.google\\.android(\\..*)?")
+            includeGroupByRegex("androidx(\\..*)?")
+        }
+    }
     gradlePluginPortal()
     mavenCentral()
 }
 
+// The plugins the look modules' convention plugin applies and configures by type. A
+// plugin on buildSrc's classpath is on every build script's, and Gradle refuses a
+// versioned request for a plugin it already holds, so the catalog's aliases for these
+// carry no version and the version is pinned here, from the same catalog. The Android
+// plugin comes along with Kotlin's: the Kotlin plugin reads its classes, and the two
+// have to be loaded side by side.
 dependencies {
+    implementation(libs.kotlin.gradle.plugin)
+    implementation(libs.compose.compiler.gradle.plugin)
+    implementation(libs.android.gradle.plugin)
     testImplementation(kotlin("test"))
 }
 
@@ -66,6 +86,12 @@ gradlePlugin {
         register("nativeImage") {
             id = "nexira.native-image"
             implementationClass = "hivens.nativeimage.NativeImagePlugin"
+        }
+        // A module under look/: the targets, Compose and, for an API, its ABI dump
+        // and version, so its own build file names only what it depends on.
+        register("look") {
+            id = "nexira.look"
+            implementationClass = "hivens.look.LookModulePlugin"
         }
     }
 }

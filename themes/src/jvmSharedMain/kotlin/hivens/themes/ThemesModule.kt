@@ -55,14 +55,7 @@ import org.slf4j.LoggerFactory
 object ThemesModule : CompiledModule {
     override val id: String = ThemesApi.ID
     override val name: String = NAME
-    override val strings: ModuleStrings = ModuleStrings(
-        mapOf(
-            "en" to mapOf(NAME to "Themes", FILE to "the theme"),
-            "ru" to mapOf(NAME to "Темы", FILE to "тема"),
-            "de" to mapOf(NAME to "Designs", FILE to "das Design"),
-            "ja" to mapOf(NAME to "テーマ", FILE to "テーマ"),
-        ),
-    )
+    override val strings: ModuleStrings = ModuleStrings.resources(ThemesModule::class.java, ThemesApi.ID)
     override val provides: Map<String, ApiVersion> = mapOf(ThemesApi.ID to ThemesApi.VERSION)
 
     // The API's own object lives in the API artifact's package, so the package is read off it.

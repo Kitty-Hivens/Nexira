@@ -6,12 +6,13 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * The host joins the themes module and the language module through their keys and their APIs, and
- * names nothing of how either is made: no class of theirs, no file in their packages, and no engine
- * of the launcher's own words of its own. The one place either module is named is where the build
- * lists the modules compiled into it, by its CompiledModule, the way every compiled module is listed
- * there, and the one engine of the launcher's own words the host makes is the recovery surface's
- * floor, which has to speak when every module failed.
+ * The host joins the themes module, the language module and the look manager through their keys and
+ * their APIs, and names nothing of how any is made: no class of theirs, no file in their packages, and
+ * no engine of the launcher's own words of its own. Of the look it names the manager's API and nothing
+ * else, no axis and no provider, which are the manager's business. The one place each module is named
+ * is where the build lists the modules compiled into it, by its CompiledModule, the way every compiled
+ * module is listed there, and the one engine of the launcher's own words the host makes is the recovery
+ * surface's floor, which has to speak when every module failed.
  *
  * Read as text, since an import the compiler drops leaves no trace in what it builds. The text is read
  * the way the compiler would join it: names in backticks without them, dots spaced or not, and string
@@ -24,8 +25,8 @@ class HostBoundaryTest {
     /** Where the build lists the modules compiled into it. */
     private val listing = "hivens/ui/widgets/modules/CompiledModules.kt"
 
-    /** What the listing may name of the two modules: each one's CompiledModule, and nothing else of either. */
-    private val registrations = setOf("import hivens.themes.ThemesModule", "import hivens.i18n.I18nModule")
+    /** What the listing may name of these modules: each one's CompiledModule, and nothing else of any. */
+    private val registrations = setOf("import hivens.themes.ThemesModule", "import hivens.i18n.I18nModule", "import hivens.look.manager.LookManagerModule")
 
     /** The recovery surface, and the one engine of the launcher's own words it may make. */
     private val floor = "hivens/ui/RecoverySurface.kt" to "NexiraStrings.translator(Locale.getDefault().language)"
@@ -35,7 +36,8 @@ class HostBoundaryTest {
         val line = joined(raw)
         val why = when {
             PACKAGE.containsMatchIn(line) -> "a file in a module's own package"
-            IMPLEMENTATION.containsMatchIn(line) && !(path == listing && line.trim() in registrations) -> "a name of a module that is not in its API"
+            (IMPLEMENTATION.containsMatchIn(line) || LOOK.containsMatchIn(line)) && !(path == listing && line.trim() in registrations) ->
+                "a name of a module that is not in its API"
             OWN_ENGINE.containsMatchIn(line) && !(path == floor.first && floor.second in line) -> "an engine of the launcher's own words"
             OWN_WORDS_SCOPE.containsMatchIn(line) -> "the launcher's own words as a scope, where an engine is made unseen"
             else -> return@mapIndexedNotNull null
@@ -59,13 +61,13 @@ class HostBoundaryTest {
     }
 
     @Test
-    fun `no host source names a class of the themes or the language module, or makes the launcher's words itself`() {
+    fun `no host source names a class of the themes or the language module or of the look, or makes the launcher's words itself`() {
         val found = sources().flatMap { (path, text) -> findings(path, text) }
         assertEquals(emptyList(), found, "the host reaches these modules through their keys and APIs only")
     }
 
     @Test
-    fun `the build lists both modules where it lists every compiled module, and recovery keeps its floor`() {
+    fun `the build lists the modules where it lists every compiled module, and recovery keeps its floor`() {
         val all = sources().toMap()
         val listed = all.getValue(listing).lines().map { it.trim() }.toSet()
         assertEquals(registrations, registrations.filter { it in listed }.toSet(), "the exception above names registrations that are gone")
@@ -90,6 +92,12 @@ class HostBoundaryTest {
             "the words object as a scope" to "with(NexiraStrings) { engine(dir, \"en\") }",
             "the words object run as a receiver" to "NexiraStrings.run { shipped(\"en\") }",
             "the words object imported under another name" to "import hivens.ui.i18n.NexiraStrings as Words",
+            "the look manager's class" to "import hivens.look.manager.LookManager",
+            "a look provider's package" to "import hivens.look.colour.nx.NxColourProvider",
+            "an axis contract the host does not read" to "import hivens.look.colour.api.Colour",
+            "a wildcard over the look" to "import hivens.look.*",
+            "a look name put together for reflection" to """Class.forName("hivens.look." + "manager.LookManager")""",
+            "a file in the look manager's API package" to "package hivens.look.manager.api",
         )
         holes.forEach { (what, line) ->
             assertEquals(1, findings("hivens/ui/Somewhere.kt", line).size, "$what is not seen: $line")
@@ -100,20 +108,30 @@ class HostBoundaryTest {
             "val s = nexiraStrings()",
             "val n = NexiraStrings.NAMESPACE",
             "import hivens.ui.i18n.NexiraStrings",
+            "import hivens.look.manager.api.LookKeys",
+            "val p = hivens.look.manager.api.LookProvision.NONE",
         )
         allowed.forEach { line -> assertEquals(emptyList(), findings("hivens/ui/Somewhere.kt", line), "$line is the API, and not refused") }
         assertEquals(emptyList(), findings(listing, "import hivens.themes.ThemesModule"))
         assertEquals(1, findings(listing, "import hivens.themes.ThemeManager").size, "the listing names the CompiledModule only")
+        assertEquals(emptyList(), findings(listing, "import hivens.look.manager.LookManagerModule"))
+        assertEquals(1, findings(listing, "import hivens.look.manager.LookManager").size, "the listing names the manager's CompiledModule only")
         assertEquals(emptyList(), findings(floor.first, "    boot[I18nKeys.Words] ?: ${floor.second}"))
         assertEquals(1, findings("hivens/ui/ShellHost.kt", floor.second).size, "the floor is the recovery surface's alone")
     }
 
     private companion object {
-        /** A file whose package is one of the two modules', their API's among them. */
-        val PACKAGE = Regex("""^\s*package\s+hivens\.(themes|i18n)\b""")
+        /** A file whose package is one of the modules', their API's among them. */
+        val PACKAGE = Regex("""^\s*package\s+hivens\.(themes|i18n|look)\b""")
 
         /** A name in the themes or the language module that is not in its API, a wildcard among them. */
         val IMPLEMENTATION = Regex("""\bhivens\.(themes|i18n)\.(?!api\b)(\w|\*)""")
+
+        /**
+         * A name of the look that is not the manager's API: the manager itself, an axis, a provider, a pack,
+         * a wildcard. The host reads the look through the manager's one key and draws on whatever it answers.
+         */
+        val LOOK = Regex("""\bhivens\.look\.(?!manager\.api\b)(\w|\*)""")
 
         /** An engine of the launcher's own words, called, taken by reference or imported. */
         val OWN_ENGINE = Regex("""\bNexiraStrings(\.|::)(engine|translator|shipped)\b""")

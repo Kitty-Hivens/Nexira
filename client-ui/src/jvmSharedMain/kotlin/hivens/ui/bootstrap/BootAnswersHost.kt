@@ -5,6 +5,7 @@ import hivens.ui.layout.LayoutGraphRepository
 import hivens.ui.modulesNamedBy
 import hivens.ui.settings.SettingsDomainFiles
 import hivens.ui.widgets.modules.CompiledModules
+import hivens.ui.widgets.modules.bootTakenContributions
 import hivens.ui.widgets.modules.fixedTakenWords
 import hivens.ui.widgets.modules.launcherWords
 import hivens.widget.api.BootContext
@@ -19,6 +20,7 @@ import hivens.widget.api.ServiceContext
 import hivens.widget.api.SettingsChange
 import hivens.widget.api.SettingsDomain
 import hivens.widget.api.SourceFactory
+import hivens.widget.api.TakenContributions
 import hivens.widget.api.TakenWords
 import hivens.widget.model.CommandKey
 import hivens.widget.model.DefaultLayout
@@ -50,9 +52,10 @@ fun bootValues(
     named: Set<String> = documentModules(dataDir),
 ): BootValues {
     val words = fixedTakenWords(launcherWords(compiled))
+    val taken = bootTakenContributions(named, compiled)
     return compiled.fold(BootValues.NONE) { gathered, module ->
         val answered = try {
-            answerOf(module, named, dataDir, words)
+            answerOf(module, named, dataDir, words, taken)
         } catch (e: Throwable) {
             if (e is VirtualMachineError) throw e
             log.warn("The module '{}' could not answer before the boot, and its values are drawn with the fallbacks", runCatching { module.id }.getOrNull(), e)
@@ -97,12 +100,12 @@ private val LayoutJson: Json = Json {
 }
 
 /** What [module] answers, held to what it declares, or nothing where the document leaves it out or it answers nothing. */
-private fun answerOf(module: CompiledModule, named: Set<String>, dataDir: Path, words: TakenWords): BootValues {
+private fun answerOf(module: CompiledModule, named: Set<String>, dataDir: Path, words: TakenWords, taken: TakenContributions): BootValues {
     val id = module.id
     if (id !in named) return BootValues.NONE
     val answers = module.boot ?: return BootValues.NONE
     val owned = Owned.of(module.contributions)
-    val answered = answers.answer(HostBootContext(id, dataDir, owned.domains, words))
+    val answered = answers.answer(HostBootContext(id, dataDir, owned.domains, words, taken))
     val foreign = answered.ids - owned.sources
     check(foreign.isEmpty()) { "the module '$id' answered ${foreign.joinToString()}, which it does not declare" }
     return answered
@@ -147,14 +150,15 @@ private class Recorder : ModuleKeys {
 
 /**
  * What the host hands the module [module] before it is up: the data directory, the settings domains it
- * declared, [domains], as the settings host opens them, read and not kept, and the words the launcher
- * and every module compiled in ship.
+ * declared, [domains], as the settings host opens them, read and not kept, the words the launcher and
+ * every module compiled in ship, and what the modules compiled in carry of the kinds they take.
  */
 private class HostBootContext(
     private val module: String,
     override val dataDir: Path,
     private val domains: Set<String>,
     words: TakenWords,
+    taken: TakenContributions,
 ) : BootContext {
     private val files = SettingsDomainFiles(
         dir        = dataDir.resolve(Storage.SETTINGS_DIR),
@@ -166,7 +170,7 @@ private class HostBootContext(
         return files.peek(domain)
     }
 
-    override val services: LevelServices = FixedServices(mapOf(TakenWords::class to words))
+    override val services: LevelServices = FixedServices(mapOf(TakenWords::class to words, TakenContributions::class to taken))
 }
 
 /** Services that are what [byType] holds and nothing else. */

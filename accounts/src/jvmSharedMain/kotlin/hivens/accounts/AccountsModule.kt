@@ -30,8 +30,8 @@ import hivens.widget.api.command
 import hivens.widget.api.find
 import hivens.widget.api.flowSource
 import hivens.widget.api.get
-import hivens.widget.api.hostServices
 import hivens.widget.api.hostService
+import hivens.widget.api.hostServices
 import hivens.widget.model.ApiVersion
 import hivens.widget.model.ScopeLevel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -43,14 +43,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 object AccountsModule : CompiledModule {
     override val id: String = AccountsApi.ID
     override val name: String = NAME
-    override val strings: ModuleStrings = ModuleStrings(
-        mapOf(
-            "en" to mapOf(NAME to "Accounts"),
-            "ru" to mapOf(NAME to "Аккаунты"),
-            "de" to mapOf(NAME to "Konten"),
-            "ja" to mapOf(NAME to "アカウント"),
-        ),
-    )
+    override val strings: ModuleStrings = ModuleStrings.resources(AccountsModule::class.java, AccountsApi.ID)
     override val provides: Map<String, ApiVersion> = mapOf(AccountsApi.ID to AccountsApi.VERSION)
 
     // The API's own object lives in the API artifact's package, so the package is read off it.

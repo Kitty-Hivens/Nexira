@@ -52,14 +52,7 @@ import java.nio.file.Path
 object I18nModule : CompiledModule {
     override val id: String = I18nApi.ID
     override val name: String = NAME
-    override val strings: ModuleStrings = ModuleStrings(
-        mapOf(
-            "en" to mapOf(NAME to "Language"),
-            "ru" to mapOf(NAME to "Язык"),
-            "de" to mapOf(NAME to "Sprache"),
-            "ja" to mapOf(NAME to "言語"),
-        ),
-    )
+    override val strings: ModuleStrings = ModuleStrings.resources(I18nModule::class.java, I18nApi.ID)
     override val provides: Map<String, ApiVersion> = mapOf(I18nApi.ID to I18nApi.VERSION)
 
     // The API's own object lives in the API artifact's package, so the package is read off it.

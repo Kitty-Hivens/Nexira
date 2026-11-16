@@ -11,14 +11,14 @@ import hivens.catalogue.api.CatalogueApi
 import hivens.catalogue.api.CatalogueKeys
 import hivens.catalogue.api.CatalogueTags
 import hivens.catalogue.api.GameVersionGroup
+import hivens.catalogue.api.OpenProject
 import hivens.catalogue.api.PackSourceContribution
 import hivens.catalogue.api.PackSources
-import hivens.catalogue.api.ProjectSearchContribution
-import hivens.catalogue.api.OpenProject
 import hivens.catalogue.api.ProjectHit
 import hivens.catalogue.api.ProjectLink
 import hivens.catalogue.api.ProjectLinkKind
 import hivens.catalogue.api.ProjectPageView
+import hivens.catalogue.api.ProjectSearchContribution
 import hivens.catalogue.api.ProjectSource
 import hivens.catalogue.api.ProjectTarget
 import hivens.catalogue.api.SearchFilter
@@ -68,14 +68,7 @@ import java.nio.file.Path
 object CatalogueModule : CompiledModule {
     override val id: String = CatalogueApi.ID
     override val name: String = NAME
-    override val strings: ModuleStrings = ModuleStrings(
-        mapOf(
-            "en" to mapOf(NAME to "Catalogue"),
-            "ru" to mapOf(NAME to "Каталог"),
-            "de" to mapOf(NAME to "Katalog"),
-            "ja" to mapOf(NAME to "カタログ"),
-        ),
-    )
+    override val strings: ModuleStrings = ModuleStrings.resources(CatalogueModule::class.java, CatalogueApi.ID)
     override val provides: Map<String, ApiVersion> = mapOf(CatalogueApi.ID to CatalogueApi.VERSION)
 
     // The API's own object lives in the API artifact's package, so the package is read off it.

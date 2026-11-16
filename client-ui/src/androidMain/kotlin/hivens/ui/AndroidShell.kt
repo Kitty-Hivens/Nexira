@@ -269,6 +269,9 @@ private fun AndroidShellContent() {
                 LocalUseCustomChrome provides false,
                 LocalRightRailSheet provides true,
             ) {
+              // Every axis of the look the manager answers, around all the window draws.
+              // The shell knows none of them: it wraps what it draws in the one value.
+              appLevel.read(ShellLookValues.Look).Provide {
               // The one window a phone has, the Activity, registered with the host and
               // given its level for as long as this shell draws it.
               HostedWindow(WindowId.Main, WindowOwner.Launcher, rememberActivityWindow()) {
@@ -375,6 +378,7 @@ private fun AndroidShellContent() {
                 } // end LayerHost
                 } // end key hooks
               }
+              } // end Look.Provide
             }
         }
     }

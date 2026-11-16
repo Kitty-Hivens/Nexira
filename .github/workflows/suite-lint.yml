@@ -16,6 +16,7 @@ on:
       - ".github/workflows/tests.yml"
       - "scripts/check-ci-suites.py"
       - "scripts/_modules.py"
+      - "scripts/tests/**"
       - ".github/workflows/suite-lint.yml"
   push:
     branches: [dev, stable]
@@ -27,6 +28,7 @@ on:
       - ".github/workflows/tests.yml"
       - "scripts/check-ci-suites.py"
       - "scripts/_modules.py"
+      - "scripts/tests/**"
       - ".github/workflows/suite-lint.yml"
 
 permissions:
@@ -47,5 +49,10 @@ jobs:
       # Strict both ways: a module with tests that the matrix does not name, and
       # a task the matrix names whose module has no tests. The second is the one
       # that would otherwise fail the whole test step on a rename.
+      # The check reads the run line the way bash runs it and the look modules'
+      # aggregate the way Gradle builds it. Its own tests hold it to that.
+      - name: Test the check
+        run: python3 -m unittest discover -s scripts/tests
+
       - name: Check every test suite is in the matrix
         run: python3 scripts/check-ci-suites.py --strict

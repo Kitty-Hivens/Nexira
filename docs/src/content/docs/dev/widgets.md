@@ -105,13 +105,14 @@ To use another module's API, for example the packs, the accounts, the catalogue 
 "Nexira-Module-Requires" to "nexira.i18n=1.0, nexira.themes=1.0, nexira.packs=2.0, nexira.accounts=1.0, nexira.catalogue=1.0",
 ```
 
-| API id             | Artifact         | Package                | What it is for                                              |
-|--------------------|------------------|------------------------|-------------------------------------------------------------|
-| `nexira.i18n`      | `:i18n-api`      | `hivens.i18n.api`      | Looking words up, the language in use, the language setting |
-| `nexira.themes`    | `:themes-api`    | `hivens.themes.api`    | The theme in use, the choice, and bringing a theme          |
-| `nexira.packs`     | `:packs-api`     | `hivens.packs.api`     | Listing, launching, installing and updating packs           |
-| `nexira.accounts`  | `:accounts-api`  | `hivens.accounts.api`  | Who is signed in, the stored accounts, signing in and out   |
-| `nexira.catalogue` | `:catalogue-api` | `hivens.catalogue.api` | Searching, installing a project, and bringing a source      |
+| API id                | Artifact            | Package                   | What it is for                                                     |
+|-----------------------|---------------------|---------------------------|--------------------------------------------------------------------|
+| `nexira.i18n`         | `:i18n-api`         | `hivens.i18n.api`         | Looking words up, the language in use, the language setting        |
+| `nexira.themes`       | `:themes-api`       | `hivens.themes.api`       | The theme in use, the choice, and bringing a theme                 |
+| `nexira.packs`        | `:packs-api`        | `hivens.packs.api`        | Listing, launching, installing and updating packs                  |
+| `nexira.accounts`     | `:accounts-api`     | `hivens.accounts.api`     | Who is signed in, the stored accounts, signing in and out          |
+| `nexira.catalogue`    | `:catalogue-api`    | `hivens.catalogue.api`    | Searching, installing a project, and bringing a source             |
+| `nexira.look.manager` | `:look:manager-api` | `hivens.look.manager.api` | Bringing an axis of the look, a provider or a pack, and the choice |
 
 Each entry is an API id and the version you compiled against. The launcher refuses your jar, with the reason in the log, when it does not carry that API or carries a version that does not serve yours: another major version, or an older minor one. An API you name is visible to your module. One you do not name is not, even when the launcher carries it.
 
@@ -239,7 +240,7 @@ fun ThemeCount() {
 
 The launcher draws its windows with what modules answer, and names nothing of the modules behind it. The theme and whether it is dark are what `ThemesKeys.Active` and `ThemesKeys.Dark` answer at the app level, and the words what `I18nKeys.Words` answers, read the way a widget reads any key. Where the document brings in no module that answers one, the window is drawn with a fallback: a neutral grey theme that `nx-ui` carries for exactly this, dark, and every word shown as its key.
 
-Colour and words are the first parts of the look joined in this way. A later one, motion, geometry, spacing, typography or sound, joins the same way: as values a module brings under keys in its own API, which every widget uses as it sees fit, and which the launcher reads beside these with a fallback of its own.
+Beside them the launcher reads one more key, `LookKeys.Provide` (`look.provide`), the answers of every axis of the look as the look manager resolves them, and wraps everything it draws in it. It names no axis and no provider: an axis a module brings reaches every window through that one value, see [Axes of the look](#axes-of-the-look). Where no look manager is brought in, every axis reads its base answers.
 
 The themes module and the language module make what answers those keys themselves, as app services: the theme manager over the module's settings and its theme file, the language engine over the person's own translations and the words every module ships. A module compiled into the launcher reaches what it needs for that through services the host keeps for the modules it trusts, and no jar sees: `HostFiles` for the data directory, the host's atomic, ordered writes inside it, and the name a file of the module's is told to the person as when a newer build wrote it, `TakenWords` for the words every owner ships, and `TakenContributions` for what the modules brought in contribute.
 
@@ -252,6 +253,53 @@ override val boot = BootAnswers { context ->
 ```
 
 `context.settings` reads a settings domain the way the host opens it and writes nothing. The answer has to be what the key answers once it is up, or the window changes under the person as the boot ends. The modules asked are the compiled modules the document names, read before the boot the way the shell reads it, so a document that leaves a module out has the boot window drawn with the same fallbacks as the shell. A module answers only the app sources its keys declare and reads only the settings domains it declares, and an answer that strays from them is refused whole. Of two modules that declare one key, the first the build lists keeps it. A module whose words, keys or answer throw costs only its own values. A jar is not loaded yet when the boot window is drawn, so it is never asked.
+
+## Axes of the look
+
+The look is more than colour: motion, shape, spacing, type, sound, anything a module decides to vary. Each part is an axis, and the look manager, `nexira.look.manager`, picks one provider per axis from the person's choice and hands its answers to the composition. A widget that wants to respect the person's choice reads an axis's answers. One that does not care draws itself.
+
+Four things, all in `:look:manager-api`:
+
+- An **axis**, `LookAxis<A>`: a class you extend with an id, the version of its contract, the type `A` of its answers and the base answers that hold where no provider answers. It makes its own composition local, `local`, which a widget reads the answers through, and the manager provides the answers under that local and nothing else, so no axis reaches what the launcher provides around it. A change of one answer recomposes only what reads it. A module may bring an axis of its own, and the first module to bring an axis id has it.
+- A **provider**, `LookProvider<A>`: the axis it answers, the family it belongs to (`nx`, `material`, yours), the contract version of the axis it was built against, the capabilities it declares, and `open`, which hands back its answers as a `StateFlow` ready at once. The manager opens a provider only while the choice needs it, on a thread of its own and never the one that draws, and closes it when that stops. Two providers never answer one axis, and one built against a contract version the axis does not serve is refused.
+- A **pack**, `LookPack`: an id, a label in your words, and the family it names for each axis. A pack names providers and nothing else, and may leave axes out. The default pack's id, `nexira`, is kept for the modules compiled into the launcher.
+- A **capability**: a feature a provider may have, a dark and a light variant (`LookCapability.VARIANTS`), a blur (`BLUR`), being open to extension by other modules (`EXTENSIBLE`) or one of your own. `LookState.offers(capability)` says whether a provider in use declares it, and the setting for it is offered only then. The person's variant and blur reach a provider that declares them through `LookContext.variant` and `LookContext.blur`, and stay null for one that does not. A provider extended by another module, a theme for a theme provider say, takes the extension through a contribution of its own API.
+
+Each axis is answered by the first of these that names a provider which is there and opens: the person's family for that axis, the family the chosen pack names, the family the default pack names, and the axis's base answers. A pack or a family whose module is away stays chosen and is passed over until it comes back. A provider whose `open` or answers throw anything, a cancellation of its own included, or whose answers are not the axis's type, is passed over the same way, and costs only itself.
+
+A module bringing an axis, a provider for it and a pack, with `nexira.look.manager` named in its manifest:
+
+```kotlin
+data class Wobble(val amount: Float)
+
+object WobbleAxis : LookAxis<Wobble>("mymodule.wobble", ApiVersion(1, 0), Wobble::class, Wobble(0f)) {
+    override val label = "wobble"                   // a key into your words
+}
+
+class JellyWobble : LookProvider<Wobble> {
+    override val label = "jelly"
+    override val axis = "mymodule.wobble"
+    override val family = "jelly"
+    override val contract = ApiVersion(1, 0)
+    override fun open(context: LookContext) = LookAnswers.of(Wobble(0.3f))
+}
+
+class JellyPack : LookPack {
+    override val id = "mymodule.jelly"
+    override val label = "jelly.pack"
+    override val providers = mapOf("mymodule.wobble" to "jelly")
+}
+```
+
+List each in `META-INF/services` under its type, `hivens.look.manager.api.LookAxis`, `LookProvider` and `LookPack`, and name the manager's API in the manifest from the property the launcher keeps it under:
+
+```kotlin
+"Nexira-Module-Requires" to "nexira.look.manager=${providers.gradleProperty("nexira.lookManagerApi").get()}",
+```
+
+A widget reads `WobbleAxis.local.current`, and draws still outside any look. To draw a subtree in another look, wrap it in `OverrideLook(LookChoice.build { pack = "mymodule.jelly" }) { ... }`: the subtree gets what the person would get by choosing that on top of their own choice, every axis going down the whole chain again, the subtree's family for it, the person's own, the subtree's pack or else the person's, the default pack, the base. Until its providers have answered, the subtree keeps the look around it. A choice is made with `LookChoice.build` and changed with its `with` functions, never through a constructor, so a field a later launcher adds does not break your module. The person's choice is `LookKeys.Settings`, changed through `LookKeys.UpdateSettings`, and `LookKeys.State` says which provider answers each axis, why, and what is on offer.
+
+A document names the manager and nothing else of the look. The axes, providers and packs of every module compiled into the launcher reach the manager whether the document names their module or not, beside those of every jar switched on, and only what the choice needs is opened. The boot window opens in the look the shell then draws: the manager answers the same keys before the boot, from the same choice and the modules compiled in, and closes the providers it opened for that before the window draws. A jar is not loaded before the boot, so a choice that names a jar's pack or family opens the boot window on what comes next in the choice, and the shell turns to the jar's look once the jar is loaded.
 
 ## Catalogue sources
 

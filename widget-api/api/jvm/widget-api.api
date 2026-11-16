@@ -403,6 +403,10 @@ public final class hivens/widget/api/ModuleStrings {
 
 public final class hivens/widget/api/ModuleStrings$Companion {
 	public final fun getEMPTY ()Lhivens/widget/api/ModuleStrings;
+	public final fun getSHIPPED_LANGUAGES ()Ljava/util/List;
+	public final fun read (Ljava/io/InputStream;)Ljava/util/Map;
+	public final fun resources (Ljava/lang/Class;Ljava/lang/String;Ljava/util/Collection;)Lhivens/widget/api/ModuleStrings;
+	public static synthetic fun resources$default (Lhivens/widget/api/ModuleStrings$Companion;Ljava/lang/Class;Ljava/lang/String;Ljava/util/Collection;ILjava/lang/Object;)Lhivens/widget/api/ModuleStrings;
 }
 
 public final class hivens/widget/api/ModuleValues {

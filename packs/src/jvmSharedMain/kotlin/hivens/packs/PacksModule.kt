@@ -59,14 +59,7 @@ private val log = LoggerFactory.getLogger("PacksModule")
 object PacksModule : CompiledModule {
     override val id: String = PacksApi.ID
     override val name: String = NAME
-    override val strings: ModuleStrings = ModuleStrings(
-        mapOf(
-            "en" to mapOf(NAME to "Packs"),
-            "ru" to mapOf(NAME to "Сборки"),
-            "de" to mapOf(NAME to "Packs"),
-            "ja" to mapOf(NAME to "パック"),
-        ),
-    )
+    override val strings: ModuleStrings = ModuleStrings.resources(PacksModule::class.java, PacksApi.ID)
     override val provides: Map<String, ApiVersion> = mapOf(PacksApi.ID to PacksApi.VERSION)
 
     // The API's own object lives in the API artifact's package, so the package is read off it.

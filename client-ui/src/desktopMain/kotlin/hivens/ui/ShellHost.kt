@@ -138,6 +138,9 @@ fun ApplicationScope.ShellHost(
     val bootDark = remember(boot) { ShellLookValues.Dark.atBoot(boot) }
     val thresholdStrings = remember(bootWords) { bootWords.strings(NexiraStrings.NAMESPACE) }
     val look = remember { ShellLook(theme = ShellLookValues.Theme.atBoot(boot), dark = bootDark, words = bootWords) }
+    // The look the boot window opens in, the person's choice as the look manager answered it before
+    // the boot. The shell's own look takes its place inside once it mounts.
+    val bootLook = remember(boot) { ShellLookValues.Look.atBoot(boot) }
 
     // A recovery restart with boot already done skips the threshold entirely
     // (no black frame). The restart flag is EXPLICIT, not inferred from the
@@ -181,32 +184,34 @@ fun ApplicationScope.ShellHost(
                 windowState.placement = WindowPlacement.Maximized
             }
         }
-        Box(Modifier.fillMaxSize()) {
-            (outcome as? BootOutcome.Ready)?.let { ready ->
-                AppShellContent(
-                    boot            = ready.result,
-                    windowState     = windowState,
-                    visibleState    = visibleState,
-                    chrome          = chrome,
-                    opening         = opening,
-                    look            = look,
-                    exitApp         = { exitApplication() },
-                )
-            }
-            if (!thresholdDone) {
-                ThresholdOverlay(
-                    stageFlow = stageFlow,
-                    outcome   = outcome,
-                    strings   = thresholdStrings,
-                    logsDir   = pre.core.initialPaths.logsDir,
-                    dark      = bootDark,
-                    onQuit    = { exitApplication() },
-                    onDone    = { thresholdDone = true },
-                    onRecovery = {
-                        RecoveryEntry.requestOnNextBoot(pre.core.initialPaths.dataDir)
-                        AppRelauncher.relaunch().also { relaunched -> if (relaunched) exitApplication() }
-                    },
-                )
+        bootLook.Provide {
+            Box(Modifier.fillMaxSize()) {
+                (outcome as? BootOutcome.Ready)?.let { ready ->
+                    AppShellContent(
+                        boot            = ready.result,
+                        windowState     = windowState,
+                        visibleState    = visibleState,
+                        chrome          = chrome,
+                        opening         = opening,
+                        look            = look,
+                        exitApp         = { exitApplication() },
+                    )
+                }
+                if (!thresholdDone) {
+                    ThresholdOverlay(
+                        stageFlow = stageFlow,
+                        outcome   = outcome,
+                        strings   = thresholdStrings,
+                        logsDir   = pre.core.initialPaths.logsDir,
+                        dark      = bootDark,
+                        onQuit    = { exitApplication() },
+                        onDone    = { thresholdDone = true },
+                        onRecovery = {
+                            RecoveryEntry.requestOnNextBoot(pre.core.initialPaths.dataDir)
+                            AppRelauncher.relaunch().also { relaunched -> if (relaunched) exitApplication() }
+                        },
+                    )
+                }
             }
         }
     }

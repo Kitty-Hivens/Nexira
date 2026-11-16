@@ -964,6 +964,9 @@ private fun FrameWindowScope.ShellContent(
                 LocalWindowCapabilities                  provides windowCapabilities.value,
                 LocalCustomChromeAvailable               provides WindowManagerProbe.allowsCustomFrame,
             ) {
+            // Every axis of the look the manager answers, around all the window draws.
+            // The shell knows none of them: it wraps what it draws in the one value.
+            appLevel.read(ShellLookValues.Look).Provide {
 
             // The main window in the host's registry, and its level, for as long as
             // this shell draws it. The console is a window of its own beside it.
@@ -1070,6 +1073,7 @@ private fun FrameWindowScope.ShellContent(
             }
             } // end LayerHost
             } // end HostedWindow(Main)
+            } // end Look.Provide
             } // end CompositionLocalProvider(LocalCustomization)
         }
     }

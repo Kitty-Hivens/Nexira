@@ -10,13 +10,11 @@ import hivens.widget.api.widgetPropsJson
 import hivens.widget.model.ApiVersion
 import hivens.widget.model.WidgetKind
 import org.slf4j.LoggerFactory
-import java.io.InputStreamReader
 import java.net.URLClassLoader
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
-import java.util.Properties
 import java.util.ServiceLoader
 import java.util.jar.JarFile
 
@@ -368,9 +366,7 @@ class WidgetModuleLoader(
                     val other = if (language == null) NAMESPACED_STRINGS_FILE.matchEntire(entry.name) else null
                     if (own == null && other == null && language == null) return@forEach
                     runCatching {
-                        val properties = Properties()
-                        InputStreamReader(file.getInputStream(entry), Charsets.UTF_8).use { properties.load(it) }
-                        val words = properties.stringPropertyNames().associateWith { properties.getProperty(it) }
+                        val words = file.getInputStream(entry).use(ModuleStrings::read)
                         if (own != null) {
                             tables[own.groupValues[1]] = words
                         } else if (language != null) {

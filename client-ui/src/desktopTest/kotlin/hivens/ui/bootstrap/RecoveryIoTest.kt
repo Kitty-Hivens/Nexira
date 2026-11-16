@@ -1,6 +1,7 @@
 package hivens.ui.bootstrap
 
 import hivens.config.Storage
+import hivens.look.manager.LookSettingsDomain
 import hivens.themes.Themes
 import hivens.themes.ThemesSettingsDomain
 import hivens.themes.api.ThemesKeys
@@ -137,6 +138,21 @@ class RecoveryIoTest {
         assertEquals(Themes.default, back[ThemesKeys.Active])
         assertEquals(false, back[ThemesKeys.Dark], "the scheme comes back from the old settings file, as it stayed before the choice moved")
         assertFalse(SettingsDomainFiles(domains, settings()).peek(ThemesSettingsDomain).dark)
+    }
+
+    @Test
+    fun `resetCustomization takes the look's choice too, so the look comes back on the default pack`() {
+        val domains = dataDir / Storage.SETTINGS_DIR
+        Files.createDirectories(domains)
+        val files = SettingsDomainFiles(domains, settings())
+        Files.writeString(domains / "${LookSettingsDomain.id}.json", """{"schema":1,"value":{"pack":"material","overrides":{"colour":"nx"}}}""")
+        assertEquals("material", files.peek(LookSettingsDomain).pack, "the file is read as the look's choice")
+
+        RecoveryIo.resetCustomization(dataDir)
+
+        assertEquals(Storage.SETTINGS_DIR + "/" + LookSettingsDomain.id + ".json", RecoveryIo.LOOK_CHOICE_FILE, "the file is the domain's")
+        assertFalse(Files.exists(domains / "${LookSettingsDomain.id}.json"))
+        assertEquals(LookSettingsDomain.defaults(), SettingsDomainFiles(domains, settings()).peek(LookSettingsDomain))
     }
 
     @Test

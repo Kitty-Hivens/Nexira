@@ -43,7 +43,8 @@ interface BootContext {
 
     /**
      * What the host can hand over before it is up: [TakenWords], holding what the host and every
-     * module compiled in ship, and nothing of a jar's.
+     * module compiled in ship, and [TakenContributions], holding what the modules compiled in carry of
+     * the kinds they take, and nothing of a jar's.
      */
     val services: LevelServices
 }

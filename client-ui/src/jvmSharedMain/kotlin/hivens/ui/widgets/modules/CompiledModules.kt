@@ -3,6 +3,7 @@ package hivens.ui.widgets.modules
 import hivens.accounts.AccountsModule
 import hivens.catalogue.CatalogueModule
 import hivens.i18n.I18nModule
+import hivens.look.manager.LookManagerModule
 import hivens.packs.PacksModule
 import hivens.source.mirror.MirrorSourceModule
 import hivens.source.modrinth.ModrinthSourceModule
@@ -16,7 +17,7 @@ import hivens.widget.model.ApiVersion
  * in a module's keys only where the document names it, the same as a jar's.
  */
 val CompiledModules: List<CompiledModule> =
-    listOf(I18nModule, ThemesModule, PacksModule, AccountsModule, CatalogueModule, MirrorSourceModule, ModrinthSourceModule)
+    listOf(I18nModule, ThemesModule, LookManagerModule, PacksModule, AccountsModule, CatalogueModule, MirrorSourceModule, ModrinthSourceModule)
 
 /**
  * The kinds of contribution read out of every jar: the ones the widget kernel declares and

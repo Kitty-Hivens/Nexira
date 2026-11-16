@@ -1,20 +1,24 @@
 #!/usr/bin/env python3
-# Fails when a user-facing string is hardcoded in Compose UI code instead of
-# going through AppStrings / LocalStrings.
+# Fails when a user-facing string is hardcoded in Kotlin source instead of
+# living in a words file the language module reads.
 #
-# Why this exists: AppStrings enforces COMPLETENESS -- the Kotlin compiler
-# requires every key to be implemented in en/ru/de, so a missing translation
-# does not build. It does NOT enforce USAGE: nothing stops a literal from
-# bypassing LocalStrings entirely. Compose Desktop has no Android-style
-# HardcodedText lint, so without this gate a hardcoded string sails through
-# the compiler, the tests, and review unnoticed. This is the call-site guard.
+# Why this exists: every word a person reads lives in a table, one per shipped
+# language: the launcher's own in client-i18n's i18n/nexira/<tag>.properties,
+# read through nexiraStrings(), and a module's in its own
+# i18n/<namespace>/<tag>.properties, a compiled module's read through
+# ModuleStrings.resources and a jar's by the loader, both looked up through
+# strings(namespace).text(key). The tables say what a language has. Nothing
+# stops a literal from bypassing them entirely, and Compose Desktop has no
+# Android-style HardcodedText lint, so without this gate a hardcoded string
+# sails through the compiler, the tests, and review unnoticed. This is the
+# call-site guard.
 #
 # High-precision heuristic: a Cyrillic run inside a string literal in Compose UI
 # code is almost always a hardcoded RU UI string. The locale files
 # and build output are excluded by path; comments may carry Cyrillic notes
 # and are skipped; and the @PropLabel / @Widget(...) / displayName annotation
 # ARGUMENT is stripped before the scan -- the key it carries is a compile-time
-# constant resolved through LocalStrings elsewhere, not user-facing text. Only
+# constant looked up in the tables elsewhere, not user-facing text. Only
 # the annotation call is removed: the rest of the line is still scanned, so a
 # hardcoded Cyrillic prop default sitting beside the annotation
 # (`@PropLabel("k") val title: String = "<cyrillic>"`) is caught rather than
@@ -76,8 +80,8 @@ CYRILLIC_LITERAL = re.compile('"[^"]*' + _CYRILLIC_CLASS + '[^"]*"')
 # a developer note, not user-facing text.
 COMMENT_LINE = re.compile(r"^\s*(?://|\*|/\*)")
 
-# Annotation argument: the key it carries is a compile-time constant resolved
-# through LocalStrings elsewhere. Stripped (not skipped) so the remainder of
+# Annotation argument: the key it carries is a compile-time constant looked
+# up in the tables elsewhere. Stripped (not skipped) so the remainder of
 # the line -- e.g. a prop default value beside the annotation -- is still
 # scanned. The argument list is a simple key / range with no nested ')', so a
 # non-greedy `[^)]*` is enough here.
@@ -158,7 +162,11 @@ def main() -> int:
         return 0
 
     print(f"check-i18n: {len(hits)} hardcoded UI string(s) across {len(targets)} files.")
-    print("Route each through LocalStrings: add a key to AppStrings + en/ru/de, render s.key.")
+    print(
+        "Move each into its owner's words: a key in i18n/<namespace>/<tag>.properties in every shipped "
+        "language (ru, en, de, ja), read through strings(namespace).text(key), nexiraStrings() for the "
+        "launcher's own, and ModuleStrings.resources for a compiled module's own name and labels."
+    )
     print()
     for hit in hits:
         rel = hit.path.relative_to(ROOT) if hit.path.is_relative_to(ROOT) else hit.path

@@ -194,5 +194,11 @@ include(":i18n")
 // person's theme.
 include(":themes-api")
 include(":themes")
+// The look: a manager that picks one provider per axis of the look from the person's choice
+// and hands their answers to the composition, knowing no axis itself. The axes, their providers
+// and the packs naming them are modules of their own under look/, built by the nexira.look
+// convention plugin in buildSrc, their suites run together by :look:allTests.
+include(":look:manager-api")
+include(":look:manager")
 include(":profiler-agent")
 include(":authlib-agent")

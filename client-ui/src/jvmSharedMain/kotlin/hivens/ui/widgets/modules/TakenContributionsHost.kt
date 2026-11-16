@@ -5,8 +5,10 @@ import hivens.widget.api.ModuleContribution
 import hivens.widget.api.TakenContribution
 import hivens.widget.api.TakenContributions
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 
@@ -25,17 +27,35 @@ internal fun hostTakenContributions(
     jars: StateFlow<WidgetModules.Snapshot>,
     scope: CoroutineScope,
 ): TakenContributions {
-    val kinds = compiled.flatMap { it.contributionKinds }.distinct()
-    fun taken(item: ModuleContribution) = kinds.any { it.isInstance(item) }
-    val everyCompiled = compiled.flatMap { module ->
-        module.contributions.filter(::taken).map { TakenContribution(module.id, it) }
-    }
+    val kinds = takenKinds(compiled)
+    val everyCompiled = compiledTaken(compiled, kinds)
     val fromCompiled = everyCompiled.filter { it.moduleId in named }
     fun all(snapshot: WidgetModules.Snapshot): List<TakenContribution<ModuleContribution>> =
-        fromCompiled + snapshot.contributions.filter { taken(it.item) }.map { TakenContribution(it.moduleId, it.item) }
+        fromCompiled + snapshot.contributions.filter { item -> kinds.any { it.isInstance(item.item) } }.map { TakenContribution(it.moduleId, it.item) }
     val flow = jars.map(::all).stateIn(scope, SharingStarted.Eagerly, all(jars.value))
     return object : TakenContributions {
         override val all: StateFlow<List<TakenContribution<ModuleContribution>>> = flow
         override val compiledIn: List<TakenContribution<ModuleContribution>> = everyCompiled
     }
 }
+
+/**
+ * What the host hands over before it is up, when no jar is loaded yet: [hostTakenContributions] with
+ * the compiled modules alone, fixed.
+ */
+internal fun bootTakenContributions(named: Set<String>, compiled: List<CompiledModule>): TakenContributions {
+    val everyCompiled = compiledTaken(compiled, takenKinds(compiled))
+    val fromCompiled = MutableStateFlow(everyCompiled.filter { it.moduleId in named }).asStateFlow()
+    return object : TakenContributions {
+        override val all: StateFlow<List<TakenContribution<ModuleContribution>>> = fromCompiled
+        override val compiledIn: List<TakenContribution<ModuleContribution>> = everyCompiled
+    }
+}
+
+private fun takenKinds(compiled: List<CompiledModule>): List<Class<out ModuleContribution>> = compiled.flatMap { it.contributionKinds }.distinct()
+
+/** What every module of [compiled] carries of [kinds], in the build's order. */
+private fun compiledTaken(compiled: List<CompiledModule>, kinds: List<Class<out ModuleContribution>>): List<TakenContribution<ModuleContribution>> =
+    compiled.flatMap { module ->
+        module.contributions.filter { item -> kinds.any { it.isInstance(item) } }.map { TakenContribution(module.id, it) }
+    }

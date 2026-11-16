@@ -4,6 +4,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import hivens.i18n.api.I18nKeys
 import hivens.i18n.api.Translator
+import hivens.look.manager.api.LookKeys
+import hivens.look.manager.api.LookProvision
 import hivens.themes.api.ThemesKeys
 import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.Theme
@@ -17,9 +19,9 @@ import org.koin.core.KoinApplication
  * through, and what the shell draws with where no module brought in answers it.
  *
  * The shell does not know where the value comes from or how it is kept. A module brings it as input
- * data under its own API's key, every widget decides for itself what to make of it, and the shell
- * reads it like any widget reads a key: from the app level once the host is up ([from]), and from what
- * the modules compiled in answered before that for the window the launcher boots in ([atBoot]).
+ * data under its own API's key, and the shell reads it like any widget reads a key: from the app level
+ * once the host is up ([read]), and from what the modules compiled in answered before that for the window
+ * the launcher boots in ([atBoot]).
  */
 class LookValue<T>(val key: SourceKey<T>, val fallback: T) {
 
@@ -30,11 +32,17 @@ class LookValue<T>(val key: SourceKey<T>, val fallback: T) {
 }
 
 /**
- * The values the shell joins in: the colours a theme module brings and the words of the language
- * module. A later axis of the look, motion or geometry or sound, joins the same way, as one more
- * value here under the key its module's API names, with a fallback of its own.
+ * The values the shell joins in: the look, the colours a theme module brings and the words of the
+ * language module, each through a [LookValue], the key its module's API names and the fallback the
+ * shell draws with where no module answers it.
+ *
+ * The look is one value whatever axes it has, colour or motion or geometry or sound: the look manager
+ * answers every axis under the one key, and the shell wraps what it draws in it without knowing any.
  */
 object ShellLookValues {
+    /** The answers of every axis of the look. None where no look manager is brought in, and every axis reads its base answers. */
+    val Look: LookValue<LookProvision> = LookValue(LookKeys.Provide, LookProvision.NONE)
+
     /** The theme every window is drawn in. Neutral where no themes module is brought in. */
     val Theme: LookValue<Theme> = LookValue(ThemesKeys.Active, NeutralTheme)
 
@@ -45,7 +53,7 @@ object ShellLookValues {
     val Words: LookValue<Translator> = LookValue(I18nKeys.Words, Translator.KEYS)
 
     /** Every value here. */
-    val all: List<LookValue<*>> = listOf(Theme, Dark, Words)
+    val all: List<LookValue<*>> = listOf(Look, Theme, Dark, Words)
 }
 
 /**

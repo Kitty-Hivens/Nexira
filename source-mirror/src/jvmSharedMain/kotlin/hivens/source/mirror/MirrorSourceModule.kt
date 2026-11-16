@@ -39,34 +39,7 @@ object MirrorSourceModule : CompiledModule {
 
     override val id: String = ID
     override val name: String = NAME
-    override val strings: ModuleStrings = ModuleStrings(
-        mapOf(
-            "en" to mapOf(
-                NAME to "Hivens mirror",
-                MirrorPackSource.LABEL to "Hivens",
-                MirrorPackSource.BUILT_BY_LABEL to "Built by",
-                MirrorPackSource.COMMUNITY_LABEL to "Community",
-            ),
-            "ru" to mapOf(
-                NAME to "Зеркало Hivens",
-                MirrorPackSource.LABEL to "Hivens",
-                MirrorPackSource.BUILT_BY_LABEL to "Кто собрал",
-                MirrorPackSource.COMMUNITY_LABEL to "Сообщество",
-            ),
-            "de" to mapOf(
-                NAME to "Hivens-Spiegel",
-                MirrorPackSource.LABEL to "Hivens",
-                MirrorPackSource.BUILT_BY_LABEL to "Erstellt von",
-                MirrorPackSource.COMMUNITY_LABEL to "Community",
-            ),
-            "ja" to mapOf(
-                NAME to "Hivens ミラー",
-                MirrorPackSource.LABEL to "Hivens",
-                MirrorPackSource.BUILT_BY_LABEL to "作成者",
-                MirrorPackSource.COMMUNITY_LABEL to "コミュニティ",
-            ),
-        ),
-    )
+    override val strings: ModuleStrings = ModuleStrings.resources(MirrorSourceModule::class.java, ID)
     override val contributions: List<ModuleContribution> = listOf(MirrorSourceKeys, MirrorPackSource)
 
     private const val NAME = "mirror.name"

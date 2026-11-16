@@ -173,6 +173,10 @@ kotlin {
                 implementation(project(":i18n"))
                 implementation(project(":themes-api"))
                 implementation(project(":themes"))
+                // The look manager, the same way: its API for the one key the shell reads the
+                // look through, the module compiled in.
+                implementation(project(":look:manager-api"))
+                implementation(project(":look:manager"))
                 implementation(project(":nx-ui"))
                 implementation(project(":ui-layers"))
                 implementation(project(":client-i18n"))
