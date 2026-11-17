@@ -158,7 +158,7 @@ libsound          = "0.2.0"
 # their test compilation inherited release 8 from the shipped-agent pin; only the
 # agent classes need Java 8 bytecode, so that pin is now scoped to compileJava and
 # 6.x resolves on every test classpath.
-mockk             = "1.14.11"
+mockk             = "1.14.12"
 junit             = "6.1.3"
 
 [libraries]
