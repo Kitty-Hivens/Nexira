@@ -42,6 +42,9 @@ import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.Motion
 import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
+import hivens.look.colour.api.Fill
+import hivens.look.colour.api.Ink
 import kotlinx.serialization.Serializable
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
@@ -294,7 +297,6 @@ private class PlayInks(
 
 @Composable
 private fun playInks(ground: PlayGround): PlayInks {
-    val scheme = NxTheme.colours.scheme
     val dark = NxTheme.isDark
     return when (ground) {
         PlayGround.Media -> PlayInks(
@@ -308,11 +310,12 @@ private fun playInks(ground: PlayGround): PlayInks {
             warn      = MEDIA_WARN,
             caption   = Color.White.copy(alpha = 0.82f),
         )
-        // The theme's two ends, crossed: the plate is its main ink and the word on it
-        // is its page, so the control is the strongest contrast the theme has.
+        // The look turned over: the plate is the inverse fill and the word on it the
+        // inverse ink, which for nx is its main ink and its page, so the control is the
+        // strongest contrast the theme has.
         PlayGround.Surface -> PlayInks(
-            plate     = scheme.inks[0],
-            onPlate   = scheme.steps[0],
+            plate     = Fill.inverse,
+            onPlate   = Ink.inverse,
             quiet     = NxInk.quiet,
             quietLine = NxInk.quiet.copy(alpha = 0.35f),
             warn      = NxColor.status(Status.Warning),
@@ -337,7 +340,7 @@ private fun PlayButtonLightPreview() = PlayButtonGrounds(dark = false)
 
 @Composable
 private fun PlayButtonGrounds(dark: Boolean) {
-    NxTheme(NeutralTheme, dark = dark) {
+    NxThemed(NeutralTheme, dark = dark) {
         Column(
             modifier            = Modifier.width(760.dp).background(NxColor.page).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),

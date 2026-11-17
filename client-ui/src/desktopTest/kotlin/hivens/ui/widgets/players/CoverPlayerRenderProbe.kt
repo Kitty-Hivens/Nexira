@@ -21,7 +21,7 @@ import hivens.ui.audio.PlaybackState
 import hivens.ui.audio.RepeatMode
 import hivens.ui.audio.TrackInfo
 import hivens.ui.i18n.ShippedLanguageProvider
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
 import java.nio.file.Paths
@@ -61,7 +61,7 @@ class CoverPlayerRenderProbe {
         val d = 2f
         val scene = ImageComposeScene((500 * d).toInt(), (1240 * d).toInt(), density = Density(d)) {
             ShippedLanguageProvider("en") {
-                NxTheme(Themes.default, dark = true) {
+                NxThemed(Themes.default, dark = true) {
                     Box(
                         Modifier.fillMaxSize().background(NxColor.page).padding(16.dp),
                         contentAlignment = Alignment.TopCenter,
@@ -103,7 +103,7 @@ class CoverPlayerRenderProbe {
         val d = 2f
         val scene = ImageComposeScene((460 * d).toInt(), (520 * d).toInt(), density = Density(d)) {
             ShippedLanguageProvider("en") {
-                NxTheme(Themes.default, dark = true) {
+                NxThemed(Themes.default, dark = true) {
                     Box(
                         Modifier.fillMaxSize().background(NxColor.page).padding(16.dp),
                         contentAlignment = Alignment.Center,
@@ -153,7 +153,7 @@ class CoverPlayerRenderProbe {
             val d = 2f
             val scene = ImageComposeScene((460 * d).toInt(), (420 * d).toInt(), density = Density(d)) {
                 ShippedLanguageProvider("ru") {
-                    NxTheme(Themes.default, dark = dark) {
+                    NxThemed(Themes.default, dark = dark) {
                         Box(
                             Modifier.fillMaxSize().background(NxColor.page).padding(16.dp),
                             contentAlignment = Alignment.TopStart,

@@ -43,7 +43,7 @@ import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import hivens.ui.theme.Theme
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
@@ -117,7 +117,7 @@ private fun ThemeCard(
             .clip(shape)
             .border(if (isSelected) 2.dp else 1.dp, frame, shape),
     ) {
-        NxTheme(theme, dark = dark, uiFamily = face) {
+        NxThemed(theme, dark = dark, uiFamily = face) {
             Column(
                 modifier            = Modifier.fillMaxSize().background(NxColor.page).padding(12.dp),
                 verticalArrangement = Arrangement.SpaceBetween,

@@ -25,7 +25,7 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.surface.ChamferedRectShape
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import hivens.ui.theme.TestTheme
 import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.Canvas as SkCanvas
@@ -63,7 +63,7 @@ class TooltipContentProbeTest {
     private fun sheet(name: String, wDp: Int, hDp: Int, shape: Shape? = null, body: @Composable () -> Unit) {
         val d = 4f
         val scene = ImageComposeScene((wDp * d).toInt(), (hDp * d).toInt(), density = Density(d)) {
-            NxTheme(TestTheme, dark = true) {
+            NxThemed(TestTheme, dark = true) {
                 Box(Modifier.fillMaxSize().background(NxColor.page), contentAlignment = Alignment.Center) {
                     NxSurface(
                         kind = SurfaceKind.Popup,

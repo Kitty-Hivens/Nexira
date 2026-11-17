@@ -21,7 +21,7 @@ import hivens.ui.editor.EditModeController
 import hivens.ui.editor.dnd.DragController
 import hivens.ui.editor.dnd.DropTargetRegistry
 import hivens.ui.layout.LayoutGraphRepository
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import hivens.widget.api.WidgetDescriptor
 import hivens.widget.model.LayoutGraph
 import hivens.widget.model.Placement
@@ -97,7 +97,7 @@ class CutGestureRestoreTest {
         val drag = DragController()
         val registry = DropTargetRegistry()
         val scene = ImageComposeScene(width = 300, height = 300, density = Density(1f)) {
-            NxTheme(Themes.default, dark = true) {
+            NxThemed(Themes.default, dark = true) {
                 Box(Modifier.fillMaxSize()) {
                     if (shown) {
                         EditableWidgetChrome(

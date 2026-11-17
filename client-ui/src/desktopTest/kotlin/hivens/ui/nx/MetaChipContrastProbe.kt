@@ -26,7 +26,7 @@ import hivens.themes.Themes
 import hivens.ui.components.SourceBadge
 import hivens.ui.components.loadedSources
 import hivens.ui.i18n.NexiraStrings
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import hivens.widget.api.LocalWidgetDataRegistry
 import org.jetbrains.skia.EncodedImageFormat
 import java.nio.file.Files
@@ -66,7 +66,7 @@ class MetaChipContrastProbe {
             "night" to Color(0xFF14161C),
         )
         val scene = ImageComposeScene(980, 60 + banners.size * 2 * 96, density = Density(1f)) {
-            NxTheme(Themes.default, dark = true) {
+            NxThemed(Themes.default, dark = true) {
                 // The badge names its source among the ones brought in, as a host lists them.
                 CompositionLocalProvider(LocalTranslator provides NexiraStrings.translator("ru"), LocalWidgetDataRegistry provides loadedSources()) {
                     Box(Modifier.fillMaxSize().background(NxColor.page).padding(16.dp)) {

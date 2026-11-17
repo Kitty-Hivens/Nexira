@@ -6,15 +6,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.lerp
+import hivens.look.colour.api.ColourAnswers
 
 @Composable
-internal actual fun ThemedContextMenu(colours: SchemeColours, content: @Composable () -> Unit) {
-    val contextMenu = remember(colours) {
-        val top = colours.step(colours.topStep)
+internal actual fun ThemedContextMenu(answers: ColourAnswers, content: @Composable () -> Unit) {
+    val contextMenu = remember(answers) {
+        val top = answers.groundDepth(answers.groundFloating)
         DefaultContextMenuRepresentation(
             backgroundColor = top,
-            textColor       = colours.inkMain,
-            itemHoverColor  = lerp(top, colours.lead, 0.14f),
+            textColor       = answers.inkMain,
+            itemHoverColor  = lerp(top, answers.paintLead, 0.14f),
         )
     }
     CompositionLocalProvider(LocalContextMenuRepresentation provides contextMenu) {

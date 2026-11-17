@@ -13,7 +13,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 
 /**
  * Provenance pill: a short [label] on the source's brand [color]. Domain-neutral
@@ -52,7 +52,7 @@ private fun NxSourceBadgeLightPreview() = SourceBadges(dark = false)
 
 @Composable
 private fun SourceBadges(dark: Boolean) {
-    NxTheme(NeutralTheme, dark = dark) {
+    NxThemed(NeutralTheme, dark = dark) {
         Row(
             modifier              = Modifier.width(420.dp).background(NxColor.page).padding(16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),

@@ -14,7 +14,7 @@ import androidx.compose.ui.unit.dp
 import hivens.launcher.legacy.RetiredClient
 import hivens.themes.Themes
 import hivens.ui.i18n.ShippedLanguageProvider
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import org.jetbrains.skia.EncodedImageFormat
 import java.nio.file.Files
 import java.nio.file.Path
@@ -69,7 +69,7 @@ class RetiredClientsRenderProbe {
         val out = Path.of("build/render", "retired-$name.png")
         Files.createDirectories(out.parent)
         val scene = ImageComposeScene(width, height, density = Density(1f)) {
-            NxTheme(Themes.default, dark = dark) {
+            NxThemed(Themes.default, dark = dark) {
                 ShippedLanguageProvider("ru") { content() }
             }
         }

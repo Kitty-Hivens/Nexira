@@ -53,7 +53,6 @@ import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.LocalPlane
 import hivens.ui.theme.NxInk
-import hivens.ui.theme.NxTheme
 import hivens.ui.theme.OnFill
 import hivens.ui.theme.familyForText
 import hivens.ui.theme.seedFromImage
@@ -340,7 +339,7 @@ internal fun SeededPlayerCard(
 private fun rememberSeededFill(artwork: ImageBitmap?, tint: Float): Color? {
     // The step a card takes over its holder, so the borrowed colour is mixed into the
     // body the card would have had rather than into the plane under it.
-    val base = NxTheme.colours.step((LocalPlane.current?.step ?: 0) + 1)
+    val base = NxColor.depth((LocalPlane.current?.step ?: 0) + 1)
     val seed by produceState<Int?>(initialValue = null, artwork) {
         value = artwork?.let { withContext(Dispatchers.Default) { seedFromImage(it) } }
     }

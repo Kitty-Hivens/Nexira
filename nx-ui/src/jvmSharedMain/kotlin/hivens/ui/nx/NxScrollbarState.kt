@@ -26,7 +26,7 @@ import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 
 /**
  * The auto-hiding bar for a scrollable that is described by its state.
@@ -57,7 +57,7 @@ private fun NxScrollbarLightPreview() = Scrollbars(dark = false)
 /** Both bars revealed, as a hovered list shows them. A touch host draws no bar, so on Android the lists stand alone. */
 @Composable
 private fun Scrollbars(dark: Boolean) {
-    NxTheme(NeutralTheme, dark = dark) {
+    NxThemed(NeutralTheme, dark = dark) {
         Column(
             modifier            = Modifier.width(360.dp).background(NxColor.page).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),

@@ -41,6 +41,7 @@ import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.settle
 import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import hivens.ui.theme.decorativePair
 import org.jetbrains.skia.EncodedImageFormat
 import java.nio.file.Files
@@ -106,14 +107,14 @@ class PlayButtonStatesProbe {
     @Composable
     private fun SurfaceStrip(height: Int, content: @Composable () -> Unit) {
         Box(
-            Modifier.width(STRIP_W.dp).height(height.dp).background(NxTheme.colours.step(1)),
+            Modifier.width(STRIP_W.dp).height(height.dp).background(NxColor.depth(1)),
             contentAlignment = Alignment.CenterEnd,
         ) { Box(Modifier.padding(horizontal = 18.dp)) { content() } }
     }
 
     @Composable
     private fun Sheet(dark: Boolean, onSurface: Boolean = false, stripH: Int = STRIP_H, button: @Composable (Cell, Strings) -> Unit) {
-        NxTheme(Themes.default, dark = dark) {
+        NxThemed(Themes.default, dark = dark) {
             Box(Modifier.fillMaxSize().background(NxColor.page).padding(16.dp)) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     cells.forEach { cell ->

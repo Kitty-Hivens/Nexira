@@ -24,7 +24,7 @@ import hivens.ui.nx.NxIconButton
 import hivens.ui.nx.NxProgressBar
 import hivens.ui.nx.NxSwitch
 import hivens.ui.surface.NxSurface
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
 import kotlin.test.Ignore
@@ -54,7 +54,7 @@ class PrimitiveShots {
     @OptIn(ExperimentalComposeUiApi::class)
     private fun sheet(name: String, theme: Theme, dark: Boolean) {
         val scene = ImageComposeScene(width = 1180, height = 760, density = Density(2f)) {
-            NxTheme(theme, dark = dark) {
+            NxThemed(theme, dark = dark) {
                 run {
                     Column(
                         modifier = Modifier.fillMaxSize().background(NxColor.page).padding(12.dp),

@@ -27,7 +27,7 @@ import hivens.ui.nx.NxToggle
 import hivens.ui.surface.NxCard
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
 import hivens.widget.model.Widget
@@ -59,7 +59,7 @@ fun ThemePickerPreviewWidget() {
     val face = MaterialTheme.typography.bodyMedium.fontFamily
 
     Box(Modifier.fillMaxSize().clip(MaterialTheme.shapes.large)) {
-        NxTheme(theme, dark = dark, uiFamily = face) {
+        NxThemed(theme, dark = dark, uiFamily = face) {
             Column(
                 modifier            = Modifier.fillMaxSize().background(NxColor.page).padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),

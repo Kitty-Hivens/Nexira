@@ -19,7 +19,7 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import hivens.ui.theme.OnFill
 
 /**
@@ -77,7 +77,7 @@ private fun NxChoiceChipLightPreview() = ChoiceChipStates(dark = false)
 
 @Composable
 private fun ChoiceChipStates(dark: Boolean) {
-    NxTheme(NeutralTheme, dark = dark) {
+    NxThemed(NeutralTheme, dark = dark) {
         Row(
             modifier              = Modifier.width(420.dp).background(NxColor.page).padding(16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),

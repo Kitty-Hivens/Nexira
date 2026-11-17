@@ -45,7 +45,7 @@ import hivens.ui.theme.Motion
 import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 
 /**
  * A labeled slider whose track is **bounded** so it never runs to the window
@@ -245,7 +245,7 @@ private fun NxSliderLightPreview() = Sliders(dark = false)
 
 @Composable
 private fun Sliders(dark: Boolean) {
-    NxTheme(NeutralTheme, dark = dark) {
+    NxThemed(NeutralTheme, dark = dark) {
         Column(
             modifier            = Modifier.width(360.dp).background(NxColor.page).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),

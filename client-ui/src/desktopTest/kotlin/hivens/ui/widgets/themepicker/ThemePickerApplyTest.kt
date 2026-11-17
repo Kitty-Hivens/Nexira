@@ -10,7 +10,7 @@ import hivens.ui.i18n.ShippedLanguageProvider
 import hivens.ui.onEventThread
 import hivens.ui.puppet.PuppetRegistry
 import hivens.ui.settle
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import hivens.ui.widgets.ChildLevel
 import hivens.ui.widgets.Commands
 import hivens.ui.widgets.KoinLevelServicesHost
@@ -66,7 +66,7 @@ class ThemePickerApplyTest {
         onEventThread {
             val scene = ImageComposeScene(900, 700, density = Density(1f)) {
                 ShippedLanguageProvider("en") {
-                    NxTheme(Themes.default, dark = true) {
+                    NxThemed(Themes.default, dark = true) {
                         CompositionLocalProvider(
                             LocalWidgetDataRegistry provides data,
                             LocalWidgetCommandRegistry provides commands,

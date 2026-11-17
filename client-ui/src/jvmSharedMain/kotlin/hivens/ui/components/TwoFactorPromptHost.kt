@@ -12,7 +12,7 @@ import hivens.widget.api.valueOrNull
  *
  * MUST be composed inside [hivens.ui.theme.NxTheme]: the prompt is a layer of the
  * window that takes its theme from where it is opened, and one raised from outside the
- * theme finds no `LocalScheme` and takes the shell down with it.
+ * theme finds none of what the theme sets and draws in Material's own colours.
  *
  * Signing the account in for the launch, saving what comes of it and handing the
  * session back to the launch are the module's. This draws the question and fires the

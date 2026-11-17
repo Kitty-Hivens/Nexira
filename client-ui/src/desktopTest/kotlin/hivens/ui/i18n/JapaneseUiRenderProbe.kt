@@ -27,7 +27,7 @@ import hivens.ui.i18n.ShippedLanguageProvider
 import hivens.ui.i18n.nexiraStrings
 import hivens.ui.surface.NxSurface
 import hivens.ui.text.needsCjkFace
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import hivens.ui.theme.nexiraCjkFamily
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
@@ -84,7 +84,7 @@ class JapaneseUiRenderProbe {
                 } else {
                     nexiraCjkFamily()
                 }
-                NxTheme(Themes.default, dark = true, uiFamily = family) {
+                NxThemed(Themes.default, dark = true, uiFamily = family) {
                     Box(
                         Modifier.fillMaxSize().background(NxColor.page).padding(16.dp),
                         contentAlignment = Alignment.Center,

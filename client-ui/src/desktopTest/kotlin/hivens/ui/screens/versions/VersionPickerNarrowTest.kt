@@ -13,7 +13,7 @@ import hivens.themes.Themes
 import hivens.ui.i18n.ShippedLanguageProvider
 import hivens.ui.layers.LayerHost
 import hivens.ui.layers.WindowLayers
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import kotlin.test.Test
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -43,7 +43,7 @@ class VersionPickerNarrowTest {
     fun `the notes keep a readable width on a phone`() {
         val scene = ImageComposeScene(1080, 2400, density = Density(2.5f)) {
             ShippedLanguageProvider("ru") {
-                NxTheme(Themes.default, dark = true) {
+                NxThemed(Themes.default, dark = true) {
                     LayerHost(WindowLayers(), Modifier.fillMaxSize()) {
                         VersionPickerWindow(
                             title = "Версии",

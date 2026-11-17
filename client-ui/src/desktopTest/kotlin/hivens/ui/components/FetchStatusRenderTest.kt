@@ -18,7 +18,7 @@ import hivens.i18n.api.LocalTranslator
 import hivens.media.MediaFetch
 import hivens.themes.Themes
 import hivens.ui.i18n.NexiraStrings
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
@@ -62,7 +62,7 @@ class FetchStatusRenderTest {
             height  = (height * scale).toInt(),
             density = Density(scale),
         ) {
-            NxTheme(Themes.default, dark = true) {
+            NxThemed(Themes.default, dark = true) {
                 CompositionLocalProvider(
                     LocalTranslator provides NexiraStrings.translator("en"),
                 ) {

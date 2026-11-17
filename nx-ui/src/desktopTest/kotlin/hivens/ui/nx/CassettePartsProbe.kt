@@ -40,7 +40,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import hivens.ui.theme.TestTheme
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
@@ -121,7 +121,7 @@ class CassettePartsProbe {
     private fun sheet(name: String, wDp: Int, hDp: Int, body: @Composable () -> Unit) {
         val d = 2f
         val scene = ImageComposeScene((wDp * d).toInt(), (hDp * d).toInt(), density = Density(d)) {
-            NxTheme(TestTheme, dark = true) {
+            NxThemed(TestTheme, dark = true) {
                 Box(
                     Modifier.fillMaxSize().background(NxColor.page).padding(16.dp),
                     contentAlignment = Alignment.Center,

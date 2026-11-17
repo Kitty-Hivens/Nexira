@@ -51,7 +51,7 @@ import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import hivens.ui.widgets.KoinLevelServicesHost
 import hivens.ui.widgets.WidgetSurface
 import hivens.widget.api.LocalLayoutGraph
@@ -378,7 +378,7 @@ class BrowseRenderTest {
                 // A pack card's badge names its source among the ones brought in.
                 CompositionLocalProvider(LocalWidgetDataRegistry provides sources) {
                     ModuleLanguageProvider("ru", listOf(MirrorSourceModule, ModrinthSourceModule)) {
-                        NxTheme(Themes.default, dark = true) {
+                        NxThemed(Themes.default, dark = true) {
                             Box(Modifier.fillMaxSize().background(NxColor.page).padding(20.dp)) {
                                 if (padded) {
                                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) { body() }

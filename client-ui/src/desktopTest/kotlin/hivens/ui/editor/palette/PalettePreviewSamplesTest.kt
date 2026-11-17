@@ -20,7 +20,7 @@ import hivens.ui.i18n.NexiraStrings
 import hivens.ui.i18n.ShippedLanguageProvider
 import hivens.ui.onEventThread
 import hivens.ui.settings.SettingsDomainFiles
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import hivens.ui.uiCommandRegistry
 import hivens.ui.uiDataRegistry
 import hivens.ui.widgets.ChildLevel
@@ -120,7 +120,7 @@ class PalettePreviewSamplesTest {
             var host: OffscreenPreviewHost? = null
             val scene = ImageComposeScene(400, 400, density = Density(1f)) {
                 ShippedLanguageProvider("en") {
-                    NxTheme(Themes.default, dark = true) {
+                    NxThemed(Themes.default, dark = true) {
                         CompositionLocalProvider(
                             LocalWidgetDataRegistry provides data,
                             LocalWidgetCommandRegistry provides commands,

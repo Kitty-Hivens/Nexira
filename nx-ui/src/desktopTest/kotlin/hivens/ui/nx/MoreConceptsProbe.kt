@@ -43,7 +43,7 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import hivens.ui.theme.TestTheme
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
@@ -86,7 +86,7 @@ class MoreConceptsProbe {
     private fun sheet(name: String, wDp: Int, hDp: Int, body: @Composable () -> Unit) {
         val d = 3f
         val scene = ImageComposeScene((wDp * d).toInt(), (hDp * d).toInt(), density = Density(d)) {
-            NxTheme(TestTheme, dark = true) {
+            NxThemed(TestTheme, dark = true) {
                 Box(
                     Modifier.fillMaxSize().background(NxColor.page).padding(16.dp),
                     contentAlignment = Alignment.Center,

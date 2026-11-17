@@ -16,7 +16,7 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 
 /**
  * Shows [content] when it fits and [compact] when it does not.
@@ -77,7 +77,7 @@ private fun NxFitLightPreview() = FitWidths(dark = false)
 
 @Composable
 private fun FitWidths(dark: Boolean) {
-    NxTheme(NeutralTheme, dark = dark) {
+    NxThemed(NeutralTheme, dark = dark) {
         Column(
             modifier            = Modifier.width(480.dp).background(NxColor.page).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),

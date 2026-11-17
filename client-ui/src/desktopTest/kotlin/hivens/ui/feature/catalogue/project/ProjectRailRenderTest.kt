@@ -35,7 +35,7 @@ import hivens.ui.feature.catalogue.links
 import hivens.ui.feature.catalogue.toTags
 import hivens.ui.feature.catalogue.toView
 import hivens.ui.surface.NxSurface
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import hivens.ui.widgets.ChildLevel
 import hivens.ui.widgets.KoinLevelServicesHost
 import hivens.ui.widgets.WidgetSurface
@@ -192,7 +192,7 @@ class ProjectRailRenderTest {
         Files.createDirectories(out.parent)
         val projects = slugs.map(::open)
         val scene = ImageComposeScene(300 * slugs.size + 40 * (slugs.size + 1), 1200, density = Density(1f)) {
-            NxTheme(Themes.default, dark = dark) {
+            NxThemed(Themes.default, dark = dark) {
                 Box(Modifier.fillMaxSize().background(NxColor.page)) {
                     Row(
                         modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp),

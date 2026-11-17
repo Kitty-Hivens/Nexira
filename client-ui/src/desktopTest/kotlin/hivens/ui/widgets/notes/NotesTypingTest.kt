@@ -7,7 +7,7 @@ import hivens.themes.Themes
 import hivens.ui.TypingScene
 import hivens.ui.i18n.ShippedLanguageProvider
 import hivens.ui.onEventThread
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import hivens.widget.api.LocalWidgetStateHost
 import hivens.widget.api.WidgetStateHost
 import hivens.widget.api.decodeWidgetState
@@ -37,7 +37,7 @@ class NotesTypingTest {
     private fun widget(store: Store, content: @Composable () -> Unit, body: TypingScene.() -> Unit) = onEventThread {
         TypingScene(400, 400) {
             ShippedLanguageProvider("en") {
-                NxTheme(Themes.default, dark = true) {
+                NxThemed(Themes.default, dark = true) {
                     CompositionLocalProvider(LocalWidgetStateHost provides store) { content() }
                 }
             }

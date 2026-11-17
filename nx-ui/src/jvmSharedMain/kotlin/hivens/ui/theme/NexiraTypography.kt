@@ -183,7 +183,7 @@ private fun NexiraTypographyLightPreview() = TypeScale(dark = false)
 
 @Composable
 private fun TypeScale(dark: Boolean) {
-    NxTheme(NeutralTheme, dark = dark) {
+    NxThemed(NeutralTheme, dark = dark) {
         val type = MaterialTheme.typography
         Column(
             modifier            = Modifier.width(560.dp).background(NxColor.page).padding(16.dp),

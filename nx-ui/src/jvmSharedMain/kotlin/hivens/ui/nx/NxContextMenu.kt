@@ -74,7 +74,7 @@ import hivens.ui.theme.NeutralTheme
 import kotlin.math.roundToInt
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import hivens.ui.theme.Status
 import hivens.ui.surface.SurfaceKind
 
@@ -578,7 +578,7 @@ private fun NxContextMenuLightPreview() = OpenMenus(dark = false)
  */
 @Composable
 private fun OpenMenus(dark: Boolean) {
-    NxTheme(NeutralTheme, dark = dark) {
+    NxThemed(NeutralTheme, dark = dark) {
         Row(
             modifier              = Modifier.width(560.dp).background(NxColor.page).padding(16.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp),

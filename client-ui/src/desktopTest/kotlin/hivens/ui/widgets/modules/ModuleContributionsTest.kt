@@ -14,7 +14,7 @@ import hivens.themes.api.ThemeContribution
 import hivens.themes.api.ThemeScheme
 import hivens.ui.ModuleAppLevel
 import hivens.ui.host.launcherServices
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import hivens.ui.widgets.modules.WidgetModules.Contributed
 import hivens.widget.api.ModuleStrings
 import hivens.widget.api.ParticleContribution
@@ -181,7 +181,7 @@ class ModuleContributionsTest {
         val descriptor = fields().all().values.single()
         SwingUtilities.invokeAndWait {
             val scene = ImageComposeScene(120, 120, density = Density(1f)) {
-                NxTheme(Themes.default, dark = true) {
+                NxThemed(Themes.default, dark = true) {
                     descriptor.Render(WidgetInstance(instanceId = "i", kind = descriptor.kind))
                 }
             }

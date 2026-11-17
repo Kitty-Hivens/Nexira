@@ -178,13 +178,24 @@ private fun AndroidShellContent() {
         )
     }
 
-    // How the launcher looks and speaks is the modules'. The shell draws with what their keys
-    // answer at the app level, and with its fallbacks where the document brings no such module
-    // (see ShellLookValues). It tells the themes module the system's scheme through the inputs
-    // the module keeps for the host: a phone can always read it.
-    val isDarkTheme = appLevel.read(ShellLookValues.Dark)
+    // How the launcher looks and speaks is the modules'. The shell draws in the look the manager
+    // answers and with the words the language module answers at the app level, and with its
+    // fallbacks where the document brings no such module (see ShellLookValues). It tells the
+    // themes module the system's scheme through the inputs the module keeps for the host: a
+    // phone can always read it.
     val themeMode = appLevel.readOrNull(ThemesKeys.Mode)
     val words = appLevel.read(ShellLookValues.Words)
+
+    // The application makes the look on a thread of its own as the process starts, and the
+    // Activity may draw before the manager's first answers are in. Until they are, at most
+    // LOOK_BOUND, nothing is drawn, so the first frame is in the look and not in the base answers.
+    var lookReady by remember(appLevel) { mutableStateOf(appLevel.lookPublished()) }
+    LaunchedEffect(appLevel) {
+        if (!lookReady) {
+            appLevel.awaitLook()
+            lookReady = true
+        }
+    }
 
     // The manager listens to the source the mode names, so the scheme is handed over
     // whenever it or the mode changes. AppRoot hands it what the wallpaper shows. Missing
@@ -237,12 +248,13 @@ private fun AndroidShellContent() {
         ).run(windowVisible = { true })
     }
 
+    if (!lookReady) return
+
     CompositionLocalProvider(LocalAprilFools provides AprilFoolsLoader.instance) {
         CompositionLocalProvider(LocalTranslator provides words) {
             val s = nexiraStrings()
             val uiFamily = if (needsCjkFace(s.text("settingsTitle") + s.text("navLibrary") + s.text("aboutTitle"))) nexiraCjkFamily() else null
 
-            val activeTheme = appLevel.read(ShellLookValues.Theme)
             val customizationJson = remember { Json { ignoreUnknownKeys = true; encodeDefaults = true; coerceInputValues = true } }
             val customizationManager = remember { CustomizationManager(dataDirectory, customizationJson, AtomicFiles::writeString) }
             var customization by remember { mutableStateOf(customizationManager.load()) }
@@ -322,7 +334,7 @@ private fun AndroidShellContent() {
                 ) {
                 LayerHost(layers, Modifier.fillMaxSize()) {
                 val themeReveal = rememberThemeReveal()
-                NxTheme(theme = activeTheme, dark = isDarkTheme, uiFamily = uiFamily) {
+                NxTheme(uiFamily = uiFamily) {
                     ThemeRevealHost(themeReveal) {
                         // The system bars and the caption of a freeform window are the system's, so the
                         // layout yields room to them instead of drawing under.

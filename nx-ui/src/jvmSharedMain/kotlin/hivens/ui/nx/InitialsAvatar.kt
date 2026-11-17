@@ -20,7 +20,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 
 /**
  * Letter-monogram fallback for a missing icon: up to two initials from
@@ -58,7 +58,7 @@ private fun InitialsAvatarLightPreview() = InitialsAvatars(dark = false)
 
 @Composable
 private fun InitialsAvatars(dark: Boolean) {
-    NxTheme(NeutralTheme, dark = dark) {
+    NxThemed(NeutralTheme, dark = dark) {
         Row(
             modifier              = Modifier.width(420.dp).background(NxColor.page).padding(16.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),

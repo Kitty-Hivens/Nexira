@@ -360,14 +360,14 @@ private fun FrameWindowScope.ShellContent(
         }
     }
 
-    // How the launcher looks and speaks is the modules'. The shell draws with what their keys
-    // answer at the app level, and with its fallbacks where the document brings no such module
-    // (see ShellLookValues). It tells the themes module what only a host can see, through the
-    // inputs the module keeps for the host: whether the system's scheme can be read, and what
-    // it says. The wallpaper is told by AppRoot. Read here, during the first composition, so the
-    // themes module has made its manager, and put a theme file from a newer build on record,
-    // before the read-only notice below looks.
-    val isDarkTheme = appLevel.read(ShellLookValues.Dark)
+    // How the launcher looks and speaks is the modules'. The shell draws in the look the manager
+    // answers and with the words the language module answers at the app level, and with its
+    // fallbacks where the document brings no such module (see ShellLookValues). It tells the
+    // themes module what only a host can see, through the inputs the module keeps for the host:
+    // whether the system's scheme can be read, and what it says. The wallpaper is told by AppRoot.
+    // The mode is read here, during the first composition, which also has the themes module make
+    // its manager, and put a theme file from a newer build on record, before the read-only notice
+    // below looks.
     val themeMode = appLevel.readOrNull(ThemesKeys.Mode)
     val words = appLevel.read(ShellLookValues.Words)
     // Missing where the document brings no themes module: then nothing follows the system.
@@ -700,9 +700,6 @@ private fun FrameWindowScope.ShellContent(
         }
         val packAutoUpdateService: PackAutoUpdateService = koinInject()
         val applyRecovery: ApplyRecovery = koinInject()
-        // The theme in use: the one chosen where it is on offer, the modules' among them.
-        val activeTheme = appLevel.read(ShellLookValues.Theme)
-
         // Customization extension: persisted choices for whether surfaces blur
         // and how the nav rail draws its selection. Provided via
         // [LocalCustomization] so NxTheme and the surfaces can read them
@@ -975,11 +972,8 @@ private fun FrameWindowScope.ShellContent(
             MainWindowNavigation(raise = mainBackend::raise)
             LayerHost(windowLayers, Modifier.fillMaxSize()) {
             val themeReveal = rememberThemeReveal()
-            NxTheme(
-                theme    = activeTheme,
-                dark     = isDarkTheme,
-                uiFamily = uiFamily,
-            ) {
+            // The bridge from the look the manager answers above to Compose and Material.
+            NxTheme(uiFamily = uiFamily) {
                 // What shows where Skia has not drawn yet while the window grows:
                 // the page colour, so a resize shows the theme and not light grey.
                 val page = NxColor.page
@@ -1018,11 +1012,7 @@ private fun FrameWindowScope.ShellContent(
             // Dev UI-debug overlay: top of the shell Box z-order (above AppRoot and
             // NotificationStack), its own NxTheme wrap so it draws in the active theme.
             // Inert unless a non-release build has the master toggle on.
-            NxTheme(
-                theme    = activeTheme,
-                dark     = isDarkTheme,
-                uiFamily = uiFamily,
-            ) {
+            NxTheme(uiFamily = uiFamily) {
                 DebugOverlay(debugOverlay)
                 // Inside the theme on purpose: the prompts are dialogs on the window's
                 // layers, which take their composition locals from where they are

@@ -37,7 +37,7 @@ import hivens.ui.navigation.NavRequests
 import hivens.ui.notifications.IndicationCenter
 import hivens.ui.settle
 import hivens.ui.theme.NxColor
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import hivens.widget.api.LocalWidgetDataRegistry
 import hivens.widget.api.WidgetDataRegistry
 import hivens.widget.api.flowSource
@@ -161,7 +161,7 @@ class PackCardRenderTest {
         val scene = ImageComposeScene((520 * d).toInt(), (480 * d).toInt(), density = Density(d)) {
             HostKoin(graph) {
                 ShippedLanguageProvider("ru") {
-                    NxTheme(Themes.default, dark = dark) {
+                    NxThemed(Themes.default, dark = dark) {
                         CompositionLocalProvider(LocalWidgetDataRegistry provides keys) {
                             Box(Modifier.fillMaxSize().background(NxColor.page).padding(16.dp)) {
                                 Column(

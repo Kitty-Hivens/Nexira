@@ -2,8 +2,9 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
 
 // Leaf design-system module (NxUI). Holds tokens, primitives, surfaces and the
-// Flexible decorator layer that the rest of the UI builds on. Depends on nothing
-// in-tree but ui-layers, which draws nothing. client-ui depends on it one-way.
+// Flexible decorator layer that the rest of the UI builds on. Depends in-tree on
+// ui-layers, which draws nothing, and on the colour axis's contract, whose answers
+// its colours are read from. client-ui depends on it one-way.
 // No application/packaging here, no puppet source-set, no client-core: this is
 // the bottom of the UI graph.
 plugins {
@@ -49,6 +50,9 @@ kotlin {
                 // Where popups, tooltips and dialogs stand and what closes them. This
                 // module draws them and asks ui-layers to place them.
                 implementation(project(":ui-layers"))
+                // What every colour here is read from: the colour axis's answers, provided by
+                // whatever answers the axis around the composition, and its base answers outside any.
+                api(project(":look:colour-api"))
             }
         }
 

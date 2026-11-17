@@ -32,13 +32,13 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.effects.pixelArtBackground
 import hivens.ui.theme.Backdrop
 import hivens.ui.theme.LocalPlane
-import hivens.ui.theme.LocalScheme
 import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import hivens.ui.theme.Plane
 import hivens.ui.theme.bevelHairline
+import hivens.look.colour.api.Colour
 
 /**
  * Where [kind] sits on the ladder, given the step of the plane holding it.
@@ -99,14 +99,14 @@ fun NxSurface(
     interactionSource: InteractionSource? = null,
     content: @Composable BoxScope.() -> Unit,
 ) {
-    val scheme = LocalScheme.current
-    val parent = LocalPlane.current ?: Plane(0, scheme.step(0), Backdrop.Page)
+    val answers = Colour.local.current
+    val parent = LocalPlane.current ?: Plane(0, answers.groundDepth(0), Backdrop.Page)
     val glass = kind == SurfaceKind.Chrome
-    val step = surfaceStep(kind, parent.step, scheme.topStep)
+    val step = surfaceStep(kind, parent.step, answers.groundFloating)
 
     // Chrome adds no depth to what it holds, but is drawn in the step above it, which
     // is what keeps a rail and a title bar apart from the page they frame.
-    val material = fillColor ?: scheme.step(if (glass) parent.step + 1 else step)
+    val material = fillColor ?: answers.groundDepth(if (glass) parent.step + 1 else step)
     val alpha = (opacity ?: kind.defaultOpacity()).coerceIn(0f, 1f)
     val body = material.copy(alpha = material.alpha * alpha)
     // A blur under a body nothing can see through is work thrown away: the filter runs
@@ -126,7 +126,7 @@ fun NxSurface(
     // otherwise recompose it and everything it contains, to change one rectangle.
     val hovered = interactionSource?.collectIsHoveredAsState()
     val pressed = interactionSource?.collectIsPressedAsState()
-    val stateTint = scheme.lead
+    val stateTint = answers.paintLead
 
     Box(
         modifier
@@ -159,7 +159,7 @@ fun NxSurface(
     ) {
         CompositionLocalProvider(
             LocalPlane provides plane,
-            LocalContentColor provides scheme.inkMain,
+            LocalContentColor provides answers.inkMain,
         ) {
             content()
         }
@@ -219,7 +219,7 @@ private fun NxSurfaceLightPreview() = SurfaceKinds(dark = false)
 
 @Composable
 private fun SurfaceKinds(dark: Boolean) {
-    NxTheme(NeutralTheme, dark = dark) {
+    NxThemed(NeutralTheme, dark = dark) {
         Column(
             modifier            = Modifier.width(640.dp).background(NxColor.page).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),

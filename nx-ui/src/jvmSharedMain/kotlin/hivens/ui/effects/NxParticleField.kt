@@ -29,11 +29,11 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.customization.LocalCustomization
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
-import hivens.ui.theme.LocalScheme
+import hivens.look.colour.api.Paint
 import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import kotlinx.coroutines.delay
 import kotlin.math.PI
 import kotlin.math.floor
@@ -99,10 +99,10 @@ fun NxParticleField(
     modifier: Modifier = Modifier,
     density: ParticleDensity = ParticleDensity.Even,
 ) {
-    val scheme = LocalScheme.current.scheme
+    val colors = Paint.palette
     val ink = NxInk.main
     val quiet = NxInk.quiet
-    val palette: List<Color> = remember(scheme, field, ink, quiet) { field.palette(ink, quiet, scheme.colors) }
+    val palette: List<Color> = remember(colors, field, ink, quiet) { field.palette(ink, quiet, colors) }
     // Named apart from the draw scope's own density, which is the screen's.
     val perArea = density
     // Held on its first frame when the person asked for less movement: the field
@@ -246,7 +246,7 @@ private fun NxParticleFieldLightPreview() = ParticleFields(dark = false)
 
 @Composable
 private fun ParticleFields(dark: Boolean) {
-    NxTheme(NeutralTheme, dark = dark) {
+    NxThemed(NeutralTheme, dark = dark) {
         Row(
             modifier              = Modifier.width(680.dp).background(NxColor.page).padding(16.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),

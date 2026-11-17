@@ -13,7 +13,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import hivens.themes.Themes
 import hivens.ui.FRAME_NANOS
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import hivens.ui.customization.CustomizationSettings
 import hivens.ui.customization.LocalCustomization
 import androidx.compose.runtime.CompositionLocalProvider
@@ -38,7 +38,7 @@ class WidgetEntranceRenderTest {
     private fun frames(entrance: Entrance, order: Int, reduceMotion: Boolean = false): Pair<Int, Int> {
         val scene = ImageComposeScene(100, 100, density = Density(1f)) {
             CompositionLocalProvider(LocalCustomization provides CustomizationSettings(reduceMotion = reduceMotion)) {
-            NxTheme(Themes.default, dark = true) {
+            NxThemed(Themes.default, dark = true) {
                 Box(Modifier.fillMaxSize().background(ground)) {
                     PlayedWidgetEntrance(entrance, order, null) {
                         Box(Modifier.size(100.dp).background(block))

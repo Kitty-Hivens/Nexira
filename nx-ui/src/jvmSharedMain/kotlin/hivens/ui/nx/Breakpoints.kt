@@ -18,7 +18,7 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 
 /**
  * Width breakpoints for per-container adaptivity. Measured against the
@@ -69,7 +69,7 @@ private fun AdaptiveWidthLightPreview() = AdaptiveWidths(dark = false)
 
 @Composable
 private fun AdaptiveWidths(dark: Boolean) {
-    NxTheme(NeutralTheme, dark = dark) {
+    NxThemed(NeutralTheme, dark = dark) {
         Column(
             modifier            = Modifier.width(800.dp).background(NxColor.page).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),

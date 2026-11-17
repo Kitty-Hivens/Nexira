@@ -11,7 +11,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.unit.dp
 import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.NxAlertDialog
-import hivens.ui.theme.NxTheme
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -51,7 +50,7 @@ class QuitGate {
  *
  * MUST be composed inside [hivens.ui.theme.NxTheme]: the dialog is a layer of the
  * window that takes its theme from where it is opened, and one raised from outside
- * the theme finds no colours.
+ * the theme finds none of what the theme sets.
  */
 @Composable
 fun QuitWithGameHost(
@@ -65,7 +64,7 @@ fun QuitWithGameHost(
     val s = nexiraStrings()
     // Material draws the dialog body, so the plane its words sit on is named by hand: the
     // dialog step of the ladder, which is what a modal is anywhere else in the app.
-    val body = NxTheme.colours.step(NxTheme.colours.topStep)
+    val body = NxColor.depth(NxColor.floating)
     NxAlertDialog(
         onDismissRequest = gate::dismiss,
         paneTitle        = s.text("quitGameTitle"),

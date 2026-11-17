@@ -19,7 +19,7 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 
 /**
  * The blessed "three dots" overflow affordance: a MoreVert button that opens an
@@ -59,7 +59,7 @@ private fun NxKebabButtonLightPreview() = KebabButtons(dark = false)
 
 @Composable
 private fun KebabButtons(dark: Boolean) {
-    NxTheme(NeutralTheme, dark = dark) {
+    NxThemed(NeutralTheme, dark = dark) {
         Row(
             modifier              = Modifier.width(200.dp).background(NxColor.page).padding(16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),

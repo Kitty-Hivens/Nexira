@@ -32,7 +32,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import hivens.themes.Themes
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import org.jetbrains.skia.EncodedImageFormat
 import java.nio.file.Files
 import java.nio.file.Path
@@ -168,7 +168,7 @@ class LoaderVectorRenderTest {
         val ink = Color(0xFFE8E8EC)
         val accent = Color(0xFFB794F6)
         val scene = ImageComposeScene(1160, 860, density = Density(2f)) {
-            NxTheme(Themes.default, dark = true) {
+            NxThemed(Themes.default, dark = true) {
                 Box(Modifier.fillMaxSize().background(NxColor.page)) {
                     Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Caption("вектор: fabric и neoforge на 16 / 24 / 48 / 96 dp")

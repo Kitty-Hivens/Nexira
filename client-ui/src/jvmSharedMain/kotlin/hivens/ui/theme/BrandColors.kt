@@ -78,9 +78,8 @@ fun decorativeColor(name: String): Color = decorativePair(name).first
  */
 @Composable @ReadOnlyComposable
 fun decorativePair(name: String): Pair<Color, Color> {
-    val spread = NxTheme.colours.distinct(DECORATIVE_SPREAD)
-    val i = Math.floorMod(name.hashCode(), spread.size)
-    return spread[i] to spread[(i + 1) % spread.size]
+    val i = Math.floorMod(name.hashCode(), DECORATIVE_SPREAD)
+    return NxColor.category(i, DECORATIVE_SPREAD) to NxColor.category((i + 1) % DECORATIVE_SPREAD, DECORATIVE_SPREAD)
 }
 
 private const val DECORATIVE_SPREAD = 8

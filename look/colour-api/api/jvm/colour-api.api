@@ -36,8 +36,10 @@ public final class hivens/look/colour/api/ColourAnswers {
 	public final fun getMediaScrim-0d7_KjU ()J
 	public final fun getPaintLead-0d7_KjU ()J
 	public final fun getPaintMark-0d7_KjU ()J
+	public final fun getPaintPalette ()Ljava/util/List;
 	public final fun getPaintPartner-0d7_KjU ()J
 	public final fun getPaintShadow-0d7_KjU ()J
+	public final fun getPaintThird-0d7_KjU ()J
 	public final fun groundDepth-vNxB06k (I)J
 	public final fun inkFaint-l2rxGTc (J)J
 	public final fun inkOn-l2rxGTc (J)J
@@ -102,10 +104,12 @@ public final class hivens/look/colour/api/ColourAnswers$Builder {
 	public final fun getPaintHashed ()Lkotlin/jvm/functions/Function1;
 	public final fun getPaintLead-QN2ZGVo ()Landroidx/compose/ui/graphics/Color;
 	public final fun getPaintMark-QN2ZGVo ()Landroidx/compose/ui/graphics/Color;
+	public final fun getPaintPalette ()Ljava/util/List;
 	public final fun getPaintPartner-QN2ZGVo ()Landroidx/compose/ui/graphics/Color;
 	public final fun getPaintShadow-QN2ZGVo ()Landroidx/compose/ui/graphics/Color;
 	public final fun getPaintShadowOn ()Lkotlin/jvm/functions/Function1;
 	public final fun getPaintStatus ()Lkotlin/jvm/functions/Function1;
+	public final fun getPaintThird-QN2ZGVo ()Landroidx/compose/ui/graphics/Color;
 	public final fun setFillInverse (Lkotlin/jvm/functions/Function1;)V
 	public final fun setFillLead (Lkotlin/jvm/functions/Function1;)V
 	public final fun setFillMatch (Lkotlin/jvm/functions/Function1;)V
@@ -149,10 +153,12 @@ public final class hivens/look/colour/api/ColourAnswers$Builder {
 	public final fun setPaintHashed (Lkotlin/jvm/functions/Function1;)V
 	public final fun setPaintLead-Y2TPw74 (Landroidx/compose/ui/graphics/Color;)V
 	public final fun setPaintMark-Y2TPw74 (Landroidx/compose/ui/graphics/Color;)V
+	public final fun setPaintPalette (Ljava/util/List;)V
 	public final fun setPaintPartner-Y2TPw74 (Landroidx/compose/ui/graphics/Color;)V
 	public final fun setPaintShadow-Y2TPw74 (Landroidx/compose/ui/graphics/Color;)V
 	public final fun setPaintShadowOn (Lkotlin/jvm/functions/Function1;)V
 	public final fun setPaintStatus (Lkotlin/jvm/functions/Function1;)V
+	public final fun setPaintThird-Y2TPw74 (Landroidx/compose/ui/graphics/Color;)V
 }
 
 public final class hivens/look/colour/api/ColourAnswers$Companion {
@@ -257,8 +263,10 @@ public final class hivens/look/colour/api/Paint {
 	public final fun data-swEIR5s (JLandroidx/compose/runtime/Composer;I)J
 	public final fun getLead (Landroidx/compose/runtime/Composer;I)J
 	public final fun getMark (Landroidx/compose/runtime/Composer;I)J
+	public final fun getPalette (Landroidx/compose/runtime/Composer;I)Ljava/util/List;
 	public final fun getPartner (Landroidx/compose/runtime/Composer;I)J
 	public final fun getShadow (Landroidx/compose/runtime/Composer;I)J
+	public final fun getThird (Landroidx/compose/runtime/Composer;I)J
 	public final fun hashed-XeAY9LY (Ljava/lang/String;Landroidx/compose/runtime/Composer;I)J
 	public final fun shadow-swEIR5s (JLandroidx/compose/runtime/Composer;I)J
 	public final fun status-XeAY9LY (Lhivens/look/manager/api/Status;Landroidx/compose/runtime/Composer;I)J

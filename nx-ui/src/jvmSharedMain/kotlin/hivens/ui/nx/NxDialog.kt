@@ -54,7 +54,7 @@ import hivens.ui.theme.Motion
 import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 
 /**
  * A modal dialog in the window: [content] centred over a scrim that blocks
@@ -254,7 +254,7 @@ private fun NxDialogLightPreview() = Dialogs(dark = false)
  */
 @Composable
 private fun Dialogs(dark: Boolean) {
-    NxTheme(NeutralTheme, dark = dark) {
+    NxThemed(NeutralTheme, dark = dark) {
         Row(
             modifier              = Modifier.width(1000.dp).background(NxColor.page).padding(16.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp),

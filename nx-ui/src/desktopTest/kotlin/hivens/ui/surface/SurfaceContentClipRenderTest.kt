@@ -18,7 +18,7 @@ import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertTrue
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import hivens.ui.theme.TestTheme
 
 /**
@@ -58,7 +58,7 @@ class SurfaceContentClipRenderTest {
     @OptIn(ExperimentalComposeUiApi::class)
     private fun pixel(px: Int, py: Int): Px {
         val scene = ImageComposeScene(width = W + 2 * M, height = H + 2 * M, density = Density(1f)) {
-            NxTheme(TestTheme, dark = true) {
+            NxThemed(TestTheme, dark = true) {
                 Box(Modifier.fillMaxSize().background(PAGE)) {
                     NxSurface(
                         kind = SurfaceKind.Panel,

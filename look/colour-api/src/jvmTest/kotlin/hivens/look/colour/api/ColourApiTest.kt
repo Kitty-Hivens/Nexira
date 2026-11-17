@@ -85,6 +85,28 @@ class ColourApiTest {
         assertEquals(lerp(ground, quiet, 0.12f), answers.lineFaint(ground))
         assertEquals(rule, answers.lineDivider(ground))
         assertEquals(ColourAnswers.BASE.inkMain, answers.inkMain, "a role nobody filled keeps its base answer")
+        assertEquals(listOf(lead, ColourAnswers.BASE.paintPartner), answers.paintPalette, "the palette is the lead, then the partner")
+        assertEquals(ColourAnswers.BASE.paintPartner, answers.paintThird, "the third is the partner")
+    }
+
+    @Test
+    fun `the third colour and the palette follow the partner and the lead a provider fills, and are its own where it fills them`() {
+        val lead = Color(0xFFCC3355)
+        val partner = Color(0xFF3355CC)
+        val third = Color(0xFF22AA44)
+        val partnered = ColourAnswers.build {
+            paintLead = lead
+            paintPartner = partner
+        }
+        assertEquals(partner, partnered.paintThird)
+        assertEquals(listOf(lead, partner), partnered.paintPalette)
+        val own = ColourAnswers.build {
+            paintThird = third
+            paintPalette = listOf(third, lead)
+        }
+        assertEquals(third, own.paintThird)
+        assertEquals(listOf(third, lead), own.paintPalette)
+        assertEquals(ColourAnswers.BASE.paintPalette, ColourAnswers.build { paintPalette = emptyList() }.paintPalette, "an empty palette keeps the base answer")
     }
 
     @Test
@@ -169,6 +191,8 @@ class ColourApiTest {
             "paintLead" to listOf(answers.paintLead),
             "paintMark" to listOf(answers.paintMark),
             "paintPartner" to listOf(answers.paintPartner),
+            "paintThird" to listOf(answers.paintThird),
+            "paintPalette" to answers.paintPalette,
             "paintStatus" to byStatus(answers::paintStatus),
             "paintCategory" to (0..9).map { answers.paintCategory(it, 10) },
             "paintHashed" to listOf("", "Ann", "a very long name of a pack").map(answers::paintHashed),

@@ -1,16 +1,26 @@
 package hivens.themes
 
+import androidx.compose.foundation.LocalContextMenuRepresentation
+import androidx.compose.foundation.text.selection.LocalTextSelectionColors
+import androidx.compose.material3.ColorScheme
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.unit.Density
 import hivens.i18n.api.FixedTranslations
 import hivens.i18n.api.Translator
 import hivens.look.colour.api.Colour
 import hivens.look.colour.api.ColourAnswers
 import hivens.look.colour.api.ColourApi
+import hivens.look.colour.api.Fill
+import hivens.look.colour.api.Ink
+import hivens.look.colour.api.Paint
 import hivens.look.manager.api.LookContext
 import hivens.look.manager.api.Status
 import hivens.themes.api.ThemeSettings
@@ -21,6 +31,7 @@ import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.Plane
+import hivens.ui.theme.SchemeColours
 import hivens.widget.api.BootContext
 import hivens.widget.api.LevelServices
 import hivens.widget.api.SettingsDomain
@@ -45,7 +56,8 @@ import hivens.ui.theme.Status as SchemeStatus
 /**
  * The module's colour provider answers the colour axis from the theme and the mode in use: the same
  * before the boot as once the host is up, following a switch of either while it stays open, from the
- * module's own settings alone, and with every role nx-ui answers today equal to what nx-ui draws.
+ * module's own settings alone, and with every role nx-ui drew from the scheme before it read the axis
+ * answered and drawn exactly as it was, the bridge's Material scheme and locals among them.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class NxColourProviderTest {
@@ -122,36 +134,63 @@ class NxColourProviderTest {
 
     @OptIn(ExperimentalComposeUiApi::class)
     @Test
-    fun `every role nx-ui answers today is answered exactly as NxInk, NxColor and NxTheme draw it, for every theme that ships in either mode`() {
+    fun `every role nx-ui answered before the colour axis is answered exactly as the scheme answered it, and drawn so, for every theme that ships in either mode`() {
         val fills = listOf(Color.White, Color.Black, Color(0xFF808080), Color(0xFFCC3355), Color(0x80FFFFFF))
         val keys = listOf("", "Ann", "Celestia", "a pack with a long name")
         Themes.all.forEach { theme ->
             listOf(true, false).forEach { dark ->
                 val answers = NxColourProvider.open(context(manager = manager(ThemeSettings(theme = theme.id, dark = dark)))).answers.value
+                val scheme = theme.scheme(dark)
+                // What nx-ui drew from the scheme before it read the colour axis, worked out the way it did.
+                val colours = SchemeColours(scheme)
+                val before = LinkedHashMap<String, Any>()
+                before["main"] = colours.inkMain
+                before["quiet"] = colours.inkQuiet
+                before["off"] = colours.inkQuiet.copy(alpha = 0.45f)
+                before["lead"] = colours.lead
+                before["page"] = colours.step(0)
+                before["dark"] = colours.isDark
+                before["floating"] = colours.topStep
+                before["partner"] = scheme.colors.getOrElse(1) { colours.lead }
+                before["third"] = scheme.colors.getOrElse(2) { scheme.colors.getOrElse(1) { scheme.colors.first() } }
+                before["palette"] = scheme.colors
+                before["inverse fill"] = colours.inkMain
+                before["inverse ink"] = colours.step(0)
+                before["line on the page"] = colours.line(colours.step(0))
+                (-3..10).forEach { before["step $it"] = colours.step(it) }
+                SchemeStatus.entries.forEach { before["status $it"] = colours.status(it) }
+                Twelve.entries.forEach { before["category $it"] = colours.distinct(Twelve.entries.size)[it.ordinal] }
+                keys.forEach { before["hashed '$it'"] = colours.hashed(it) }
+                fills.forEach { before["on $it"] = colours.on(it) }
+                (fills.filter { it.alpha == 1f } + colours.step(2)).forEach { before["line on $it"] = colours.line(it) }
+
+                // What nx-ui draws now, inside the bridge, over the provider's answers.
                 val drawn = LinkedHashMap<String, Any>()
-                val asked = LinkedHashMap<String, Any>()
                 val scene = ImageComposeScene(8, 8, Density(1f)) {
-                    NxTheme(theme, dark) {
-                        val colours = NxTheme.colours
-                        drawn["main"] = NxInk.main
-                        drawn["quiet"] = NxInk.quiet
-                        drawn["off"] = NxInk.off
-                        drawn["lead"] = NxColor.lead()
-                        drawn["page"] = NxColor.page
-                        drawn["dark"] = NxTheme.isDark
-                        drawn["floating"] = colours.topStep
-                        drawn["partner"] = MaterialTheme.colorScheme.secondary
-                        drawn["inverse fill"] = colours.inkMain
-                        drawn["inverse ink"] = colours.step(0)
-                        drawn["line on the page"] = NxInk.line
-                        (-3..10).forEach { drawn["step $it"] = colours.step(it) }
-                        SchemeStatus.entries.forEach { drawn["status $it"] = NxColor.status(it) }
-                        Twelve.entries.forEach { drawn["category $it"] = NxColor.of(it) }
-                        keys.forEach { drawn["hashed '$it'"] = NxColor.hashed(it) }
-                        fills.forEach { drawn["on $it"] = NxColor.on(it) }
-                        (fills.filter { it.alpha == 1f } + colours.step(2)).forEach { ground ->
-                            CompositionLocalProvider(LocalPlane provides Plane(0, ground, Backdrop.Plane)) {
-                                drawn["line on $ground"] = NxInk.line
+                    CompositionLocalProvider(Colour.local provides answers) {
+                        NxTheme {
+                            drawn["main"] = NxInk.main
+                            drawn["quiet"] = NxInk.quiet
+                            drawn["off"] = NxInk.off
+                            drawn["lead"] = NxColor.lead()
+                            drawn["page"] = NxColor.page
+                            drawn["dark"] = NxTheme.isDark
+                            drawn["floating"] = NxColor.floating
+                            drawn["partner"] = MaterialTheme.colorScheme.secondary
+                            drawn["third"] = NxColor.third
+                            drawn["palette"] = Paint.palette
+                            drawn["inverse fill"] = Fill.inverse
+                            drawn["inverse ink"] = Ink.inverse
+                            drawn["line on the page"] = NxInk.line
+                            (-3..10).forEach { drawn["step $it"] = NxColor.depth(it) }
+                            SchemeStatus.entries.forEach { drawn["status $it"] = NxColor.status(it) }
+                            Twelve.entries.forEach { drawn["category $it"] = NxColor.of(it) }
+                            keys.forEach { drawn["hashed '$it'"] = NxColor.hashed(it) }
+                            fills.forEach { drawn["on $it"] = NxColor.on(it) }
+                            (fills.filter { it.alpha == 1f } + colours.step(2)).forEach { ground ->
+                                CompositionLocalProvider(LocalPlane provides Plane(0, ground, Backdrop.Plane)) {
+                                    drawn["line on $ground"] = NxInk.line
+                                }
                             }
                         }
                     }
@@ -161,6 +200,8 @@ class NxColourProviderTest {
                 } finally {
                     scene.close()
                 }
+                assertEquals(before, drawn, "${theme.id}, dark $dark: drawn")
+                val asked = LinkedHashMap<String, Any>()
                 asked["main"] = answers.inkMain
                 asked["quiet"] = answers.inkQuiet
                 asked["off"] = answers.inkOff
@@ -169,6 +210,8 @@ class NxColourProviderTest {
                 asked["dark"] = answers.groundDark
                 asked["floating"] = answers.groundFloating
                 asked["partner"] = answers.paintPartner
+                asked["third"] = answers.paintThird
+                asked["palette"] = answers.paintPalette
                 asked["inverse fill"] = answers.fillInverse(answers.groundPage)
                 asked["inverse ink"] = answers.inkInverse
                 asked["line on the page"] = answers.lineDivider(answers.groundPage)
@@ -178,8 +221,99 @@ class NxColourProviderTest {
                 keys.forEach { asked["hashed '$it'"] = answers.paintHashed(it) }
                 fills.forEach { asked["on $it"] = answers.inkOn(it) }
                 (fills.filter { it.alpha == 1f } + answers.groundDepth(2)).forEach { asked["line on $it"] = answers.lineDivider(it) }
-                assertEquals(drawn, asked, "${theme.id}, dark $dark")
+                assertEquals(before, asked, "${theme.id}, dark $dark: answered")
             }
+        }
+    }
+
+    @OptIn(ExperimentalComposeUiApi::class)
+    @Test
+    fun `the bridge sets what NxTheme set from the scheme, for every theme that ships in either mode`() {
+        Themes.all.forEach { theme ->
+            listOf(true, false).forEach { dark ->
+                val answers = NxColourProvider.open(context(manager = manager(ThemeSettings(theme = theme.id, dark = dark)))).answers.value
+                val colours = SchemeColours(theme.scheme(dark))
+                val top = colours.step(colours.topStep)
+                val before = LinkedHashMap<String, Any>()
+                before["colorScheme"] = schemeBefore(colours).toString()
+                before["content"] = colours.inkMain
+                before["selection"] = colours.lead to colours.lead.copy(alpha = 0.4f)
+                // The representation keeps its colours as their packed values.
+                before["menu"] = listOf(top, colours.inkMain, lerp(top, colours.lead, 0.14f)).map { it.value.toLong() }
+                before["plane"] = Plane(0, colours.step(0), Backdrop.Page)
+                val drawn = LinkedHashMap<String, Any>()
+                val scene = ImageComposeScene(8, 8, Density(1f)) {
+                    CompositionLocalProvider(Colour.local provides answers) {
+                        NxTheme {
+                            drawn["colorScheme"] = MaterialTheme.colorScheme.toString()
+                            drawn["content"] = LocalContentColor.current
+                            val selection = LocalTextSelectionColors.current
+                            drawn["selection"] = selection.handleColor to selection.backgroundColor
+                            val menu = LocalContextMenuRepresentation.current
+                            drawn["menu"] = listOf("backgroundColor", "textColor", "itemHoverColor").map { name ->
+                                menu::class.java.getDeclaredField(name).also { it.isAccessible = true }.get(menu) as Long
+                            }
+                            drawn["plane"] = LocalPlane.current as Any
+                        }
+                    }
+                }
+                try {
+                    scene.render()
+                } finally {
+                    scene.close()
+                }
+                assertEquals(before, drawn, "${theme.id}, dark $dark")
+            }
+        }
+    }
+
+    /** Material's scheme as NxTheme cut it from the scheme before it read the colour axis. */
+    private fun schemeBefore(c: SchemeColours): ColorScheme {
+        val page = c.step(0)
+        val lead = c.lead
+        val second = c.scheme.colors.getOrElse(1) { lead }
+        val third = c.scheme.colors.getOrElse(2) { second }
+        val error = c.status(SchemeStatus.Error)
+        val ink = c.inkMain
+        val quiet = c.inkQuiet
+        return if (c.isDark) {
+            darkColorScheme(
+                primary = lead, onPrimary = c.on(lead),
+                primaryContainer = lerp(c.step(2), lead, 0.3f), onPrimaryContainer = ink,
+                secondary = second, onSecondary = c.on(second),
+                secondaryContainer = lerp(c.step(2), second, 0.3f), onSecondaryContainer = ink,
+                tertiary = third, onTertiary = c.on(third),
+                background = page, onBackground = ink,
+                surface = c.step(1), onSurface = ink,
+                surfaceVariant = c.step(2), onSurfaceVariant = quiet,
+                surfaceTint = lead,
+                inverseSurface = ink, inverseOnSurface = page,
+                error = error, onError = c.on(error),
+                outline = c.line(c.step(1)), outlineVariant = c.line(page),
+                scrim = page,
+                surfaceDim = page, surfaceBright = c.step(4),
+                surfaceContainerLowest = page, surfaceContainerLow = c.step(1),
+                surfaceContainer = c.step(2), surfaceContainerHigh = c.step(3), surfaceContainerHighest = c.step(4),
+            )
+        } else {
+            lightColorScheme(
+                primary = lead, onPrimary = c.on(lead),
+                primaryContainer = lerp(c.step(2), lead, 0.2f), onPrimaryContainer = ink,
+                secondary = second, onSecondary = c.on(second),
+                secondaryContainer = lerp(c.step(2), second, 0.2f), onSecondaryContainer = ink,
+                tertiary = third, onTertiary = c.on(third),
+                background = page, onBackground = ink,
+                surface = c.step(1), onSurface = ink,
+                surfaceVariant = c.step(2), onSurfaceVariant = quiet,
+                surfaceTint = lead,
+                inverseSurface = ink, inverseOnSurface = page,
+                error = error, onError = c.on(error),
+                outline = c.line(c.step(1)), outlineVariant = c.line(page),
+                scrim = ink,
+                surfaceDim = c.step(4), surfaceBright = page,
+                surfaceContainerLowest = page, surfaceContainerLow = c.step(1),
+                surfaceContainer = c.step(2), surfaceContainerHigh = c.step(3), surfaceContainerHighest = c.step(4),
+            )
         }
     }
 
@@ -257,6 +391,8 @@ class NxColourProviderTest {
             "paintLead" to listOf(answers.paintLead),
             "paintMark" to listOf(answers.paintMark),
             "paintPartner" to listOf(answers.paintPartner),
+            "paintThird" to listOf(answers.paintThird),
+            "paintPalette" to answers.paintPalette,
             "paintStatus" to byStatus(answers::paintStatus),
             "paintCategory" to listOf(1, 3, 8, 13).flatMap { count -> (0 until count).map { answers.paintCategory(it, count) } },
             "paintHashed" to listOf("", "Ann", "Celestia", "a pack with a long name").map(answers::paintHashed),

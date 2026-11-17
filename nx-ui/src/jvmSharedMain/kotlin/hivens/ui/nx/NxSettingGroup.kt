@@ -35,7 +35,7 @@ import hivens.ui.theme.Motion
 import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import hivens.ui.theme.Status
 
 /**
@@ -184,7 +184,7 @@ private fun NxSettingGroupLightPreview() = SettingGroups(dark = false)
 
 @Composable
 private fun SettingGroups(dark: Boolean) {
-    NxTheme(NeutralTheme, dark = dark) {
+    NxThemed(NeutralTheme, dark = dark) {
         Column(
             modifier            = Modifier.width(480.dp).background(NxColor.page).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp),

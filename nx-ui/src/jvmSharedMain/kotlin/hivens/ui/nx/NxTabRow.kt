@@ -37,7 +37,7 @@ import hivens.ui.theme.Motion
 import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 
 /**
  * Sections of one thing, as words with a mark under the current one.
@@ -167,7 +167,7 @@ private fun NxTabRowLightPreview() = TabRows(dark = false)
 @Composable
 private fun TabRows(dark: Boolean) {
     val tabs = listOf("Overview", "Content", "Versions", "Settings", "Logs")
-    NxTheme(NeutralTheme, dark = dark) {
+    NxThemed(NeutralTheme, dark = dark) {
         Column(
             modifier            = Modifier.width(480.dp).background(NxColor.page).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),

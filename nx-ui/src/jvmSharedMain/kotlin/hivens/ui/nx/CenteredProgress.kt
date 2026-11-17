@@ -11,7 +11,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 
 /**
  * Centred loading spinner, the launcher's one async-loading shape. The
@@ -40,7 +40,7 @@ private fun CenteredProgressLightPreview() = CenteredProgressPane(dark = false)
 
 @Composable
 private fun CenteredProgressPane(dark: Boolean) {
-    NxTheme(NeutralTheme, dark = dark) {
+    NxThemed(NeutralTheme, dark = dark) {
         CenteredProgress(Modifier.size(240.dp, 120.dp).background(NxColor.page))
     }
 }

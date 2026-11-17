@@ -3,6 +3,7 @@ package hivens.ui
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Density
 import hivens.config.Storage
 import hivens.i18n.I18nModule
@@ -10,6 +11,7 @@ import hivens.i18n.api.I18nApi
 import hivens.i18n.api.I18nKeys
 import hivens.i18n.api.Translator
 import hivens.look.colour.api.Colour
+import hivens.look.colour.api.ColourAnswers
 import hivens.look.colour.api.ColourApi
 import hivens.look.manager.LookManagerModule
 import hivens.look.manager.LookSettingsDomain
@@ -31,9 +33,9 @@ import hivens.themes.api.ThemesApi
 import hivens.themes.api.ThemesKeys
 import hivens.ui.bootstrap.bootValues
 import hivens.ui.i18n.NexiraStrings
-import hivens.ui.theme.NeutralTheme
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.Scheme
 import hivens.ui.widgets.modules.CompiledModules
 import hivens.widget.api.BootValues
 import hivens.widget.api.CompiledModule
@@ -63,9 +65,14 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.serialization.Serializable
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.io.path.createDirectories
 import kotlin.io.path.writeText
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.nanoseconds
+import kotlin.time.Duration.Companion.seconds
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -74,8 +81,9 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 /**
- * The shell draws its windows with what the modules' keys answer at the app level, and with its own
- * fallbacks where the document brings no module that answers them, before the boot as after it.
+ * The shell draws its windows in the look and with the words the modules' keys answer at the app level,
+ * and with its own fallbacks where the document brings no module that answers them, before the boot as
+ * after it.
  */
 @OptIn(ExperimentalComposeUiApi::class)
 class LookValuesTest {
@@ -86,13 +94,13 @@ class LookValuesTest {
     @AfterTest
     fun tearDown() = stopThenDelete(scope, dir)
 
-    /** The scheme a window of the shell is drawn in over [shell]'s app level, read the way the shell reads it. */
-    private fun drawnScheme(shell: ModuleAppLevel): Scheme? {
-        var drawn: Scheme? = null
+    /** The main ink and the page a window of the shell is drawn in over [shell]'s app level, read the way the shell reads them. */
+    private fun drawn(shell: ModuleAppLevel): Pair<Color, Color>? {
+        var drawn: Pair<Color, Color>? = null
         onEventThread {
             val scene = ImageComposeScene(64, 64, Density(1f)) {
-                NxTheme(theme = shell.app.read(ShellLookValues.Theme), dark = shell.app.read(ShellLookValues.Dark)) {
-                    drawn = NxTheme.colours.scheme
+                shell.app.read(ShellLookValues.Look).Provide {
+                    NxTheme { drawn = NxInk.main to NxColor.page }
                 }
             }
             try {
@@ -104,18 +112,81 @@ class LookValuesTest {
         return drawn
     }
 
+    private val baseDrawn = ColourAnswers.BASE.inkMain to ColourAnswers.BASE.groundPage
+
     @Test
-    fun `a document without the themes module has the shell drawn in the neutral theme`() {
+    fun `a document without the look manager has the shell drawn in the colour axis's base answers`() {
         ModuleAppLevel(dir, listOf(I18nModule, ThemesModule), scope, named = setOf(I18nApi.ID)).use { shell ->
-            assertEquals(NeutralTheme.dark, drawnScheme(shell), "the shell draws its fallback, dark as a first start opens")
+            assertEquals(baseDrawn, drawn(shell), "colourless, dark as a first start opens")
+        }
+        ModuleAppLevel(dir, listOf(I18nModule, ThemesModule), scope, named = setOf(I18nApi.ID, ThemesApi.ID)).use { shell ->
+            assertEquals(baseDrawn, drawn(shell), "the themes module alone draws nothing: nothing reads its keys to draw")
         }
     }
 
     @Test
-    fun `a document with the themes module has the shell drawn in what its keys answer`() {
-        ModuleAppLevel(dir, listOf(I18nModule, ThemesModule), scope, named = setOf(I18nApi.ID, ThemesApi.ID)).use { shell ->
-            assertEquals(Themes.default.dark, drawnScheme(shell))
+    fun `a document with the look manager has the shell drawn in the nx colour provider's answers`() {
+        ModuleAppLevel(dir, CompiledModules, scope, named = setOf(I18nApi.ID, LookApi.ID)).use { shell ->
+            val celestia = Themes.default.dark.inks[0] to Themes.default.dark.steps[0]
+            assertEquals(celestia, eventually(celestia) { drawn(shell) })
         }
+    }
+
+    @Test
+    fun `the shell's look is made and its first answers published before its first composition`() {
+        ModuleAppLevel(dir, CompiledModules, scope, named = setOf(I18nApi.ID, LookApi.ID)).use { shell ->
+            shell.app.prepareLook()
+            assertTrue(shell.app.lookPublished(), "the manager published its first pass")
+            assertEquals("nx", shell.value(LookKeys.State).axis(Colour.id)?.family)
+            assertEquals(Themes.default.dark.inks[0], shell.value(LookKeys.Answers).of(Colour).inkMain, "so the first frame is drawn in the theme")
+        }
+        ModuleAppLevel(dir, CompiledModules, scope, named = setOf(I18nApi.ID)).use { shell ->
+            assertTrue(shell.app.lookPublished(), "where no manager is brought in the base answers are the look, and nothing is waited for")
+            val start = System.nanoTime()
+            shell.app.prepareLook()
+            assertTrue(System.nanoTime() - start < LOOK_BOUND.inWholeNanoseconds)
+        }
+    }
+
+    @Test
+    fun `a look whose first pass does not come is waited for no longer than the bound`() {
+        dir.resolve(Storage.SETTINGS_DIR).createDirectories().resolve("look.json").writeText("""{"schema":1,"value":{"pack":"stuck"}}""")
+        ModuleAppLevel(dir, listOf(LookManagerModule, StuckModule), scope, named = setOf(LookApi.ID)).use { shell ->
+            try {
+                val start = System.nanoTime()
+                shell.app.prepareLook(bound = 300.milliseconds)
+                val waited = (System.nanoTime() - start).nanoseconds
+                assertTrue(waited < 3.seconds, "waited $waited")
+                assertTrue(stuckGate.count == 1L && !shell.app.lookPublished(), "the first pass is still held by the provider that does not answer")
+            } finally {
+                stuckGate.countDown()
+            }
+            assertEquals(true, eventually(true) { shell.app.lookPublished() }, "and is published once it answers")
+        }
+    }
+
+    private val stuckGate = CountDownLatch(1)
+
+    /** A provider whose opening once the host is up waits on [stuckGate], so the manager's first pass does not finish until the test lets it. */
+    private inner class StuckTint : LookProvider<Tint> {
+        override val label = "stuck"
+        override val contract = ApiVersion(1, 0)
+        override val axis = TintAxis.id
+        override val family = "stuck"
+        override fun open(context: LookContext): LookAnswers<Tint> {
+            if (context.boot == null) stuckGate.await(5, TimeUnit.SECONDS)
+            return LookAnswers.of(Tint("stuck"))
+        }
+    }
+
+    private val StuckModule: CompiledModule = object : CompiledModule {
+        override val id = "test.look.stuck"
+        override val name = id
+        override val contributions: List<ModuleContribution> = listOf(TintAxis, StuckTint(), object : LookPack {
+            override val id = "stuck"
+            override val label = id
+            override val providers = mapOf(TintAxis.id to "stuck")
+        })
     }
 
     @Test
@@ -137,13 +208,10 @@ class LookValuesTest {
     @Test
     fun `what a module answers before the boot is what the boot window draws`() {
         val boot = BootValues.of {
-            put(ThemesKeys.Active, Themes.Lotus)
-            put(ThemesKeys.Dark, false)
             put(I18nKeys.Words, NexiraStrings.translator("de"))
         }
-        assertEquals(Themes.Lotus, ShellLookValues.Theme.atBoot(boot))
-        assertEquals(false, ShellLookValues.Dark.atBoot(boot))
         assertEquals("de", ShellLookValues.Words.atBoot(boot).language.tag)
+        assertEquals(listOf(ShellLookValues.Look, ShellLookValues.Words), ShellLookValues.all, "the look and the words, and no theme of the shell's own")
     }
 
     @Test
@@ -166,8 +234,6 @@ class LookValuesTest {
     fun `what no module answers before the boot is drawn with the same fallbacks`() {
         val boot = bootValues(dir, compiled = emptyList())
         assertSame(LookProvision.NONE, ShellLookValues.Look.atBoot(boot))
-        assertEquals(NeutralTheme, ShellLookValues.Theme.atBoot(boot))
-        assertEquals(true, ShellLookValues.Dark.atBoot(boot))
         assertSame(Translator.KEYS, ShellLookValues.Words.atBoot(boot))
     }
 

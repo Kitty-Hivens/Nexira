@@ -22,7 +22,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.math.roundToInt
@@ -107,7 +107,7 @@ private fun PixelArtBackgroundLightPreview() = PixelArtCards(dark = false)
 
 @Composable
 private fun PixelArtCards(dark: Boolean) {
-    NxTheme(NeutralTheme, dark = dark) {
+    NxThemed(NeutralTheme, dark = dark) {
         Row(
             modifier              = Modifier.width(560.dp).background(NxColor.page).padding(16.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),

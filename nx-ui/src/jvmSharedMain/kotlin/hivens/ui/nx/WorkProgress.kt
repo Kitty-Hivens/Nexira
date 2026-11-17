@@ -29,7 +29,7 @@ import hivens.ui.theme.Motion
 import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 
 /**
  * Work in progress drawn inside the control that waits on it, rather than in a bar
@@ -74,7 +74,7 @@ private fun WorkProgressLightPreview() = WorkProgressFills(dark = false)
 
 @Composable
 private fun WorkProgressFills(dark: Boolean) {
-    NxTheme(NeutralTheme, dark = dark) {
+    NxThemed(NeutralTheme, dark = dark) {
         Column(
             modifier            = Modifier.width(320.dp).background(NxColor.page).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),

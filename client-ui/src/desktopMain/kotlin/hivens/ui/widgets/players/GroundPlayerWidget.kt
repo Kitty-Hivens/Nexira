@@ -48,7 +48,6 @@ import hivens.ui.nx.NxPopoverPanel
 import hivens.ui.nx.NxSlider
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
-import hivens.ui.theme.NxTheme
 import hivens.ui.theme.familyForText
 import hivens.ui.widgets.services.MusicPlayerService
 import hivens.widget.api.rememberProps
@@ -340,12 +339,10 @@ private fun Ground(artwork: ImageBitmap?) {
             modifier           = Modifier.fillMaxSize().blur(GROUND_BLUR, BlurredEdgeTreatment.Unbounded),
         )
     } else {
-        val colors = NxTheme.colours.scheme.colors
-        val third = colors.getOrElse(2) { colors.getOrElse(1) { colors.first() } }
         Box(
             Modifier.fillMaxSize().background(
                 Brush.linearGradient(
-                    listOf(NxColor.wash(NxColor.lead(), 0.30f), NxColor.wash(third, 0.16f)),
+                    listOf(NxColor.wash(NxColor.lead(), 0.30f), NxColor.wash(NxColor.third, 0.16f)),
                 ),
             ),
         )

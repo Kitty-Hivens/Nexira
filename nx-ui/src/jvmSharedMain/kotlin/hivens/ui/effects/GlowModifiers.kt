@@ -33,7 +33,7 @@ import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Pulsating outer glow -- animates spread and alpha behind the composable
@@ -170,7 +170,7 @@ private fun GlowModifiersLightPreview() = GlowEffects(dark = false)
 
 @Composable
 private fun GlowEffects(dark: Boolean) {
-    NxTheme(NeutralTheme, dark = dark) {
+    NxThemed(NeutralTheme, dark = dark) {
         Row(
             modifier              = Modifier.width(520.dp).background(NxColor.page).padding(28.dp),
             horizontalArrangement = Arrangement.spacedBy(36.dp),

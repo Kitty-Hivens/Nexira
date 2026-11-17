@@ -25,7 +25,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import androidx.graphics.shapes.CornerRounding
 import androidx.graphics.shapes.RoundedPolygon
 import androidx.graphics.shapes.star
@@ -199,7 +199,7 @@ private fun PolygonShapeLightPreview() = SurfaceShapes(dark = false)
 
 @Composable
 private fun SurfaceShapes(dark: Boolean) {
-    NxTheme(NeutralTheme, dark = dark) {
+    NxThemed(NeutralTheme, dark = dark) {
         Column(
             modifier            = Modifier.width(520.dp).background(NxColor.page).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),

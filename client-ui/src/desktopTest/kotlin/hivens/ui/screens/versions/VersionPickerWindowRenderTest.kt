@@ -9,7 +9,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Density
 import hivens.core.update.VersionChannel
 import hivens.themes.Themes
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import org.jetbrains.skia.EncodedImageFormat
 import java.awt.image.BufferedImage
 import java.io.ByteArrayInputStream
@@ -77,7 +77,7 @@ class VersionPickerWindowRenderTest {
         val out = Path.of("build/render", name)
         Files.createDirectories(out.parent)
         val scene = ImageComposeScene(width, height, density = Density(1f)) {
-            NxTheme(Themes.default, dark = true) {
+            NxThemed(Themes.default, dark = true) {
                 Box(Modifier.fillMaxSize().background(Color(0xFFE91E63))) {
                     VersionPickerWindow(
                         title = "Установка сборки",

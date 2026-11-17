@@ -20,7 +20,6 @@ import hivens.launcher.network.CertificateTrustGate
 import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.NxAlertDialog
 import hivens.ui.puppet.PuppetClick
-import hivens.ui.theme.NxTheme
 import org.koin.compose.koinInject
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -40,7 +39,7 @@ import hivens.ui.theme.Status
  *
  * MUST be composed inside [hivens.ui.theme.NxTheme]: the prompt is a layer of the
  * window that takes its theme from where it is opened, and one raised from outside the
- * theme finds no `LocalScheme` and takes the shell down with it.
+ * theme finds none of what the theme sets and draws in Material's own colours.
  */
 @Composable
 fun CertificatePromptHost() {
@@ -63,7 +62,7 @@ fun CertificatePromptHost() {
     val request = pending ?: return
     // Material draws the dialog body, so the plane its words sit on is named by hand: the
     // dialog step of the ladder, which is what a modal is anywhere else in the app.
-    val body = NxTheme.colours.step(NxTheme.colours.topStep)
+    val body = NxColor.depth(NxColor.floating)
     NxAlertDialog(
         onDismissRequest = { gate.dismiss() },
         paneTitle        = s.text("sslWarningTitle"),

@@ -96,6 +96,16 @@ object Paint {
         @Composable @ReadOnlyComposable
         get() = answers().paintPartner
 
+    /** See [ColourAnswers.paintThird]. */
+    val third: Color
+        @Composable @ReadOnlyComposable
+        get() = answers().paintThird
+
+    /** See [ColourAnswers.paintPalette]. */
+    val palette: List<Color>
+        @Composable @ReadOnlyComposable
+        get() = answers().paintPalette
+
     /** See [ColourAnswers.paintShadow]. */
     val shadow: Color
         @Composable @ReadOnlyComposable

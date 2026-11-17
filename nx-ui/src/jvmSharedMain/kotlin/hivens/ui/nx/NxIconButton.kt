@@ -25,7 +25,7 @@ import hivens.ui.layers.layerTrigger
 import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import hivens.ui.theme.Status
 
 /**
@@ -101,7 +101,7 @@ private fun NxIconButtonLightPreview() = IconButtonStates(dark = false)
 
 @Composable
 private fun IconButtonStates(dark: Boolean) {
-    NxTheme(NeutralTheme, dark = dark) {
+    NxThemed(NeutralTheme, dark = dark) {
         Row(
             modifier              = Modifier.width(420.dp).background(NxColor.page).padding(16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),

@@ -20,7 +20,7 @@ import hivens.ui.layout.LayoutGraphRepository
 import hivens.ui.navigation.NavState
 import hivens.ui.onEventThread
 import hivens.ui.settle
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import hivens.ui.widgets.profile.ProfileSelection
 import hivens.ui.widgets.profile.ProfileSelectionSource
 import hivens.widget.api.LocalLayoutGraph
@@ -317,7 +317,7 @@ class ScopedKeysTest {
         val inked = onEventThread {
             val scene = ImageComposeScene(240, 80, density = Density(1f)) {
                 ShippedLanguageProvider("en") {
-                    NxTheme(Themes.default, dark = true) {
+                    NxThemed(Themes.default, dark = true) {
                         CompositionLocalProvider(
                             LocalWidgetDataRegistry provides data,
                             LocalWidgetCommandRegistry provides commands,

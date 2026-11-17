@@ -15,7 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import hivens.ui.theme.TestTheme
 import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.EncodedImageFormat
@@ -46,7 +46,7 @@ class MenuOpacityRenderTest {
         val wPx = 600
         val hPx = 600
         val scene = ImageComposeScene(width = wPx, height = hPx, density = Density(2f)) {
-            NxTheme(TestTheme, dark = true) {
+            NxThemed(TestTheme, dark = true) {
                 Box(Modifier.fillMaxSize().background(Color(0xFFFF00FF))) { // bright magenta ground
                     Column(Modifier.padding(20.dp)) {
                         // The magenta stands in for a wallpaper here.

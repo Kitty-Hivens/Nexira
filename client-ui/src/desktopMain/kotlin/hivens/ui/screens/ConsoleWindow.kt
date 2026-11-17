@@ -60,9 +60,10 @@ import java.awt.event.WindowEvent
  * main window does meanwhile: hiding the main window to the tray leaves it open.
  * It is an independent window in the host's registry, with its own [WindowHost], its
  * own window level, its own layers and dismiss stack, and the window locals of its
- * own window. It draws in the look the main shell decided, read through [look], and in
- * the answers of every axis of the look, read off the app level as the main window reads
- * them. Its frame is the system's, so nothing of the app's frame is offered in it.
+ * own window. It draws in the answers of every axis of the look, read off the app level
+ * as the main window reads them, and in the words, the face and the customization the
+ * main shell decided, read through [look]. Its frame is the system's, so nothing of the
+ * app's frame is offered in it.
  *
  * [koin] is the launcher's graph, which it is drawn inside (see [HostKoin]).
  */
@@ -146,7 +147,7 @@ private fun ConsoleWindowContent(look: ShellLook) {
                         // Around the theme, as in the main window: the layers belong to the
                         // window, and a layer takes its theme from where it is opened.
                         LayerHost(layers, Modifier.fillMaxSize()) {
-                            NxTheme(theme = look.theme, dark = look.dark, uiFamily = look.uiFamily) {
+                            NxTheme(uiFamily = look.uiFamily) {
                                 NxSurface(SurfaceKind.Page, Modifier.fillMaxSize(), shape = RectangleShape) {
                                     ConsoleContent(settings = settings, onSettingsChange = settingsStore::update)
                                 }

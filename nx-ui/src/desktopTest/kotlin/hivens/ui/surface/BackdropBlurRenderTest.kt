@@ -26,7 +26,7 @@ import kotlin.math.abs
 import kotlin.math.sqrt
 import kotlin.test.Test
 import kotlin.test.assertTrue
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import hivens.ui.theme.TestTheme
 
 /**
@@ -113,7 +113,7 @@ class BackdropBlurRenderTest {
         blurEnabled: Boolean = true,
     ): Sample {
         val scene = ImageComposeScene(width = W, height = H, density = Density(1f)) {
-            NxTheme(TestTheme, dark = true) {
+            NxThemed(TestTheme, dark = true) {
                 CompositionLocalProvider(LocalCustomization provides CustomizationSettings(surfaceBlur = blurEnabled)) {
                 Box(Modifier.fillMaxSize().drawBehind { stripes() }) {
                     if (plate != null) {

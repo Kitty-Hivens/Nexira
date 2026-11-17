@@ -15,7 +15,7 @@ import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import hivens.ui.theme.TestTheme
 import hivens.ui.theme.SchemeColours
 import hivens.ui.theme.Status
@@ -51,7 +51,7 @@ class NxProgressBarRenderTest {
     @OptIn(ExperimentalComposeUiApi::class)
     private fun render(progress: Float?): Bitmap {
         val scene = ImageComposeScene(width = width, height = barHeight, density = Density(density)) {
-            NxTheme(TestTheme, dark = true) {
+            NxThemed(TestTheme, dark = true) {
                 Box(Modifier.fillMaxSize().background(Color(0xFF121212))) {
                     NxProgressBar(progress = progress, height = barHeight.dp)
                 }

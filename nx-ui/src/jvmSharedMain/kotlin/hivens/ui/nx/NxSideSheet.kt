@@ -49,7 +49,7 @@ import hivens.ui.theme.Motion
 import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import kotlinx.coroutines.launch
 
 /**
@@ -155,7 +155,7 @@ private fun NxSideSheetLightPreview() = OpenSideSheet(dark = false)
  */
 @Composable
 private fun OpenSideSheet(dark: Boolean) {
-    NxTheme(NeutralTheme, dark = dark) {
+    NxThemed(NeutralTheme, dark = dark) {
         CompositionLocalProvider(LocalCustomization provides CustomizationSettings(reduceMotion = true)) {
             LayerHost(rememberWindowLayers(), Modifier.size(640.dp, 400.dp).background(NxColor.page)) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {

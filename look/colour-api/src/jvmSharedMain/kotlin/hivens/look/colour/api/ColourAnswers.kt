@@ -71,6 +71,15 @@ class ColourAnswers private constructor(filled: Builder) {
     /** A second colour that goes with the lead, for art in two colours and gradients. Base #8C8C8C. */
     val paintPartner: Color = filled.paintPartner ?: Neutral.PARTNER
 
+    /** A third colour beside the lead and the partner, for art in three colours and the far end of a gradient. Base [paintPartner]. */
+    val paintThird: Color = filled.paintThird ?: paintPartner
+
+    /**
+     * The look's own colours in the order of their weight, the lead first, for decoration that shows them
+     * all, such as a field of particles. Never empty. Base the lead, then the partner.
+     */
+    val paintPalette: List<Color> = filled.paintPalette?.takeIf { it.isNotEmpty() }?.toList() ?: listOf(paintLead, paintPartner)
+
     /** The colour of a cast shadow. Base black. */
     val paintShadow: Color = filled.paintShadow ?: Color.Black
 
@@ -251,6 +260,12 @@ class ColourAnswers private constructor(filled: Builder) {
 
         /** See [ColourAnswers.paintPartner]. */
         var paintPartner: Color? = null
+
+        /** See [ColourAnswers.paintThird]. */
+        var paintThird: Color? = null
+
+        /** See [ColourAnswers.paintPalette]. An empty list keeps the base answer. */
+        var paintPalette: List<Color>? = null
 
         /** See [ColourAnswers.paintStatus]. */
         var paintStatus: ((status: Status) -> Color)? = null

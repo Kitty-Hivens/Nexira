@@ -47,7 +47,7 @@ import hivens.ui.theme.Motion
 import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import hivens.ui.surface.SurfaceKind
 
 /**
@@ -248,7 +248,7 @@ private fun NxPopoverPanelLightPreview() = OpenPopover(dark = false)
  */
 @Composable
 private fun OpenPopover(dark: Boolean) {
-    NxTheme(NeutralTheme, dark = dark) {
+    NxThemed(NeutralTheme, dark = dark) {
         LayerHost(rememberWindowLayers(), Modifier.size(360.dp, 400.dp).background(NxColor.page)) {
             Box(Modifier.align(Alignment.TopEnd).padding(12.dp)) {
                 NxIconButton(NxIcon.Tune, "View options", onClick = {})

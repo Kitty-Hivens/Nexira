@@ -3,6 +3,7 @@ package hivens.ui
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
@@ -12,7 +13,8 @@ import kotlin.test.assertTrue
  * else, no axis and no provider, which are the manager's business. The one place each module is named,
  * the look's axes and packs among them, is where the build lists the modules compiled into it, by its
  * CompiledModule, the way every compiled module is listed there, and the one engine of the launcher's own words the host makes is the recovery
- * surface's floor, which has to speak when every module failed.
+ * surface's floor, which has to speak when every module failed. No window is drawn with the themes module's keys: what of them the host
+ * still names is listed file by file, with the step that takes it out.
  *
  * Read as text, since an import the compiler drops leaves no trace in what it builds. The text is read
  * the way the compiler would join it: names in backticks without them, dots spaced or not, and string
@@ -37,6 +39,42 @@ class HostBoundaryTest {
     /** The recovery surface, and the one engine of the launcher's own words it may make. */
     private val floor = "hivens/ui/RecoverySurface.kt" to "NexiraStrings.translator(Locale.getDefault().language)"
 
+    /**
+     * The host sources that still name the themes module's keys or inputs, each with what it names and
+     * the step of the look plan that takes it out. Nothing here is read to draw: every window draws in
+     * the look the manager answers. What is left is the nx colour provider's controller, still in the
+     * host, and the inputs the host feeds it.
+     */
+    private val themesAllowances: Map<String, Set<String>> = mapOf(
+        // The system's scheme, probed by the host and fed to the module: step 8 moves the probe into the module.
+        "hivens/ui/AppShell.kt" to setOf("ThemesKeys.Mode", "ThemeInputs", "SystemScheme", "ThemeMode"),
+        "hivens/ui/AndroidShell.kt" to setOf("ThemesKeys.Mode", "ThemeInputs", "SystemScheme"),
+        // The tone of the wallpaper, fed by the host until the background is a widget module of its own.
+        "hivens/ui/AppRoot.kt" to setOf("ThemeInputs"),
+        // The day and night switch, the mode, the island and the picker: step 7 moves them into the nx
+        // colour provider's controller module.
+        "hivens/ui/AppLayout.kt" to setOf(
+            "ThemesKeys.Dark", "ThemesKeys.Mode", "ThemesKeys.SystemSchemeAvailable", "ThemesKeys.Active",
+            "ThemesKeys.SetDark", "ThemesKeys.SetMode", "ThemeMode",
+        ),
+        "hivens/ui/widgets/bgsettings/AppearanceThemeIsland.kt" to setOf("ThemeMode"),
+        "hivens/ui/widgets/bgsettings/BgSettingsSurface.kt" to setOf("ThemeMode"),
+        "hivens/ui/widgets/themepicker/ThemePickerSurface.kt" to setOf("ThemesKeys.Offered", "ThemesKeys.Active", "ThemesKeys.Choose"),
+        "hivens/ui/widgets/themepicker/ThemePickerGridWidget.kt" to setOf("ThemesKeys.OFFERED_ID", "ThemesKeys.DARK_ID", "ThemesKeys.Offered", "ThemesKeys.Dark"),
+        "hivens/ui/widgets/themepicker/ThemePickerPreviewWidget.kt" to setOf("ThemesKeys.DARK_ID", "ThemesKeys.Dark"),
+        "hivens/ui/UiModule.kt" to setOf("ThemesKeys.ACTIVE_ID"),
+        // The first start's mode, written for the module: step 7, with the mode's own controller.
+        "hivens/ui/bootstrap/FirstRunDefaults.kt" to setOf("ThemeMode"),
+    )
+
+    /** Every name of the themes module's keys and inputs [line] holds, a key by its member where it names one. */
+    private fun themesNames(line: String): Set<String> =
+        if (line.trimStart().startsWith("*") || line.trimStart().startsWith("//") || line.trimStart().startsWith("import ")) {
+            emptySet()
+        } else {
+            THEMES.findAll(line).map { it.value }.toSet()
+        }
+
     /** Every line of [text] that names what the host may not, with why, as `path:line: why: text`. */
     private fun findings(path: String, text: String): List<String> = text.lines().mapIndexedNotNull { index, raw ->
         val line = joined(raw)
@@ -46,6 +84,7 @@ class HostBoundaryTest {
                 "a name of a module that is not in its API"
             OWN_ENGINE.containsMatchIn(line) && !(path == floor.first && floor.second in line) -> "an engine of the launcher's own words"
             OWN_WORDS_SCOPE.containsMatchIn(line) -> "the launcher's own words as a scope, where an engine is made unseen"
+            (themesNames(line) - themesAllowances[path].orEmpty()).isNotEmpty() -> "a key or an input of the themes module, which the host does not draw with"
             else -> return@mapIndexedNotNull null
         }
         "$path:${index + 1}: $why: ${raw.trim()}"
@@ -81,6 +120,26 @@ class HostBoundaryTest {
     }
 
     @Test
+    fun `the themes module's keys and inputs are named only where the plan still has them, and no window draws with them`() {
+        val all = sources().toMap()
+        themesAllowances.forEach { (path, names) ->
+            val text = assertNotNull(all[path], "the allowance names $path, which is gone")
+            val named = text.lines().flatMap(::themesNames).toSet()
+            assertEquals(names, named, "the allowance for $path names what it no longer uses, or misses what it does")
+        }
+        val drawing = listOf("ThemesKeys.Active", "ThemesKeys.Dark", "ThemesKeys.ACTIVE_ID", "ThemesKeys.DARK_ID")
+        val shells = listOf("hivens/ui/AppShell.kt", "hivens/ui/AndroidShell.kt", "hivens/ui/ShellHost.kt", "hivens/ui/ShellLook.kt", "hivens/ui/screens/ConsoleWindow.kt", "hivens/ui/LookValues.kt")
+        shells.forEach { path ->
+            val text = assertNotNull(all[path], "$path is gone")
+            drawing.forEach { name -> assertTrue(name !in text, "$path names $name, which the windows no longer draw with") }
+        }
+        assertEquals(1, findings("hivens/ui/Somewhere.kt", "val dark = app.read(ThemesKeys.Dark)").size)
+        assertEquals(1, findings("hivens/ui/AppShell.kt", "val dark = app.read(ThemesKeys.Dark)").size, "a shell may not read the dark flag")
+        assertEquals(emptyList(), findings("hivens/ui/AppShell.kt", "val mode = app.readOrNull(ThemesKeys.Mode)"))
+        assertEquals(emptyList(), findings("hivens/ui/Somewhere.kt", " * the keys are in `hivens.themes.api.ThemesKeys`"), "a comment naming the keys is not a read")
+    }
+
+    @Test
     fun `every way of naming a module's insides is seen`() {
         val holes = mapOf(
             "a wildcard import" to "import hivens.themes.*",
@@ -110,6 +169,7 @@ class HostBoundaryTest {
         }
         val allowed = listOf(
             "import hivens.themes.api.ThemesKeys",
+            "val dark = NxTheme.isDark",
             "import hivens.i18n.api.I18nKeys",
             "val s = nexiraStrings()",
             "val n = NexiraStrings.NAMESPACE",
@@ -140,6 +200,9 @@ class HostBoundaryTest {
          * a wildcard. The host reads the look through the manager's one key and draws on whatever it answers.
          */
         val LOOK = Regex("""\bhivens\.look\.(?!manager\.api\b)(\w|\*)""")
+
+        /** A key of the themes module, by its member where it names one, or one of the inputs the host feeds it. */
+        val THEMES = Regex("""\bThemesKeys(\.[A-Za-z_]+)?|\bThemeInputs\b|\bSystemScheme\b|\bThemeMode\b""")
 
         /** An engine of the launcher's own words, called, taken by reference or imported. */
         val OWN_ENGINE = Regex("""\bNexiraStrings(\.|::)(engine|translator|shipped)\b""")

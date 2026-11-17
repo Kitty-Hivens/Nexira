@@ -98,7 +98,6 @@ import hivens.ui.nx.NxAlertDialog
 import hivens.ui.nx.NxContextMenu
 import hivens.ui.nx.NxMenuItem
 import hivens.ui.theme.Motion
-import hivens.ui.theme.NxTheme
 import hivens.widget.api.LocalPlacementSlotSizeDp
 import hivens.widget.api.LocalGridGeometry
 import hivens.widget.api.LocalLayoutGraph
@@ -871,7 +870,7 @@ fun EditableWidgetChrome(
     }
 
     if (forceRemoveOpen) {
-        val container = NxTheme.colours.step(NxTheme.colours.topStep)
+        val container = NxColor.depth(NxColor.floating)
         OnFill(container) {
             NxAlertDialog(
                 onDismissRequest  = { forceRemoveOpen = false },

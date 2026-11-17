@@ -23,7 +23,7 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.icons.NxIcon
 import hivens.ui.layers.LayerHost
 import hivens.ui.layers.rememberWindowLayers
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import hivens.ui.theme.TestTheme
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
@@ -83,7 +83,7 @@ class DropdownProbe {
             // The window's layers at the root, where the shell mounts them: every
             // popup on these sheets is one of them.
             LayerHost(rememberWindowLayers(), Modifier.fillMaxSize()) {
-                NxTheme(TestTheme, dark = dark) {
+                NxThemed(TestTheme, dark = dark) {
                     Box(Modifier.fillMaxSize().background(NxColor.page).padding(16.dp)) { body() }
                 }
             }

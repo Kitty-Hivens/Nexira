@@ -18,7 +18,7 @@ import hivens.ui.audio.PlaybackState
 import hivens.ui.audio.RepeatMode
 import hivens.ui.audio.TrackInfo
 import hivens.ui.i18n.ShippedLanguageProvider
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
 import java.nio.file.Paths
@@ -57,7 +57,7 @@ class SeededPlayerRenderProbe {
         val d = 2f
         val scene = ImageComposeScene((wDp * d).toInt(), (hDp * d).toInt(), density = Density(d)) {
             ShippedLanguageProvider("en") {
-                NxTheme(Themes.default, dark = dark) {
+                NxThemed(Themes.default, dark = dark) {
                     Box(
                         Modifier.fillMaxSize().background(NxColor.page).padding(16.dp),
                         contentAlignment = Alignment.TopCenter,

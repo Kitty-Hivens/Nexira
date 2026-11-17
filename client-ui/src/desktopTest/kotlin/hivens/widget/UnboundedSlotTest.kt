@@ -19,7 +19,7 @@ import androidx.compose.ui.unit.dp
 import hivens.themes.Themes
 import hivens.themes.api.ThemesKeys
 import hivens.ui.i18n.ShippedLanguageProvider
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import hivens.ui.widgets.ChildLevel
 import hivens.ui.widgets.KoinLevelServicesHost
 import hivens.ui.widgets.WidgetSurface
@@ -209,7 +209,7 @@ class UnboundedSlotTest {
         return runCatching {
             scene.setContent {
                 ShippedLanguageProvider("en") {
-                    NxTheme(Themes.default, dark = true) {
+                    NxThemed(Themes.default, dark = true) {
                         CompositionLocalProvider(
                             LocalLayoutGraph provides graph,
                             LocalWidgetRegistry provides GeneratedWidgetRegistry,

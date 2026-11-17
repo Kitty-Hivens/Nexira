@@ -12,7 +12,7 @@ import androidx.compose.ui.unit.dp
 import hivens.themes.Themes
 import hivens.ui.TypingScene
 import hivens.ui.onEventThread
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -56,7 +56,7 @@ class BrowseSearchTypingTest {
     private fun search(body: TypingScene.(LaggingBrowse) -> Unit) = onEventThread {
         val browse = LaggingBrowse()
         TypingScene(420, 80) {
-            NxTheme(Themes.default, dark = true) { Search(browse) }
+            NxThemed(Themes.default, dark = true) { Search(browse) }
         }.use { scene ->
             scene.settle()
             scene.focusField()

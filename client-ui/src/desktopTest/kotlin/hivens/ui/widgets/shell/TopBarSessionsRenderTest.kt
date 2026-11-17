@@ -17,7 +17,7 @@ import hivens.ui.i18n.ShippedLanguageProvider
 import hivens.ui.notifications.SessionRegistry
 import hivens.ui.settle
 import hivens.ui.theme.NxColor
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
@@ -62,7 +62,7 @@ class TopBarSessionsRenderTest {
         val scene = ImageComposeScene((720 * d).toInt(), (44 * d).toInt(), density = Density(d)) {
             HostKoin(app) {
                 ShippedLanguageProvider("ru") {
-                    NxTheme(Themes.default, dark = true) {
+                    NxThemed(Themes.default, dark = true) {
                         Box(
                             Modifier.fillMaxSize().background(NxColor.page),
                             contentAlignment = Alignment.CenterEnd,

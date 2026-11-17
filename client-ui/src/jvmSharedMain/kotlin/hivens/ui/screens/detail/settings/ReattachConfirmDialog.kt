@@ -32,7 +32,6 @@ import hivens.ui.nx.CalloutBanner
 import hivens.ui.nx.CalloutTone
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
-import hivens.ui.theme.NxTheme
 import hivens.ui.theme.OnFill
 import hivens.ui.theme.Status
 import hivens.ui.utils.shortNameList
@@ -85,7 +84,7 @@ internal fun ReattachConfirmDialog(
     }
     val state = previews?.get(packId) ?: ReattachPreviewView.Comparing
     val title = s.text("packSettingsReattach", sourceName)
-    val container = NxTheme.colours.step(NxTheme.colours.topStep)
+    val container = NxColor.depth(NxColor.floating)
     OnFill(container) {
         NxAlertDialog(
             onDismissRequest = onDismiss,
