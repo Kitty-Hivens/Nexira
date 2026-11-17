@@ -58,7 +58,7 @@ import org.slf4j.LoggerFactory
  *   * `GET  /diag/actions`   -> ActionRing snapshot
  *   * `GET  /diag/snapshot`  -> all of the above + UI snapshot in one round-trip
  *
- * The `/diag/...` family is documented in detail in [DiagRoutes.kt].
+ * The `/diag/...` family is documented in detail in `DiagRoutes.kt`.
  *
  * **Concrete class, public no-arg constructor**: ServiceLoader requires
  * both. Singleton-by-convention via the [PuppetServerLoader.instance]

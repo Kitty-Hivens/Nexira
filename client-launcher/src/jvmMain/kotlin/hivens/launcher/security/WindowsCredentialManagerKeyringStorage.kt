@@ -35,7 +35,7 @@ import java.lang.invoke.MethodHandle
  *
  * All strings are wide (UTF-16LE) with a `\0\0` terminator. The
  * CREDENTIAL struct is allocated by us for writes; for reads, Windows
- * allocates the result buffer and we must release it via [CredFree]
+ * allocates the result buffer and we must release it via `CredFree`
  * after copying out the bytes.
  *
  * `TargetName` carries our `service/account` tuple as a slash-joined

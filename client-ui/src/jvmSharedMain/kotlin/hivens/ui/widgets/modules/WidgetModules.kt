@@ -122,7 +122,7 @@ class WidgetModules(
 
     val state: StateFlow<Snapshot> = _state.asStateFlow()
 
-    /** What is set for each screen effect, by [ModuleEffect.scope]. Read in the composition, so a change is drawn at once. */
+    /** What is set for each screen effect, by [Contributed.scope]. Read in the composition, so a change is drawn at once. */
     val settings: StateFlow<Map<String, Map<String, String>>> = _settings.asStateFlow()
 
     /** Set when a module was switched off after crashing, until the shell has said so. */

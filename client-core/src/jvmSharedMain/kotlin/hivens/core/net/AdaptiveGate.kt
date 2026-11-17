@@ -16,7 +16,7 @@ import org.slf4j.LoggerFactory
  *
  * Growth is measured, not assumed. Before widening the pool the gate records how
  * much moved in a window, widens by one, and measures the same window again; a
- * gain under [MIN_GAIN] means the extra connection is dividing the same
+ * gain under [MIN_GAIN_PERCENT] means the extra connection is dividing the same
  * bandwidth rather than finding more, so it is given back. Without that test a
  * pool grows until something breaks whenever the bottleneck is the far end or
  * the disk, neither of which cares how many sockets we opened.

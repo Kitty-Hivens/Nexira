@@ -9,9 +9,9 @@ import androidx.compose.ui.unit.dp
  * size) lives here once instead of being copied as a magic literal into each,
  * where the copies silently diverge.
  *
- * Unlike [Spacing], these are not a scale -- each is a specific component
- * measurement. Add one only when a dimension is genuinely shared; a value used
- * in a single place stays local to it.
+ * These are not a scale: each is a specific component measurement. Add one only
+ * when a dimension is genuinely shared. A value used in a single place stays
+ * local to it.
  */
 object Dimens {
     /** Minimum height of a pack row (Library + Browse). Content may grow past it. */

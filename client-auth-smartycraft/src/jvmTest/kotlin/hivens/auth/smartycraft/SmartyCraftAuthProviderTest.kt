@@ -28,7 +28,7 @@ import kotlin.test.assertTrue
  * but no Ktor wire-format ceremony.
  *
  * Network-level failures (HTTP 500, malformed JSON, etc.) now belong in
- * [hivens.launcher.protocol.SmartycraftV1ProtocolTest] -- that's where the
+ * `hivens.launcher.protocol.SmartycraftV1ProtocolTest` -- that's where the
  * actual HTTP client lives. Here we test what SmartyCraftAuthProvider DOES with a
  * protocol response, not how the protocol assembles HTTP requests.
  */

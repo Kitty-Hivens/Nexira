@@ -25,7 +25,7 @@ data class LoaderRequest(
  * `news` field is sometimes absent depending on upstream deployment state.
  *
  * On [ProtocolStatus.UPDATE] the [servers] list is empty; consumer must
- * refresh the launcher hash via [hivens.core.api.protocol.LauncherHashCache]
+ * refresh the launcher hash via [hivens.launcher.protocol.LauncherHashCache]
  * and retry.
  */
 @Serializable
