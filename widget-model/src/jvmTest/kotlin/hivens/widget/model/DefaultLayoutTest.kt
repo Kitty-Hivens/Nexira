@@ -51,6 +51,8 @@ class DefaultLayoutTest {
                 "bg.settings",
                 "profile",
                 "theme.picker",
+                // The slots the settings screen leaves for the colour provider's controls
+                "settings.appearance",
             ),
             surfaceIds,
             "default-layout drift -- expected exactly these surfaces",

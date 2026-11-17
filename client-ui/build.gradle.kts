@@ -182,8 +182,12 @@ kotlin {
                 // them beyond listing their CompiledModule.
                 implementation(project(":look:colour-api"))
                 implementation(project(":look:packs"))
+                // The nx colour provider's controls, compiled in like the provider: the shell
+                // names nothing of it beyond its CompiledModule, and draws its widgets by kind.
+                implementation(project(":look:colour-nx-controls"))
                 implementation(project(":nx-ui"))
                 implementation(project(":ui-layers"))
+                implementation(project(":ui-puppet"))
                 implementation(project(":client-i18n"))
                 implementation(project(":client-render3d"))
                 implementation(project(":client-easter"))

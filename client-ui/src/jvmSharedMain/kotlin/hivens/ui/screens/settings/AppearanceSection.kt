@@ -10,8 +10,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -22,10 +20,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.boundsInWindow
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.ui.chrome.LocalCustomChromeAvailable
@@ -39,27 +33,31 @@ import hivens.ui.nx.NxChoiceMenu
 import hivens.ui.nx.NxMenuAlign
 import hivens.ui.nx.NxRow
 import hivens.ui.nx.NxSection
-import hivens.ui.nx.NxSwitch
 import hivens.ui.nx.NxToggle
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetToggle
-import hivens.ui.customization.LocalCustomization
-import hivens.ui.theme.LocalThemeReveal
 import hivens.ui.theme.Motion
 import hivens.ui.theme.familyForText
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.Status
+import hivens.widget.api.SlotRenderer
+import hivens.widget.model.SlotId
+import hivens.widget.model.SurfaceId
 
 /**
  * Interface + Behavior block. Drives anything user-facing about how the
- * launcher looks and how it behaves around launches: language, theme
- * preset shortcut, background shortcut, dark/light toggle, window chrome,
- * close-after-launch, offline mode.
+ * launcher looks and how it behaves around launches: language, background
+ * shortcut, window chrome, close-after-launch, offline mode.
  *
  * Two [NxSection] planes (Interface, Behavior) per the island model;
- * expressiveness stays as a row state (day/night sun/moon + reveal,
- * the offline accent), never a whole-row wash.
+ * expressiveness stays as a row state (the offline accent), never a
+ * whole-row wash.
+ *
+ * The way to the theme picker and the day and night switch belong to the
+ * colour provider's controls, which the look draws wherever this leaves the
+ * slots of [APPEARANCE_SURFACE] for them, and nothing at all where they are
+ * absent or their provider does not draw.
  *
  * Network bypasses live separately in [NetworkSection]; update, content,
  * launch and protocol knobs in [AdvancedSection].
@@ -68,9 +66,6 @@ import hivens.ui.theme.Status
 internal fun AppearanceSection(
     form: SettingsFormState,
     save: () -> Unit,
-    isDarkTheme: Boolean,
-    onToggleTheme: () -> Unit,
-    onOpenThemePicker: () -> Unit,
     onOpenBackgroundSettings: () -> Unit,
     currentLanguage: LanguageInfo,
     languages: List<LanguageInfo>,
@@ -80,7 +75,6 @@ internal fun AppearanceSection(
     var langExpanded by remember { mutableStateOf(false) }
     var langShown by remember { mutableStateOf(false) }
     val langTurn by animateFloatAsState(if (langExpanded) 180f else 0f, animationSpec = Motion.tap, label = "langChevron")
-    var themeSwitchState by remember(isDarkTheme) { mutableStateOf(isDarkTheme) }
 
     NxSection(s.text("settingsSectionUI")) {
         // Language. The whole row opens the picker; the trailing shows the
@@ -126,16 +120,7 @@ internal fun AppearanceSection(
             },
         )
 
-        // Theme preset shortcut.
-        PuppetClick("settings.openThemePicker") { onOpenThemePicker() }
-        NxRow(
-            title    = s.text("settingsThemePicker"),
-            subtitle = s.text("settingsThemePickerSub"),
-            icon     = NxIcon.Star,
-            iconTint = NxColor.lead(),
-            onClick  = onOpenThemePicker,
-            trailing = { Symbol(NxIcon.ChevronRight, null, tint = NxColor.lead()) },
-        )
+        SlotRenderer(SurfaceId(APPEARANCE_SURFACE), SlotId("theme.link"))
 
         // Custom background shortcut.
         PuppetClick("settings.openBackground") { onOpenBackgroundSettings() }
@@ -148,15 +133,7 @@ internal fun AppearanceSection(
             trailing = { Symbol(NxIcon.ChevronRight, null, tint = NxColor.lead()) },
         )
 
-        // Dark theme: day/night identity (sun warm, moon cool) + GNOME-style reveal.
-        DayNightRow(
-            checked     = themeSwitchState,
-            title       = s.text("settingsDarkTheme"),
-            description = s.text("settingsDarkThemeDesc"),
-        ) { isChecked -> themeSwitchState = isChecked; onToggleTheme() }
-        PuppetToggle("settings.darkTheme", themeSwitchState) { isChecked ->
-            themeSwitchState = isChecked; onToggleTheme()
-        }
+        SlotRenderer(SurfaceId(APPEARANCE_SURFACE), SlotId("theme.daynight"))
 
         // Window chrome. `undecorated` is fixed when the window is created, so the flip
         // lands at the next launch and the row says so rather than looking inert. Where
@@ -217,59 +194,6 @@ internal fun AppearanceSection(
  */
 internal fun shownChecked(stored: Boolean, available: Boolean): Boolean = stored && available
 
-// Static day/night colours -- the sun stays warm-orange and the moon cool-blue
-// regardless of palette, so the dark-theme toggle reads as day/night at a glance.
-private val SunOrange = Color(0xFFFF8C00)
-private val MoonBlue  = Color(0xFF8AB4F8)
-
-/**
- * Dark-theme toggle as an in-plane row with a day/night identity: sun (warm) when
- * light, moon (cool) when dark. Icon and switch track take that FIXED colour, not
- * the theme's lead colour. The flip runs through the GNOME-style reveal (a circle growing
- * out of the switch) when a host is present; no host (or motion off) is a plain flip.
- */
-@Composable
-internal fun DayNightRow(
-    checked: Boolean,
-    title: String,
-    description: String,
-    onCheckedChange: (Boolean) -> Unit,
-) {
-    val tint = if (checked) MoonBlue else SunOrange
-    val reveal = LocalThemeReveal.current
-    // The theme wipe's own pace -- a set piece rather than an interface response.
-    // With motion reduced it is no wipe at all: the reveal reads a non-positive
-    // duration as a plain flip.
-    val still = LocalCustomization.current.reduceMotion
-    val durationMs = if (still) 0 else Motion.ownRhythm(THEME_REVEAL_MS).durationMs
-    var switchOrigin by remember { mutableStateOf(Offset.Zero) }
-    val onToggle: (Boolean) -> Unit = { newValue ->
-        if (reveal != null) reveal.reveal(switchOrigin, durationMs) { onCheckedChange(newValue) }
-        else onCheckedChange(newValue)
-    }
-    Row(
-        modifier              = Modifier.fillMaxWidth().padding(vertical = 6.dp),
-        verticalAlignment     = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-            Symbol(if (checked) NxIcon.DarkMode else NxIcon.LightMode, null, tint = tint, size = 22.dp)
-            Spacer(Modifier.width(12.dp))
-            Column {
-                Text(title, color = NxInk.main, fontWeight = FontWeight.Medium)
-                Text(description, style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
-            }
-        }
-        Spacer(Modifier.width(12.dp))
-        NxSwitch(
-            checked         = checked,
-            onCheckedChange = onToggle,
-            accent          = tint,
-            modifier        = Modifier.onGloballyPositioned { switchOrigin = it.boundsInWindow().center },
-        )
-    }
-}
-
 /**
  * A labelled single-select chip group (title + sub + wrapping [NxChoiceChip]s). The
  * chips wrap to a second line on a narrow pane instead of the longest label shrinking
@@ -294,5 +218,5 @@ internal fun PickerBlock(
     }
 }
 
-/** How long the theme wipe takes to cross the window. */
-private const val THEME_REVEAL_MS = 550
+/** The surface whose slots this section leaves for the colour provider's controls. */
+private const val APPEARANCE_SURFACE = "settings.appearance"

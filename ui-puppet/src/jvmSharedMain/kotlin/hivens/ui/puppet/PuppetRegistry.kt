@@ -10,19 +10,35 @@ import java.util.concurrent.ConcurrentHashMap
  * mirrors the LIVE UI surface -- no stale entries for screens that
  * aren't currently mounted.
  *
- * Read by the server behind [PuppetServerLifecycle] when handling HTTP queries; mutated only via
- * Composable side effects. Backed by [ConcurrentHashMap] so the HTTP
+ * Read by the launcher's puppet server when handling HTTP queries, and mutated only
+ * through Composable side effects. Backed by [ConcurrentHashMap] so the HTTP
  * thread can read snapshots without blocking the UI thread, and
  * registration churn from rapid recomposition stays correct.
  *
  * **State mutation thread.** Calls into [click] / [setField] /
  * [setToggle] invoke caller-supplied lambdas that typically touch
  * `mutableStateOf` -- those MUST run on the AWT EDT, which is Compose
- * Desktop's UI thread. The HTTP layer behind [PuppetServerLifecycle] is responsible
+ * Desktop's UI thread. The server's HTTP layer is responsible
  * for hopping onto the EDT before calling these methods; the registry
  * itself doesn't dispatch.
+ *
+ * A module of its own so a module compiled into the launcher registers its controls under the
+ * same ids the launcher's own do. It draws nothing and knows no server: the server and its wire
+ * format stay with the launcher, which builds them in only for a puppet build.
  */
-internal object PuppetRegistry {
+object PuppetRegistry {
+
+    /** One registered element as [snapshot] reports it: [value] for a field, [boolValue] for a toggle. */
+    data class Element(
+        val id: String,
+        val kind: String,
+        val value: String? = null,
+        val boolValue: Boolean? = null,
+        val enabled: Boolean = true,
+    )
+
+    /** The screen last marked by [PuppetScreen] and every element registered now, by id. */
+    data class Snapshot(val screen: String, val elements: List<Element>)
 
     private data class ClickEntry(
         val onClick: () -> Unit,
@@ -77,13 +93,13 @@ internal object PuppetRegistry {
 
     fun setCurrentScreen(name: String) { currentScreen = name }
 
-    fun snapshot(): PuppetSnapshot {
+    fun snapshot(): Snapshot {
         val elements = buildList {
-            clicks.forEach  { (id, e) -> add(PuppetElement(id, "click",  enabled = e.enabled())) }
-            fields.forEach  { (id, e) -> add(PuppetElement(id, "field",  value = e.getValue(), enabled = e.enabled())) }
-            toggles.forEach { (id, e) -> add(PuppetElement(id, "toggle", boolValue = e.getValue(), enabled = e.enabled())) }
+            clicks.forEach  { (id, e) -> add(Element(id, "click",  enabled = e.enabled())) }
+            fields.forEach  { (id, e) -> add(Element(id, "field",  value = e.getValue(), enabled = e.enabled())) }
+            toggles.forEach { (id, e) -> add(Element(id, "toggle", boolValue = e.getValue(), enabled = e.enabled())) }
         }.sortedBy { it.id }
-        return PuppetSnapshot(currentScreen, elements)
+        return Snapshot(currentScreen, elements)
     }
 
     fun click(id: String): Result<Unit> {

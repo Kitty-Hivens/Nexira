@@ -33,7 +33,7 @@ import androidx.compose.runtime.rememberUpdatedState
  */
 
 @Composable
-internal fun PuppetClick(
+fun PuppetClick(
     id: String,
     enabled: Boolean = true,
     onClick: () -> Unit,
@@ -54,7 +54,7 @@ internal fun PuppetClick(
 // syntax: `PuppetField("id", value) { newValue -> ... }`. Don't reorder.
 
 @Composable
-internal fun PuppetField(
+fun PuppetField(
     id: String,
     value: String,
     enabled: Boolean = true,
@@ -75,7 +75,7 @@ internal fun PuppetField(
 }
 
 @Composable
-internal fun PuppetToggle(
+fun PuppetToggle(
     id: String,
     value: Boolean,
     enabled: Boolean = true,
@@ -107,7 +107,7 @@ internal fun PuppetToggle(
  * a time, so this is fine.
  */
 @Composable
-internal fun PuppetScreen(name: String) {
+fun PuppetScreen(name: String) {
     DisposableEffect(name) {
         PuppetRegistry.setCurrentScreen(name)
         onDispose { /* see KDoc on nested scoping */ }

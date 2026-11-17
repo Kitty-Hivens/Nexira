@@ -44,6 +44,8 @@ package hivens.widget.api
  *    [ModuleStrings.resources], in the languages the launcher ships
  *    ([ModuleStrings.SHIPPED_LANGUAGES]), through the reader the loader uses for a jar's
  *    ([ModuleStrings.read]).
+ *    A module compiled in brings widgets of its own ([CompiledModule.widgets]), and every
+ *    composition answers the kernel's own keys for moving what it shows ([CompositionKeys]).
  */
 object WidgetApi {
     const val VERSION: Int = 3

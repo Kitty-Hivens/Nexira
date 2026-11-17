@@ -10,8 +10,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import hivens.accounts.api.SessionState
-import hivens.themes.api.ThemeMode
-import hivens.themes.api.ThemesKeys
 import hivens.ui.background.BackgroundSettings
 import hivens.ui.chrome.LocalWindowClass
 import hivens.ui.chrome.rememberWindowClass
@@ -56,6 +54,7 @@ import hivens.ui.widgets.Commands
 import hivens.ui.widgets.LevelHost
 import hivens.ui.widgets.MisplacedWidget
 import hivens.ui.widgets.Sources
+import hivens.widget.api.CompositionKeys
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.LocalMisplacedWidget
 import hivens.widget.api.LocalScope
@@ -67,12 +66,13 @@ import hivens.widget.api.rememberLatestCommand
 import hivens.widget.api.rememberScopedCommand
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
+import hivens.widget.model.LayoutGraph
 import hivens.widget.model.ScopeLevel
+import hivens.widget.model.screen
 import hivens.widget.model.SlotId
 import hivens.widget.model.SurfaceId
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxColor
-import hivens.ui.theme.NxTheme
 
 // ─── Layout ──────────────────────────────────────────────────────────────────
 
@@ -100,19 +100,12 @@ fun AppLayout(
     // Aims the window's browse at a pack, where a catalogue module answers it.
     val aimBrowse = rememberScopedCommand(CatalogueKeys.Aim)
 
-    // How the composition looks and speaks, read and changed the way a widget does,
-    // for the screens that still take it as arguments. The themes module's: where it is
-    // not brought in, the switches show the scheme the window is drawn in and change nothing.
-    val isDarkTheme = rememberScopedSource(ThemesKeys.Dark).valueOrNull() ?: NxTheme.isDark
-    val themeMode = rememberScopedSource(ThemesKeys.Mode).valueOrNull() ?: ThemeMode.Manual
-    val systemThemeAvailable = rememberScopedSource(ThemesKeys.SystemSchemeAvailable).valueOrNull() ?: false
-    val activeTheme = rememberScopedSource(ThemesKeys.Active).valueOrNull()
-    // The language module's: where it is not brought in, the picker shows the one language in use.
+    // How the composition speaks, read and changed the way a widget does, for the screens
+    // that still take it as arguments. The language module's: where it is not brought in,
+    // the picker shows the one language in use. How it looks is steered by the colour
+    // provider's controls, drawn in the slots the screens leave for them.
     val currentLanguage = rememberScopedSource(I18nKeys.Language).valueOrNull() ?: LocalTranslator.current.language
     val languages = rememberScopedSource(I18nKeys.Languages).valueOrNull() ?: listOf(currentLanguage)
-    val setDark = rememberScopedCommand(ThemesKeys.SetDark)
-    val onToggleDarkTheme: () -> Unit = { setDark?.invoke(!isDarkTheme) }
-    val onThemeModeChanged = rememberScopedCommand(ThemesKeys.SetMode) ?: {}
     val updateLanguage = rememberScopedCommand(I18nKeys.UpdateSettings)
     val onLanguageChanged: (String) -> Unit = { tag -> updateLanguage?.invoke(SettingsChange { it.copy(language = tag) }) }
 
@@ -151,9 +144,6 @@ fun AppLayout(
 
                 Screen.Settings ->
                     SettingsScreen(
-                        isDarkTheme                  = isDarkTheme,
-                        onToggleTheme                = onToggleDarkTheme,
-                        onOpenThemePicker            = { onScreenChange(Screen.ThemePicker) },
                         currentLanguage              = currentLanguage,
                         languages                    = languages,
                         onLanguageChanged            = onLanguageChanged,
@@ -171,17 +161,10 @@ fun AppLayout(
                         currentSettings   = backgroundSettings,
                         onSettingsChanged = onBackgroundSettingsChanged,
                         onBack            = onBack,
-                        isDarkTheme       = isDarkTheme,
-                        onToggleDarkTheme = onToggleDarkTheme,
-                        themeMode = themeMode,
-                        onThemeModeChanged = onThemeModeChanged,
-                        systemThemeAvailable = systemThemeAvailable,
-                        activeTheme       = activeTheme,
                         surfaceBlur       = customization.surfaceBlur,
                         onSurfaceBlurChanged = { onCustomizationChanged(customization.copy(surfaceBlur = it)) },
                         reduceMotion      = customization.reduceMotion,
                         onReduceMotionChanged = { onCustomizationChanged(customization.copy(reduceMotion = it)) },
-                        onOpenThemePicker = { onScreenChange(Screen.ThemePicker) },
                     )
 
                 Screen.Library -> LibraryScreen(onScreenChange = onScreenChange)
@@ -301,7 +284,9 @@ fun AppLayout(
 
 /**
  * Puts the composition's history over its level for [content]: where it stands
- * and the commands that move it, the keys only the owner of the history can answer.
+ * and the commands that move it, the keys only the owner of the history can answer,
+ * the kernel's [CompositionKeys.ShowConfig] among them, which shows the screen
+ * [screenOfConfig] answers for the config named.
  * Each command is one object for the composition's life that runs the latest
  * lambda it was handed, so a reader does not recompose because the shell did.
  *
@@ -323,12 +308,15 @@ private fun ProvideComposition(
     val backCommand = rememberLatestCommand<Unit> { back() }
     val forwardCommand = rememberLatestCommand<Unit> { forward() }
     val popToCommand = rememberLatestCommand(popTo)
+    val graph = LocalLayoutGraph.current
+    val showCommand = rememberLatestCommand<String> { id -> screenOfConfig(id, graph)?.let(navigate) }
     ProvideScoped(Sources.Navigation, nav) {
     ProvideScopedCommand(Commands.Navigate, navigateCommand) {
     ProvideScopedCommand(Commands.SwitchTab, switchTabCommand) {
     ProvideScopedCommand(Commands.Back, backCommand) {
     ProvideScopedCommand(Commands.Forward, forwardCommand) {
     ProvideScopedCommand(Commands.PopTo, popToCommand) {
+    ProvideScopedCommand(CompositionKeys.ShowConfig, showCommand) {
         CompositionLocalProvider(LocalMisplacedWidget provides MisplacedWidget, content = content)
     }
     }
@@ -336,7 +324,27 @@ private fun ProvideComposition(
     }
     }
     }
+    }
 }
+
+/**
+ * The screen the config [id] stands for, until a composition shows configs itself: one of the
+ * launcher's own screens by the surface it draws, or a screen somebody made by its id. Null for an id
+ * that names neither, which shows nothing new.
+ */
+internal fun screenOfConfig(id: String, graph: LayoutGraph): Screen? =
+    CONFIG_SCREENS[id] ?: Screen.Custom(id).takeIf { graph.screen(id) != null }
+
+/** The launcher's own screens that draw a surface, by its id. */
+private val CONFIG_SCREENS: Map<String, Screen> = mapOf(
+    "home.new" to Screen.Home,
+    "library" to Screen.Library,
+    "browse" to Screen.Browse,
+    "profile" to Screen.Profile,
+    "about" to Screen.About,
+    "bg.settings" to Screen.BackgroundSettings,
+    "theme.picker" to Screen.ThemePicker,
+)
 
 /**
  * Draws [currentScreen] with [screen], each destination in its own saveable state

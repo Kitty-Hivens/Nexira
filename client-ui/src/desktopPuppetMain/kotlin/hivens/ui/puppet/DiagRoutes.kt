@@ -260,7 +260,7 @@ internal fun Routing.diagRoutes() {
                 threads   = DiagCollector.threads(),
                 jvm       = DiagCollector.jvm(),
                 actions   = DiagCollector.actions(),
-                ui        = PuppetRegistry.snapshot(),
+                ui        = PuppetRegistry.snapshot().wire(),
             )
         )
     }

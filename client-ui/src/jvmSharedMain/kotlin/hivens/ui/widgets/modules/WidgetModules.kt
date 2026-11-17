@@ -2,6 +2,7 @@ package hivens.ui.widgets.modules
 
 import hivens.core.io.AtomicFiles
 import hivens.core.io.readUtf8
+import hivens.widget.api.CompiledModule
 import hivens.widget.api.CompositeWidgetRegistry
 import hivens.widget.api.ModuleSetting
 import hivens.widget.api.ModuleStrings
@@ -39,6 +40,11 @@ import kotlin.time.Duration.Companion.seconds
  * its class loader carries, and the shell's recovery switches the module off
  * before it starts again, instead of retrying the same crash until safe mode.
  *
+ * The widgets of the modules compiled into the launcher, [compiled], are in the
+ * registry beside the built-in ones, after them and before every jar's. A compiled
+ * module cannot be switched off, so they are always there, and they are named in
+ * the words of the module that brought them, as a jar's are.
+ *
  * Every module ever loaded is remembered with the widget kinds it brought, until
  * somebody forgets it. That is what keeps a module that is off, broken or gone
  * from losing its widgets to the schema-bump prune, which otherwise reads "not in
@@ -51,6 +57,7 @@ class WidgetModules(
     private val builtIn: WidgetRegistry,
     private val scope: CoroutineScope,
     private val host: WidgetModuleHost,
+    private val compiled: List<CompiledModule> = emptyList(),
 ) {
     private val log = LoggerFactory.getLogger("Widgets")
     private val lock = Any()
@@ -116,7 +123,7 @@ class WidgetModules(
 
     private var saved: Saved = readSaved()
     private var live: List<LoadedModule> = emptyList()
-    private val _state = MutableStateFlow(Snapshot(builtIn, emptyList()))
+    private val _state = MutableStateFlow(Snapshot(CompositeWidgetRegistry(listOf(builtIn) + compiled.map { it.widgets }), emptyList()))
     private val _crashNotice = MutableStateFlow<CrashNotice?>(null)
     private val _settings = MutableStateFlow(saved.settings)
 
@@ -242,8 +249,8 @@ class WidgetModules(
                 Contributed(module.id, module.name, it)
             })
         }
-        val sources = listOf(builtIn) + scan.loaded.flatMap { listOf(it.registry, particleWidgets.getValue(it.id)) }
-        val labels = listOf("built-in") + scan.loaded.flatMap { listOf(it.id, "${it.id} particles") }
+        val sources = listOf(builtIn) + compiled.map { it.widgets } + scan.loaded.flatMap { listOf(it.registry, particleWidgets.getValue(it.id)) }
+        val labels = listOf("built-in") + compiled.map { it.id } + scan.loaded.flatMap { listOf(it.id, "${it.id} particles") }
         val composite = CompositeWidgetRegistry(sources)
         log.info("Widget registry: {} kinds from {} source(s) [{}]", composite.all().size, sources.size, labels.joinToString(", "))
         // A contribution that loses its id loses it silently otherwise: the widget
@@ -263,9 +270,10 @@ class WidgetModules(
             scan.rejected.forEach { add(Entry.Refused(it.file, it.reason)) }
             (saved.known.keys + saved.disabled.keys).filter { it !in present }.sorted().forEach { add(Entry.Gone(it)) }
         }
+        // A kind a jar shadows is drawn by the compiled module that holds it, so it is named by that module too.
         val widgetModules = scan.loaded.flatMap { module ->
             (module.registry.all().keys + particleWidgets.getValue(module.id).all().keys).map { it to module.id }
-        }.toMap()
+        }.toMap() + compiled.flatMap { module -> module.widgets.all().keys.map { it to module.id } }.toMap()
         return Snapshot(composite, entries, contributions, widgetModules, scan.loaded.associate { it.id to it.strings })
     }
 

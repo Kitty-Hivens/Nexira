@@ -34,6 +34,7 @@ class HostBoundaryTest {
         "import hivens.look.manager.LookManagerModule",
         "import hivens.look.colour.api.ColourModule",
         "import hivens.look.packs.LookPacksModule",
+        "import hivens.look.colour.nx.controls.ColourNxControls",
     )
 
     /** The recovery surface, and the one engine of the launcher's own words it may make. */
@@ -43,7 +44,8 @@ class HostBoundaryTest {
      * The host sources that still name the themes module's keys or inputs, each with what it names and
      * the step of the look plan that takes it out. Nothing here is read to draw: every window draws in
      * the look the manager answers. What is left is the nx colour provider's controller, still in the
-     * host, and the inputs the host feeds it.
+     * host, and the inputs the host feeds it. The controls of the nx colour provider are a module of
+     * their own, which the host draws by widget kind in the slots it leaves for them.
      */
     private val themesAllowances: Map<String, Set<String>> = mapOf(
         // The system's scheme, probed by the host and fed to the module: step 8 moves the probe into the module.
@@ -51,19 +53,9 @@ class HostBoundaryTest {
         "hivens/ui/AndroidShell.kt" to setOf("ThemesKeys.Mode", "ThemeInputs", "SystemScheme"),
         // The tone of the wallpaper, fed by the host until the background is a widget module of its own.
         "hivens/ui/AppRoot.kt" to setOf("ThemeInputs"),
-        // The day and night switch, the mode, the island and the picker: step 7 moves them into the nx
-        // colour provider's controller module.
-        "hivens/ui/AppLayout.kt" to setOf(
-            "ThemesKeys.Dark", "ThemesKeys.Mode", "ThemesKeys.SystemSchemeAvailable", "ThemesKeys.Active",
-            "ThemesKeys.SetDark", "ThemesKeys.SetMode", "ThemeMode",
-        ),
-        "hivens/ui/widgets/bgsettings/AppearanceThemeIsland.kt" to setOf("ThemeMode"),
-        "hivens/ui/widgets/bgsettings/BgSettingsSurface.kt" to setOf("ThemeMode"),
-        "hivens/ui/widgets/themepicker/ThemePickerSurface.kt" to setOf("ThemesKeys.Offered", "ThemesKeys.Active", "ThemesKeys.Choose"),
-        "hivens/ui/widgets/themepicker/ThemePickerGridWidget.kt" to setOf("ThemesKeys.OFFERED_ID", "ThemesKeys.DARK_ID", "ThemesKeys.Offered", "ThemesKeys.Dark"),
-        "hivens/ui/widgets/themepicker/ThemePickerPreviewWidget.kt" to setOf("ThemesKeys.DARK_ID", "ThemesKeys.Dark"),
-        "hivens/ui/UiModule.kt" to setOf("ThemesKeys.ACTIVE_ID"),
-        // The first start's mode, written for the module: step 7, with the mode's own controller.
+        // The first start's mode, written into the former settings file for the module to take. A
+        // first-launch value of a settings domain's own, beside step 8's boot work of the themes module,
+        // takes it out, together with the language module's first-start language.
         "hivens/ui/bootstrap/FirstRunDefaults.kt" to setOf("ThemeMode"),
     )
 
@@ -127,6 +119,8 @@ class HostBoundaryTest {
             val named = text.lines().flatMap(::themesNames).toSet()
             assertEquals(names, named, "the allowance for $path names what it no longer uses, or misses what it does")
         }
+        val layout = assertNotNull(all["hivens/ui/AppLayout.kt"], "AppLayout is gone")
+        assertTrue(layout.lines().flatMap(::themesNames).isEmpty(), "AppLayout names a key of the themes module, whose controls are a module of their own")
         val drawing = listOf("ThemesKeys.Active", "ThemesKeys.Dark", "ThemesKeys.ACTIVE_ID", "ThemesKeys.DARK_ID")
         val shells = listOf("hivens/ui/AppShell.kt", "hivens/ui/AndroidShell.kt", "hivens/ui/ShellHost.kt", "hivens/ui/ShellLook.kt", "hivens/ui/screens/ConsoleWindow.kt", "hivens/ui/LookValues.kt")
         shells.forEach { path ->
@@ -163,6 +157,8 @@ class HostBoundaryTest {
             "a wildcard over the look" to "import hivens.look.*",
             "a look name put together for reflection" to """Class.forName("hivens.look." + "manager.LookManager")""",
             "a file in the look manager's API package" to "package hivens.look.manager.api",
+            "a class of the colour provider's controls" to "import hivens.look.colour.nx.controls.DayNightWidgetKt",
+            "a widget of the controls called by name" to "hivens.look.colour.nx.controls.ThemePickerGridWidget()",
         )
         holes.forEach { (what, line) ->
             assertEquals(1, findings("hivens/ui/Somewhere.kt", line).size, "$what is not seen: $line")
@@ -184,6 +180,8 @@ class HostBoundaryTest {
         assertEquals(1, findings(listing, "import hivens.look.manager.LookManager").size, "the listing names the manager's CompiledModule only")
         assertEquals(emptyList(), findings(listing, "import hivens.look.colour.api.ColourModule"))
         assertEquals(1, findings(listing, "import hivens.look.colour.api.Colour").size, "the listing names the colour axis's CompiledModule only, not the axis")
+        assertEquals(emptyList(), findings(listing, "import hivens.look.colour.nx.controls.ColourNxControls"))
+        assertEquals(1, findings(listing, "import hivens.look.colour.nx.controls.ThemePickerGridWidget").size, "the listing names the controls' CompiledModule only")
         assertEquals(emptyList(), findings(floor.first, "    boot[I18nKeys.Words] ?: ${floor.second}"))
         assertEquals(1, findings("hivens/ui/ShellHost.kt", floor.second).size, "the floor is the recovery surface's alone")
     }

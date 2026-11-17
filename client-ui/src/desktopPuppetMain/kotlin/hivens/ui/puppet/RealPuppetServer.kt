@@ -87,7 +87,7 @@ class RealPuppetServer : PuppetServerLifecycle {
                         call.respond(ScreenResponse(PuppetRegistry.snapshot().screen))
                     }
                     get("/elements") {
-                        call.respond(PuppetRegistry.snapshot())
+                        call.respond(PuppetRegistry.snapshot().wire())
                     }
                     post("/click") {
                         val req = call.receive<ClickRequest>()

@@ -1,6 +1,6 @@
 {
   "schema_version": 15,
-  "modules": ["nexira.i18n", "nexira.themes", "nexira.look.manager", "nexira.packs", "nexira.accounts", "nexira.catalogue", "nexira.source.mirror", "nexira.source.modrinth"],
+  "modules": ["nexira.i18n", "nexira.themes", "nexira.look.manager", "nexira.look.colour.nx.controls", "nexira.packs", "nexira.accounts", "nexira.catalogue", "nexira.source.mirror", "nexira.source.modrinth"],
   "graph": {
     "surfaces": {
       "appshell.backdrop": {
@@ -671,6 +671,42 @@
                   "kind": "scroll",
                   "axis": "vertical"
                 }
+              },
+              "theme": {
+                "widgets": [
+                  {
+                    "kind": "theme.daynight",
+                    "instance_id": "theme-daynight-island"
+                  },
+                  {
+                    "kind": "theme.darkonly",
+                    "instance_id": "theme-darkonly-island"
+                  },
+                  {
+                    "kind": "theme.mode",
+                    "instance_id": "theme-mode-island"
+                  }
+                ],
+                "flow": {
+                  "direction": "vertical",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
+              },
+              "theme.link": {
+                "widgets": [
+                  {
+                    "kind": "theme.picker.link",
+                    "instance_id": "theme-picker-link-island"
+                  }
+                ],
+                "flow": {
+                  "direction": "vertical",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
               }
             }
           }
@@ -788,10 +824,60 @@
           }
         }
       },
+      "settings.appearance": {
+        "families": {
+          "general": {
+            "slots": {
+              "theme.link": {
+                "widgets": [
+                  {
+                    "kind": "theme.picker.link",
+                    "instance_id": "theme-picker-link-settings"
+                  }
+                ],
+                "flow": {
+                  "direction": "vertical",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
+              },
+              "theme.daynight": {
+                "widgets": [
+                  {
+                    "kind": "theme.daynight",
+                    "instance_id": "theme-daynight-settings"
+                  }
+                ],
+                "flow": {
+                  "direction": "vertical",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
+              }
+            }
+          }
+        }
+      },
       "theme.picker": {
         "families": {
           "general": {
             "slots": {
+              "header": {
+                "widgets": [
+                  {
+                    "kind": "theme.picker.header",
+                    "instance_id": "theme-picker-header-default"
+                  }
+                ],
+                "flow": {
+                  "direction": "vertical",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
+              },
               "grid": {
                 "widgets": [
                   {

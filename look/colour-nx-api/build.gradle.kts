@@ -44,6 +44,8 @@ kotlin {
             dependencies {
                 api(project(":widget-api"))
                 api(project(":nx-ui"))
+                // The colour axis's local, which a preview of a theme answers for what it wraps.
+                api(project(":look:colour-api"))
                 implementation(libs.compose.runtime)
             }
         }

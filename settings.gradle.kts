@@ -121,6 +121,9 @@ include(":nx-ui")
 // Layer ordering and the dismiss stack of a window, with no visuals. Below both
 // nx-ui and the widget kernel, and depends on neither.
 include(":ui-layers")
+// The puppet hooks a control registers itself with for the puppet's HTTP control surface, and their
+// registry. A development seam with no visuals, used by client-ui and the modules compiled into it.
+include(":ui-puppet")
 // The launcher's own words: the tables of the `nexira` namespace the language module
 // answers, and the composable that reads them. Carved out of
 // client-ui, where it was the single largest package and imported by 150
@@ -203,5 +206,7 @@ include(":look:packs")
 // person's theme.
 include(":look:colour-nx-api")
 include(":look:colour-nx")
+// The UI that steers the nx colour provider: the day and night switch, the mode, the theme picker.
+include(":look:colour-nx-controls")
 include(":profiler-agent")
 include(":authlib-agent")

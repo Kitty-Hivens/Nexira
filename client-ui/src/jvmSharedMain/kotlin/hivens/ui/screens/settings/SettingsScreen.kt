@@ -37,9 +37,6 @@ import hivens.ui.surface.SurfaceKind
  */
 @Composable
 fun SettingsScreen(
-    isDarkTheme: Boolean,
-    onToggleTheme: () -> Unit,
-    onOpenThemePicker: () -> Unit,
     currentLanguage: LanguageInfo,
     languages: List<LanguageInfo>,
     onLanguageChanged: (tag: String) -> Unit,
@@ -132,9 +129,6 @@ fun SettingsScreen(
                         SettingsCategory.Appearance -> AppearanceSection(
                             form                         = form,
                             save                         = ::save,
-                            isDarkTheme                  = isDarkTheme,
-                            onToggleTheme                = onToggleTheme,
-                            onOpenThemePicker            = onOpenThemePicker,
                             onOpenBackgroundSettings     = onOpenBackgroundSettings,
                             currentLanguage              = currentLanguage,
                             languages                    = languages,

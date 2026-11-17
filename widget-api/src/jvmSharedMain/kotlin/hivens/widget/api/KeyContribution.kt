@@ -4,6 +4,7 @@ import hivens.widget.model.ApiVersion
 import hivens.widget.model.CommandKey
 import hivens.widget.model.ScopeLevel
 import hivens.widget.model.SourceKey
+import hivens.widget.model.WidgetKind
 import kotlinx.coroutines.CoroutineScope
 import kotlin.reflect.KClass
 
@@ -183,8 +184,24 @@ interface CompiledModule {
     val contributions: List<ModuleContribution>
 
     /**
+     * The widgets it brings. The host draws them after its own widgets and before any jar's, so
+     * one of them cannot take a kind the host's own widgets hold, and names them in the module's
+     * [strings]. A compiled module cannot be switched off, so its widgets are there whether the
+     * document names the module or not: where its keys are not brought in, a widget that needs
+     * one stands misplaced, as a jar's does. None by default.
+     */
+    val widgets: WidgetRegistry get() = NoWidgets
+
+    /**
      * What it answers of its app sources before the host is up, for the window the launcher boots
      * in, or null where it answers nothing then. See [BootAnswers].
      */
     val boot: BootAnswers? get() = null
+}
+
+/** The widgets of a compiled module that brings none. */
+private object NoWidgets : WidgetRegistry {
+    override fun all(): Map<WidgetKind, WidgetDescriptor> = emptyMap()
+
+    override fun get(kind: WidgetKind): WidgetDescriptor? = null
 }

@@ -2,6 +2,7 @@ package hivens.ui.widgets
 
 import hivens.ui.Screen
 import hivens.ui.background.BackgroundSettings
+import hivens.widget.api.CompositionKeys
 import hivens.widget.model.CommandKey
 import hivens.widget.model.ScopeLevel
 
@@ -53,8 +54,9 @@ object Commands {
     /**
      * Steps back one screen. At the root it moves nothing and is counted in
      * [Sources.Navigation], for a composition that answers a back with nowhere to go.
+     * The kernel's own key, so a module's widget steps back without naming the host.
      */
-    val Back = CommandKey<Unit>("nav.back", ScopeLevel.Composition)
+    val Back: CommandKey<Unit> = CompositionKeys.Back
     val Forward = CommandKey<Unit>("nav.forward", ScopeLevel.Composition)
 
     /** Steps back to a screen already in the trail. */

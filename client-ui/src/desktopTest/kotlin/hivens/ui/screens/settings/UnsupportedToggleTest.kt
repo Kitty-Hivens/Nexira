@@ -53,9 +53,6 @@ class UnsupportedToggleTest {
                             AppearanceSection(
                                 form = form,
                                 save = {},
-                                isDarkTheme = true,
-                                onToggleTheme = {},
-                                onOpenThemePicker = {},
                                 onOpenBackgroundSettings = {},
                                 currentLanguage = NexiraStrings.translator("en").language,
                                 languages = ShippedLanguages.all,

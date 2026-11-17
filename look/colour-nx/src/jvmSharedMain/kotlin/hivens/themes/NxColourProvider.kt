@@ -6,6 +6,7 @@ import hivens.look.colour.api.ColourApi
 import hivens.look.manager.api.LookAnswers
 import hivens.look.manager.api.LookContext
 import hivens.look.manager.api.LookProvider
+import hivens.themes.api.ThemesApi
 import hivens.ui.theme.colourAnswers
 import hivens.widget.api.get
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,7 +25,7 @@ import kotlinx.coroutines.launch
  */
 internal object NxColourProvider : LookProvider<ColourAnswers> {
     override val axis: String = Colour.id
-    override val family: String = "nx"
+    override val family: String = ThemesApi.COLOUR_FAMILY
     override val contract = ColourApi.VERSION
     override val label: String = "themes.colour"
 

@@ -1,5 +1,6 @@
 package hivens.widget
 
+import hivens.ui.widgets.modules.CompiledModules
 import hivens.widget.generated.GeneratedWidgetRegistry
 import hivens.widget.model.DefaultLayout
 import kotlin.test.Test
@@ -15,7 +16,7 @@ import kotlin.test.fail
 class WidgetRegistryConsistencyTest {
 
     @Test
-    fun `every default-layout widget kind exists in the generated registry`() {
+    fun `every default-layout widget kind exists in the generated registry or a compiled module's`() {
         val graph = DefaultLayout.load()
         // Every family, not just the general one: a kind that only the project-view
         // rail names is just as capable of being renamed out from under the layout.
@@ -24,7 +25,7 @@ class WidgetRegistryConsistencyTest {
             .flatMap { it.widgets }
             .map { it.kind }
             .toSet()
-        val available = GeneratedWidgetRegistry.all().keys
+        val available = GeneratedWidgetRegistry.all().keys + CompiledModules.flatMap { it.widgets.all().keys }
 
         val missing = referenced - available
         assertEquals(
@@ -130,8 +131,6 @@ class WidgetRegistryConsistencyTest {
             "profile.skin.section",
             "profile.account.section",
             "profile.signin",
-            "theme.picker.grid",
-            "theme.picker.preview",
             // persistent notification history
             "notifications.history",
             // per-instance persisted state widgets

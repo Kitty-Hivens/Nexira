@@ -1,4 +1,4 @@
-package hivens.ui.widgets.themepicker
+package hivens.look.colour.nx.controls
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -16,8 +16,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import hivens.i18n.api.strings
 import hivens.themes.api.ThemesKeys
-import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxChoiceChip
@@ -27,7 +27,6 @@ import hivens.ui.nx.NxToggle
 import hivens.ui.surface.NxCard
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
-import hivens.ui.theme.NxThemed
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
 import hivens.widget.model.Widget
@@ -40,26 +39,28 @@ import androidx.compose.ui.graphics.Color
 // colours, as data rather than as names of places they were supposed to go.
 //
 // Reads only, never writes. Safe to remove from the surface: the grid still picks
-// and the header button still applies.
+// and the header button still applies. Drawn only while nx draws the colour.
 @Widget(
     id = "theme.picker.preview",
     displayName = "widget.theme.picker.preview",
     minWidth = 240, minHeight = 300,
     prefWidth = 320, prefHeight = 432,
     maxWidth = 720, maxHeight = 760,
-    needs = [ThemesKeys.DARK_ID, "theme.picker.selection"],
+    needs = [ThemesKeys.ACTIVE_ID, ThemesKeys.DARK_ID, "theme.picker.selection"],
 )
 @Composable
 fun ThemePickerPreviewWidget() {
+    if (!nxDrawsColour()) return
+    val active = rememberScopedSource(ThemesKeys.Active).valueOrNull() ?: return
     val dark = rememberScopedSource(ThemesKeys.Dark).valueOrNull() ?: return
     val selection = rememberScopedSource(ThemeSelectionSource).valueOrNull() ?: return
-    val s = nexiraStrings()
-    val theme = selection.theme
+    val s = strings(ColourNxControls.ID)
+    val theme = selection.or(active)
     val scheme = theme.scheme(dark)
     val face = MaterialTheme.typography.bodyMedium.fontFamily
 
     Box(Modifier.fillMaxSize().clip(MaterialTheme.shapes.large)) {
-        NxThemed(theme, dark = dark, uiFamily = face) {
+        InTheme(theme, dark, face) {
             Column(
                 modifier            = Modifier.fillMaxSize().background(NxColor.page).padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),

@@ -45,6 +45,7 @@ public abstract interface class hivens/widget/api/CompiledModule {
 	public abstract fun getName ()Ljava/lang/String;
 	public fun getProvides ()Ljava/util/Map;
 	public fun getStrings ()Lhivens/widget/api/ModuleStrings;
+	public fun getWidgets ()Lhivens/widget/api/WidgetRegistry;
 }
 
 public final class hivens/widget/api/CompiledModule$DefaultImpls {
@@ -53,6 +54,7 @@ public final class hivens/widget/api/CompiledModule$DefaultImpls {
 	public static fun getContributionKinds (Lhivens/widget/api/CompiledModule;)Ljava/util/List;
 	public static fun getProvides (Lhivens/widget/api/CompiledModule;)Ljava/util/Map;
 	public static fun getStrings (Lhivens/widget/api/CompiledModule;)Lhivens/widget/api/ModuleStrings;
+	public static fun getWidgets (Lhivens/widget/api/CompiledModule;)Lhivens/widget/api/WidgetRegistry;
 }
 
 public final class hivens/widget/api/CompositeWidgetRegistry : hivens/widget/api/WidgetRegistry {
@@ -61,6 +63,13 @@ public final class hivens/widget/api/CompositeWidgetRegistry : hivens/widget/api
 	public fun all ()Ljava/util/Map;
 	public fun get-GE_qCgk (Ljava/lang/String;)Lhivens/widget/api/WidgetDescriptor;
 	public final fun getShadowed ()Ljava/util/List;
+}
+
+public final class hivens/widget/api/CompositionKeys {
+	public static final field $stable I
+	public static final field INSTANCE Lhivens/widget/api/CompositionKeys;
+	public final fun getBack ()Lhivens/widget/model/CommandKey;
+	public final fun getShowConfig ()Lhivens/widget/model/CommandKey;
 }
 
 public final class hivens/widget/api/ContributedLevelServices : hivens/widget/api/LevelServices {

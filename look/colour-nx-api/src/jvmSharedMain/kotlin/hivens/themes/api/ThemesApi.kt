@@ -23,10 +23,18 @@ object ThemesApi {
      * The version of this API. A minor step only adds. A major step removes or changes
      * a key or a value type.
      *
+     * 1.1 adds [COLOUR_FAMILY] and [ThemePreview].
+     *
      * The module builds stamp their manifests from the `nexira.themesApi` Gradle property,
      * which a test holds equal to this.
      */
-    val VERSION: ApiVersion = ApiVersion(1, 0)
+    val VERSION: ApiVersion = ApiVersion(1, 1)
+
+    /**
+     * The family this module answers the look's colour axis as. What the look's state names while
+     * this module draws the colour, so a module that steers it asks whether it is the one drawing.
+     */
+    const val COLOUR_FAMILY: String = "nx"
 
     /**
      * The id of the theme made from the wallpaper's colours. It is offered while there is a

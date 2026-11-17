@@ -1,4 +1,4 @@
-package hivens.ui.widgets.themepicker
+package hivens.look.colour.nx.controls
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -31,8 +31,8 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import hivens.i18n.api.strings
 import hivens.themes.api.ThemesKeys
-import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.nx.NxButton
@@ -43,8 +43,8 @@ import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
-import hivens.ui.theme.NxThemed
 import hivens.ui.theme.Theme
+import hivens.ui.puppet.PuppetClick
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
 import hivens.widget.model.Widget
@@ -55,6 +55,8 @@ import hivens.widget.model.Widget
 // cannot disagree. The old cards painted the hex values a theme declared, which the
 // launcher then did not apply.
 //
+// Drawn only while nx draws the colour, the themes being nx's.
+//
 // The ceiling is load-bearing: a LazyVerticalGrid cannot be measured against an
 // unbounded height, and the editor can put this in a slot that has none.
 @Widget(
@@ -63,14 +65,19 @@ import hivens.widget.model.Widget
     drawsOwnSurface = true,
     minWidth = 260, minHeight = 220,
     maxWidth = 960, maxHeight = 1600,
-    needs = [ThemesKeys.OFFERED_ID, ThemesKeys.DARK_ID, "theme.picker.selection"],
+    needs = [ThemesKeys.OFFERED_ID, ThemesKeys.ACTIVE_ID, ThemesKeys.DARK_ID, "theme.picker.selection"],
 )
 @Composable
 fun ThemePickerGridWidget() {
+    if (!nxDrawsColour()) return
     val themes = rememberScopedSource(ThemesKeys.Offered).valueOrNull() ?: return
+    val active = rememberScopedSource(ThemesKeys.Active).valueOrNull() ?: return
     val dark = rememberScopedSource(ThemesKeys.Dark).valueOrNull() ?: return
     val selection = rememberScopedSource(ThemeSelectionSource).valueOrNull() ?: return
-    val selected = selection.theme
+    val selected = selection.or(active)
+    themes.forEach { theme ->
+        PuppetClick("themePicker.select.${theme.id}") { selection.theme = theme }
+    }
 
     NxCard(modifier = Modifier.fillMaxSize(), shape = MaterialTheme.shapes.large) {
         LazyVerticalGrid(
@@ -98,7 +105,7 @@ private fun ThemeCard(
     isSelected: Boolean,
     onClick: () -> Unit,
 ) {
-    val s = nexiraStrings()
+    val s = strings(ColourNxControls.ID)
     val scale by animateFloatAsState(
         targetValue   = if (isSelected) 1.03f else 1f,
         animationSpec = spring(dampingRatio = 0.7f, stiffness = 300f),
@@ -117,7 +124,7 @@ private fun ThemeCard(
             .clip(shape)
             .border(if (isSelected) 2.dp else 1.dp, frame, shape),
     ) {
-        NxThemed(theme, dark = dark, uiFamily = face) {
+        InTheme(theme, dark, face) {
             Column(
                 modifier            = Modifier.fillMaxSize().background(NxColor.page).padding(12.dp),
                 verticalArrangement = Arrangement.SpaceBetween,
