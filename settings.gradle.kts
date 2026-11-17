@@ -200,5 +200,7 @@ include(":themes")
 // convention plugin in buildSrc, their suites run together by :look:allTests.
 include(":look:manager-api")
 include(":look:manager")
+include(":look:colour-api")
+include(":look:packs")
 include(":profiler-agent")
 include(":authlib-agent")

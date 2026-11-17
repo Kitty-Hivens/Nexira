@@ -9,9 +9,9 @@ import kotlin.test.assertTrue
  * The host joins the themes module, the language module and the look manager through their keys and
  * their APIs, and names nothing of how any is made: no class of theirs, no file in their packages, and
  * no engine of the launcher's own words of its own. Of the look it names the manager's API and nothing
- * else, no axis and no provider, which are the manager's business. The one place each module is named
- * is where the build lists the modules compiled into it, by its CompiledModule, the way every compiled
- * module is listed there, and the one engine of the launcher's own words the host makes is the recovery
+ * else, no axis and no provider, which are the manager's business. The one place each module is named,
+ * the look's axes and packs among them, is where the build lists the modules compiled into it, by its
+ * CompiledModule, the way every compiled module is listed there, and the one engine of the launcher's own words the host makes is the recovery
  * surface's floor, which has to speak when every module failed.
  *
  * Read as text, since an import the compiler drops leaves no trace in what it builds. The text is read
@@ -26,7 +26,13 @@ class HostBoundaryTest {
     private val listing = "hivens/ui/widgets/modules/CompiledModules.kt"
 
     /** What the listing may name of these modules: each one's CompiledModule, and nothing else of any. */
-    private val registrations = setOf("import hivens.themes.ThemesModule", "import hivens.i18n.I18nModule", "import hivens.look.manager.LookManagerModule")
+    private val registrations = setOf(
+        "import hivens.themes.ThemesModule",
+        "import hivens.i18n.I18nModule",
+        "import hivens.look.manager.LookManagerModule",
+        "import hivens.look.colour.api.ColourModule",
+        "import hivens.look.packs.LookPacksModule",
+    )
 
     /** The recovery surface, and the one engine of the launcher's own words it may make. */
     private val floor = "hivens/ui/RecoverySurface.kt" to "NexiraStrings.translator(Locale.getDefault().language)"
@@ -116,6 +122,8 @@ class HostBoundaryTest {
         assertEquals(1, findings(listing, "import hivens.themes.ThemeManager").size, "the listing names the CompiledModule only")
         assertEquals(emptyList(), findings(listing, "import hivens.look.manager.LookManagerModule"))
         assertEquals(1, findings(listing, "import hivens.look.manager.LookManager").size, "the listing names the manager's CompiledModule only")
+        assertEquals(emptyList(), findings(listing, "import hivens.look.colour.api.ColourModule"))
+        assertEquals(1, findings(listing, "import hivens.look.colour.api.Colour").size, "the listing names the colour axis's CompiledModule only, not the axis")
         assertEquals(emptyList(), findings(floor.first, "    boot[I18nKeys.Words] ?: ${floor.second}"))
         assertEquals(1, findings("hivens/ui/ShellHost.kt", floor.second).size, "the floor is the recovery surface's alone")
     }

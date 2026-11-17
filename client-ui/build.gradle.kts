@@ -177,6 +177,11 @@ kotlin {
                 // look through, the module compiled in.
                 implementation(project(":look:manager-api"))
                 implementation(project(":look:manager"))
+                // The axes of the look and the packs that ship, compiled in for the manager to
+                // take whether a document names them or not. The shell compiles against none of
+                // them beyond listing their CompiledModule.
+                implementation(project(":look:colour-api"))
+                implementation(project(":look:packs"))
                 implementation(project(":nx-ui"))
                 implementation(project(":ui-layers"))
                 implementation(project(":client-i18n"))

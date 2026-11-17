@@ -9,6 +9,8 @@ import hivens.i18n.I18nModule
 import hivens.i18n.api.I18nApi
 import hivens.i18n.api.I18nKeys
 import hivens.i18n.api.Translator
+import hivens.look.colour.api.Colour
+import hivens.look.colour.api.ColourApi
 import hivens.look.manager.LookManagerModule
 import hivens.look.manager.LookSettingsDomain
 import hivens.look.manager.api.LookAnswers
@@ -21,6 +23,7 @@ import hivens.look.manager.api.LookPack
 import hivens.look.manager.api.LookProvider
 import hivens.look.manager.api.LookProvision
 import hivens.look.manager.api.LookView
+import hivens.look.packs.LookPacksModule
 import hivens.test.stopThenDelete
 import hivens.themes.Themes
 import hivens.themes.ThemesModule
@@ -31,6 +34,7 @@ import hivens.ui.i18n.NexiraStrings
 import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.Scheme
+import hivens.ui.widgets.modules.CompiledModules
 import hivens.widget.api.BootValues
 import hivens.widget.api.CompiledModule
 import hivens.widget.api.KeyContribution
@@ -67,6 +71,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotSame
 import kotlin.test.assertSame
+import kotlin.test.assertTrue
 
 /**
  * The shell draws its windows with what the modules' keys answer at the app level, and with its own
@@ -182,6 +187,16 @@ class LookValuesTest {
         }
         ModuleAppLevel(dir, listOf(LookManagerModule), scope, named = setOf(LookApi.ID)).use { shell ->
             assertNotSame(LookProvision.NONE, shell.value(LookKeys.Provide))
+        }
+    }
+
+    @Test
+    fun `the build carries the colour axis and the default pack, which reach the manager though the document names neither`() {
+        ModuleAppLevel(dir, CompiledModules, scope, named = setOf(LookApi.ID)).use { shell ->
+            assertTrue(eventually(true) { shell.value(LookKeys.State).axis(Colour.id) != null }, "the manager answers the colour axis")
+            val state = shell.value(LookKeys.State)
+            assertEquals(ColourApi.VERSION, state.axis(Colour.id)?.contract)
+            assertEquals(listOf(LookPacksModule.ID to LookApi.DEFAULT_PACK), state.packs.map { it.moduleId to it.id }, "and offers the default pack")
         }
     }
 
