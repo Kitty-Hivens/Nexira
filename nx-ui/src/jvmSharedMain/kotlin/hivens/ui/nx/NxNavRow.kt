@@ -29,7 +29,6 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.surface.NxSurface
 import hivens.ui.theme.NeutralTheme
-import hivens.ui.theme.Spacing
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxTheme
@@ -73,13 +72,13 @@ fun NxNavRow(
             modifier              = Modifier
                 .fillMaxWidth()
                 .drawBehind { drawSoftHover(tint, alpha.value) }
-                .padding(Spacing.s16),
+                .padding(16.dp),
             verticalAlignment     = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
                 Symbol(icon, null, tint = iconTint ?: NxColor.lead(), size = 24.dp)
-                Spacer(Modifier.width(Spacing.s16))
+                Spacer(Modifier.width(16.dp))
                 Column {
                     Text(title, color = NxInk.main, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     if (subtitle != null) {

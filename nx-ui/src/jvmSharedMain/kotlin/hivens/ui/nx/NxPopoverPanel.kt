@@ -46,7 +46,6 @@ import hivens.ui.surface.NxSurface
 import hivens.ui.theme.Motion
 import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
-import hivens.ui.theme.Spacing
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxTheme
 import hivens.ui.surface.SurfaceKind
@@ -128,7 +127,7 @@ fun NxPopoverPanel(
                     // No inset on the end and none on top: the close sits exactly
                     // where the trigger is, so the panel's corner IS that control.
                     Row(
-                        modifier          = Modifier.fillMaxWidth().padding(start = Spacing.s14, bottom = Spacing.s6),
+                        modifier          = Modifier.fillMaxWidth().padding(start = 14.dp, bottom = 6.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
@@ -150,15 +149,15 @@ fun NxPopoverPanel(
                             .fillMaxWidth()
                             .heightIn(max = maxBodyHeight)
                             .verticalScroll(rememberScrollState())
-                            .padding(horizontal = Spacing.s14, vertical = Spacing.s12),
-                        verticalArrangement = Arrangement.spacedBy(Spacing.s14),
+                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp),
                     ) {
                         content()
                     }
                     footer?.let {
                         HorizontalDivider(color = NxInk.line)
                         Row(
-                            modifier              = Modifier.fillMaxWidth().padding(horizontal = Spacing.s10, vertical = Spacing.s8),
+                            modifier              = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
                             verticalAlignment     = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween,
                         ) { it() }
@@ -214,7 +213,7 @@ fun NxPanelGroup(
     hint: String? = null,
     content: @Composable () -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s6)) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(
             text  = label,
             style = MaterialTheme.typography.labelSmall,

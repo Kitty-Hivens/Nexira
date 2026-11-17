@@ -58,7 +58,6 @@ import hivens.ui.theme.Motion
 import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.Spacing
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 import kotlin.time.Duration.Companion.milliseconds
@@ -128,7 +127,7 @@ data class NxTooltipBehaviour(
             delayMillis = 400,
             placement = NxTooltipPlacement.BelowAnchor,
             maxWidth = 280.dp,
-            contentPadding = PaddingValues(horizontal = Spacing.s8, vertical = Spacing.s4),
+            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
         )
 
         /**
@@ -145,7 +144,7 @@ data class NxTooltipBehaviour(
             delayMillis = 600,
             placement = NxTooltipPlacement.BelowAnchor,
             maxWidth = 360.dp,
-            contentPadding = PaddingValues(horizontal = Spacing.s12, vertical = Spacing.s10),
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
             enterable = true,
         )
 
@@ -154,7 +153,7 @@ data class NxTooltipBehaviour(
             delayMillis = 700,
             placement = NxTooltipPlacement.BelowAnchor,
             maxWidth = 320.dp,
-            contentPadding = PaddingValues(Spacing.s10),
+            contentPadding = PaddingValues(10.dp),
             enterable = true,
         )
     }
@@ -309,7 +308,7 @@ fun NxTooltipGlyphLabel(icon: IconKey, text: String) {
     // against the middle of the block, pointing at the gap between its lines.
     Row(verticalAlignment = Alignment.Top) {
         Symbol(icon, contentDescription = null, tint = NxInk.quiet, size = 16.dp)
-        Spacer(Modifier.width(Spacing.s8))
+        Spacer(Modifier.width(8.dp))
         NxTooltipLabel(text)
     }
 }
@@ -329,7 +328,7 @@ fun NxTooltipTitled(title: String, description: String, shortcut: String? = null
                 color = NxInk.main,
             )
             if (shortcut != null) {
-                Spacer(Modifier.width(Spacing.s12))
+                Spacer(Modifier.width(12.dp))
                 Text(
                     text = shortcut,
                     style = MaterialTheme.typography.labelSmall,
@@ -337,7 +336,7 @@ fun NxTooltipTitled(title: String, description: String, shortcut: String? = null
                 )
             }
         }
-        Spacer(Modifier.height(Spacing.s2))
+        Spacer(Modifier.height(2.dp))
         Text(
             text = description,
             style = MaterialTheme.typography.bodySmall,
@@ -355,7 +354,7 @@ fun NxTooltipPreview(caption: String? = null, picture: @Composable () -> Unit) {
     Column {
         picture()
         if (caption != null) {
-            Spacer(Modifier.height(Spacing.s6))
+            Spacer(Modifier.height(6.dp))
             Text(
                 text = caption,
                 style = MaterialTheme.typography.labelSmall,

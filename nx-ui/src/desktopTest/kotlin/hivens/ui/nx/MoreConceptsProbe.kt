@@ -44,7 +44,6 @@ import hivens.ui.icons.Symbol
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.Spacing
 import hivens.ui.theme.TestTheme
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
@@ -89,7 +88,7 @@ class MoreConceptsProbe {
         val scene = ImageComposeScene((wDp * d).toInt(), (hDp * d).toInt(), density = Density(d)) {
             NxTheme(TestTheme, dark = true) {
                 Box(
-                    Modifier.fillMaxSize().background(NxColor.page).padding(Spacing.s16),
+                    Modifier.fillMaxSize().background(NxColor.page).padding(16.dp),
                     contentAlignment = Alignment.Center,
                 ) { body() }
             }
@@ -113,7 +112,7 @@ class MoreConceptsProbe {
     private fun ConceptCassette() {
         val c = probeInks()
         NxSurface(SurfaceKind.Card, Modifier.width(340.dp), shape = MaterialTheme.shapes.medium) {
-            Column(Modifier.fillMaxWidth().padding(Spacing.s14)) {
+            Column(Modifier.fillMaxWidth().padding(14.dp)) {
                 Box(
                     Modifier.fillMaxWidth().height(92.dp).clip(RoundedCornerShape(10.dp))
                         .background(lerp(c.raised, Color.Black, 0.35f)),
@@ -147,7 +146,7 @@ class MoreConceptsProbe {
                         reel(rx, fraction, lit = true)
                     }
                     // The label sits across the shell, the way a cassette's does.
-                    Column(Modifier.align(Alignment.BottomStart).padding(Spacing.s10)) {
+                    Column(Modifier.align(Alignment.BottomStart).padding(10.dp)) {
                         Text(
                             title, style = MaterialTheme.typography.bodyMedium, color = c.main,
                             fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis,
@@ -158,16 +157,16 @@ class MoreConceptsProbe {
                         )
                     }
                 }
-                Spacer(Modifier.height(Spacing.s10))
+                Spacer(Modifier.height(10.dp))
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         artist, style = MaterialTheme.typography.bodySmall, color = c.quiet,
                         maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
                     )
                     Glyph(NxIcon.SkipPrevious, 18, c.quiet)
-                    Spacer(Modifier.width(Spacing.s10))
+                    Spacer(Modifier.width(10.dp))
                     Glyph(NxIcon.Pause, 22, c.main)
-                    Spacer(Modifier.width(Spacing.s10))
+                    Spacer(Modifier.width(10.dp))
                     Glyph(NxIcon.SkipNext, 18, c.quiet)
                 }
             }
@@ -182,12 +181,12 @@ class MoreConceptsProbe {
     private fun ConceptColumn() {
         val c = probeInks()
         NxSurface(SurfaceKind.Card, Modifier.width(148.dp), shape = MaterialTheme.shapes.medium) {
-            Column(Modifier.fillMaxWidth().padding(Spacing.s12)) {
+            Column(Modifier.fillMaxWidth().padding(12.dp)) {
                 Image(
                     cover, null, contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxWidth().height(124.dp).clip(MaterialTheme.shapes.small),
                 )
-                Spacer(Modifier.height(Spacing.s10))
+                Spacer(Modifier.height(10.dp))
                 Row(Modifier.fillMaxWidth().height(96.dp)) {
                     Canvas(Modifier.width(22.dp).fillMaxHeight()) {
                         val n = env.size
@@ -203,7 +202,7 @@ class MoreConceptsProbe {
                             )
                         }
                     }
-                    Spacer(Modifier.width(Spacing.s10))
+                    Spacer(Modifier.width(10.dp))
                     Column(Modifier.weight(1f).fillMaxHeight()) {
                         Text(
                             title, style = MaterialTheme.typography.bodyMedium, color = c.main,
@@ -217,7 +216,7 @@ class MoreConceptsProbe {
                         Text("$elapsed / $total", style = MaterialTheme.typography.labelSmall, color = c.quiet)
                     }
                 }
-                Spacer(Modifier.height(Spacing.s10))
+                Spacer(Modifier.height(10.dp))
                 Row(
                     Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -250,7 +249,7 @@ class MoreConceptsProbe {
                     ),
                 ),
             )
-            Column(Modifier.fillMaxSize().padding(Spacing.s14)) {
+            Column(Modifier.fillMaxSize().padding(14.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text(
@@ -263,9 +262,9 @@ class MoreConceptsProbe {
                         )
                     }
                     Glyph(NxIcon.SkipPrevious, 18, Color.White.copy(alpha = 0.8f))
-                    Spacer(Modifier.width(Spacing.s10))
+                    Spacer(Modifier.width(10.dp))
                     Glyph(NxIcon.Pause, 24, Color.White)
-                    Spacer(Modifier.width(Spacing.s10))
+                    Spacer(Modifier.width(10.dp))
                     Glyph(NxIcon.SkipNext, 18, Color.White.copy(alpha = 0.8f))
                 }
                 Spacer(Modifier.weight(1f))

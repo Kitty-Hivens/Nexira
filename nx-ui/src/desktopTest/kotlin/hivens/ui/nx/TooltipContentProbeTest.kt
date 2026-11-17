@@ -26,7 +26,6 @@ import hivens.ui.surface.ChamferedRectShape
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.Spacing
 import hivens.ui.theme.TestTheme
 import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.Canvas as SkCanvas
@@ -74,7 +73,7 @@ class TooltipContentProbeTest {
                         Box(
                             Modifier
                                 .widthIn(max = 320.dp)
-                                .padding(PaddingValues(horizontal = Spacing.s8, vertical = Spacing.s4)),
+                                .padding(PaddingValues(horizontal = 8.dp, vertical = 4.dp)),
                         ) { body() }
                     }
                 }
@@ -109,7 +108,7 @@ class TooltipContentProbeTest {
         // The long hexagon as a tooltip body, which is the form this shape was
         // asked for. Small cut so the points read as ends rather than as arrows.
         sheet("chamfer", 190, 44, shape = ChamferedRectShape(startCutDp = 9f, endCutDp = 9f, roundingDp = 1.5f)) {
-            Box(Modifier.padding(horizontal = Spacing.s6)) { NxTooltipLabel("Rendered on the GPU") }
+            Box(Modifier.padding(horizontal = 6.dp)) { NxTooltipLabel("Rendered on the GPU") }
         }
     }
 }

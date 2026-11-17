@@ -41,7 +41,6 @@ import hivens.ui.icons.Symbol
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.Spacing
 import hivens.ui.theme.TestTheme
 import hivens.ui.theme.seedFromImage
 import org.jetbrains.skia.EncodedImageFormat
@@ -98,7 +97,7 @@ class RealTrackConceptsProbe {
         val scene = ImageComposeScene((wDp * d).toInt(), (hDp * d).toInt(), density = Density(d)) {
             NxTheme(TestTheme, dark = true) {
                 Box(
-                    Modifier.fillMaxSize().background(NxColor.page).padding(Spacing.s16),
+                    Modifier.fillMaxSize().background(NxColor.page).padding(16.dp),
                     contentAlignment = Alignment.Center,
                 ) { body() }
             }
@@ -143,22 +142,22 @@ class RealTrackConceptsProbe {
         val c = probeInks()
         NxSurface(SurfaceKind.Card, Modifier.width(340.dp), shape = MaterialTheme.shapes.medium) {
             Row(
-                Modifier.fillMaxWidth().height(104.dp).padding(Spacing.s14),
+                Modifier.fillMaxWidth().height(104.dp).padding(14.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Box(
                     Modifier.size(46.dp).clip(CircleShape).background(c.leadWash),
                     contentAlignment = Alignment.Center,
                 ) { Glyph(NxIcon.Pause, 22, c.main) }
-                Spacer(Modifier.width(Spacing.s14))
+                Spacer(Modifier.width(14.dp))
                 Column(Modifier.weight(1f)) {
                     Text(
                         title, style = MaterialTheme.typography.bodyLarge, color = c.main,
                         fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis,
                     )
-                    Spacer(Modifier.height(Spacing.s6))
+                    Spacer(Modifier.height(6.dp))
                     Envelope(c.lead, c.quiet.copy(alpha = 0.28f), Modifier.fillMaxWidth().height(34.dp))
-                    Spacer(Modifier.height(Spacing.s4))
+                    Spacer(Modifier.height(4.dp))
                     Row(Modifier.fillMaxWidth()) {
                         Text(elapsed, style = MaterialTheme.typography.labelSmall, color = c.quiet)
                         Spacer(Modifier.weight(1f))
@@ -183,7 +182,7 @@ class RealTrackConceptsProbe {
             SurfaceKind.Card, Modifier.width(340.dp),
             shape = MaterialTheme.shapes.medium, fillColor = body,
         ) {
-            Row(Modifier.fillMaxWidth().height(112.dp).padding(Spacing.s12), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().height(112.dp).padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                 val art = cover
                 if (art != null) {
                     Image(
@@ -197,7 +196,7 @@ class RealTrackConceptsProbe {
                         contentAlignment = Alignment.Center,
                     ) { Glyph(NxIcon.MusicNote, 30, c.lead) }
                 }
-                Spacer(Modifier.width(Spacing.s14))
+                Spacer(Modifier.width(14.dp))
                 Column(Modifier.weight(1f)) {
                     Text(
                         title, style = MaterialTheme.typography.titleMedium, color = c.main,
@@ -211,14 +210,14 @@ class RealTrackConceptsProbe {
                         album, style = MaterialTheme.typography.labelSmall,
                         color = c.quiet.copy(alpha = 0.7f), maxLines = 1, overflow = TextOverflow.Ellipsis,
                     )
-                    Spacer(Modifier.height(Spacing.s8))
+                    Spacer(Modifier.height(8.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Glyph(NxIcon.SkipPrevious, 18, c.quiet)
-                        Spacer(Modifier.width(Spacing.s10))
+                        Spacer(Modifier.width(10.dp))
                         Glyph(NxIcon.Pause, 22, c.main)
-                        Spacer(Modifier.width(Spacing.s10))
+                        Spacer(Modifier.width(10.dp))
                         Glyph(NxIcon.SkipNext, 18, c.quiet)
-                        Spacer(Modifier.width(Spacing.s12))
+                        Spacer(Modifier.width(12.dp))
                         Box(Modifier.weight(1f).height(3.dp).clip(CircleShape)) {
                             Box(Modifier.fillMaxSize().background(c.quiet.copy(alpha = 0.24f)))
                             Box(Modifier.fillMaxWidth(fraction).fillMaxHeight().background(c.lead))

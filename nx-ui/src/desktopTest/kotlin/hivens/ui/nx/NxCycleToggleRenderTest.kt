@@ -15,9 +15,9 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
 import hivens.ui.icons.NxIcon
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.Spacing
 import hivens.ui.theme.TestTheme
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
@@ -44,10 +44,10 @@ class NxCycleToggleRenderTest {
 
     @Composable
     private fun Strip(label: String) {
-        Column(verticalArrangement = Arrangement.spacedBy(Spacing.s6)) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(label, style = MaterialTheme.typography.labelSmall, color = NxInk.quiet)
             Row(
-                horizontalArrangement = Arrangement.spacedBy(Spacing.s10),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment     = Alignment.CenterVertically,
             ) {
                 modes.indices.forEach { i ->
@@ -64,7 +64,7 @@ class NxCycleToggleRenderTest {
         val scene = ImageComposeScene((260 * d).toInt(), (86 * d).toInt(), density = Density(d)) {
             NxTheme(TestTheme, dark = dark) {
                 Box(
-                    Modifier.fillMaxSize().background(NxColor.page).padding(Spacing.s12),
+                    Modifier.fillMaxSize().background(NxColor.page).padding(12.dp),
                     contentAlignment = Alignment.CenterStart,
                 ) { Strip(if (dark) "off / queue / one / disabled" else "off / queue / one / disabled") }
             }

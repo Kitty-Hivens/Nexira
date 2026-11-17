@@ -57,7 +57,6 @@ import hivens.ui.icons.Symbol
 import hivens.ui.surface.NxSurface
 import hivens.ui.theme.Motion
 import hivens.ui.theme.NeutralTheme
-import hivens.ui.theme.Spacing
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxTheme
@@ -150,16 +149,16 @@ fun <T> NxSelect(
             // Inside the field, so the inks are the ones that read on it.
             val ink = if (enabled) NxInk.main else NxInk.off
             Row(
-                modifier          = Modifier.fillMaxWidth().padding(start = Spacing.s12, end = Spacing.s8, top = 9.dp, bottom = 9.dp),
+                modifier          = Modifier.fillMaxWidth().padding(start = 12.dp, end = 8.dp, top = 9.dp, bottom = 9.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 prefix?.let {
                     Text(it, style = MaterialTheme.typography.bodyMedium, color = NxInk.quiet, fontWeight = FontWeight.SemiBold, maxLines = 1)
-                    Spacer(Modifier.width(Spacing.s6))
+                    Spacer(Modifier.width(6.dp))
                 }
                 selected?.let(icon)?.let {
                     Symbol(it, contentDescription = null, tint = ink, size = 18.dp)
-                    Spacer(Modifier.width(Spacing.s8))
+                    Spacer(Modifier.width(8.dp))
                 }
                 Text(
                     text       = selected?.let(label) ?: placeholder,
@@ -172,7 +171,7 @@ fun <T> NxSelect(
                     // short the answer is, where the eye looks for "this opens".
                     modifier   = Modifier.weight(1f),
                 )
-                Spacer(Modifier.width(Spacing.s8))
+                Spacer(Modifier.width(8.dp))
                 Symbol(
                     icon               = NxIcon.ExpandMore,
                     contentDescription = null,
@@ -279,7 +278,7 @@ private fun <T> SelectList(
                         NxVerticalScrollbar(
                             state    = listState,
                             revealed = hovered || listState.isScrollInProgress,
-                            modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(vertical = Spacing.s6),
+                            modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(vertical = 6.dp),
                         )
                     }
                 }

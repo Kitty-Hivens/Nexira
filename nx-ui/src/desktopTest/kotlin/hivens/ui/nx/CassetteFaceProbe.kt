@@ -40,7 +40,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.Spacing
 import hivens.ui.theme.TestTheme
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
@@ -96,7 +95,7 @@ class CassetteFaceProbe {
         val scene = ImageComposeScene((wDp * d).toInt(), (hDp * d).toInt(), density = Density(d)) {
             NxTheme(TestTheme, dark = true) {
                 Box(
-                    Modifier.fillMaxSize().background(NxColor.page).padding(Spacing.s16),
+                    Modifier.fillMaxSize().background(NxColor.page).padding(16.dp),
                     contentAlignment = Alignment.Center,
                 ) { body() }
             }
@@ -336,13 +335,13 @@ class CassetteFaceProbe {
     fun probe() {
         sheet("faces", 720, 520) {
             val c = probeInks()
-            Column(verticalArrangement = Arrangement.spacedBy(Spacing.s20)) {
+            Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
                 Face.entries.chunked(2).forEach { row ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s20)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                         row.forEach { face ->
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Cassette(face)
-                                Spacer(Modifier.height(Spacing.s8))
+                                Spacer(Modifier.height(8.dp))
                                 Text(
                                     face.caption, style = MaterialTheme.typography.labelMedium,
                                     color = c.quiet,

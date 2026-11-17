@@ -20,7 +20,6 @@ import hivens.ui.audio.RepeatMode
 import hivens.ui.audio.TrackInfo
 import hivens.ui.i18n.ShippedLanguageProvider
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.Spacing
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
 import java.nio.file.Paths
@@ -54,7 +53,7 @@ class TimelinePlayerRenderProbe {
             ShippedLanguageProvider("en") {
                 NxTheme(Themes.default, dark = dark) {
                     Box(
-                        Modifier.fillMaxSize().background(NxColor.page).padding(Spacing.s16),
+                        Modifier.fillMaxSize().background(NxColor.page).padding(16.dp),
                         contentAlignment = Alignment.TopCenter,
                     ) { body() }
                 }
@@ -91,7 +90,7 @@ class TimelinePlayerRenderProbe {
     fun positions() {
         for (dark in listOf(true, false)) {
             sheet("positions-${if (dark) "dark" else "light"}", 380, 560, dark) {
-                Column(verticalArrangement = Arrangement.spacedBy(Spacing.s10)) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     listOf(0f, 0.08f, 0.36f, 0.72f, 1f).forEach { card(at(it), sample) }
                     // Nothing loaded: no fill at all, and the plane is the picker.
                     card(PlaybackState.Idle, null, queueSize = 0)
@@ -104,7 +103,7 @@ class TimelinePlayerRenderProbe {
     @Test
     fun ink() {
         sheet("ink", 380, 320, dark = true) {
-            Column(verticalArrangement = Arrangement.spacedBy(Spacing.s10)) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 listOf(0.05f, 0.22f, 0.5f).forEach { card(at(0.45f), sample, fill = it) }
             }
         }
@@ -114,7 +113,7 @@ class TimelinePlayerRenderProbe {
     @Test
     fun widths() {
         sheet("widths", 420, 700, dark = true) {
-            Column(verticalArrangement = Arrangement.spacedBy(Spacing.s10)) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 listOf(400, 340, 300, 260, 220, 180).forEach { card(at(0.45f), sample, width = it) }
             }
         }

@@ -43,7 +43,6 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.customization.sliderKeyboardAdjust
 import hivens.ui.theme.Motion
 import hivens.ui.theme.NeutralTheme
-import hivens.ui.theme.Spacing
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxTheme
@@ -85,7 +84,7 @@ fun NxSlider(
                 fontWeight = FontWeight.Medium,
                 maxLines   = 1,
                 overflow   = TextOverflow.Ellipsis,
-                modifier   = Modifier.weight(1f, fill = false).padding(end = Spacing.s8),
+                modifier   = Modifier.weight(1f, fill = false).padding(end = 8.dp),
             )
             Text(
                 valueText,

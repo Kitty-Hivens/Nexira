@@ -22,7 +22,6 @@ import hivens.ui.audio.RepeatMode
 import hivens.ui.audio.TrackInfo
 import hivens.ui.i18n.ShippedLanguageProvider
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.Spacing
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
 import java.nio.file.Paths
@@ -64,10 +63,10 @@ class CoverPlayerRenderProbe {
             ShippedLanguageProvider("en") {
                 NxTheme(Themes.default, dark = true) {
                     Box(
-                        Modifier.fillMaxSize().background(NxColor.page).padding(Spacing.s16),
+                        Modifier.fillMaxSize().background(NxColor.page).padding(16.dp),
                         contentAlignment = Alignment.TopCenter,
                     ) {
-                        Column(verticalArrangement = Arrangement.spacedBy(Spacing.s10)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             widths.forEach { w ->
                                 Box(Modifier.width(w.dp)) {
                                     CoverPlayerCard(
@@ -106,10 +105,10 @@ class CoverPlayerRenderProbe {
             ShippedLanguageProvider("en") {
                 NxTheme(Themes.default, dark = true) {
                     Box(
-                        Modifier.fillMaxSize().background(NxColor.page).padding(Spacing.s16),
+                        Modifier.fillMaxSize().background(NxColor.page).padding(16.dp),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Column(verticalArrangement = Arrangement.spacedBy(Spacing.s16)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                             row(
                                 playing(107_000L),
                                 TrackInfo(
@@ -156,7 +155,7 @@ class CoverPlayerRenderProbe {
                 ShippedLanguageProvider("ru") {
                     NxTheme(Themes.default, dark = dark) {
                         Box(
-                            Modifier.fillMaxSize().background(NxColor.page).padding(Spacing.s16),
+                            Modifier.fillMaxSize().background(NxColor.page).padding(16.dp),
                             contentAlignment = Alignment.TopStart,
                         ) {
                             Box(Modifier.width(420.dp)) {

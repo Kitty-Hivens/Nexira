@@ -42,7 +42,6 @@ import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.Motion
 import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.Spacing
 import kotlinx.serialization.Serializable
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
@@ -127,7 +126,7 @@ fun PlayButton(
         Row(
             modifier = modifier,
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Spacing.s12),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
                 text       = label,
@@ -215,8 +214,8 @@ private fun Plate(
     val pad = when {
         !words && compact -> PaddingValues(7.dp)
         !words            -> PaddingValues(9.dp)
-        compact           -> PaddingValues(horizontal = Spacing.s14, vertical = Spacing.s6)
-        else              -> PaddingValues(horizontal = Spacing.s20, vertical = 9.dp)
+        compact           -> PaddingValues(horizontal = 14.dp, vertical = 6.dp)
+        else              -> PaddingValues(horizontal = 20.dp, vertical = 9.dp)
     }
     val showFigures = figures && tone == PlayTone.Waiting && progress != null
 

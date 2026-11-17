@@ -71,7 +71,6 @@ import hivens.ui.layers.layerTrigger
 import hivens.ui.surface.NxSurface
 import hivens.ui.theme.Motion
 import hivens.ui.theme.NeutralTheme
-import hivens.ui.theme.Spacing
 import kotlin.math.roundToInt
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
@@ -101,7 +100,7 @@ enum class NxMenuMark { None, Check }
 private val MENU_GAP = 4.dp
 
 /** The inset from the surface edge to the rows, which carry their own padding. */
-private val MENU_INSET = Spacing.s6
+private val MENU_INSET = 6.dp
 
 /**
  * Past this a menu is a column of sentences: the labels ellipsize instead, and
@@ -390,12 +389,12 @@ fun NxMenuItem(
             .hoverable(interaction, enabled = enabled)
             .layerTrigger()
             .clickable(interactionSource = interaction, indication = null, enabled = enabled, onClick = onClick)
-            .padding(horizontal = Spacing.s10, vertical = 9.dp),
+            .padding(horizontal = 10.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (icon != null) {
             Symbol(icon, contentDescription = null, tint = color, size = 18.dp)
-            Spacer(Modifier.width(Spacing.s10))
+            Spacer(Modifier.width(10.dp))
         }
         // Exactly one weighted child in the row, and it is the label. Two of them
         // (the label plus a spacer that pushed the hint over) doubled the row's
@@ -415,14 +414,14 @@ fun NxMenuItem(
         val trailingCheck = selected && mark == NxMenuMark.Check
         // Fixed, so the intrinsic pass can see it: the gap between a label and the
         // shortcut beside it is part of how wide the menu has to be.
-        if (hint != null || trailingCheck) Spacer(Modifier.width(Spacing.s16))
+        if (hint != null || trailingCheck) Spacer(Modifier.width(16.dp))
         if (hint != null) {
             Text(
                 text  = hint,
                 style = MaterialTheme.typography.labelSmall,
                 color = quiet,
             )
-            if (trailingCheck) Spacer(Modifier.width(Spacing.s8))
+            if (trailingCheck) Spacer(Modifier.width(8.dp))
         }
         if (trailingCheck) {
             Symbol(NxIcon.Check, contentDescription = null, tint = color, size = 18.dp)
@@ -438,7 +437,7 @@ fun NxMenuItem(
 fun NxMenuDivider() {
     HorizontalDivider(
         color    = NxInk.line,
-        modifier = Modifier.padding(horizontal = Spacing.s10, vertical = Spacing.s6),
+        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
     )
 }
 
@@ -451,7 +450,7 @@ fun NxMenuSection(label: String) {
         color    = NxInk.quiet,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
-        modifier = Modifier.padding(start = Spacing.s10, end = Spacing.s10, top = Spacing.s6, bottom = Spacing.s4),
+        modifier = Modifier.padding(start = 10.dp, end = 10.dp, top = 6.dp, bottom = 4.dp),
     )
 }
 

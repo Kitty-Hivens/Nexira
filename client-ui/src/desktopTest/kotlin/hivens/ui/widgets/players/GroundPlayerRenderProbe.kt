@@ -20,7 +20,6 @@ import hivens.ui.audio.TrackInfo
 import hivens.ui.audio.Waveform
 import hivens.ui.i18n.ShippedLanguageProvider
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.Spacing
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
 import java.nio.file.Paths
@@ -74,7 +73,7 @@ class GroundPlayerRenderProbe {
             ShippedLanguageProvider("en") {
                 NxTheme(Themes.default, dark = dark) {
                     Box(
-                        Modifier.fillMaxSize().background(NxColor.page).padding(Spacing.s16),
+                        Modifier.fillMaxSize().background(NxColor.page).padding(16.dp),
                         contentAlignment = Alignment.TopCenter,
                     ) { body() }
                 }
@@ -105,7 +104,7 @@ class GroundPlayerRenderProbe {
     fun probe() {
         for (dark in listOf(true, false)) {
             sheet("card-${if (dark) "dark" else "light"}", 400, 440, dark) {
-                Column(verticalArrangement = Arrangement.spacedBy(Spacing.s12)) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     // The concept's own value, then none, then the far end. If the
                     // first and the second look alike the darkening is not reaching
                     // the ground at all.
@@ -121,7 +120,7 @@ class GroundPlayerRenderProbe {
     @Test
     fun states() {
         sheet("states", 400, 440, dark = true) {
-            Column(verticalArrangement = Arrangement.spacedBy(Spacing.s12)) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Box(Modifier.width(340.dp)) {
                     card(playing(12_000L), TrackInfo("audio", null, null, null))
                 }
@@ -142,7 +141,7 @@ class GroundPlayerRenderProbe {
     fun widths() {
         val widths = listOf(400, 340, 300, 280, 260, 220, 180)
         sheet("widths", 440, 1000, dark = true) {
-            Column(verticalArrangement = Arrangement.spacedBy(Spacing.s10)) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 widths.forEach { w ->
                     Box(Modifier.width(w.dp)) { card(playing(107_000L), track) }
                 }

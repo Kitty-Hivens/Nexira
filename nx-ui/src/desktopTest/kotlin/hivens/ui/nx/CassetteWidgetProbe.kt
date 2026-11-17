@@ -47,7 +47,6 @@ import hivens.ui.icons.Symbol
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.Spacing
 import hivens.ui.theme.TestTheme
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
@@ -218,7 +217,7 @@ class CassetteWidgetProbe {
     private fun Widget(fraction: Float, seeking: Boolean, repeatOn: Boolean) {
         val c = probeInks()
         NxSurface(SurfaceKind.Card, Modifier.width(340.dp), shape = MaterialTheme.shapes.medium) {
-            Column(Modifier.fillMaxWidth().padding(Spacing.s12)) {
+            Column(Modifier.fillMaxWidth().padding(12.dp)) {
                 Box {
                     Shell(fraction, seeking)
                     Row(
@@ -251,7 +250,7 @@ class CassetteWidgetProbe {
                     }
                 }
 
-                Spacer(Modifier.height(Spacing.s12))
+                Spacer(Modifier.height(12.dp))
 
                 val plate = Color.White.copy(alpha = 0.07f)
                 // Two keys a side. Equal weights centre the transport between the
@@ -264,17 +263,17 @@ class CassetteWidgetProbe {
                         if (repeatOn) c.lead.copy(alpha = 0.22f) else plate,
                         if (repeatOn) c.lead else c.quiet,
                     )
-                    Spacer(Modifier.width(Spacing.s8))
+                    Spacer(Modifier.width(8.dp))
                     Key(NxIcon.Shuffle, plate, c.quiet)
                     Spacer(Modifier.weight(1f))
                     Key(NxIcon.SkipPrevious, plate, c.quiet)
-                    Spacer(Modifier.width(Spacing.s6))
+                    Spacer(Modifier.width(6.dp))
                     Key(NxIcon.Pause, c.lead, c.onLead, width = 46, glyph = 20)
-                    Spacer(Modifier.width(Spacing.s6))
+                    Spacer(Modifier.width(6.dp))
                     Key(NxIcon.SkipNext, plate, c.quiet)
                     Spacer(Modifier.weight(1f))
                     Key(NxIcon.QueueMusic, plate, c.quiet)
-                    Spacer(Modifier.width(Spacing.s8))
+                    Spacer(Modifier.width(8.dp))
                     Key(NxIcon.MoreVert, plate, c.quiet)
                 }
             }

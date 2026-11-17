@@ -28,7 +28,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import hivens.ui.theme.NeutralTheme
-import hivens.ui.theme.Spacing
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxTheme
@@ -78,7 +77,7 @@ fun NxColorField(
         // reached the edge.
         modifier              = modifier.fillMaxWidth(),
         verticalAlignment     = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.s10),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Box(
             Modifier
@@ -103,7 +102,7 @@ fun NxColorField(
                 modifier = Modifier
                     .clip(MaterialTheme.shapes.small)
                     .clickable { text = ""; onClear() }
-                    .padding(horizontal = Spacing.s8, vertical = Spacing.s4),
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
             )
         }
     }

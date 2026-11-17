@@ -41,7 +41,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.Spacing
 import hivens.ui.theme.TestTheme
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
@@ -124,7 +123,7 @@ class CassettePartsProbe {
         val scene = ImageComposeScene((wDp * d).toInt(), (hDp * d).toInt(), density = Density(d)) {
             NxTheme(TestTheme, dark = true) {
                 Box(
-                    Modifier.fillMaxSize().background(NxColor.page).padding(Spacing.s16),
+                    Modifier.fillMaxSize().background(NxColor.page).padding(16.dp),
                     contentAlignment = Alignment.Center,
                 ) { body() }
             }
@@ -399,13 +398,13 @@ class CassettePartsProbe {
     @Composable
     private fun Grid(cells: List<Pair<String, Look>>) {
         val c = probeInks()
-        Column(verticalArrangement = Arrangement.spacedBy(Spacing.s20)) {
+        Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
             cells.chunked(2).forEach { row ->
-                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s20)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                     row.forEach { (caption, look) ->
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Cassette(look)
-                            Spacer(Modifier.height(Spacing.s8))
+                            Spacer(Modifier.height(8.dp))
                             Text(
                                 caption, style = MaterialTheme.typography.labelMedium,
                                 color = c.quiet,

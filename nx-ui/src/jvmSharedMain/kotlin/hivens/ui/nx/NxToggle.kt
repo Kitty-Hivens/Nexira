@@ -23,7 +23,6 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
-import hivens.ui.theme.Spacing
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.Status
@@ -60,7 +59,7 @@ fun NxToggle(
                 // a whole-row wash.
                 val iconTint = if (accent != null && checked) accent else NxInk.quiet
                 Symbol(icon, null, tint = iconTint.copy(alpha = alpha), size = 22.dp)
-                Spacer(Modifier.width(Spacing.s12))
+                Spacer(Modifier.width(12.dp))
             }
             Column {
                 Text(
@@ -81,10 +80,10 @@ fun NxToggle(
                 }
             }
         }
-        Spacer(Modifier.width(Spacing.s12))
+        Spacer(Modifier.width(12.dp))
         if (trailing != null) {
             trailing()
-            Spacer(Modifier.width(Spacing.s12))
+            Spacer(Modifier.width(12.dp))
         }
         NxSwitch(
             checked         = checked,

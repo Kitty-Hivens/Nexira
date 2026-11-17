@@ -21,7 +21,6 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.icons.NxIcon
 import hivens.ui.surface.NxSurface
 import hivens.ui.theme.NeutralTheme
-import hivens.ui.theme.Spacing
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxTheme
 import hivens.ui.surface.SurfaceKind
@@ -54,10 +53,10 @@ fun NxSection(
             maxLines   = 1,
             overflow   = TextOverflow.Ellipsis,
         )
-        Spacer(Modifier.height(Spacing.s8))
+        Spacer(Modifier.height(8.dp))
         NxSurface(SurfaceKind.Panel, modifier = Modifier.fillMaxWidth()) {
             Column(
-                modifier            = Modifier.fillMaxWidth().padding(Spacing.s16),
+                modifier            = Modifier.fillMaxWidth().padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(spacing),
                 content             = content,
             )

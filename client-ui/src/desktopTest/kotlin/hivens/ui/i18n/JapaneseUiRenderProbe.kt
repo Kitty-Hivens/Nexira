@@ -20,6 +20,7 @@ import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
 import hivens.themes.Themes
 import hivens.ui.i18n.NexiraStrings
 import hivens.ui.i18n.ShippedLanguageProvider
@@ -27,7 +28,6 @@ import hivens.ui.i18n.nexiraStrings
 import hivens.ui.surface.NxSurface
 import hivens.ui.text.needsCjkFace
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.Spacing
 import hivens.ui.theme.nexiraCjkFamily
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
@@ -52,14 +52,14 @@ class JapaneseUiRenderProbe {
     @Composable
     private fun Panel(title: String, rows: List<Pair<String, String>>) {
         NxSurface(SurfaceKind.Panel, Modifier.width(360.dp()), shape = MaterialTheme.shapes.medium) {
-            Column(Modifier.fillMaxWidth().padding(Spacing.s16)) {
+            Column(Modifier.fillMaxWidth().padding(16.dp)) {
                 Text(
                     title, style = MaterialTheme.typography.titleMedium,
                     color = NxInk.main, fontWeight = FontWeight.SemiBold,
                 )
-                Spacer(Modifier.height(Spacing.s12))
+                Spacer(Modifier.height(12.dp))
                 rows.forEach { (label, sub) ->
-                    Row(Modifier.fillMaxWidth().padding(vertical = Spacing.s6)) {
+                    Row(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
                         Column(Modifier.width(320.dp())) {
                             Text(label, style = MaterialTheme.typography.bodyMedium, color = NxInk.main)
                             Text(sub, style = MaterialTheme.typography.labelSmall, color = NxInk.quiet)
@@ -86,10 +86,10 @@ class JapaneseUiRenderProbe {
                 }
                 NxTheme(Themes.default, dark = true, uiFamily = family) {
                     Box(
-                        Modifier.fillMaxSize().background(NxColor.page).padding(Spacing.s16),
+                        Modifier.fillMaxSize().background(NxColor.page).padding(16.dp),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s16)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                             Panel(
                                 s.text("settingsTitle"),
                                 listOf(

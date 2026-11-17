@@ -40,7 +40,6 @@ import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.Spacing
 
 /**
  * One text input: a [BasicTextField] inside a [SurfaceKind.Field] surface with a
@@ -80,7 +79,7 @@ fun NxField(
             // field's own edge landed on nothing, and to the shell it was a press
             // outside the field, which let go of the caret.
             decorationBox = { inner ->
-                Box(Modifier.padding(horizontal = Spacing.s10, vertical = Spacing.s8)) {
+                Box(Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
                     if (value.isEmpty()) {
                         Text(placeholder, style = ts.copy(color = NxInk.quiet))
                     }

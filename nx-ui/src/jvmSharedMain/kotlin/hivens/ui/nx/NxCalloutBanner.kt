@@ -22,7 +22,6 @@ import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.theme.NeutralTheme
-import hivens.ui.theme.Spacing
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxTheme
@@ -74,13 +73,13 @@ fun NxCalloutBanner(
                 .clip(shape)
                 .background(fill)
                 .border(1.dp, NxColor.wash(accent, 0.4f), shape)
-                .padding(Spacing.s14),
-            horizontalArrangement = Arrangement.spacedBy(Spacing.s12),
+                .padding(14.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Symbol(glyph, contentDescription = null, tint = NxColor.status(status), modifier = Modifier.size(20.dp))
             Column(
                 modifier            = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(Spacing.s8),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 if (title != null) {
                     Text(title, style = MaterialTheme.typography.titleSmall, color = NxColor.status(status), fontWeight = FontWeight.Bold)

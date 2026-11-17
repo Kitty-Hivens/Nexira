@@ -19,7 +19,6 @@ import hivens.ui.audio.RepeatMode
 import hivens.ui.audio.TrackInfo
 import hivens.ui.i18n.ShippedLanguageProvider
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.Spacing
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
 import java.nio.file.Paths
@@ -60,7 +59,7 @@ class SeededPlayerRenderProbe {
             ShippedLanguageProvider("en") {
                 NxTheme(Themes.default, dark = dark) {
                     Box(
-                        Modifier.fillMaxSize().background(NxColor.page).padding(Spacing.s16),
+                        Modifier.fillMaxSize().background(NxColor.page).padding(16.dp),
                         contentAlignment = Alignment.TopCenter,
                     ) { body() }
                 }
@@ -83,7 +82,7 @@ class SeededPlayerRenderProbe {
     fun probe() {
         for (dark in listOf(true, false)) {
             sheet("card-${if (dark) "dark" else "light"}", 400, 420, dark) {
-                Column(verticalArrangement = Arrangement.spacedBy(Spacing.s12)) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     // The concept's own value, then none, then the far end: if these
                     // three look the same the seed is not reaching the surface.
                     listOf(0.24f, 0f, 0.6f).forEach { tint ->
@@ -105,7 +104,7 @@ class SeededPlayerRenderProbe {
     @Test
     fun states() {
         sheet("states", 400, 320, dark = true) {
-            Column(verticalArrangement = Arrangement.spacedBy(Spacing.s12)) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Box(Modifier.width(340.dp)) {
                     SeededPlayerCard(
                         state = PlaybackState.Idle, track = null, volume = 0.7f,
@@ -136,7 +135,7 @@ class SeededPlayerRenderProbe {
     fun widths() {
         val widths = listOf(400, 340, 300, 280, 240, 200, 160)
         sheet("widths", 440, 1000, dark = true) {
-            Column(verticalArrangement = Arrangement.spacedBy(Spacing.s10)) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 widths.forEach { w ->
                     Box(Modifier.width(w.dp)) {
                         SeededPlayerCard(

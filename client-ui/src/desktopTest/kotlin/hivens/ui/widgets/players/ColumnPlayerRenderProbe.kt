@@ -20,7 +20,6 @@ import hivens.ui.audio.TrackInfo
 import hivens.ui.audio.Waveform
 import hivens.ui.i18n.ShippedLanguageProvider
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.Spacing
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
 import java.nio.file.Paths
@@ -73,7 +72,7 @@ class ColumnPlayerRenderProbe {
             ShippedLanguageProvider("en") {
                 NxTheme(Themes.default, dark = dark) {
                     Box(
-                        Modifier.fillMaxSize().background(NxColor.page).padding(Spacing.s16),
+                        Modifier.fillMaxSize().background(NxColor.page).padding(16.dp),
                         contentAlignment = Alignment.TopStart,
                     ) { body() }
                 }
@@ -105,7 +104,7 @@ class ColumnPlayerRenderProbe {
     fun probe() {
         for (dark in listOf(true, false)) {
             sheet("card-${if (dark) "dark" else "light"}", 560, 400, dark) {
-                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s12), verticalAlignment = Alignment.Top) {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
                     Box(Modifier.width(148.dp)) { card(playing(107_000L), long) }
                     Box(Modifier.width(148.dp)) { card(playing(107_000L), short) }
                     Box(Modifier.width(148.dp)) { card(playing(107_000L), long, showCover = false) }
@@ -118,7 +117,7 @@ class ColumnPlayerRenderProbe {
     @Test
     fun states() {
         sheet("states", 560, 400, dark = true) {
-            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s12), verticalAlignment = Alignment.Top) {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
                 Box(Modifier.width(148.dp)) {
                     card(playing(12_000L), TrackInfo("audio", null, null, null))
                 }
@@ -133,7 +132,7 @@ class ColumnPlayerRenderProbe {
     fun widths() {
         val widths = listOf(200, 172, 148, 128, 112, 96)
         sheet("widths", 940, 420, dark = true) {
-            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s10), verticalAlignment = Alignment.Top) {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Top) {
                 widths.forEach { w ->
                     Box(Modifier.width(w.dp)) { card(playing(107_000L), long) }
                 }

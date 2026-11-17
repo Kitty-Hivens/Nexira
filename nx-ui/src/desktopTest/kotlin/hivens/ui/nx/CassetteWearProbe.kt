@@ -47,7 +47,6 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.Spacing
 import hivens.ui.theme.TestTheme
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
@@ -312,7 +311,7 @@ class CassetteWearProbe {
                     drawPath(loops, Color(0xFF3B2A20), style = Stroke(width = 2.5f))
                 }
                 ChewedHint(
-                    Modifier.align(Alignment.BottomCenter).padding(bottom = Spacing.s8),
+                    Modifier.align(Alignment.BottomCenter).padding(bottom = 8.dp),
                 )
             }
         }

@@ -24,7 +24,6 @@ import hivens.ui.icons.Symbol
 import hivens.ui.layers.layerTrigger
 import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
-import hivens.ui.theme.Spacing
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.Status
@@ -84,7 +83,7 @@ fun NxIconButton(
                     enabled           = enabled,
                     onClick           = onClick,
                 )
-                .padding(Spacing.s6),
+                .padding(6.dp),
             contentAlignment = Alignment.Center,
         ) {
             Symbol(icon, contentDescription, tint = shownTint, fill = fill, weight = weight, size = iconSize)

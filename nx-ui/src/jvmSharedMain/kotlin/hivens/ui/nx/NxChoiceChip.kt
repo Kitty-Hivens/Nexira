@@ -21,7 +21,6 @@ import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.OnFill
-import hivens.ui.theme.Spacing
 
 /**
  * A small selectable chip (e.g. regex / bold). Selected = a wash of the theme's lead
@@ -63,7 +62,7 @@ fun NxChoiceChip(
                     enabled           = enabled,
                     onClick           = onToggle,
                 )
-                .padding(horizontal = Spacing.s10, vertical = Spacing.s6),
+                .padding(horizontal = 10.dp, vertical = 6.dp),
         )
     }
 }

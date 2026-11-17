@@ -45,7 +45,6 @@ import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.Motion
 import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
-import hivens.ui.theme.Spacing
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxTheme
 
@@ -104,9 +103,9 @@ fun NxRow(
             .drawBehind { drawSoftHover(tint, alpha.value) }
             .layerTrigger()
             .clickable(interactionSource = interaction, indication = null, onClick = onClick)
-            .padding(horizontal = edgeBleed, vertical = Spacing.s8)
+            .padding(horizontal = edgeBleed, vertical = 8.dp)
     } else {
-        Modifier.fillMaxWidth().padding(vertical = if (compact) Spacing.s4 else Spacing.s8)
+        Modifier.fillMaxWidth().padding(vertical = if (compact) 4.dp else 8.dp)
     }
     Row(
         modifier              = modifier.then(rowModifier),
@@ -120,7 +119,7 @@ fun NxRow(
         Row(label, verticalAlignment = Alignment.CenterVertically) {
             if (icon != null) {
                 Symbol(icon, null, tint = iconTint, size = if (compact) 16.dp else 22.dp)
-                Spacer(Modifier.width(if (compact) Spacing.s8 else Spacing.s12))
+                Spacer(Modifier.width(if (compact) 8.dp else 12.dp))
             }
             Column {
                 Text(
@@ -140,7 +139,7 @@ fun NxRow(
                 }
             }
         }
-        Spacer(Modifier.width(if (compact) Spacing.s8 else Spacing.s12))
+        Spacer(Modifier.width(if (compact) 8.dp else 12.dp))
         // The trailing slot takes the rest of the row when the label is pinned, so a
         // field or a slider fills the column it was given rather than wrapping to its
         // own content and leaving a gap the eye reads as a missing control.

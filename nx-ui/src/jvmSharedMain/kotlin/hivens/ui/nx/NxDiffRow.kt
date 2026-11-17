@@ -21,7 +21,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import hivens.ui.theme.NeutralTheme
-import hivens.ui.theme.Spacing
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxTheme
@@ -58,7 +57,7 @@ fun NxDiffRow(
     Row(
         modifier              = modifier.fillMaxWidth().padding(vertical = 3.dp),
         verticalAlignment     = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.s10),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Box(
             modifier         = Modifier.size(20.dp).clip(RoundedCornerShape(6.dp)).background(badge),

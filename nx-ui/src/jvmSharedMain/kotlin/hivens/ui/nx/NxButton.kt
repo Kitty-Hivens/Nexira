@@ -29,7 +29,6 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.layers.layerTrigger
 import hivens.ui.theme.NeutralTheme
-import hivens.ui.theme.Spacing
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxTheme
@@ -86,8 +85,8 @@ fun NxButton(
     val outline = NxInk.line
     val bordered = style == NxButtonStyle.Secondary
     val dim = if (enabled) 1f else 0.45f
-    val pad = if (compact) PaddingValues(horizontal = Spacing.s12, vertical = Spacing.s6)
-              else PaddingValues(horizontal = 18.dp, vertical = Spacing.s10)
+    val pad = if (compact) PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+              else PaddingValues(horizontal = 18.dp, vertical = 10.dp)
 
     // Hover/press feedback through the shared ShapedStateLayer, provided as
     // LocalIndication so the clickable picks it up.
