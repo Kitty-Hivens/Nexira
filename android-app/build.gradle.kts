@@ -77,6 +77,14 @@ android {
         sourceCompatibility = JavaVersion.VERSION_25
         targetCompatibility = JavaVersion.VERSION_25
     }
+
+    // The IDE's Compose Preview builds its resource APK through the unit tests of the variant it
+    // previews, and AGP refuses to create that task where the unit tests leave the resources out.
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+        }
+    }
 }
 
 kotlin {

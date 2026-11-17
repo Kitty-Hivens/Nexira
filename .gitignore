@@ -114,3 +114,4 @@ core.[0-9]*
 # went on being committed: an ignore does not reach a file git already has.
 __pycache__/
 *.pyc
+local.properties
