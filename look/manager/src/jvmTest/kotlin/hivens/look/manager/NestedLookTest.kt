@@ -129,7 +129,7 @@ class NestedLookTest {
     @Test
     fun `answers worked out before the boot provide a subtree nothing of its own`() {
         val managed = managed()
-        val detached = managed.manager.detachedProvision()
+        val detached = managed.manager.detached().provision
         val seen = read { content -> detached.Provide { OverrideLook(choice(pack = "material"), content) } }
         assertEquals(listOf("shade/standard|motion/standard"), seen)
         assertEquals(0, materialShade.opened)

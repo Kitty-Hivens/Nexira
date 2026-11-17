@@ -24,6 +24,14 @@ import kotlin.reflect.KClass
  * manager provides the answers under the axis's own local and nothing more, so an axis cannot reach
  * into what the host provides around it.
  *
+ * No contract depends on another contract: the module that carries an axis compiles against this API
+ * and no other axis's. A provider may compile against other contracts' types, never against another
+ * provider. A question asked in another axis's terms takes that axis's answers as an argument, or reads
+ * that axis's [local] while it draws, so it never holds answers it captured when it was opened. The
+ * manager resolves each axis on its own, with no order between axes, and outside composition both axes
+ * are read from one [LookSnapshot]. Whether it is dark now is the colour axis's answer alone, which
+ * every other axis that cares reads.
+ *
  * Carried like any other contribution: a jar lists it as a service under this class's name,
  * `META-INF/services/hivens.look.manager.api.LookAxis`, and names [LookApi.ID] in its manifest.
  */

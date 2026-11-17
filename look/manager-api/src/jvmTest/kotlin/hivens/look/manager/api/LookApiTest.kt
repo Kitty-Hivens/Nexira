@@ -29,6 +29,7 @@ class LookApiTest {
             LookKeys.UPDATE_SETTINGS_ID to LookKeys.UpdateSettings,
             LookKeys.PROVIDE_ID to LookKeys.Provide,
             LookKeys.STATE_ID to LookKeys.State,
+            LookKeys.ANSWERS_ID to LookKeys.Answers,
         )
         pairs.forEach { (id, key) ->
             val (keyId, level) = when (key) {
@@ -87,6 +88,18 @@ class LookApiTest {
 
     private object Wobble : LookAxis<Int>("test.wobble", ApiVersion(1, 0), Int::class, 0) {
         override val label = "wobble"
+    }
+
+    @Test
+    fun `a snapshot answers each axis in its own type, and its base answers where it holds none of that type`() {
+        val other = object : LookAxis<Int>("test.other", ApiVersion(1, 0), Int::class, 7) {
+            override val label = "other"
+        }
+        val snapshot = LookSnapshot(mapOf(Wobble.id to 3, other.id to "not an int"))
+        assertEquals(3, snapshot.of(Wobble))
+        assertEquals(7, snapshot.of(other), "answers not of the axis's type are its base answers")
+        assertEquals(0, LookSnapshot.EMPTY.of(Wobble), "an axis no snapshot holds reads its base answers")
+        assertEquals(LookSnapshot(mapOf(Wobble.id to 3)), LookSnapshot(mapOf(Wobble.id to 3)))
     }
 
     @Test

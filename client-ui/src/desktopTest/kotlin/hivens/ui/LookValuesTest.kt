@@ -20,6 +20,7 @@ import hivens.look.manager.api.LookKeys
 import hivens.look.manager.api.LookPack
 import hivens.look.manager.api.LookProvider
 import hivens.look.manager.api.LookProvision
+import hivens.look.manager.api.LookView
 import hivens.test.stopThenDelete
 import hivens.themes.Themes
 import hivens.themes.ThemesModule
@@ -221,6 +222,25 @@ class LookValuesTest {
         ModuleAppLevel(dir, compiled, scope, named = setOf(LookApi.ID)).use { shell ->
             // The live manager opens its providers off this thread, so its state is read once it settled.
             assertEquals(bootState, eventually(bootState) { shell.value(LookKeys.State) })
+        }
+    }
+
+    @Test
+    fun `outside composition every module reads the look the shell draws, the same before the boot as after it`() {
+        val compiled = listOf(LookManagerModule, TintModule)
+        val named = setOf(LookApi.ID)
+        ModuleAppLevel(dir, compiled, scope, named = named).use { shell ->
+            shell.fire(LookKeys.UpdateSettings, SettingsChange { LookChoice.build { pack = "warm" } })
+        }
+        val atBoot = requireNotNull(bootValues(dir, compiled = compiled, named = named)[LookKeys.Answers]) { "the boot answers no snapshot" }
+        assertEquals(Tint("warm"), atBoot.of(TintAxis))
+        ModuleAppLevel(dir, compiled, scope, named = named).use { shell ->
+            assertEquals(atBoot, eventually(atBoot) { shell.value(LookKeys.Answers) }, "the live snapshot is the boot one")
+            // What every module's services see, not the host's own view.
+            val view = shell.app.services.get<LookView>()
+            assertEquals(atBoot, view.answers.value)
+            assertEquals(shell.value(LookKeys.State), view.state.value)
+            assertEquals(drawnTint(shell.value(LookKeys.Provide)), view.answers.value.of(TintAxis).name, "and is what the shell is provided")
         }
     }
 

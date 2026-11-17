@@ -14,6 +14,7 @@ object LookKeys {
     const val UPDATE_SETTINGS_ID = "look.settings.update"
     const val PROVIDE_ID = "look.provide"
     const val STATE_ID = "look.state"
+    const val ANSWERS_ID = "look.answers"
 
     /** What the person chose, as stored. */
     val Settings = SourceKey<LookChoice>(SETTINGS_ID, ScopeLevel.App)
@@ -30,4 +31,10 @@ object LookKeys {
 
     /** Which provider answers each axis and why, and what is on offer. */
     val State = SourceKey<LookState>(STATE_ID, ScopeLevel.App)
+
+    /**
+     * Every axis's answers now as one value, for code outside composition, see [LookSnapshot]. The same
+     * answers [Provide] provides. A service reads them through [LookView] instead, as services read no source.
+     */
+    val Answers = SourceKey<LookSnapshot>(ANSWERS_ID, ScopeLevel.App)
 }

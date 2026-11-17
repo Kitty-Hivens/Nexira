@@ -7,8 +7,10 @@ import hivens.look.manager.api.LookChoice
 import hivens.look.manager.api.LookContext
 import hivens.look.manager.api.LookProvider
 import hivens.look.manager.api.LookProvision
+import hivens.look.manager.api.LookSnapshot
 import hivens.look.manager.api.LookSource
 import hivens.look.manager.api.LookState
+import hivens.look.manager.api.LookView
 import hivens.widget.api.BootContext
 import hivens.widget.api.LevelServices
 import hivens.widget.api.ModuleContribution
@@ -32,7 +34,8 @@ import kotlin.coroutines.cancellation.CancellationException
 
 /**
  * Picks one provider per axis from the person's [choice], opens only those, and answers the look as
- * they answer it: [provision] for the composition and [state] for whoever shows or changes the choice.
+ * they answer it: [provision] for the composition, [view] for code outside it, and [state] for whoever
+ * shows or changes the choice.
  *
  * The axes, providers and packs are what [taken] holds, as it changes: an axis a module brings is
  * answered as soon as it arrives, and one whose module leaves is gone with it. Each axis is answered by
@@ -93,8 +96,16 @@ internal class LookManager(
     /** Each axis's answers now. */
     val answers: StateFlow<List<AxisAnswer>> = _answers.asStateFlow()
 
+    private val _snapshot = MutableStateFlow(snapshotOf(_answers.value))
+
     /** The value of `look.provide`, the same for the manager's whole life. */
     val provision: StateFlow<LookProvision> = MutableStateFlow(LiveProvision(this)).asStateFlow()
+
+    /** The look for code outside composition: the same answers [provision] provides, and [state], published by the same pass. */
+    val view: LookView = object : LookView {
+        override val answers: StateFlow<LookSnapshot> = _snapshot.asStateFlow()
+        override val state: StateFlow<LookState> = this@LookManager.state
+    }
 
     init {
         scope.launch(worker) {
@@ -129,8 +140,14 @@ internal class LookManager(
         }
     }
 
-    /** The answers as they stand, for a window drawn before the manager is up: no manager behind them. */
-    fun detachedProvision(): LookProvision = FixedProvision(_answers.value)
+    /**
+     * The look as it stands, for a window drawn before the manager is up, with no manager behind it: the
+     * state, the provision and the snapshot of one pass, read together.
+     */
+    fun detached(): Detached = synchronized(lock) { Detached(_state.value, FixedProvision(_answers.value), _snapshot.value) }
+
+    /** What [detached] reads, all of one pass. */
+    class Detached(val state: LookState, val provision: LookProvision, val snapshot: LookSnapshot)
 
     /**
      * A subtree's look under [choice], open until it is closed, or forgotten or abandoned by the
@@ -214,7 +231,9 @@ internal class LookManager(
                 (input.open + opening).forEach { (provider, opened) -> if (provider in used) next[provider] = opened else unused += opened }
                 open = next
                 installed = true
-                _answers.value = top.map { AxisAnswer(it.axis, it.value) }
+                val answered = top.map { AxisAnswer(it.axis, it.value) }
+                _answers.value = answered
+                _snapshot.value = snapshotOf(answered)
                 _state.value = LookState(
                     choice    = input.chosen,
                     axes      = top.map { LookAxisState(it.axis.id, it.axis.contract, it.opened?.entry?.family, it.source) },
@@ -233,6 +252,9 @@ internal class LookManager(
             if (!installed) opening.values.forEach(Opened::close)
         }
     }
+
+    /** [answers] as one value, by axis id. */
+    private fun snapshotOf(answers: List<AxisAnswer>): LookSnapshot = LookSnapshot(answers.associate { it.axis.id to it.value })
 
     /** An axis, the provider answering it, null for its base answers, its answers, and where in the choice that came from. */
     private class Resolution(val axis: AxisEntry, val opened: Opened?, val value: Any, val source: LookSource)

@@ -12,7 +12,9 @@ import hivens.look.manager.api.LookKeys
 import hivens.look.manager.api.LookPack
 import hivens.look.manager.api.LookProvider
 import hivens.look.manager.api.LookProvision
+import hivens.look.manager.api.LookSnapshot
 import hivens.look.manager.api.LookState
+import hivens.look.manager.api.LookView
 import hivens.widget.api.BootAnswers
 import hivens.widget.api.BootContext
 import hivens.widget.api.BootValues
@@ -53,7 +55,8 @@ import kotlinx.coroutines.launch
  *
  * It answers [LookKeys] at the app level, over its settings domain `look`, and the same keys before the
  * boot, worked out from the same file and the same modules, so the window the launcher boots in opens in
- * the look the shell then draws.
+ * the look the shell then draws. Beside them it declares [LookView], an app service every module reads,
+ * for services, which read no source.
  */
 object LookManagerModule : CompiledModule {
     override val id: String = LookApi.ID
@@ -84,8 +87,10 @@ object LookKeysContribution : KeyContribution {
     override fun declare(keys: ModuleKeys) {
         keys.settings(LookSettingsDomain, LookKeys.Settings, LookKeys.UpdateSettings)
         keys.service(ScopeLevel.App, ::moduleManager)
+        keys.service(ScopeLevel.App, LookView::class) { context -> context.services.get<LookManager>().view }
         keys.source(LookKeys.Provide, sample = { LookProvision.NONE }) { app -> flowSource(app.services.get<LookManager>().provision) }
-        keys.source(LookKeys.State, sample = { LookState.EMPTY }) { app -> flowSource(app.services.get<LookManager>().state) }
+        keys.source(LookKeys.State, sample = { LookState.EMPTY }) { app -> flowSource(app.services.get<LookView>().state) }
+        keys.source(LookKeys.Answers, sample = { LookSnapshot.EMPTY }) { app -> flowSource(app.services.get<LookView>().answers) }
     }
 }
 
@@ -162,10 +167,12 @@ private fun bootAnswer(context: BootContext): BootValues {
             bootOf             = context::ofModule,
         )
         try {
+            val look = manager.detached()
             return BootValues.of {
                 put(LookKeys.Settings, choice)
-                put(LookKeys.State, manager.state.value)
-                put(LookKeys.Provide, manager.detachedProvision())
+                put(LookKeys.State, look.state)
+                put(LookKeys.Provide, look.provision)
+                put(LookKeys.Answers, look.snapshot)
             }
         } finally {
             manager.close()

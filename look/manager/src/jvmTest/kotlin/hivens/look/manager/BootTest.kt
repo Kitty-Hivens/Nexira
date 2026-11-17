@@ -87,6 +87,20 @@ class BootTest {
     }
 
     @Test
+    fun `the boot snapshot is the live one, and what the boot window is provided`() {
+        val boot = LookManagerModule.boot.answer(Boot(choice, Host(compiled)))
+        val scope = eagerScope()
+        val live = LookManager(MutableStateFlow(choice), lookTaken(Host(compiled), scope), ::ModuleServices, scope, setOf("test.look"), Dispatchers.Unconfined, Dispatchers.Unconfined)
+        val atBoot = requireNotNull(boot[LookKeys.Answers]) { "the boot answers no snapshot" }
+        assertEquals(live.view.answers.value, atBoot)
+        val axes = compiled.map { it.item }.filterIsInstance<TestAxis>()
+        var provided = emptyMap<String, Shade>()
+        composeOnce { requireNotNull(boot[LookKeys.Provide]).Provide { provided = axes.associate { it.id to it.local.current } } }
+        assertEquals(axes.associate { it.id to atBoot.of(it) }, provided, "the boot window is provided what the boot snapshot holds")
+        live.close()
+    }
+
+    @Test
     fun `the providers the boot opened are closed again before the boot window draws`() {
         LookManagerModule.boot.answer(Boot(choice, Host(compiled)))
         assertEquals(1, shade.opened)

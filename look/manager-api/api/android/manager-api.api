@@ -90,11 +90,13 @@ public abstract interface class hivens/look/manager/api/LookContext {
 
 public final class hivens/look/manager/api/LookKeys {
 	public static final field $stable I
+	public static final field ANSWERS_ID Ljava/lang/String;
 	public static final field INSTANCE Lhivens/look/manager/api/LookKeys;
 	public static final field PROVIDE_ID Ljava/lang/String;
 	public static final field SETTINGS_ID Ljava/lang/String;
 	public static final field STATE_ID Ljava/lang/String;
 	public static final field UPDATE_SETTINGS_ID Ljava/lang/String;
+	public final fun getAnswers ()Lhivens/widget/model/SourceKey;
 	public final fun getProvide ()Lhivens/widget/model/SourceKey;
 	public final fun getSettings ()Lhivens/widget/model/SourceKey;
 	public final fun getState ()Lhivens/widget/model/SourceKey;
@@ -161,6 +163,20 @@ public final class hivens/look/manager/api/LookProvisionKt {
 	public static final fun getLocalLookProvision ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 }
 
+public final class hivens/look/manager/api/LookSnapshot {
+	public static final field $stable I
+	public static final field Companion Lhivens/look/manager/api/LookSnapshot$Companion;
+	public fun <init> (Ljava/util/Map;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public final fun of (Lhivens/look/manager/api/LookAxis;)Ljava/lang/Object;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/look/manager/api/LookSnapshot$Companion {
+	public final fun getEMPTY ()Lhivens/look/manager/api/LookSnapshot;
+}
+
 public final class hivens/look/manager/api/LookSource : java/lang/Enum {
 	public static final field Base Lhivens/look/manager/api/LookSource;
 	public static final field DefaultPack Lhivens/look/manager/api/LookSource;
@@ -188,5 +204,10 @@ public final class hivens/look/manager/api/LookState {
 
 public final class hivens/look/manager/api/LookState$Companion {
 	public final fun getEMPTY ()Lhivens/look/manager/api/LookState;
+}
+
+public abstract interface class hivens/look/manager/api/LookView {
+	public abstract fun getAnswers ()Lkotlinx/coroutines/flow/StateFlow;
+	public abstract fun getState ()Lkotlinx/coroutines/flow/StateFlow;
 }
 
