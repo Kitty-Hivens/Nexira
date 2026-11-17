@@ -55,7 +55,7 @@ fun bootValues(
     val taken = bootTakenContributions(named, compiled)
     return compiled.fold(BootValues.NONE) { gathered, module ->
         val answered = try {
-            answerOf(module, named, dataDir, words, taken)
+            answerOf(module, named, dataDir, words, taken, compiled)
         } catch (e: Throwable) {
             if (e is VirtualMachineError) throw e
             log.warn("The module '{}' could not answer before the boot, and its values are drawn with the fallbacks", runCatching { module.id }.getOrNull(), e)
@@ -99,13 +99,23 @@ private val LayoutJson: Json = Json {
     coerceInputValues = true
 }
 
-/** What [module] answers, held to what it declares, or nothing where the document leaves it out or it answers nothing. */
-private fun answerOf(module: CompiledModule, named: Set<String>, dataDir: Path, words: TakenWords, taken: TakenContributions): BootValues {
+/**
+ * What [module] answers, held to what it declares, or nothing where the document leaves it out or it
+ * answers nothing. [compiled] are the modules whose context it may ask for, see [BootContext.ofModule].
+ */
+private fun answerOf(
+    module: CompiledModule,
+    named: Set<String>,
+    dataDir: Path,
+    words: TakenWords,
+    taken: TakenContributions,
+    compiled: List<CompiledModule>,
+): BootValues {
     val id = module.id
     if (id !in named) return BootValues.NONE
     val answers = module.boot ?: return BootValues.NONE
     val owned = Owned.of(module.contributions)
-    val answered = answers.answer(HostBootContext(id, dataDir, owned.domains, words, taken))
+    val answered = answers.answer(HostBootContext(id, dataDir, owned.domains, words, taken, compiled))
     val foreign = answered.ids - owned.sources
     check(foreign.isEmpty()) { "the module '$id' answered ${foreign.joinToString()}, which it does not declare" }
     return answered
@@ -151,14 +161,16 @@ private class Recorder : ModuleKeys {
 /**
  * What the host hands the module [module] before it is up: the data directory, the settings domains it
  * declared, [domains], as the settings host opens them, read and not kept, the words the launcher and
- * every module compiled in ship, and what the modules compiled in carry of the kinds they take.
+ * every module compiled in ship, and what the modules compiled in carry of the kinds they take. Every
+ * module asked is compiled in and trusted, so each may have the context of any module in [compiled].
  */
 private class HostBootContext(
     private val module: String,
     override val dataDir: Path,
     private val domains: Set<String>,
-    words: TakenWords,
-    taken: TakenContributions,
+    private val words: TakenWords,
+    private val taken: TakenContributions,
+    private val compiled: List<CompiledModule>,
 ) : BootContext {
     private val files = SettingsDomainFiles(
         dir        = dataDir.resolve(Storage.SETTINGS_DIR),
@@ -171,6 +183,11 @@ private class HostBootContext(
     }
 
     override val services: LevelServices = FixedServices(mapOf(TakenWords::class to words, TakenContributions::class to taken))
+
+    // The other module's domains are read off its declaration, as the host reads every module's.
+    override fun ofModule(moduleId: String): BootContext? = compiled.firstOrNull { it.id == moduleId }?.let { other ->
+        HostBootContext(moduleId, dataDir, Owned.of(other.contributions).domains, words, taken, compiled)
+    }
 }
 
 /** Services that are what [byType] holds and nothing else. */

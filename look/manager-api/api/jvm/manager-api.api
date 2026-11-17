@@ -83,7 +83,9 @@ public final class hivens/look/manager/api/LookChoice$Companion {
 }
 
 public abstract interface class hivens/look/manager/api/LookContext {
+	public abstract fun getBoot ()Lhivens/widget/api/BootContext;
 	public abstract fun getCoroutineScope ()Lkotlinx/coroutines/CoroutineScope;
+	public abstract fun getServices ()Lhivens/widget/api/LevelServices;
 }
 
 public final class hivens/look/manager/api/LookKeys {

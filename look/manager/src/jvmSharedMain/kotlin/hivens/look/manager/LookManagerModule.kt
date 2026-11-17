@@ -87,14 +87,18 @@ object LookKeysContribution : KeyContribution {
     }
 }
 
-/** The manager for the app, over its settings domain and what the modules brought in carry of the look. */
+/**
+ * The manager for the app, over its settings domain and what the modules brought in carry of the look.
+ * A provider is opened with the services its own module sees, the way the catalogue opens a source.
+ */
 private fun moduleManager(context: ServiceContext): LookManager {
     val taken = context.hostServices.find<TakenContributions>()
     return LookManager(
-        choice   = context.services.get<SettingsStores>().of(LookSettingsDomain).value,
-        taken    = taken?.let { lookTaken(it, context.coroutineScope) } ?: MutableStateFlow(emptyList()),
-        scope    = context.coroutineScope,
-        compiled = taken?.compiledIn.orEmpty().mapTo(HashSet()) { it.moduleId },
+        choice     = context.services.get<SettingsStores>().of(LookSettingsDomain).value,
+        taken      = taken?.let { lookTaken(it, context.coroutineScope) } ?: MutableStateFlow(emptyList()),
+        servicesOf = context::servicesOf,
+        scope      = context.coroutineScope,
+        compiled   = taken?.compiledIn.orEmpty().mapTo(HashSet()) { it.moduleId },
     )
 }
 
@@ -115,7 +119,8 @@ internal fun lookTaken(taken: TakenContributions, scope: CoroutineScope): StateF
  * before the boot window draws. The boot asks off the drawing thread, so the pass runs on the thread
  * that asks and the providers' own work on a background one. A jar is not loaded yet, so a choice that
  * names a jar's pack or family opens the boot window on what comes next in the choice, quietly, as the
- * shell does while the jar is away.
+ * shell does while the jar is away. A provider is opened with the services the host hands every module
+ * then and its own module's boot context, so it reads its own files as it does once the host is up.
  */
 private fun bootAnswer(context: BootContext): BootValues {
     val choice = context.settings(LookSettingsDomain)
@@ -125,10 +130,12 @@ private fun bootAnswer(context: BootContext): BootValues {
         val manager = LookManager(
             choice             = MutableStateFlow(choice),
             taken              = host?.let { lookTaken(it, scope) } ?: MutableStateFlow(emptyList()),
+            servicesOf         = { context.services },
             scope              = scope,
             compiled           = host?.compiledIn.orEmpty().mapTo(HashSet()) { it.moduleId },
             worker             = Dispatchers.Unconfined,
             providerDispatcher = Dispatchers.Default,
+            bootOf             = context::ofModule,
         )
         try {
             return BootValues.of {

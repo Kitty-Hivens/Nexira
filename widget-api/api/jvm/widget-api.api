@@ -5,7 +5,12 @@ public abstract interface class hivens/widget/api/BootAnswers {
 public abstract interface class hivens/widget/api/BootContext {
 	public abstract fun getDataDir ()Ljava/nio/file/Path;
 	public abstract fun getServices ()Lhivens/widget/api/LevelServices;
+	public fun ofModule (Ljava/lang/String;)Lhivens/widget/api/BootContext;
 	public abstract fun settings (Lhivens/widget/api/SettingsDomain;)Ljava/lang/Object;
+}
+
+public final class hivens/widget/api/BootContext$DefaultImpls {
+	public static fun ofModule (Lhivens/widget/api/BootContext;Ljava/lang/String;)Lhivens/widget/api/BootContext;
 }
 
 public final class hivens/widget/api/BootValues {

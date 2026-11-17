@@ -47,6 +47,15 @@ interface BootContext {
      * the kinds they take, and nothing of a jar's.
      */
     val services: LevelServices
+
+    /**
+     * This context as the module [moduleId] is handed it: its settings domains and no other, for a module
+     * the host trusts that runs that module's code before the host is up, a contribution it takes say. The
+     * twin of [ServiceContext.servicesOf]. Null where the build carries no compiled module of that id, and
+     * in this default, for a host that keeps none.
+     */
+    @HostApi
+    fun ofModule(moduleId: String): BootContext? = null
 }
 
 /**

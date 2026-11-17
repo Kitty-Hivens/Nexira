@@ -9,6 +9,7 @@ import hivens.i18n.api.I18nApi
 import hivens.i18n.api.I18nKeys
 import hivens.i18n.api.Translator
 import hivens.look.manager.LookManagerModule
+import hivens.look.manager.LookSettingsDomain
 import hivens.look.manager.api.LookAnswers
 import hivens.look.manager.api.LookApi
 import hivens.look.manager.api.LookAxis
@@ -30,18 +31,30 @@ import hivens.ui.theme.NxTheme
 import hivens.ui.theme.Scheme
 import hivens.widget.api.BootValues
 import hivens.widget.api.CompiledModule
+import hivens.widget.api.KeyContribution
 import hivens.widget.api.LocalScope
 import hivens.widget.api.ModuleContribution
+import hivens.widget.api.ModuleKeys
 import hivens.widget.api.ModuleStrings
 import hivens.widget.api.SettingsChange
+import hivens.widget.api.SettingsDomain
+import hivens.widget.api.SettingsStores
 import hivens.widget.api.TakenWords
 import hivens.widget.api.current
+import hivens.widget.api.get
 import hivens.widget.model.ApiVersion
+import hivens.widget.model.CommandKey
+import hivens.widget.model.ScopeLevel
+import hivens.widget.model.SourceKey
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.serialization.Serializable
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.atomic.AtomicInteger
@@ -249,6 +262,94 @@ class LookValuesTest {
             assertSame(shell.app, scopeInside, "the host's app level is still what the look's subtree reads")
             assertEquals("warm", tintInside, "and the axis is answered under its own local")
         }
+    }
+
+    @Serializable
+    data class TintSettings(val name: String = "plain")
+
+    object TintDomain : SettingsDomain<TintSettings>("tint", TintSettings.serializer()) {
+        override fun defaults() = TintSettings()
+    }
+
+    private val tintUpdate = CommandKey<SettingsChange<TintSettings>>("test.tint.settings.update", ScopeLevel.App)
+
+    /**
+     * A provider that answers the tint its own module's settings hold, before the boot from its module's
+     * boot context and after it from its module's store as it changes, and notes under "boot" and "live"
+     * whether it could read the look manager's settings as well.
+     */
+    private class OwnTint(private val tried: MutableMap<String, Boolean>) : LookProvider<Tint> {
+        override val label = "own"
+        override val contract = ApiVersion(1, 0)
+        override val axis = TintAxis.id
+        override val family = "own"
+        override fun open(context: LookContext): LookAnswers<Tint> {
+            val boot = context.boot
+            if (boot != null) {
+                tried["boot"] = runCatching { boot.settings(LookSettingsDomain) }.isSuccess
+                return LookAnswers.of(Tint(boot.settings(TintDomain).name))
+            }
+            val stores = context.services.get<SettingsStores>()
+            tried["live"] = runCatching { stores.of(LookSettingsDomain) }.isSuccess
+            val store = stores.of(TintDomain)
+            return LookAnswers.following(store.value.map { Tint(it.name) }.stateIn(context.coroutineScope, SharingStarted.Eagerly, Tint(store.value.value.name)))
+        }
+    }
+
+    /** A compiled look module with settings of its own, which its provider answers from. */
+    private inner class OwnTintModule(tried: MutableMap<String, Boolean>) : CompiledModule {
+        override val id = "test.look.own"
+        override val name = id
+        override val contributions: List<ModuleContribution> = listOf(
+            TintAxis,
+            OwnTint(tried),
+            object : LookPack {
+                override val id = "own"
+                override val label = id
+                override val providers = mapOf(TintAxis.id to "own")
+            },
+            object : KeyContribution {
+                override val id = "test.look.own.keys"
+                override val label = "Own"
+                override fun declare(keys: ModuleKeys) = keys.settings(TintDomain, SourceKey("test.tint.settings", ScopeLevel.App), tintUpdate)
+            },
+        )
+    }
+
+    /** The tint a window drawn in [look] reads. */
+    private fun drawnTint(look: LookProvision): String {
+        var tint = ""
+        onEventThread {
+            val scene = ImageComposeScene(8, 8, Density(1f)) { look.Provide { tint = TintAxis.local.current.name } }
+            try {
+                scene.settle(1)
+            } finally {
+                scene.close()
+            }
+        }
+        return tint
+    }
+
+    @Test
+    fun `a provider reads its own module's settings and no other's, the same before the boot as after it`() {
+        val tried = HashMap<String, Boolean>()
+        val module = OwnTintModule(tried)
+        val compiled = listOf(LookManagerModule, module)
+        val named = setOf(LookApi.ID, module.id)
+        ModuleAppLevel(dir, compiled, scope, named = named).use { shell ->
+            shell.fire(LookKeys.UpdateSettings, SettingsChange { LookChoice.build { pack = "own" } })
+            shell.fire(tintUpdate, SettingsChange { TintSettings("dusk") })
+        }
+        val atBoot = drawnTint(ShellLookValues.Look.atBoot(bootValues(dir, compiled = compiled, named = named)))
+        ModuleAppLevel(dir, compiled, scope, named = named).use { shell ->
+            assertEquals("own", eventually("own") { shell.value(LookKeys.State).axis(TintAxis.id)?.family })
+            assertEquals("dusk", atBoot)
+            assertEquals(atBoot, drawnTint(shell.value(LookKeys.Provide)), "the shell draws what the boot window drew")
+
+            shell.fire(tintUpdate, SettingsChange { TintSettings("dawn") })
+            assertEquals("dawn", eventually("dawn") { drawnTint(shell.value(LookKeys.Provide)) }, "and follows the module's settings as they change")
+        }
+        assertEquals(mapOf("boot" to false, "live" to false), tried, "the manager's settings are not the provider's to read")
     }
 
     @Test

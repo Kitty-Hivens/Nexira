@@ -130,7 +130,7 @@ class LoadingTest {
             }
         }
         val nx = TestProvider("shade", "nx")
-        val manager = LookManager(choice, MutableStateFlow(taken(TestAxis("shade"), slow, nx)), scope, setOf("test.look"))
+        val manager = LookManager(choice, MutableStateFlow(taken(TestAxis("shade"), slow, nx)), ::ModuleServices, scope, setOf("test.look"))
         try {
             choice.value = choice(overrides = mapOf("shade" to "slow"))
             assertTrue(waitUntil { manager.state.value.choice == choice.value }, "the timed out choice is taken")
@@ -160,7 +160,7 @@ class LoadingTest {
         val manager = LookManager(
             MutableStateFlow(choice(pack = "p")),
             MutableStateFlow(taken(TestAxis("motion"), TestAxis("shade"), first, cancelling, TestPack("p", mapOf("motion" to "nx", "shade" to "cancelling")))),
-            scope, setOf("test.look"), worker = Dispatchers.Unconfined, providerDispatcher = Dispatchers.Unconfined,
+            ::ModuleServices, scope, setOf("test.look"), worker = Dispatchers.Unconfined, providerDispatcher = Dispatchers.Unconfined,
         )
         assertEquals(1, first.opened)
         assertFalse(first.isOpen, "a provider the abandoned pass opened has no owner left, and is closed")
@@ -250,7 +250,7 @@ class LoadingTest {
                 return LookAnswers.of(Shade("slow"))
             }
         }
-        val manager = LookManager(MutableStateFlow(choice()), MutableStateFlow(taken(TestAxis("shade"), slow)), scope, setOf("test.look"))
+        val manager = LookManager(MutableStateFlow(choice()), MutableStateFlow(taken(TestAxis("shade"), slow)), ::ModuleServices, scope, setOf("test.look"))
         try {
             val asked = System.nanoTime()
             val lease = manager.lease(choice(overrides = mapOf("shade" to "slow")))
@@ -293,7 +293,7 @@ class LoadingTest {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         val choice = MutableStateFlow(choice())
         val takenFlow = MutableStateFlow(base)
-        val manager = LookManager(choice, takenFlow, scope, setOf("test.look"))
+        val manager = LookManager(choice, takenFlow, ::ModuleServices, scope, setOf("test.look"))
         val pool = Executors.newFixedThreadPool(8)
         val start = CountDownLatch(1)
         repeat(8) { t ->

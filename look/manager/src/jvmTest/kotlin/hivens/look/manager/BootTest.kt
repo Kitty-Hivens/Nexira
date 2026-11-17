@@ -26,6 +26,7 @@ import kotlin.reflect.KClass
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 /** The look the boot window opens in is the look the shell draws once it is up, over the same choice and the same modules. */
@@ -36,8 +37,14 @@ class BootTest {
         override val compiledIn: List<TakenContribution<ModuleContribution>> = compiled
     }
 
-    private class Boot(private val choice: LookChoice, taken: TakenContributions) : BootContext {
+    private class Boot(
+        private val choice: LookChoice,
+        taken: TakenContributions,
+        private val modules: Map<String, BootContext> = emptyMap(),
+    ) : BootContext {
         override val dataDir: Path = Path.of("unused")
+
+        override fun ofModule(moduleId: String): BootContext? = modules[moduleId]
 
         @Suppress("UNCHECKED_CAST")
         // The manager asks for its own domain only, whose value is a choice.
@@ -69,7 +76,7 @@ class BootTest {
     fun `the boot answers the choice, the state and the answers the live manager answers`() {
         val boot = LookManagerModule.boot.answer(Boot(choice, Host(compiled)))
         val scope = eagerScope()
-        val live = LookManager(MutableStateFlow(choice), lookTaken(Host(compiled), scope), scope, setOf("test.look"), Dispatchers.Unconfined, Dispatchers.Unconfined)
+        val live = LookManager(MutableStateFlow(choice), lookTaken(Host(compiled), scope), ::ModuleServices, scope, setOf("test.look"), Dispatchers.Unconfined, Dispatchers.Unconfined)
 
         assertEquals(choice, boot[LookKeys.Settings])
         assertEquals(live.state.value, boot[LookKeys.State])
@@ -117,6 +124,28 @@ class BootTest {
         }
         LookManagerModule.boot.answer(Boot(choice, Host(taken(TestAxis("shade"), recording, TestPack("material", mapOf("shade" to "material"))))))
         assertEquals(Dispatchers.Default, dispatcher, "a provider's own work is not run inline on the boot thread")
+    }
+
+    /** A module's own boot context, which no test reads anything through. */
+    private class Own(val moduleId: String) : BootContext {
+        override val dataDir: Path = Path.of("unused")
+        override fun <T : Any> settings(domain: SettingsDomain<T>): T = error("not read here")
+        override val services: LevelServices = ModuleServices(moduleId)
+    }
+
+    @Test
+    fun `before the boot a provider is opened with its own module's boot context and the services every module is handed`() {
+        val material = TestProvider("shade", "material")
+        val standard = TestProvider("motion", "standard")
+        val taken = taken(TestAxis("shade"), TestAxis("motion"), TestPack("material", mapOf("shade" to "material", "motion" to "standard"))) +
+            taken(material, module = "test.material") +
+            taken(standard, module = "test.standard")
+        val own = mapOf("test.material" to Own("test.material"), "test.standard" to Own("test.standard"))
+        val boot = Boot(choice, Host(taken), own)
+        LookManagerModule.boot.answer(boot)
+        assertSame(own["test.material"], material.context?.boot)
+        assertSame(own["test.standard"], standard.context?.boot, "each provider gets its own module's, not the module that brought the pack")
+        assertSame(boot.services, material.context?.services)
     }
 
     @Test

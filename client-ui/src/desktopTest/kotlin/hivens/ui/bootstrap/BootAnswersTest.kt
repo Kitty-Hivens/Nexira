@@ -269,6 +269,45 @@ class BootAnswersTest {
         assertEquals("Reader", handed?.get("test.reader")?.tables?.get("en")?.get("reader"))
     }
 
+    /** A settings domain of a module that runs another module's code before the boot. */
+    object AskerDomain : SettingsDomain<VolumeSettings>("asker", VolumeSettings.serializer()) {
+        override fun defaults() = VolumeSettings(level = 1)
+    }
+
+    @Test
+    fun `a module has another compiled module's context, which reads that module's settings and no other`() {
+        writeVolume(8)
+        val askerLevel = SourceKey<Int>("test.asker.level", ScopeLevel.App)
+        val tried = HashMap<String, Any?>()
+        val asker = object : CompiledModule {
+            override val id = "test.asker"
+            override val name = "asker"
+            override val contributions: List<ModuleContribution> = listOf(
+                object : KeyContribution {
+                    override val id = "test.asker.keys"
+                    override val label = "Asker"
+                    override fun declare(keys: ModuleKeys) {
+                        keys.settings(AskerDomain, SourceKey("test.asker.settings", ScopeLevel.App), CommandKey("test.asker.settings.update", ScopeLevel.App))
+                        keys.source(askerLevel) { error("never read here") }
+                    }
+                },
+            )
+            override val boot = BootAnswers { context ->
+                val volume = requireNotNull(context.ofModule("test.volume"))
+                tried["asker's own through the volume's"] = runCatching { volume.settings(AskerDomain) }.isSuccess
+                tried["nobody"] = context.ofModule("test.nobody")
+                tried["services"] = volume.services.find<TakenWords>() != null
+                BootValues.of { put(askerLevel, volume.settings(VolumeDomain).level) }
+            }
+        }
+
+        val boot = bootValues(dir, listOf(asker, Volume()), named = setOf(asker.id))
+
+        assertEquals(8, boot[askerLevel], "the volume module's settings, read through its context, though the document does not name it")
+        assertNull(boot[level], "the volume module itself is not asked, as the document does not name it")
+        assertEquals<Map<String, Any?>>(mapOf("asker's own through the volume's" to false, "nobody" to null, "services" to true), tried)
+    }
+
     @Test
     fun `what is answered later holds nothing rather than failing, so the boot window still opens`() {
         val later = answeredLater { error("nothing could be read") }

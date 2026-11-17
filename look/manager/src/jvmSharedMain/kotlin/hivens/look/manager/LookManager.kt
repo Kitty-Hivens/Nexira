@@ -9,6 +9,8 @@ import hivens.look.manager.api.LookProvider
 import hivens.look.manager.api.LookProvision
 import hivens.look.manager.api.LookSource
 import hivens.look.manager.api.LookState
+import hivens.widget.api.BootContext
+import hivens.widget.api.LevelServices
 import hivens.widget.api.ModuleContribution
 import hivens.widget.api.TakenContribution
 import kotlinx.coroutines.CoroutineDispatcher
@@ -39,6 +41,10 @@ import kotlin.coroutines.cancellation.CancellationException
  * answer one axis, and a provider nothing needs is closed, so switching the choice closes the provider
  * it switched away from. Only modules in [compiled] may bring the default pack.
  *
+ * A provider is opened with what its own module may use: the services [servicesOf] answers for that
+ * module, and before the boot the boot context [bootOf] answers for it. One whose module's services
+ * cannot be had fails to open like any other.
+ *
  * Providers are opened, read and closed by one worker on [worker], one pass after another, and never
  * under the lock, so no provider runs on the thread that changed the choice or drew a subtree, and a
  * slow one holds up only the look. Until a pass is done the answers before it stand, base answers at
@@ -54,10 +60,12 @@ import kotlin.coroutines.cancellation.CancellationException
 internal class LookManager(
     choice: StateFlow<LookChoice>,
     taken: StateFlow<List<TakenContribution<ModuleContribution>>>,
+    private val servicesOf: (moduleId: String) -> LevelServices,
     private val scope: CoroutineScope,
     private val compiled: Set<String>,
     worker: CoroutineDispatcher = Dispatchers.Default.limitedParallelism(1),
     private val providerDispatcher: CoroutineDispatcher = Dispatchers.Default,
+    private val bootOf: (moduleId: String) -> BootContext? = { null },
 ) : AutoCloseable {
     private val lock = Any()
     private val alive: () -> Boolean = { scope.isActive }
@@ -250,10 +258,14 @@ internal class LookManager(
     // [resolve]'s to find, which reads the answers.
     private fun openOf(entry: ProviderEntry): Opened? {
         val job = SupervisorJob(scope.coroutineContext[Job])
-        val context = object : LookContext {
-            override val coroutineScope = CoroutineScope(scope.coroutineContext + providerDispatcher + job)
-        }
-        val answers = guarded(alive) { entry.provider.open(context) }.getOrElse {
+        val answers = guarded(alive) {
+            val context = object : LookContext {
+                override val coroutineScope = CoroutineScope(scope.coroutineContext + providerDispatcher + job)
+                override val services = servicesOf(entry.moduleId)
+                override val boot = bootOf(entry.moduleId)
+            }
+            entry.provider.open(context)
+        }.getOrElse {
             job.cancel()
             log.warn("Look provider '{}' of module '{}' could not open, and axis '{}' goes on without it", entry.family, entry.moduleId, entry.axis, it)
             return null

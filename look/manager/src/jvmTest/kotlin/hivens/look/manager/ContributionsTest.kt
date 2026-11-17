@@ -65,7 +65,7 @@ class ContributionsTest {
         }
         val scope = eagerScope()
         val choice = MutableStateFlow(choice())
-        val manager = LookManager(choice, lookTaken(host, scope), scope, setOf("nexira.look.shade", "nexira.look.material"), Dispatchers.Unconfined, Dispatchers.Unconfined)
+        val manager = LookManager(choice, lookTaken(host, scope), ::ModuleServices, scope, setOf("nexira.look.shade", "nexira.look.material"), Dispatchers.Unconfined, Dispatchers.Unconfined)
         fun answer() = manager.answers.value.single().value
 
         assertEquals(Shade("shade/standard"), answer())

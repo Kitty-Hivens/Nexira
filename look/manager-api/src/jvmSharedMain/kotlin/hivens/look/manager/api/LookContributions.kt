@@ -2,6 +2,8 @@ package hivens.look.manager.api
 
 import androidx.compose.runtime.ProvidableCompositionLocal
 import androidx.compose.runtime.compositionLocalOf
+import hivens.widget.api.BootContext
+import hivens.widget.api.LevelServices
 import hivens.widget.api.ModuleContribution
 import hivens.widget.model.ApiVersion
 import kotlinx.coroutines.CoroutineScope
@@ -90,6 +92,19 @@ interface LookProvider<A : Any> : ModuleContribution {
 interface LookContext {
     /** Cancelled when the manager closes the provider's answers, so the work the provider started stops with them. Runs off the drawing thread. */
     val coroutineScope: CoroutineScope
+
+    /**
+     * The app services as the provider's own module sees them, its own settings stores among them and
+     * no other module's. Before the host is up, what the host hands every module then, with no settings.
+     */
+    val services: LevelServices
+
+    /**
+     * Before the host is up, the boot context of the provider's own module: its files, and its settings
+     * read and not kept. Null once the host is up, when [services] holds the settings. A provider answers
+     * the same from either, so the window the launcher boots in opens in the look the shell then draws.
+     */
+    val boot: BootContext?
 }
 
 /** A provider's answers while it is open. */

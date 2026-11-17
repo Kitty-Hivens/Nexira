@@ -34,7 +34,9 @@ package hivens.widget.api
  *    own a newer build wrote in its own words, and the words every owner ships
  *    ([TakenWords]), both host services. Before the host is up it is handed what the modules
  *    compiled in carry of the kinds they take as well ([BootContext.services]), for the look
- *    manager to open the window the launcher boots in with the providers the choice names.
+ *    manager to open the window the launcher boots in with the providers the choice names,
+ *    and another compiled module's view of that context ([BootContext.ofModule]), the twin of
+ *    [ServiceContext.servicesOf], to run that module's code with that module's settings.
  *    A module compiled in ships its words as files the way a jar does and reads them with
  *    [ModuleStrings.resources], in the languages the launcher ships
  *    ([ModuleStrings.SHIPPED_LANGUAGES]), through the reader the loader uses for a jar's
