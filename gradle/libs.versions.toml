@@ -107,7 +107,7 @@ libtray           = "0.2.0"
 # from the in-app NotificationCenter. Maven Central as dev.hivens:libnotify.
 # 0.1.1: same DBusMessageIter buffer-overflow + arena-leak fixes as libtray.
 # 0.1.2: private D-Bus connection -- same shared-bus message-theft fix as libtray.
-libnotify         = "0.1.2"
+libnotify         = "0.2.0"
 
 # Pure-Panama secret storage (Kitty-Hivens/libvault) -- OS keyring (Secret
 # Service / Credential Manager / Keychain) with an AES-256-GCM file fallback.
