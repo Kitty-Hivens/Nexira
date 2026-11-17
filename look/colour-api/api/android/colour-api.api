@@ -55,7 +55,6 @@ public final class hivens/look/colour/api/ColourAnswers {
 	public final fun paintHashed-vNxB06k (Ljava/lang/String;)J
 	public final fun paintShadowOn-l2rxGTc (J)J
 	public final fun paintStatus-vNxB06k (Lhivens/look/manager/api/Status;)J
-	public final fun paintTerminal-vNxB06k (I)J
 }
 
 public final class hivens/look/colour/api/ColourAnswers$Builder {
@@ -107,7 +106,6 @@ public final class hivens/look/colour/api/ColourAnswers$Builder {
 	public final fun getPaintShadow-QN2ZGVo ()Landroidx/compose/ui/graphics/Color;
 	public final fun getPaintShadowOn ()Lkotlin/jvm/functions/Function1;
 	public final fun getPaintStatus ()Lkotlin/jvm/functions/Function1;
-	public final fun getPaintTerminal ()Lkotlin/jvm/functions/Function1;
 	public final fun setFillInverse (Lkotlin/jvm/functions/Function1;)V
 	public final fun setFillLead (Lkotlin/jvm/functions/Function1;)V
 	public final fun setFillMatch (Lkotlin/jvm/functions/Function1;)V
@@ -155,7 +153,6 @@ public final class hivens/look/colour/api/ColourAnswers$Builder {
 	public final fun setPaintShadow-Y2TPw74 (Landroidx/compose/ui/graphics/Color;)V
 	public final fun setPaintShadowOn (Lkotlin/jvm/functions/Function1;)V
 	public final fun setPaintStatus (Lkotlin/jvm/functions/Function1;)V
-	public final fun setPaintTerminal (Lkotlin/jvm/functions/Function1;)V
 }
 
 public final class hivens/look/colour/api/ColourAnswers$Companion {
@@ -265,7 +262,6 @@ public final class hivens/look/colour/api/Paint {
 	public final fun hashed-XeAY9LY (Ljava/lang/String;Landroidx/compose/runtime/Composer;I)J
 	public final fun shadow-swEIR5s (JLandroidx/compose/runtime/Composer;I)J
 	public final fun status-XeAY9LY (Lhivens/look/manager/api/Status;Landroidx/compose/runtime/Composer;I)J
-	public final fun terminal-XeAY9LY (ILandroidx/compose/runtime/Composer;I)J
 }
 
 public final class hivens/look/colour/api/RolesKt {

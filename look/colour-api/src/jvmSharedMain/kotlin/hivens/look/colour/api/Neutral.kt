@@ -28,22 +28,6 @@ internal object Neutral {
         Color(0xFFD0D0D0), Color(0xFF8C8C8C), Color(0xFFB0B0B0), Color(0xFF9E9E9E),
     )
 
-    /** The 16 terminal colours as greys of the lightness the xterm colours have, for a dark ground. */
-    val TERMINAL_DARK = listOf(
-        Color(0xFF000000), Color(0xFF656565), Color(0xFFB0B0B0), Color(0xFFC6C6C6),
-        Color(0xFF5E5E5E), Color(0xFF747474), Color(0xFFB8B8B8), Color(0xFFE5E5E5),
-        Color(0xFF7F7F7F), Color(0xFF919191), Color(0xFFDFDFDF), Color(0xFFF7F7F7),
-        Color(0xFF737373), Color(0xFFA0A0A0), Color(0xFFE8E8E8), Color(0xFFFFFFFF),
-    )
-
-    /** The same greys at half their lightness, so each still reads on a light ground. */
-    val TERMINAL_LIGHT = listOf(
-        Color(0xFF000000), Color(0xFF333333), Color(0xFF555555), Color(0xFF5E5E5E),
-        Color(0xFF303030), Color(0xFF3A3A3A), Color(0xFF585858), Color(0xFF6C6C6C),
-        Color(0xFF3F3F3F), Color(0xFF474747), Color(0xFF696969), Color(0xFF747474),
-        Color(0xFF3A3A3A), Color(0xFF4D4D4D), Color(0xFF6D6D6D), Color(0xFF777777),
-    )
-
     /** Step [n] of the ladder, past either end carried on by the ladder's mean step and held between black and white. */
     fun depth(n: Int): Color {
         if (n in STEPS.indices) return STEPS[n]

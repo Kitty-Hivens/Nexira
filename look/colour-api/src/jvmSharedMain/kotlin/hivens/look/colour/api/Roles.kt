@@ -129,11 +129,6 @@ object Paint {
     @ReadOnlyComposable
     fun data(dark: Color, light: Color): Color = answers().paintData(dark, light)
 
-    /** See [ColourAnswers.paintTerminal]. */
-    @Composable
-    @ReadOnlyComposable
-    fun terminal(slot: Int): Color = answers().paintTerminal(slot)
-
     /** See [ColourAnswers.paintShadowOn]. */
     @Composable
     @ReadOnlyComposable

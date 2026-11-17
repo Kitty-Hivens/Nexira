@@ -95,7 +95,6 @@ class ColourAnswers private constructor(filled: Builder) {
     private val paintCategoryRule = filled.paintCategory
     private val paintHashedRule = filled.paintHashed
     private val paintDataRule = filled.paintData
-    private val paintTerminalRule = filled.paintTerminal
     private val paintShadowOnRule = filled.paintShadowOn
     private val groundDepthRule = filled.groundDepth
     private val mediaStatusRule = filled.mediaStatus
@@ -140,14 +139,6 @@ class ColourAnswers private constructor(filled: Builder) {
 
     /** The same for a colour authored once per mode: the one [groundDark] picks, as [paintData] draws it. */
     fun paintData(dark: Color, light: Color): Color = paintData(if (groundDark) dark else light)
-
-    /**
-     * One of the 16 colours a terminal names, [slot] 0 to 7 the standard ones and 8 to 15 the bright
-     * ones, a slot outside them as the nearest. Base greys as light as the xterm colours, toned down on
-     * a light ground.
-     */
-    fun paintTerminal(slot: Int): Color = paintTerminalRule?.invoke(slot)
-        ?: (if (groundDark) Neutral.TERMINAL_DARK else Neutral.TERMINAL_LIGHT)[slot.coerceIn(0, 15)]
 
     /** The shadow a plane of [fill] casts. Base [paintShadow]. */
     fun paintShadowOn(fill: Color): Color = paintShadowOnRule?.invoke(fill) ?: paintShadow
@@ -272,9 +263,6 @@ class ColourAnswers private constructor(filled: Builder) {
 
         /** See [ColourAnswers.paintData]. */
         var paintData: ((colour: Color) -> Color)? = null
-
-        /** See [ColourAnswers.paintTerminal]. */
-        var paintTerminal: ((slot: Int) -> Color)? = null
 
         /** See [ColourAnswers.paintShadow]. */
         var paintShadow: Color? = null

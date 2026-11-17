@@ -234,7 +234,7 @@ class NxColourProviderTest {
     /**
      * Every role of [answers], each over a spread of what it is asked over: grounds dark, light, grey and
      * coloured, fills opaque and translucent, every status, members of sets of several sizes, names,
-     * data colours single and per mode, every terminal slot and past them, and the ladder past its ends.
+     * data colours single and per mode, and the ladder past its ends.
      */
     private fun sample(answers: ColourAnswers): Map<String, List<Any>> {
         val grounds = listOf(answers.groundPage, answers.groundDepth(3), Color(0xFF808080), Color.White, Color.Black, Color(0xFF1E5AA8))
@@ -261,7 +261,6 @@ class NxColourProviderTest {
             "paintCategory" to listOf(1, 3, 8, 13).flatMap { count -> (0 until count).map { answers.paintCategory(it, count) } },
             "paintHashed" to listOf("", "Ann", "Celestia", "a pack with a long name").map(answers::paintHashed),
             "paintData" to listOf(answers.paintData(Color(0xFF4CAF50)), answers.paintData(Color(0xFF123456), Color(0xFFABCDEF))),
-            "paintTerminal" to (-1..16).map(answers::paintTerminal),
             "paintShadow" to listOf(answers.paintShadow),
             "paintShadowOn" to fills.map(answers::paintShadowOn),
             "fillLead" to over(answers::fillLead),

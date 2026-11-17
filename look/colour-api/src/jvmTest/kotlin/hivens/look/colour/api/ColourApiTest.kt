@@ -173,7 +173,6 @@ class ColourApiTest {
             "paintCategory" to (0..9).map { answers.paintCategory(it, 10) },
             "paintHashed" to listOf("", "Ann", "a very long name of a pack").map(answers::paintHashed),
             "paintData" to listOf(answers.paintData(Color(0xFF777777)), answers.paintData(Color(0xFF555555), Color(0xFF999999))),
-            "paintTerminal" to (-1..16).map(answers::paintTerminal),
             "paintShadow" to listOf(answers.paintShadow),
             "paintShadowOn" to over(answers::paintShadowOn),
             "fillLead" to over(answers::fillLead),
